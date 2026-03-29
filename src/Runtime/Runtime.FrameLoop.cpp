@@ -32,6 +32,24 @@ namespace Runtime
 
     namespace
     {
+        [[nodiscard]] FrameTelemetrySnapshot BuildTelemetrySnapshot(
+            const FixedStepAdvanceResult& fixedStep,
+            const FrameGraphTimingTotals* timings)
+        {
+            FrameTelemetrySnapshot snapshot{
+                .FixedStepSubsteps = static_cast<uint32_t>(fixedStep.ExecutedSubsteps),
+                .AccumulatorClamped = fixedStep.AccumulatorClamped,
+                .SimulationCpuTimeNs = fixedStep.CpuTimeNs,
+            };
+            if (timings)
+            {
+                snapshot.FrameGraphCompileNs = timings->CompileNsTotal;
+                snapshot.FrameGraphExecuteNs = timings->ExecuteNsTotal;
+                snapshot.FrameGraphCriticalPathNs = timings->CriticalPathNsTotal;
+            }
+            return snapshot;
+        }
+
         [[nodiscard]] FramePhaseRunResult RunFramePhasesStaged(double frameTime,
                                                                double& accumulator,
                                                                const FrameLoopPolicy& policy,
@@ -61,7 +79,7 @@ namespace Runtime
                            std::move(callbacks.Render),
                            std::move(callbacks.ExecuteVariableGraph));
 
-            maintenanceLane.Run();
+            maintenanceLane.Run(BuildTelemetrySnapshot(result.FixedStep, callbacks.Timings));
             return result;
         }
 
@@ -93,7 +111,7 @@ namespace Runtime
                            std::move(callbacks.Render),
                            std::move(callbacks.ExecuteVariableGraph));
 
-            maintenanceLane.Run();
+            maintenanceLane.Run(BuildTelemetrySnapshot(fixedStep, callbacks.Timings));
             return FramePhaseRunResult{
                 .FixedStep = fixedStep,
                 .Mode = FrameLoopMode::LegacyCompatibility,
@@ -451,7 +469,18 @@ namespace Runtime
         m_Maintenance.ProcessMaterialDeletions();
     }
 
-    void MaintenanceLaneCoordinator::Run(this const MaintenanceLaneCoordinator& self)
+    void RuntimeMaintenanceLaneHost::CaptureFrameTelemetry(const FrameTelemetrySnapshot& snapshot)
+    {
+        m_Maintenance.CaptureFrameTelemetry(snapshot);
+    }
+
+    void RuntimeMaintenanceLaneHost::BookkeepHotReloads()
+    {
+        m_Maintenance.BookkeepHotReloads();
+    }
+
+    void MaintenanceLaneCoordinator::Run(this const MaintenanceLaneCoordinator& self,
+                                         const FrameTelemetrySnapshot& telemetry)
     {
         self.Host.CaptureGpuSyncState();
         self.Host.ProcessCompletedReadbacks();
@@ -459,6 +488,8 @@ namespace Runtime
         self.Host.GarbageCollectTransfers();
         self.Host.ProcessTextureDeletions();
         self.Host.ProcessMaterialDeletions();
+        self.Host.CaptureFrameTelemetry(telemetry);
+        self.Host.BookkeepHotReloads();
     }
 
     Core::FrameGraph& RuntimeRenderLaneHost::GetFrameGraph()
@@ -628,13 +659,6 @@ namespace Runtime
                                         std::move(callbacks));
         }
 
-        return RunFramePhasesStaged(frameTime,
-                                    accumulator,
-                                    policy,
-                                    streamingLane,
-                                    maintenanceLane,
-                                    renderLane,
-                                    fixedGraph,
-                                    std::move(callbacks));
+        std::unreachable();
     }
 }

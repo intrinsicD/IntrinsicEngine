@@ -224,8 +224,14 @@ Begin telemetry
   ├─ drain dispatcher events
   ├─ client OnRender
   ├─ maintenance lane
-  │    └─ transfer-manager garbage collection
-  ├─ write telemetry / benchmark frame
+  │    ├─ GPU sync state capture
+  │    ├─ completed readback processing
+  │    ├─ GPU deferred destruction GC
+  │    ├─ transfer-manager garbage collection
+  │    ├─ texture / material deletion processing
+  │    ├─ frame telemetry capture (simulation, task scheduler, frame-graph stats)
+  │    └─ hot-reload bookkeeping
+  ├─ benchmark frame recording (if benchmark mode)
 End telemetry
 ```
 

@@ -10,6 +10,7 @@
 import Core;
 import Runtime.FrameLoop;
 import Runtime.RenderExtraction;
+import Runtime.ResourceMaintenance;
 import Graphics.Camera;
 
 namespace
@@ -35,8 +36,15 @@ namespace
         void GarbageCollectTransfers() override { Calls.emplace_back("gc"); }
         void ProcessTextureDeletions() override { Calls.emplace_back("textures"); }
         void ProcessMaterialDeletions() override { Calls.emplace_back("materials"); }
+        void CaptureFrameTelemetry(const Runtime::FrameTelemetrySnapshot& snapshot) override
+        {
+            Calls.emplace_back("telemetry");
+            LastTelemetry = snapshot;
+        }
+        void BookkeepHotReloads() override { Calls.emplace_back("hot_reloads"); }
 
         std::vector<std::string> Calls;
+        Runtime::FrameTelemetrySnapshot LastTelemetry{};
     };
 
     class FakePlatformFrameHost final : public Runtime::IPlatformFrameHost
@@ -338,7 +346,15 @@ TEST(RuntimeFrameLoop, MaintenanceLaneCoordinator_RunsHeadlessCleanupWithoutRend
     FakeMaintenanceLaneHost host;
     const Runtime::MaintenanceLaneCoordinator coordinator{.Host = host};
 
-    coordinator.Run();
+    const Runtime::FrameTelemetrySnapshot telemetry{
+        .FixedStepSubsteps = 2,
+        .AccumulatorClamped = true,
+        .SimulationCpuTimeNs = 500'000,
+        .FrameGraphCompileNs = 100'000,
+        .FrameGraphExecuteNs = 200'000,
+        .FrameGraphCriticalPathNs = 150'000,
+    };
+    coordinator.Run(telemetry);
 
     EXPECT_EQ(host.Calls, (std::vector<std::string>{
                               "capture_sync",
@@ -347,7 +363,71 @@ TEST(RuntimeFrameLoop, MaintenanceLaneCoordinator_RunsHeadlessCleanupWithoutRend
                               "gc",
                               "textures",
                               "materials",
+                              "telemetry",
+                              "hot_reloads",
                           }));
+
+    EXPECT_EQ(host.LastTelemetry.FixedStepSubsteps, 2u);
+    EXPECT_TRUE(host.LastTelemetry.AccumulatorClamped);
+    EXPECT_EQ(host.LastTelemetry.SimulationCpuTimeNs, 500'000u);
+    EXPECT_EQ(host.LastTelemetry.FrameGraphCompileNs, 100'000u);
+    EXPECT_EQ(host.LastTelemetry.FrameGraphExecuteNs, 200'000u);
+    EXPECT_EQ(host.LastTelemetry.FrameGraphCriticalPathNs, 150'000u);
+}
+
+TEST(RuntimeFrameLoop, RunFramePhases_NullTimingsProducesZeroedFrameGraphStats)
+{
+    Runtime::FrameLoopPolicy policy{
+        .FixedDt = 0.1,
+        .MaxFrameDelta = 0.25,
+        .MaxSubstepsPerFrame = 8,
+    };
+
+    double accumulator = 0.15;
+
+    Core::Memory::ScopeStack scope(64 * 1024);
+    Core::FrameGraph graph(scope);
+
+    FakeStreamingLaneHost streamingHost;
+    FakeMaintenanceLaneHost maintenanceHost;
+    FakeRenderLaneHost renderHost(graph);
+
+    const Runtime::StreamingLaneCoordinator streamingLane{.Host = streamingHost};
+    const Runtime::MaintenanceLaneCoordinator maintenanceLane{.Host = maintenanceHost};
+    const Runtime::RenderLaneCoordinator renderLane{.Host = renderHost};
+
+    // FramePhaseCallbacks with Timings = nullptr (default).
+    (void)Runtime::RunFramePhases(
+        1.0 / 60.0,
+        accumulator,
+        policy,
+        streamingLane,
+        maintenanceLane,
+        renderLane,
+        graph,
+        {
+            .OnFixedUpdate = [](float) {},
+            .RegisterFixedSystems = [](Core::FrameGraph&, float) {},
+            .CommitFixedTick = []() {},
+            .ExecuteFixedGraph = [](Core::FrameGraph&) {},
+            .Render =
+                {
+                    .OnUpdate = [](float) {},
+                    .RegisterVariableSystems = [](Core::FrameGraph&, float) {},
+                    .OnRender = [](double) {},
+                },
+            .ExecuteVariableGraph = [](Core::FrameGraph&) {},
+            // Timings intentionally left as nullptr.
+        });
+
+    // Maintenance lane should still run; telemetry snapshot should have zeroed
+    // frame-graph fields because no Timings accumulator was provided.
+    EXPECT_EQ(maintenanceHost.LastTelemetry.FrameGraphCompileNs, 0u);
+    EXPECT_EQ(maintenanceHost.LastTelemetry.FrameGraphExecuteNs, 0u);
+    EXPECT_EQ(maintenanceHost.LastTelemetry.FrameGraphCriticalPathNs, 0u);
+
+    // But fixed-step stats should still be populated from the FixedStepAdvanceResult.
+    EXPECT_EQ(maintenanceHost.LastTelemetry.FixedStepSubsteps, 1u);
 }
 
 TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PumpsEventsAndContinuesWhenWindowIsActive)
@@ -712,6 +792,8 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
                                          "gc",
                                          "textures",
                                          "materials",
+                                         "telemetry",
+                                         "hot_reloads",
                                      }));
 
     const std::vector<std::string> expectedRenderHostCalls{
@@ -808,6 +890,8 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
                                          "gc",
                                          "textures",
                                          "materials",
+                                         "telemetry",
+                                         "hot_reloads",
                                      }));
 
     const std::vector<std::string> expectedRenderHostCalls{

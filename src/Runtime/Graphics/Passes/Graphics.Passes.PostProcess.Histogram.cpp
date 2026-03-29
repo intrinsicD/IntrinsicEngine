@@ -6,6 +6,7 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -21,10 +22,12 @@ import Core.Logging;
 import Core.Filesystem;
 
 import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.ComputePipeline;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Image;
+import RHI.Shader;
 
 import Geometry.Frustum;
 import Geometry.Overlap;
