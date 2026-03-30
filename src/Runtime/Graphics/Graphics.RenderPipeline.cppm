@@ -18,8 +18,11 @@ import Graphics.GPUScene;
 import Graphics.MaterialRegistry;
 import Graphics.Geometry;
 import Geometry.Handle;
+import Geometry.Frustum;
 import Geometry.HalfedgeMesh;
+import Geometry.Overlap;
 import Geometry.PointCloudUtils;
+import Geometry.Sphere;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.DebugDraw;
@@ -323,6 +326,11 @@ export namespace Graphics
         uint32_t EdgeCount = 0;
         uint32_t EntityKey = 0;
         std::vector<uint32_t> EdgeColors{};
+
+        // Local-space bounding sphere (center.xyz, radius w).
+        // Resolved from GeometryPool during render preparation so the
+        // draw packet is self-contained for CPU frustum culling.
+        glm::vec4 LocalBoundingSphere{0.0f, 0.0f, 0.0f, 0.0f};
     };
 
     struct PointDrawPacket
@@ -337,6 +345,11 @@ export namespace Graphics
         uint32_t EntityKey = 0;
         std::vector<uint32_t> Colors{};
         std::vector<float> Radii{};
+
+        // Local-space bounding sphere (center.xyz, radius w).
+        // Resolved from GeometryPool during render preparation so the
+        // draw packet is self-contained for CPU frustum culling.
+        glm::vec4 LocalBoundingSphere{0.0f, 0.0f, 0.0f, 0.0f};
     };
 
     struct HtexPatchPreviewPacket
@@ -391,6 +404,33 @@ export namespace Graphics
     {
         bool Available = false;
         uint32_t ActiveCountApprox = 0;
+    };
+
+    // -----------------------------------------------------------------------
+    // CulledDrawList — CPU frustum-culled draw packet indices (B1).
+    // -----------------------------------------------------------------------
+    // Produced by CullDrawPackets() during render preparation, consumed by
+    // Line/PointPass instead of per-pass inline frustum culling.  Surface
+    // packets are excluded because SurfacePass uses GPU-driven culling via
+    // GPUScene (compute shader).
+    //
+    // When Active is true, passes iterate only the visible indices rather
+    // than the full draw packet spans.  The CulledDrawList is valid for the
+    // lifetime of the BuildGraphInput / RenderWorld it was built from.
+    struct CulledDrawList
+    {
+        std::vector<uint32_t> VisibleLineIndices{};
+        std::vector<uint32_t> VisiblePointIndices{};
+
+        // Pre-cull statistics for telemetry/debugging.
+        uint32_t TotalLineCount = 0;
+        uint32_t TotalPointCount = 0;
+        uint32_t CulledLineCount = 0;
+        uint32_t CulledPointCount = 0;
+
+        // True once CullDrawPackets has run (even if culling was disabled —
+        // in that case all indices are present).
+        bool Active = false;
     };
 
     // ---------------------------------------------------------------------
@@ -453,6 +493,7 @@ export namespace Graphics
         std::span<const SurfaceDrawPacket> SurfaceDrawPackets{};
         std::span<const LineDrawPacket> LineDrawPackets{};
         std::span<const PointDrawPacket> PointDrawPackets{};
+        CulledDrawList CulledDraws{};
         const HtexPatchPreviewPacket* HtexPatchPreview = nullptr;
 
         // Debug draw snapshot — immutable copies extracted from DebugDraw accumulator.
@@ -667,6 +708,10 @@ export namespace Graphics
         std::span<const LineDrawPacket> LineDraws{};
         std::span<const PointDrawPacket> PointDraws{};
 
+        // CPU-culled draw list (B1).  When Active, Line/PointPass iterate
+        // only the visible indices rather than the full spans above.
+        CulledDrawList CulledDraws{};
+
         // Optional preview data
         const HtexPatchPreviewPacket* HtexPatchPreview = nullptr;
 
@@ -679,5 +724,26 @@ export namespace Graphics
         // Editor overlay state
         EditorOverlayPacket EditorOverlay{};
     };
+
+    // -----------------------------------------------------------------------
+    // Render Preparation Functions (B1)
+    // -----------------------------------------------------------------------
+
+    // Resolve bounding spheres from GeometryPool into draw packet fields.
+    // Must be called before CullDrawPackets so packets are self-contained.
+    void ResolveDrawPacketBounds(
+        std::span<LineDrawPacket> lines,
+        std::span<PointDrawPacket> points,
+        const GeometryPool& geometryStorage);
+
+    // CPU frustum cull Line/Point draw packets.
+    // Returns a CulledDrawList with indices of visible packets.
+    // Surface packets are excluded (SurfacePass uses GPU culling).
+    [[nodiscard]] CulledDrawList CullDrawPackets(
+        std::span<const LineDrawPacket> lines,
+        std::span<const PointDrawPacket> points,
+        const glm::mat4& cameraProj,
+        const glm::mat4& cameraView,
+        bool cullingEnabled);
 
 }

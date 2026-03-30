@@ -256,7 +256,7 @@ Lifecycle systems create GPU geometry and populate per-pass ECS components. All 
 
 ### CPU-Side Frustum Culling
 
-All three retained passes extract camera frustum planes from `CameraProj * CameraView`, transform each entity's local bounding sphere to world space (center via model matrix, radius scaled by max axis scale), and test with `Geometry::TestOverlap(Frustum, Sphere)`. Culled entities skip draws but retain buffers. Respects `Debug.DisableCulling` toggle. `FrustumCullSphere()` helper in `PassUtils.hpp` implements the world-space transform + plane test.
+Line and Point draw packets carry a self-contained `LocalBoundingSphere` (resolved from `GeometryPool` during `ResolveDrawPacketBounds()`). Centralized `CullDrawPackets()` in `Graphics.RenderPipeline` extracts camera frustum planes from `CameraProj * CameraView`, transforms each packet's local bounding sphere to world space (center via model matrix, radius scaled by max axis scale), and tests with `Geometry::TestOverlap(Frustum, Sphere)`. The resulting `CulledDrawList` (visible index lists + statistics) flows through `BuildGraphInput` → `RenderPassContext` to `LinePass` and `PointPass`. Culled entities skip draws but retain buffers. Respects `Debug.DisableCulling` toggle. SurfacePass uses GPU-driven culling via compute shader (`instance_cull.comp`) on `GPUScene` instances.
 
 ### Numerical Safeguards
 
