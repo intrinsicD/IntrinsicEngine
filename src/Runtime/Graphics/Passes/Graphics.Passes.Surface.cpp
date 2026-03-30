@@ -673,10 +673,11 @@ namespace Graphics::Passes
                                         if (stream->Batches.empty())
                                             return;
 
-                                        // When depth prepass has filled SceneDepth, use EQUAL
-                                        // to skip all fragments that fail the depth test. This
-                                        // eliminates 100% of overdraw in the fragment shader.
-                                        vkCmdSetDepthCompareOp(cmd, prepassActive ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS);
+                                        // Default depth compare: LESS (no prepass) or EQUAL
+                                        // (prepass filled depth for triangles). Per-batch
+                                        // override below handles non-triangle topologies.
+                                        const VkCompareOp triCompareOp = prepassActive ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS;
+                                        vkCmdSetDepthCompareOp(cmd, triCompareOp);
 
                                         // NOTE: We bind pipelines per-batch based on topology.
                                         // Vulkan restricts dynamic topology switches unless dynamicPrimitiveTopologyUnrestricted is enabled.
@@ -747,6 +748,16 @@ namespace Graphics::Passes
                                             {
                                                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, desired->GetHandle());
                                                 currentPipeline = desired;
+                                            }
+
+                                            // Lines/points were not in the depth prepass (triangle-only),
+                                            // so they must use LESS_OR_EQUAL rather than EQUAL to pass
+                                            // the depth test against the prepass-filled depth buffer.
+                                            if (prepassActive)
+                                            {
+                                                const VkCompareOp batchOp = (b.Topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                                                    ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS_OR_EQUAL;
+                                                vkCmdSetDepthCompareOp(cmd, batchOp);
                                             }
 
                                             const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
@@ -998,7 +1009,7 @@ namespace Graphics::Passes
                         .PtrCentroids = 0
                     };
                     vkCmdPushConstants(cmd, depthPipeline->GetLayout(),
-                                       VK_SHADER_STAGE_VERTEX_BIT,
+                                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                        0, sizeof(RHI::MeshPushConstants), &push);
 
                     const uint32_t maxDraws = b.MaxDraws;

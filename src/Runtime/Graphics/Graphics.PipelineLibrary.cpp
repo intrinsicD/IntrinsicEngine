@@ -365,10 +365,14 @@ namespace Graphics
             builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
             builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
 
+            // Use VERTEX|FRAGMENT stage flags to match the forward pipeline layout,
+            // ensuring pipeline layout compatibility for descriptor set bindings.
+            // Vulkan allows specifying stage flags for absent stages (no fragment
+            // shader here) — the data is simply ignored for missing stages.
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
             pushConstant.size = sizeof(RHI::MeshPushConstants);
-            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             builder.AddPushConstantRange(pushConstant);
 
             auto pipelineResult = builder.Build();
