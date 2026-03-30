@@ -44,6 +44,7 @@ import Graphics.Passes.SelectionOutline;
 import Graphics.Passes.SelectionOutlineSettings;
 import Graphics.Passes.PostProcessSettings;
 import Graphics.Pipelines;
+import Graphics.RenderPipeline;
 import Graphics.TextureLoader;
 import Graphics.TransformGizmo;
 import Geometry;
@@ -607,6 +608,52 @@ private:
     // =========================================================================
     void DrawViewSettingsPanel()
     {
+        // --- Lighting ---
+        {
+            auto& lighting = GetRenderOrchestrator().GetRenderDriver().GetLightEnvironment();
+
+            ImGui::SeparatorText("Lighting");
+
+            // Directional light direction — spherical angles for intuitive control.
+            // Convert current direction to spherical (azimuth, elevation).
+            glm::vec3 dir = glm::normalize(lighting.LightDirection);
+            float elevation = glm::degrees(std::asin(glm::clamp(dir.y, -1.0f, 1.0f)));
+            float azimuth = glm::degrees(std::atan2(dir.x, dir.z));
+
+            bool dirChanged = false;
+            dirChanged |= ImGui::SliderFloat("Azimuth##Light", &azimuth, -180.0f, 180.0f, "%.1f deg");
+            // Clamp to avoid gimbal lock at poles (cos(90deg) = 0 makes azimuth degenerate).
+            dirChanged |= ImGui::SliderFloat("Elevation##Light", &elevation, -89.0f, 89.0f, "%.1f deg");
+
+            if (dirChanged)
+            {
+                float elevRad = glm::radians(elevation);
+                float azimRad = glm::radians(azimuth);
+                lighting.LightDirection = glm::vec3(
+                    std::cos(elevRad) * std::sin(azimRad),
+                    std::sin(elevRad),
+                    std::cos(elevRad) * std::cos(azimRad));
+            }
+
+            ImGui::SliderFloat("Intensity##Light", &lighting.LightIntensity, 0.0f, 5.0f, "%.2f");
+
+            float lightCol[3] = { lighting.LightColor.r, lighting.LightColor.g, lighting.LightColor.b };
+            if (ImGui::ColorEdit3("Color##Light", lightCol))
+                lighting.LightColor = glm::vec3(lightCol[0], lightCol[1], lightCol[2]);
+
+            ImGui::SeparatorText("Ambient");
+
+            float ambCol[3] = { lighting.AmbientColor.r, lighting.AmbientColor.g, lighting.AmbientColor.b };
+            if (ImGui::ColorEdit3("Color##Ambient", ambCol))
+                lighting.AmbientColor = glm::vec3(ambCol[0], ambCol[1], ambCol[2]);
+
+            ImGui::SliderFloat("Intensity##Ambient", &lighting.AmbientIntensity, 0.0f, 1.0f, "%.2f");
+
+            ImGui::Spacing();
+            if (ImGui::Button("Reset Lighting"))
+                lighting = Graphics::LightEnvironmentPacket{};
+        }
+
         // --- Post-Processing ---
         auto* postSettings = GetRenderOrchestrator().GetRenderDriver().GetPostProcessSettings();
         if (postSettings)

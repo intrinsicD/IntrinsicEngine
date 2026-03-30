@@ -103,6 +103,12 @@ export namespace Graphics
         // Access histogram readback data (returns nullptr if not available)
         [[nodiscard]] const Passes::HistogramReadback* GetHistogramReadback() const;
 
+        // Mutable scene lighting state.  UI panels modify this directly;
+        // RenderOrchestrator::ExtractRenderWorld() copies the current value
+        // into RenderWorld::Lighting each frame.
+        [[nodiscard]] LightEnvironmentPacket& GetLightEnvironment() { return m_LightEnvironment; }
+        [[nodiscard]] const LightEnvironmentPacket& GetLightEnvironment() const { return m_LightEnvironment; }
+
         // Consume the last resolved GPU profiling result (moves ownership to the caller).
         // Returns std::nullopt if no resolved result is available yet.
         [[nodiscard]] std::optional<RHI::GpuTimestampFrame> ConsumeResolvedGpuProfile();
@@ -147,6 +153,9 @@ export namespace Graphics
         VkExtent2D m_LastBuiltGraphExtent{};
         uint32_t m_LastBuiltFrameIndex = 0;
         uint32_t m_LastBuiltImageIndex = 0;
+
+        // Scene lighting state, editable from View Settings panel.
+        LightEnvironmentPacket m_LightEnvironment{};
 
         // Pipeline (hot-swappable)
         std::unique_ptr<RenderPipeline> m_ActivePipeline;
