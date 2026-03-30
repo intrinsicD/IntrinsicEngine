@@ -306,7 +306,7 @@ namespace Runtime::EditorUI
         {
             if (ImGui::BeginMenu("Tools"))
             {
-                if (ImGui::MenuItem("Features"))
+                if (ImGui::MenuItem("Features", "F12"))
                 {
                     Interface::GUI::OpenPanel("Features");
                 }
@@ -511,19 +511,19 @@ namespace Runtime::EditorUI
             if (ImGui::BeginMenu("File"))
             {
                 // ---- Save Scene ----
-                if (ImGui::MenuItem("Save Scene"))
+                if (ImGui::MenuItem("Save Scene", "Ctrl+S"))
                 {
                     ImGui::OpenPopup("SaveScenePopup");
                 }
 
                 // ---- Save Scene As... ----
-                if (ImGui::MenuItem("Save Scene As..."))
+                if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S"))
                 {
                     ImGui::OpenPopup("SaveSceneAsPopup");
                 }
 
                 // ---- Load Scene ----
-                if (ImGui::MenuItem("Load Scene"))
+                if (ImGui::MenuItem("Load Scene", "Ctrl+O"))
                 {
                     ImGui::OpenPopup("LoadScenePopup");
                 }

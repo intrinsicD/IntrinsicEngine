@@ -63,6 +63,14 @@ namespace Interface::GUI
     static bool s_BackendInitialized = false;
     static bool s_FrameActive = false;
     static std::unordered_set<void*> s_RegisteredTextures;
+    static Theme s_ActiveTheme = Theme::Dark;
+    static bool s_DockLayoutBuilt = false;
+    static float s_DpiScale = 1.0f;
+
+    // Forward declarations for theme functions (defined below).
+    static void ApplyDarkTheme();
+    static void ApplyLightTheme();
+    static void ApplyHighContrastTheme();
 
     template <typename T>
     static T* FindNamedItem(std::vector<T>& items, std::string_view name)
@@ -569,7 +577,7 @@ namespace Interface::GUI
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-        ImGui::StyleColorsDark();
+        ApplyDarkTheme();
 
         // --- HIGH DPI SCALING START ---
 
@@ -579,6 +587,8 @@ namespace Interface::GUI
 
         // On some Linux configs (Wayland), GLFW might return 1.0 even on HiDPI.
         // You can optionally override this if x_scale == 1.0f but you know it's wrong.
+        s_DpiScale = x_scale;
+
         if (x_scale > 1.0f)
         {
             Core::Log::Info("High DPI Detected: Scale Factor {}", x_scale);
@@ -714,6 +724,33 @@ namespace Interface::GUI
 
     void DrawGUI()
     {
+        // 0. DOCKSPACE over the entire viewport
+        {
+            const ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(viewport->WorkPos);
+            ImGui::SetNextWindowSize(viewport->WorkSize);
+            ImGui::SetNextWindowViewport(viewport->ID);
+
+            ImGuiWindowFlags dockFlags =
+                ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+            ImGui::Begin("##IntrinsicDockSpaceWindow", nullptr, dockFlags);
+            ImGui::PopStyleVar(3);
+
+            ImGuiID dockspaceId = ImGui::GetID("IntrinsicDockSpace");
+            ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+
+            BuildDefaultDockLayout();
+
+            ImGui::End();
+        }
+
         // 1. MAIN MENU BAR
         if (ImGui::BeginMainMenuBar())
         {
@@ -723,16 +760,23 @@ namespace Interface::GUI
                 if (menu.Callback) menu.Callback();
             }
 
-            // B. Automatic "Panels" Menu (To re-open closed windows)
-            if (ImGui::BeginMenu("Panels"))
+            // B. View menu (Theme, panel toggles)
+            if (ImGui::BeginMenu("View"))
             {
+                if (ImGui::BeginMenu("Theme"))
+                {
+                    if (ImGui::MenuItem("Dark", nullptr, s_ActiveTheme == Theme::Dark))
+                        ApplyTheme(Theme::Dark);
+                    if (ImGui::MenuItem("Light", nullptr, s_ActiveTheme == Theme::Light))
+                        ApplyTheme(Theme::Light);
+                    if (ImGui::MenuItem("High Contrast", nullptr, s_ActiveTheme == Theme::HighContrast))
+                        ApplyTheme(Theme::HighContrast);
+                    ImGui::EndMenu();
+                }
+                ImGui::Separator();
                 for (auto& panel : s_Panels)
                 {
-                    // Checkbox to toggle visibility
-                    if (ImGui::MenuItem(panel.Name.c_str(), nullptr, &panel.IsOpen))
-                    {
-                        // Logic handled by bool reference
-                    }
+                    ImGui::MenuItem(panel.Name.c_str(), nullptr, &panel.IsOpen);
                 }
                 ImGui::Separator();
                 ImGui::MenuItem("Performance", nullptr, &s_ShowTelemetryPanel);
@@ -848,6 +892,18 @@ namespace Interface::GUI
         return ImGui::GetIO().WantCaptureKeyboard;
     }
 
+    void ItemTooltip(const char* text)
+    {
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+        {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 25.0f);
+            ImGui::TextUnformatted(text);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    }
+
     bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
     {
         bool changed = false;
@@ -893,6 +949,305 @@ namespace Interface::GUI
         ImGui::PopID();
 
         return changed;
+    }
+
+    // =========================================================================
+    // Theme system
+    // =========================================================================
+
+    static void ApplyDarkTheme()
+    {
+        ImGui::StyleColorsDark();
+        ImGuiStyle& style = ImGui::GetStyle();
+
+        // Refine the default dark theme for a modern, professional look.
+        style.WindowRounding = 4.0f;
+        style.FrameRounding = 3.0f;
+        style.GrabRounding = 3.0f;
+        style.TabRounding = 3.0f;
+        style.ScrollbarRounding = 6.0f;
+        style.WindowBorderSize = 1.0f;
+        style.FrameBorderSize = 0.0f;
+        style.PopupBorderSize = 1.0f;
+        style.WindowPadding = ImVec2(8.0f, 8.0f);
+        style.FramePadding = ImVec2(6.0f, 4.0f);
+        style.ItemSpacing = ImVec2(8.0f, 4.0f);
+        style.ItemInnerSpacing = ImVec2(4.0f, 4.0f);
+        style.IndentSpacing = 16.0f;
+        style.ScrollbarSize = 14.0f;
+        style.GrabMinSize = 12.0f;
+        style.SeparatorTextBorderSize = 2.0f;
+
+        auto* colors = style.Colors;
+
+        // Window backgrounds
+        colors[ImGuiCol_WindowBg]         = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+        colors[ImGuiCol_ChildBg]          = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+        colors[ImGuiCol_PopupBg]          = ImVec4(0.12f, 0.12f, 0.14f, 0.96f);
+
+        // Borders
+        colors[ImGuiCol_Border]           = ImVec4(0.22f, 0.22f, 0.26f, 1.00f);
+        colors[ImGuiCol_BorderShadow]     = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+
+        // Frames (input fields, checkboxes, sliders)
+        colors[ImGuiCol_FrameBg]          = ImVec4(0.16f, 0.16f, 0.19f, 1.00f);
+        colors[ImGuiCol_FrameBgHovered]   = ImVec4(0.22f, 0.22f, 0.26f, 1.00f);
+        colors[ImGuiCol_FrameBgActive]    = ImVec4(0.28f, 0.28f, 0.32f, 1.00f);
+
+        // Title bar
+        colors[ImGuiCol_TitleBg]          = ImVec4(0.08f, 0.08f, 0.10f, 1.00f);
+        colors[ImGuiCol_TitleBgActive]    = ImVec4(0.12f, 0.12f, 0.15f, 1.00f);
+        colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.08f, 0.08f, 0.10f, 0.75f);
+
+        // Menu bar
+        colors[ImGuiCol_MenuBarBg]        = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+
+        // Scrollbar
+        colors[ImGuiCol_ScrollbarBg]      = ImVec4(0.08f, 0.08f, 0.10f, 0.60f);
+        colors[ImGuiCol_ScrollbarGrab]    = ImVec4(0.28f, 0.28f, 0.32f, 1.00f);
+        colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.35f, 0.35f, 0.40f, 1.00f);
+        colors[ImGuiCol_ScrollbarGrabActive]  = ImVec4(0.45f, 0.45f, 0.50f, 1.00f);
+
+        // Accent color (blue)
+        const ImVec4 accent       = ImVec4(0.26f, 0.52f, 0.96f, 1.00f);
+        const ImVec4 accentHover  = ImVec4(0.36f, 0.60f, 1.00f, 1.00f);
+        const ImVec4 accentActive = ImVec4(0.20f, 0.44f, 0.86f, 1.00f);
+
+        // Buttons
+        colors[ImGuiCol_Button]           = ImVec4(0.20f, 0.20f, 0.24f, 1.00f);
+        colors[ImGuiCol_ButtonHovered]    = accent;
+        colors[ImGuiCol_ButtonActive]     = accentActive;
+
+        // Headers (collapsing headers, tree nodes, selectable)
+        colors[ImGuiCol_Header]           = ImVec4(0.18f, 0.18f, 0.22f, 1.00f);
+        colors[ImGuiCol_HeaderHovered]    = ImVec4(0.26f, 0.26f, 0.32f, 1.00f);
+        colors[ImGuiCol_HeaderActive]     = accent;
+
+        // Separator
+        colors[ImGuiCol_Separator]        = ImVec4(0.22f, 0.22f, 0.26f, 1.00f);
+        colors[ImGuiCol_SeparatorHovered] = accentHover;
+        colors[ImGuiCol_SeparatorActive]  = accent;
+
+        // Tabs
+        colors[ImGuiCol_Tab]                = ImVec4(0.12f, 0.12f, 0.15f, 1.00f);
+        colors[ImGuiCol_TabHovered]         = accent;
+        colors[ImGuiCol_TabSelected]        = ImVec4(0.18f, 0.36f, 0.68f, 1.00f);
+        colors[ImGuiCol_TabDimmed]          = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+        colors[ImGuiCol_TabDimmedSelected]  = ImVec4(0.14f, 0.28f, 0.52f, 1.00f);
+
+        // Docking
+        colors[ImGuiCol_DockingPreview]   = ImVec4(0.26f, 0.52f, 0.96f, 0.70f);
+        colors[ImGuiCol_DockingEmptyBg]   = ImVec4(0.08f, 0.08f, 0.08f, 1.00f);
+
+        // Checkmark, slider grab
+        colors[ImGuiCol_CheckMark]        = accent;
+        colors[ImGuiCol_SliderGrab]       = accent;
+        colors[ImGuiCol_SliderGrabActive] = accentHover;
+
+        // Resize grip
+        colors[ImGuiCol_ResizeGrip]          = ImVec4(0.26f, 0.52f, 0.96f, 0.20f);
+        colors[ImGuiCol_ResizeGripHovered]   = ImVec4(0.26f, 0.52f, 0.96f, 0.67f);
+        colors[ImGuiCol_ResizeGripActive]    = ImVec4(0.26f, 0.52f, 0.96f, 0.95f);
+
+        // Text
+        colors[ImGuiCol_Text]             = ImVec4(0.90f, 0.90f, 0.93f, 1.00f);
+        colors[ImGuiCol_TextDisabled]     = ImVec4(0.50f, 0.50f, 0.55f, 1.00f);
+        colors[ImGuiCol_TextSelectedBg]   = ImVec4(0.26f, 0.52f, 0.96f, 0.35f);
+    }
+
+    static void ApplyLightTheme()
+    {
+        ImGui::StyleColorsLight();
+        ImGuiStyle& style = ImGui::GetStyle();
+
+        style.WindowRounding = 4.0f;
+        style.FrameRounding = 3.0f;
+        style.GrabRounding = 3.0f;
+        style.TabRounding = 3.0f;
+        style.ScrollbarRounding = 6.0f;
+        style.WindowBorderSize = 1.0f;
+        style.FrameBorderSize = 1.0f;
+        style.PopupBorderSize = 1.0f;
+        style.WindowPadding = ImVec2(8.0f, 8.0f);
+        style.FramePadding = ImVec2(6.0f, 4.0f);
+        style.ItemSpacing = ImVec2(8.0f, 4.0f);
+        style.ItemInnerSpacing = ImVec2(4.0f, 4.0f);
+        style.SeparatorTextBorderSize = 2.0f;
+
+        auto* colors = style.Colors;
+
+        colors[ImGuiCol_WindowBg]         = ImVec4(0.95f, 0.95f, 0.96f, 1.00f);
+        colors[ImGuiCol_PopupBg]          = ImVec4(1.00f, 1.00f, 1.00f, 0.98f);
+        colors[ImGuiCol_Border]           = ImVec4(0.78f, 0.78f, 0.80f, 1.00f);
+
+        colors[ImGuiCol_FrameBg]          = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+        colors[ImGuiCol_FrameBgHovered]   = ImVec4(0.90f, 0.92f, 0.96f, 1.00f);
+        colors[ImGuiCol_FrameBgActive]    = ImVec4(0.82f, 0.86f, 0.94f, 1.00f);
+
+        colors[ImGuiCol_TitleBg]          = ImVec4(0.88f, 0.88f, 0.90f, 1.00f);
+        colors[ImGuiCol_TitleBgActive]    = ImVec4(0.82f, 0.84f, 0.88f, 1.00f);
+        colors[ImGuiCol_MenuBarBg]        = ImVec4(0.92f, 0.92f, 0.94f, 1.00f);
+
+        const ImVec4 accent       = ImVec4(0.16f, 0.44f, 0.86f, 1.00f);
+        const ImVec4 accentHover  = ImVec4(0.22f, 0.52f, 0.94f, 1.00f);
+
+        colors[ImGuiCol_Button]           = ImVec4(0.86f, 0.86f, 0.90f, 1.00f);
+        colors[ImGuiCol_ButtonHovered]    = accent;
+        colors[ImGuiCol_ButtonActive]     = ImVec4(0.12f, 0.38f, 0.78f, 1.00f);
+
+        colors[ImGuiCol_Header]           = ImVec4(0.88f, 0.90f, 0.94f, 1.00f);
+        colors[ImGuiCol_HeaderHovered]    = ImVec4(0.80f, 0.84f, 0.92f, 1.00f);
+        colors[ImGuiCol_HeaderActive]     = accent;
+
+        colors[ImGuiCol_Tab]              = ImVec4(0.88f, 0.88f, 0.90f, 1.00f);
+        colors[ImGuiCol_TabHovered]       = accent;
+        colors[ImGuiCol_TabSelected]      = ImVec4(0.72f, 0.80f, 0.94f, 1.00f);
+
+        colors[ImGuiCol_CheckMark]        = accent;
+        colors[ImGuiCol_SliderGrab]       = accent;
+        colors[ImGuiCol_SliderGrabActive] = accentHover;
+
+        colors[ImGuiCol_DockingPreview]   = ImVec4(0.16f, 0.44f, 0.86f, 0.70f);
+
+        colors[ImGuiCol_Text]             = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+        colors[ImGuiCol_TextDisabled]     = ImVec4(0.50f, 0.50f, 0.55f, 1.00f);
+        colors[ImGuiCol_TextSelectedBg]   = ImVec4(0.16f, 0.44f, 0.86f, 0.35f);
+    }
+
+    static void ApplyHighContrastTheme()
+    {
+        ImGui::StyleColorsDark();
+        ImGuiStyle& style = ImGui::GetStyle();
+
+        style.WindowRounding = 0.0f;
+        style.FrameRounding = 0.0f;
+        style.GrabRounding = 0.0f;
+        style.TabRounding = 0.0f;
+        style.ScrollbarRounding = 0.0f;
+        style.WindowBorderSize = 2.0f;
+        style.FrameBorderSize = 1.0f;
+        style.PopupBorderSize = 2.0f;
+        style.WindowPadding = ImVec2(8.0f, 8.0f);
+        style.FramePadding = ImVec2(6.0f, 4.0f);
+        style.ItemSpacing = ImVec2(8.0f, 4.0f);
+        style.SeparatorTextBorderSize = 2.0f;
+
+        auto* colors = style.Colors;
+
+        colors[ImGuiCol_WindowBg]         = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+        colors[ImGuiCol_PopupBg]          = ImVec4(0.05f, 0.05f, 0.05f, 1.00f);
+        colors[ImGuiCol_Border]           = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+
+        colors[ImGuiCol_FrameBg]          = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
+        colors[ImGuiCol_FrameBgHovered]   = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+        colors[ImGuiCol_FrameBgActive]    = ImVec4(0.30f, 0.30f, 0.30f, 1.00f);
+
+        colors[ImGuiCol_TitleBg]          = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+        colors[ImGuiCol_TitleBgActive]    = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
+        colors[ImGuiCol_MenuBarBg]        = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+
+        const ImVec4 accent       = ImVec4(0.00f, 0.60f, 1.00f, 1.00f);
+        const ImVec4 accentBright = ImVec4(0.20f, 0.80f, 1.00f, 1.00f);
+
+        colors[ImGuiCol_Button]           = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
+        colors[ImGuiCol_ButtonHovered]    = accent;
+        colors[ImGuiCol_ButtonActive]     = accentBright;
+
+        colors[ImGuiCol_Header]           = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
+        colors[ImGuiCol_HeaderHovered]    = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
+        colors[ImGuiCol_HeaderActive]     = accent;
+
+        colors[ImGuiCol_Tab]              = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+        colors[ImGuiCol_TabHovered]       = accent;
+        colors[ImGuiCol_TabSelected]      = ImVec4(0.00f, 0.40f, 0.70f, 1.00f);
+
+        colors[ImGuiCol_CheckMark]        = ImVec4(1.00f, 1.00f, 0.00f, 1.00f);
+        colors[ImGuiCol_SliderGrab]       = accent;
+        colors[ImGuiCol_SliderGrabActive] = accentBright;
+
+        colors[ImGuiCol_DockingPreview]   = ImVec4(0.00f, 0.60f, 1.00f, 0.70f);
+
+        colors[ImGuiCol_Separator]        = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
+
+        colors[ImGuiCol_Text]             = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+        colors[ImGuiCol_TextDisabled]     = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
+        colors[ImGuiCol_TextSelectedBg]   = ImVec4(0.00f, 0.60f, 1.00f, 0.50f);
+    }
+
+    void ApplyTheme(Theme theme)
+    {
+        s_ActiveTheme = theme;
+        switch (theme)
+        {
+        case Theme::Dark:         ApplyDarkTheme(); break;
+        case Theme::Light:        ApplyLightTheme(); break;
+        case Theme::HighContrast: ApplyHighContrastTheme(); break;
+        }
+
+        // Re-apply HiDPI scaling after theme reset (themes set unscaled values).
+        if (s_DpiScale > 1.0f)
+            ImGui::GetStyle().ScaleAllSizes(s_DpiScale);
+    }
+
+    Theme GetActiveTheme()
+    {
+        return s_ActiveTheme;
+    }
+
+    // =========================================================================
+    // Default dock layout
+    // =========================================================================
+
+    void BuildDefaultDockLayout()
+    {
+        if (s_DockLayoutBuilt)
+            return;
+
+        ImGuiID dockspaceId = ImGui::GetID("IntrinsicDockSpace");
+
+        // Only build the layout if no prior layout exists (first launch / no imgui.ini).
+        if (ImGui::DockBuilderGetNode(dockspaceId) != nullptr)
+        {
+            s_DockLayoutBuilt = true;
+            return;
+        }
+
+        s_DockLayoutBuilt = true;
+
+        ImGui::DockBuilderRemoveNode(dockspaceId);
+        ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
+
+        // Split: left panel (18%) | center+right remainder
+        ImGuiID dockLeft, dockRemaining;
+        ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.18f, &dockLeft, &dockRemaining);
+
+        // Split: center viewport | right panel (22%)
+        ImGuiID dockCenter, dockRight;
+        ImGui::DockBuilderSplitNode(dockRemaining, ImGuiDir_Right, 0.22f, &dockRight, &dockCenter);
+
+        // Split right panel: inspector top (65%) | view settings bottom (35%)
+        ImGuiID dockRightTop, dockRightBottom;
+        ImGui::DockBuilderSplitNode(dockRight, ImGuiDir_Down, 0.35f, &dockRightBottom, &dockRightTop);
+
+        // Split bottom of center: assets/stats area
+        ImGuiID dockCenterMain, dockBottom;
+        ImGui::DockBuilderSplitNode(dockCenter, ImGuiDir_Down, 0.25f, &dockBottom, &dockCenterMain);
+
+        // Dock panels into their designated locations.
+        ImGui::DockBuilderDockWindow("Hierarchy", dockLeft);
+        ImGui::DockBuilderDockWindow("Inspector", dockRightTop);
+        ImGui::DockBuilderDockWindow("View Settings", dockRightBottom);
+        ImGui::DockBuilderDockWindow("Stats", dockBottom);
+        ImGui::DockBuilderDockWindow("Assets", dockBottom);
+        ImGui::DockBuilderDockWindow("Performance", dockBottom);
+        ImGui::DockBuilderDockWindow("Features", dockBottom);
+        ImGui::DockBuilderDockWindow("Frame Graph", dockBottom);
+        ImGui::DockBuilderDockWindow("Selection", dockBottom);
+
+        ImGui::DockBuilderFinish(dockspaceId);
     }
 
     void* AddTexture(VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout)

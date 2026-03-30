@@ -128,15 +128,17 @@ Undo/redo integration now lives in `Core::CommandHistory`; editor panels should 
 
 ### UI Improvements
 
-Concrete execution items are now tracked in `TODO.md` → P1/F (UI Architecture & Feature Wiring). The near-term priorities are:
+The editor UI foundation is in place: programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View → Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
+
+Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Feature Wiring):
 
 - **Wire remaining geometry operators** (Shortest Path, LSCM, CSG, Convex Hull, Surface Reconstruction, Vector Heat, Normal Estimation, Mesh Quality) — `TODO.md` F1.
 - **Rendering controls** (light environment, camera properties, render mode toolbar) — `TODO.md` F2.
 - **Undo/redo integration** (CommandHistory wired to gizmo, inspector, operators) — `TODO.md` F3.
-- **Hierarchy tree nesting** with drag-and-drop reparenting — `TODO.md` F4.
+- **Hierarchy refinements** (drag-and-drop reparenting, multi-select, expand/collapse all) — `TODO.md` F4.
 - **Viewport context menus** — `TODO.md` F5.
-- **Editor polish** (dockable layout, log panel, themes, multi-object editing, tooltips) — `TODO.md` F6.
-- **Render Target Viewer** panel implementation — `TODO.md` F7.
+- **Editor polish** (log panel, keyboard shortcuts reference panel, multi-object editing, remaining tooltip coverage) — `TODO.md` F6.
+- **Render Target Viewer** panel enhancements — `TODO.md` F7.
 
 Each improvement is independent and can land incrementally.
 

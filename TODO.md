@@ -167,8 +167,6 @@ Mapping guidance for current Intrinsic code:
 
 Centralize CPU frustum culling into a render-preparation step that consumes immutable `RenderWorld` state and produces filtered draw lists consumed by passes. Structure draw packets so they are consumable by both CPU and GPU cull paths (forward reference: P2 C9).
 
-- [x] Centralize Line/Point CPU frustum culling into `CullDrawPackets()` in `Graphics.RenderPipeline`, producing `CulledDrawList` consumed by `LinePass` and `PointPass`. Self-contained `LocalBoundingSphere` on draw packets enables future GPU cull path.
-- [x] Add 8 integration tests (`DrawCulling.*`): culling disabled, behind camera, beyond far plane, zero radius, empty packets, transform-into-view, statistics, consistency with per-sphere test.
 - [ ] Extract `RenderDriver::PrepareFrame()` rendering preparation into a schedulable unit (job-graph node) rather than inline sequential call.
 - [ ] Emit draw packets and scheduling metadata rather than immediate live-state callbacks.
 
@@ -322,12 +320,10 @@ The lighting environment, camera properties, and render mode are controlled prog
 
 The hierarchy panel renders a flat entity list. The backend supports parent-child relationships via `Transform::Component` parent references.
 
-- [ ] Render the hierarchy as a tree using `ImGui::TreeNodeEx` with parent-child nesting derived from `Transform::Component::Parent`. Root entities (no parent) at top level.
 - [ ] Add drag-and-drop reparenting: dragging entity A onto entity B sets A's parent to B. Compute local transform via `TryComputeLocalTransform()`.
 - [ ] Add expand/collapse all buttons.
-- [ ] Display entity icons by component type (mesh, graph, point cloud, empty/group).
 - [ ] Add multi-entity selection support in hierarchy (Ctrl+click, Shift+click range). Cross-cutting: propagates into Inspector (multi-object editing, F6), gizmo (already supports multi-select), and context menus. Track as a separate sub-task if scope grows.
-- [ ] Right-click context menu: Delete, Duplicate, Rename, Create Child, Focus Camera, Toggle Visibility.
+- [ ] Add remaining context menu actions: Duplicate, Rename, Create Child, Toggle Visibility.
 
 #### F5. Viewport Context Menus
 
@@ -342,13 +338,11 @@ No right-click context menu exists in the 3D viewport.
 
 Incremental improvements that modernize the editor feel. Each is independent.
 
-- [ ] **Default Dock Layout:** ImGui docking is already enabled. Create a programmatic default dock layout on first launch (Hierarchy left, Viewport center, Inspector right, Assets/Log bottom). Save/restore via `imgui.ini`.
-- [ ] **Status Bar Enrichment:** Display: selection mode (Entity/Vertex/Edge/Face), selected entity count, selected sub-element count, GPU memory usage (when E2 lands), current lighting path, active tool name.
+- [ ] **Status Bar — GPU Memory:** Add GPU memory usage display to the status bar (depends on E2).
 - [ ] **Console/Log Panel:** Add a scrollable, filterable log panel capturing engine log output (currently stdout-only). Category filters (Info/Warning/Error), search, auto-scroll toggle, clear button. Prerequisite: add a ring-buffer log sink to the logging backend so the panel can read captured entries.
-- [ ] **Theme Presets:** Add View → Theme submenu with Dark (default), Light, and High Contrast presets. Store preference in `imgui.ini` or a separate editor prefs file.
-- [ ] **Keyboard Shortcut Display:** Show bound shortcut keys next to menu items and toolbar buttons (e.g. "Translate (W)"). Add a Help → Keyboard Shortcuts reference panel.
+- [ ] **Help → Keyboard Shortcuts Panel:** Add a reference panel listing all keyboard shortcuts (supplement to the shortcut hints already shown in menus and toolbar).
 - [ ] **Multi-Object Property Editing:** When multiple entities are selected, Inspector shows shared properties with mixed-value indicators. Edits apply to all selected entities. Use `CommandHistory` for batch undo.
-- [ ] **Tooltip Enrichment:** Add contextual tooltips to all Inspector fields, View Settings sliders, and toolbar buttons describing the parameter's effect and valid range.
+- [ ] **Tooltip Coverage — Inspector Fields:** Extend tooltip coverage to all Inspector fields and remaining View Settings sliders.
 
 #### F7. Render Target Viewer Panel Enhancements
 

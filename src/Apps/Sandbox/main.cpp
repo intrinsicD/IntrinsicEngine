@@ -12,6 +12,7 @@
 #include <functional>
 #include <memory>
 #include <filesystem>
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <imgui.h>
@@ -503,8 +504,8 @@ private:
             }
         }, true, 0, false);
 
-        // Status bar
-        Interface::GUI::RegisterPanel("Status Bar", [this]()
+        // Status bar — enriched overlay (not a dockable panel)
+        Interface::GUI::RegisterOverlay("Status Bar", [this]()
         {
             const ImGuiViewport* viewport = ImGui::GetMainViewport();
             const float statusBarHeight = ImGui::GetFrameHeight() + 10.0f;
@@ -538,15 +539,67 @@ private:
 
             if (ImGui::Begin("##IntrinsicStatusBar", nullptr, flags))
             {
-                ImGui::Text("Frame: %.2f ms (%.1f FPS)", frameMs, fps);
+                // Frame timing
+                ImGui::Text("%.2f ms (%.0f FPS)", frameMs, fps);
                 VerticalSeparator();
+
+                // Entity count
                 ImGui::Text("Entities: %d", static_cast<int>(GetSceneManager().GetScene().Size()));
                 VerticalSeparator();
-                ImGui::Text("Render Mode: DefaultPipeline");
+
+                // Selection mode
+                const auto& selConfig = GetSelection().GetConfig();
+                constexpr const char* modeNames[] = {"Entity", "Vertex", "Edge", "Face"};
+                const int modeIdx = std::clamp(static_cast<int>(selConfig.ElementMode), 0,
+                                               static_cast<int>(std::size(modeNames) - 1));
+                ImGui::Text("Mode: %s", modeNames[modeIdx]);
+                VerticalSeparator();
+
+                // Selected entity / sub-element counts
+                {
+                    const entt::entity sel = m_CachedSelectedEntity;
+                    const bool hasSel = (sel != entt::null) &&
+                                        GetSceneManager().GetScene().GetRegistry().valid(sel);
+
+                    if (hasSel)
+                    {
+                        const auto& subSel = GetSelection().GetSubElementSelection();
+                        const size_t vCount = subSel.SelectedVertices.size();
+                        const size_t eCount = subSel.SelectedEdges.size();
+                        const size_t fCount = subSel.SelectedFaces.size();
+                        const size_t totalSub = vCount + eCount + fCount;
+
+                        if (totalSub > 0)
+                            ImGui::Text("Sel: 1 entity, %zu sub", totalSub);
+                        else
+                            ImGui::Text("Sel: 1 entity");
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Sel: none");
+                    }
+                }
+                VerticalSeparator();
+
+                // Active gizmo tool
+                {
+                    constexpr const char* toolNames[] = {"Translate", "Rotate", "Scale"};
+                    const int toolIdx = std::clamp(static_cast<int>(m_Gizmo.GetConfig().Mode), 0,
+                                                   static_cast<int>(std::size(toolNames) - 1));
+                    ImGui::Text("Tool: %s", toolNames[toolIdx]);
+                }
+                VerticalSeparator();
+
+                // Lighting path
+                {
+                    using namespace Core::Hash;
+                    const bool deferred = GetFeatureRegistry().IsEnabled("DeferredLighting"_id);
+                    ImGui::Text("Lighting: %s", deferred ? "Deferred" : "Forward");
+                }
             }
             ImGui::End();
             ImGui::PopStyleVar();
-        }, false, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
+        });
 
         // Viewport toolbar (gizmo)
         Interface::GUI::RegisterPanel("Viewport Toolbar", [this]()
@@ -556,35 +609,48 @@ private:
             ImGui::SeparatorText("Gizmo Mode");
             int mode = static_cast<int>(cfg.Mode);
             if (ImGui::RadioButton("Translate (W)", mode == 0)) m_Gizmo.SetMode(Graphics::GizmoMode::Translate);
+            Interface::GUI::ItemTooltip("Move selected entities along axes. Shortcut: W");
             ImGui::SameLine();
             if (ImGui::RadioButton("Rotate (E)", mode == 1)) m_Gizmo.SetMode(Graphics::GizmoMode::Rotate);
+            Interface::GUI::ItemTooltip("Rotate selected entities around axes. Shortcut: E");
             ImGui::SameLine();
             if (ImGui::RadioButton("Scale (R)", mode == 2)) m_Gizmo.SetMode(Graphics::GizmoMode::Scale);
+            Interface::GUI::ItemTooltip("Scale selected entities along axes. Shortcut: R");
 
             ImGui::SeparatorText("Transform Space");
             int space = static_cast<int>(cfg.Space);
             if (ImGui::RadioButton("World", space == 0)) cfg.Space = Graphics::GizmoSpace::World;
+            Interface::GUI::ItemTooltip("Gizmo axes aligned to world coordinate system.");
             ImGui::SameLine();
             if (ImGui::RadioButton("Local (X)", space == 1)) cfg.Space = Graphics::GizmoSpace::Local;
+            Interface::GUI::ItemTooltip("Gizmo axes aligned to entity's local rotation. Toggle: X");
 
             ImGui::SeparatorText("Pivot");
             int pivot = static_cast<int>(cfg.Pivot);
             if (ImGui::RadioButton("Centroid", pivot == 0)) cfg.Pivot = Graphics::GizmoPivot::Centroid;
+            Interface::GUI::ItemTooltip("Gizmo placed at the average position of all selected entities.");
             ImGui::SameLine();
             if (ImGui::RadioButton("First Selected", pivot == 1)) cfg.Pivot = Graphics::GizmoPivot::FirstSelected;
+            Interface::GUI::ItemTooltip("Gizmo placed at the first entity that was selected.");
 
             ImGui::SeparatorText("Snapping");
             ImGui::Checkbox("Enable Snap", &cfg.SnapEnabled);
+            Interface::GUI::ItemTooltip("When enabled, transform values snap to discrete increments.");
             if (cfg.SnapEnabled)
             {
                 ImGui::DragFloat("Translate Snap", &cfg.TranslateSnap, 0.05f, 0.01f, 10.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Snap increment for translation in world units.");
                 ImGui::DragFloat("Rotate Snap (deg)", &cfg.RotateSnap, 1.0f, 1.0f, 90.0f, "%.1f");
+                Interface::GUI::ItemTooltip("Snap increment for rotation in degrees.");
                 ImGui::DragFloat("Scale Snap", &cfg.ScaleSnap, 0.01f, 0.01f, 1.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Snap increment for scale factor.");
             }
 
             ImGui::SeparatorText("Appearance");
             ImGui::SliderFloat("Handle Size", &cfg.HandleLength, 0.3f, 3.0f, "%.1f");
+            Interface::GUI::ItemTooltip("Visual length of the gizmo handles.");
             ImGui::SliderFloat("Handle Thickness", &cfg.HandleThickness, 1.0f, 8.0f, "%.1f px");
+            Interface::GUI::ItemTooltip("Pixel thickness of the gizmo handle lines.");
 
             ImGui::Separator();
             const char* stateNames[] = {"Idle", "Hovered", "Active"};
@@ -615,15 +681,15 @@ private:
             ImGui::SeparatorText("Lighting");
 
             // Directional light direction — spherical angles for intuitive control.
-            // Convert current direction to spherical (azimuth, elevation).
             glm::vec3 dir = glm::normalize(lighting.LightDirection);
             float elevation = glm::degrees(std::asin(glm::clamp(dir.y, -1.0f, 1.0f)));
             float azimuth = glm::degrees(std::atan2(dir.x, dir.z));
 
             bool dirChanged = false;
             dirChanged |= ImGui::SliderFloat("Azimuth##Light", &azimuth, -180.0f, 180.0f, "%.1f deg");
-            // Clamp to avoid gimbal lock at poles (cos(90deg) = 0 makes azimuth degenerate).
+            Interface::GUI::ItemTooltip("Horizontal rotation of the directional light source (-180 to 180 degrees).");
             dirChanged |= ImGui::SliderFloat("Elevation##Light", &elevation, -89.0f, 89.0f, "%.1f deg");
+            Interface::GUI::ItemTooltip("Vertical angle of the directional light. Higher values move the sun upward.");
 
             if (dirChanged)
             {
@@ -636,22 +702,27 @@ private:
             }
 
             ImGui::SliderFloat("Intensity##Light", &lighting.LightIntensity, 0.0f, 5.0f, "%.2f");
+            Interface::GUI::ItemTooltip("Brightness multiplier for the directional light (0 = off, 5 = very bright).");
 
             float lightCol[3] = { lighting.LightColor.r, lighting.LightColor.g, lighting.LightColor.b };
             if (ImGui::ColorEdit3("Color##Light", lightCol))
                 lighting.LightColor = glm::vec3(lightCol[0], lightCol[1], lightCol[2]);
+            Interface::GUI::ItemTooltip("RGB color of the directional light.");
 
             ImGui::SeparatorText("Ambient");
 
             float ambCol[3] = { lighting.AmbientColor.r, lighting.AmbientColor.g, lighting.AmbientColor.b };
             if (ImGui::ColorEdit3("Color##Ambient", ambCol))
                 lighting.AmbientColor = glm::vec3(ambCol[0], ambCol[1], ambCol[2]);
+            Interface::GUI::ItemTooltip("RGB color of the ambient (fill) light that illuminates all surfaces equally.");
 
             ImGui::SliderFloat("Intensity##Ambient", &lighting.AmbientIntensity, 0.0f, 1.0f, "%.2f");
+            Interface::GUI::ItemTooltip("Strength of the ambient light. 0 = no ambient, 1 = full ambient fill.");
 
             ImGui::Spacing();
             if (ImGui::Button("Reset Lighting"))
                 lighting = Graphics::LightEnvironmentPacket{};
+            Interface::GUI::ItemTooltip("Reset all lighting parameters to their default values.");
         }
 
         // --- Post-Processing ---
@@ -664,17 +735,23 @@ private:
             int toneOp = static_cast<int>(postSettings->ToneOperator);
             if (ImGui::Combo("Tone Mapping", &toneOp, toneMapOps, 3))
                 postSettings->ToneOperator = static_cast<Graphics::Passes::ToneMapOperator>(toneOp);
+            Interface::GUI::ItemTooltip("Tone mapping operator that maps HDR scene colors to displayable LDR range.\nACES: filmic, industry standard.\nReinhard: simple, soft rolloff.\nUncharted 2: Hable filmic curve.");
 
             ImGui::SliderFloat("Exposure", &postSettings->Exposure, 0.1f, 10.0f, "%.2f");
+            Interface::GUI::ItemTooltip("Global exposure multiplier applied before tone mapping. Higher = brighter scene.");
 
             // Bloom
             ImGui::Spacing();
             ImGui::Checkbox("Bloom", &postSettings->BloomEnabled);
+            Interface::GUI::ItemTooltip("Enable bloom glow effect on bright areas of the image.");
             if (postSettings->BloomEnabled)
             {
                 ImGui::SliderFloat("Bloom Threshold", &postSettings->BloomThreshold, 0.0f, 5.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Minimum HDR brightness for a pixel to contribute to bloom. Lower = more glow.");
                 ImGui::SliderFloat("Bloom Intensity", &postSettings->BloomIntensity, 0.0f, 1.0f, "%.3f");
+                Interface::GUI::ItemTooltip("Strength of the bloom effect blended into the final image.");
                 ImGui::SliderFloat("Bloom Radius", &postSettings->BloomFilterRadius, 0.5f, 3.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Filter radius of the bloom blur kernel. Larger = wider glow spread.");
             }
 
             // Anti-Aliasing
@@ -829,60 +906,135 @@ private:
     }
 
     // =========================================================================
-    // Hierarchy panel
+    // Hierarchy panel — tree-nested with entity type icons
     // =========================================================================
-    void DrawHierarchyPanel()
-    {
-        ImGui::Begin("Scene Hierarchy");
 
-        if (ImGui::CollapsingHeader("Selection", ImGuiTreeNodeFlags_DefaultOpen))
+    // Returns a short text icon prefix based on the entity's primary component type.
+    static const char* EntityTypeIcon(const entt::registry& reg, entt::entity e)
+    {
+        if (reg.all_of<ECS::Surface::Component>(e))       return "[M] ";  // Mesh
+        if (reg.all_of<ECS::Graph::Data>(e))               return "[G] ";  // Graph
+        if (reg.all_of<ECS::PointCloud::Data>(e))          return "[P] ";  // Point Cloud
+        if (reg.all_of<ECS::Components::Hierarchy::Component>(e))
         {
-            ImGui::TextUnformatted("Pick mouse button:");
-            ImGui::SameLine();
-            ImGui::RadioButton("LMB", &m_SelectMouseButton, 0);
-            ImGui::SameLine();
-            ImGui::RadioButton("RMB", &m_SelectMouseButton, 1);
-            ImGui::SameLine();
-            ImGui::RadioButton("MMB", &m_SelectMouseButton, 2);
+            const auto& h = reg.get<ECS::Components::Hierarchy::Component>(e);
+            if (h.FirstChild != entt::null)                return "[+] ";  // Group/parent
         }
+        return "[o] ";  // Empty/other
+    }
+
+    // Recursively draw one entity and its hierarchy children.
+    void DrawEntityNode(entt::entity entityID)
+    {
+        auto& reg = GetSceneManager().GetScene().GetRegistry();
+        if (!reg.valid(entityID))
+            return;
+        if (reg.all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
+            return;
 
         const entt::entity selected = m_CachedSelectedEntity;
 
-        GetSceneManager().GetScene().GetRegistry().view<entt::entity>().each([&](auto entityID)
+        // Entity display name
+        std::string name = "Entity";
+        if (const auto* nameTag = reg.try_get<ECS::Components::NameTag::Component>(entityID))
+            name = nameTag->Name;
+
+        const char* icon = EntityTypeIcon(reg, entityID);
+        std::string displayName = std::string(icon) + name;
+
+        // Determine if this entity has children
+        bool hasChildren = false;
+        if (const auto* hierarchy = reg.try_get<ECS::Components::Hierarchy::Component>(entityID))
+            hasChildren = (hierarchy->FirstChild != entt::null);
+
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+        if (selected == entityID)
+            flags |= ImGuiTreeNodeFlags_Selected;
+        if (!hasChildren)
+            flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+
+        bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(static_cast<entt::id_type>(entityID)),
+            flags, "%s", displayName.c_str());
+
+        if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         {
-            if (GetSceneManager().GetScene().GetRegistry().all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
-                return;
+            GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), entityID);
+        }
 
-            std::string name = "Entity";
-            if (GetSceneManager().GetScene().GetRegistry().all_of<ECS::Components::NameTag::Component>(entityID))
-            {
-                name = GetSceneManager().GetScene().GetRegistry().get<ECS::Components::NameTag::Component>(entityID).Name;
-            }
-
-            ImGuiTreeNodeFlags flags = ((selected == entityID) ? ImGuiTreeNodeFlags_Selected : 0) |
-                ImGuiTreeNodeFlags_OpenOnArrow;
-            flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
-
-            bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<entt::id_type>(entityID)), flags, "%s",
-                                            name.c_str());
-
-            if (ImGui::IsItemClicked())
+        // Context menu per entity
+        if (ImGui::BeginPopupContextItem())
+        {
+            if (ImGui::MenuItem("Focus Camera"))
             {
                 GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), entityID);
+                // F key handling in HandleCameraShortcuts will process on next frame
+            }
+            if (ImGui::MenuItem("Delete"))
+            {
+                // Detach from hierarchy before destroying to keep sibling list consistent.
+                if (reg.all_of<ECS::Components::Hierarchy::Component>(entityID))
+                    ECS::Components::Hierarchy::Detach(reg, entityID);
+                reg.destroy(entityID);
+                GetSelection().ClearSelection(GetSceneManager().GetScene());
+                ImGui::EndPopup();
+                if (opened && hasChildren)
+                    ImGui::TreePop();
+                return;
+            }
+            ImGui::EndPopup();
+        }
+
+        if (opened && hasChildren)
+        {
+            // Walk child linked list
+            if (const auto* hierarchy = reg.try_get<ECS::Components::Hierarchy::Component>(entityID))
+            {
+                entt::entity child = hierarchy->FirstChild;
+                uint32_t safety = 0;
+                while (child != entt::null && reg.valid(child) && safety < 1000)
+                {
+                    DrawEntityNode(child);
+                    if (const auto* childH = reg.try_get<ECS::Components::Hierarchy::Component>(child))
+                        child = childH->NextSibling;
+                    else
+                        break;
+                    ++safety;
+                }
+            }
+            ImGui::TreePop();
+        }
+    }
+
+    void DrawHierarchyPanel()
+    {
+        auto& reg = GetSceneManager().GetScene().GetRegistry();
+        const entt::entity selected = m_CachedSelectedEntity;
+
+        // Collect root entities (no parent, or no Hierarchy component).
+        reg.view<entt::entity>().each([&](auto entityID)
+        {
+            if (reg.all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
+                return;
+
+            // Skip entities that have a parent (they'll be drawn as children).
+            if (const auto* hierarchy = reg.try_get<ECS::Components::Hierarchy::Component>(entityID))
+            {
+                if (hierarchy->Parent != entt::null)
+                    return;
             }
 
-            if (opened)
-            {
-                ImGui::TreePop();
-            }
+            DrawEntityNode(entityID);
         });
 
+        // Click on empty space to deselect
         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
         {
             GetSelection().ClearSelection(GetSceneManager().GetScene());
         }
 
-        if (ImGui::BeginPopupContextWindow(nullptr, 1))
+        // Right-click context menu on empty space
+        if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_NoOpenOverExistingPopup | ImGuiPopupFlags_MouseButtonRight))
         {
             if (ImGui::MenuItem("Create Empty Entity"))
             {
@@ -892,19 +1044,17 @@ private:
             {
                 SpawnDemoPointCloud();
             }
-            if (ImGui::MenuItem("Remove Entity"))
+            ImGui::Separator();
+            if (ImGui::MenuItem("Remove Selected", nullptr, false,
+                                selected != entt::null && reg.valid(selected)))
             {
-                const entt::entity cur = m_CachedSelectedEntity;
-                if (cur != entt::null && GetSceneManager().GetScene().GetRegistry().valid(cur))
-                {
-                    GetSceneManager().GetScene().GetRegistry().destroy(cur);
-                    GetSelection().ClearSelection(GetSceneManager().GetScene());
-                }
+                if (reg.all_of<ECS::Components::Hierarchy::Component>(selected))
+                    ECS::Components::Hierarchy::Detach(reg, selected);
+                reg.destroy(selected);
+                GetSelection().ClearSelection(GetSceneManager().GetScene());
             }
             ImGui::EndPopup();
         }
-
-        ImGui::End();
     }
 
     // =========================================================================

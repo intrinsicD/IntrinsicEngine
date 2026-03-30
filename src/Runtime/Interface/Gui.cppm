@@ -70,6 +70,39 @@ export namespace Interface::GUI
 
     bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f);
 
+    // Displays a tooltip for the previously drawn ImGui item.
+    // No-ops if the item is not hovered. Wraps text at ~25 font-widths.
+    void ItemTooltip(const char* text);
+
+    // =========================================================================
+    // Theme system
+    // =========================================================================
+
+    enum class Theme : uint8_t
+    {
+        Dark = 0,
+        Light,
+        HighContrast,
+    };
+
+    // Applies the given theme preset. Safe to call at any time after Init().
+    void ApplyTheme(Theme theme);
+
+    // Returns the currently active theme preset.
+    [[nodiscard]] Theme GetActiveTheme();
+
+    // =========================================================================
+    // Default dock layout
+    // =========================================================================
+
+    // Builds the default dockspace layout on first launch (when no imgui.ini exists).
+    // Called once per frame from DrawGUI(); no-ops after the first successful build.
+    void BuildDefaultDockLayout();
+
+    // =========================================================================
+    // Texture registration
+    // =========================================================================
+
     // Registers a sampled image for use with ImGui::Image(). Returns an ImTextureID that remains valid
     // until explicitly removed via RemoveTexture().
     //
