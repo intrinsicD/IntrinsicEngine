@@ -8,7 +8,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## 0. Scope & Success Criteria
 
-**Current focus:** harden the frame pipeline, close the remaining rendering architecture gaps (depth prepass, shadow mapping, GPU-driven submission), and advance the GPU compute backend — without painting the engine into a corner for hybrid, transparency, or material-system work.
+**Current focus:** harden the frame pipeline, close the remaining rendering architecture gaps (depth prepass, shadow mapping, GPU-driven submission), advance the GPU compute backend, and wire all implemented backend features to the editor UI — without painting the engine into a corner for hybrid, transparency, or material-system work.
 
 **Success criteria:**
 
@@ -19,6 +19,9 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - Migration hardened by graph compile tests, contract tests, and at least one integration test.
 - Depth prepass available for both forward and deferred paths. ✓
 - At least one shadow-casting light type with validated resource contracts.
+- All implemented geometry operators reachable from the editor UI.
+- Undo/redo wired to transform, inspector, and geometry operator actions.
+- Lighting and camera properties editable from the View Settings panel.
 
 ---
 
@@ -264,6 +267,96 @@ The engine has no visibility into GPU memory consumption.
 - [ ] Add an ImGui panel section showing live GPU memory usage.
 - [ ] Warning threshold configurable via `FeatureRegistry`. Initial default 80% per heap. Warning fires once per heap per transition (not per frame).
 
+### F. UI Architecture & Feature Wiring
+
+Wire implemented backend features to the editor UI and improve editor UX. Independent of rendering architecture work (A/B sections). High ROI: most items are pure UI additions over existing, tested backends.
+
+**Dependency graph:**
+
+```
+F1 (Operator Wiring) — no deps, parallel with everything
+F2 (Rendering Controls) — no deps
+F3 (Undo Integration) ──→ F5 (Context Menus, use undo for delete/duplicate)
+F4 (Hierarchy Tree) — no deps
+F5 (Context Menus) — depends on F3 for reversible actions
+F6 (Editor Polish) — no deps, incremental
+F7 (Render Target Viewer) — depends on E2 for GPU memory display
+```
+
+#### F1. Wire Remaining Geometry Operators to UI
+
+Eight geometry operators have full backends (Params/Result/optional contract, mesh property publishing, test coverage) but no editor panel or trigger button. Wire each using the existing `GeometryWorkflowController` + `Widgets` pattern.
+
+- [ ] **Shortest Path (Dijkstra):** Add widget in Inspector Geometry Processing section. Source vertices from `SubElementSelection`. Target vertices optional (empty = full tree). Display result path length, vertex count. Publish `v:shortest_path_distance` and auto-switch color source. Add "Extract Path Graph" button to materialize `Graph::Graph` entity from predecessor tree.
+- [ ] **Parameterization (LSCM):** Add dedicated Geometry → Parameterization panel. Pin vertex selection from `SubElementSelection` (or auto-pin boundary). Display conformal energy, flipped triangle count. Publish `v:texcoord` and offer UV checker visualization toggle.
+- [ ] **Boolean CSG:** Add Geometry → Boolean panel. Entity A = selected, Entity B = secondary pick. Operation combo (Union/Intersection/Difference). Display vertex/face counts of result. Warn on partial overlap (baseline limitation).
+- [ ] **Convex Hull Builder:** Add "Compute Convex Hull" button in Inspector Geometry Processing section. Materialize result as new `Halfedge::Mesh` entity. Display hull vertex/face counts and volume.
+- [ ] **Surface Reconstruction:** Add Geometry → Reconstruct Surface panel. Expose `KNeighbors`, `GridResolution`, `Padding` params. Enable only for point cloud entities. Display reconstructed mesh vertex/face count. Materialize as new mesh entity.
+- [ ] **Vector Heat Method:** Add widget in Inspector Geometry Processing section (Vertex mode). Source vertices from `SubElementSelection`. Two buttons: "Transport Vectors" and "Compute Log Map". Display per-vertex `v:transported_vector`/`v:logmap_coords` properties. Auto-switch color source to angle/distance.
+- [ ] **Normal Estimation:** Add "Estimate Normals" button for point cloud entities in Inspector. Expose `KNeighbors` and orientation strategy. Re-upload normals on completion for immediate surfel rendering.
+- [ ] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel. Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Add per-metric histograms via ImGui `PlotHistogram`. No per-element publishing (that's Mesh Analysis); this is summary diagnostics.
+
+#### F2. Rendering Controls UI
+
+The lighting environment, camera properties, and render mode are controlled programmatically but lack editor panels.
+
+- [ ] **Light Environment Panel:** Add View Settings → Lighting section. Expose `LightEnvironmentPacket` fields: direction (3-axis sliders or gizmo), intensity, color, ambient color, ambient intensity. Changes propagate through `RenderWorld::Lighting` extraction. Store in scene serialization.
+- [ ] **Camera Property Editor:** Add View Settings → Camera section. Expose FOV (degrees slider), near/far clip planes, projection type (perspective/orthographic). Orthographic zoom factor when in ortho mode. Display current eye position and look direction read-only.
+- [ ] **Render Mode Toolbar:** Add viewport overlay dropdown for per-entity or global rendering mode switching: Shaded, Wireframe, Wireframe+Shaded, Points, Flat Shading. Implementation: toggle `Surface::Component`/`Line::Component`/`Point::Component` presence on selected entities, or set a global override in `VisualizationConfig`.
+- [ ] **Lighting Path Selector:** Move the `FrameLightingPath` toggle (Forward/Deferred) from FeatureRegistry into a prominent View Settings → Rendering combo box with a descriptive label. Keep the FeatureRegistry entry as the backing store.
+
+#### F3. Undo/Redo Integration
+
+`Core::CommandHistory` and `CmdComponentChange<T>` are implemented and tested but not wired to any editor action.
+
+- [ ] Wire `CommandHistory` into `Engine` or `SceneManager` as a singleton accessible to all editor controllers.
+- [ ] Add Edit → Undo / Redo menu items with Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) keyboard shortcuts.
+- [ ] Wrap `TransformGizmo` drag completion (mouse release) as a `TransformCommand` capturing before/after `Transform::Component` snapshots for all affected entities.
+- [ ] Wrap Inspector numeric field edits (point size, line width, color changes) as property commands via `MakeComponentChangeCommand<T>()`.
+- [ ] Wrap geometry operator applications (simplify, remesh, smooth, subdivide, repair) as commands capturing mesh state before/after.
+- [ ] Wrap entity creation/deletion from hierarchy context menu as commands.
+- [ ] Display undo/redo stack depth in status bar or Edit menu (e.g. "Undo: Scale (3 remaining)").
+
+#### F4. Hierarchy Panel Improvements
+
+The hierarchy panel renders a flat entity list. The backend supports parent-child relationships via `Transform::Component` parent references.
+
+- [ ] Render the hierarchy as a tree using `ImGui::TreeNodeEx` with parent-child nesting derived from `Transform::Component::Parent`. Root entities (no parent) at top level.
+- [ ] Add drag-and-drop reparenting: dragging entity A onto entity B sets A's parent to B. Compute local transform via `TryComputeLocalTransform()`.
+- [ ] Add expand/collapse all buttons.
+- [ ] Display entity icons by component type (mesh, graph, point cloud, empty/group).
+- [ ] Add multi-selection support in hierarchy (Ctrl+click, Shift+click range).
+- [ ] Right-click context menu: Delete, Duplicate, Rename, Create Child, Focus Camera, Toggle Visibility.
+
+#### F5. Viewport Context Menus
+
+No right-click context menu exists in the 3D viewport.
+
+- [ ] Right-click on entity: Focus Camera, Delete, Duplicate, Select Children, Toggle Visibility, Isolate (hide all others).
+- [ ] Right-click on empty space: Create Primitive (Cube/Sphere/Plane/Cylinder), Paste, Reset Camera.
+- [ ] Right-click on sub-element (vertex/edge/face mode): Select Connected, Select Ring/Loop (edges), Grow Selection, Shrink Selection.
+- [ ] All destructive actions routed through `CommandHistory` (F3 dependency).
+
+#### F6. Editor Polish
+
+Incremental improvements that modernize the editor feel. Each is independent.
+
+- [ ] **Default Dock Layout:** ImGui docking is already enabled. Create a programmatic default dock layout on first launch (Hierarchy left, Viewport center, Inspector right, Assets/Log bottom). Save/restore via `imgui.ini`.
+- [ ] **Status Bar Enrichment:** Display: selection mode (Entity/Vertex/Edge/Face), selected entity count, selected sub-element count, GPU memory usage (when E2 lands), current lighting path, active tool name.
+- [ ] **Console/Log Panel:** Add a scrollable, filterable log panel capturing engine log output (currently stdout-only). Category filters (Info/Warning/Error), search, auto-scroll toggle, clear button.
+- [ ] **Theme Presets:** Add View → Theme submenu with Dark (default), Light, and High Contrast presets. Store preference in `imgui.ini` or a separate editor prefs file.
+- [ ] **Keyboard Shortcut Display:** Show bound shortcut keys next to menu items and toolbar buttons (e.g. "Translate (W)"). Add a Help → Keyboard Shortcuts reference panel.
+- [ ] **Multi-Object Property Editing:** When multiple entities are selected, Inspector shows shared properties with mixed-value indicators. Edits apply to all selected entities. Use `CommandHistory` for batch undo.
+- [ ] **Tooltip Enrichment:** Add contextual tooltips to all Inspector fields, View Settings sliders, and toolbar buttons describing the parameter's effect and valid range.
+
+#### F7. Render Target Viewer Panel Enhancements
+
+The Render Target Viewer panel is already implemented with frame state, recipe flags, pipeline feature state, selection outline / post-process internals, debug view toggles, and resource lists. These are incremental improvements:
+
+- [ ] Add a visual resource lifetime timeline bar per resource (first producer pass → last consumer pass) alongside the existing resource table.
+- [ ] Add zoomable texture preview on resource click (currently only viewport debug source selection is supported).
+- [ ] When E2 (GPU Memory Budget) lands, show per-resource estimated memory footprint in the resource table.
+
 ---
 
 ## 3. Later (P2) — Planned Downstream Work
@@ -334,7 +427,7 @@ P2 items are design-only: plan the interfaces and constraints, do not implement.
 ### C8. Render Asset / Shader System Cleanup
 
 - [ ] Plan shader registration refactor.
-- [ ] Plan shader hot-reload boundaries by pass/stage (builds on P1/A3 foundation).
+- [ ] Plan shader hot-reload boundaries by pass/stage (builds on P1/E1 foundation).
 - [ ] Plan permutation management.
 - [ ] Plan shader feature-key derivation from material/frame recipe.
 - [ ] Plan pipeline-cache invalidation strategy.
