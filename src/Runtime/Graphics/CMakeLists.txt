@@ -99,6 +99,7 @@ target_sources(${target_name}
         Graphics.Geometry.cpp
         Graphics.Material.cpp
         Graphics.MaterialRegistry.cpp
+        Graphics.RenderPipeline.cpp
         Graphics.RenderDriver.cpp
         Graphics.RenderGraph.cpp
         Graphics.ModelLoader.cpp

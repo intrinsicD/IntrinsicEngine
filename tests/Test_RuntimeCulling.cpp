@@ -353,3 +353,227 @@ TEST(Culling, FrustumCullSphere_BeyondFarPlane)
 
     EXPECT_FALSE(FrustumCullSphere_CPU(identity, localBounds, frustum));
 }
+
+// =============================================================================
+// Draw-packet-level centralized CPU culling (B1).
+// =============================================================================
+// Tests validate CullDrawPackets produces correct visible index lists for known
+// packet configurations, matching what the per-pass inline culling would have
+// produced.
+
+import Graphics.RenderPipeline;
+
+namespace
+{
+    Graphics::LineDrawPacket MakeLinePacket(const glm::mat4& world, const glm::vec4& bounds, uint32_t edgeCount = 10)
+    {
+        Graphics::LineDrawPacket p{};
+        p.WorldMatrix = world;
+        p.LocalBoundingSphere = bounds;
+        p.EdgeCount = edgeCount;
+        return p;
+    }
+
+    Graphics::PointDrawPacket MakePointPacket(const glm::mat4& world, const glm::vec4& bounds)
+    {
+        Graphics::PointDrawPacket p{};
+        p.WorldMatrix = world;
+        p.LocalBoundingSphere = bounds;
+        return p;
+    }
+
+    glm::mat4 TranslateZ(float z)
+    {
+        return glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z));
+    }
+}
+
+TEST(DrawCulling, AllVisible_WhenCullingDisabled)
+{
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 100.0f);
+
+    // One line behind the camera — would normally be culled.
+    std::vector<Graphics::LineDrawPacket> lines = {
+        MakeLinePacket(TranslateZ(50.0f), {0, 0, 0, 1.0f}),  // behind camera (positive Z = behind in RH)
+    };
+    std::vector<Graphics::PointDrawPacket> points = {
+        MakePointPacket(TranslateZ(50.0f), {0, 0, 0, 1.0f}),
+    };
+
+    auto result = Graphics::CullDrawPackets(lines, points, proj, view, /*cullingEnabled=*/false);
+
+    EXPECT_TRUE(result.Active);
+    EXPECT_EQ(result.VisibleLineIndices.size(), 1u);
+    EXPECT_EQ(result.VisiblePointIndices.size(), 1u);
+    EXPECT_EQ(result.CulledLineCount, 0u);
+    EXPECT_EQ(result.CulledPointCount, 0u);
+}
+
+TEST(DrawCulling, BehindCamera_Culled)
+{
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 100.0f);
+
+    // In RH with identity view: -Z is forward, +Z is behind.
+    std::vector<Graphics::LineDrawPacket> lines = {
+        MakeLinePacket(glm::mat4(1.0f), {0, 0, -5.0f, 1.0f}),   // In front (visible)
+        MakeLinePacket(glm::mat4(1.0f), {0, 0, 50.0f, 1.0f}),   // Behind camera (culled)
+    };
+    std::vector<Graphics::PointDrawPacket> points = {
+        MakePointPacket(glm::mat4(1.0f), {0, 0, -5.0f, 1.0f}),  // Visible
+        MakePointPacket(glm::mat4(1.0f), {0, 0, 50.0f, 1.0f}),  // Culled
+        MakePointPacket(glm::mat4(1.0f), {0, 0, -20.0f, 1.0f}), // Visible
+    };
+
+    auto result = Graphics::CullDrawPackets(lines, points, proj, view, /*cullingEnabled=*/true);
+
+    EXPECT_TRUE(result.Active);
+    EXPECT_EQ(result.TotalLineCount, 2u);
+    EXPECT_EQ(result.TotalPointCount, 3u);
+
+    // Line 0 visible, line 1 culled.
+    ASSERT_EQ(result.VisibleLineIndices.size(), 1u);
+    EXPECT_EQ(result.VisibleLineIndices[0], 0u);
+    EXPECT_EQ(result.CulledLineCount, 1u);
+
+    // Points 0, 2 visible; point 1 culled.
+    ASSERT_EQ(result.VisiblePointIndices.size(), 2u);
+    EXPECT_EQ(result.VisiblePointIndices[0], 0u);
+    EXPECT_EQ(result.VisiblePointIndices[1], 2u);
+    EXPECT_EQ(result.CulledPointCount, 1u);
+}
+
+TEST(DrawCulling, BeyondFarPlane_Culled)
+{
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 100.0f);
+
+    std::vector<Graphics::LineDrawPacket> lines = {
+        MakeLinePacket(glm::mat4(1.0f), {0, 0, -50.0f, 1.0f}),   // Inside frustum
+        MakeLinePacket(glm::mat4(1.0f), {0, 0, -500.0f, 1.0f}),  // Beyond far plane
+    };
+    std::vector<Graphics::PointDrawPacket> points;
+
+    auto result = Graphics::CullDrawPackets(lines, points, proj, view, /*cullingEnabled=*/true);
+
+    ASSERT_EQ(result.VisibleLineIndices.size(), 1u);
+    EXPECT_EQ(result.VisibleLineIndices[0], 0u);
+    EXPECT_EQ(result.CulledLineCount, 1u);
+}
+
+TEST(DrawCulling, ZeroRadius_AlwaysCulled)
+{
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 100.0f);
+
+    std::vector<Graphics::LineDrawPacket> lines;
+    std::vector<Graphics::PointDrawPacket> points = {
+        MakePointPacket(glm::mat4(1.0f), {0, 0, -5.0f, 0.0f}),   // Zero radius → culled
+        MakePointPacket(glm::mat4(1.0f), {0, 0, -5.0f, -1.0f}),  // Negative radius → culled
+        MakePointPacket(glm::mat4(1.0f), {0, 0, -5.0f, 1.0f}),   // Positive → visible
+    };
+
+    auto result = Graphics::CullDrawPackets(lines, points, proj, view, /*cullingEnabled=*/true);
+
+    ASSERT_EQ(result.VisiblePointIndices.size(), 1u);
+    EXPECT_EQ(result.VisiblePointIndices[0], 2u);
+    EXPECT_EQ(result.CulledPointCount, 2u);
+}
+
+TEST(DrawCulling, EmptyPackets_ProducesEmptyResult)
+{
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 100.0f);
+
+    std::vector<Graphics::LineDrawPacket> lines;
+    std::vector<Graphics::PointDrawPacket> points;
+
+    auto result = Graphics::CullDrawPackets(lines, points, proj, view, /*cullingEnabled=*/true);
+
+    EXPECT_TRUE(result.Active);
+    EXPECT_EQ(result.TotalLineCount, 0u);
+    EXPECT_EQ(result.TotalPointCount, 0u);
+    EXPECT_TRUE(result.VisibleLineIndices.empty());
+    EXPECT_TRUE(result.VisiblePointIndices.empty());
+}
+
+TEST(DrawCulling, TransformMovesIntoView)
+{
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 100.0f);
+
+    // Object at local origin, but world matrix translates it in front of camera.
+    std::vector<Graphics::LineDrawPacket> lines = {
+        MakeLinePacket(TranslateZ(-10.0f), {0, 0, 0, 1.0f}),
+    };
+    std::vector<Graphics::PointDrawPacket> points;
+
+    auto result = Graphics::CullDrawPackets(lines, points, proj, view, /*cullingEnabled=*/true);
+
+    ASSERT_EQ(result.VisibleLineIndices.size(), 1u);
+    EXPECT_EQ(result.CulledLineCount, 0u);
+}
+
+TEST(DrawCulling, Statistics_MatchExpected)
+{
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 100.0f);
+
+    std::vector<Graphics::LineDrawPacket> lines = {
+        MakeLinePacket(glm::mat4(1.0f), {0, 0, -5.0f, 1.0f}),   // Visible
+        MakeLinePacket(glm::mat4(1.0f), {0, 0, 50.0f, 1.0f}),   // Culled
+        MakeLinePacket(glm::mat4(1.0f), {0, 0, -20.0f, 1.0f}),  // Visible
+    };
+    std::vector<Graphics::PointDrawPacket> points = {
+        MakePointPacket(glm::mat4(1.0f), {0, 0, 50.0f, 1.0f}),  // Culled
+    };
+
+    auto result = Graphics::CullDrawPackets(lines, points, proj, view, /*cullingEnabled=*/true);
+
+    EXPECT_EQ(result.TotalLineCount, 3u);
+    EXPECT_EQ(result.CulledLineCount, 1u);
+    EXPECT_EQ(result.TotalPointCount, 1u);
+    EXPECT_EQ(result.CulledPointCount, 1u);
+    EXPECT_EQ(result.VisibleLineIndices.size(), 2u);
+    EXPECT_EQ(result.VisiblePointIndices.size(), 0u);
+}
+
+TEST(DrawCulling, MatchesFrustumCullSphere_Consistency)
+{
+    // Verify CullDrawPackets produces the same visibility as the
+    // per-packet FrustumCullSphere_CPU helper used in per-pass culling.
+    const glm::mat4 view(1.0f);
+    const glm::mat4 proj = glm::perspectiveRH_ZO(glm::radians(60.0f), 16.0f / 9.0f, 0.1f, 1000.0f);
+    const auto frustum = Geometry::Frustum::CreateFromMatrix(proj * view);
+
+    struct TestCase { glm::mat4 world; glm::vec4 bounds; };
+    const std::vector<TestCase> cases = {
+        {glm::mat4(1.0f), {0, 0, -5.0f, 1.0f}},
+        {glm::mat4(1.0f), {0, 0, 50.0f, 1.0f}},
+        {TranslateZ(-500.0f), {0, 0, 0, 10.0f}},
+        {glm::scale(glm::mat4(1.0f), glm::vec3(5.0f)), {0, 0, -0.5f, 0.1f}},
+        {glm::mat4(1.0f), {100.0f, 0, -5.0f, 1.0f}},  // Off to the side
+    };
+
+    std::vector<Graphics::LineDrawPacket> lines;
+    for (const auto& tc : cases)
+        lines.push_back(MakeLinePacket(tc.world, tc.bounds));
+
+    auto result = Graphics::CullDrawPackets(lines, {}, proj, view, /*cullingEnabled=*/true);
+
+    // Check each packet: centralized result matches per-packet CPU cull.
+    std::vector<bool> expectedVisible;
+    for (const auto& tc : cases)
+        expectedVisible.push_back(FrustumCullSphere_CPU(tc.world, tc.bounds, frustum));
+
+    std::vector<bool> actualVisible(cases.size(), false);
+    for (uint32_t idx : result.VisibleLineIndices)
+        actualVisible[idx] = true;
+
+    for (size_t i = 0; i < cases.size(); ++i)
+    {
+        EXPECT_EQ(actualVisible[i], expectedVisible[i])
+            << "Mismatch at packet " << i;
+    }
+}

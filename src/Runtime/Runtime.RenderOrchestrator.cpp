@@ -411,6 +411,25 @@ namespace Runtime
 
         m_RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
 
+        // B1: Resolve bounding spheres from GeometryPool into draw packets so
+        // they are self-contained for CPU frustum culling.
+        {
+            RenderWorld* mutableWorld = frame.GetPreparedRenderWorld();
+            Graphics::ResolveDrawPacketBounds(mutableWorld->LineDraws,
+                                               mutableWorld->PointDraws,
+                                               m_GeometryStorage);
+        }
+
+        // B1: Centralized CPU frustum cull for Line/Point packets.
+        // Surface packets are excluded — SurfacePass uses GPU-driven culling.
+        const bool cullingEnabled = !preparedRenderWorld->DebugView.DisableCulling;
+        Graphics::CulledDrawList culledDraws = Graphics::CullDrawPackets(
+            preparedRenderWorld->LineDraws,
+            preparedRenderWorld->PointDraws,
+            preparedRenderWorld->View.ProjectionMatrix,
+            preparedRenderWorld->View.ViewMatrix,
+            cullingEnabled);
+
         // Construct structured render preparation input from the extracted RenderWorld.
         // BuildGraphInput holds non-owning views into the RenderWorld, which remains
         // alive on the FrameContext until EndFrame.
@@ -427,6 +446,7 @@ namespace Runtime
             .SurfaceDraws = preparedRenderWorld->SurfaceDraws,
             .LineDraws = preparedRenderWorld->LineDraws,
             .PointDraws = preparedRenderWorld->PointDraws,
+            .CulledDraws = std::move(culledDraws),
             .HtexPatchPreview = preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr,
             .DebugDrawLines = preparedRenderWorld->DebugDrawLines,
             .DebugDrawOverlayLines = preparedRenderWorld->DebugDrawOverlayLines,

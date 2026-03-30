@@ -22,9 +22,6 @@ import Graphics.Components;
 import Graphics.ShaderRegistry;
 import Graphics.GpuColor;
 
-import Geometry.Frustum;
-import Geometry.Overlap;
-import Geometry.Sphere;
 
 import Core.Hash;
 import Core.Logging;
@@ -291,46 +288,36 @@ namespace Graphics::Passes
         std::vector<uint32_t> activeAttrKeys;
         std::vector<uint32_t> activeRadiiKeys;
 
-        // Frustum extraction — CPU-side culling for retained-mode draws.
-        const bool cullingEnabled = !ctx.Debug.DisableCulling;
-        const Geometry::Frustum frustum = CreateCullingFrustum(
-            ctx.CameraProj, ctx.CameraView, cullingEnabled);
-
         // =================================================================
         // Retained-mode draws via ECS::Point::Component
         // =================================================================
-        // Point::Component is populated by lifecycle systems:
-        // - MeshViewLifecycle (mesh vertex views)
-        // - GraphLifecycleSystem (graph nodes)
+        // B1: Consume pre-culled point draw indices from the centralized
+        // CPU frustum cull performed during render preparation.
+        // Falls back to iterating all packets when no culled list is active.
         {
-            for (const auto& pt : ctx.PointDrawPackets)
+            const auto& culled = ctx.CulledDraws;
+            const auto& allPackets = ctx.PointDrawPackets;
+
+            const auto processPacket = [&](const PointDrawPacket& pt)
             {
                 if (!pt.Geometry.IsValid())
-                    continue;
+                    return;
 
                 GeometryGpuData* geo = m_GeometryStorage->GetIfValid(pt.Geometry);
                 if (!geo || !geo->GetVertexBuffer())
-                    continue;
+                    return;
 
                 const auto& layout = geo->GetLayout();
                 if (layout.PositionsSize == 0)
-                    continue;
+                    return;
 
                 const uint32_t vertexCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
                 if (vertexCount == 0)
-                    continue;
-
-                const glm::mat4 worldMatrix = pt.WorldMatrix;
-
-                // Frustum cull.
-                if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
-                    continue;
+                    return;
 
                 const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
                 const uint64_t posAddr = baseAddr + layout.PositionsOffset;
 
-                // Only expose normals to shaders when the component explicitly reports
-                // per-point normals and the uploaded layout actually contains them.
                 const bool hasValidNormals = pt.HasPerPointNormals && (layout.NormalsSize > 0);
                 const uint64_t normAddr = hasValidNormals ? (baseAddr + layout.NormalsOffset) : 0;
 
@@ -340,12 +327,10 @@ namespace Graphics::Passes
                 const uint32_t requestedModeIdx = static_cast<uint32_t>(pt.Mode);
                 const bool requestedNormalOrientedMode = (requestedModeIdx == 1u || requestedModeIdx == 2u);
 
-                // Surfel/EWA require geometric normals; otherwise render as FlatDisc.
                 const uint32_t effectiveModeIdx =
                     (requestedNormalOrientedMode && !hasValidNormals) ? 0u : requestedModeIdx;
                 const bool isEWA = (effectiveModeIdx == 2u);
 
-                // Per-point color aux buffer (resolved during extraction).
                 uint64_t attrAddr = 0;
                 if (!pt.Colors.empty())
                 {
@@ -356,7 +341,6 @@ namespace Graphics::Passes
                     }
                 }
 
-                // Per-point radii buffer (resolved during extraction).
                 uint64_t radiiAddr = 0;
                 {
                     if (!pt.Radii.empty() && pt.Radii.size() == vertexCount)
@@ -369,26 +353,35 @@ namespace Graphics::Passes
                 }
 
                 uint32_t flags = 0;
-                if (attrAddr != 0)   flags |= 1u; // has per-point colors
-                if (isEWA)          flags |= 2u; // EWA mode
-                if (radiiAddr != 0) flags |= 4u; // has per-point radii
+                if (attrAddr != 0)   flags |= 1u;
+                if (isEWA)          flags |= 2u;
+                if (radiiAddr != 0) flags |= 4u;
 
                 DrawInfo di{};
-                di.Model = worldMatrix;
+                di.Model = pt.WorldMatrix;
                 di.PtrPositions = posAddr;
                 di.PtrNormals = normAddr;
                 di.PtrAttr = attrAddr;
                 di.VertexCount = vertexCount;
-                // Clamp point radius to safe world-space range [0.0001, 1.0].
                 di.PointSize = ClampPointSize(pt.Size);
                 di.SizeMultiplier = pt.SizeMultiplier;
                 di.Color = ptColor;
                 di.Flags = flags;
                 di.PtrRadii = radiiAddr;
-                // Pipeline index: FlatDisc=0, Surfel/EWA=1, Sphere=3
                 di.PipelineIndex = (effectiveModeIdx == 0u) ? 0u
                                  : (effectiveModeIdx == 3u) ? 3u : 1u;
                 draws.push_back(di);
+            };
+
+            if (culled.Active)
+            {
+                for (const uint32_t idx : culled.VisiblePointIndices)
+                    processPacket(allPackets[idx]);
+            }
+            else
+            {
+                for (const auto& pt : allPackets)
+                    processPacket(pt);
             }
         }
 

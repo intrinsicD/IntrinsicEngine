@@ -21,9 +21,6 @@ import Graphics.Components;
 import Graphics.ShaderRegistry;
 import Graphics.GpuColor;
 
-import Geometry.Frustum;
-import Geometry.Overlap;
-import Geometry.Sphere;
 
 import Core.Hash;
 import Core.Logging;
@@ -270,34 +267,27 @@ namespace Graphics::Passes
         // MeshViewLifecycleSystem or GraphLifecycleSystem).
         if (m_GeometryStorage)
         {
-            // Frustum extraction — CPU-side culling for retained-mode draws.
-            const bool cullingEnabled = !ctx.Debug.DisableCulling;
-            const Geometry::Frustum frustum = CreateCullingFrustum(
-                ctx.CameraProj, ctx.CameraView, cullingEnabled);
+            // B1: Consume pre-culled line draw indices from the centralized
+            // CPU frustum cull performed during render preparation.
+            // Falls back to iterating all packets when no culled list is active.
+            const auto& culled = ctx.CulledDraws;
+            const auto& allPackets = ctx.LineDrawPackets;
 
-            for (const auto& line : ctx.LineDrawPackets)
+            // Build the index range to iterate — culled visible indices or all.
+            const auto processPacket = [&](const LineDrawPacket& line)
             {
-                // Skip entities without valid geometry or edges.
                 if (!line.Geometry.IsValid() || line.EdgeCount == 0)
-                    continue;
-
-                // EdgeView must be valid — all edge sources create proper
-                // BDA index buffers via ReuseVertexBuffersFrom.
+                    return;
                 if (!line.EdgeView.IsValid())
-                    continue;
+                    return;
 
                 GeometryGpuData* geo = m_GeometryStorage->GetIfValid(line.Geometry);
                 if (!geo || !geo->GetVertexBuffer())
-                    continue;
+                    return;
 
                 GeometryGpuData* edgeGeo = m_GeometryStorage->GetIfValid(line.EdgeView);
                 if (!edgeGeo || !edgeGeo->GetIndexBuffer() || !edgeGeo->GetVertexBuffer())
-                    continue;
-
-                const glm::mat4 worldMatrix = line.WorldMatrix;
-
-                if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
-                    continue;
+                    return;
 
                 const uint32_t entityKey = line.EntityKey;
                 const uint32_t edgeCount = line.EdgeCount;
@@ -309,7 +299,6 @@ namespace Graphics::Passes
                 const uint32_t wireColor = GpuColor::PackColorF(
                     line.Color.r, line.Color.g, line.Color.b, line.Color.a);
 
-                // Per-edge color aux buffer (resolved during extraction).
                 uint64_t edgeAttrAddr = 0;
                 if (!line.EdgeColors.empty())
                 {
@@ -321,12 +310,11 @@ namespace Graphics::Passes
                 }
 
                 DrawInfo di{};
-                di.Model = worldMatrix;
+                di.Model = line.WorldMatrix;
                 di.PtrPositions = posAddr;
                 di.PtrEdges = edgeAddr;
                 di.EdgeCount = edgeCount;
                 di.Color = wireColor;
-                // Clamp line width to safe pixel range [0.5, 32.0].
                 di.LineWidth = ClampLineWidth(line.Width);
                 di.PtrEdgeAttr = edgeAttrAddr;
 
@@ -334,7 +322,17 @@ namespace Graphics::Passes
                     overlayDraws.push_back(di);
                 else
                     depthDraws.push_back(di);
+            };
 
+            if (culled.Active)
+            {
+                for (const uint32_t idx : culled.VisibleLineIndices)
+                    processPacket(allPackets[idx]);
+            }
+            else
+            {
+                for (const auto& line : allPackets)
+                    processPacket(line);
             }
 
             // Cleanup orphaned edge attribute buffers.

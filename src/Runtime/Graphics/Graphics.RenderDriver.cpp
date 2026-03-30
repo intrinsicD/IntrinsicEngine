@@ -1122,6 +1122,7 @@ namespace Graphics
         ctx.SurfaceDrawPackets = input.SurfaceDraws;
         ctx.LineDrawPackets = input.LineDraws;
         ctx.PointDrawPackets = input.PointDraws;
+        ctx.CulledDraws = input.CulledDraws;
         ctx.HtexPatchPreview = input.HtexPatchPreview;
         ctx.DebugDrawLines = input.DebugDrawLines;
         ctx.DebugDrawOverlayLines = input.DebugDrawOverlayLines;
