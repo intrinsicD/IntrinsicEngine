@@ -86,6 +86,7 @@ export namespace Runtime::EditorUI
         Smoothing,
         Subdivision,
         Repair,
+        NormalEstimation,
     };
 
     struct GeometryProcessingCapabilities
@@ -279,6 +280,17 @@ export namespace Runtime::EditorUI
         int Iterations = 1;
     };
 
+    struct NormalEstimationWidgetState
+    {
+        int KNeighbors = 15;
+        bool OrientNormals = true;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        std::size_t EstimatedCount = 0;
+        std::size_t DegenerateCount = 0;
+        std::size_t FlippedCount = 0;
+    };
+
     struct MeshAnalysisWidgetState
     {
         bool HasResults = false;
@@ -318,6 +330,9 @@ export namespace Runtime::EditorUI
                                              SubdivisionWidgetState& state);
     [[nodiscard]] bool DrawRepairWidget(Runtime::Engine& engine,
                                         entt::entity entity);
+    [[nodiscard]] bool DrawNormalEstimationWidget(Runtime::Engine& engine,
+                                                  entt::entity entity,
+                                                  NormalEstimationWidgetState& state);
 
     // =========================================================================
     // InspectorController — component property inspector panel
@@ -357,6 +372,7 @@ export namespace Runtime::EditorUI
         SmoothingWidgetState m_SmoothingUi{};
         SubdivisionWidgetState m_SubdivisionUi{};
         MeshAnalysisWidgetState m_MeshAnalysisUi{};
+        NormalEstimationWidgetState m_NormalEstimationUi{};
     };
 
     // =========================================================================

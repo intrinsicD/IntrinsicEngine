@@ -285,7 +285,7 @@ F7 (Render Target Viewer) — no hard deps; memory footprint sub-item soft-depen
 
 #### F1. Wire Remaining Geometry Operators to UI
 
-Seven geometry operators and one profiling tool have full backends but no editor panel or trigger button. Wire each using the existing `GeometryWorkflowController` + `Widgets` pattern. (Note: Geodesic Distance, K-Means, Mesh Analysis, Remeshing, Simplification, Smoothing, Subdivision, and Repair are already wired.)
+Six geometry operators and one profiling tool have full backends but no editor panel or trigger button. Wire each using the existing `GeometryWorkflowController` + `Widgets` pattern. (Note: Geodesic Distance, K-Means, Mesh Analysis, Normal Estimation, Remeshing, Simplification, Smoothing, Subdivision, and Repair are already wired.)
 
 - [ ] **Shortest Path (Dijkstra):** Add widget in Inspector Geometry Processing section. Source vertices from `SubElementSelection`. Target vertices optional (empty = full tree). Display result path length, vertex count. Publish `v:shortest_path_distance` and auto-switch color source. "Extract Path Graph" button materializes result as a new `Graph::Graph` entity (requires entity-creation plumbing similar to `SpawnDemoPointCloud`).
 - [ ] **Parameterization (LSCM):** Add dedicated Geometry → Parameterization panel. Pin vertex selection from `SubElementSelection` (or auto-pin boundary). Display conformal energy, flipped triangle count. Publish `v:texcoord` and offer UV checker visualization toggle.
@@ -293,7 +293,7 @@ Seven geometry operators and one profiling tool have full backends but no editor
 - [ ] **Convex Hull Builder:** Add "Compute Convex Hull" button in Inspector Geometry Processing section. Materialize result as new `Halfedge::Mesh` entity. Display hull vertex/face counts and volume. (Complements the existing wireframe debug visualization in `SpatialDebugController`.)
 - [ ] **Surface Reconstruction:** Add Geometry → Reconstruct Surface panel. Expose `KNeighbors`, `GridResolution`, `Padding` params. Enable only for point cloud entities. Display reconstructed mesh vertex/face count. Materialize as new mesh entity.
 - [ ] **Vector Heat Method:** Add widget in Inspector Geometry Processing section (Vertex mode). Source vertices from `SubElementSelection`. Two buttons: "Transport Vectors" and "Compute Log Map". Display per-vertex `v:transported_vector`/`v:logmap_coords` properties. Auto-switch color source to angle/distance.
-- [ ] **Normal Estimation:** Add "Estimate Normals" button for point cloud entities in Inspector. Expose `KNeighbors` and orientation strategy. Re-upload normals on completion for immediate surfel rendering.
+
 - [ ] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel (distinct from the existing Mesh Analysis defect-marker panel). Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Per-metric histograms via ImGui `PlotHistogram`. Summary diagnostics only — no per-element property publishing.
 - [ ] **Benchmark Runner Panel:** Add a Benchmark panel via `GUI::RegisterPanel`. Expose frame count, warmup frames, and output path inputs. "Run Benchmark" button calls `BenchmarkRunner::Configure()` + `Start()`. Display `BenchmarkStats` summary (avg/min/max/p95/p99 frame time, avg FPS, per-pass averages) in a table after completion. Currently CLI-only (`--benchmark`).
 
