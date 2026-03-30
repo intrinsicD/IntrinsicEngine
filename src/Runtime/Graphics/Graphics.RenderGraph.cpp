@@ -2,6 +2,7 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <cassert>
+#include <bit>
 #include <chrono>
 #include <string>
 #include <vector>
@@ -21,6 +22,27 @@ import RHI.CommandContext;
 import RHI.Device;
 import RHI.Image;
 import RHI.TransientAllocator;
+
+namespace
+{
+    [[nodiscard]] constexpr VkImageAspectFlags GetImageAspectForFormat(VkFormat format) noexcept
+    {
+        switch (format)
+        {
+            case VK_FORMAT_D32_SFLOAT_S8_UINT:
+            case VK_FORMAT_D24_UNORM_S8_UINT:
+            case VK_FORMAT_D16_UNORM_S8_UINT:
+                return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+            case VK_FORMAT_D32_SFLOAT:
+            case VK_FORMAT_D16_UNORM:
+                return VK_IMAGE_ASPECT_DEPTH_BIT;
+            case VK_FORMAT_S8_UINT:
+                return VK_IMAGE_ASPECT_STENCIL_BIT;
+            default:
+                return VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+    }
+}
 
 namespace Graphics
 {
@@ -166,9 +188,12 @@ namespace Graphics
     RGResourceHandle RGBuilder::CreateTexture(Core::Hash::StringID name, const RGTextureDesc& desc)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Texture);
+        if (id == kInvalidResource)
+            return {kInvalidResource};
+
+        auto& node = m_Graph.m_ResourcePool[id];
         if (created)
         {
-            auto& node = m_Graph.m_ResourcePool[id];
             node.Extent = {desc.Width, desc.Height};
             node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -176,17 +201,39 @@ namespace Graphics
             node.Usage = desc.Usage;
             node.Aspect = desc.Aspect;
         }
+        else if (node.Type != ResourceType::Texture ||
+                 node.Extent.width != desc.Width ||
+                 node.Extent.height != desc.Height ||
+                 node.Format != desc.Format ||
+                 node.Usage != desc.Usage ||
+                 node.Aspect != desc.Aspect)
+        {
+            Core::Log::Error("RenderGraph: texture resource name collision for '{}' with incompatible descriptor.",
+                             name.Value);
+            return {kInvalidResource};
+        }
         return {id};
     }
 
     RGResourceHandle RGBuilder::CreateBuffer(Core::Hash::StringID name, const RGBufferDesc& desc)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Buffer);
+        if (id == kInvalidResource)
+            return {kInvalidResource};
+
+        auto& node = m_Graph.m_ResourcePool[id];
         if (created)
         {
-            auto& node = m_Graph.m_ResourcePool[id];
             node.BufferSize = desc.Size;
             node.BufferUsage = desc.Usage;
+        }
+        else if (node.Type != ResourceType::Buffer ||
+                 node.BufferSize != desc.Size ||
+                 node.BufferUsage != desc.Usage)
+        {
+            Core::Log::Error("RenderGraph: buffer resource name collision for '{}' with incompatible descriptor.",
+                             name.Value);
+            return {kInvalidResource};
         }
         return {id};
     }
@@ -196,24 +243,38 @@ namespace Graphics
                                               VkExtent2D extent, VkImageLayout currentLayout)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
+        if (id == kInvalidResource)
+            return {kInvalidResource};
+
+        auto& node = m_Graph.m_ResourcePool[id];
         if (created)
         {
-            auto& node = m_Graph.m_ResourcePool[id];
             node.PhysicalImage = image;
             node.PhysicalView = view;
             node.InitialLayout = currentLayout;
             node.CurrentLayout = currentLayout;
             node.Extent = extent;
             node.Format = format;
-            node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT || format ==
-                              VK_FORMAT_D32_SFLOAT)
-                              ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT)
-                              : VK_IMAGE_ASPECT_COLOR_BIT;
+            node.Aspect = GetImageAspectForFormat(format);
             m_Graph.m_Registry.RegisterImage(id, image, view);
 
             // Mark as active immediately for imports
             node.StartPass = 0;
             node.EndPass = 0;
+        }
+        else if (node.Type != ResourceType::Import ||
+                 node.PhysicalImage != image ||
+                 node.PhysicalView != view ||
+                 node.Extent.width != extent.width ||
+                 node.Extent.height != extent.height ||
+                 node.Format != format ||
+                 node.InitialLayout != currentLayout ||
+                 node.CurrentLayout != currentLayout ||
+                 node.Aspect != GetImageAspectForFormat(format))
+        {
+            Core::Log::Error("RenderGraph: imported texture resource name collision for '{}' with incompatible binding.",
+                             name.Value);
+            return {kInvalidResource};
         }
         return {id};
     }
@@ -221,13 +282,22 @@ namespace Graphics
     RGResourceHandle RGBuilder::ImportBuffer(Core::Hash::StringID name, RHI::VulkanBuffer& buffer)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
+        if (id == kInvalidResource)
+            return {kInvalidResource};
+
+        auto& node = m_Graph.m_ResourcePool[id];
         if (created)
         {
-            auto& node = m_Graph.m_ResourcePool[id];
             node.PhysicalBuffer = buffer.GetHandle();
             m_Graph.m_Registry.RegisterBuffer(id, buffer.GetHandle());
             node.StartPass = 0;
             node.EndPass = 0;
+        }
+        else if (node.Type != ResourceType::Import || node.PhysicalBuffer != buffer.GetHandle())
+        {
+            Core::Log::Error("RenderGraph: imported buffer resource name collision for '{}' with incompatible binding.",
+                             name.Value);
+            return {kInvalidResource};
         }
         return {id};
     }
@@ -309,7 +379,14 @@ namespace Graphics
     {
         if (auto it = m_ResourceLookup.find(name); it != m_ResourceLookup.end())
         {
-            return {it->second, false};
+            const ResourceID id = it->second;
+            if (id < m_ResourcePool.size() && m_ResourcePool[id].Type != type)
+            {
+                Core::Log::Error("RenderGraph: resource name collision for '{}' reused with incompatible resource type.",
+                                 name.Value);
+                return {kInvalidResource, false};
+            }
+            return {id, false};
         }
 
         // Grow pool if needed
@@ -1107,6 +1184,23 @@ namespace Graphics
             {
                 h = HashCombine64(h, static_cast<uint64_t>(att->ID));
                 h = HashCombine64(h, att->IsDepth ? 1ull : 0ull);
+                h = HashCombine64(h, static_cast<uint64_t>(att->Info.LoadOp));
+                h = HashCombine64(h, static_cast<uint64_t>(att->Info.StoreOp));
+                if (att->Info.LoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)
+                {
+                    if (att->IsDepth)
+                    {
+                        h = HashCombine64(h, static_cast<uint64_t>(std::bit_cast<uint32_t>(att->Info.ClearValue.depthStencil.depth)));
+                        h = HashCombine64(h, static_cast<uint64_t>(att->Info.ClearValue.depthStencil.stencil));
+                    }
+                    else
+                    {
+                        for (uint32_t c = 0; c < 4; ++c)
+                        {
+                            h = HashCombine64(h, static_cast<uint64_t>(std::bit_cast<uint32_t>(att->Info.ClearValue.color.float32[c])));
+                        }
+                    }
+                }
             }
         }
         return h;
@@ -1131,13 +1225,36 @@ namespace Graphics
         if (a.AttachmentHead == nullptr || b.AttachmentHead == nullptr)
             return false;
 
-        // Walk both linked lists and compare resource IDs and depth classification.
+        // Walk both linked lists and compare resource IDs, depth classification, and attachment semantics.
         const AttachmentNode* na = a.AttachmentHead;
         const AttachmentNode* nb = b.AttachmentHead;
         while (na != nullptr && nb != nullptr)
         {
             if (na->ID != nb->ID || na->IsDepth != nb->IsDepth)
                 return false;
+
+            if (na->Info.LoadOp != nb->Info.LoadOp || na->Info.StoreOp != nb->Info.StoreOp)
+                return false;
+
+            if (na->Info.LoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)
+            {
+                if (na->IsDepth)
+                {
+                    if (na->Info.ClearValue.depthStencil.depth != nb->Info.ClearValue.depthStencil.depth ||
+                        na->Info.ClearValue.depthStencil.stencil != nb->Info.ClearValue.depthStencil.stencil)
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    for (uint32_t c = 0; c < 4; ++c)
+                    {
+                        if (na->Info.ClearValue.color.float32[c] != nb->Info.ClearValue.color.float32[c])
+                            return false;
+                    }
+                }
+            }
             na = na->Next;
             nb = nb->Next;
         }
@@ -1172,7 +1289,11 @@ namespace Graphics
                 {
                     const auto& res = m_ResourcePool[att->ID];
                     if (att->IsDepth)
+                    {
                         pkt.DepthFormat = res.Format;
+                        if ((res.Aspect & VK_IMAGE_ASPECT_STENCIL_BIT) != 0)
+                            pkt.StencilFormat = res.Format;
+                    }
                     else
                         pkt.ColorFormats.push_back(res.Format);
                 }

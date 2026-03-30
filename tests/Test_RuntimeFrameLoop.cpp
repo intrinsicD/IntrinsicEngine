@@ -414,7 +414,8 @@ TEST(RuntimeFrameLoop, RunFramePhases_NullTimingsProducesZeroedFrameGraphStats)
                 {
                     .OnUpdate = [](float) {},
                     .RegisterVariableSystems = [](Core::FrameGraph&, float) {},
-                    .OnRender = [](double) {},
+                    .BeforeDispatch = [&](){},
+                    .OnRender = [](double) {}
                 },
             .ExecuteVariableGraph = [](Core::FrameGraph&) {},
             // Timings intentionally left as nullptr.

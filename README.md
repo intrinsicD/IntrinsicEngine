@@ -198,7 +198,7 @@ Adaptive remeshing now exposes runtime safety controls in `AdaptiveRemeshingPara
   - Lambda-based pass declaration: `AddPass<Data>(setup, execute)`.
   - Debug/audit introspection now records per-pass attachment metadata (format, load/store ops, imported vs. transient) and per-resource first/last read-write provenance for UI inspection and temporary render-path logging.
   - Structured validation (`ValidateCompiledGraph`) returns `RenderGraphValidationResult` with typed diagnostics (error/warning). Imported-resource write policies (`ImportedResourceWritePolicy`) enforce which passes may write to imported resources (e.g., only `Present.LDR` may write to the Backbuffer). Missing required resources and transient resources without producers are now errors rather than warnings.
-  - Execution packet merging: consecutive passes in a linear DAG chain are merged into single secondary command buffer recordings. Both compute/copy and raster passes are eligible — raster passes merge when they target the exact same color+depth attachments, sharing a single `vkCmdBeginRendering` scope with load ops from the first pass and store ops from the last.
+  - Execution packet merging: consecutive passes in a linear DAG chain are merged into single secondary command buffer recordings. Both compute/copy and raster passes are eligible — raster passes merge when they target the exact same color+depth attachments *and* matching attachment semantics (load/store ops plus clear values when relevant), sharing a single `vkCmdBeginRendering` scope with load ops from the first pass and store ops from the last.
 - **Async Transfer System:**
   - Staging Belt: Persistent ring-buffer allocator for CPU-to-GPU streaming.
   - Timeline Semaphore synchronization for async asset uploads.

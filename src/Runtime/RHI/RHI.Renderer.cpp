@@ -146,10 +146,9 @@ namespace RHI
         // IMPORTANT: this must happen before advancing the global frame epoch used by SafeDestroy().
         m_Device->FlushDeletionQueue(m_CurrentFrame);
 
-        // 3. Advance global frame epoch for newly scheduled deferred deletions.
-        m_Device->IncrementGlobalFrame();
-
-        // 4. Acquire Image — timed for telemetry
+        // 3. Acquire Image — timed for telemetry.
+        // Only advance the global frame epoch after acquisition succeeds so skipped
+        // frames cannot skew profiler/secondary-buffer reuse or deletion scheduling.
         const auto acquireStart = std::chrono::high_resolution_clock::now();
         VkResult result = vkAcquireNextImageKHR(
             m_Device->GetLogicalDevice(),
@@ -178,6 +177,10 @@ namespace RHI
             Core::Log::Error("Failed to acquire swapchain image!");
             return;
         }
+
+        // Now that this frame is definitely live, advance the global epoch for any
+        // deferred work scheduled during command-buffer recording.
+        m_Device->IncrementGlobalFrame();
 
         VK_CHECK(vkResetFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]));
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];

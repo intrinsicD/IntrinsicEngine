@@ -1129,7 +1129,7 @@ TEST(RenderExtraction, FrameContext_ResolvedGpuProfile_SurvivesSlotReuseUntilCon
     slot0.ResolvedGpuProfile = std::move(profile);
 
     // Advance to the next slot.
-    ring.BeginFrame(1u, vp);
+    (void)ring.BeginFrame(1u, vp);
 
     // Reuse slot 0 — the profile should still be there.
     Runtime::FrameContext& slot0_reused = ring.BeginFrame(2u, vp);

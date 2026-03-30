@@ -50,6 +50,14 @@ import RHI.Types;
 
 using namespace Core::Hash;
 
+namespace
+{
+    [[nodiscard]] constexpr uint64_t HashCombine64(uint64_t seed, uint64_t value) noexcept
+    {
+        return seed ^ (value + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2));
+    }
+}
+
 namespace Graphics::Passes
 {
     void SurfacePass::AddPasses(RenderPassContext& ctx)
@@ -668,7 +676,7 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, pipeline = m_Pipeline, stream, fi = ctx.FrameIndex % FRAMES, prepassActive](const PassData&, const RGRegistry&, VkCommandBuffer cmd)
+                                    [this, &ctx, pipeline = m_Pipeline, stream, prepassActive](const PassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
                                         if (stream->Batches.empty())
                                             return;
@@ -711,18 +719,9 @@ namespace Graphics::Passes
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
 
-                                        // Reuse one persistent instance descriptor set per frame slot.
-                                        VkDescriptorSet instanceSet = m_InstanceSet[fi];
-                                        if (instanceSet == VK_NULL_HANDLE)
-                                        {
-                                            instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                            m_InstanceSet[fi] = instanceSet;
-                                            if (instanceSet == VK_NULL_HANDLE)
-                                                return;
-                                        }
-                                        VkBuffer currentInstBuffer = VK_NULL_HANDLE;
-                                        VkBuffer currentVisBuffer = VK_NULL_HANDLE;
-
+                                        // Descriptor sets are immutable once bound in a command buffer.
+                                        // Cache one instance descriptor set per unique (instance, visibility) pair.
+                                        std::unordered_map<uint64_t, VkDescriptorSet> instanceSetCache;
                                         const RHI::GraphicsPipeline* currentPipeline = nullptr;
 
                                         for (const DrawBatch& b : stream->Batches)
@@ -750,6 +749,10 @@ namespace Graphics::Passes
                                                 currentPipeline = desired;
                                             }
 
+                                            // `VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY` is enabled on the surface pipelines,
+                                            // so each batch must program the topology before issuing the draw.
+                                            vkCmdSetPrimitiveTopology(cmd, b.Topology);
+
                                             // Lines/points were not in the depth prepass (triangle-only),
                                             // so they must use LESS_OR_EQUAL rather than EQUAL to pass
                                             // the depth test against the prepass-filled depth buffer.
@@ -762,9 +765,21 @@ namespace Graphics::Passes
 
                                             const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
                                             const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
+                                            const uint64_t instanceKey = HashCombine64(
+                                                std::hash<VkBuffer>{}(instHandle),
+                                                std::hash<VkBuffer>{}(visHandle));
 
-                                            if (instHandle != currentInstBuffer || visHandle != currentVisBuffer)
+                                            VkDescriptorSet instanceSet = VK_NULL_HANDLE;
+                                            if (auto it = instanceSetCache.find(instanceKey); it != instanceSetCache.end())
                                             {
+                                                instanceSet = it->second;
+                                            }
+                                            else
+                                            {
+                                                instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                                if (instanceSet == VK_NULL_HANDLE)
+                                                    return;
+
                                                 VkDescriptorBufferInfo instInfo{.buffer = instHandle, .offset = 0, .range = VK_WHOLE_SIZE};
                                                 VkDescriptorBufferInfo visInfo{.buffer = visHandle, .offset = 0, .range = VK_WHOLE_SIZE};
 
@@ -784,17 +799,12 @@ namespace Graphics::Passes
                                                 writes[1].pBufferInfo = &visInfo;
 
                                                 vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
-                                                currentInstBuffer = instHandle;
-                                                currentVisBuffer = visHandle;
+                                                instanceSetCache.emplace(instanceKey, instanceSet);
                                             }
-
                                             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                                     desired->GetLayout(),
                                                                     2, 1, &instanceSet,
                                                                     0, nullptr);
-
-                                            vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                                            vkCmdSetPrimitiveTopology(cmd, b.Topology);
 
                                             // NOTE: Forward point rendering uses fixed pixel-size points via gl_PointSize.
                                             // We default to 4px for visibility; later we can plumb per-entity UI values.
@@ -827,6 +837,8 @@ namespace Graphics::Passes
                                             const uint32_t safeMaxDraws = std::min(maxDraws, maxDrawsInSlice);
                                             if (safeMaxDraws == 0)
                                                 continue;
+
+                                            vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
                                             if (b.CountBuffer && vkCmdDrawIndexedIndirectCountKHR)
                                             {
@@ -896,14 +908,17 @@ namespace Graphics::Passes
                     builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                 }
             },
-            [this, &ctx, depthPipeline = m_DepthPrepassPipeline, stream, fi = ctx.FrameIndex % FRAMES]
+            [this, &ctx, depthPipeline = m_DepthPrepassPipeline, stream]
             (const DepthPrepassData&, const RGRegistry&, VkCommandBuffer cmd)
             {
+                const uint32_t fi = ctx.FrameIndex % FRAMES;
+
                 if (stream->Batches.empty())
                     return;
 
-                // Depth compare op is statically LESS in the depth prepass pipeline
-                // (no dynamic override needed — this pipeline always fills depth).
+                // Depth compare op is statically LESS in the depth prepass pipeline.
+                // Primitive topology is still a dynamic state, so we must set the
+                // triangle-list topology before issuing the indirect indexed draw.
 
                 VkViewport viewport{};
                 viewport.x = 0.0f;
@@ -938,17 +953,9 @@ namespace Graphics::Passes
                                         1, 1, &globalTextures,
                                         0, nullptr);
 
-                // Reuse the instance descriptor set from the current frame slot.
-                VkDescriptorSet instanceSet = m_InstanceSet[fi];
-                if (instanceSet == VK_NULL_HANDLE)
-                {
-                    instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                    m_InstanceSet[fi] = instanceSet;
-                    if (instanceSet == VK_NULL_HANDLE)
-                        return;
-                }
-                VkBuffer currentInstBuffer = VK_NULL_HANDLE;
-                VkBuffer currentVisBuffer = VK_NULL_HANDLE;
+                // Descriptor sets are immutable once bound in a command buffer.
+                // Cache one instance descriptor set per unique (instance, visibility) pair.
+                std::unordered_map<uint64_t, VkDescriptorSet> instanceSetCache;
 
                 for (const DrawBatch& b : stream->Batches)
                 {
@@ -963,9 +970,21 @@ namespace Graphics::Passes
 
                     const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
                     const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
+                    const uint64_t instanceKey = HashCombine64(
+                        std::hash<VkBuffer>{}(instHandle),
+                        std::hash<VkBuffer>{}(visHandle));
 
-                    if (instHandle != currentInstBuffer || visHandle != currentVisBuffer)
+                    VkDescriptorSet instanceSet = VK_NULL_HANDLE;
+                    if (auto it = instanceSetCache.find(instanceKey); it != instanceSetCache.end())
                     {
+                        instanceSet = it->second;
+                    }
+                    else
+                    {
+                        instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                        if (instanceSet == VK_NULL_HANDLE)
+                            return;
+
                         VkDescriptorBufferInfo instInfo{.buffer = instHandle, .offset = 0, .range = VK_WHOLE_SIZE};
                         VkDescriptorBufferInfo visInfo{.buffer = visHandle, .offset = 0, .range = VK_WHOLE_SIZE};
 
@@ -985,8 +1004,7 @@ namespace Graphics::Passes
                         writes[1].pBufferInfo = &visInfo;
 
                         vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
-                        currentInstBuffer = instHandle;
-                        currentVisBuffer = visHandle;
+                        instanceSetCache.emplace(instanceKey, instanceSet);
                     }
 
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -995,6 +1013,7 @@ namespace Graphics::Passes
                                             0, nullptr);
 
                     vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
                     RHI::MeshPushConstants push{
                         .Model = glm::mat4(1.0f),
@@ -1116,7 +1135,7 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, stream, fi = ctx.FrameIndex % FRAMES, prepassActive]
+                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, stream, prepassActive]
                                     (const GBufferPassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
                                         if (stream->Batches.empty())
@@ -1153,16 +1172,7 @@ namespace Graphics::Passes
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
 
-                                        VkDescriptorSet instanceSet = m_InstanceSet[fi];
-                                        if (instanceSet == VK_NULL_HANDLE)
-                                        {
-                                            instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                            m_InstanceSet[fi] = instanceSet;
-                                            if (instanceSet == VK_NULL_HANDLE)
-                                                return;
-                                        }
-                                        VkBuffer currentInstBuffer = VK_NULL_HANDLE;
-                                        VkBuffer currentVisBuffer = VK_NULL_HANDLE;
+                                        std::unordered_map<uint64_t, VkDescriptorSet> instanceSetCache;
 
                                         const RHI::GraphicsPipeline* currentPipeline = nullptr;
 
@@ -1189,9 +1199,21 @@ namespace Graphics::Passes
 
                                             const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
                                             const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
+                                            const uint64_t instanceKey = HashCombine64(
+                                                std::hash<VkBuffer>{}(instHandle),
+                                                std::hash<VkBuffer>{}(visHandle));
 
-                                            if (instHandle != currentInstBuffer || visHandle != currentVisBuffer)
+                                            VkDescriptorSet instanceSet = VK_NULL_HANDLE;
+                                            if (auto it = instanceSetCache.find(instanceKey); it != instanceSetCache.end())
                                             {
+                                                instanceSet = it->second;
+                                            }
+                                            else
+                                            {
+                                                instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                                if (instanceSet == VK_NULL_HANDLE)
+                                                    return;
+
                                                 VkDescriptorBufferInfo instInfo{instHandle, 0, VK_WHOLE_SIZE};
                                                 VkDescriptorBufferInfo visInfo{visHandle, 0, VK_WHOLE_SIZE};
                                                 VkWriteDescriptorSet writes[2]{};
@@ -1208,14 +1230,13 @@ namespace Graphics::Passes
                                                 writes[1].descriptorCount = 1;
                                                 writes[1].pBufferInfo = &visInfo;
                                                 vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
-
-                                                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                                        desired->GetLayout(),
-                                                                        2, 1, &instanceSet, 0, nullptr);
-
-                                                currentInstBuffer = instHandle;
-                                                currentVisBuffer = visHandle;
+                                                instanceSetCache.emplace(instanceKey, instanceSet);
                                             }
+
+                                            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                    desired->GetLayout(),
+                                                                    2, 1, &instanceSet, 0, nullptr);
+
 
                                             RHI::MeshPushConstants pc{};
                                             pc.Model = glm::mat4(1.0f);

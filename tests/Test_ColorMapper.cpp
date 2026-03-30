@@ -22,7 +22,7 @@ static uint8_t B(uint32_t c) { return static_cast<uint8_t>((c >> 16) & 0xFF); }
 TEST(ColorMapper, EmptyPropertyNameReturnsNullopt)
 {
     Geometry::PropertySet ps;
-    ps.Add<float>("test", 0.0f);
+    (void)ps.Add<float>("test", 0.0f);
 
     ColorSource config;
     config.PropertyName = "";
@@ -34,7 +34,7 @@ TEST(ColorMapper, EmptyPropertyNameReturnsNullopt)
 TEST(ColorMapper, NonexistentPropertyReturnsNullopt)
 {
     Geometry::PropertySet ps;
-    ps.Add<float>("exists", 0.0f);
+    (void)ps.Add<float>("exists", 0.0f);
 
     ColorSource config;
     config.PropertyName = "does_not_exist";

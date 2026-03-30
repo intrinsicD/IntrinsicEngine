@@ -37,7 +37,7 @@ namespace
         Geometry::Halfedge::Mesh refined;
         Geometry::Subdivision::SubdivisionParams sp;
         sp.Iterations = 2;
-        Geometry::Subdivision::Subdivide(ico, refined, sp);
+        (void)Geometry::Subdivision::Subdivide(ico, refined, sp);
         return refined;
     }
 }

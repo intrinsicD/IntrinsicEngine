@@ -587,6 +587,58 @@ TEST_F(RenderGraphPacketTest, TwoRasterPasses_SameAttachments_Merge)
 }
 
 // ---------------------------------------------------------------------------
+// Same attachments but different clear values must not merge: attachment
+// semantics differ even though resource IDs match.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, TwoRasterPasses_SameAttachments_DifferentClearValues_NoMerge)
+{
+    struct PassData {};
+
+    RGResourceHandle color, depth;
+
+    m_Graph->AddPass<PassData>("RasterA",
+        [&color, &depth](PassData&, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("color"_id,
+                RGTextureDesc{.Width = 64, .Height = 64, .Format = VK_FORMAT_R8G8B8A8_UNORM});
+            depth = builder.CreateTexture("depth"_id,
+                RGTextureDesc{.Width = 64, .Height = 64,
+                              .Format = VK_FORMAT_D32_SFLOAT,
+                              .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                              .Aspect = VK_IMAGE_ASPECT_DEPTH_BIT});
+            builder.WriteColor(color, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .ClearValue = VkClearValue{.color = {{1.0f, 0.0f, 0.0f, 1.0f}}}});
+            builder.WriteDepth(depth, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .ClearValue = VkClearValue{.depthStencil = {1.0f, 0u}}});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("RasterB",
+        [&color, &depth](PassData&, RGBuilder& builder)
+        {
+            builder.WriteColor(color, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .ClearValue = VkClearValue{.color = {{0.0f, 1.0f, 0.0f, 1.0f}}}});
+            builder.WriteDepth(depth, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE,
+                .ClearValue = VkClearValue{.depthStencil = {0.5f, 0u}}});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    auto stats = m_Graph->GetLastPacketStats();
+    EXPECT_EQ(stats.PassCount, 2u);
+    EXPECT_EQ(stats.PacketCount, 2u);
+}
+
+// ---------------------------------------------------------------------------
 // Three consecutive raster passes on the same attachments: all merge.
 // ---------------------------------------------------------------------------
 TEST_F(RenderGraphPacketTest, ThreeRasterPasses_SameAttachments_MergeAll)
@@ -711,6 +763,47 @@ TEST_F(RenderGraphPacketTest, RasterThenCompute_NoMerge)
     auto stats = m_Graph->GetLastPacketStats();
     EXPECT_EQ(stats.PassCount, 2u);
     EXPECT_EQ(stats.PacketCount, 2u);  // Raster + compute → never merge
+}
+
+// ---------------------------------------------------------------------------
+// Imported depth-stencil textures must preserve both depth and stencil aspects.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, ImportTexture_DepthStencilFormat_UsesDepthAndStencilAspects)
+{
+    struct PassData {};
+
+    RHI::VulkanImage importTexture(*m_Device,
+                                  8,
+                                  8,
+                                  1,
+                                  VK_FORMAT_D32_SFLOAT_S8_UINT,
+                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                  VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+
+    m_Graph->AddPass<PassData>("ImportDepthStencil",
+        [&](PassData&, RGBuilder& builder)
+        {
+            auto handle = builder.ImportTexture("depthStencil"_id,
+                                                importTexture.GetHandle(),
+                                                importTexture.GetView(),
+                                                importTexture.GetFormat(),
+                                                {8u, 8u},
+                                                VK_IMAGE_LAYOUT_UNDEFINED);
+            builder.WriteDepth(handle, RGAttachmentInfo{.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    const auto images = m_Graph->BuildDebugImageList();
+    const auto it = std::find_if(images.begin(), images.end(), [](const RenderGraphDebugImage& img)
+    {
+        return img.Name == "depthStencil"_id;
+    });
+
+    ASSERT_NE(it, images.end());
+    EXPECT_NE(it->Aspect & VK_IMAGE_ASPECT_DEPTH_BIT, 0u);
+    EXPECT_NE(it->Aspect & VK_IMAGE_ASPECT_STENCIL_BIT, 0u);
 }
 
 // ---------------------------------------------------------------------------
