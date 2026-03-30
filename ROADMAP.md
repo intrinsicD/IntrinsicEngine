@@ -128,16 +128,17 @@ Undo/redo integration now lives in `Core::CommandHistory`; editor panels should 
 
 ### UI Improvements
 
-Each improvement is independent and can land incrementally:
-- **Dockable panel layout:** ImGui docking branch — free panel arrangement, save/restore layouts.
-- **Viewport toolbar:** Render mode switching, wireframe overlay, debug views directly in the 3D viewport.
-- **Undo/redo stack:** Command-pattern undo for all property changes via `Core::CommandHistory` and ECS before/after snapshots.
-- **Multi-object editing:** Edit shared properties across all selected entities.
-- **Asset browser:** Thumbnail previews, drag-and-drop import, directory navigation.
-- **Console / log panel:** Scrollable, filterable log output (currently stdout only).
-- **Keyboard shortcuts:** Configurable hotkeys for common operations.
-- **Context menus:** Right-click on entities for delete, duplicate, rename, focus camera.
-- **Dark/light theme:** Configurable ImGui theme presets.
+Concrete execution items are now tracked in `TODO.md` → P1/F (UI Architecture & Feature Wiring). The near-term priorities are:
+
+- **Wire remaining geometry operators** (Shortest Path, LSCM, CSG, Convex Hull, Surface Reconstruction, Vector Heat, Normal Estimation, Mesh Quality) — `TODO.md` F1.
+- **Rendering controls** (light environment, camera properties, render mode toolbar) — `TODO.md` F2.
+- **Undo/redo integration** (CommandHistory wired to gizmo, inspector, operators) — `TODO.md` F3.
+- **Hierarchy tree nesting** with drag-and-drop reparenting — `TODO.md` F4.
+- **Viewport context menus** — `TODO.md` F5.
+- **Editor polish** (dockable layout, log panel, themes, multi-object editing, tooltips) — `TODO.md` F6.
+- **Render Target Viewer** panel implementation — `TODO.md` F7.
+
+Each improvement is independent and can land incrementally.
 
 ### Scene Serialization (**MVP complete**)
 
@@ -305,7 +306,7 @@ The two-layer architecture (I/O backend + format loaders) is complete with 8 imp
 
 ## Ongoing
 
-- **Shader hot-reload:** Tracked in `TODO.md` P1/A3. File-watcher integration for automatic recompilation on save.
+- **Shader hot-reload:** Tracked in `TODO.md` P1/E1. File-watcher integration for automatic recompilation on save.
 - **Port-based testing boundaries:** Type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. Implement opportunistically as new subsystems are added.
 
 ---
