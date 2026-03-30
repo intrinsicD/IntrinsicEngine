@@ -49,6 +49,7 @@ export namespace RHI
         PipelineBuilder& DisableDepthTest();
         PipelineBuilder& EnableAlphaBlending();
         PipelineBuilder& EnableDepthBias(float constantFactor, float slopeFactor);
+        PipelineBuilder& EnableDynamicDepthCompareOp();
 
         // Critical: Dynamic Rendering Formats
         PipelineBuilder& SetColorFormats(const std::vector<VkFormat>& formats);
@@ -77,5 +78,6 @@ export namespace RHI
         std::vector<VkPushConstantRange> m_PushConstants;
 
         std::vector<VkFormat> m_ColorFormats; // Temp storage to keep pointer valid
+        bool m_DynamicDepthCompareOp = false;
     };
 }

@@ -88,12 +88,12 @@ namespace Graphics::Passes
                 "SurfacePass.Cull");
         }
 
-        DrawStream stream = BuildDrawStream(ctx);
+        auto stream = std::make_shared<const DrawStream>(BuildDrawStream(ctx));
 
         // Depth prepass: depth-only early-Z fill before the main raster pass.
         // When active, the main raster pass switches to depth-equal test to
         // eliminate redundant fragment work (zero overdraw).
-        if (ctx.Recipe.DepthPrepass && m_DepthPrepassPipeline && !stream.Batches.empty())
+        if (ctx.Recipe.DepthPrepass && m_DepthPrepassPipeline && !stream->Batches.empty())
             AddDepthPrepass(ctx, depth, stream);
 
         // Deferred-backed paths write the G-buffer MRT set instead of SceneColorHDR.
@@ -105,7 +105,7 @@ namespace Graphics::Passes
 
             if (normal.IsValid() && albedo.IsValid() && material.IsValid())
             {
-                AddGBufferRasterPass(ctx, normal, albedo, material, depth, std::move(stream));
+                AddGBufferRasterPass(ctx, normal, albedo, material, depth, stream);
 
                 // Debug triangles render to SceneColorHDR even in deferred mode
                 // (they're editor overlays, not scene geometry).
@@ -123,7 +123,7 @@ namespace Graphics::Passes
         if (!sceneColor.IsValid())
             return;
 
-        AddRasterPass(ctx, sceneColor, depth, std::move(stream));
+        AddRasterPass(ctx, sceneColor, depth, stream);
 
         // Transient debug triangles — rendered AFTER retained geometry with alpha blending
         // and depth-write-off so fills don't occlude scene content.
@@ -619,7 +619,8 @@ namespace Graphics::Passes
         return out;
     }
 
-    void Graphics::Passes::SurfacePass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth, DrawStream&& stream)
+    void Graphics::Passes::SurfacePass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth,
+                                                        std::shared_ptr<const DrawStream> stream)
     {
         // Single raster pass consuming the draw stream. Even with no batches, we still
         // clear/write the canonical HDR scene target so downstream post-processing has
@@ -667,9 +668,9 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES, prepassActive](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                    [this, &ctx, pipeline = m_Pipeline, stream, fi = ctx.FrameIndex % FRAMES, prepassActive](const PassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
-                                        if (stream.Batches.empty())
+                                        if (stream->Batches.empty())
                                             return;
 
                                         // When depth prepass has filled SceneDepth, use EQUAL
@@ -723,7 +724,7 @@ namespace Graphics::Passes
 
                                         const RHI::GraphicsPipeline* currentPipeline = nullptr;
 
-                                        for (const DrawBatch& b : stream.Batches)
+                                        for (const DrawBatch& b : stream->Batches)
                                         {
                                             if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                                                 continue;
@@ -846,7 +847,8 @@ namespace Graphics::Passes
     // Depth Prepass (early-Z fill)
     // =========================================================================
     void Graphics::Passes::SurfacePass::AddDepthPrepass(
-        RenderPassContext& ctx, RGResourceHandle depth, DrawStream& stream)
+        RenderPassContext& ctx, RGResourceHandle depth,
+        std::shared_ptr<const DrawStream> stream)
     {
         // Depth-only pass: clears and fills SceneDepth before the main raster
         // pass. No color attachments, no fragment shader — fastest possible
@@ -883,13 +885,14 @@ namespace Graphics::Passes
                     builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                 }
             },
-            [this, &ctx, depthPipeline = m_DepthPrepassPipeline, &stream, fi = ctx.FrameIndex % FRAMES]
+            [this, &ctx, depthPipeline = m_DepthPrepassPipeline, stream, fi = ctx.FrameIndex % FRAMES]
             (const DepthPrepassData&, const RGRegistry&, VkCommandBuffer cmd)
             {
-                if (stream.Batches.empty())
+                if (stream->Batches.empty())
                     return;
 
-                vkCmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
+                // Depth compare op is statically LESS in the depth prepass pipeline
+                // (no dynamic override needed — this pipeline always fills depth).
 
                 VkViewport viewport{};
                 viewport.x = 0.0f;
@@ -936,7 +939,7 @@ namespace Graphics::Passes
                 VkBuffer currentInstBuffer = VK_NULL_HANDLE;
                 VkBuffer currentVisBuffer = VK_NULL_HANDLE;
 
-                for (const DrawBatch& b : stream.Batches)
+                for (const DrawBatch& b : stream->Batches)
                 {
                     if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                         continue;
@@ -1045,7 +1048,7 @@ namespace Graphics::Passes
         RenderPassContext& ctx,
         RGResourceHandle normal, RGResourceHandle albedo,
         RGResourceHandle material, RGResourceHandle depth,
-        DrawStream&& stream)
+        std::shared_ptr<const DrawStream> stream)
     {
         // G-buffer pass: writes to 3 MRT color targets + depth.
         // Even with no batches, we still clear/write so downstream composition
@@ -1102,10 +1105,10 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES, prepassActive]
-                                    (const GBufferPassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, stream, fi = ctx.FrameIndex % FRAMES, prepassActive]
+                                    (const GBufferPassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
-                                        if (stream.Batches.empty())
+                                        if (stream->Batches.empty())
                                             return;
 
                                         vkCmdSetDepthCompareOp(cmd, prepassActive ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS);
@@ -1152,7 +1155,7 @@ namespace Graphics::Passes
 
                                         const RHI::GraphicsPipeline* currentPipeline = nullptr;
 
-                                        for (const DrawBatch& b : stream.Batches)
+                                        for (const DrawBatch& b : stream->Batches)
                                         {
                                             if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                                                 continue;

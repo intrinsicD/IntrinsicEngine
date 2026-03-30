@@ -106,6 +106,10 @@ namespace Graphics
             builder.SetColorFormats({sceneColorFormat});
             builder.SetDepthFormat(depthFormat);
 
+            // Depth prepass shares the draw stream: prepass records LESS, raster
+            // records EQUAL. Dynamic compare-op avoids duplicate pipeline objects.
+            builder.EnableDynamicDepthCompareOp();
+
             // Current asset winding is CCW in clip space; use CCW front-face.
             // If this ever flips again, revisit the projection Y-flip convention.
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
@@ -186,6 +190,7 @@ namespace Graphics
                 builder.SetColorFormats({sceneColorFormat});
                 builder.SetDepthFormat(depthFormat);
                 builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+                builder.EnableDynamicDepthCompareOp();
 
                 builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
                 builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
@@ -222,6 +227,7 @@ namespace Graphics
                 builder.SetColorFormats({sceneColorFormat});
                 builder.SetDepthFormat(depthFormat);
                 builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
+                builder.EnableDynamicDepthCompareOp();
 
                 builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
                 builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
@@ -270,6 +276,7 @@ namespace Graphics
             });
             builder.SetDepthFormat(depthFormat);
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableDynamicDepthCompareOp();
             builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
             builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
             builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);

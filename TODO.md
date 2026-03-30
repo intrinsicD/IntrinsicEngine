@@ -17,7 +17,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - Selection, post, and debug visualization decoupled from a single lighting path.
 - Only recipe-required intermediate resources allocated per frame.
 - Migration hardened by graph compile tests, contract tests, and at least one integration test.
-- Depth prepass available for both forward and deferred paths.
+- Depth prepass available for both forward and deferred paths. ✓
 - At least one shadow-casting light type with validated resource contracts.
 
 ---
@@ -51,18 +51,6 @@ A1 (Depth Prepass) ✓ ──→ A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PC
                      └─→ future SSAO (see P2 C6)
                      └─→ future HiZ (see P2 C4)
 ```
-
-#### A1. Depth Prepass (**complete**)
-
-Depth-only early-Z prepass is implemented as an internal pass of `SurfacePass`, gated by `FrameRecipe::DepthPrepass` and the `DepthPrepass` feature flag in `FeatureCatalog`.
-
-- [x] Depth prepass writes `SceneDepth` (CLEAR+LESS) before the main raster/G-buffer pass.
-- [x] `SurfacePass` switches to depth-equal test when prepass is active (dynamic `VK_COMPARE_OP_EQUAL` via `vkCmdSetDepthCompareOp`, Vulkan 1.3 core).
-- [x] Recipe-driven: `FrameRecipe::DepthPrepass` enabled when feature on + SurfacePass enabled + geometry present.
-- [x] Pipeline: vertex-only (no fragment shader), no color attachments, depth write enabled. Reuses `Surface.Vert` + BDA push constants + same descriptor set layouts.
-- [x] Deferred path supported: G-buffer pass also uses LOAD+EQUAL when prepass active.
-- [x] 5 contract tests covering recipe enable/disable logic.
-- [x] `rendering-three-pass.md` pass contract table updated.
 
 #### A2. Cascaded Shadow Maps (CSM)
 
