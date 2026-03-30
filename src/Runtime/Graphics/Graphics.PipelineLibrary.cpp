@@ -106,6 +106,10 @@ namespace Graphics
             builder.SetColorFormats({sceneColorFormat});
             builder.SetDepthFormat(depthFormat);
 
+            // Depth prepass shares the draw stream: prepass records LESS, raster
+            // records EQUAL. Dynamic compare-op avoids duplicate pipeline objects.
+            builder.EnableDynamicDepthCompareOp();
+
             // Current asset winding is CCW in clip space; use CCW front-face.
             // If this ever flips again, revisit the projection Y-flip convention.
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
@@ -186,6 +190,7 @@ namespace Graphics
                 builder.SetColorFormats({sceneColorFormat});
                 builder.SetDepthFormat(depthFormat);
                 builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+                builder.EnableDynamicDepthCompareOp();
 
                 builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
                 builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
@@ -222,6 +227,7 @@ namespace Graphics
                 builder.SetColorFormats({sceneColorFormat});
                 builder.SetDepthFormat(depthFormat);
                 builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
+                builder.EnableDynamicDepthCompareOp();
 
                 builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
                 builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
@@ -270,6 +276,7 @@ namespace Graphics
             });
             builder.SetDepthFormat(depthFormat);
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableDynamicDepthCompareOp();
             builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
             builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
             builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
@@ -329,6 +336,53 @@ namespace Graphics
             }
 
             m_Pipelines[kPipeline_DebugSurface] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
+        // Depth prepass pipeline (depth-only, no fragment shader, no color)
+        //
+        // Reuses the same vertex shader as the forward surface pass (BDA
+        // pull-model). Zero color attachments, depth write enabled with
+        // VK_COMPARE_OP_LESS. No fragment invocations — fastest early-Z fill.
+        // Same descriptor set layout (global + bindless + instance SSBOs) so
+        // the draw stream from SurfacePass is directly consumable.
+        // ---------------------------------------------------------------------
+        {
+            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(resolver, "Surface.Vert"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_DeviceOwner);
+            builder.SetShaders(&vert, nullptr);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({});
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableDepthTest(true, VK_COMPARE_OP_LESS);
+
+            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
+            builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+
+            // Use VERTEX|FRAGMENT stage flags to match the forward pipeline layout,
+            // ensuring pipeline layout compatibility for descriptor set bindings.
+            // Vulkan allows specifying stage flags for absent stages (no fragment
+            // shader here) — the data is simply ignored for missing stages.
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = sizeof(RHI::MeshPushConstants);
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build DepthPrepass pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Pipelines[kPipeline_DepthPrepass] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------

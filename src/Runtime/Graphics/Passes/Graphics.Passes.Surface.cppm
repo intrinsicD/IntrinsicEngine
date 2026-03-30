@@ -61,6 +61,7 @@ export namespace Graphics::Passes
         void SetCullPipeline(RHI::ComputePipeline* p) { m_CullPipeline = p; }
         void SetGBufferPipeline(RHI::GraphicsPipeline* p) { m_GBufferPipeline = p; }
         void SetDebugSurfacePipeline(RHI::GraphicsPipeline* p) { m_DebugSurfacePipeline = p; }
+        void SetDepthPrepassPipeline(RHI::GraphicsPipeline* p) { m_DepthPrepassPipeline = p; }
 
         void AddPasses(RenderPassContext& ctx) override;
 
@@ -120,6 +121,11 @@ export namespace Graphics::Passes
             RGResourceHandle Depth{};
         };
 
+        struct DepthPrepassData
+        {
+            RGResourceHandle Depth{};
+        };
+
         struct GBufferPassData
         {
             RGResourceHandle Normal{};
@@ -151,6 +157,7 @@ export namespace Graphics::Passes
         RHI::ComputePipeline* m_CullPipeline = nullptr; // owned by PipelineLibrary
         RHI::GraphicsPipeline* m_GBufferPipeline = nullptr; // owned by PipelineLibrary
         RHI::GraphicsPipeline* m_DebugSurfacePipeline = nullptr; // owned by PipelineLibrary
+        RHI::GraphicsPipeline* m_DepthPrepassPipeline = nullptr; // owned by PipelineLibrary
 
         // Stage 1: SSBO pull-model.
         // CRITICAL: must match VulkanDevice::MAX_FRAMES_IN_FLIGHT (3) exactly.
@@ -278,16 +285,24 @@ export namespace Graphics::Passes
         [[nodiscard]] DrawStream BuildDrawStream(RenderPassContext& ctx);
 
         // Record a single raster pass that consumes the draw stream exactly once.
-        void AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth, DrawStream&& stream);
+        void AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth,
+                           std::shared_ptr<const DrawStream> stream);
 
         // Record a G-buffer raster pass (deferred path) that writes to MRT targets.
         void AddGBufferRasterPass(RenderPassContext& ctx,
                                   RGResourceHandle normal, RGResourceHandle albedo,
                                   RGResourceHandle material, RGResourceHandle depth,
-                                  DrawStream&& stream);
+                                  std::shared_ptr<const DrawStream> stream);
 
         // Render transient debug triangles (geometry-processing visualization).
         void AddDebugTrianglePass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth);
+
+        // Depth-only early-Z prepass. Writes SceneDepth with CLEAR before the
+        // main raster/G-buffer pass. Gated by FrameRecipe::DepthPrepass.
+        // Both the prepass and raster pass share the same DrawStream via
+        // shared_ptr to avoid dangling reference after move.
+        void AddDepthPrepass(RenderPassContext& ctx, RGResourceHandle depth,
+                             std::shared_ptr<const DrawStream> stream);
 
         // Legacy helpers (will be folded into BuildDrawStream/AddRasterPass).
         void AddStage1And2Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth);

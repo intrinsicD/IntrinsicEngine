@@ -46,7 +46,8 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | Pass | Inputs | Outputs | Initialization / Ownership |
 |------|--------|---------|----------------------------|
 | `PickingPass` | `SceneDepth` | `EntityId` | Clears both; no swapchain ownership |
-| `SurfacePass` | `SceneDepth`, GPUScene buffers | forward: `SceneColorHDR`; deferred: `SceneNormal` + `Albedo` + `Material0`, `SceneDepth` | Opaque surface lane. Clears depth plus either HDR color or the G-buffer MRT set |
+| `DepthPrepass` | GPUScene buffers | `SceneDepth` | Depth-only early-Z fill (triangle-list geometry only). Clears depth to 1.0. Recipe-driven: active only when `FrameRecipe::DepthPrepass` is true. Internal to `SurfacePass` (shares draw stream and GPU culling infrastructure) |
+| `SurfacePass` | `SceneDepth`, GPUScene buffers | forward: `SceneColorHDR`; deferred: `SceneNormal` + `Albedo` + `Material0`, `SceneDepth` | Opaque surface lane. When depth prepass is active, loads existing depth and uses `VK_COMPARE_OP_EQUAL` (zero overdraw). Otherwise clears depth with `VK_COMPARE_OP_LESS` |
 | `CompositionPass` | deferred: `SceneNormal`, `Albedo`, `Material0`, `SceneDepth` | deferred: `SceneColorHDR` | Fullscreen deferred lighting. No-op in forward mode |
 | `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for wireframe/graph/debug lines; accumulates via `LOAD` |
 | `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for point clouds/debug points; accumulates via `LOAD` |
@@ -80,15 +81,16 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 `DefaultPipeline` execution order:
 
 1. `PickingPass`
-2. `SurfacePass`
-3. `CompositionPass`
-4. `LinePass`
-5. `PointPass`
-6. `PostProcessPass`
-7. `SelectionOutlinePass`
-8. `DebugViewPass`
-9. `ImGuiPass`
-10. `Present`
+2. `DepthPrepass` (internal to `SurfacePass`, recipe-gated)
+3. `SurfacePass`
+4. `CompositionPass`
+5. `LinePass`
+6. `PointPass`
+7. `PostProcessPass`
+8. `SelectionOutlinePass`
+9. `DebugViewPass`
+10. `ImGuiPass`
+11. `Present`
 
 Lighting-path coexistence is now explicit:
 

@@ -149,6 +149,12 @@ namespace RHI
         return *this;
     }
 
+    PipelineBuilder& PipelineBuilder::EnableDynamicDepthCompareOp()
+    {
+        m_DynamicDepthCompareOp = true;
+        return *this;
+    }
+
     PipelineBuilder& PipelineBuilder::EnableAlphaBlending()
     {
         m_ColorBlendAttachment.blendEnable = VK_TRUE;
@@ -209,6 +215,11 @@ namespace RHI
         std::vector<VkDynamicState> dynamicStates = {
             VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY
         };
+        // VK_DYNAMIC_STATE_DEPTH_COMPARE_OP (Vulkan 1.3 core) is opt-in: only
+        // pipelines that need runtime compare-op switching (depth prepass/raster)
+        // request it. Other passes keep their static compare op from EnableDepthTest().
+        if (m_DynamicDepthCompareOp)
+            dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_COMPARE_OP);
         VkPipelineDynamicStateCreateInfo dynamicInfo{};
         dynamicInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
         dynamicInfo.dynamicStateCount = (uint32_t)dynamicStates.size();

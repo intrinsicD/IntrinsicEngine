@@ -88,7 +88,13 @@ namespace Graphics::Passes
                 "SurfacePass.Cull");
         }
 
-        DrawStream stream = BuildDrawStream(ctx);
+        auto stream = std::make_shared<const DrawStream>(BuildDrawStream(ctx));
+
+        // Depth prepass: depth-only early-Z fill before the main raster pass.
+        // When active, the main raster pass switches to depth-equal test to
+        // eliminate redundant fragment work (zero overdraw).
+        if (ctx.Recipe.DepthPrepass && m_DepthPrepassPipeline && !stream->Batches.empty())
+            AddDepthPrepass(ctx, depth, stream);
 
         // Deferred-backed paths write the G-buffer MRT set instead of SceneColorHDR.
         if (UsesDeferredComposition(ctx.Recipe.LightingPath) && m_GBufferPipeline)
@@ -99,7 +105,7 @@ namespace Graphics::Passes
 
             if (normal.IsValid() && albedo.IsValid() && material.IsValid())
             {
-                AddGBufferRasterPass(ctx, normal, albedo, material, depth, std::move(stream));
+                AddGBufferRasterPass(ctx, normal, albedo, material, depth, stream);
 
                 // Debug triangles render to SceneColorHDR even in deferred mode
                 // (they're editor overlays, not scene geometry).
@@ -117,7 +123,7 @@ namespace Graphics::Passes
         if (!sceneColor.IsValid())
             return;
 
-        AddRasterPass(ctx, sceneColor, depth, std::move(stream));
+        AddRasterPass(ctx, sceneColor, depth, stream);
 
         // Transient debug triangles — rendered AFTER retained geometry with alpha blending
         // and depth-write-off so fills don't occlude scene content.
@@ -613,13 +619,15 @@ namespace Graphics::Passes
         return out;
     }
 
-    void Graphics::Passes::SurfacePass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth, DrawStream&& stream)
+    void Graphics::Passes::SurfacePass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth,
+                                                        std::shared_ptr<const DrawStream> stream)
     {
         // Single raster pass consuming the draw stream. Even with no batches, we still
         // clear/write the canonical HDR scene target so downstream post-processing has
         // a valid producer in empty-scene frames.
+        const bool prepassActive = ctx.Recipe.DepthPrepass && m_DepthPrepassPipeline;
         ctx.Graph.AddPass<PassData>("ForwardRaster",
-                                    [this, &ctx, sceneColor, depth, fi = ctx.FrameIndex % FRAMES](PassData& data, RGBuilder& builder)
+                                    [this, &ctx, sceneColor, depth, fi = ctx.FrameIndex % FRAMES, prepassActive](PassData& data, RGBuilder& builder)
                                     {
                                         RGAttachmentInfo colorInfo{};
                                         colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
@@ -628,6 +636,11 @@ namespace Graphics::Passes
 
                                         RGAttachmentInfo depthInfo{};
                                         depthInfo.ClearValue.depthStencil = {1.0f, 0};
+                                        // When depth prepass has already filled SceneDepth,
+                                        // load existing depth and use equal test to skip
+                                        // redundant fragment work (zero overdraw).
+                                        if (prepassActive)
+                                            depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 
                                         data.Color = builder.WriteColor(sceneColor, colorInfo);
                                         data.Depth = builder.WriteDepth(depth, depthInfo);
@@ -655,10 +668,16 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                    [this, &ctx, pipeline = m_Pipeline, stream, fi = ctx.FrameIndex % FRAMES, prepassActive](const PassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
-                                        if (stream.Batches.empty())
+                                        if (stream->Batches.empty())
                                             return;
+
+                                        // Default depth compare: LESS (no prepass) or EQUAL
+                                        // (prepass filled depth for triangles). Per-batch
+                                        // override below handles non-triangle topologies.
+                                        const VkCompareOp triCompareOp = prepassActive ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS;
+                                        vkCmdSetDepthCompareOp(cmd, triCompareOp);
 
                                         // NOTE: We bind pipelines per-batch based on topology.
                                         // Vulkan restricts dynamic topology switches unless dynamicPrimitiveTopologyUnrestricted is enabled.
@@ -706,7 +725,7 @@ namespace Graphics::Passes
 
                                         const RHI::GraphicsPipeline* currentPipeline = nullptr;
 
-                                        for (const DrawBatch& b : stream.Batches)
+                                        for (const DrawBatch& b : stream->Batches)
                                         {
                                             if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                                                 continue;
@@ -729,6 +748,16 @@ namespace Graphics::Passes
                                             {
                                                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, desired->GetHandle());
                                                 currentPipeline = desired;
+                                            }
+
+                                            // Lines/points were not in the depth prepass (triangle-only),
+                                            // so they must use LESS_OR_EQUAL rather than EQUAL to pass
+                                            // the depth test against the prepass-filled depth buffer.
+                                            if (prepassActive)
+                                            {
+                                                const VkCompareOp batchOp = (b.Topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                                                    ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS_OR_EQUAL;
+                                                vkCmdSetDepthCompareOp(cmd, batchOp);
                                             }
 
                                             const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
@@ -826,19 +855,218 @@ namespace Graphics::Passes
     }
 
     // =========================================================================
+    // Depth Prepass (early-Z fill)
+    // =========================================================================
+    void Graphics::Passes::SurfacePass::AddDepthPrepass(
+        RenderPassContext& ctx, RGResourceHandle depth,
+        std::shared_ptr<const DrawStream> stream)
+    {
+        // Depth-only pass: clears and fills SceneDepth before the main raster
+        // pass. No color attachments, no fragment shader — fastest possible
+        // early-Z fill. The main raster pass then uses depth-equal test.
+        ctx.Graph.AddPass<DepthPrepassData>("DepthPrepass",
+            [this, &ctx, depth, fi = ctx.FrameIndex % FRAMES]
+            (DepthPrepassData& data, RGBuilder& builder)
+            {
+                RGAttachmentInfo depthInfo{};
+                depthInfo.ClearValue.depthStencil = {1.0f, 0};
+                depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                data.Depth = builder.WriteDepth(depth, depthInfo);
+
+                // Declare dependencies on GPU-culled buffers (same as forward).
+                if (m_Stage3IndirectPacked[fi])
+                {
+                    auto indirect = builder.ImportBuffer("Stage3.IndirectPacked"_id, *m_Stage3IndirectPacked[fi]);
+                    builder.Read(indirect, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+                }
+                if (m_Stage3VisibilityPacked[fi])
+                {
+                    auto visibility = builder.ImportBuffer("Stage3.VisibilityPacked"_id, *m_Stage3VisibilityPacked[fi]);
+                    builder.Read(visibility, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                }
+                if (m_Stage3DrawCountsPacked[fi])
+                {
+                    auto counts = builder.ImportBuffer("Stage3.DrawCounts"_id, *m_Stage3DrawCountsPacked[fi]);
+                    builder.Read(counts, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+                }
+                if (ctx.GpuScene)
+                {
+                    auto instances = builder.ImportBuffer("GPUScene.Scene"_id, ctx.GpuScene->GetSceneBuffer());
+                    builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                }
+            },
+            [this, &ctx, depthPipeline = m_DepthPrepassPipeline, stream, fi = ctx.FrameIndex % FRAMES]
+            (const DepthPrepassData&, const RGRegistry&, VkCommandBuffer cmd)
+            {
+                if (stream->Batches.empty())
+                    return;
+
+                // Depth compare op is statically LESS in the depth prepass pipeline
+                // (no dynamic override needed — this pipeline always fills depth).
+
+                VkViewport viewport{};
+                viewport.x = 0.0f;
+                viewport.y = 0.0f;
+                viewport.width = (float)ctx.Resolution.width;
+                viewport.height = (float)ctx.Resolution.height;
+                viewport.minDepth = 0.0f;
+                viewport.maxDepth = 1.0f;
+
+                VkRect2D scissor{};
+                scissor.offset = {0, 0};
+                scissor.extent = {ctx.Resolution.width, ctx.Resolution.height};
+
+                vkCmdSetViewport(cmd, 0, 1, &viewport);
+                vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+                // Bind the depth-only pipeline (vertex shader only, no fragment).
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, depthPipeline->GetHandle());
+
+                // Bind global camera UBO (set=0).
+                const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        depthPipeline->GetLayout(),
+                                        0, 1, &ctx.GlobalDescriptorSet,
+                                        1, &dynamicOffset);
+
+                // Bind bindless textures (set=1) — required by pipeline layout even
+                // though the depth-only vertex shader doesn't sample textures.
+                VkDescriptorSet globalTextures = ctx.Bindless.GetGlobalSet();
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        depthPipeline->GetLayout(),
+                                        1, 1, &globalTextures,
+                                        0, nullptr);
+
+                // Reuse the instance descriptor set from the current frame slot.
+                VkDescriptorSet instanceSet = m_InstanceSet[fi];
+                if (instanceSet == VK_NULL_HANDLE)
+                {
+                    instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                    m_InstanceSet[fi] = instanceSet;
+                    if (instanceSet == VK_NULL_HANDLE)
+                        return;
+                }
+                VkBuffer currentInstBuffer = VK_NULL_HANDLE;
+                VkBuffer currentVisBuffer = VK_NULL_HANDLE;
+
+                for (const DrawBatch& b : stream->Batches)
+                {
+                    if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
+                        continue;
+
+                    // Depth prepass only renders triangle-list geometry.
+                    // Lines and points have their own passes with depth bias and don't
+                    // benefit from an early-Z fill.
+                    if (b.Topology != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                        continue;
+
+                    const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
+                    const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
+
+                    if (instHandle != currentInstBuffer || visHandle != currentVisBuffer)
+                    {
+                        VkDescriptorBufferInfo instInfo{.buffer = instHandle, .offset = 0, .range = VK_WHOLE_SIZE};
+                        VkDescriptorBufferInfo visInfo{.buffer = visHandle, .offset = 0, .range = VK_WHOLE_SIZE};
+
+                        VkWriteDescriptorSet writes[2]{};
+                        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                        writes[0].dstSet = instanceSet;
+                        writes[0].dstBinding = 0;
+                        writes[0].descriptorCount = 1;
+                        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                        writes[0].pBufferInfo = &instInfo;
+
+                        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                        writes[1].dstSet = instanceSet;
+                        writes[1].dstBinding = 1;
+                        writes[1].descriptorCount = 1;
+                        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                        writes[1].pBufferInfo = &visInfo;
+
+                        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
+                        currentInstBuffer = instHandle;
+                        currentVisBuffer = visHandle;
+                    }
+
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                            depthPipeline->GetLayout(),
+                                            2, 1, &instanceSet,
+                                            0, nullptr);
+
+                    vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                    RHI::MeshPushConstants push{
+                        .Model = glm::mat4(1.0f),
+                        .PtrPositions = b.PtrPositions,
+                        .PtrNormals = b.PtrNormals,
+                        .PtrAux = b.PtrAux,
+                        .VisibilityBase = b.VisibilityBase,
+                        .PointSizePx = 1.0f,
+                        .PtrFaceAttr = 0,
+                        .PtrVertexAttr = 0,
+                        .PtrIndices = 0,
+                        .PtrCentroids = 0
+                    };
+                    vkCmdPushConstants(cmd, depthPipeline->GetLayout(),
+                                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                       0, sizeof(RHI::MeshPushConstants), &push);
+
+                    const uint32_t maxDraws = b.MaxDraws;
+                    if (maxDraws == 0)
+                        continue;
+
+                    const VkDeviceSize indirectSize = b.IndirectBuffer->GetSizeBytes();
+                    if (indirectSize <= b.IndirectOffsetBytes)
+                        continue;
+
+                    const VkDeviceSize availableBytes = indirectSize - b.IndirectOffsetBytes;
+                    const uint32_t maxDrawsInSlice = static_cast<uint32_t>(availableBytes / sizeof(VkDrawIndexedIndirectCommand));
+                    const uint32_t safeMaxDraws = std::min(maxDraws, maxDrawsInSlice);
+                    if (safeMaxDraws == 0)
+                        continue;
+
+                    if (b.CountBuffer && vkCmdDrawIndexedIndirectCountKHR)
+                    {
+                        const VkDeviceSize countSize = b.CountBuffer->GetSizeBytes();
+                        if (countSize <= b.CountOffsetBytes)
+                            continue;
+
+                        vkCmdDrawIndexedIndirectCountKHR(cmd,
+                                                         b.IndirectBuffer->GetHandle(),
+                                                         b.IndirectOffsetBytes,
+                                                         b.CountBuffer->GetHandle(),
+                                                         b.CountOffsetBytes,
+                                                         safeMaxDraws,
+                                                         sizeof(VkDrawIndexedIndirectCommand));
+                    }
+                    else
+                    {
+                        vkCmdDrawIndexedIndirect(cmd,
+                                                 b.IndirectBuffer->GetHandle(),
+                                                 b.IndirectOffsetBytes,
+                                                 safeMaxDraws,
+                                                 sizeof(VkDrawIndexedIndirectCommand));
+                    }
+                }
+            });
+    }
+
+    // =========================================================================
     // G-Buffer Raster Pass (deferred path)
     // =========================================================================
     void Graphics::Passes::SurfacePass::AddGBufferRasterPass(
         RenderPassContext& ctx,
         RGResourceHandle normal, RGResourceHandle albedo,
         RGResourceHandle material, RGResourceHandle depth,
-        DrawStream&& stream)
+        std::shared_ptr<const DrawStream> stream)
     {
         // G-buffer pass: writes to 3 MRT color targets + depth.
         // Even with no batches, we still clear/write so downstream composition
         // has valid producers in empty-scene frames.
+        const bool prepassActive = ctx.Recipe.DepthPrepass && m_DepthPrepassPipeline;
         ctx.Graph.AddPass<GBufferPassData>("GBufferRaster",
-                                    [this, &ctx, normal, albedo, material, depth, fi = ctx.FrameIndex % FRAMES]
+                                    [this, &ctx, normal, albedo, material, depth, fi = ctx.FrameIndex % FRAMES, prepassActive]
                                     (GBufferPassData& data, RGBuilder& builder)
                                     {
                                         RGAttachmentInfo normalInfo{};
@@ -858,6 +1086,8 @@ namespace Graphics::Passes
 
                                         RGAttachmentInfo depthInfo{};
                                         depthInfo.ClearValue.depthStencil = {1.0f, 0};
+                                        if (prepassActive)
+                                            depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 
                                         data.Normal   = builder.WriteColor(normal, normalInfo);
                                         data.Albedo   = builder.WriteColor(albedo, albedoInfo);
@@ -886,11 +1116,13 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES]
-                                    (const GBufferPassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, stream, fi = ctx.FrameIndex % FRAMES, prepassActive]
+                                    (const GBufferPassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
-                                        if (stream.Batches.empty())
+                                        if (stream->Batches.empty())
                                             return;
+
+                                        vkCmdSetDepthCompareOp(cmd, prepassActive ? VK_COMPARE_OP_EQUAL : VK_COMPARE_OP_LESS);
 
                                         VkViewport viewport{};
                                         viewport.x = 0.0f;
@@ -934,7 +1166,7 @@ namespace Graphics::Passes
 
                                         const RHI::GraphicsPipeline* currentPipeline = nullptr;
 
-                                        for (const DrawBatch& b : stream.Batches)
+                                        for (const DrawBatch& b : stream->Batches)
                                         {
                                             if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                                                 continue;

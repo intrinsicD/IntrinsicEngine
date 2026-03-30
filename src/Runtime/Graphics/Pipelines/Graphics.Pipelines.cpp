@@ -83,6 +83,7 @@ namespace Graphics
                               : FrameLightingPath::Forward)
             : (debugRequestsSceneColor ? FrameLightingPath::Forward : FrameLightingPath::None);
 
+        recipe.DepthPrepass = inputs.DepthPrepassEnabled && inputs.SurfacePassEnabled && hasGeometry;
         recipe.Normals = UsesDeferredComposition(recipe.LightingPath) || debugRequestsNormals;
         recipe.MaterialChannels = UsesDeferredComposition(recipe.LightingPath) || debugRequestsMaterial;
         recipe.SceneColorLDR = recipe.Post || selectionActive || debugActive || inputs.ImGuiPassEnabled;
@@ -170,6 +171,10 @@ namespace Graphics
         // Wire debug surface pipeline for transient triangle visualization.
         if (pipelineLibrary.Contains(kPipeline_DebugSurface))
             m_SurfacePass->SetDebugSurfacePipeline(&pipelineLibrary.GetOrDie(kPipeline_DebugSurface));
+
+        // Wire depth prepass pipeline for early-Z fill.
+        if (pipelineLibrary.Contains(kPipeline_DepthPrepass))
+            m_SurfacePass->SetDepthPrepassPipeline(&pipelineLibrary.GetOrDie(kPipeline_DepthPrepass));
 
         m_PathDirty = true;
     }
@@ -429,6 +434,7 @@ namespace Graphics
         inputs.DebugViewEnabled = ctx.Debug.Enabled;
         inputs.DebugResource = ctx.Debug.SelectedResource;
 
+        inputs.DepthPrepassEnabled = IsFeatureEnabled(FeatureCatalog::DepthPrepass);
         inputs.RequestedLightingPath = (inputs.CompositionPassEnabled && IsFeatureEnabled(FeatureCatalog::DeferredLighting))
             ? FrameLightingPath::Deferred
             : FrameLightingPath::Forward;
@@ -450,6 +456,7 @@ namespace Graphics
         state.PathDirty = m_PathDirty;
 
         state.PickingPass = {m_PickingPass != nullptr, m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass)};
+        state.DepthPrepass = {m_SurfacePass != nullptr, m_SurfacePass && IsFeatureEnabled(FeatureCatalog::DepthPrepass)};
         state.SurfacePass = {m_SurfacePass != nullptr, m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass)};
         state.SelectionOutlinePass = {m_SelectionOutlinePass != nullptr, m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass)};
         state.LinePass = {m_LinePass != nullptr, m_LinePass && IsFeatureEnabled(FeatureCatalog::LinePass)};

@@ -17,7 +17,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - Selection, post, and debug visualization decoupled from a single lighting path.
 - Only recipe-required intermediate resources allocated per frame.
 - Migration hardened by graph compile tests, contract tests, and at least one integration test.
-- Depth prepass available for both forward and deferred paths.
+- Depth prepass available for both forward and deferred paths. ✓
 - At least one shadow-casting light type with validated resource contracts.
 
 ---
@@ -47,23 +47,10 @@ These close critical gaps in the rendering pipeline that block or de-risk later 
 **Dependency graph:**
 
 ```
-A1 (Depth Prepass) ──→ A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
-                   └─→ future SSAO (see P2 C6)
-                   └─→ future HiZ (see P2 C4)
+A1 (Depth Prepass) ✓ ──→ A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
+                     └─→ future SSAO (see P2 C6)
+                     └─→ future HiZ (see P2 C4)
 ```
-
-#### A1. Depth Prepass
-
-A depth-only early-Z pass is a prerequisite for shadow mapping, SSAO, and efficient deferred/hybrid lighting. Without it the deferred path over-shades, and forward transparent objects lack a reliable depth reference.
-
-- [ ] Add a `DepthPrepass` render feature that writes `SceneDepth` before `SurfacePass`.
-- [ ] `SurfacePass` switches to depth-equal test when prepass is active (no redundant fragment work).
-- [ ] Recipe-driven: prepass is enabled/disabled via `FrameRecipe` feature flag.
-- [ ] Pipeline created with no fragment shader module and no color attachments (depth-only rendering). Reuse `SurfacePass` vertex pipeline + BDA push constants.
-- [ ] Validate depth prepass + deferred path: `CompositionPass` reads prepass-produced `SceneDepth` for position reconstruction.
-- [ ] Add contract test: when prepass is active, `SurfacePass` must not clear depth.
-- [ ] Add integration test: depth prepass produces correct results in both forward and deferred modes.
-- [ ] Update `rendering-three-pass.md` pass contract table.
 
 #### A2. Cascaded Shadow Maps (CSM)
 

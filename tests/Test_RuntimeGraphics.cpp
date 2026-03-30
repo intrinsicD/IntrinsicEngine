@@ -1377,3 +1377,91 @@ TEST(RenderResources, GBufferResourceDefinitions)
     EXPECT_EQ(material.Lifetime, RenderResourceLifetime::FrameTransient);
     EXPECT_TRUE(material.Optional);
 }
+
+// =========================================================================
+// Depth Prepass contract tests
+// =========================================================================
+
+TEST(DepthPrepass, RecipeEnablesPrepassWhenSurfacePassHasGeometry)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.DepthPrepassEnabled = true;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = true;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_TRUE(recipe.DepthPrepass);
+    EXPECT_TRUE(recipe.Depth);
+}
+
+TEST(DepthPrepass, RecipeDisablesPrepassWhenFeatureDisabled)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.DepthPrepassEnabled = false;
+    inputs.LinePassEnabled = true;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_FALSE(recipe.DepthPrepass);
+}
+
+TEST(DepthPrepass, RecipeDisablesPrepassWhenNoSurfacePass)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = false;
+    inputs.DepthPrepassEnabled = true;
+    inputs.LinePassEnabled = true;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_FALSE(recipe.DepthPrepass);
+}
+
+TEST(DepthPrepass, RecipeDisablesPrepassWhenNoGeometry)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.DepthPrepassEnabled = true;
+    inputs.LinePassEnabled = false;
+    inputs.PointPassEnabled = false;
+    // SurfacePassEnabled alone counts as hasGeometry
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_TRUE(recipe.DepthPrepass);
+
+    // No geometry passes at all
+    DefaultPipelineRecipeInputs noGeo{};
+    noGeo.SurfacePassEnabled = false;
+    noGeo.DepthPrepassEnabled = true;
+    noGeo.LinePassEnabled = false;
+    noGeo.PointPassEnabled = false;
+    const FrameRecipe noGeoRecipe = BuildDefaultPipelineRecipe(noGeo);
+    EXPECT_FALSE(noGeoRecipe.DepthPrepass);
+}
+
+TEST(DepthPrepass, PrepassDoesNotAffectDepthRequirement)
+{
+    using namespace Graphics;
+
+    // Depth should be required regardless of prepass state when geometry exists.
+    DefaultPipelineRecipeInputs withPrepass{};
+    withPrepass.SurfacePassEnabled = true;
+    withPrepass.DepthPrepassEnabled = true;
+    const FrameRecipe withRecipe = BuildDefaultPipelineRecipe(withPrepass);
+
+    DefaultPipelineRecipeInputs withoutPrepass{};
+    withoutPrepass.SurfacePassEnabled = true;
+    withoutPrepass.DepthPrepassEnabled = false;
+    const FrameRecipe withoutRecipe = BuildDefaultPipelineRecipe(withoutPrepass);
+
+    EXPECT_EQ(withRecipe.Depth, withoutRecipe.Depth);
+    EXPECT_TRUE(withRecipe.Requires(RenderResource::SceneDepth));
+    EXPECT_TRUE(withoutRecipe.Requires(RenderResource::SceneDepth));
+}
