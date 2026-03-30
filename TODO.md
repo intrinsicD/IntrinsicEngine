@@ -295,6 +295,7 @@ Eight geometry operators have full backends (Params/Result/optional contract, me
 - [ ] **Vector Heat Method:** Add widget in Inspector Geometry Processing section (Vertex mode). Source vertices from `SubElementSelection`. Two buttons: "Transport Vectors" and "Compute Log Map". Display per-vertex `v:transported_vector`/`v:logmap_coords` properties. Auto-switch color source to angle/distance.
 - [ ] **Normal Estimation:** Add "Estimate Normals" button for point cloud entities in Inspector. Expose `KNeighbors` and orientation strategy. Re-upload normals on completion for immediate surfel rendering.
 - [ ] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel. Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Add per-metric histograms via ImGui `PlotHistogram`. No per-element publishing (that's Mesh Analysis); this is summary diagnostics.
+- [ ] **Benchmark Runner Panel:** Add a Benchmark panel via `GUI::RegisterPanel`. Expose frame count, warmup frames, and output path inputs. "Run Benchmark" button calls `BenchmarkRunner::Configure()` + `Start()`. Display `BenchmarkStats` summary (avg/min/max/p95/p99 frame time, avg FPS, per-pass averages) in a table after completion. Currently CLI-only (`--benchmark`).
 
 #### F2. Rendering Controls UI
 
