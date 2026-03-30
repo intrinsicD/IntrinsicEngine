@@ -162,11 +162,12 @@ Mapping guidance for current Intrinsic code:
 
 #### B1. Render Preparation as Job-Scheduled Work
 
-First concrete deliverable: CPU frustum culling of `SurfaceDrawPacket`s using existing `Geometry::Frustum` + GPUScene bounding spheres, producing a filtered draw list consumed by `SurfacePass`. Structure draw packets so they are consumable by both CPU and GPU cull paths (forward reference: P2 C9).
+Centralize CPU frustum culling into a render-preparation step that consumes immutable `RenderWorld` state and produces filtered draw lists consumed by passes. Structure draw packets so they are consumable by both CPU and GPU cull paths (forward reference: P2 C9).
 
-- [ ] Extract `RenderDriver::PrepareFrame()` rendering preparation into a schedulable unit that consumes immutable `RenderWorld` state.
+- [x] Centralize Line/Point CPU frustum culling into `CullDrawPackets()` in `Graphics.RenderPipeline`, producing `CulledDrawList` consumed by `LinePass` and `PointPass`. Self-contained `LocalBoundingSphere` on draw packets enables future GPU cull path.
+- [x] Add 8 integration tests (`DrawCulling.*`): culling disabled, behind camera, beyond far plane, zero radius, empty packets, transform-into-view, statistics, consistency with per-sphere test.
+- [ ] Extract `RenderDriver::PrepareFrame()` rendering preparation into a schedulable unit (job-graph node) rather than inline sequential call.
 - [ ] Emit draw packets and scheduling metadata rather than immediate live-state callbacks.
-- [ ] Add integration test: render preparation produces correct draw packet count for a known scene with partially culled entities.
 
 #### B2. GPU Submission Stage Hardening
 
