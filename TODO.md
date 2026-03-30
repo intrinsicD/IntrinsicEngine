@@ -280,31 +280,32 @@ F3 (Undo Integration) ──→ F5 (Context Menus, use undo for delete/duplicate
 F4 (Hierarchy Tree) — no deps
 F5 (Context Menus) — depends on F3 for reversible actions
 F6 (Editor Polish) — no deps, incremental
-F7 (Render Target Viewer) — depends on E2 for GPU memory display
+F7 (Render Target Viewer) — no hard deps; memory footprint sub-item soft-depends on E2
 ```
 
 #### F1. Wire Remaining Geometry Operators to UI
 
-Eight geometry operators have full backends (Params/Result/optional contract, mesh property publishing, test coverage) but no editor panel or trigger button. Wire each using the existing `GeometryWorkflowController` + `Widgets` pattern.
+Seven geometry operators and one profiling tool have full backends but no editor panel or trigger button. Wire each using the existing `GeometryWorkflowController` + `Widgets` pattern. (Note: Geodesic Distance, K-Means, Mesh Analysis, Remeshing, Simplification, Smoothing, Subdivision, and Repair are already wired.)
 
-- [ ] **Shortest Path (Dijkstra):** Add widget in Inspector Geometry Processing section. Source vertices from `SubElementSelection`. Target vertices optional (empty = full tree). Display result path length, vertex count. Publish `v:shortest_path_distance` and auto-switch color source. Add "Extract Path Graph" button to materialize `Graph::Graph` entity from predecessor tree.
+- [ ] **Shortest Path (Dijkstra):** Add widget in Inspector Geometry Processing section. Source vertices from `SubElementSelection`. Target vertices optional (empty = full tree). Display result path length, vertex count. Publish `v:shortest_path_distance` and auto-switch color source. "Extract Path Graph" button materializes result as a new `Graph::Graph` entity (requires entity-creation plumbing similar to `SpawnDemoPointCloud`).
 - [ ] **Parameterization (LSCM):** Add dedicated Geometry → Parameterization panel. Pin vertex selection from `SubElementSelection` (or auto-pin boundary). Display conformal energy, flipped triangle count. Publish `v:texcoord` and offer UV checker visualization toggle.
-- [ ] **Boolean CSG:** Add Geometry → Boolean panel. Entity A = selected, Entity B = secondary pick. Operation combo (Union/Intersection/Difference). Display vertex/face counts of result. Warn on partial overlap (baseline limitation).
-- [ ] **Convex Hull Builder:** Add "Compute Convex Hull" button in Inspector Geometry Processing section. Materialize result as new `Halfedge::Mesh` entity. Display hull vertex/face counts and volume.
+- [ ] **Boolean CSG:** Add Geometry → Boolean panel. Entity A = selected, Entity B = chosen via entity combo box (no secondary pick API exists). Operation combo (Union/Intersection/Difference). Display vertex/face counts of result. Warn on partial overlap (baseline limitation).
+- [ ] **Convex Hull Builder:** Add "Compute Convex Hull" button in Inspector Geometry Processing section. Materialize result as new `Halfedge::Mesh` entity. Display hull vertex/face counts and volume. (Complements the existing wireframe debug visualization in `SpatialDebugController`.)
 - [ ] **Surface Reconstruction:** Add Geometry → Reconstruct Surface panel. Expose `KNeighbors`, `GridResolution`, `Padding` params. Enable only for point cloud entities. Display reconstructed mesh vertex/face count. Materialize as new mesh entity.
 - [ ] **Vector Heat Method:** Add widget in Inspector Geometry Processing section (Vertex mode). Source vertices from `SubElementSelection`. Two buttons: "Transport Vectors" and "Compute Log Map". Display per-vertex `v:transported_vector`/`v:logmap_coords` properties. Auto-switch color source to angle/distance.
 - [ ] **Normal Estimation:** Add "Estimate Normals" button for point cloud entities in Inspector. Expose `KNeighbors` and orientation strategy. Re-upload normals on completion for immediate surfel rendering.
-- [ ] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel. Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Add per-metric histograms via ImGui `PlotHistogram`. No per-element publishing (that's Mesh Analysis); this is summary diagnostics.
+- [ ] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel (distinct from the existing Mesh Analysis defect-marker panel). Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Per-metric histograms via ImGui `PlotHistogram`. Summary diagnostics only — no per-element property publishing.
 - [ ] **Benchmark Runner Panel:** Add a Benchmark panel via `GUI::RegisterPanel`. Expose frame count, warmup frames, and output path inputs. "Run Benchmark" button calls `BenchmarkRunner::Configure()` + `Start()`. Display `BenchmarkStats` summary (avg/min/max/p95/p99 frame time, avg FPS, per-pass averages) in a table after completion. Currently CLI-only (`--benchmark`).
 
 #### F2. Rendering Controls UI
 
 The lighting environment, camera properties, and render mode are controlled programmatically but lack editor panels.
 
-- [ ] **Light Environment Panel:** Add View Settings → Lighting section. Expose `LightEnvironmentPacket` fields: direction (3-axis sliders or gizmo), intensity, color, ambient color, ambient intensity. Changes propagate through `RenderWorld::Lighting` extraction. Store in scene serialization.
+- [ ] **Light Environment Panel:** Add View Settings → Lighting section. Expose `LightEnvironmentPacket` fields: direction (3-axis sliders or gizmo), intensity, color, ambient color, ambient intensity. Changes propagate through `RenderWorld::Lighting` extraction. Requires adding a mutable `LightEnvironmentPacket` on `RenderOrchestrator` or as an ECS component.
+- [ ] **Light Environment Serialization:** Extend `Runtime::SceneSerializer` to persist light environment fields. Separate commit from the panel itself.
 - [ ] **Camera Property Editor:** Add View Settings → Camera section. Expose FOV (degrees slider), near/far clip planes, projection type (perspective/orthographic). Orthographic zoom factor when in ortho mode. Display current eye position and look direction read-only.
-- [ ] **Render Mode Toolbar:** Add viewport overlay dropdown for per-entity or global rendering mode switching: Shaded, Wireframe, Wireframe+Shaded, Points, Flat Shading. Implementation: toggle `Surface::Component`/`Line::Component`/`Point::Component` presence on selected entities, or set a global override in `VisualizationConfig`.
-- [ ] **Lighting Path Selector:** Move the `FrameLightingPath` toggle (Forward/Deferred) from FeatureRegistry into a prominent View Settings → Rendering combo box with a descriptive label. Keep the FeatureRegistry entry as the backing store.
+- [ ] **Global Render Mode Override:** Add a viewport-level render mode dropdown (Shaded/Wireframe/Wireframe+Shaded/Points/Flat). This is a *global* override distinct from the existing per-entity Surface/Wireframe/Vertex visibility toggles in the Inspector. Set a global override in `VisualizationConfig` that passes consume during draw.
+- [ ] **Lighting Path Selector:** Move the `FrameLightingPath` toggle (Forward/Deferred) from the Feature Browser into a prominent View Settings → Rendering combo box. The FeatureRegistry entry remains the backing store; this adds a more discoverable access point.
 
 #### F3. Undo/Redo Integration
 
@@ -314,8 +315,8 @@ The lighting environment, camera properties, and render mode are controlled prog
 - [ ] Add Edit → Undo / Redo menu items with Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) keyboard shortcuts.
 - [ ] Wrap `TransformGizmo` drag completion (mouse release) as a `TransformCommand` capturing before/after `Transform::Component` snapshots for all affected entities.
 - [ ] Wrap Inspector numeric field edits (point size, line width, color changes) as property commands via `MakeComponentChangeCommand<T>()`.
-- [ ] Wrap geometry operator applications (simplify, remesh, smooth, subdivide, repair) as commands capturing mesh state before/after.
 - [ ] Wrap entity creation/deletion from hierarchy context menu as commands.
+- [ ] Wrap geometry operator applications (simplify, remesh, smooth, subdivide, repair) as commands capturing mesh state before/after. Note: full mesh deep-copy snapshots are expensive for large meshes. Evaluate shallow CoW or diff-based approach if memory pressure is measured. Consider deferring to P2 if the snapshot cost is prohibitive.
 - [ ] Display undo/redo stack depth in status bar or Edit menu (e.g. "Undo: Scale (3 remaining)").
 
 #### F4. Hierarchy Panel Improvements
@@ -326,7 +327,7 @@ The hierarchy panel renders a flat entity list. The backend supports parent-chil
 - [ ] Add drag-and-drop reparenting: dragging entity A onto entity B sets A's parent to B. Compute local transform via `TryComputeLocalTransform()`.
 - [ ] Add expand/collapse all buttons.
 - [ ] Display entity icons by component type (mesh, graph, point cloud, empty/group).
-- [ ] Add multi-selection support in hierarchy (Ctrl+click, Shift+click range).
+- [ ] Add multi-entity selection support in hierarchy (Ctrl+click, Shift+click range). Cross-cutting: propagates into Inspector (multi-object editing, F6), gizmo (already supports multi-select), and context menus. Track as a separate sub-task if scope grows.
 - [ ] Right-click context menu: Delete, Duplicate, Rename, Create Child, Focus Camera, Toggle Visibility.
 
 #### F5. Viewport Context Menus
@@ -335,7 +336,7 @@ No right-click context menu exists in the 3D viewport.
 
 - [ ] Right-click on entity: Focus Camera, Delete, Duplicate, Select Children, Toggle Visibility, Isolate (hide all others).
 - [ ] Right-click on empty space: Create Primitive (Cube/Sphere/Plane/Cylinder), Paste, Reset Camera.
-- [ ] Right-click on sub-element (vertex/edge/face mode): Select Connected, Select Ring/Loop (edges), Grow Selection, Shrink Selection.
+- [ ] Right-click on sub-element (vertex/edge/face mode): Select Connected, Grow Selection, Shrink Selection. Edge Ring/Loop selection deferred until halfedge traversal helpers for manifold strip walking are verified or added.
 - [ ] All destructive actions routed through `CommandHistory` (F3 dependency).
 
 #### F6. Editor Polish
@@ -344,7 +345,7 @@ Incremental improvements that modernize the editor feel. Each is independent.
 
 - [ ] **Default Dock Layout:** ImGui docking is already enabled. Create a programmatic default dock layout on first launch (Hierarchy left, Viewport center, Inspector right, Assets/Log bottom). Save/restore via `imgui.ini`.
 - [ ] **Status Bar Enrichment:** Display: selection mode (Entity/Vertex/Edge/Face), selected entity count, selected sub-element count, GPU memory usage (when E2 lands), current lighting path, active tool name.
-- [ ] **Console/Log Panel:** Add a scrollable, filterable log panel capturing engine log output (currently stdout-only). Category filters (Info/Warning/Error), search, auto-scroll toggle, clear button.
+- [ ] **Console/Log Panel:** Add a scrollable, filterable log panel capturing engine log output (currently stdout-only). Category filters (Info/Warning/Error), search, auto-scroll toggle, clear button. Prerequisite: add a ring-buffer log sink to the logging backend so the panel can read captured entries.
 - [ ] **Theme Presets:** Add View → Theme submenu with Dark (default), Light, and High Contrast presets. Store preference in `imgui.ini` or a separate editor prefs file.
 - [ ] **Keyboard Shortcut Display:** Show bound shortcut keys next to menu items and toolbar buttons (e.g. "Translate (W)"). Add a Help → Keyboard Shortcuts reference panel.
 - [ ] **Multi-Object Property Editing:** When multiple entities are selected, Inspector shows shared properties with mixed-value indicators. Edits apply to all selected entities. Use `CommandHistory` for batch undo.
