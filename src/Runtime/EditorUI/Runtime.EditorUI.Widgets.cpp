@@ -46,6 +46,7 @@ import Geometry.Smoothing;
 import Geometry.CatmullClark;
 import Geometry.MeshRepair;
 import Geometry.MeshAnalysis;
+import Geometry.NormalEstimation;
 
 import Core.Logging;
 
@@ -1729,6 +1730,89 @@ bool DrawRepairWidget(Runtime::Engine& engine,
     {
         static_cast<void>(Geometry::MeshRepair::Repair(mesh));
     });
+}
+
+// =========================================================================
+// Normal Estimation (Point Cloud)
+// =========================================================================
+
+bool DrawNormalEstimationWidget(Runtime::Engine& engine,
+                                entt::entity entity,
+                                NormalEstimationWidgetState& state)
+{
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+
+    auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity);
+    if (!pcd || !pcd->CloudRef || pcd->CloudRef->IsEmpty())
+    {
+        ImGui::TextDisabled("Normal Estimation requires a point cloud with positions.");
+        return false;
+    }
+
+    ImGui::TextDisabled("Estimates surface normals via PCA local plane fitting\n"
+                        "with MST-based consistent orientation (Hoppe et al. 1992).");
+
+    ImGui::SliderInt("K Neighbors", &state.KNeighbors, 3, 50);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Number of nearest neighbors for local plane fitting.\n"
+                          "Larger k = smoother normals, less sensitive to features.");
+    ImGui::Checkbox("Orient Normals (MST)", &state.OrientNormals);
+
+    const bool hasNormals = pcd->CloudRef->HasNormals();
+    if (hasNormals)
+        ImGui::TextColored({0.4f, 0.8f, 0.4f, 1.0f}, "Cloud already has normals (%zu points).",
+                           pcd->CloudRef->Normals().size());
+
+    const bool pressed = ImGui::Button(hasNormals ? "Re-estimate Normals" : "Estimate Normals");
+
+    // Persistent result / failure display (survives across frames).
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last estimation failed (too few points?).");
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Estimated: %zu normals", state.EstimatedCount);
+        ImGui::Text("Degenerate neighborhoods: %zu", state.DegenerateCount);
+        if (state.FlippedCount > 0)
+            ImGui::Text("Flipped during orientation: %zu", state.FlippedCount);
+    }
+
+    if (!pressed)
+        return false;
+
+    Geometry::NormalEstimation::EstimationParams params;
+    params.KNeighbors = static_cast<std::size_t>(std::max(3, state.KNeighbors));
+    params.OrientNormals = state.OrientNormals;
+
+    auto positions = pcd->CloudRef->Positions();
+    auto result = Geometry::NormalEstimation::EstimateNormals(positions, params);
+    if (!result)
+    {
+        state.LastRunFailed = true;
+        state.HasResults = false;
+        return false;
+    }
+
+    state.LastRunFailed = false;
+    state.HasResults = true;
+    state.EstimatedCount = result->Normals.size();
+    state.DegenerateCount = result->DegenerateCount;
+    state.FlippedCount = result->FlippedCount;
+
+    auto& cloud = *pcd->CloudRef;
+    if (!cloud.HasNormals())
+        cloud.EnableNormals();
+
+    auto normals = cloud.Normals();
+    for (std::size_t i = 0; i < result->Normals.size() && i < normals.size(); ++i)
+        normals[i] = result->Normals[i];
+
+    pcd->GpuDirty = true;
+
+    Core::Log::Info("NormalEstimation: estimated {} normals ({} degenerate, {} flipped)",
+                    result->Normals.size(), result->DegenerateCount, result->FlippedCount);
+
+    return true;
 }
 
 // =========================================================================

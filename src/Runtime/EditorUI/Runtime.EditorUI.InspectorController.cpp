@@ -263,6 +263,9 @@ void InspectorController::Draw()
                     case GeometryProcessingAlgorithm::Repair:
                         static_cast<void>(DrawRepairWidget(*m_Engine, selected));
                         break;
+                    case GeometryProcessingAlgorithm::NormalEstimation:
+                        static_cast<void>(DrawNormalEstimationWidget(*m_Engine, selected, m_NormalEstimationUi));
+                        break;
                     }
 
                     if (m_GeometryWorkflow && entry.Algorithm != GeometryProcessingAlgorithm::KMeans)

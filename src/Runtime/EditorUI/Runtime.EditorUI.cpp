@@ -56,6 +56,7 @@ namespace Runtime::EditorUI
             case GeometryProcessingAlgorithm::Repair:
                 return true;
             case GeometryProcessingAlgorithm::KMeans:
+            case GeometryProcessingAlgorithm::NormalEstimation:
             default:
                 return false;
             }
@@ -89,6 +90,7 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::Smoothing: return "Smoothing";
         case GeometryProcessingAlgorithm::Subdivision: return "Subdivision";
         case GeometryProcessingAlgorithm::Repair: return "Repair";
+        case GeometryProcessingAlgorithm::NormalEstimation: return "Normal Estimation";
         default: return "Unknown";
         }
     }
@@ -147,6 +149,8 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::Subdivision:
         case GeometryProcessingAlgorithm::Repair:
             return kMeshTopologyDomains;
+        case GeometryProcessingAlgorithm::NormalEstimation:
+            return GeometryProcessingDomain::PointCloudPoints;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -163,8 +167,9 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
-        static constexpr std::array<GeometryProcessingAlgorithm, 6> kAlgorithmOrder = {
+        static constexpr std::array<GeometryProcessingAlgorithm, 7> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
+            GeometryProcessingAlgorithm::NormalEstimation,
             GeometryProcessingAlgorithm::Remeshing,
             GeometryProcessingAlgorithm::Simplification,
             GeometryProcessingAlgorithm::Smoothing,
