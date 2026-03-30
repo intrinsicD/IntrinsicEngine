@@ -301,7 +301,6 @@ Seven geometry operators and one profiling tool have full backends but no editor
 
 The lighting environment, camera properties, and render mode are controlled programmatically but lack editor panels.
 
-- [ ] **Light Environment Panel:** Add View Settings → Lighting section. Expose `LightEnvironmentPacket` fields: direction (3-axis sliders or gizmo), intensity, color, ambient color, ambient intensity. Changes propagate through `RenderWorld::Lighting` extraction. Requires adding a mutable `LightEnvironmentPacket` on `RenderOrchestrator` or as an ECS component.
 - [ ] **Light Environment Serialization:** Extend `Runtime::SceneSerializer` to persist light environment fields. Separate commit from the panel itself.
 - [ ] **Camera Property Editor:** Add View Settings → Camera section. Expose FOV (degrees slider), near/far clip planes, projection type (perspective/orthographic). Orthographic zoom factor when in ortho mode. Display current eye position and look direction read-only.
 - [ ] **Global Render Mode Override:** Add a viewport-level render mode dropdown (Shaded/Wireframe/Wireframe+Shaded/Points/Flat). This is a *global* override distinct from the existing per-entity Surface/Wireframe/Vertex visibility toggles in the Inspector. Set a global override in `VisualizationConfig` that passes consume during draw.

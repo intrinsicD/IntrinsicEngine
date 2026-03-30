@@ -324,6 +324,10 @@ namespace Runtime
     {
         RenderWorld world = Runtime::ExtractRenderWorld(input);
 
+        // Override the default lighting with the driver-owned settings
+        // so UI-driven changes propagate into the rendered frame.
+        world.Lighting = m_RenderDriver->GetLightEnvironment();
+
         // Snapshot transient debug draw data into immutable vectors so render
         // passes consume frozen state instead of the live DebugDraw accumulator.
         auto lines = m_DebugDraw.GetLines();
