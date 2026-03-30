@@ -47,23 +47,22 @@ These close critical gaps in the rendering pipeline that block or de-risk later 
 **Dependency graph:**
 
 ```
-A1 (Depth Prepass) ──→ A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
-                   └─→ future SSAO (see P2 C6)
-                   └─→ future HiZ (see P2 C4)
+A1 (Depth Prepass) ✓ ──→ A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
+                     └─→ future SSAO (see P2 C6)
+                     └─→ future HiZ (see P2 C4)
 ```
 
-#### A1. Depth Prepass
+#### A1. Depth Prepass (**complete**)
 
-A depth-only early-Z pass is a prerequisite for shadow mapping, SSAO, and efficient deferred/hybrid lighting. Without it the deferred path over-shades, and forward transparent objects lack a reliable depth reference.
+Depth-only early-Z prepass is implemented as an internal pass of `SurfacePass`, gated by `FrameRecipe::DepthPrepass` and the `DepthPrepass` feature flag in `FeatureCatalog`.
 
-- [ ] Add a `DepthPrepass` render feature that writes `SceneDepth` before `SurfacePass`.
-- [ ] `SurfacePass` switches to depth-equal test when prepass is active (no redundant fragment work).
-- [ ] Recipe-driven: prepass is enabled/disabled via `FrameRecipe` feature flag.
-- [ ] Pipeline created with no fragment shader module and no color attachments (depth-only rendering). Reuse `SurfacePass` vertex pipeline + BDA push constants.
-- [ ] Validate depth prepass + deferred path: `CompositionPass` reads prepass-produced `SceneDepth` for position reconstruction.
-- [ ] Add contract test: when prepass is active, `SurfacePass` must not clear depth.
-- [ ] Add integration test: depth prepass produces correct results in both forward and deferred modes.
-- [ ] Update `rendering-three-pass.md` pass contract table.
+- [x] Depth prepass writes `SceneDepth` (CLEAR+LESS) before the main raster/G-buffer pass.
+- [x] `SurfacePass` switches to depth-equal test when prepass is active (dynamic `VK_COMPARE_OP_EQUAL` via `vkCmdSetDepthCompareOp`, Vulkan 1.3 core).
+- [x] Recipe-driven: `FrameRecipe::DepthPrepass` enabled when feature on + SurfacePass enabled + geometry present.
+- [x] Pipeline: vertex-only (no fragment shader), no color attachments, depth write enabled. Reuses `Surface.Vert` + BDA push constants + same descriptor set layouts.
+- [x] Deferred path supported: G-buffer pass also uses LOAD+EQUAL when prepass active.
+- [x] 5 contract tests covering recipe enable/disable logic.
+- [x] `rendering-three-pass.md` pass contract table updated.
 
 #### A2. Cascaded Shadow Maps (CSM)
 

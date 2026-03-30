@@ -91,4 +91,5 @@ export namespace Graphics
     inline constexpr StringID kPipeline_PickPoint = "Pipeline.PickPoint"_id;
     inline constexpr StringID kPipeline_SurfaceGBuffer = "Pipeline.SurfaceGBuffer"_id;
     inline constexpr StringID kPipeline_DebugSurface = "Pipeline.DebugSurface"_id;
+    inline constexpr StringID kPipeline_DepthPrepass = "Pipeline.DepthPrepass"_id;
 }

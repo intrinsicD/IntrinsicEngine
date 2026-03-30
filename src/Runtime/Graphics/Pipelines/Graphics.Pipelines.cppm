@@ -34,6 +34,7 @@ export namespace Graphics
     {
         bool PickingPassEnabled = true;
         bool SurfacePassEnabled = true;
+        bool DepthPrepassEnabled = true;
         bool LinePassEnabled = true;
         bool PointPassEnabled = true;
         bool PostProcessPassEnabled = true;

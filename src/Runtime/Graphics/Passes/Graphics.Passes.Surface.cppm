@@ -61,6 +61,7 @@ export namespace Graphics::Passes
         void SetCullPipeline(RHI::ComputePipeline* p) { m_CullPipeline = p; }
         void SetGBufferPipeline(RHI::GraphicsPipeline* p) { m_GBufferPipeline = p; }
         void SetDebugSurfacePipeline(RHI::GraphicsPipeline* p) { m_DebugSurfacePipeline = p; }
+        void SetDepthPrepassPipeline(RHI::GraphicsPipeline* p) { m_DepthPrepassPipeline = p; }
 
         void AddPasses(RenderPassContext& ctx) override;
 
@@ -120,6 +121,11 @@ export namespace Graphics::Passes
             RGResourceHandle Depth{};
         };
 
+        struct DepthPrepassData
+        {
+            RGResourceHandle Depth{};
+        };
+
         struct GBufferPassData
         {
             RGResourceHandle Normal{};
@@ -151,6 +157,7 @@ export namespace Graphics::Passes
         RHI::ComputePipeline* m_CullPipeline = nullptr; // owned by PipelineLibrary
         RHI::GraphicsPipeline* m_GBufferPipeline = nullptr; // owned by PipelineLibrary
         RHI::GraphicsPipeline* m_DebugSurfacePipeline = nullptr; // owned by PipelineLibrary
+        RHI::GraphicsPipeline* m_DepthPrepassPipeline = nullptr; // owned by PipelineLibrary
 
         // Stage 1: SSBO pull-model.
         // CRITICAL: must match VulkanDevice::MAX_FRAMES_IN_FLIGHT (3) exactly.
@@ -288,6 +295,10 @@ export namespace Graphics::Passes
 
         // Render transient debug triangles (geometry-processing visualization).
         void AddDebugTrianglePass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth);
+
+        // Depth-only early-Z prepass. Writes SceneDepth with CLEAR before the
+        // main raster/G-buffer pass. Gated by FrameRecipe::DepthPrepass.
+        void AddDepthPrepass(RenderPassContext& ctx, RGResourceHandle depth, DrawStream& stream);
 
         // Legacy helpers (will be folded into BuildDrawStream/AddRasterPass).
         void AddStage1And2Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth);

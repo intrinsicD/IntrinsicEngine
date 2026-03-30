@@ -206,8 +206,12 @@ namespace RHI
         vertexInputInfo.pVertexAttributeDescriptions = m_VertexInput.Attributes.data();
 
         // 3. Dynamic State
+        // VK_DYNAMIC_STATE_DEPTH_COMPARE_OP is core in Vulkan 1.3. It enables
+        // depth prepass to share the same pipeline as the main raster pass:
+        // the prepass records with LESS, the main pass records with EQUAL.
         std::vector<VkDynamicState> dynamicStates = {
-            VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY
+            VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
+            VK_DYNAMIC_STATE_DEPTH_COMPARE_OP
         };
         VkPipelineDynamicStateCreateInfo dynamicInfo{};
         dynamicInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;

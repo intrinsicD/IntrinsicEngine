@@ -184,6 +184,7 @@ export namespace Graphics
     struct FrameRecipe
     {
         bool Depth = false;
+        bool DepthPrepass = false;
         bool EntityId = false;
         bool PrimitiveId = false;
         bool Normals = false;
@@ -510,6 +511,7 @@ export namespace Graphics
         bool HasFeatureRegistry = false;
         bool PathDirty = false;
         RenderPipelineFeatureDebugState PickingPass{};
+        RenderPipelineFeatureDebugState DepthPrepass{};
         RenderPipelineFeatureDebugState SurfacePass{};
         RenderPipelineFeatureDebugState SelectionOutlinePass{};
         RenderPipelineFeatureDebugState LinePass{};

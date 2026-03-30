@@ -332,6 +332,49 @@ namespace Graphics
         }
 
         // ---------------------------------------------------------------------
+        // Depth prepass pipeline (depth-only, no fragment shader, no color)
+        //
+        // Reuses the same vertex shader as the forward surface pass (BDA
+        // pull-model). Zero color attachments, depth write enabled with
+        // VK_COMPARE_OP_LESS. No fragment invocations — fastest early-Z fill.
+        // Same descriptor set layout (global + bindless + instance SSBOs) so
+        // the draw stream from SurfacePass is directly consumable.
+        // ---------------------------------------------------------------------
+        {
+            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(resolver, "Surface.Vert"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_DeviceOwner);
+            builder.SetShaders(&vert, nullptr);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({});
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableDepthTest(true, VK_COMPARE_OP_LESS);
+
+            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
+            builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = sizeof(RHI::MeshPushConstants);
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build DepthPrepass pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Pipelines[kPipeline_DepthPrepass] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
         // Picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         {

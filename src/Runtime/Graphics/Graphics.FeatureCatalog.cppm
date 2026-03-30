@@ -58,4 +58,9 @@ export namespace Graphics::FeatureCatalog
         Core::FeatureCategory::RenderFeature,
         "Deferred lighting path (G-buffer + fullscreen composition)",
         false);
+
+    inline constexpr Core::FeatureDescriptor DepthPrepass = MakeFeatureDescriptor(
+        "DepthPrepass",
+        Core::FeatureCategory::RenderFeature,
+        "Depth-only early-Z prepass for efficient shading and shadow mapping foundation");
 }
