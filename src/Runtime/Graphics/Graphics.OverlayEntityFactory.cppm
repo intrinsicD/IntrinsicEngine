@@ -13,27 +13,32 @@
 // VectorFieldManager and makes it available to editor UI and algorithms.
 
 module;
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <entt/entity/registry.hpp>
 
 export module Graphics.OverlayEntityFactory;
 
+import Graphics.Geometry;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.PointCloudUtils;
+import RHI.Device;
+import RHI.Transfer;
 
 export namespace Graphics::OverlayEntityFactory
 {
     /// Create a child Mesh overlay on a parent entity.
     /// Returns the child entity with Mesh::Data + Surface::Component +
-    /// DataAuthority::MeshTag.  The child is selectable and follows the
-    /// parent's transform.
+    /// DataAuthority::MeshTag.  The mesh is uploaded immediately so the
+    /// surface handle is valid for rendering/picking on the first frame.
     entt::entity CreateMeshOverlay(
         entt::registry& registry,
         entt::entity parent,
         std::shared_ptr<Geometry::Halfedge::Mesh> mesh,
+        std::shared_ptr<RHI::VulkanDevice> device,
+        RHI::TransferManager& transferManager,
+        Graphics::GeometryPool& geometryStorage,
         const std::string& name);
 
     /// Create a child PointCloud overlay on a parent entity.
