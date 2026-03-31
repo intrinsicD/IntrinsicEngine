@@ -1,4 +1,5 @@
 module;
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <thread>
@@ -177,6 +178,16 @@ export namespace Runtime
         IPlatformFrameHost& Host;
         FrameClock& Clock;
         double MinimizedWaitSeconds = 0.05;
+        // Optional active-frame pacing cap to reduce CPU busy looping when
+        // running uncapped present modes (0.0 disables pacing).
+        double MaxActiveFps = 0.0;
+        Core::InplaceFunction<void(double), 64> SleepForSeconds =
+            [](double seconds)
+        {
+            if (seconds <= 0.0)
+                return;
+            std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+        };
         std::thread::id OwningThread = std::this_thread::get_id();
 
         [[nodiscard]] PlatformFrameResult BeginFrame(this PlatformFrameCoordinator&,

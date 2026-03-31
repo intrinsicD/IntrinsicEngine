@@ -53,6 +53,7 @@ export namespace Runtime
         double FixedStepHz = DefaultFixedStepHz;
         double MaxFrameDeltaSeconds = DefaultMaxFrameDeltaSeconds;
         int MaxSubstepsPerFrame = DefaultMaxSubstepsPerFrame;
+        double MaxActiveFps = 0.0;
 
         // Benchmark mode: when enabled, the engine runs for a fixed number of frames
         // and writes timing data to a JSON file, then exits.

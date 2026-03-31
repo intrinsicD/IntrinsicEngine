@@ -348,6 +348,17 @@ namespace Runtime
 
         if (!self.Host.IsMinimized())
         {
+            FrameTimeStep frameStep = self.Clock.Advance(policy);
+            if (self.MaxActiveFps > 0.0 && std::isfinite(self.MaxActiveFps))
+            {
+                const double minFrameSeconds = 1.0 / self.MaxActiveFps;
+                if (frameStep.FrameTime > 0.0 && frameStep.FrameTime < minFrameSeconds)
+                {
+                    self.SleepForSeconds(minFrameSeconds - frameStep.FrameTime);
+                    frameStep.FrameTime = minFrameSeconds;
+                }
+            }
+
             self.Host.ConsumeResizeRequest();
             return PlatformFrameResult{
                 .ContinueFrame = true,
@@ -355,7 +366,7 @@ namespace Runtime
                 .ResizeRequested = resizeRequested,
                 .FramebufferWidth = self.Host.GetFramebufferWidth(),
                 .FramebufferHeight = self.Host.GetFramebufferHeight(),
-                .FrameStep = self.Clock.Advance(policy),
+                .FrameStep = frameStep,
             };
         }
 

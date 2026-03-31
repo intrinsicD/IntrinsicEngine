@@ -340,6 +340,7 @@ namespace Runtime
         PlatformFrameCoordinator platformFrame{
             .Host = platformFrameHost,
             .Clock = frameClock,
+            .MaxActiveFps = m_EngineConfig.MaxActiveFps,
         };
         RuntimeResizeSyncHost resizeSyncHost{
             *m_GraphicsBackend,
