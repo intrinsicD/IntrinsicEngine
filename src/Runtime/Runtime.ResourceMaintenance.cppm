@@ -60,5 +60,6 @@ export namespace Runtime
         // Warnings fire once per transition (below→above), not per frame.
         static constexpr uint32_t kMaxHeaps = 16;
         std::array<bool, kMaxHeaps> m_HeapOverBudget{};
+        bool m_LoggedGpuMemoryThresholdConflict = false;
     };
 }

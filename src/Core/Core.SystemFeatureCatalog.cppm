@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <string_view>
 
 export module Core.SystemFeatureCatalog;
@@ -55,11 +56,58 @@ export namespace Runtime::SystemFeatureCatalog
         "Use 70% GPU memory warning threshold instead of the 80% baseline",
         false);
 
+    inline constexpr Core::FeatureDescriptor GpuMemoryWarnThreshold75 = MakeFeatureDescriptor(
+        "GpuMemoryWarnThreshold75",
+        Core::FeatureCategory::System,
+        "Use 75% GPU memory warning threshold instead of the 80% baseline",
+        false);
+
+    inline constexpr Core::FeatureDescriptor GpuMemoryWarnThreshold85 = MakeFeatureDescriptor(
+        "GpuMemoryWarnThreshold85",
+        Core::FeatureCategory::System,
+        "Use 85% GPU memory warning threshold instead of the 80% baseline",
+        false);
+
     inline constexpr Core::FeatureDescriptor GpuMemoryWarnThreshold90 = MakeFeatureDescriptor(
         "GpuMemoryWarnThreshold90",
         Core::FeatureCategory::System,
         "Use 90% GPU memory warning threshold instead of the 80% baseline",
         false);
+
+    struct GpuMemoryWarningThresholdConfig
+    {
+        double ThresholdFraction = 0.80;
+        uint32_t EnabledPresetCount = 0;
+    };
+
+    [[nodiscard]] inline GpuMemoryWarningThresholdConfig ResolveGpuMemoryWarningThreshold(
+        const Core::FeatureRegistry& features)
+    {
+        GpuMemoryWarningThresholdConfig config{};
+
+        if (features.IsEnabled(GpuMemoryWarnThreshold70))
+        {
+            config.ThresholdFraction = 0.70;
+            ++config.EnabledPresetCount;
+        }
+        if (features.IsEnabled(GpuMemoryWarnThreshold75))
+        {
+            config.ThresholdFraction = 0.75;
+            ++config.EnabledPresetCount;
+        }
+        if (features.IsEnabled(GpuMemoryWarnThreshold85))
+        {
+            config.ThresholdFraction = 0.85;
+            ++config.EnabledPresetCount;
+        }
+        if (features.IsEnabled(GpuMemoryWarnThreshold90))
+        {
+            config.ThresholdFraction = 0.90;
+            ++config.EnabledPresetCount;
+        }
+
+        return config;
+    }
 
     // -------------------------------------------------------------------------
     // Pass Names — single source of truth for FrameGraph pass name strings.
