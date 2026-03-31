@@ -2,8 +2,7 @@ module;
 
 export module ECS:TransformGraphContracts;
 
-import :Components.Transform;
-import :Components.Hierarchy;
+import :ComponentForwardDecls;
 import Core.FrameGraph;
 import Core.Hash;
 import Core.SystemFeatureCatalog;

@@ -7,6 +7,7 @@ target_sources(${target_name}
         ECS.cppm
         Components/ECS.Components.AssetSourceRef.cppm
         Components/ECS.Components.AxisRotator.cppm
+        Components/ECS.ComponentForwardDecls.cppm
         Components/ECS.Components.Hierarchy.cppm
         Components/ECS.HierarchyStructure.cppm
         Components/ECS.Components.NameTag.cppm
