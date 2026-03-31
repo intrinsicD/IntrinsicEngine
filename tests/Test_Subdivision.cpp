@@ -150,3 +150,31 @@ TEST(Subdivision, InputMeshIsNotModified)
     EXPECT_EQ(input.VertexCount(), origVerts);
     EXPECT_EQ(input.FaceCount(), origFaces);
 }
+
+TEST(Subdivision, RespectsMaxOutputFaceBudget)
+{
+    auto input = MakeTetrahedron();
+    Geometry::Halfedge::Mesh output;
+
+    Geometry::Subdivision::SubdivisionParams params;
+    params.Iterations = 5;
+    params.MaxOutputFaces = 70; // tetrahedron: 4 -> 16 -> 64 -> 256 ...
+
+    auto result = Geometry::Subdivision::Subdivide(input, output, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->IterationsPerformed, 2u);
+    EXPECT_EQ(result->FinalFaceCount, 64u);
+}
+
+TEST(Subdivision, ReturnsNulloptWhenBudgetBlocksFirstIteration)
+{
+    auto input = MakeTetrahedron();
+    Geometry::Halfedge::Mesh output;
+
+    Geometry::Subdivision::SubdivisionParams params;
+    params.Iterations = 1;
+    params.MaxOutputFaces = 8; // first iteration needs 16 faces
+
+    auto result = Geometry::Subdivision::Subdivide(input, output, params);
+    EXPECT_FALSE(result.has_value());
+}

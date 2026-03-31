@@ -42,6 +42,11 @@ export namespace Geometry::Subdivision
         // Number of subdivision iterations. Each iteration quadruples
         // the face count: n_faces_out = n_faces_in * 4^Iterations.
         std::size_t Iterations{1};
+
+        // Optional hard budget for output triangle count. Zero disables
+        // budget clamping. When non-zero, Subdivide() automatically clamps
+        // Iterations so the produced mesh does not exceed this count.
+        std::size_t MaxOutputFaces{0};
     };
 
     struct SubdivisionResult
