@@ -33,6 +33,7 @@ target_sources(${target_name}
         Geometry.Properties.cppm
         Geometry.Circulators.cppm
         Geometry.MeshUtils.cppm
+        Geometry.SpatialQueries.cppm
         Geometry.Octree.cppm
         Geometry.KDTree.cppm
         Geometry.BVH.cppm

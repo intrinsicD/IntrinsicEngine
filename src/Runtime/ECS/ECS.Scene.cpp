@@ -3,18 +3,14 @@ module;
 
 module ECS:Scene.Impl;
 import :Scene;
-import :Components;
+import :SceneBootstrap;
 
 namespace ECS
 {
     entt::entity Scene::CreateEntity(const std::string& name)
     {
         entt::entity e = m_Registry.create();
-        m_Registry.emplace<Components::NameTag::Component>(e, name);
-        m_Registry.emplace<Components::Transform::Component>(e);
-        m_Registry.emplace<Components::Transform::WorldMatrix>(e);
-        m_Registry.emplace<Components::Transform::IsDirtyTag>(e);
-        m_Registry.emplace<Components::Hierarchy::Component>(e);
+        SceneBootstrap::EmplaceDefaults(m_Registry, e, name);
         return e;
     }
 

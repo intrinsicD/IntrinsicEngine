@@ -89,7 +89,8 @@ intrinsic_test_object_lib(ECSTestObjs
     SOURCES
         Test_RuntimeECS.cpp
         Test_FrameGraphSystems.cpp
-    DEPS IntrinsicCore IntrinsicECS
+        Test_CompileHotspotRefactors.cpp
+    DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry
 )
 
 # --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---

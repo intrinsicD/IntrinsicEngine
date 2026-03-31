@@ -15,16 +15,10 @@ import Geometry.Primitives;
 import Geometry.Containment;
 import Geometry.Support;
 import Geometry.Overlap;
+import Geometry.SpatialQueries;
 
 export namespace Geometry
 {
-    template <typename Shape>
-    concept SpatialQueryShape =
-        requires(const Shape& s, const AABB& box)
-        {
-            { TestOverlap(box, s) } -> std::convertible_to<bool>;
-        };
-
     struct BVHBuildParams
     {
         std::uint32_t LeafSize{8};
@@ -32,12 +26,7 @@ export namespace Geometry
         float MinSplitExtent{1.0e-12f};
     };
 
-    struct BVHBuildResult
-    {
-        std::size_t ElementCount{0};
-        std::size_t NodeCount{0};
-        std::uint32_t MaxDepthReached{0};
-    };
+    using BVHBuildResult = SpatialBuildResult;
 
     class BVH
     {

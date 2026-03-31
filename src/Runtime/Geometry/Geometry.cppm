@@ -19,6 +19,7 @@ export import Geometry.GJK;
 export import Geometry.EPA;
 export import Geometry.Handle;
 export import Geometry.MeshUtils;
+export import Geometry.SpatialQueries;
 export import Geometry.Octree;
 export import Geometry.KDTree;
 export import Geometry.BVH;
