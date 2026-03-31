@@ -9,7 +9,6 @@ from typing import Iterable
 SOURCE_EXTENSIONS = (".cppm", ".cpp", ".cc", ".cxx", ".c")
 COMPILE_OUTPUT_SUFFIXES = (".cppm.o", ".cpp.o", ".cc.o", ".cxx.o", ".c.o", ".o", ".pcm")
 
-
 @dataclass
 class NinjaEntry:
     duration_ms: int
@@ -32,7 +31,7 @@ def parse_ninja_log(path: Path) -> list[NinjaEntry]:
         entries.append(NinjaEntry(duration_ms=duration_ms, output=output))
     return entries
 
-
+  
 def strip_compile_suffix(path_fragment: str) -> tuple[str, str | None]:
     for suffix in COMPILE_OUTPUT_SUFFIXES:
         if path_fragment.endswith(suffix):
@@ -102,6 +101,7 @@ class SourceResolver:
         return self._choose_best(unique, preferred_ext)
 
 
+
 def source_stats(root: Path, rel_source: str) -> tuple[int, int, int, int] | None:
     p = root / rel_source
     if not p.exists():
@@ -145,6 +145,7 @@ def main() -> int:
         stats = source_stats(root, rel_source)
         if stats is None:
             print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{rel_source}\t(n/a)\t-\t-\t-")
+
             continue
 
         line_count, include_count, import_count, export_count = stats
