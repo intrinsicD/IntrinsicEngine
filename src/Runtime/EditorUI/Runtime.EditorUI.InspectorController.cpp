@@ -650,13 +650,18 @@ void InspectorController::Draw()
             entt::entity child = hierarchy->FirstChild;
             while (child != entt::null && reg.valid(child))
             {
-                const bool isOverlay = reg.any_of<ECS::DataAuthority::PointCloudTag,
+                const bool isOverlay = reg.any_of<ECS::DataAuthority::MeshTag,
+                                                   ECS::DataAuthority::PointCloudTag,
                                                    ECS::DataAuthority::GraphTag>(child);
                 if (isOverlay)
                 {
-                    const char* overlayType = reg.all_of<ECS::DataAuthority::PointCloudTag>(child)
-                                                  ? "PointCloud"
-                                                  : "Graph";
+                    const char* overlayType = "Unknown";
+                    if (reg.all_of<ECS::DataAuthority::MeshTag>(child))
+                        overlayType = "Mesh";
+                    else if (reg.all_of<ECS::DataAuthority::PointCloudTag>(child))
+                        overlayType = "PointCloud";
+                    else if (reg.all_of<ECS::DataAuthority::GraphTag>(child))
+                        overlayType = "Graph";
                     std::string childName = "?";
                     if (auto* nameTag = reg.try_get<ECS::Components::NameTag::Component>(child))
                         childName = nameTag->Name;
@@ -667,7 +672,9 @@ void InspectorController::Draw()
                     if (ImGui::TreeNode(label.c_str()))
                     {
                         // Inline visibility toggle for overlay children.
-                        if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(child))
+                        if (auto* sc = reg.try_get<ECS::Surface::Component>(child))
+                            ImGui::Checkbox("Visible##Overlay", &sc->Visible);
+                        else if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(child))
                             ImGui::Checkbox("Visible##Overlay", &pcd->Visible);
                         else if (auto* gd = reg.try_get<ECS::Graph::Data>(child))
                             ImGui::Checkbox("Visible##Overlay", &gd->Visible);

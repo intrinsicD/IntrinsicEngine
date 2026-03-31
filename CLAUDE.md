@@ -266,7 +266,7 @@ Each entity carries at most **one authoritative geometry data source** per geome
 
 `RenderExtraction` uses these hints to select picking/draw behavior without checking for the presence of data components (no more `registry.all_of<Graph::Data>()` heuristics).
 
-**OverlayEntityFactory** (`Graphics::OverlayEntityFactory`) creates child overlay entities with proper Hierarchy attachment, DataAuthority tag, transform inheritance, NameTag, and PickID. Used when composing point cloud or graph overlays on mesh entities.
+**OverlayEntityFactory** (`Graphics::OverlayEntityFactory`) creates child overlay entities with proper Hierarchy attachment, DataAuthority tag, transform inheritance, NameTag, and PickID. Used when composing mesh, point cloud, or graph overlays on parent entities. `CreateMeshOverlay` also emplaces `Surface::Component` so the child enters the rendering pipeline via `MeshRendererLifecycle`.
 
 ### CPU-Side Frustum Culling
 

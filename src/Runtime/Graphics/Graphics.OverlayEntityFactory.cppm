@@ -21,10 +21,21 @@ module;
 export module Graphics.OverlayEntityFactory;
 
 import Geometry.Graph;
+import Geometry.HalfedgeMesh;
 import Geometry.PointCloudUtils;
 
 export namespace Graphics::OverlayEntityFactory
 {
+    /// Create a child Mesh overlay on a parent entity.
+    /// Returns the child entity with Mesh::Data + Surface::Component +
+    /// DataAuthority::MeshTag.  The child is selectable and follows the
+    /// parent's transform.
+    entt::entity CreateMeshOverlay(
+        entt::registry& registry,
+        entt::entity parent,
+        std::shared_ptr<Geometry::Halfedge::Mesh> mesh,
+        const std::string& name);
+
     /// Create a child PointCloud overlay on a parent entity.
     /// Returns the child entity with PointCloud::Data + DataAuthority::PointCloudTag.
     /// The child is selectable and follows the parent's transform.
