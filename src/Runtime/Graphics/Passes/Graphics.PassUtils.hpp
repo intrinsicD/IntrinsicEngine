@@ -9,6 +9,7 @@
 
 // This header is included from global module fragments, so it must include the
 // standard-library facilities it uses explicitly instead of relying on transitive includes.
+#include <algorithm>
 
 // =============================================================================
 // CheckVkResult — unified Vulkan error logging for render passes.

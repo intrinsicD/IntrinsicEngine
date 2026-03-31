@@ -912,13 +912,13 @@ private:
     // Returns a short text icon prefix based on the entity's primary component type.
     static const char* EntityTypeIcon(const entt::registry& reg, entt::entity e)
     {
-        if (reg.all_of<ECS::Surface::Component>(e))       return "[M] ";  // Mesh
-        if (reg.all_of<ECS::Graph::Data>(e))               return "[G] ";  // Graph
-        if (reg.all_of<ECS::PointCloud::Data>(e))          return "[P] ";  // Point Cloud
+        if (reg.all_of<ECS::DataAuthority::MeshTag>(e))         return "[M] ";  // Mesh
+        if (reg.all_of<ECS::DataAuthority::GraphTag>(e))        return "[G] ";  // Graph
+        if (reg.all_of<ECS::DataAuthority::PointCloudTag>(e))   return "[P] ";  // Point Cloud
         if (reg.all_of<ECS::Components::Hierarchy::Component>(e))
         {
             const auto& h = reg.get<ECS::Components::Hierarchy::Component>(e);
-            if (h.FirstChild != entt::null)                return "[+] ";  // Group/parent
+            if (h.FirstChild != entt::null)                     return "[+] ";  // Group/parent
         }
         return "[o] ";  // Empty/other
     }
@@ -1247,6 +1247,7 @@ private:
         auto& scene = GetSceneManager().GetScene();
         entt::entity entity = scene.CreateEntity("Demo Point Cloud");
 
+        scene.GetRegistry().emplace<ECS::DataAuthority::PointCloudTag>(entity);
         auto& pcd = scene.GetRegistry().emplace<ECS::PointCloud::Data>(entity);
         pcd.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(std::move(cloud));
         pcd.GpuDirty = true;

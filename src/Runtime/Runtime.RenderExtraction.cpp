@@ -124,10 +124,9 @@ namespace Runtime
 
             for (auto [entity, transform, line] : view.each())
             {
-                const bool isMeshEntity =
-                    registry.all_of<ECS::MeshCollider::Component>(entity) || registry.all_of<ECS::Mesh::Data>(entity);
-                const bool isGraphEntity = registry.all_of<ECS::Graph::Data>(entity);
-                if (isMeshEntity || !isGraphEntity)
+                // Only graph entities emit line picking packets.
+                // Mesh wireframe edges are not independently pickable as lines.
+                if (line.SourceDomain != ECS::Line::Domain::GraphEdge)
                     continue;
                 if (!line.Geometry.IsValid() || !line.EdgeView.IsValid() || line.EdgeCount == 0u)
                     continue;
@@ -157,11 +156,9 @@ namespace Runtime
 
             for (auto [entity, transform, point] : view.each())
             {
-                const bool isMeshEntity =
-                    registry.all_of<ECS::MeshCollider::Component>(entity) || registry.all_of<ECS::Mesh::Data>(entity);
-                const bool isGraphEntity = registry.all_of<ECS::Graph::Data>(entity);
-                const bool isPointCloudEntity = registry.all_of<ECS::PointCloud::Data>(entity);
-                if (isMeshEntity || isGraphEntity || !isPointCloudEntity)
+                // Only standalone point cloud entities emit point picking packets.
+                // Mesh vertex dots and graph nodes are picked through their parent domain.
+                if (point.SourceDomain != ECS::Point::Domain::CloudPoint)
                     continue;
                 if (!point.Geometry.IsValid())
                     continue;
@@ -348,10 +345,15 @@ namespace Runtime
 
                 if (line.HasPerEdgeColors && line.ShowPerEdgeColors)
                 {
-                    if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
-                        graphData && graphData->CachedEdgeColors.size() == line.EdgeCount)
+                    // Use domain hint to resolve per-edge color source without
+                    // probing multiple Data component types.
+                    if (line.SourceDomain == ECS::Line::Domain::GraphEdge)
                     {
-                        packet.EdgeColors = graphData->CachedEdgeColors;
+                        if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
+                            graphData && graphData->CachedEdgeColors.size() == line.EdgeCount)
+                        {
+                            packet.EdgeColors = graphData->CachedEdgeColors;
+                        }
                     }
                     else if (line.CachedEdgeColors.size() == line.EdgeCount)
                     {
@@ -391,31 +393,36 @@ namespace Runtime
                     .EntityKey = static_cast<uint32_t>(entity),
                 };
 
+                // Use domain hint to resolve per-point attribute sources.
                 if (point.HasPerPointColors)
                 {
-                    if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
-                        graphData && !graphData->CachedNodeColors.empty())
+                    if (point.SourceDomain == ECS::Point::Domain::GraphNode)
                     {
-                        packet.Colors = graphData->CachedNodeColors;
+                        if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
+                            graphData && !graphData->CachedNodeColors.empty())
+                            packet.Colors = graphData->CachedNodeColors;
                     }
-                    else if (const auto* pointCloud = registry.try_get<ECS::PointCloud::Data>(entity);
-                        pointCloud && !pointCloud->CachedColors.empty())
+                    else if (point.SourceDomain == ECS::Point::Domain::CloudPoint)
                     {
-                        packet.Colors = pointCloud->CachedColors;
+                        if (const auto* pointCloud = registry.try_get<ECS::PointCloud::Data>(entity);
+                            pointCloud && !pointCloud->CachedColors.empty())
+                            packet.Colors = pointCloud->CachedColors;
                     }
                 }
 
                 if (point.HasPerPointRadii)
                 {
-                    if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
-                        graphData && !graphData->CachedNodeRadii.empty())
+                    if (point.SourceDomain == ECS::Point::Domain::GraphNode)
                     {
-                        packet.Radii = graphData->CachedNodeRadii;
+                        if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
+                            graphData && !graphData->CachedNodeRadii.empty())
+                            packet.Radii = graphData->CachedNodeRadii;
                     }
-                    else if (const auto* pointCloud = registry.try_get<ECS::PointCloud::Data>(entity);
-                        pointCloud && !pointCloud->CachedRadii.empty())
+                    else if (point.SourceDomain == ECS::Point::Domain::CloudPoint)
                     {
-                        packet.Radii = pointCloud->CachedRadii;
+                        if (const auto* pointCloud = registry.try_get<ECS::PointCloud::Data>(entity);
+                            pointCloud && !pointCloud->CachedRadii.empty())
+                            packet.Radii = pointCloud->CachedRadii;
                     }
                 }
 

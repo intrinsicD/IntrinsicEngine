@@ -210,9 +210,10 @@ namespace Graphics::Systems::MeshViewLifecycle
             auto* lineComp = registry.try_get<ECS::Line::Component>(entity);
             if (lineComp)
             {
-                lineComp->Geometry  = sc.Geometry;   // Shared vertex buffer (BDA)
-                lineComp->EdgeView  = ev.Geometry;   // Edge index buffer
-                lineComp->EdgeCount = ev.EdgeCount;
+                lineComp->Geometry     = sc.Geometry;   // Shared vertex buffer (BDA)
+                lineComp->EdgeView     = ev.Geometry;   // Edge index buffer
+                lineComp->EdgeCount    = ev.EdgeCount;
+                lineComp->SourceDomain = ECS::Line::Domain::MeshEdge;
             }
         }
 
@@ -284,7 +285,8 @@ namespace Graphics::Systems::MeshViewLifecycle
             auto* pointComp = registry.try_get<ECS::Point::Component>(entity);
             if (pointComp)
             {
-                pointComp->Geometry = pv.Geometry;  // Vertex view (Points topology)
+                pointComp->Geometry     = pv.Geometry;  // Vertex view (Points topology)
+                pointComp->SourceDomain = ECS::Point::Domain::MeshVertex;
 
                 // Propagate normals availability from source mesh.
                 GeometryGpuData* geo = geometryStorage.GetIfValid(pv.Geometry);

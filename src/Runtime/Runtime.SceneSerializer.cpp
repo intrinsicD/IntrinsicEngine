@@ -531,7 +531,9 @@ namespace Runtime
 
                         if (geo && geo->GetTopology() == Graphics::PrimitiveTopology::Points)
                         {
-                            auto& pcd = engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::PointCloud::Data>(entity);
+                            auto& entityReg = engine.GetSceneManager().GetScene().GetRegistry();
+                            entityReg.emplace_or_replace<ECS::DataAuthority::PointCloudTag>(entity);
+                            auto& pcd = entityReg.emplace_or_replace<ECS::PointCloud::Data>(entity);
                             pcd.GpuGeometry = handle;
                             pcd.GpuDirty = false;
                             pcd.CloudRef.reset();
@@ -541,6 +543,7 @@ namespace Runtime
                         }
                         else
                         {
+                            engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::DataAuthority::MeshTag>(entity);
                             auto& sc = engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::Surface::Component>(entity);
                             sc.Geometry = handle;
                             sc.Material = it->second.MaterialHandle;

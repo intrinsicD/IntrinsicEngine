@@ -26,6 +26,7 @@
 export module Graphics.Components;
 
 export import Graphics.Components.Core;
+export import Graphics.Components.DataAuthority;
 export import Graphics.Components.DirtyTag;
 export import Graphics.Components.MeshCollider;
 export import Graphics.Components.PrimitiveBVH;

@@ -14,6 +14,7 @@ target_sources(${target_name}
         Graphics.RenderGraph.cppm
         Components/Graphics.Components.cppm
         Components/Graphics.Components.Core.cppm
+        Components/Graphics.Components.DataAuthority.cppm
         Components/Graphics.Components.DirtyTag.cppm
         Components/Graphics.Components.MeshCollider.cppm
         Components/Graphics.Components.PrimitiveBVH.cppm
@@ -61,6 +62,7 @@ target_sources(${target_name}
         Graphics.VectorFieldManager.cppm
         Graphics.LifecycleUtils.cppm
         Graphics.IsolineExtractor.cppm
+        Graphics.OverlayEntityFactory.cppm
 
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
@@ -121,6 +123,7 @@ target_sources(${target_name}
         Graphics.ColorMapper.cpp
         Graphics.VectorFieldManager.cpp
         Graphics.IsolineExtractor.cpp
+        Graphics.OverlayEntityFactory.cpp
         Pipelines/Graphics.Pipelines.cpp
         Graphics.IORegistry.cpp
         Systems/Graphics.Systems.GPUSceneSync.cpp

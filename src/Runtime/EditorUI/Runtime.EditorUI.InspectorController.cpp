@@ -633,6 +633,64 @@ void InspectorController::Draw()
             EntityIdText("Next Sibling", hierarchy->NextSibling);
             EntityIdText("Prev Sibling", hierarchy->PrevSibling);
             ImGui::Text("Child Count: %u", hierarchy->ChildCount);
+
+            // Show data authority type if present.
+            if (reg.all_of<ECS::DataAuthority::MeshTag>(selected))
+                ImGui::TextColored(ImVec4(0.4f, 0.8f, 0.4f, 1.0f), "Authority: Mesh");
+            else if (reg.all_of<ECS::DataAuthority::GraphTag>(selected))
+                ImGui::TextColored(ImVec4(0.8f, 0.6f, 0.2f, 1.0f), "Authority: Graph");
+            else if (reg.all_of<ECS::DataAuthority::PointCloudTag>(selected))
+                ImGui::TextColored(ImVec4(0.3f, 0.6f, 1.0f, 1.0f), "Authority: PointCloud");
+        }
+
+        // --- Overlay Children --- List child entities that carry their
+        // own data authority (point cloud overlays, graph overlays, etc.).
+        if (hierarchy->ChildCount > 0 && ImGui::CollapsingHeader("Overlay Children"))
+        {
+            entt::entity child = hierarchy->FirstChild;
+            while (child != entt::null && reg.valid(child))
+            {
+                const bool isOverlay = reg.any_of<ECS::DataAuthority::MeshTag,
+                                                   ECS::DataAuthority::PointCloudTag,
+                                                   ECS::DataAuthority::GraphTag>(child);
+                if (isOverlay)
+                {
+                    const char* overlayType = "Unknown";
+                    if (reg.all_of<ECS::DataAuthority::MeshTag>(child))
+                        overlayType = "Mesh";
+                    else if (reg.all_of<ECS::DataAuthority::PointCloudTag>(child))
+                        overlayType = "PointCloud";
+                    else if (reg.all_of<ECS::DataAuthority::GraphTag>(child))
+                        overlayType = "Graph";
+                    std::string childName = "?";
+                    if (auto* nameTag = reg.try_get<ECS::Components::NameTag::Component>(child))
+                        childName = nameTag->Name;
+
+                    ImGui::PushID(static_cast<int>(static_cast<entt::id_type>(child)));
+
+                    const std::string label = childName + " [" + overlayType + "]";
+                    if (ImGui::TreeNode(label.c_str()))
+                    {
+                        // Inline visibility toggle for overlay children.
+                        if (auto* sc = reg.try_get<ECS::Surface::Component>(child))
+                            ImGui::Checkbox("Visible##Overlay", &sc->Visible);
+                        else if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(child))
+                            ImGui::Checkbox("Visible##Overlay", &pcd->Visible);
+                        else if (auto* gd = reg.try_get<ECS::Graph::Data>(child))
+                            ImGui::Checkbox("Visible##Overlay", &gd->Visible);
+
+                        if (ImGui::SmallButton("Select"))
+                            *m_CachedSelected = child;
+
+                        ImGui::TreePop();
+                    }
+
+                    ImGui::PopID();
+                }
+
+                auto* childHier = reg.try_get<ECS::Components::Hierarchy::Component>(child);
+                child = childHier ? childHier->NextSibling : entt::null;
+            }
         }
     }
 
