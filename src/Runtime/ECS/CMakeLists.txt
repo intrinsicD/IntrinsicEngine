@@ -8,6 +8,7 @@ target_sources(${target_name}
         Components/ECS.Components.AssetSourceRef.cppm
         Components/ECS.Components.AxisRotator.cppm
         Components/ECS.Components.Hierarchy.cppm
+        Components/ECS.HierarchyStructure.cppm
         Components/ECS.Components.NameTag.cppm
         Components/ECS.Components.Transform.cppm
         Components/ECS.Components.Selection.cppm
@@ -19,7 +20,10 @@ target_sources(${target_name}
         Systems/ECS.TransformGraphContracts.cppm
         Systems/ECS.HierarchyTraversal.cppm
         ECS.Scene.cppm
+        ECS.SceneBootstrap.cppm
         FILE_SET ecs_impl TYPE CXX_MODULES FILES
+        ECS.SceneBootstrap.cpp
+        Components/ECS.HierarchyStructure.cpp
         Components/ECS.Components.Hierarchy.cpp
         Systems/ECS.Systems.AxisRotator.cpp
         Systems/ECS.Systems.Transform.cpp
