@@ -86,9 +86,9 @@ Target the currently observed worst compile edges (`build/ci/.ninja_log`) and re
   - [ ] Add benchmark + test gates: octree query perf parity (or better) and compile-edge reduction tracked in CI.
 
 - [ ] **C2 — `ECS.Systems.Transform.cpp` import-closure reduction (≈90.9s edge)**
-  - [ ] Introduce a slim `ECS.TransformGraphContracts` module for pass registration contracts; keep EnTT-heavy traversal in impl partition only.
-  - [ ] Split hierarchy walk into `ECS.HierarchyTraversal` utility with non-exported implementation to decouple from system registration TU.
-  - [ ] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
+  - [x] Introduce a slim `ECS.TransformGraphContracts` module for pass registration contracts; keep EnTT-heavy traversal in impl partition only.
+  - [x] Split hierarchy walk into `ECS.HierarchyTraversal` utility with non-exported implementation to decouple from system registration TU.
+  - [x] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
   - [ ] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
 
 - [ ] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**

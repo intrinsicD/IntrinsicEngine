@@ -16,11 +16,14 @@ target_sources(${target_name}
         Components/ECS.Components.cppm
         Systems/ECS.Systems.AxisRotator.cppm
         Systems/ECS.Systems.Transform.cppm
+        Systems/ECS.TransformGraphContracts.cppm
+        Systems/ECS.HierarchyTraversal.cppm
         ECS.Scene.cppm
         FILE_SET ecs_impl TYPE CXX_MODULES FILES
         Components/ECS.Components.Hierarchy.cpp
         Systems/ECS.Systems.AxisRotator.cpp
         Systems/ECS.Systems.Transform.cpp
+        Systems/ECS.HierarchyTraversal.cpp
         ECS.Scene.cpp
 )
 

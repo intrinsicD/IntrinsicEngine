@@ -3,7 +3,10 @@ module;
 
 export module ECS:Systems.Transform;
 
-import Core.FrameGraph;
+export namespace Core
+{
+    class FrameGraph;
+}
 
 export namespace ECS::Systems::Transform
 {
