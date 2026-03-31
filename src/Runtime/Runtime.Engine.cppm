@@ -55,6 +55,10 @@ export namespace Runtime
         int MaxSubstepsPerFrame = DefaultMaxSubstepsPerFrame;
         double MaxActiveFps = 0.0;
 
+        // Activity-aware idle throttling. When Enabled, the engine automatically
+        // reduces frame rate after IdleTimeoutSeconds of no user/scene activity.
+        FramePacingConfig FramePacing{};
+
         // Benchmark mode: when enabled, the engine runs for a fixed number of frames
         // and writes timing data to a JSON file, then exits.
         bool BenchmarkMode = false;

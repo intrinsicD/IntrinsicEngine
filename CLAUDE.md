@@ -81,6 +81,16 @@ When a class with virtual functions is declared in a module partition interface 
 
 This pattern is retained for robustness even though Clang 20 has resolved the vtable emission bugs that affected Clang 18.
 
+## Frame Pacing and CPU Usage Policy
+
+The engine uses **activity-aware idle throttling** to conserve CPU/GPU resources in editor workloads:
+
+- **VSync is the default present mode** (`PresentPolicy::VSync` / `VK_PRESENT_MODE_FIFO_KHR`). This naturally limits the frame rate to the display refresh rate without CPU busy-looping. Latency-sensitive modes (`LowLatency`, `Uncapped`) are available but opt-in.
+- **`ActivityTracker`** in `Runtime::FrameLoop` tracks user interaction via GLFW input callbacks (key, mouse button, scroll, char, drop, resize — but NOT cursor motion, which would false-wake on passive hover). After `IdleTimeoutSeconds` of no activity, the frame rate drops to `IdleFps` (default 15 fps). Any input instantly restores the active rate.
+- **`FramePacingConfig`** in `EngineConfig` exposes `ActiveFps` (0 = VSync-only), `IdleFps`, `IdleTimeoutSeconds`, and an `Enabled` master switch. The Sandbox defaults to VSync + 15 fps idle with 2-second timeout.
+- **`FrameClock::Resample()`** re-anchors the clock after deliberate sleeps so the next `Advance()` does not count sleep duration as part of the following frame's time.
+- **Known limitation:** only GLFW input events currently signal activity. Scene mutations from async operations (file loads, GPU readbacks) do not yet wake the engine from idle. This is acceptable for interactive editor use and can be extended if needed.
+
 ## Lambda Captures and InplaceFunction
 
 `RHI::VulkanDevice::SafeDestroy()` accepts an `InplaceFunction` (small-buffer-optimized callable) that requires `is_nothrow_move_constructible`. When writing deferred-destruction lambdas:

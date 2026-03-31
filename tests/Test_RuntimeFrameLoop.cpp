@@ -453,17 +453,24 @@ TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PumpsEventsAndContinuesWhenWindo
     EXPECT_DOUBLE_EQ(host.WaitSeconds, 0.0);
 }
 
-TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PacesActiveFrameWhenMaxFpsIsSet)
+TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PacesActiveFrameViaActivityTracker)
 {
     FakePlatformFrameHost host;
     Runtime::FrameClock clock;
     double sleptSeconds = 0.0;
 
+    Runtime::ActivityTracker tracker{};
+    tracker.Config.ActiveFps = 10.0;
+    tracker.Config.IdleFps = 0.0;
+    tracker.Config.Enabled = true;
+    tracker.Reset();
+    tracker.NoteActivity();
+
     Runtime::PlatformFrameCoordinator coordinator{
         .Host = host,
         .Clock = clock,
         .MinimizedWaitSeconds = 0.125,
-        .MaxActiveFps = 10.0,
+        .Activity = &tracker,
         .SleepForSeconds = [&](double seconds) { sleptSeconds += seconds; },
     };
 
@@ -945,4 +952,88 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         "render",
     };
     EXPECT_EQ(trace, expectedTrace);
+}
+
+// ---------------------------------------------------------------------------
+// ActivityTracker unit tests
+// ---------------------------------------------------------------------------
+
+TEST(ActivityTracker, ReturnsActiveFpsImmediatelyAfterNoteActivity)
+{
+    Runtime::ActivityTracker tracker{};
+    tracker.Config = {.ActiveFps = 60.0, .IdleFps = 15.0, .IdleTimeoutSeconds = 2.0, .Enabled = true};
+    tracker.Reset();
+    tracker.NoteActivity();
+
+    const double now = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    EXPECT_DOUBLE_EQ(tracker.EffectiveFpsCap(now), 60.0);
+    EXPECT_FALSE(tracker.IsIdle(now));
+}
+
+TEST(ActivityTracker, ReturnsIdleFpsAfterTimeout)
+{
+    Runtime::ActivityTracker tracker{};
+    tracker.Config = {.ActiveFps = 60.0, .IdleFps = 15.0, .IdleTimeoutSeconds = 0.0, .Enabled = true};
+    tracker.Reset();
+    tracker.NoteActivity();
+
+    const double now = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    const double futureTime = now + 10.0;
+    EXPECT_DOUBLE_EQ(tracker.EffectiveFpsCap(futureTime), 15.0);
+    EXPECT_TRUE(tracker.IsIdle(futureTime));
+}
+
+TEST(ActivityTracker, ReturnsActiveFpsWhenIdleThrottleDisabled)
+{
+    Runtime::ActivityTracker tracker{};
+    tracker.Config = {.ActiveFps = 60.0, .IdleFps = 0.0, .IdleTimeoutSeconds = 2.0, .Enabled = true};
+    tracker.Reset();
+
+    const double futureTime = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count() + 100.0;
+    EXPECT_DOUBLE_EQ(tracker.EffectiveFpsCap(futureTime), 60.0);
+    EXPECT_FALSE(tracker.IsIdle(futureTime));
+}
+
+TEST(ActivityTracker, ReturnsActiveFpsWhenNotEnabled)
+{
+    Runtime::ActivityTracker tracker{};
+    tracker.Config = {.ActiveFps = 60.0, .IdleFps = 15.0, .IdleTimeoutSeconds = 2.0, .Enabled = false};
+
+    const double futureTime = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count() + 100.0;
+    EXPECT_DOUBLE_EQ(tracker.EffectiveFpsCap(futureTime), 60.0);
+    EXPECT_FALSE(tracker.IsIdle(futureTime));
+}
+
+TEST(ActivityTracker, ResetPutsTrackerInActiveState)
+{
+    Runtime::ActivityTracker tracker{};
+    tracker.Config = {.ActiveFps = 60.0, .IdleFps = 15.0, .IdleTimeoutSeconds = 2.0, .Enabled = true};
+    tracker.Reset();
+
+    const double now = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    EXPECT_DOUBLE_EQ(tracker.EffectiveFpsCap(now), 60.0);
+    EXPECT_FALSE(tracker.IsIdle(now));
+}
+
+TEST(ActivityTracker, NoteActivityWakesFromIdle)
+{
+    Runtime::ActivityTracker tracker{};
+    tracker.Config = {.ActiveFps = 120.0, .IdleFps = 10.0, .IdleTimeoutSeconds = 0.5, .Enabled = true};
+    tracker.Reset();
+
+    const double now = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    EXPECT_DOUBLE_EQ(tracker.EffectiveFpsCap(now + 5.0), 10.0);
+    EXPECT_TRUE(tracker.IsIdle(now + 5.0));
+
+    tracker.NoteActivity();
+    const double afterActivity = std::chrono::duration<double>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    EXPECT_DOUBLE_EQ(tracker.EffectiveFpsCap(afterActivity), 120.0);
+    EXPECT_FALSE(tracker.IsIdle(afterActivity));
 }

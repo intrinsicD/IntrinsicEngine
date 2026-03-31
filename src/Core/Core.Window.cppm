@@ -103,6 +103,11 @@ export namespace Core::Windowing
 
         void SetTitle(const std::string& title) const;
 
+        // Returns true if any user input events (key, mouse button, scroll,
+        // char, drop, resize) were dispatched since the last call, then clears
+        // the flag. Used by the activity tracker to detect idle state.
+        [[nodiscard]] bool ConsumeInputActivity();
+
         // We use void* to avoid including vulkan.h in the module interface
         // instance is a VkInstance, allocator is VkAllocationCallbacks*
         [[nodiscard]] bool CreateSurface(void* instance, void* allocator, void* surfaceOut);
@@ -120,6 +125,7 @@ export namespace Core::Windowing
             int FramebufferHeight = 0;
             EventCallbackFn Callback;
             Input::Context* InputCtx = nullptr;
+            bool InputActivity = false;
         };
 
         WindowData m_Data;

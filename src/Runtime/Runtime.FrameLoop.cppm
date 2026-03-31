@@ -26,6 +26,48 @@ export namespace Runtime
     inline constexpr double DefaultMaxFrameDeltaSeconds = 0.25;
     inline constexpr int DefaultMaxSubstepsPerFrame = 8;
 
+    // ---------------------------------------------------------------------------
+    // Frame Pacing — activity-aware idle throttling
+    // ---------------------------------------------------------------------------
+
+    // Configures how the engine throttles CPU usage based on user activity.
+    // When no input, scene mutations, or async completions occur for a sustained
+    // period, the frame rate drops to IdleFps to conserve CPU/GPU resources.
+    // Any activity instantly restores the active rate.
+    struct FramePacingConfig
+    {
+        double ActiveFps = 60.0;         // Target FPS when the user is interacting (0 = VSync-limited only)
+        double IdleFps = 15.0;           // Target FPS when idle (0 = disabled, use ActiveFps always)
+        double IdleTimeoutSeconds = 2.0; // Seconds of inactivity before entering idle pacing
+        bool   Enabled = true;           // Master switch for idle throttling
+    };
+
+    // Tracks frame-loop activity to drive idle throttling.
+    // Call NoteActivity() from any signal source (input events, scene mutations,
+    // async completions, window resize). The coordinator queries
+    // EffectiveFpsCap() each frame to select the active or idle rate.
+    struct ActivityTracker
+    {
+        FramePacingConfig Config{};
+
+        // Signal that user/scene activity occurred this frame.
+        void NoteActivity() &;
+
+        // Returns the effective FPS cap for the current frame, considering
+        // idle timeout and configuration.
+        [[nodiscard]] double EffectiveFpsCap(double currentTimeSeconds) const &;
+
+        // Returns true when the tracker is in idle pacing mode.
+        [[nodiscard]] bool IsIdle(double currentTimeSeconds) const &;
+
+        // Reset to active state (e.g., on window focus).
+        void Reset() &;
+
+    private:
+        double m_LastActivityTimeSeconds = 0.0;
+        bool   m_HasActivity = false;
+    };
+
     enum class FrameLoopMode : uint8_t
     {
         LegacyCompatibility = 0,
@@ -76,6 +118,11 @@ export namespace Runtime
     public:
         void Reset();
         [[nodiscard]] FrameTimeStep Advance(const FrameLoopPolicy& policy) &;
+
+        // Re-anchor the last-sample timestamp to now without computing a frame
+        // delta. Call after deliberate sleeps so the next Advance() does not
+        // count the sleep duration as part of the following frame's time.
+        void Resample() &;
 
     private:
         double m_LastSampleSeconds = 0.0;
@@ -134,6 +181,11 @@ export namespace Runtime
         [[nodiscard]] virtual int GetFramebufferHeight() const = 0;
         virtual bool HasResizeRequest() const = 0;
         virtual bool ConsumeResizeRequest() = 0;
+
+        // Returns true if any user input events occurred during the last
+        // PumpEvents() call, then clears the flag. Used by the activity
+        // tracker to detect idle state.
+        [[nodiscard]] virtual bool ConsumeInputActivity() { return false; }
     };
 
     class RuntimePlatformFrameHost final : public IPlatformFrameHost
@@ -155,6 +207,7 @@ export namespace Runtime
         [[nodiscard]] int GetFramebufferHeight() const override;
         bool HasResizeRequest() const override;
         bool ConsumeResizeRequest() override;
+        [[nodiscard]] bool ConsumeInputActivity() override;
 
     private:
         Core::Windowing::Window& m_Window;
@@ -178,9 +231,10 @@ export namespace Runtime
         IPlatformFrameHost& Host;
         FrameClock& Clock;
         double MinimizedWaitSeconds = 0.05;
-        // Optional active-frame pacing cap to reduce CPU busy looping when
-        // running uncapped present modes (0.0 disables pacing).
-        double MaxActiveFps = 0.0;
+        // Activity-aware frame pacing. When non-null, EffectiveFpsCap()
+        // drives sleep-based throttling each frame. When null, no CPU-side
+        // cap is applied (VSync or GPU back-pressure is the sole limiter).
+        ActivityTracker* Activity = nullptr;
         Core::InplaceFunction<void(double), 64> SleepForSeconds =
             [](double seconds)
         {

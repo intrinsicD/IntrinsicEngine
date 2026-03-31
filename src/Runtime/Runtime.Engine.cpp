@@ -336,11 +336,22 @@ namespace Runtime
                         frameLoopPolicy.MaxFrameDelta,
                         frameLoopPolicy.MaxSubstepsPerFrame);
         FrameClock frameClock{};
+        ActivityTracker activityTracker{};
+        activityTracker.Config = m_EngineConfig.FramePacing;
+        // If FramePacing is disabled but MaxActiveFps is set, honour the legacy
+        // field so existing callers keep working.
+        if (!m_EngineConfig.FramePacing.Enabled && m_EngineConfig.MaxActiveFps > 0.0)
+        {
+            activityTracker.Config.Enabled = true;
+            activityTracker.Config.ActiveFps = m_EngineConfig.MaxActiveFps;
+            activityTracker.Config.IdleFps = 0.0; // no idle throttle, just cap
+        }
+        activityTracker.Reset();
         RuntimePlatformFrameHost platformFrameHost{*m_Window, m_FramebufferResized};
         PlatformFrameCoordinator platformFrame{
             .Host = platformFrameHost,
             .Clock = frameClock,
-            .MaxActiveFps = m_EngineConfig.MaxActiveFps,
+            .Activity = activityTracker.Config.Enabled ? &activityTracker : nullptr,
         };
         RuntimeResizeSyncHost resizeSyncHost{
             *m_GraphicsBackend,
@@ -369,6 +380,13 @@ namespace Runtime
         const RenderLaneCoordinator renderLane{.Host = renderLaneHost};
         FrameLoopMode activeFrameLoopMode = ResolveFrameLoopMode(m_FeatureRegistry);
         Core::Log::Info("Engine::Run frame-loop mode: {}", ToString(activeFrameLoopMode));
+        if (activityTracker.Config.Enabled)
+        {
+            Core::Log::Info("Engine frame pacing: active={:.0f} fps (0=VSync), idle={:.0f} fps, timeout={:.1f}s",
+                            activityTracker.Config.ActiveFps,
+                            activityTracker.Config.IdleFps,
+                            activityTracker.Config.IdleTimeoutSeconds);
+        }
 
         while (m_Running)
         {

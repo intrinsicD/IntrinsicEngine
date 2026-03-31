@@ -109,6 +109,7 @@ namespace Core::Windowing
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
             data.FramebufferWidth = width;
             data.FramebufferHeight = height;
+            data.InputActivity = true;
             if (data.Callback)
             {
                 data.Callback(WindowResizeEvent{width, height});
@@ -153,6 +154,7 @@ namespace Core::Windowing
         {
             ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            data.InputActivity = true;
 
             if (action == GLFW_PRESS || action == GLFW_RELEASE)
             {
@@ -167,6 +169,7 @@ namespace Core::Windowing
         {
             ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            data.InputActivity = true;
 
             if (action == GLFW_PRESS || action == GLFW_RELEASE)
             {
@@ -181,6 +184,7 @@ namespace Core::Windowing
         {
             ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            data.InputActivity = true;
             if (data.InputCtx)
             {
                 data.InputCtx->AccumulateScroll(static_cast<float>(xoffset), static_cast<float>(yoffset));
@@ -195,6 +199,10 @@ namespace Core::Windowing
         {
             ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            // Cursor motion alone is NOT treated as user activity for idle
+            // throttling — the cursor drifting over the viewport while the user
+            // works in another app should not prevent idle pacing. Clicks,
+            // scrolls, and key presses are the meaningful activity signals.
             if (data.Callback)
             {
                 data.Callback(CursorEvent{xpos, ypos});
@@ -205,6 +213,7 @@ namespace Core::Windowing
         {
             ImGui_ImplGlfw_CharCallback(window, c);
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            data.InputActivity = true;
             if (data.Callback)
             {
                 data.Callback(CharEvent{c});
@@ -214,6 +223,7 @@ namespace Core::Windowing
         glfwSetDropCallback(glfwWindow, [](GLFWwindow* window, int count, const char** paths)
         {
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            data.InputActivity = true;
 
             WindowDropEvent event;
             // Convert C-strings to std::vector<std::string>
@@ -250,6 +260,13 @@ namespace Core::Windowing
 
         glfwGetWindowSize(static_cast<GLFWwindow*>(m_Window), &m_Data.WindowWidth, &m_Data.WindowHeight);
         glfwGetFramebufferSize(static_cast<GLFWwindow*>(m_Window), &m_Data.FramebufferWidth, &m_Data.FramebufferHeight);
+    }
+
+    bool Window::ConsumeInputActivity()
+    {
+        const bool had = m_Data.InputActivity;
+        m_Data.InputActivity = false;
+        return had;
     }
 
     void Window::WaitForEventsTimeout(double timeoutSeconds)

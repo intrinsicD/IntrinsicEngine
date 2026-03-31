@@ -1273,7 +1273,14 @@ int main(int argc, char* argv[])
     config.AppName = "Sandbox";
     config.Width = 1600;
     config.Height = 900;
-    config.MaxActiveFps = 120.0;
+    // Editor-oriented defaults: VSync handles primary pacing; the activity
+    // tracker drops to 15 fps after 2 seconds of idle to conserve CPU/GPU.
+    config.FramePacing = {
+        .ActiveFps = 0.0,             // 0 = VSync-limited (no additional sleep cap)
+        .IdleFps = 15.0,              // Idle rate when no user interaction
+        .IdleTimeoutSeconds = 2.0,    // Seconds before entering idle pacing
+        .Enabled = true,
+    };
 
     for (int i = 1; i < argc; ++i)
     {
@@ -1305,7 +1312,19 @@ int main(int argc, char* argv[])
         }
         else if (arg == "--max-active-fps" && i + 1 < argc)
         {
-            config.MaxActiveFps = std::stod(argv[++i]);
+            config.FramePacing.ActiveFps = std::stod(argv[++i]);
+        }
+        else if (arg == "--idle-fps" && i + 1 < argc)
+        {
+            config.FramePacing.IdleFps = std::stod(argv[++i]);
+        }
+        else if (arg == "--idle-timeout" && i + 1 < argc)
+        {
+            config.FramePacing.IdleTimeoutSeconds = std::stod(argv[++i]);
+        }
+        else if (arg == "--no-idle-throttle")
+        {
+            config.FramePacing.Enabled = false;
         }
     }
 
