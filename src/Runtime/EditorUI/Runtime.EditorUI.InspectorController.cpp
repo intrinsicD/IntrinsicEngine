@@ -86,6 +86,29 @@ void InspectorController::Draw()
 
     auto& reg = m_Engine->GetSceneManager().GetScene().GetRegistry();
 
+    // === Reset per-entity widget state on selection change ===
+    if (selected != m_PreviousSelected)
+    {
+        m_PreviousSelected = selected;
+        m_MeshVertexPropertiesUi = {};
+        m_MeshEdgePropertiesUi = {};
+        m_MeshHalfedgePropertiesUi = {};
+        m_MeshFacePropertiesUi = {};
+        m_GraphVertexPropertiesUi = {};
+        m_GraphEdgePropertiesUi = {};
+        m_GraphHalfedgePropertiesUi = {};
+        m_PointCloudPropertiesUi = {};
+        m_MeshSpectralUi = {};
+        m_GraphSpectralUi = {};
+        m_KMeansUi = {};
+        m_RemeshingUi = {};
+        m_SimplificationUi = {};
+        m_SmoothingUi = {};
+        m_SubdivisionUi = {};
+        m_MeshAnalysisUi = {};
+        m_NormalEstimationUi = {};
+    }
+
     // === Entity ID (always shown at top) ===
     ImGui::Text("Entity ID: %u", static_cast<uint32_t>(static_cast<entt::id_type>(selected)));
 
@@ -132,7 +155,7 @@ void InspectorController::Draw()
 
             if (geo)
             {
-                ImGui::Text("Vertices: %lu", geo->GetLayout().PositionsSize / sizeof(glm::vec3));
+                ImGui::Text("Vertices: %zu", geo->GetLayout().PositionsSize / sizeof(glm::vec3));
                 ImGui::Text("Indices: %u", geo->GetIndexCount());
 
                 const char* topoName = "Unknown";
@@ -369,17 +392,24 @@ void InspectorController::Draw()
             ImGui::Checkbox("Visible##Graph", &gd->Visible);
 
             ImGui::SeparatorText("Node Settings");
-            PointRenderModeCombo("Node Render Mode", gd->NodeRenderMode);
-            ImGui::SliderFloat("Node Size", &gd->DefaultNodeRadius, 0.0001f, 1.0f, "%.5f",
-                               ImGuiSliderFlags_Logarithmic);
-            ImGui::SliderFloat("Node Size Multiplier", &gd->NodeSizeMultiplier, 0.1f, 10.0f, "%.2f",
-                               ImGuiSliderFlags_Logarithmic);
-            ColorEdit4("Node Color", gd->DefaultNodeColor);
+            if (PointRenderModeCombo("Node Render Mode", gd->NodeRenderMode))
+                gd->GpuDirty = true;
+            if (ImGui::SliderFloat("Node Size", &gd->DefaultNodeRadius, 0.0001f, 1.0f, "%.5f",
+                               ImGuiSliderFlags_Logarithmic))
+                gd->GpuDirty = true;
+            if (ImGui::SliderFloat("Node Size Multiplier", &gd->NodeSizeMultiplier, 0.1f, 10.0f, "%.2f",
+                               ImGuiSliderFlags_Logarithmic))
+                gd->GpuDirty = true;
+            if (ColorEdit4("Node Color", gd->DefaultNodeColor))
+                gd->GpuDirty = true;
 
             ImGui::SeparatorText("Edge Settings");
-            ColorEdit4("Edge Color", gd->DefaultEdgeColor);
-            ImGui::SliderFloat("Edge Width", &gd->EdgeWidth, 0.5f, 32.0f, "%.1f");
-            ImGui::Checkbox("Edge Overlay", &gd->EdgesOverlay);
+            if (ColorEdit4("Edge Color", gd->DefaultEdgeColor))
+                gd->GpuDirty = true;
+            if (ImGui::SliderFloat("Edge Width", &gd->EdgeWidth, 0.5f, 32.0f, "%.1f"))
+                gd->GpuDirty = true;
+            if (ImGui::Checkbox("Edge Overlay", &gd->EdgesOverlay))
+                gd->GpuDirty = true;
 
             if (gd->HasEdgeColors())
             {
@@ -436,14 +466,18 @@ void InspectorController::Draw()
             ImGui::SeparatorText("Rendering");
             ImGui::Checkbox("Visible##PCD", &pcd->Visible);
 
-            PointRenderModeCombo("Render Mode##PCD", pcd->RenderMode);
+            if (PointRenderModeCombo("Render Mode##PCD", pcd->RenderMode))
+                pcd->GpuDirty = true;
 
-            ImGui::SliderFloat("Default Radius##PCD", &pcd->DefaultRadius, 0.0001f, 1.0f, "%.5f",
-                               ImGuiSliderFlags_Logarithmic);
-            ImGui::SliderFloat("Size Multiplier##PCD", &pcd->SizeMultiplier, 0.1f, 10.0f, "%.2f",
-                               ImGuiSliderFlags_Logarithmic);
+            if (ImGui::SliderFloat("Default Radius##PCD", &pcd->DefaultRadius, 0.0001f, 1.0f, "%.5f",
+                               ImGuiSliderFlags_Logarithmic))
+                pcd->GpuDirty = true;
+            if (ImGui::SliderFloat("Size Multiplier##PCD", &pcd->SizeMultiplier, 0.1f, 10.0f, "%.2f",
+                               ImGuiSliderFlags_Logarithmic))
+                pcd->GpuDirty = true;
 
-            ColorEdit4("Default Color##PCD", pcd->DefaultColor);
+            if (ColorEdit4("Default Color##PCD", pcd->DefaultColor))
+                pcd->GpuDirty = true;
 
             if (pcd->CloudRef)
             {
