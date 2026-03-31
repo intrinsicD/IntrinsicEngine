@@ -169,7 +169,10 @@ export namespace Runtime::EditorUI
     // Returns true if any value changed. When registry is provided, child
     // Graph entities are destroyed immediately on removal (prevents leaks).
     bool VectorFieldWidget(Graphics::VisualizationConfig& config,
-                           const Geometry::ConstPropertySet* ps, const char* suffix,
+                           const Geometry::ConstPropertySet* vertexPs,
+                           const Geometry::ConstPropertySet* edgePs,
+                           const Geometry::ConstPropertySet* facePs,
+                           const char* suffix,
                            entt::registry* registry = nullptr);
 
     // Point render mode combo (FlatDisc/Surfel/EWA/Sphere). Returns true on change.

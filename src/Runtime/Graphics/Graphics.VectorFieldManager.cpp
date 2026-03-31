@@ -2,7 +2,7 @@ module;
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
+#include <utility>
 #include <memory>
 #include <span>
 #include <string>
@@ -14,6 +14,7 @@ module;
 module Graphics.VectorFieldManager;
 
 import Graphics.Components;
+import Graphics.OverlayEntityFactory;
 import Graphics.VisualizationConfig;
 import Graphics.ColorMapper;
 import Graphics.GpuColor;
@@ -26,21 +27,47 @@ using namespace Graphics;
 
 namespace
 {
-    /// Build a Graph from base positions + vec3 offsets.
-    /// Nodes: 0..N-1 = base, N..2N-1 = target.
-    /// Edges: base[i] → target[i].
-    /// Supports per-vector length scaling via a scalar property.
+    using Domain = Graphics::VectorFieldDomain;
+
+    [[nodiscard]] const char* DomainSuffix(Domain domain) noexcept
+    {
+        switch (domain)
+        {
+        case Domain::Vertex: return "V";
+        case Domain::Edge:   return "E";
+        case Domain::Face:   return "F";
+        }
+        return "V";
+    }
+
+    /// Build a child Graph from base positions + explicit endpoints.
+    /// Layout:
+    ///   - vertices [0, N)   = base points
+    ///   - vertices [N, 2N)  = baked endpoints
+    ///   - edges    [0, N)   = base[i] → endpoint[i]
     [[nodiscard]] std::shared_ptr<Geometry::Graph::Graph> BuildVectorFieldGraph(
         std::span<const glm::vec3> positions,
-        const Geometry::PropertySet& vertexProps,
+        const Geometry::PropertySet& domainProps,
         const VectorFieldEntry& entry)
     {
-        auto vecProp = vertexProps.Get<glm::vec3>(entry.PropertyName);
-        if (!vecProp.IsValid())
+        const auto vectorVecProp = domainProps.Get<glm::vec3>(entry.VectorPropertyName);
+        if (!vectorVecProp.IsValid())
             return nullptr;
 
-        const auto& vectors = vecProp.Vector();
-        const size_t N = std::min(positions.size(), vectors.size());
+        const auto& vectors = vectorVecProp.Vector();
+        std::span<const glm::vec3> bases = positions;
+        std::vector<glm::vec3> baseScratch;
+        if (!entry.BasePropertyName.empty())
+        {
+            auto baseVecProp = domainProps.Get<glm::vec3>(entry.BasePropertyName);
+            if (!baseVecProp.IsValid())
+                return nullptr;
+            const auto& baseValues = baseVecProp.Vector();
+            baseScratch.assign(baseValues.begin(), baseValues.end());
+            bases = baseScratch;
+        }
+
+        const size_t N = std::min(bases.size(), vectors.size());
         if (N == 0)
             return nullptr;
 
@@ -48,7 +75,7 @@ namespace
         const float* lengthScales = nullptr;
         if (!entry.LengthPropertyName.empty())
         {
-            auto lenProp = vertexProps.Get<float>(entry.LengthPropertyName);
+            auto lenProp = domainProps.Get<float>(entry.LengthPropertyName);
             if (lenProp.IsValid() && lenProp.Vector().size() >= N)
             {
                 lengthScales = lenProp.Vector().data();
@@ -57,18 +84,23 @@ namespace
 
         auto graph = std::make_shared<Geometry::Graph::Graph>();
 
-        // Add base points and target points.
+        graph->Reserve(N * 2u, N);
+
+        // Add base points and baked endpoints.
         std::vector<Geometry::VertexHandle> baseVerts(N);
         std::vector<Geometry::VertexHandle> targetVerts(N);
 
         for (size_t i = 0; i < N; ++i)
         {
+            const glm::vec3 base = bases[i];
             const float scale = entry.Scale * (lengthScales ? lengthScales[i] : 1.0f);
-            baseVerts[i] = graph->AddVertex(positions[i]);
-            targetVerts[i] = graph->AddVertex(positions[i] + vectors[i] * scale);
+            const glm::vec3 end = base + vectors[i] * scale;
+
+            baseVerts[i] = graph->AddVertex(base);
+            targetVerts[i] = graph->AddVertex(end);
         }
 
-        // Add edges from base to target.
+        // Add edges from base to duplicate.
         for (size_t i = 0; i < N; ++i)
         {
             (void)graph->AddEdge(baseVerts[i], targetVerts[i]);
@@ -76,70 +108,87 @@ namespace
 
         return graph;
     }
+
+    [[nodiscard]] bool HasOverlayContract(entt::registry& registry, entt::entity entity) noexcept
+    {
+        return registry.valid(entity)
+            && registry.all_of<ECS::Components::Transform::Component,
+                               ECS::Components::Transform::WorldMatrix,
+                               ECS::Components::Hierarchy::Component,
+                               ECS::Graph::Data>(entity);
+    }
+
+    void DestroyOverlayIfValid(entt::registry& registry, entt::entity entity) noexcept
+    {
+        if (entity != entt::null && registry.valid(entity))
+            OverlayEntityFactory::DestroyOverlay(registry, entity);
+    }
 } // namespace
 
 void VectorFieldManager::SyncVectorFields(
     entt::registry& registry,
     entt::entity sourceEntity,
     std::span<const glm::vec3> positions,
-    const Geometry::PropertySet& vertexProps,
+    Domain domain,
+    const Geometry::PropertySet& domainProps,
     VisualizationConfig& config,
     const std::string& sourceName)
 {
     for (auto& entry : config.VectorFields)
     {
-        if (entry.PropertyName.empty())
+        if (entry.Domain != domain)
+            continue;
+
+        if (entry.VectorPropertyName.empty())
         {
             // No property selected — destroy child if it exists.
-            if (entry.ChildEntity != entt::null && registry.valid(entry.ChildEntity))
-            {
-                registry.destroy(entry.ChildEntity);
-            }
+            DestroyOverlayIfValid(registry, entry.ChildEntity);
             entry.ChildEntity = entt::null;
             continue;
         }
 
         // Build the graph.
-        auto graph = BuildVectorFieldGraph(positions, vertexProps, entry);
+        auto graph = BuildVectorFieldGraph(positions, domainProps, entry);
         if (!graph)
         {
             // Property not found or empty — destroy child.
-            if (entry.ChildEntity != entt::null && registry.valid(entry.ChildEntity))
-            {
-                registry.destroy(entry.ChildEntity);
-            }
+            DestroyOverlayIfValid(registry, entry.ChildEntity);
             entry.ChildEntity = entt::null;
             continue;
         }
 
+        const size_t edgeCount = graph->EdgeCount();
+
+        const std::string childName = sourceName + " [VF " + std::string(DomainSuffix(domain)) + ": " + entry.VectorPropertyName + "]";
+
         // Create or update child entity.
-        if (entry.ChildEntity == entt::null || !registry.valid(entry.ChildEntity))
+        if (!HasOverlayContract(registry, entry.ChildEntity))
         {
-            // Create new child entity.
-            entry.ChildEntity = registry.create();
+            DestroyOverlayIfValid(registry, entry.ChildEntity);
+            entry.ChildEntity = OverlayEntityFactory::CreateGraphOverlay(
+                registry, sourceEntity, std::move(graph), childName);
 
-            std::string childName = sourceName + " [VF: " + entry.PropertyName + "]";
-            registry.emplace<ECS::Components::NameTag::Component>(
-                entry.ChildEntity, ECS::Components::NameTag::Component{std::move(childName)});
-
-            // Attach as child via hierarchy.
-            ECS::Components::Hierarchy::Attach(registry, entry.ChildEntity, sourceEntity);
+            if (entry.ChildEntity == entt::null || !registry.valid(entry.ChildEntity))
+                continue;
+        }
+        else
+        {
+            auto& graphData = registry.get<ECS::Graph::Data>(entry.ChildEntity);
+            graphData.GraphRef = std::move(graph);
+            graphData.GpuDirty = true;
+            graphData.VectorFieldMode = true;
         }
 
         // Per-vector colors: map a source property to per-edge colors on the child graph.
         bool hasPerVectorColors = false;
         std::vector<uint32_t> perEdgeColors;
-        if (!entry.ColorPropertyName.empty())
+        if (!entry.ArrowColor.PropertyName.empty())
         {
-            ColorSource colorConfig;
-            colorConfig.PropertyName = entry.ColorPropertyName;
-            colorConfig.AutoRange = true;
-
-            auto mapped = ColorMapper::MapProperty(vertexProps, colorConfig);
-            if (mapped && mapped->Colors.size() >= static_cast<size_t>(graph->EdgeCount()))
+            auto colorConfig = entry.ArrowColor;
+            auto mapped = ColorMapper::MapProperty(domainProps, colorConfig);
+            if (mapped && mapped->Colors.size() >= edgeCount)
             {
-                // Each edge i corresponds to base vertex i. Use base vertex color.
-                const size_t edgeCount = graph->EdgeCount();
+                // Each edge i corresponds to base vertex i.
                 perEdgeColors.resize(edgeCount);
                 for (size_t i = 0; i < edgeCount; ++i)
                     perEdgeColors[i] = mapped->Colors[i];
@@ -147,18 +196,14 @@ void VectorFieldManager::SyncVectorFields(
             }
         }
 
-        // Ensure DataAuthority tag is present on the child entity.
-        if (!registry.all_of<ECS::DataAuthority::GraphTag>(entry.ChildEntity))
-            registry.emplace<ECS::DataAuthority::GraphTag>(entry.ChildEntity);
-
         // Set up Graph::Data on the child entity.
         auto& graphData = registry.get_or_emplace<ECS::Graph::Data>(entry.ChildEntity);
-        graphData.GraphRef = std::move(graph);
         graphData.DefaultEdgeColor = entry.Color;
         graphData.DefaultNodeColor = entry.Color;
         graphData.DefaultNodeRadius = 0.003f;
         graphData.EdgeWidth = entry.EdgeWidth;
         graphData.EdgesOverlay = entry.Overlay;
+        graphData.VectorFieldMode = true;
         graphData.Visible = true;
         graphData.GpuDirty = true;
 
@@ -173,7 +218,9 @@ void VectorFieldManager::SyncVectorFields(
         }
 
         if (auto* line = registry.try_get<ECS::Line::Component>(entry.ChildEntity))
+        {
             line->ShowPerEdgeColors = hasPerVectorColors;
+        }
     }
 }
 
@@ -183,10 +230,7 @@ void VectorFieldManager::DestroyAllVectorFields(
 {
     for (auto& entry : config.VectorFields)
     {
-        if (entry.ChildEntity != entt::null && registry.valid(entry.ChildEntity))
-        {
-            registry.destroy(entry.ChildEntity);
-        }
+        DestroyOverlayIfValid(registry, entry.ChildEntity);
         entry.ChildEntity = entt::null;
     }
 }

@@ -294,7 +294,7 @@ void InspectorController::Draw()
                                   "and store as v:normal / f:normal properties.\n"
                                   "These then appear in vector field and color source selectors.");
 
-            if (VectorFieldWidget(md->Visualization, &vtxPs, "MeshVF", &reg))
+            if (VectorFieldWidget(md->Visualization, &vtxPs, &edgePs, &facePs, "MeshVF", &reg))
                 md->Visualization.VectorFieldsDirty = true;
 
             // --- Property Browsers ---
@@ -445,7 +445,7 @@ void InspectorController::Draw()
                 if (ColorSourceWidget("Edge Color Source", gd->Visualization.EdgeColors, &edgePs, "GraphEdge"))
                     reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
 
-                if (VectorFieldWidget(gd->Visualization, &vtxPs, "GraphVF", &reg))
+                if (VectorFieldWidget(gd->Visualization, &vtxPs, &edgePs, nullptr, "GraphVF", &reg))
                     gd->Visualization.VectorFieldsDirty = true;
 
                 if (ImGui::CollapsingHeader("Property Browser##Graph"))
@@ -504,7 +504,7 @@ void InspectorController::Draw()
                 if (ColorSourceWidget("Point Color Source", pcd->Visualization.VertexColors, &ptPs, "PCDVtx"))
                     reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
 
-                if (VectorFieldWidget(pcd->Visualization, &ptPs, "PCDVF", &reg))
+                if (VectorFieldWidget(pcd->Visualization, &ptPs, nullptr, nullptr, "PCDVF", &reg))
                     pcd->Visualization.VectorFieldsDirty = true;
 
                 if (ImGui::CollapsingHeader("Property Browser##PointCloud"))

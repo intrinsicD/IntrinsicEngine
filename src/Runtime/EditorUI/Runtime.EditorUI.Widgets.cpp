@@ -869,111 +869,216 @@ bool ColorSourceWidget(const char* label, Graphics::ColorSource& src,
 // VectorFieldWidget
 // =========================================================================
 bool VectorFieldWidget(Graphics::VisualizationConfig& config,
-                       const Geometry::ConstPropertySet* ps, const char* suffix,
+                       const Geometry::ConstPropertySet* vertexPs,
+                       const Geometry::ConstPropertySet* edgePs,
+                       const Geometry::ConstPropertySet* facePs,
+                       const char* suffix,
                        entt::registry* registry)
 {
     bool changed = false;
     char idBuf[128];
 
+
+    auto domainProps = [&](Graphics::VectorFieldDomain domain) -> const Geometry::ConstPropertySet*
+    {
+        switch (domain)
+        {
+        case Graphics::VectorFieldDomain::Vertex: return vertexPs;
+        case Graphics::VectorFieldDomain::Edge:   return edgePs;
+        case Graphics::VectorFieldDomain::Face:   return facePs;
+        }
+        return vertexPs;
+    };
+
+    auto domainVecProps = [&](const Geometry::ConstPropertySet* props)
+    {
+        std::vector<Graphics::PropertyInfo> result;
+        if (props)
+            result = Graphics::EnumerateVectorProperties(*props);
+        return result;
+    };
+
     ImGui::SeparatorText("Vector Fields");
 
-    // Available vec3 properties.
-    std::vector<Graphics::PropertyInfo> vecProps;
-    if (ps)
-        vecProps = Graphics::EnumerateVectorProperties(*ps);
-
-    // Add new vector field.
-    snprintf(idBuf, sizeof(idBuf), "Add Vector Field##%s", suffix);
-    if (!vecProps.empty() && ImGui::BeginCombo(idBuf, "Add..."))
+    struct DomainSection
     {
-        for (const auto& p : vecProps)
+        Graphics::VectorFieldDomain Domain;
+        const Geometry::ConstPropertySet* Props;
+        const char* Label;
+        std::vector<Graphics::PropertyInfo> VectorProps;
+    };
+
+    const DomainSection sections[] = {
+        {Graphics::VectorFieldDomain::Vertex, vertexPs, "Vertex", domainVecProps(vertexPs)},
+        {Graphics::VectorFieldDomain::Edge,   edgePs,   "Edge",   domainVecProps(edgePs)},
+        {Graphics::VectorFieldDomain::Face,   facePs,   "Face",   domainVecProps(facePs)},
+    };
+
+    for (const auto& section : sections)
+    {
+        if (!section.Props)
+            continue;
+
+        ImGui::PushID(section.Label);
+        ImGui::SeparatorText(section.Label);
+
+        snprintf(idBuf, sizeof(idBuf), "Add Vector Field##%s-%s", suffix, section.Label);
+        if (!section.VectorProps.empty() && ImGui::BeginCombo(idBuf, "Add..."))
         {
-            if (ImGui::Selectable(p.Name.c_str()))
+            for (const auto& p : section.VectorProps)
             {
-                Graphics::VectorFieldEntry entry;
-                entry.PropertyName = p.Name;
-                config.VectorFields.push_back(std::move(entry));
-                changed = true;
+                std::string label = std::string(section.Label) + ": " + p.Name;
+                if (ImGui::Selectable(label.c_str()))
+                {
+                    Graphics::VectorFieldEntry entry;
+                    entry.Domain = section.Domain;
+                    entry.VectorPropertyName = p.Name;
+                    config.VectorFields.push_back(std::move(entry));
+                    changed = true;
+                }
             }
+            ImGui::EndCombo();
         }
-        ImGui::EndCombo();
-    }
 
-    // List existing vector fields.
-    for (size_t i = 0; i < config.VectorFields.size();)
-    {
-        auto& vf = config.VectorFields[i];
-        ImGui::PushID(static_cast<int>(i));
-
-        ImGui::Text("%s", vf.PropertyName.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("X"))
+        const bool hasEntries = std::ranges::any_of(config.VectorFields, [&](const Graphics::VectorFieldEntry& vf)
         {
-            // Destroy the child Graph entity before erasing the entry.
-            if (vf.ChildEntity != entt::null && registry && registry->valid(vf.ChildEntity))
-                registry->destroy(vf.ChildEntity);
-            config.VectorFields.erase(config.VectorFields.begin() + static_cast<ptrdiff_t>(i));
-            changed = true;
+            return vf.Domain == section.Domain;
+        });
+
+        if (!hasEntries)
+        {
+            ImGui::TextDisabled("No vector fields attached to this domain.");
             ImGui::PopID();
             continue;
         }
 
-        ImGui::DragFloat("Scale", &vf.Scale, 0.01f, 0.001f, 100.0f);
-        ImGui::SliderFloat("Width", &vf.EdgeWidth, 0.5f, 5.0f);
-        ColorEdit4("Color", vf.Color);
-        ImGui::Checkbox("Overlay", &vf.Overlay);
-
-        // Per-vector color property selector.
-        if (ps)
+        for (size_t i = 0; i < config.VectorFields.size();)
         {
-            auto colorableProps = Graphics::EnumerateColorableProperties(*ps);
-            const char* colorPreview = vf.ColorPropertyName.empty()
-                                           ? "(Uniform)"
-                                           : vf.ColorPropertyName.c_str();
-            if (ImGui::BeginCombo("Arrow Color", colorPreview))
+            auto& vf = config.VectorFields[i];
+            if (vf.Domain != section.Domain)
             {
-                if (ImGui::Selectable("(Uniform)", vf.ColorPropertyName.empty()))
-                {
-                    vf.ColorPropertyName.clear();
-                    changed = true;
-                }
-                for (const auto& cp : colorableProps)
-                {
-                    if (ImGui::Selectable(cp.Name.c_str(), vf.ColorPropertyName == cp.Name))
-                    {
-                        vf.ColorPropertyName = cp.Name;
-                        changed = true;
-                    }
-                }
-                ImGui::EndCombo();
+                ++i;
+                continue;
             }
 
-            // Per-vector length property selector.
-            auto scalarProps = Graphics::EnumerateScalarProperties(*ps);
-            const char* lenPreview = vf.LengthPropertyName.empty()
-                                         ? "(Uniform)"
-                                         : vf.LengthPropertyName.c_str();
-            if (ImGui::BeginCombo("Arrow Length", lenPreview))
+            ImGui::PushID(static_cast<int>(i));
+            ImGui::Separator();
+            ImGui::Text("%s", vf.VectorPropertyName.empty() ? "(inactive)" : vf.VectorPropertyName.c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("X"))
             {
-                if (ImGui::Selectable("(Uniform)", vf.LengthPropertyName.empty()))
+                if (vf.ChildEntity != entt::null && registry && registry->valid(vf.ChildEntity))
+                    registry->destroy(vf.ChildEntity);
+                config.VectorFields.erase(config.VectorFields.begin() + static_cast<ptrdiff_t>(i));
+                changed = true;
+                ImGui::PopID();
+                continue;
+            }
+
+            static constexpr const char* kDomainNames[] = {"Vertex", "Edge", "Face"};
+            int domainIdx = static_cast<int>(vf.Domain);
+            if (domainIdx < 0 || domainIdx > 2)
+                domainIdx = 0;
+            if (ImGui::Combo("Domain", &domainIdx, kDomainNames, 3))
+            {
+                vf.Domain = static_cast<Graphics::VectorFieldDomain>(domainIdx);
+                changed = true;
+            }
+
+            auto* props = domainProps(vf.Domain);
+            const auto vectorProps = domainVecProps(props);
+
+            if (props && !vectorProps.empty())
+            {
+                const char* basePreview = vf.BasePropertyName.empty()
+                    ? "(Canonical Positions)"
+                    : vf.BasePropertyName.c_str();
+                if (ImGui::BeginCombo("Base Points", basePreview))
                 {
-                    vf.LengthPropertyName.clear();
-                    changed = true;
-                }
-                for (const auto& sp : scalarProps)
-                {
-                    if (ImGui::Selectable(sp.Name.c_str(), vf.LengthPropertyName == sp.Name))
+                    if (ImGui::Selectable("(Canonical Positions)", vf.BasePropertyName.empty()))
                     {
-                        vf.LengthPropertyName = sp.Name;
+                        vf.BasePropertyName.clear();
                         changed = true;
                     }
+                    for (const auto& p : vectorProps)
+                    {
+                        if (ImGui::Selectable(p.Name.c_str(), vf.BasePropertyName == p.Name))
+                        {
+                            vf.BasePropertyName = p.Name;
+                            changed = true;
+                        }
+                    }
+                    ImGui::EndCombo();
                 }
-                ImGui::EndCombo();
+
+                const char* vectorPreview = vf.VectorPropertyName.empty()
+                    ? "(None)"
+                    : vf.VectorPropertyName.c_str();
+                if (ImGui::BeginCombo("Vector Source", vectorPreview))
+                {
+                    if (ImGui::Selectable("(None)", vf.VectorPropertyName.empty()))
+                    {
+                        vf.VectorPropertyName.clear();
+                        changed = true;
+                    }
+                    for (const auto& p : vectorProps)
+                    {
+                        if (ImGui::Selectable(p.Name.c_str(), vf.VectorPropertyName == p.Name))
+                        {
+                            vf.VectorPropertyName = p.Name;
+                            changed = true;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
             }
+            else
+            {
+                ImGui::TextDisabled("No vec3 properties available for %s.", section.Label);
+            }
+
+            if (ColorSourceWidget("Arrow Color Source", vf.ArrowColor, props, "ArrowColor"))
+                changed = true;
+
+            if (ImGui::DragFloat("Scale", &vf.Scale, 0.01f, 0.001f, 100.0f))
+                changed = true;
+            if (ImGui::SliderFloat("Width", &vf.EdgeWidth, 0.5f, 5.0f))
+                changed = true;
+            if (ColorEdit4("Uniform Color", vf.Color))
+                changed = true;
+            if (ImGui::Checkbox("Overlay", &vf.Overlay))
+                changed = true;
+
+            if (props)
+            {
+                auto scalarProps = Graphics::EnumerateScalarProperties(*props);
+                const char* lenPreview = vf.LengthPropertyName.empty()
+                    ? "(Uniform)"
+                    : vf.LengthPropertyName.c_str();
+                if (ImGui::BeginCombo("Arrow Length", lenPreview))
+                {
+                    if (ImGui::Selectable("(Uniform)", vf.LengthPropertyName.empty()))
+                    {
+                        vf.LengthPropertyName.clear();
+                        changed = true;
+                    }
+                    for (const auto& sp : scalarProps)
+                    {
+                        if (ImGui::Selectable(sp.Name.c_str(), vf.LengthPropertyName == sp.Name))
+                        {
+                            vf.LengthPropertyName = sp.Name;
+                            changed = true;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+
+            ImGui::PopID();
+            ++i;
         }
 
         ImGui::PopID();
-        ++i;
     }
 
     return changed;

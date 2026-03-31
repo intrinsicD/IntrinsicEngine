@@ -28,19 +28,6 @@ export namespace ECS::Line
 
     struct Component
     {
-        Component() noexcept
-            : Geometry{}
-            , EdgeView{}
-            , EdgeCount(0)
-            , Color(0.85f, 0.85f, 0.85f, 1.0f)
-            , Width(1.5f)
-            , Overlay(false)
-            , HasPerEdgeColors(false)
-            , HasPerEdgeWidths(false)
-            , ShowPerEdgeColors(true)
-            , CachedEdgeColors{}
-        {
-        }
 
         // ---- Geometry Handles ----
         // Shared vertex buffer (BDA) — same device-local buffer as the
@@ -83,5 +70,6 @@ export namespace ECS::Line
         // ---- Domain Hint ----
         // Set by the lifecycle system that populated this component.
         Domain SourceDomain = Domain::MeshEdge;
+
     };
 }

@@ -65,6 +65,7 @@ void main()
     // Read positions via BDA from the shared vertex buffer.
     PosBuf posBuf = PosBuf(push.PtrPositions);
     vec3 posA = posBuf.v[edge.i0];
+
     vec3 posB = posBuf.v[edge.i1];
 
     // Transform to world space.

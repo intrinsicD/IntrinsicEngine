@@ -1,8 +1,11 @@
 module;
 
+#include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <optional>
+#include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -35,6 +38,109 @@ using namespace Core::Hash;
 
 namespace Graphics::Systems::PropertySetDirtySync
 {
+    namespace
+    {
+        [[nodiscard]] std::vector<glm::vec3> BuildMeshEdgeMidpoints(const Geometry::Halfedge::Mesh& mesh)
+        {
+            std::vector<glm::vec3> positions;
+            positions.reserve(mesh.EdgesSize());
+
+            for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+            {
+                const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(e) || mesh.IsDeleted(e))
+                {
+                    positions.emplace_back(0.0f);
+                    continue;
+                }
+
+                const auto h0 = mesh.Halfedge(e, 0);
+                if (!h0.IsValid())
+                {
+                    positions.emplace_back(0.0f);
+                    continue;
+                }
+
+                const glm::vec3 a = mesh.Position(mesh.FromVertex(h0));
+                const glm::vec3 b = mesh.Position(mesh.ToVertex(h0));
+                positions.push_back(0.5f * (a + b));
+            }
+
+            return positions;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> BuildMeshFaceCentroids(const Geometry::Halfedge::Mesh& mesh)
+        {
+            std::vector<glm::vec3> positions;
+            positions.reserve(mesh.FacesSize());
+
+            for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+            {
+                const Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(f) || mesh.IsDeleted(f))
+                {
+                    positions.emplace_back(0.0f);
+                    continue;
+                }
+
+                const auto h0 = mesh.Halfedge(f);
+                if (!h0.IsValid())
+                {
+                    positions.emplace_back(0.0f);
+                    continue;
+                }
+
+                glm::vec3 sum(0.0f);
+                std::size_t count = 0;
+                std::size_t safety = 0;
+                const std::size_t maxIter = mesh.HalfedgesSize();
+                for (const auto h : mesh.HalfedgesAroundFace(f))
+                {
+                    sum += mesh.Position(mesh.ToVertex(h));
+                    ++count;
+                    if (++safety > maxIter)
+                        break;
+                }
+
+                positions.push_back(count > 0 ? sum / static_cast<float>(count) : mesh.Position(mesh.ToVertex(h0)));
+            }
+
+            return positions;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> BuildGraphEdgeMidpoints(const Geometry::Graph::Graph& graph)
+        {
+            std::vector<glm::vec3> positions;
+            positions.reserve(graph.EdgesSize());
+
+            for (std::size_t i = 0; i < graph.EdgesSize(); ++i)
+            {
+                const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+                if (!graph.IsValid(e) || graph.IsDeleted(e))
+                {
+                    positions.emplace_back(0.0f);
+                    continue;
+                }
+
+                const auto [v0, v1] = graph.EdgeVertices(e);
+                positions.push_back(0.5f * (graph.VertexPosition(v0) + graph.VertexPosition(v1)));
+            }
+
+            return positions;
+        }
+
+        template <class PropertySetT>
+        void PublishVec3Property(PropertySetT& ps, std::string_view name, std::span<const glm::vec3> values)
+        {
+            auto property = ps.template GetOrAdd<glm::vec3>(std::string{name}, glm::vec3(0.0f));
+            auto& dest = property.Vector();
+            dest.resize(values.size());
+            const std::size_t count = std::min(dest.size(), values.size());
+            for (std::size_t i = 0; i < count; ++i)
+                dest[i] = values[i];
+        }
+    }
+
     // =====================================================================
     // Graph entity: re-extract per-node attributes from PropertySets.
     // =====================================================================
@@ -352,10 +458,37 @@ namespace Graphics::Systems::PropertySetDirtySync
 
                 if (meshData.MeshRef)
                 {
+                    PublishVec3Property(
+                        meshData.MeshRef->EdgeProperties(),
+                        "e:vf_center",
+                        BuildMeshEdgeMidpoints(*meshData.MeshRef));
+
+                    PublishVec3Property(
+                        meshData.MeshRef->FaceProperties(),
+                        "f:vf_center",
+                        BuildMeshFaceCentroids(*meshData.MeshRef));
+
                     VectorFieldManager::SyncVectorFields(
                         registry, entity,
                         meshData.MeshRef->Positions(),
+                        Graphics::VectorFieldDomain::Vertex,
                         meshData.MeshRef->VertexProperties(),
+                        viz,
+                        getName(entity));
+
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity,
+                        BuildMeshEdgeMidpoints(*meshData.MeshRef),
+                        Graphics::VectorFieldDomain::Edge,
+                        meshData.MeshRef->EdgeProperties(),
+                        viz,
+                        getName(entity));
+
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity,
+                        BuildMeshFaceCentroids(*meshData.MeshRef),
+                        Graphics::VectorFieldDomain::Face,
+                        meshData.MeshRef->FaceProperties(),
                         viz,
                         getName(entity));
                     viz.VectorFieldsDirty = false;
@@ -382,24 +515,31 @@ namespace Graphics::Systems::PropertySetDirtySync
                 {
                     auto& graph = *graphData.GraphRef;
                     const std::size_t vSize = graph.VerticesSize();
-
-                    // Include ALL vertices (even deleted) to maintain index
-                    // alignment with PropertySet vectors. Deleted vertices
-                    // produce zero-length arrows which is harmless.
                     std::vector<glm::vec3> positions(vSize);
                     for (std::size_t i = 0; i < vSize; ++i)
                     {
-                        const Geometry::VertexHandle v{
-                            static_cast<Geometry::PropertyIndex>(i)};
-                        positions[i] = graph.IsDeleted(v)
-                            ? glm::vec3(0.0f)
-                            : graph.VertexPosition(v);
+                        const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                        positions[i] = graph.IsDeleted(v) ? glm::vec3(0.0f) : graph.VertexPosition(v);
                     }
+
+                    PublishVec3Property(
+                        graph.EdgeProperties(),
+                        "e:vf_center",
+                        BuildGraphEdgeMidpoints(graph));
 
                     VectorFieldManager::SyncVectorFields(
                         registry, entity,
                         positions,
+                        Graphics::VectorFieldDomain::Vertex,
                         graph.VertexProperties(),
+                        viz,
+                        getName(entity));
+
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity,
+                        BuildGraphEdgeMidpoints(graph),
+                        Graphics::VectorFieldDomain::Edge,
+                        graph.EdgeProperties(),
                         viz,
                         getName(entity));
                     viz.VectorFieldsDirty = false;
@@ -425,6 +565,7 @@ namespace Graphics::Systems::PropertySetDirtySync
                     VectorFieldManager::SyncVectorFields(
                         registry, entity,
                         pcData.CloudRef->Positions(),
+                        Graphics::VectorFieldDomain::Vertex,
                         pcData.CloudRef->PointProperties(),
                         viz,
                         getName(entity));

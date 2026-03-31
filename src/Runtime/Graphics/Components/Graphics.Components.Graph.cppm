@@ -11,7 +11,7 @@
 //   - Edges rendered via LinePass (BDA position pull + edge buffer).
 
 module;
-#include <cstdint>
+#include <string>
 #include <memory>
 #include <vector>
 #include <entt/entity/entity.hpp>
@@ -43,6 +43,7 @@ export namespace ECS::Graph
         bool      EdgesOverlay       = false;
         bool      Visible            = true;
         bool      StaticGeometry     = false;
+        bool      VectorFieldMode    = false;
 
         // ---- Visualization Configuration ----
         // Selects which PropertySet properties drive per-node/edge color rendering.

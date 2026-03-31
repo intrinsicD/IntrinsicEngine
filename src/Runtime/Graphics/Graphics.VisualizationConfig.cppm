@@ -1,6 +1,5 @@
 module;
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -48,16 +47,34 @@ export namespace Graphics
         float Width = 1.5f;
     };
 
+    /// Domain used by vector-field overlays.
+    /// The selected domain determines both the source PropertySet and the
+    /// base-point sampling strategy used by the line renderer.
+    enum class VectorFieldDomain : unsigned char
+    {
+        Vertex,
+        Edge,
+        Face,
+    };
+
     /// Vector field overlay — each active field spawns a child Graph entity.
+    /// The field is attached to one present domain on the source entity and
+    /// can choose a vec3 property for the base points, a vec3 property for
+    /// the vector source, and an optional property-driven color source.
+    ///
+    /// The child graph stores explicit base/end points baked on the CPU so
+    /// the retained line pipeline can render them as ordinary line segments.
     struct VectorFieldEntry
     {
-        std::string PropertyName;                    ///< vec3 vertex property
+        VectorFieldDomain Domain = VectorFieldDomain::Vertex;
+        std::string BasePropertyName;                ///< vec3 base-point property; empty = canonical domain positions
+        std::string VectorPropertyName;              ///< vec3 vector source; empty = inactive / destroy child
         float Scale = 1.0f;                          ///< Arrow length multiplier
         glm::vec4 Color = {0.2f, 0.6f, 1.0f, 1.0f};
         float EdgeWidth = 1.5f;
         bool Overlay = true;                         ///< No depth test
         entt::entity ChildEntity = entt::null;       ///< Managed child Graph entity
-        std::string ColorPropertyName;               ///< "" = uniform Color; scalar/vec3/vec4 property for per-arrow color
+        ColorSource ArrowColor;                      ///< "" = uniform Color; scalar/vec3/vec4 property for per-arrow color
         std::string LengthPropertyName;              ///< "" = uniform Scale; scalar property for per-arrow length
     };
 
@@ -65,6 +82,7 @@ export namespace Graphics
     /// Stored on data authority components (Mesh::Data, Graph::Data, PointCloud::Data).
     struct VisualizationConfig
     {
+
         ColorSource VertexColors;                    ///< Points/nodes
         ColorSource EdgeColors;                      ///< Edges (graph, mesh wireframe)
         ColorSource FaceColors;                      ///< Faces (mesh only)
@@ -79,7 +97,7 @@ export namespace Graphics
 
         /// Multiple vector fields can be active simultaneously.
         /// Each spawns a separate child Graph entity.
-        std::vector<VectorFieldEntry> VectorFields;
+        std::vector<VectorFieldEntry> VectorFields = std::vector<VectorFieldEntry>{};
 
         /// Set true when VectorFields entries change or source data changes.
         /// Consumed by PropertySetDirtySync to trigger SyncVectorFields.

@@ -4,7 +4,6 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -72,6 +71,7 @@ namespace Graphics::Systems::GraphLifecycle
             gd.CachedNodeRadii.clear();
             gd.GpuVertexCount = 0;
             gd.GpuDirty = false;
+            gd.VectorFieldMode = false;
         };
 
         for (auto [entity, graphData] : view.each())
@@ -91,6 +91,7 @@ namespace Graphics::Systems::GraphLifecycle
                 {
 
                 auto& graph = *graphData.GraphRef;
+                const bool vectorFieldMode = graphData.VectorFieldMode;
 
                 // Run garbage collection if the graph has deleted elements to ensure
                 // contiguous storage. This simplifies the compaction step.
@@ -156,14 +157,17 @@ namespace Graphics::Systems::GraphLifecycle
                     // Skip zero-length edges (coincident endpoints) — these would
                     // produce degenerate line quads. Nodes are still rendered as
                     // points via Point::Component.
-                    if (ci0 == ci1)
-                        continue;
+                    if (!vectorFieldMode)
                     {
-                        const glm::vec3& p0 = positions[ci0];
-                        const glm::vec3& p1 = positions[ci1];
-                        const glm::vec3 d = p1 - p0;
-                        if (glm::dot(d, d) < 1e-12f)
+                        if (ci0 == ci1)
                             continue;
+                        {
+                            const glm::vec3& p0 = positions[ci0];
+                            const glm::vec3& p1 = positions[ci1];
+                            const glm::vec3 d = p1 - p0;
+                            if (glm::dot(d, d) < 1e-12f)
+                                continue;
+                        }
                     }
 
                     edgePairs.push_back({ci0, ci1});
@@ -304,7 +308,7 @@ namespace Graphics::Systems::GraphLifecycle
                 });
 
             PopulateOrRemovePassComponent<ECS::Point::Component>(
-                registry, entity, graphData.Visible, gpuValid,
+                registry, entity, graphData.Visible && !graphData.VectorFieldMode, gpuValid,
                 [&](ECS::Point::Component& pt) {
                     pt.Geometry          = graphData.GpuGeometry;
                     pt.Color             = graphData.DefaultNodeColor;

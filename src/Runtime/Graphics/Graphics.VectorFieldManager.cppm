@@ -1,10 +1,7 @@
 module;
 
-#include <cstddef>
-#include <memory>
 #include <span>
 #include <string>
-#include <vector>
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -18,10 +15,10 @@ import Geometry.Properties;
 // VectorFieldManager — creates/updates/destroys child Graph entities for
 // vector field visualization overlays.
 //
-// Each VectorFieldEntry in a VisualizationConfig spawns a child Graph entity
-// whose nodes are (base positions + target positions) and whose edges connect
-// each base[i] to target[i]. The child Graph entity reuses the full graph
-// rendering pipeline (edge colors, node rendering, width, overlay toggle).
+// Each VectorFieldEntry in a VisualizationConfig spawns a child Graph overlay
+// entity that inherits the parent's transform. Its nodes are explicit
+// base/end points baked on the CPU, and the line pipeline consumes the shared
+// vertex buffer directly.
 //
 // Multiple vector fields can be active simultaneously on the same source
 // entity, each producing an independent child Graph entity.
@@ -33,20 +30,24 @@ import Geometry.Properties;
 
 export namespace Graphics::VectorFieldManager
 {
+    /// Domain used by a vector-field source entry.
+    using Domain = Graphics::VectorFieldDomain;
+
     /// Synchronize vector field child Graph entities for a source entity.
     ///
     /// @param registry     ECS registry
     /// @param sourceEntity Entity that owns the VisualizationConfig
-    /// @param positions    Base point positions (vertex/node/point positions)
-    /// @param normals      Optional normals (may be empty)
-    /// @param vertexProps  PropertySet to read vec3 properties from
+    /// @param positions    Canonical base positions for the selected domain
+    /// @param domain       Base-point domain (vertex, edge, face)
+    /// @param domainProps  PropertySet for the selected domain
     /// @param config       VisualizationConfig with VectorFields entries
     /// @param sourceName   Name of the source entity (for child naming)
     void SyncVectorFields(
         entt::registry& registry,
         entt::entity sourceEntity,
         std::span<const glm::vec3> positions,
-        const Geometry::PropertySet& vertexProps,
+        Domain domain,
+        const Geometry::PropertySet& domainProps,
         Graphics::VisualizationConfig& config,
         const std::string& sourceName);
 
