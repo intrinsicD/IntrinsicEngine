@@ -59,29 +59,36 @@ namespace ECS::Components::Hierarchy::Detail
     void DetachHelper(entt::registry& registry, Component& childComp)
     {
         entt::entity parent = childComp.Parent;
-        auto& parentComp = registry.get<Component>(parent);
 
-        // 1. Fix Previous Sibling or Parent Head
-        if (childComp.PrevSibling != entt::null)
-        {
-            auto& prev = registry.get<Component>(childComp.PrevSibling);
-            prev.NextSibling = childComp.NextSibling;
-        }
-        else
-        {
-            // If we have no prev, we were the head
-            parentComp.FirstChild = childComp.NextSibling;
-        }
+        // During cascading entity destruction the parent's Hierarchy component
+        // may already be gone (EnTT does not guarantee component destruction
+        // order).  In that case we can only clear the child's own pointers.
+        auto* parentComp = registry.valid(parent) ? registry.try_get<Component>(parent) : nullptr;
 
-        // 2. Fix Next Sibling
-        if (childComp.NextSibling != entt::null)
+        if (parentComp)
         {
-            auto& next = registry.get<Component>(childComp.NextSibling);
-            next.PrevSibling = childComp.PrevSibling;
-        }
+            // 1. Fix Previous Sibling or Parent Head
+            if (childComp.PrevSibling != entt::null)
+            {
+                if (auto* prev = registry.try_get<Component>(childComp.PrevSibling))
+                    prev->NextSibling = childComp.NextSibling;
+            }
+            else
+            {
+                // If we have no prev, we were the head
+                parentComp->FirstChild = childComp.NextSibling;
+            }
 
-        // 3. Update Parent Data
-        parentComp.ChildCount--;
+            // 2. Fix Next Sibling
+            if (childComp.NextSibling != entt::null)
+            {
+                if (auto* next = registry.try_get<Component>(childComp.NextSibling))
+                    next->PrevSibling = childComp.PrevSibling;
+            }
+
+            // 3. Update Parent Data
+            parentComp->ChildCount--;
+        }
 
         // 4. Clear Child Data
         childComp.Parent = entt::null;

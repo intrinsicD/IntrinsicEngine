@@ -228,9 +228,13 @@ void VectorFieldManager::DestroyAllVectorFields(
     entt::registry& registry,
     VisualizationConfig& config)
 {
-    for (auto& entry : config.VectorFields)
-    {
+    // Move the vector out before iterating.  Destroying a child Graph entity
+    // triggers on_destroy<Graph::Data> which re-enters this function on the
+    // child.  Because we cleared config.VectorFields first, the re-entrant
+    // call sees an empty vector and returns immediately.
+    auto entries = std::move(config.VectorFields);
+    config.VectorFields.clear();
+
+    for (auto& entry : entries)
         DestroyOverlayIfValid(registry, entry.ChildEntity);
-        entry.ChildEntity = entt::null;
-    }
 }
