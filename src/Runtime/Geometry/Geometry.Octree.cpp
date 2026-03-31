@@ -1,16 +1,159 @@
 module;
 
 #include <algorithm>
-#include <span>
+#include <array>
+#include <cassert>
+#include <cmath>
+#include <iterator>
+#include <limits>
 #include <numeric>
 #include <queue>
 #include <functional>
+#include <span>
+#include <utility>
 #include <glm/glm.hpp>
 
 module Geometry.Octree;
+import Utils.BoundedHeap;
+import Geometry.Containment;
+import Geometry.Overlap;
+import Geometry.Support;
 
 namespace Geometry
 {
+    namespace
+    {
+        template <typename Shape>
+        void QueryOverlap(const std::vector<Octree::Node>& nodes, const std::vector<AABB>& elementAabbs,
+                          const std::vector<Octree::ElementIndex>& elementIndices, const Shape& queryShape,
+                          std::vector<size_t>& out)
+        {
+            out.clear();
+            if (nodes.empty())
+            {
+                return;
+            }
+
+            const Octree::Node* nodePtr = nodes.data();
+            alignas(64) std::array<Octree::NodeIndex, 128> stack{};
+            int stackTop = 0;
+            stack[stackTop++] = 0;
+
+            while (stackTop > 0)
+            {
+                const Octree::NodeIndex nodeIdx = stack[--stackTop];
+                const Octree::Node& node = nodePtr[nodeIdx];
+
+                if (!TestOverlap(node.Aabb, queryShape))
+                {
+                    continue;
+                }
+
+                if constexpr (requires { Contains(queryShape, node.Aabb); Volume(queryShape); })
+                {
+                    constexpr double eps = 0.0;
+                    const double queryVolume = static_cast<double>(Volume(queryShape));
+                    const double nodeVolume = node.Aabb.GetVolume();
+                    if (queryVolume > nodeVolume + eps && Contains(queryShape, node.Aabb))
+                    {
+                        const size_t end = node.FirstElement + node.NumElements;
+                        for (size_t i = node.FirstElement; i < end; ++i)
+                        {
+                            out.push_back(elementIndices[i]);
+                        }
+                        continue;
+                    }
+                }
+
+                const size_t elemEnd = node.FirstElement + (node.IsLeaf ? node.NumElements : node.NumStraddlers);
+                for (size_t i = node.FirstElement; i < elemEnd; ++i)
+                {
+                    const size_t ei = elementIndices[i];
+                    if (TestOverlap(elementAabbs[ei], queryShape))
+                    {
+                        out.push_back(ei);
+                    }
+                }
+
+                if (!node.IsLeaf && node.BaseChildIndex != Octree::kInvalidIndex)
+                {
+                    uint32_t childOffset = 0;
+                    for (int i = 0; i < 8; ++i)
+                    {
+                        if (!node.ChildExists(i))
+                        {
+                            continue;
+                        }
+
+                        const Octree::NodeIndex childIndex = node.BaseChildIndex + childOffset;
+                        if (childIndex != Octree::kInvalidIndex && TestOverlap(nodePtr[childIndex].Aabb, queryShape))
+                        {
+                            stack[stackTop++] = childIndex;
+                        }
+                        ++childOffset;
+                    }
+                }
+            }
+        }
+    } // namespace
+
+    bool Octree::Build(std::span<const AABB> aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
+                       const std::size_t maxDepth)
+    {
+        ElementAabbs.assign(aabbs.begin(), aabbs.end());
+        return BuildFromOwned(policy, maxPerNode, maxDepth);
+    }
+
+    bool Octree::Build(std::vector<AABB>&& aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
+                       const std::size_t maxDepth)
+    {
+        ElementAabbs = std::move(aabbs);
+        return BuildFromOwned(policy, maxPerNode, maxDepth);
+    }
+
+    bool Octree::BuildFromPoints(std::span<const glm::vec3> points, const SplitPolicy& policy,
+                                 const std::size_t maxPerNode, const std::size_t maxDepth)
+    {
+        std::vector<AABB> pointAabbs;
+        pointAabbs.reserve(points.size());
+        for (const glm::vec3& p : points)
+        {
+            pointAabbs.push_back(AABB{.Min = p, .Max = p});
+        }
+        return Build(std::move(pointAabbs), policy, maxPerNode, maxDepth);
+    }
+
+    void Octree::QueryRay(const Ray& queryShape, std::vector<size_t>& out) const
+    {
+        QueryOverlap(m_Nodes, ElementAabbs, m_ElementIndices, queryShape, out);
+    }
+
+    void Octree::QueryAABB(const AABB& queryShape, std::vector<size_t>& out) const
+    {
+        QueryOverlap(m_Nodes, ElementAabbs, m_ElementIndices, queryShape, out);
+    }
+
+    void Octree::QuerySphere(const Sphere& queryShape, std::vector<size_t>& out) const
+    {
+        QueryOverlap(m_Nodes, ElementAabbs, m_ElementIndices, queryShape, out);
+    }
+
+    bool Octree::ValidateStructure() const
+    {
+        if (NodeProperties.Empty())
+        {
+            return m_ElementIndices.empty();
+        }
+        return ValidateNode(0);
+    }
+
+    Octree::NodeIndex Octree::CreateNode()
+    {
+        const auto idx = static_cast<NodeIndex>(m_Nodes.size());
+        m_Nodes.emplace_back();
+        return idx;
+    }
+
     void Octree::QueryNearest(const glm::vec3& queryPoint, std::size_t& out) const
     {
         out = std::numeric_limits<size_t>::max();

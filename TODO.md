@@ -80,8 +80,8 @@ Split into two sub-phases to keep commits reviewable:
 Target the currently observed worst compile edges (`build/ci/.ninja_log`) and reduce full rebuild latency by shrinking module import closures and exported surface area.
 
 - [ ] **C1 — `Geometry.Octree.cppm` split (≈91.9s edge)**
-  - [ ] Create `Geometry.Octree` as a thin API partition (types + non-template signatures only).
-  - [ ] Move query/build internals into `Geometry.Octree.Impl` (`.cpp`) and keep only minimal exported wrappers.
+  - [x] Create `Geometry.Octree` as a thin API partition (types + non-template signatures only).
+  - [x] Move query/build internals into `Geometry.Octree.Impl` (`.cpp`) and keep only minimal exported wrappers.
   - [ ] Factor broad-phase query helpers into a private `Geometry.SpatialQueries` partition shared by Octree/KDTree/BVH to avoid repeated heavy parsing.
   - [ ] Add benchmark + test gates: octree query perf parity (or better) and compile-edge reduction tracked in CI.
 
