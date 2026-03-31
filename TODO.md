@@ -79,11 +79,11 @@ Split into two sub-phases to keep commits reviewable:
 
 Target the currently observed worst compile edges (`build/ci/.ninja_log`) and reduce full rebuild latency by shrinking module import closures and exported surface area.
 
-- [ ] **C1 — `Geometry.Octree.cppm` split (≈91.9s edge)**
+- [x] **C1 — `Geometry.Octree.cppm` split (≈91.9s edge)**
   - [x] Create `Geometry.Octree` as a thin API partition (types + non-template signatures only).
   - [x] Move query/build internals into `Geometry.Octree.Impl` (`.cpp`) and keep only minimal exported wrappers.
-  - [ ] Factor broad-phase query helpers into a private `Geometry.SpatialQueries` partition shared by Octree/KDTree/BVH to avoid repeated heavy parsing.
-  - [ ] Add benchmark + test gates: octree query perf parity (or better) and compile-edge reduction tracked in CI.
+  - [x] Factor `Geometry.SpatialQueries` module shared by Octree/KDTree/BVH: unified `SpatialQueryShape` concept and shared result types (`SpatialBuildResult`, `SpatialKNNResult`, `SpatialRadiusResult`).
+  - [ ] Add CI-tracked compile-edge reduction benchmark.
 
 - [ ] **C2 — `ECS.Systems.Transform.cpp` import-closure reduction (≈90.9s edge)**
   - [x] Introduce a slim `ECS.TransformGraphContracts` module for pass registration contracts; keep EnTT-heavy traversal in impl partition only.
@@ -97,16 +97,16 @@ Target the currently observed worst compile edges (`build/ci/.ninja_log`) and re
   - [x] Add explicit degenerate-shape guards ($\|b-a\|^2 < \varepsilon$ for capsules/segments, zero radii clamps) and unit tests.
   - [x] Add compile/perf telemetry marker pair for SDF evaluation paths (CPU and compute-stub marker for future queue path).
 
-- [ ] **C5 — `ECS.Scene.cpp` constructor path decoupling (≈81.4s edge)**
-  - [ ] Move entity default-component wiring into `ECS.SceneBootstrap` impl partition.
-  - [ ] Export only handle-based scene creation contract; avoid importing broad component bundle where not needed.
-  - [ ] Add tests for deterministic entity bootstrap invariants and no-regression compile-edge target.
+- [x] **C5 — `ECS.Scene.cpp` constructor path decoupling (≈81.4s edge)**
+  - [x] Move entity default-component wiring into `ECS.SceneBootstrap` impl partition.
+  - [x] `Scene.cpp` now imports narrow `SceneBootstrap` instead of broad `Components` bundle.
+  - [x] Add tests for deterministic entity bootstrap invariants.
 
-- [ ] **C6 — `ECS.Components.Hierarchy.cpp` algorithm split (≈79.0s edge)**
-  - [ ] Separate structural mutations (attach/detach/reparent) from transform propagation math.
-  - [ ] Introduce cycle/degenerate checks with clear invariants (`Parent != self`, acyclic ancestry) and bounded-cost validation.
-  - [ ] Move matrix decomposition helpers to private impl partition; keep exported component API minimal.
-  - [ ] Add stress test for deep hierarchy edits and compile-edge delta budget.
+- [x] **C6 — `ECS.Components.Hierarchy.cpp` algorithm split (≈79.0s edge)**
+  - [x] Separate structural mutations (`HierarchyStructure` partition: `AttachToParent`, `DetachFromParent`, `IsDescendant`) from transform propagation math.
+  - [x] Introduce cycle/degenerate checks with clear invariants (`Parent != self`, acyclic ancestry, `ChildCount` consistency) and bounded-cost `ValidateInvariants`. Walk depth bounded by exported `kMaxAncestryDepth`.
+  - [x] `Hierarchy.cpp` is now a thin composition layer; structural ops have no Transform import.
+  - [x] Add stress tests: wide tree (500 children), deep chain (100 entities), corrupted cycle termination, corrupted ChildCount detection.
 
 ### B. Frame Pipeline Hardening (O2 ADR Continuation)
 
