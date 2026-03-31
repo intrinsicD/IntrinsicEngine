@@ -94,6 +94,14 @@ export namespace Geometry::MeshUtils
     /// Shared tangential Laplacian smoothing pass used by remeshing operators.
     void TangentialSmooth(Halfedge::Mesh& mesh, double lambda, bool preserveBoundary);
 
+    /// Compute area-weighted vertex normals and store as "v:normal" property.
+    /// Returns the number of vertices with valid normals.
+    std::size_t PublishVertexNormals(Halfedge::Mesh& mesh);
+
+    /// Compute face normals and store as "f:normal" property.
+    /// Returns the number of faces with valid normals.
+    std::size_t PublishFaceNormals(Halfedge::Mesh& mesh);
+
     /// Mixed Voronoi area per vertex (Meyer et al., 2003).
     /// Returns a vector indexed by vertex storage index.
     /// Used by Curvature, Smoothing (cotan), and DEC (Hodge star 0).

@@ -18,6 +18,7 @@ module;
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <entt/entity/fwd.hpp>
+#include <entt/entity/entity.hpp>
 #include <entt/signal/fwd.hpp>
 
 module Runtime.EditorUI;
@@ -868,7 +869,8 @@ bool ColorSourceWidget(const char* label, Graphics::ColorSource& src,
 // VectorFieldWidget
 // =========================================================================
 bool VectorFieldWidget(Graphics::VisualizationConfig& config,
-                       const Geometry::ConstPropertySet* ps, const char* suffix)
+                       const Geometry::ConstPropertySet* ps, const char* suffix,
+                       entt::registry* registry)
 {
     bool changed = false;
     char idBuf[128];
@@ -907,6 +909,9 @@ bool VectorFieldWidget(Graphics::VisualizationConfig& config,
         ImGui::SameLine();
         if (ImGui::SmallButton("X"))
         {
+            // Destroy the child Graph entity before erasing the entry.
+            if (vf.ChildEntity != entt::null && registry && registry->valid(vf.ChildEntity))
+                registry->destroy(vf.ChildEntity);
             config.VectorFields.erase(config.VectorFields.begin() + static_cast<ptrdiff_t>(i));
             changed = true;
             ImGui::PopID();

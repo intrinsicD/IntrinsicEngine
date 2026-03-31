@@ -60,6 +60,26 @@ TEST(PropertyEnumerator, FiltersInternalProperties)
     EXPECT_EQ(props[0].Name, "curvature");
 }
 
+TEST(PropertyEnumerator, VectorEnumeration_IncludesNormals)
+{
+    Geometry::PropertySet ps;
+    (void)ps.Add<glm::vec3>("v:position", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("v:normal", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("f:normal", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("p:normal", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("direction", glm::vec3(0.0f));
+
+    // Normals should appear in vector enumeration (valid vector field sources)
+    auto vecProps = EnumerateVectorProperties(ps);
+    ASSERT_EQ(vecProps.size(), 4u); // v:normal, f:normal, p:normal, direction
+    // v:position should still be filtered out
+
+    // But normals should NOT appear in colorable enumeration
+    auto colorProps = EnumerateColorableProperties(ps);
+    ASSERT_EQ(colorProps.size(), 1u); // only direction
+    EXPECT_EQ(colorProps[0].Name, "direction");
+}
+
 TEST(PropertyEnumerator, EnumerateScalarOnlyReturnsFloat)
 {
     Geometry::PropertySet ps;

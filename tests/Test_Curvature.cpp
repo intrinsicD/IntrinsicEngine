@@ -298,6 +298,48 @@ TEST(MeshUtils_VertexNormal, FlatMesh_NormalsPointAlongFaceNormal)
 }
 
 
+// =========================================================================
+// PublishVertexNormals / PublishFaceNormals — store normals in PropertySets
+// =========================================================================
+
+TEST(MeshUtils_PublishNormals, VertexNormals_StoredAsProperty)
+{
+    auto mesh = MakeTetrahedron();
+    auto count = Geometry::MeshUtils::PublishVertexNormals(mesh);
+    EXPECT_EQ(count, mesh.VertexCount());
+
+    auto prop = mesh.VertexProperties().Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(prop.IsValid());
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(vh)) continue;
+        glm::vec3 n = prop[i];
+        EXPECT_NEAR(glm::length(n), 1.0f, 1e-5f)
+            << "Published vertex normal should be unit length (vertex " << i << ")";
+    }
+}
+
+TEST(MeshUtils_PublishNormals, FaceNormals_StoredAsProperty)
+{
+    auto mesh = MakeTetrahedron();
+    auto count = Geometry::MeshUtils::PublishFaceNormals(mesh);
+    EXPECT_EQ(count, mesh.FaceCount());
+
+    auto prop = mesh.FaceProperties().Get<glm::vec3>("f:normal");
+    ASSERT_TRUE(prop.IsValid());
+
+    for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+    {
+        Geometry::FaceHandle fh{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(fh)) continue;
+        glm::vec3 n = prop[i];
+        EXPECT_NEAR(glm::length(n), 1.0f, 1e-5f)
+            << "Published face normal should be unit length (face " << i << ")";
+    }
+}
+
 TEST(MeshUtils_AngleDefect, ClosedTetrahedron_TotalDefectEqualsFourPi)
 {
     auto mesh = MakeTetrahedron();

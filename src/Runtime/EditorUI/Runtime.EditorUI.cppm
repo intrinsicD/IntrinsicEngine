@@ -166,9 +166,11 @@ export namespace Runtime::EditorUI
                            const Geometry::ConstPropertySet* ps, const char* suffix);
 
     // Vector field overlay manager: add/remove/configure vector field entries.
-    // Returns true if any value changed.
+    // Returns true if any value changed. When registry is provided, child
+    // Graph entities are destroyed immediately on removal (prevents leaks).
     bool VectorFieldWidget(Graphics::VisualizationConfig& config,
-                           const Geometry::ConstPropertySet* ps, const char* suffix);
+                           const Geometry::ConstPropertySet* ps, const char* suffix,
+                           entt::registry* registry = nullptr);
 
     // Point render mode combo (FlatDisc/Surfel/EWA/Sphere). Returns true on change.
     bool PointRenderModeCombo(const char* label,
