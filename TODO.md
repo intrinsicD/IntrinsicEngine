@@ -89,6 +89,7 @@ Target the currently observed worst compile edges (`build/ci/.ninja_log`) and re
   - [x] Introduce a slim `ECS.TransformGraphContracts` module for pass registration contracts; keep EnTT-heavy traversal in impl partition only.
   - [x] Split hierarchy walk into `ECS.HierarchyTraversal` utility with non-exported implementation to decouple from system registration TU.
   - [x] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
+  - [x] Add `ECS.ComponentForwardDecls` partition so `ECS.TransformGraphContracts` no longer imports full Transform/Hierarchy component modules.
   - [ ] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
 
 - [x] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**
