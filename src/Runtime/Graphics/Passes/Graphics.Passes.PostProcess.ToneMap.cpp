@@ -1,10 +1,12 @@
 module;
 
+#include <algorithm>
 #include <memory>
 #include <span>
 #include <string>
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"

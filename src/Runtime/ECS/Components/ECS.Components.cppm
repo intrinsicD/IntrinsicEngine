@@ -9,4 +9,3 @@ export import :Components.Transform;
 export import :Components.Selection;
 export import :Components.DEC;
 export import :Components.Events;
-export import :Components.GeometryDataSources;
