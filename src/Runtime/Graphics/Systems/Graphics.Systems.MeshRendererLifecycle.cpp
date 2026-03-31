@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
@@ -40,9 +41,13 @@ namespace Graphics::Systems::MeshRendererLifecycle
 
         for (auto [entity, mr, world] : view.each())
         {
-            // Ensure DataAuthority tag is present for mesh entities.
+            // Ensure DataAuthority tag is present (single-authority invariant).
             if (!registry.all_of<ECS::DataAuthority::MeshTag>(entity))
+            {
+                assert((!registry.any_of<ECS::DataAuthority::GraphTag, ECS::DataAuthority::PointCloudTag>(entity))
+                       && "Entity already has a different DataAuthority tag");
                 registry.emplace<ECS::DataAuthority::MeshTag>(entity);
+            }
 
             // Allocate slot for newly-added components.
             if (mr.GpuSlot == ECS::kInvalidGpuSlot)

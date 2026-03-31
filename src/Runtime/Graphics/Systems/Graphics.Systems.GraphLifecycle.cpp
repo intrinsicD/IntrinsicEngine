@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -281,9 +282,13 @@ namespace Graphics::Systems::GraphLifecycle
             // -----------------------------------------------------------------
             const bool gpuValid = graphData.GpuGeometry.IsValid();
 
-            // Ensure DataAuthority tag is present.
+            // Ensure DataAuthority tag is present (single-authority invariant).
             if (!registry.all_of<ECS::DataAuthority::GraphTag>(entity))
+            {
+                assert((!registry.any_of<ECS::DataAuthority::MeshTag, ECS::DataAuthority::PointCloudTag>(entity))
+                       && "Entity already has a different DataAuthority tag");
                 registry.emplace<ECS::DataAuthority::GraphTag>(entity);
+            }
 
             PopulateOrRemovePassComponent<ECS::Line::Component>(
                 registry, entity, graphData.Visible, gpuValid,

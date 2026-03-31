@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <span>
 #include <cstdint>
 #include <memory>
@@ -146,9 +147,13 @@ namespace Graphics::Systems::PointCloudLifecycle
                 registry, entity, gpuScene, geometryStorage,
                 pcData.GpuSlot, pcData.GpuGeometry);
 
-            // Ensure DataAuthority tag is present.
+            // Ensure DataAuthority tag is present (single-authority invariant).
             if (!registry.all_of<ECS::DataAuthority::PointCloudTag>(entity))
+            {
+                assert((!registry.any_of<ECS::DataAuthority::MeshTag, ECS::DataAuthority::GraphTag>(entity))
+                        && "Entity already has a different DataAuthority tag");
                 registry.emplace<ECS::DataAuthority::PointCloudTag>(entity);
+            }
 
             // -----------------------------------------------------------------
             // Phase 3: Populate Point::Component from PointCloud::Data.

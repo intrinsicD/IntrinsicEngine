@@ -15,9 +15,10 @@ import Geometry.PointCloudUtils;
 
 namespace
 {
-    // Monotonic pick ID counter for overlay entities (avoids collision with
-    // SceneManager's counter by starting high).
-    static uint32_t s_OverlayPickId = 50000u;
+    // Monotonic pick ID counter for overlay entities.  Uses the upper half of
+    // the uint32_t range to avoid collision with SceneManager (starts at 1),
+    // SceneSerializer, and SelectionModule counters.
+    static uint32_t s_OverlayPickId = 0x80000000u;
 }
 
 namespace Graphics::OverlayEntityFactory
