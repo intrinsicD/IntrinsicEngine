@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+SOURCE_EXTENSIONS = (".cppm", ".cpp", ".cc", ".cxx", ".c")
+COMPILE_OUTPUT_SUFFIXES = (".cppm.o", ".cpp.o", ".cc.o", ".cxx.o", ".c.o", ".o", ".pcm")
+
 
 @dataclass
 class NinjaEntry:
@@ -14,7 +17,10 @@ class NinjaEntry:
 
 
 def parse_ninja_log(path: Path) -> list[NinjaEntry]:
-    entries: list[NinjaEntry] = []
+    # Ninja logs may contain multiple records per output across incremental builds.
+    # Keep only the most recent record for each output (last-write-wins by file order).
+    latest_by_output: dict[str, NinjaEntry] = {}
+
     for line in path.read_text().splitlines():
         if not line or line.startswith("#"):
             continue
@@ -26,42 +32,77 @@ def parse_ninja_log(path: Path) -> list[NinjaEntry]:
             duration_ms = int(end) - int(start)
         except ValueError:
             continue
-        entries.append(NinjaEntry(duration_ms=duration_ms, output=output))
-    return entries
+        latest_by_output[output] = NinjaEntry(duration_ms=duration_ms, output=output)
+    return list(latest_by_output.values())
 
 
-def normalize_source_path(output: str) -> str | None:
-    if ".dir/" in output:
-        inner = output.split('.dir/', 1)[1]
-        for suffix in ('.cppm.o', '.cpp.o', '.cc.o', '.cxx.o', '.c.o', '.pcm'):
-            if inner.endswith(suffix):
-                candidate = inner[: -len(suffix)]
-                if candidate.startswith('Systems/') or candidate.startswith('Components/'):
-                    return f"src/Runtime/ECS/{candidate}.cpp"
-                if candidate.startswith('Geometry.'):
-                    return f"src/Runtime/Geometry/{candidate}.cppm"
-                if candidate.startswith('ECS.'):
-                    return f"src/Runtime/ECS/{candidate}.cpp"
-                if candidate.startswith('Core.'):
-                    return f"src/Core/{candidate}.cppm"
-                if candidate.startswith('Runtime.'):
-                    return f"src/Runtime/{candidate}.cpp"
-                return None
+def strip_compile_suffix(path_fragment: str) -> tuple[str, str | None]:
+    for suffix in COMPILE_OUTPUT_SUFFIXES:
+        if path_fragment.endswith(suffix):
+            stem = path_fragment[: -len(suffix)]
+            if suffix == ".cppm.o":
+                return stem, ".cppm"
+            if suffix == ".cpp.o":
+                return stem, ".cpp"
+            if suffix == ".cc.o":
+                return stem, ".cc"
+            if suffix == ".cxx.o":
+                return stem, ".cxx"
+            if suffix == ".c.o":
+                return stem, ".c"
+            return stem, None
+    return path_fragment, None
 
-    suffixes = [".cppm.o", ".cpp.o", ".cc.o", ".cxx.o", ".c.o", ".o", ".pcm"]
-    stem = None
-    for suffix in suffixes:
-        if output.endswith(suffix):
-            stem = Path(output).name[: -len(suffix)]
-            break
-    if stem is None:
-        return None
 
-    stem = stem.replace("-", ".")
-    if stem.startswith("Geometry"):
-        return f"src/Runtime/Geometry/{stem}.cppm"
-    return None
+class SourceResolver:
+    def __init__(self, repo_root: Path) -> None:
+        self.repo_root = repo_root
+        self.sources = [p.relative_to(repo_root).as_posix() for p in repo_root.glob("src/**/*") if p.suffix in SOURCE_EXTENSIONS]
 
+    def _choose_best(self, candidates: list[str], preferred_ext: str | None) -> str | None:
+        if not candidates:
+            return None
+        if preferred_ext:
+            exact = [c for c in candidates if c.endswith(preferred_ext)]
+            if exact:
+                return sorted(exact, key=len)[0]
+        return sorted(candidates, key=len)[0]
+
+    def resolve(self, output: str) -> str | None:
+        fragment = output.split(".dir/", 1)[1] if ".dir/" in output else Path(output).name
+        stem, preferred_ext = strip_compile_suffix(fragment)
+
+        tokens = [stem, stem.replace("-", ".")]
+        if "/" in stem:
+            basename = Path(stem).name
+            tokens.extend([basename, basename.replace("-", ".")])
+
+        candidates: list[str] = []
+        for token in tokens:
+            if not token:
+                continue
+            # direct match if token already contains extension
+            if any(token.endswith(ext) for ext in SOURCE_EXTENSIONS):
+                direct = [s for s in self.sources if s.endswith(token)]
+                candidates.extend(direct)
+                continue
+
+            # extension-aware probing
+            for ext in SOURCE_EXTENSIONS:
+                target = f"{token}{ext}"
+                matches = [s for s in self.sources if s.endswith(target)]
+                candidates.extend(matches)
+
+            # module-impl artifacts like ECS-Scene.Impl.pcm -> ECS.Scene.cpp(.m)
+            if token.endswith(".Impl"):
+                base = token[: -len(".Impl")]
+                for ext in SOURCE_EXTENSIONS:
+                    target = f"{base}{ext}"
+                    matches = [s for s in self.sources if s.endswith(target)]
+                    candidates.extend(matches)
+
+        unique = list(dict.fromkeys(candidates))
+        return self._choose_best(unique, preferred_ext)
 
 
 def source_stats(root: Path, rel_source: str) -> tuple[int, int, int, int] | None:
@@ -92,26 +133,26 @@ def main() -> int:
     if not log_path.exists():
         raise SystemExit(f"Missing ninja log: {log_path}")
 
+    resolver = SourceResolver(root)
     entries = sorted(iter_compile_entries(parse_ninja_log(log_path)), key=lambda x: x.duration_ms, reverse=True)
 
     print(f"Top {min(args.top, len(entries))} compile edges from {log_path}:")
-    print("duration_s\toutput\tsource_lines\tincludes\timports\texports")
+    print("duration_s\toutput\tsource\tsource_lines\tincludes\timports\texports")
 
     for entry in entries[: args.top]:
-        rel_source = normalize_source_path(entry.output)
+        rel_source = resolver.resolve(entry.output)
         if rel_source is None:
-            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t-\t-\t-\t-")
+            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t-\t-\t-\t-\t-")
             continue
 
-        source_rel = rel_source
-        stats = source_stats(root, source_rel)
+        stats = source_stats(root, rel_source)
         if stats is None:
-            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t(n/a)\t-\t-\t-")
+            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{rel_source}\t(n/a)\t-\t-\t-")
             continue
 
         line_count, include_count, import_count, export_count = stats
         print(
-            f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{line_count}\t{include_count}\t{import_count}\t{export_count}"
+            f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{rel_source}\t{line_count}\t{include_count}\t{import_count}\t{export_count}"
         )
 
     return 0
