@@ -1,5 +1,6 @@
 module;
 #include <entt/fwd.hpp>
+#include <glm/vec3.hpp>
 #include <glm/fwd.hpp>
 #include <span>
 

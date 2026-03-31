@@ -20,7 +20,7 @@ namespace ECS::Systems::AxisRotator
                                                   float dt)
         {
             const glm::vec3 safeAxis = glm::normalize(
-                glm::length2(angularVelocity.Axis) > 1e-12f ? angularVelocity.Axis : glm::vec3{0.0f, 1.0f, 0.0f});
+                glm::dot(angularVelocity.Axis, angularVelocity.Axis) > 1e-12f ? angularVelocity.Axis : glm::vec3{0.0f, 1.0f, 0.0f});
             const glm::quat deltaRotation =
                 glm::angleAxis(glm::radians(angularVelocity.DegreesPerSecond * dt), safeAxis);
             return glm::normalize(deltaRotation * currentRotation);
