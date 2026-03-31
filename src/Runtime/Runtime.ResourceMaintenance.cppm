@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <array>
 
 export module Runtime.ResourceMaintenance;
 
@@ -50,5 +51,10 @@ export namespace Runtime
         Graphics::MaterialRegistry& m_Materials;
         uint64_t m_LastCompletedGraphicsTimelineValue = 0;
         uint64_t m_LastObservedGlobalFrameNumber = 0;
+
+        // Per-heap memory warning state: true = currently above threshold.
+        // Warnings fire once per transition (below→above), not per frame.
+        static constexpr uint32_t kMaxHeaps = 16;
+        std::array<bool, kMaxHeaps> m_HeapOverBudget{};
     };
 }
