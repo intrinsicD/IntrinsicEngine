@@ -7,7 +7,6 @@
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/norm.hpp>
 
 import Geometry;
 
@@ -142,6 +141,13 @@ TEST(SDF_Math, Ray_ZeroDirectionFallsBackToPointDistance)
     EXPECT_NEAR(d, 5.0f, kEps);
 }
 
+TEST(SDF_Math, Ellipsoid_DegenerateCenterUsesShortestRadius)
+{
+    const glm::vec3 radii{2.0f, 2.0f, 2.0f};
+    const float d = SDF::Math::Sdf_Ellipsoid(glm::vec3(0, 0, 0), radii);
+    EXPECT_NEAR(d, -2.0f, kEps);
+}
+
 // ============================================================================
 // SDF Functors via CreateSDF
 // ============================================================================
@@ -194,6 +200,13 @@ TEST(SDF_Functor, CylinderSDF_Degenerate)
     auto sdf = SDF::CreateSDF(cyl);
     float d = sdf(glm::vec3(2, 1, 1));
     EXPECT_TRUE(std::isfinite(d));
+}
+
+TEST(SDF_Functor, EllipsoidSDF_DegenerateCenterUsesShortestRadius)
+{
+    Ellipsoid e{glm::vec3(0, 0, 0), glm::vec3(2.0f, 3.0f, 4.0f), glm::quat(1, 0, 0, 0)};
+    auto sdf = SDF::CreateSDF(e);
+    EXPECT_NEAR(sdf(glm::vec3(0, 0, 0)), -2.0f, kEps);
 }
 
 TEST(SDF_Functor, TriangleSDF)

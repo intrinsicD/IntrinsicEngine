@@ -1,8 +1,14 @@
 module;
+
+#include <glm/glm.hpp>
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <glm/gtc/constants.hpp>
+#include <numbers>
+#include <span>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
 
 module Geometry.SDF;
 
@@ -74,7 +80,7 @@ namespace Geometry::SDF
             const float k1 = glm::length(p / (safeRadii * safeRadii));
             if (k1 <= kEpsilon)
             {
-                return k0 - 1.0f;
+                return -std::min({safeRadii.x, safeRadii.y, safeRadii.z});
             }
             return k0 * (k0 - 1.0f) / k1;
         }
@@ -269,7 +275,7 @@ namespace Geometry::SDF
         }
         else if (d < -0.9999f)
         {
-            rot = glm::angleAxis(glm::pi<float>(), glm::vec3(1, 0, 0));
+            rot = glm::angleAxis(std::numbers::pi_v<float>, glm::vec3(1, 0, 0));
         }
         else
         {
