@@ -75,6 +75,44 @@ Split into two sub-phases to keep commits reviewable:
 - [ ] Stabilized cascade frusta (texel snapping to reduce shimmer).
 - [ ] Update `rendering-three-pass.md` pass contract table with `ShadowPass`.
 
+### C. Compile-Time Hotspot Refactors (Build Throughput)
+
+Target the currently observed worst compile edges (`build/ci/.ninja_log`) and reduce full rebuild latency by shrinking module import closures and exported surface area.
+
+- [ ] **C1 — `Geometry.Octree.cppm` split (≈91.9s edge)**
+  - [ ] Create `Geometry.Octree` as a thin API partition (types + non-template signatures only).
+  - [ ] Move query/build internals into `Geometry.Octree.Impl` (`.cpp`) and keep only minimal exported wrappers.
+  - [ ] Factor broad-phase query helpers into a private `Geometry.SpatialQueries` partition shared by Octree/KDTree/BVH to avoid repeated heavy parsing.
+  - [ ] Add benchmark + test gates: octree query perf parity (or better) and compile-edge reduction tracked in CI.
+
+- [ ] **C2 — `ECS.Systems.Transform.cpp` import-closure reduction (≈90.9s edge)**
+  - [ ] Introduce a slim `ECS.TransformGraphContracts` module for pass registration contracts; keep EnTT-heavy traversal in impl partition only.
+  - [ ] Split hierarchy walk into `ECS.HierarchyTraversal` utility with non-exported implementation to decouple from system registration TU.
+  - [ ] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
+  - [ ] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
+
+- [ ] **C3 — `ECS.Systems.AxisRotator.cpp` hot-loop isolation (≈88.6s edge)**
+  - [ ] Keep exported interface to scheduling contract only; move quaternion update kernel into implementation partition.
+  - [ ] Add SoA-ready update path (`span<quat>`, `span<axis_speed>`) for batch rotation updates to reduce template-heavy view work in the TU.
+  - [ ] Add deterministic regression test for transform dirty-tag propagation + compile-edge tracking.
+
+- [ ] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**
+  - [ ] Split raw SDF primitives, boolean ops, and gradient/normal estimation into separate partitions.
+  - [ ] Keep experimental GLM headers out of exported interface when possible; confine to impl partitions.
+  - [ ] Add explicit degenerate-shape guards ($\|b-a\|^2 < \varepsilon$ for capsules/segments, zero radii clamps) and unit tests.
+  - [ ] Add compile/perf telemetry marker pair for SDF evaluation paths (CPU and future compute queue path).
+
+- [ ] **C5 — `ECS.Scene.cpp` constructor path decoupling (≈81.4s edge)**
+  - [ ] Move entity default-component wiring into `ECS.SceneBootstrap` impl partition.
+  - [ ] Export only handle-based scene creation contract; avoid importing broad component bundle where not needed.
+  - [ ] Add tests for deterministic entity bootstrap invariants and no-regression compile-edge target.
+
+- [ ] **C6 — `ECS.Components.Hierarchy.cpp` algorithm split (≈79.0s edge)**
+  - [ ] Separate structural mutations (attach/detach/reparent) from transform propagation math.
+  - [ ] Introduce cycle/degenerate checks with clear invariants (`Parent != self`, acyclic ancestry) and bounded-cost validation.
+  - [ ] Move matrix decomposition helpers to private impl partition; keep exported component API minimal.
+  - [ ] Add stress test for deep hierarchy edits and compile-edge delta budget.
+
 ### B. Frame Pipeline Hardening (O2 ADR Continuation)
 
 Continue the staged frame-pipeline refactor from `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md`. These items harden existing seams rather than adding new features.

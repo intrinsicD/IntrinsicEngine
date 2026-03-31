@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
+
+SOURCE_EXTENSIONS = (".cppm", ".cpp", ".cc", ".cxx", ".c")
+COMPILE_OUTPUT_SUFFIXES = (".cppm.o", ".cpp.o", ".cc.o", ".cxx.o", ".c.o", ".o", ".pcm")
+
+
+@dataclass
+class NinjaEntry:
+    duration_ms: int
+    output: str
+
+
+def parse_ninja_log(path: Path) -> list[NinjaEntry]:
+    entries: list[NinjaEntry] = []
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 5:
+            continue
+        start, end, _, output, _ = parts[:5]
+        try:
+            duration_ms = int(end) - int(start)
+        except ValueError:
+            continue
+        entries.append(NinjaEntry(duration_ms=duration_ms, output=output))
+    return entries
+
+
+def strip_compile_suffix(path_fragment: str) -> tuple[str, str | None]:
+    for suffix in COMPILE_OUTPUT_SUFFIXES:
+        if path_fragment.endswith(suffix):
+            stem = path_fragment[: -len(suffix)]
+            if suffix == ".cppm.o":
+                return stem, ".cppm"
+            if suffix == ".cpp.o":
+                return stem, ".cpp"
+            if suffix == ".cc.o":
+                return stem, ".cc"
+            if suffix == ".cxx.o":
+                return stem, ".cxx"
+            if suffix == ".c.o":
+                return stem, ".c"
+            return stem, None
+    return path_fragment, None
+
+
+class SourceResolver:
+    def __init__(self, repo_root: Path) -> None:
+        self.repo_root = repo_root
+        self.sources = [p.relative_to(repo_root).as_posix() for p in repo_root.glob("src/**/*") if p.suffix in SOURCE_EXTENSIONS]
+
+    def _choose_best(self, candidates: list[str], preferred_ext: str | None) -> str | None:
+        if not candidates:
+            return None
+        if preferred_ext:
+            exact = [c for c in candidates if c.endswith(preferred_ext)]
+            if exact:
+                return sorted(exact, key=len)[0]
+        return sorted(candidates, key=len)[0]
+
+    def resolve(self, output: str) -> str | None:
+        fragment = output.split(".dir/", 1)[1] if ".dir/" in output else Path(output).name
+        stem, preferred_ext = strip_compile_suffix(fragment)
+
+        tokens = [stem, stem.replace("-", ".")]
+        if "/" in stem:
+            basename = Path(stem).name
+            tokens.extend([basename, basename.replace("-", ".")])
+
+        candidates: list[str] = []
+        for token in tokens:
+            if not token:
+                continue
+            # direct match if token already contains extension
+            if any(token.endswith(ext) for ext in SOURCE_EXTENSIONS):
+                direct = [s for s in self.sources if s.endswith(token)]
+                candidates.extend(direct)
+                continue
+
+            # extension-aware probing
+            for ext in SOURCE_EXTENSIONS:
+                target = f"{token}{ext}"
+                matches = [s for s in self.sources if s.endswith(target)]
+                candidates.extend(matches)
+
+            # module-impl artifacts like ECS-Scene.Impl.pcm -> ECS.Scene.cpp(.m)
+            if token.endswith(".Impl"):
+                base = token[: -len(".Impl")]
+                for ext in SOURCE_EXTENSIONS:
+                    target = f"{base}{ext}"
+                    matches = [s for s in self.sources if s.endswith(target)]
+                    candidates.extend(matches)
+
+        unique = list(dict.fromkeys(candidates))
+        return self._choose_best(unique, preferred_ext)
+
+
+def source_stats(root: Path, rel_source: str) -> tuple[int, int, int, int] | None:
+    p = root / rel_source
+    if not p.exists():
+        return None
+    lines = p.read_text(errors="ignore").splitlines()
+    include_count = sum(1 for ln in lines if ln.strip().startswith("#include"))
+    import_count = sum(1 for ln in lines if ln.strip().startswith("import "))
+    export_count = sum(1 for ln in lines if ln.strip().startswith("export "))
+    return len(lines), include_count, import_count, export_count
+
+
+def iter_compile_entries(entries: Iterable[NinjaEntry]) -> Iterable[NinjaEntry]:
+    for entry in entries:
+        if entry.output.endswith((".o", ".pcm")):
+            yield entry
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Report slow Ninja compile/module edges")
+    parser.add_argument("--build-dir", default="build/ci", help="Build directory that owns .ninja_log")
+    parser.add_argument("--top", type=int, default=15, help="Number of rows to print")
+    args = parser.parse_args()
+
+    root = Path(__file__).resolve().parents[1]
+    log_path = root / args.build_dir / ".ninja_log"
+    if not log_path.exists():
+        raise SystemExit(f"Missing ninja log: {log_path}")
+
+    resolver = SourceResolver(root)
+    entries = sorted(iter_compile_entries(parse_ninja_log(log_path)), key=lambda x: x.duration_ms, reverse=True)
+
+    print(f"Top {min(args.top, len(entries))} compile edges from {log_path}:")
+    print("duration_s\toutput\tsource\tsource_lines\tincludes\timports\texports")
+
+    for entry in entries[: args.top]:
+        rel_source = resolver.resolve(entry.output)
+        if rel_source is None:
+            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t-\t-\t-\t-\t-")
+            continue
+
+        stats = source_stats(root, rel_source)
+        if stats is None:
+            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{rel_source}\t(n/a)\t-\t-\t-")
+            continue
+
+        line_count, include_count, import_count, export_count = stats
+        print(
+            f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{rel_source}\t{line_count}\t{include_count}\t{import_count}\t{export_count}"
+        )
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
