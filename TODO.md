@@ -91,11 +91,11 @@ Target the currently observed worst compile edges (`build/ci/.ninja_log`) and re
   - [x] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
   - [ ] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
 
-- [ ] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**
-  - [ ] Split raw SDF primitives, boolean ops, and gradient/normal estimation into separate partitions.
-  - [ ] Keep experimental GLM headers out of exported interface when possible; confine to impl partitions.
-  - [ ] Add explicit degenerate-shape guards ($\|b-a\|^2 < \varepsilon$ for capsules/segments, zero radii clamps) and unit tests.
-  - [ ] Add compile/perf telemetry marker pair for SDF evaluation paths (CPU and future compute queue path).
+- [x] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**
+  - [x] Split SDF interface/implementation so importers parse declarations only while heavy math lives in `Geometry.SDF.cpp`.
+  - [x] Keep heavy GLM/algorithm code out of exported interface by confining bodies/factory logic to impl.
+  - [x] Add explicit degenerate-shape guards ($\|b-a\|^2 < \varepsilon$ for capsules/segments, zero radii clamps) and unit tests.
+  - [x] Add compile/perf telemetry marker pair for SDF evaluation paths (CPU and compute-stub marker for future queue path).
 
 - [ ] **C5 — `ECS.Scene.cpp` constructor path decoupling (≈81.4s edge)**
   - [ ] Move entity default-component wiring into `ECS.SceneBootstrap` impl partition.
