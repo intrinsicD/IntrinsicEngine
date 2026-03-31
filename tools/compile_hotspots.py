@@ -106,6 +106,43 @@ class SourceResolver:
         return self._choose_best(unique, preferred_ext)
 
 
+def build_report_row(root: Path, resolver: SourceResolver, entry: NinjaEntry) -> dict[str, object]:
+    rel_source = resolver.resolve(entry.output)
+    if rel_source is None:
+        return {
+            "duration_ms": entry.duration_ms,
+            "output": entry.output,
+            "source": None,
+            "source_lines": None,
+            "includes": None,
+            "imports": None,
+            "exports": None,
+        }
+
+    stats = source_stats(root, rel_source)
+    if stats is None:
+        return {
+            "duration_ms": entry.duration_ms,
+            "output": entry.output,
+            "source": rel_source,
+            "source_lines": None,
+            "includes": None,
+            "imports": None,
+            "exports": None,
+        }
+
+    line_count, include_count, import_count, export_count = stats
+    return {
+        "duration_ms": entry.duration_ms,
+        "output": entry.output,
+        "source": rel_source,
+        "source_lines": line_count,
+        "includes": include_count,
+        "imports": import_count,
+        "exports": export_count,
+    }
+
+
 def source_stats(root: Path, rel_source: str) -> tuple[int, int, int, int] | None:
     p = root / rel_source
     if not p.exists():
@@ -145,58 +182,19 @@ def main() -> int:
     resolver = SourceResolver(root)
     entries = sorted(iter_compile_entries(parse_ninja_log(log_path)), key=lambda x: x.duration_ms, reverse=True)
 
+    all_rows = [build_report_row(root, resolver, entry) for entry in entries]
+    report_rows = all_rows[: args.top]
+
     print(f"Top {min(args.top, len(entries))} compile edges from {log_path}:")
     print("duration_s\toutput\tsource\tsource_lines\tincludes\timports\texports")
-
-    report_rows: list[dict[str, object]] = []
-
-    for entry in entries[: args.top]:
-        rel_source = resolver.resolve(entry.output)
-        if rel_source is None:
-            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t-\t-\t-\t-\t-")
-            report_rows.append(
-                {
-                    "duration_ms": entry.duration_ms,
-                    "output": entry.output,
-                    "source": None,
-                    "source_lines": None,
-                    "includes": None,
-                    "imports": None,
-                    "exports": None,
-                }
-            )
-            continue
-
-        stats = source_stats(root, rel_source)
-        if stats is None:
-            print(f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{rel_source}\t(n/a)\t-\t-\t-")
-            report_rows.append(
-                {
-                    "duration_ms": entry.duration_ms,
-                    "output": entry.output,
-                    "source": rel_source,
-                    "source_lines": None,
-                    "includes": None,
-                    "imports": None,
-                    "exports": None,
-                }
-            )
-            continue
-
-        line_count, include_count, import_count, export_count = stats
+    for row in report_rows:
+        source = row["source"] if row["source"] is not None else "-"
+        source_lines = row["source_lines"] if row["source_lines"] is not None else "-"
+        includes = row["includes"] if row["includes"] is not None else "-"
+        imports = row["imports"] if row["imports"] is not None else "-"
+        exports = row["exports"] if row["exports"] is not None else "-"
         print(
-            f"{entry.duration_ms/1000:.3f}\t{entry.output}\t{rel_source}\t{line_count}\t{include_count}\t{import_count}\t{export_count}"
-        )
-        report_rows.append(
-            {
-                "duration_ms": entry.duration_ms,
-                "output": entry.output,
-                "source": rel_source,
-                "source_lines": line_count,
-                "includes": include_count,
-                "imports": import_count,
-                "exports": export_count,
-            }
+            f"{int(row['duration_ms'])/1000:.3f}\t{row['output']}\t{source}\t{source_lines}\t{includes}\t{imports}\t{exports}"
         )
 
     if args.json_out:
@@ -211,7 +209,7 @@ def main() -> int:
         baseline = json.loads(baseline_path.read_text())
         max_regression_ms = int(baseline.get("max_regression_ms", 0))
         targets = baseline.get("targets", [])
-        row_by_source = {str(row.get("source")): row for row in report_rows if row.get("source")}
+        row_by_source = {str(row.get("source")): row for row in all_rows if row.get("source")}
 
         failures: list[str] = []
         for target in targets:
@@ -219,7 +217,7 @@ def main() -> int:
             max_duration_ms = int(target["max_duration_ms"])
             row = row_by_source.get(source)
             if row is None:
-                failures.append(f"missing source '{source}' in top-{args.top} rows")
+                failures.append(f"missing source '{source}' in compile entries")
                 continue
             duration_ms = int(row["duration_ms"])
             if duration_ms > max_duration_ms + max_regression_ms:
