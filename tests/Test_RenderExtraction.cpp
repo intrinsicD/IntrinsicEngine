@@ -314,6 +314,7 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
     line.Width = 3.5f;
     line.HasPerEdgeColors = true;
     line.CachedEdgeColors = {0xFF010203u, 0xFF040506u, 0xFF070809u, 0xFF0A0B0Cu};
+    line.SourceDomain = ECS::Line::Domain::GraphEdge;
     auto& graphData = registry.emplace<ECS::Graph::Data>(lineEntity);
     graphData.GraphRef = std::make_shared<Geometry::Graph::Graph>();
     graphData.CachedEdgeColors = {0xFF111213u, 0xFF141516u, 0xFF171819u, 0xFF1A1B1Cu};
@@ -335,6 +336,7 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
     point.HasPerPointColors = true;
     point.HasPerPointRadii = true;
     point.HasPerPointNormals = true;
+    point.SourceDomain = ECS::Point::Domain::CloudPoint;
     auto& cloudData = registry.emplace<ECS::PointCloud::Data>(pointEntity);
     cloudData.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
     cloudData.CachedColors = {0xFF212223u, 0xFF242526u};
@@ -457,6 +459,7 @@ TEST(RenderExtraction, ExtractedRenderPacketsRemainStableAfterSceneMutation)
     line.HasPerEdgeColors = true;
     line.CachedEdgeColors = {0xFF101112u, 0xFF131415u, 0xFF161718u, 0xFF191A1Bu,
                              0xFF1C1D1Eu, 0xFF1F2021u, 0xFF222324u};
+    line.SourceDomain = ECS::Line::Domain::GraphEdge;
     auto& graphData = registry.emplace<ECS::Graph::Data>(lineEntity);
     graphData.GraphRef = std::make_shared<Geometry::Graph::Graph>();
     graphData.CachedEdgeColors = line.CachedEdgeColors;
@@ -471,6 +474,7 @@ TEST(RenderExtraction, ExtractedRenderPacketsRemainStableAfterSceneMutation)
     point.Geometry = Geometry::GeometryHandle{61u, 1u};
     point.HasPerPointColors = true;
     point.HasPerPointRadii = true;
+    point.SourceDomain = ECS::Point::Domain::CloudPoint;
     auto& pointCloud = registry.emplace<ECS::PointCloud::Data>(pointEntity);
     pointCloud.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
     pointCloud.CachedColors = {0xFF252627u, 0xFF28292Au};

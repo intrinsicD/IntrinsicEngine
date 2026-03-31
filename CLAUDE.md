@@ -254,6 +254,20 @@ Lifecycle systems create GPU geometry and populate per-pass ECS components. All 
 - **`GPUSceneSync`**: Handles transform-only updates for all entity types with GPUScene slots.
 - **`PropertySetDirtySyncSystem`** (`"PropertySetDirtySync"`): Per-domain dirty tracking for incremental CPU→GPU sync. Six `ECS::DirtyTag` tag components (`VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`). Position/topology tags escalate to `GpuDirty` for full re-upload by existing lifecycle systems. Attribute tags re-extract cached vectors (colors, radii) from PropertySets without full vertex buffer re-upload. Count-divergence safety escalates to full re-upload. Runs before lifecycle systems via FrameGraph ordering. Tags cleared after processing.
 
+### Data Authority & Domain Hints
+
+Each entity carries at most **one authoritative geometry data source** per geometric domain (point, edge, halfedge, face). Composite entities (e.g. a mesh with a point cloud overlay or graph overlay) use parent-child hierarchy via `Hierarchy::Component` — the overlay is a separate child entity with its own data authority.
+
+**DataAuthority tags** (`ECS::DataAuthority::MeshTag`, `GraphTag`, `PointCloudTag`) are zero-size ECS components emplaced by lifecycle systems and spawn sites. They enable O(1) entity type queries and eliminate type-probing heuristics.
+
+**Domain hints on render components** declare the provenance of each render component's data:
+- `ECS::Line::Domain` (`MeshEdge`, `GraphEdge`) — `Line::Component::SourceDomain`
+- `ECS::Point::Domain` (`MeshVertex`, `GraphNode`, `CloudPoint`) — `Point::Component::SourceDomain`
+
+`RenderExtraction` uses these hints to select picking/draw behavior without checking for the presence of data components (no more `registry.all_of<Graph::Data>()` heuristics).
+
+**OverlayEntityFactory** (`Graphics::OverlayEntityFactory`) creates child overlay entities with proper Hierarchy attachment, DataAuthority tag, transform inheritance, NameTag, and PickID. Used when composing point cloud or graph overlays on mesh entities.
+
 ### CPU-Side Frustum Culling
 
 Line and Point draw packets carry a self-contained `LocalBoundingSphere` (resolved from `GeometryPool` during `ResolveDrawPacketBounds()`). Centralized `CullDrawPackets()` in `Graphics.RenderPipeline` extracts camera frustum planes from `CameraProj * CameraView`, transforms each packet's local bounding sphere to world space (center via model matrix, radius scaled by max axis scale), and tests with `Geometry::TestOverlap(Frustum, Sphere)`. The resulting `CulledDrawList` (visible index lists + statistics) flows through `BuildGraphInput` → `RenderPassContext` to `LinePass` and `PointPass`. Culled entities skip draws but retain buffers. Respects `Debug.DisableCulling` toggle. SurfacePass uses GPU-driven culling via compute shader (`instance_cull.comp`) on `GPUScene` instances.
