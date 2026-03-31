@@ -69,10 +69,22 @@ TEST(SDF_Math, Capsule_Inside)
     EXPECT_LT(d, 0.0f);
 }
 
+TEST(SDF_Math, Capsule_DegenerateSegmentFallback)
+{
+    float d = SDF::Math::Sdf_Capsule(glm::vec3(2, 0, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), 1.0f);
+    EXPECT_NEAR(d, 1.0f, kEps);
+}
+
 TEST(SDF_Math, Segment_DistanceToMidpoint)
 {
     float d = SDF::Math::Sdf_Segment(glm::vec3(0, 1, 0), glm::vec3(-1, 0, 0), glm::vec3(1, 0, 0));
     EXPECT_NEAR(d, 1.0f, kEps);
+}
+
+TEST(SDF_Math, Segment_DegenerateToPointDistance)
+{
+    float d = SDF::Math::Sdf_Segment(glm::vec3(0, 3, 4), glm::vec3(0, 0, 0), glm::vec3(0, 0, 0));
+    EXPECT_NEAR(d, 5.0f, kEps);
 }
 
 TEST(SDF_Math, Plane_PositiveSide)
@@ -103,6 +115,14 @@ TEST(SDF_Math, Triangle_AboveFace)
     EXPECT_NEAR(d, 1.0f, kEps);
 }
 
+TEST(SDF_Math, Triangle_DegenerateEdgeFallback)
+{
+    float d = SDF::Math::Sdf_Triangle(
+        glm::vec3(0.5f, 1.0f, 0.0f),
+        glm::vec3(0, 0, 0), glm::vec3(1, 0, 0), glm::vec3(2, 0, 0));
+    EXPECT_NEAR(d, 1.0f, kEps);
+}
+
 TEST(SDF_Math, Ray_DistancePerpendicular)
 {
     float d = SDF::Math::Sdf_Ray(glm::vec3(0, 3, 0), glm::vec3(0, 0, 0), glm::vec3(1, 0, 0));
@@ -114,6 +134,12 @@ TEST(SDF_Math, Ray_BehindOrigin)
     // Point behind ray origin — clamped at origin
     float d = SDF::Math::Sdf_Ray(glm::vec3(-2, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1, 0, 0));
     EXPECT_NEAR(d, 2.0f, kEps);
+}
+
+TEST(SDF_Math, Ray_ZeroDirectionFallsBackToPointDistance)
+{
+    float d = SDF::Math::Sdf_Ray(glm::vec3(0, 3, 4), glm::vec3(0, 0, 0), glm::vec3(0, 0, 0));
+    EXPECT_NEAR(d, 5.0f, kEps);
 }
 
 // ============================================================================
