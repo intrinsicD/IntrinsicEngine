@@ -256,14 +256,11 @@ Begin alongside A1 for fast shader iteration during rendering mode and shadow de
 - [ ] Scope: graphics pipelines only (compute hot-reload can follow later).
 - [ ] Update ROADMAP "Ongoing" section to cross-reference this item.
 
-#### E2. GPU Memory Budget Tracking
+#### E2. GPU Memory Budget Tracking ✓
 
-The engine has no visibility into GPU memory consumption.
+GPU memory budget tracking is implemented. Per-heap usage/budget is queried once per frame via VMA (`vmaGetHeapBudgets`), published to `Core::Telemetry`, and displayed in the Performance panel. Warning fires once per heap per transition at 80% threshold.
 
-- [ ] Query `VkPhysicalDeviceMemoryBudgetPropertiesEXT` (or VMA budget API) once per frame.
-- [ ] Expose total/used/budget per memory heap in telemetry.
-- [ ] Add an ImGui panel section showing live GPU memory usage.
-- [ ] Warning threshold configurable via `FeatureRegistry`. Initial default 80% per heap. Warning fires once per heap per transition (not per frame).
+Remaining: make the 80% warning threshold configurable via `FeatureRegistry` (currently hardcoded).
 
 ### F. UI Architecture & Feature Wiring
 

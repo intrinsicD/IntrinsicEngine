@@ -1,5 +1,9 @@
+module;
+#include <cstdint>
+
 module Runtime.ResourceMaintenance;
 
+import Core.Logging;
 import Core.Tasks;
 import Core.Telemetry;
 
@@ -10,6 +14,29 @@ namespace Runtime
         auto& device = m_Graphics.GetDevice();
         m_LastCompletedGraphicsTimelineValue = device.GetGraphicsTimelineCompletedValue();
         m_LastObservedGlobalFrameNumber = device.GetGlobalFrameNumber();
+
+        // Query GPU memory budgets and publish to telemetry.
+        const auto memSnap = device.QueryMemoryBudgets();
+        Core::Telemetry::TelemetrySystem::Get().SetGpuMemoryBudgets(memSnap);
+
+        // Fire once-per-transition warnings when any heap exceeds 80%.
+        constexpr double kWarningThreshold = 0.80;
+        for (uint32_t i = 0; i < memSnap.HeapCount && i < kMaxHeaps; ++i)
+        {
+            if (memSnap.Heaps[i].BudgetBytes == 0) continue;
+            const double usage = static_cast<double>(memSnap.Heaps[i].UsageBytes)
+                               / static_cast<double>(memSnap.Heaps[i].BudgetBytes);
+            const bool over = usage >= kWarningThreshold;
+            if (over && !m_HeapOverBudget[i])
+            {
+                const bool deviceLocal = (memSnap.Heaps[i].Flags & Core::Telemetry::kHeapFlagDeviceLocal) != 0;
+                Core::Log::Warn("GPU memory heap {} ({}) at {:.1f}% of budget ({:.0f} / {:.0f} MB)",
+                    i, deviceLocal ? "device-local" : "host-visible", usage * 100.0,
+                    static_cast<double>(memSnap.Heaps[i].UsageBytes) / (1024.0 * 1024.0),
+                    static_cast<double>(memSnap.Heaps[i].BudgetBytes) / (1024.0 * 1024.0));
+            }
+            m_HeapOverBudget[i] = over;
+        }
     }
 
     void ResourceMaintenanceService::ProcessCompletedReadbacks()

@@ -172,6 +172,11 @@ namespace Core::Telemetry
         m_FrameGraphCriticalPathTimeNs.store(criticalPathTimeNs, std::memory_order_relaxed);
     }
 
+    void TelemetrySystem::SetGpuMemoryBudgets(const GpuMemorySnapshot& snapshot)
+    {
+        m_GpuMemory = snapshot;
+    }
+
     void TelemetrySystem::SetPassGpuTimings(std::vector<PassTimingEntry> timings)
     {
         m_PassTimings = std::move(timings);

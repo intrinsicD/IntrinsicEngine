@@ -17,6 +17,27 @@ export namespace Core::Telemetry
     // Lock-Free Ring Buffer for Frame Timing Data
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // GPU Memory Budget — per-heap usage and budget data from VMA
+    // -------------------------------------------------------------------------
+
+    inline constexpr size_t MAX_MEMORY_HEAPS = 16; // Matches VK_MAX_MEMORY_HEAPS
+    inline constexpr uint32_t kHeapFlagDeviceLocal = 0x01; // VK_MEMORY_HEAP_DEVICE_LOCAL_BIT
+
+    struct GpuHeapBudget
+    {
+        uint64_t UsageBytes = 0;        // Total device-memory block bytes allocated by VMA (includes internal fragmentation)
+        uint64_t BudgetBytes = 0;       // OS/driver reported budget (or heap size if extension unavailable)
+        uint32_t Flags = 0;             // Vulkan VkMemoryHeapFlags (kHeapFlagDeviceLocal = device-local)
+    };
+
+    struct GpuMemorySnapshot
+    {
+        uint32_t HeapCount = 0;
+        std::array<GpuHeapBudget, MAX_MEMORY_HEAPS> Heaps{};
+        bool HasBudgetExtension = false;
+    };
+
     struct TimingSample
     {
         uint64_t StartTimeNs = 0;
@@ -113,6 +134,12 @@ export namespace Core::Telemetry
         void SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats);
         void SetFrameGraphTimings(uint64_t compileTimeNs, uint64_t executeTimeNs, uint64_t criticalPathTimeNs);
 
+        // Set GPU memory budget snapshot for the current frame.
+        void SetGpuMemoryBudgets(const GpuMemorySnapshot& snapshot);
+
+        // Get the most recent GPU memory snapshot.
+        [[nodiscard]] const GpuMemorySnapshot& GetGpuMemorySnapshot() const { return m_GpuMemory; }
+
         // Set per-pass GPU timings (from GpuProfiler::Resolve).
         void SetPassGpuTimings(std::vector<PassTimingEntry> timings);
 
@@ -178,6 +205,11 @@ export namespace Core::Telemetry
 
         // Per-pass timing data (updated each frame, consumed by Performance panel).
         std::vector<PassTimingEntry> m_PassTimings;
+
+        // GPU memory budget snapshot (updated once per frame from maintenance lane).
+        // Main-thread-only: both SetGpuMemoryBudgets() and GetGpuMemorySnapshot()
+        // run on the main thread (maintenance lane write, ImGui panel read).
+        GpuMemorySnapshot m_GpuMemory{};
     };
 
     // -------------------------------------------------------------------------

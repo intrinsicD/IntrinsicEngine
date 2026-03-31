@@ -35,6 +35,11 @@ namespace RHI
         VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME
     };
 
+    // Optional extensions — enabled when available, gracefully absent otherwise.
+    const std::vector<const char*> OPTIONAL_DEVICE_EXTENSIONS = {
+        VK_EXT_MEMORY_BUDGET_EXTENSION_NAME
+    };
+
     VulkanDevice::VulkanDevice(VulkanContext& context, VkSurfaceKHR surface)
         : m_Surface(surface)
     {
@@ -402,6 +407,28 @@ namespace RHI
             std::erase_if(enabledExtensions, [](const char* ext) { return std::string_view(ext) == VK_KHR_SWAPCHAIN_EXTENSION_NAME; });
         }
 
+        // Probe and enable optional extensions.
+        {
+            uint32_t extCount = 0;
+            vkEnumerateDeviceExtensionProperties(m_PhysicalDevice, nullptr, &extCount, nullptr);
+            std::vector<VkExtensionProperties> available(extCount);
+            vkEnumerateDeviceExtensionProperties(m_PhysicalDevice, nullptr, &extCount, available.data());
+
+            for (const char* opt : OPTIONAL_DEVICE_EXTENSIONS)
+            {
+                for (const auto& ext : available)
+                {
+                    if (std::string_view(ext.extensionName) == opt)
+                    {
+                        enabledExtensions.push_back(opt);
+                        if (std::string_view(opt) == VK_EXT_MEMORY_BUDGET_EXTENSION_NAME)
+                            m_HasMemoryBudgetExtension = true;
+                        break;
+                    }
+                }
+            }
+        }
+
         createInfo.enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size());
         createInfo.ppEnabledExtensionNames = enabledExtensions.data();
         createInfo.enabledLayerCount = 0;
@@ -426,12 +453,23 @@ namespace RHI
         allocatorInfo.instance = context.GetInstance();
         allocatorInfo.pVulkanFunctions = &vulkanFunctions;
         allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+        if (m_HasMemoryBudgetExtension)
+            allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
 
         if (vmaCreateAllocator(&allocatorInfo, &m_Allocator) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create VMA allocator!");
             m_IsValid = false;
             return;
+        }
+
+        // Cache static memory heap properties (heap count and flags never change).
+        {
+            VkPhysicalDeviceMemoryProperties memProps;
+            vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &memProps);
+            m_CachedHeapCount = memProps.memoryHeapCount;
+            for (uint32_t i = 0; i < m_CachedHeapCount && i < m_CachedHeapFlags.size(); ++i)
+                m_CachedHeapFlags[i] = memProps.memoryHeaps[i].flags;
         }
 
         vkGetDeviceQueue(m_Device, m_Indices.GraphicsFamily.value(), 0, &m_GraphicsQueue);
@@ -443,6 +481,25 @@ namespace RHI
         {
             vkGetDeviceQueue(m_Device, m_Indices.TransferFamily.value(), 0, &m_TransferQueue);
         }
+    }
+
+    Core::Telemetry::GpuMemorySnapshot VulkanDevice::QueryMemoryBudgets() const
+    {
+        Core::Telemetry::GpuMemorySnapshot result{};
+        result.HasBudgetExtension = m_HasMemoryBudgetExtension;
+        result.HeapCount = m_CachedHeapCount;
+
+        VmaBudget budgets[VK_MAX_MEMORY_HEAPS]{};
+        vmaGetHeapBudgets(m_Allocator, budgets);
+
+        for (uint32_t i = 0; i < result.HeapCount && i < Core::Telemetry::MAX_MEMORY_HEAPS; ++i)
+        {
+            result.Heaps[i].UsageBytes = budgets[i].statistics.blockBytes;
+            result.Heaps[i].BudgetBytes = budgets[i].budget;
+            result.Heaps[i].Flags = m_CachedHeapFlags[i];
+        }
+
+        return result;
     }
 
     void VulkanDevice::CreateCommandPool()

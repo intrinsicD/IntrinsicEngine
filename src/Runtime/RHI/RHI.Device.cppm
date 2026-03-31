@@ -1,4 +1,5 @@
 module;
+#include <array>
 #include <vector>
 #include <optional>
 #include <mutex>
@@ -10,6 +11,7 @@ export module RHI.Device;
 
 import RHI.Context;
 import Core.InplaceFunction;
+import Core.Telemetry;
 
 // =============================================================================
 // Device Reference Lifetime Contract
@@ -75,6 +77,11 @@ namespace RHI
         [[nodiscard]] VkSurfaceKHR GetSurface() const { return m_Surface; }
         [[nodiscard]] VkCommandPool GetCommandPool() const { return m_CommandPool; }
         [[nodiscard]] VmaAllocator GetAllocator() const { return m_Allocator; }
+        [[nodiscard]] bool HasMemoryBudgetExtension() const { return m_HasMemoryBudgetExtension; }
+
+        // Query per-heap memory usage and budget from VMA.
+        [[nodiscard]] Core::Telemetry::GpuMemorySnapshot QueryMemoryBudgets() const;
+
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
         [[nodiscard]] static constexpr uint32_t GetFramesInFlight() { return MAX_FRAMES_IN_FLIGHT; }
         [[nodiscard]] constexpr uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
@@ -164,6 +171,11 @@ namespace RHI
         std::vector<VkCommandPool> m_ThreadCommandPools;
 
         bool m_IsValid = true;
+        bool m_HasMemoryBudgetExtension = false;
+
+        // Cached at construction — heap count and flags are static device properties.
+        uint32_t m_CachedHeapCount = 0;
+        std::array<uint32_t, 16> m_CachedHeapFlags{}; // VkMemoryHeapFlags per heap
 
         // NOTE: 3 frames-in-flight gives the deferred deletion queues enough slack for transient
         // RenderGraph resources that are recreated every frame.

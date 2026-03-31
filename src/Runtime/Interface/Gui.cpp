@@ -13,6 +13,7 @@ module;
 #include <GLFW/glfw3.h> // Required for glfwGetInstanceProcAddress
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
@@ -335,6 +336,111 @@ namespace Interface::GUI
                 ImGui::Text("Ticks: %u", stats.SimulationTickCount);
                 ImGui::Text("Accumulator clamp hits: %u", stats.SimulationClampHitCount);
                 ImGui::Text("Simulation CPU: %.3f ms", simulationCpuMs);
+                ImGui::TreePop();
+            }
+
+            ImGui::Separator();
+
+            // -----------------------------------------------------------------
+            // GPU Memory Budget
+            // -----------------------------------------------------------------
+            if (ImGui::TreeNodeEx("GPU Memory", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const auto& mem = telemetry.GetGpuMemorySnapshot();
+                if (mem.HeapCount == 0)
+                {
+                    ImGui::TextDisabled("No GPU memory data available.");
+                }
+                else
+                {
+                    if (!mem.HasBudgetExtension)
+                        ImGui::TextDisabled("VK_EXT_memory_budget unavailable; showing VMA-tracked usage vs. heap size.");
+
+                    // Helper: color-code a usage fraction (green < 70%, yellow < 85%, red >= 85%).
+                    auto UsageColor = [](float pct) -> ImVec4 {
+                        if (pct < 70.0f) return ImVec4(0.20f, 0.75f, 0.30f, 1.0f);
+                        if (pct < 85.0f) return ImVec4(0.90f, 0.75f, 0.15f, 1.0f);
+                        return ImVec4(0.95f, 0.25f, 0.20f, 1.0f);
+                    };
+
+                    // Compute device-local totals for the summary line.
+                    uint64_t totalDeviceUsed = 0;
+                    uint64_t totalDeviceBudget = 0;
+                    for (uint32_t i = 0; i < mem.HeapCount; ++i)
+                    {
+                        if (mem.Heaps[i].Flags & Core::Telemetry::kHeapFlagDeviceLocal)
+                        {
+                            totalDeviceUsed += mem.Heaps[i].UsageBytes;
+                            totalDeviceBudget += mem.Heaps[i].BudgetBytes;
+                        }
+                    }
+
+                    if (totalDeviceBudget == 0)
+                    {
+                        ImGui::TextDisabled("No device-local heaps detected.");
+                    }
+                    else
+                    {
+                        const float usedMB = static_cast<float>(totalDeviceUsed) / (1024.0f * 1024.0f);
+                        const float budgetMB = static_cast<float>(totalDeviceBudget) / (1024.0f * 1024.0f);
+                        const float frac = static_cast<float>(static_cast<double>(totalDeviceUsed) / static_cast<double>(totalDeviceBudget));
+                        const float pct = frac * 100.0f;
+
+                        char overlay[64];
+                        std::snprintf(overlay, sizeof(overlay), "%.0f / %.0f MB (%.1f%%)", usedMB, budgetMB, pct);
+                        ImGui::TextUnformatted("Device-Local");
+                        ImGui::SameLine();
+                        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, UsageColor(pct));
+                        ImGui::ProgressBar(frac, ImVec2(-1.0f, 0.0f), overlay);
+                        ImGui::PopStyleColor();
+                    }
+
+                    // Per-heap table.
+                    if (ImGui::BeginTable("GpuHeapTable", 5,
+                        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+                    {
+                        ImGui::TableSetupColumn("Heap");
+                        ImGui::TableSetupColumn("Type");
+                        ImGui::TableSetupColumn("Used (MB)", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+                        ImGui::TableSetupColumn("Budget (MB)", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+                        ImGui::TableSetupColumn("Usage", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+                        ImGui::TableHeadersRow();
+
+                        for (uint32_t i = 0; i < mem.HeapCount; ++i)
+                        {
+                            const auto& heap = mem.Heaps[i];
+                            const float hUsedMB = static_cast<float>(heap.UsageBytes) / (1024.0f * 1024.0f);
+                            const float hBudgetMB = static_cast<float>(heap.BudgetBytes) / (1024.0f * 1024.0f);
+                            const float hFrac = (heap.BudgetBytes > 0)
+                                ? static_cast<float>(static_cast<double>(heap.UsageBytes) / static_cast<double>(heap.BudgetBytes))
+                                : 0.0f;
+                            const float hPct = hFrac * 100.0f;
+
+                            ImGui::TableNextRow();
+                            ImGui::TableNextColumn();
+                            ImGui::Text("%u", i);
+
+                            ImGui::TableNextColumn();
+                            const bool isDeviceLocal = (heap.Flags & Core::Telemetry::kHeapFlagDeviceLocal) != 0;
+                            ImGui::TextUnformatted(isDeviceLocal ? "Device" : "Host");
+
+                            ImGui::TableNextColumn();
+                            ImGui::Text("%.1f", hUsedMB);
+
+                            ImGui::TableNextColumn();
+                            ImGui::Text("%.1f", hBudgetMB);
+
+                            ImGui::TableNextColumn();
+                            char hOverlay[32];
+                            std::snprintf(hOverlay, sizeof(hOverlay), "%.0f%%", hPct);
+                            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, UsageColor(hPct));
+                            ImGui::ProgressBar(hFrac, ImVec2(-1.0f, 0.0f), hOverlay);
+                            ImGui::PopStyleColor();
+                        }
+
+                        ImGui::EndTable();
+                    }
+                }
                 ImGui::TreePop();
             }
 
