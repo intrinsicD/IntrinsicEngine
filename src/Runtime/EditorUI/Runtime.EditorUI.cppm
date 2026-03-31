@@ -283,6 +283,8 @@ export namespace Runtime::EditorUI
     struct SubdivisionWidgetState
     {
         int Iterations = 1;
+        bool EnforceFaceBudget = true;
+        int MaxOutputFaces = 250000;
     };
 
     struct NormalEstimationWidgetState

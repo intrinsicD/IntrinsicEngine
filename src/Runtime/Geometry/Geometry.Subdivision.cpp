@@ -55,6 +55,9 @@ namespace Geometry::Subdivision
         }
 
         output.Clear();
+        output.Reserve(nV + nE,
+                       2u * nE + 3u * nF,
+                       4u * nF);
 
         // Phase 1: Compute new positions for even vertices (existing vertices)
         std::vector<glm::vec3> evenPositions(nV, glm::vec3(0.0f));
@@ -278,6 +281,29 @@ namespace Geometry::Subdivision
         if (input.IsEmpty() || params.Iterations == 0)
             return std::nullopt;
 
+        std::size_t iterationsToRun = params.Iterations;
+        if (params.MaxOutputFaces > 0)
+        {
+            const std::size_t inputFaces = input.FaceCount();
+            if (inputFaces == 0 || inputFaces > params.MaxOutputFaces)
+                return std::nullopt;
+
+            std::size_t capped = 0;
+            std::size_t faces = inputFaces;
+            while (capped < params.Iterations)
+            {
+                if (faces > (params.MaxOutputFaces / 4u))
+                    break;
+                faces *= 4u;
+                ++capped;
+            }
+
+            if (capped == 0)
+                return std::nullopt;
+
+            iterationsToRun = capped;
+        }
+
         SubdivisionResult result;
 
         // First iteration: input → output
@@ -288,7 +314,7 @@ namespace Geometry::Subdivision
 
         // Subsequent iterations: ping-pong between two meshes
         Halfedge::Mesh temp;
-        for (std::size_t i = 1; i < params.Iterations; ++i)
+        for (std::size_t i = 1; i < iterationsToRun; ++i)
         {
             temp.Clear();
             if (!SubdivideOnce(output, temp))

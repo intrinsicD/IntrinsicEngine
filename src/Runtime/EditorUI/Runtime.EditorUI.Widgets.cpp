@@ -1788,8 +1788,47 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
 
     ImGui::TextDisabled("Input Domains: Mesh Vertices / Mesh Edges / Mesh Halfedges / Mesh Faces");
     ImGui::DragInt("Iterations", &state.Iterations, 1.0f, 1, 5);
+    ImGui::Checkbox("Clamp output faces", &state.EnforceFaceBudget);
+    if (state.EnforceFaceBudget)
+    {
+        ImGui::DragInt("Max Output Faces", &state.MaxOutputFaces, 1000.0f, 1024, 4000000);
+    }
 
     bool changed = false;
+    const auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+    const auto* meshData = reg.try_get<ECS::Mesh>(entity);
+    const std::size_t inputFaceCount = (meshData && meshData->MeshRef) ? meshData->MeshRef->FaceCount() : 0u;
+
+    std::size_t requestedFaces = inputFaceCount;
+    for (int i = 0; i < std::max(state.Iterations, 0); ++i)
+    {
+        if (requestedFaces > (std::numeric_limits<std::size_t>::max() / 4u))
+            break;
+        requestedFaces *= 4u;
+    }
+
+    if (state.EnforceFaceBudget && state.MaxOutputFaces > 0 && inputFaceCount > 0)
+    {
+        std::size_t clampedIterations = 0;
+        std::size_t faces = inputFaceCount;
+        while (clampedIterations < static_cast<std::size_t>(std::max(state.Iterations, 0)))
+        {
+            if (faces > (static_cast<std::size_t>(state.MaxOutputFaces) / 4u))
+                break;
+            faces *= 4u;
+            ++clampedIterations;
+        }
+
+        ImGui::TextDisabled("Face growth estimate: %zu -> %zu (effective iterations: %zu)",
+                            inputFaceCount,
+                            faces,
+                            clampedIterations);
+    }
+    else if (inputFaceCount > 0)
+    {
+        ImGui::TextDisabled("Face growth estimate: %zu -> %zu", inputFaceCount, requestedFaces);
+    }
+
     if (ImGui::Button("Run Loop Subdivision"))
     {
         const auto ui = state;
@@ -1797,7 +1836,11 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
         {
             Geometry::Halfedge::Mesh out;
             Geometry::Subdivision::SubdivisionParams params;
-            params.Iterations = ui.Iterations;
+            params.Iterations = static_cast<std::size_t>(std::max(ui.Iterations, 1));
+            if (ui.EnforceFaceBudget && ui.MaxOutputFaces > 0)
+            {
+                params.MaxOutputFaces = static_cast<std::size_t>(ui.MaxOutputFaces);
+            }
             if (Geometry::Subdivision::Subdivide(mesh, out, params))
                 mesh = std::move(out);
         });
