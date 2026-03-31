@@ -481,7 +481,9 @@ namespace Graphics::Systems::PropertySetDirtySync
         graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::PropertySetDirtySync,
             [](Core::FrameGraphBuilder& builder)
             {
-                // Writes to data components (GpuDirty, cached attributes).
+                // Writes to data components (GpuDirty, cached attributes,
+                // VectorFieldsDirty).
+                builder.Write<ECS::Mesh::Data>();
                 builder.Write<ECS::Graph::Data>();
                 builder.Write<ECS::PointCloud::Data>();
                 builder.Write<ECS::Surface::Component>();

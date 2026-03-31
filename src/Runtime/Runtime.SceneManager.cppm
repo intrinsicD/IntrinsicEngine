@@ -9,6 +9,7 @@ import Core.Assets;
 import Graphics.Components;
 import Graphics.Geometry;
 import Graphics.GPUScene;
+import Graphics.VisualizationConfig;
 import ECS;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;
@@ -111,6 +112,9 @@ export namespace Runtime
 
         template <typename T>
         void OnGpuComponentDestroyed(entt::registry& registry, entt::entity entity);
+
+        template <typename T>
+        void OnDataComponentDestroyed(entt::registry& registry, entt::entity entity);
 
         ECS::Scene m_Scene;
         Graphics::GeometryPool* m_GeometryStorage = nullptr;
