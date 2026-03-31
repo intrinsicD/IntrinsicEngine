@@ -1,0 +1,13 @@
+{
+  "max_regression_ms": 3000,
+  "targets": [
+    {
+      "source": "src/Runtime/Geometry/Geometry.Octree.cppm",
+      "max_duration_ms": 92000
+    },
+    {
+      "source": "src/Runtime/ECS/Systems/ECS.Systems.Transform.cpp",
+      "max_duration_ms": 91000
+    }
+  ]
+}

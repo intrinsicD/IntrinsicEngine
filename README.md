@@ -51,6 +51,18 @@ cmake --build --preset dev --target IntrinsicTests
 ./build/dev/bin/IntrinsicTests --gtest_filter="RuntimeFrameLoop.*"
 ```
 
+### Compile hotspot benchmark (CI parity)
+
+Capture and gate the slowest Ninja compile edges after a build:
+
+```bash
+python3 ./tools/compile_hotspots.py \
+  --build-dir build \
+  --top 40 \
+  --json-out build/compile_hotspots_report.json \
+  --baseline-json tools/compile_hotspot_baseline.json
+```
+
 ---
 
 ## Architectural Pillars
