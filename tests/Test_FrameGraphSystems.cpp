@@ -378,6 +378,33 @@ TEST(AxisRotator, EntityWithoutTransform_IsSkipped)
     ECS::Systems::AxisRotator::OnUpdate(registry, 1.0f);
 }
 
+TEST(AxisRotator, RotateBatch_MatchesScalarIntegration)
+{
+    std::vector<glm::quat> rotations = {
+        glm::quat{1.0f, 0.0f, 0.0f, 0.0f},
+        glm::quat{1.0f, 0.0f, 0.0f, 0.0f},
+    };
+    const std::vector<ECS::Systems::AxisRotator::AxisAngularVelocity> angularVelocities = {
+        {.Axis = glm::vec3{0.0f, 1.0f, 0.0f}, .DegreesPerSecond = 45.0f},
+        {.Axis = glm::vec3{0.0f, 0.0f, 0.0f}, .DegreesPerSecond = 90.0f}, // degenerate axis should fallback to +Y
+    };
+
+    ECS::Systems::AxisRotator::RotateBatch(rotations, angularVelocities, 1.0f);
+
+    const glm::quat expected0 = glm::angleAxis(glm::radians(45.0f), glm::vec3{0.0f, 1.0f, 0.0f});
+    const glm::quat expected1 = glm::angleAxis(glm::radians(90.0f), glm::vec3{0.0f, 1.0f, 0.0f});
+
+    EXPECT_NEAR(rotations[0].x, expected0.x, 1e-5f);
+    EXPECT_NEAR(rotations[0].y, expected0.y, 1e-5f);
+    EXPECT_NEAR(rotations[0].z, expected0.z, 1e-5f);
+    EXPECT_NEAR(rotations[0].w, expected0.w, 1e-5f);
+
+    EXPECT_NEAR(rotations[1].x, expected1.x, 1e-5f);
+    EXPECT_NEAR(rotations[1].y, expected1.y, 1e-5f);
+    EXPECT_NEAR(rotations[1].z, expected1.z, 1e-5f);
+    EXPECT_NEAR(rotations[1].w, expected1.w, 1e-5f);
+}
+
 // =========================================================================
 // Test: Multi-frame reset and re-registration
 // =========================================================================

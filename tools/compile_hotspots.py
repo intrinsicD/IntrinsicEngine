@@ -20,6 +20,7 @@ def parse_ninja_log(path: Path) -> list[NinjaEntry]:
     # Ninja logs may contain multiple records per output across incremental builds.
     # Keep only the most recent record for each output (last-write-wins by file order).
     latest_by_output: dict[str, NinjaEntry] = {}
+
     for line in path.read_text().splitlines():
         if not line or line.startswith("#"):
             continue
