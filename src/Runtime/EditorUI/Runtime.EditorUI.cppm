@@ -356,6 +356,7 @@ export namespace Runtime::EditorUI
         Runtime::Engine* m_Engine = nullptr;
         entt::entity* m_CachedSelected = nullptr;
         GeometryWorkflowController* m_GeometryWorkflow = nullptr;
+        entt::entity m_PreviousSelected = entt::null;
         PropertySetBrowserState m_MeshVertexPropertiesUi{};
         PropertySetBrowserState m_MeshEdgePropertiesUi{};
         PropertySetBrowserState m_MeshHalfedgePropertiesUi{};
