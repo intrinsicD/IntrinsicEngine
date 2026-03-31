@@ -10,8 +10,6 @@ import :Components.Hierarchy;
 
 namespace ECS::Components::Hierarchy::Structure
 {
-    static constexpr uint32_t kMaxAncestryDepth = 65536;
-
     bool IsDescendant(entt::registry& registry, entt::entity entity, entt::entity potentialDescendant)
     {
         entt::entity current = potentialDescendant;

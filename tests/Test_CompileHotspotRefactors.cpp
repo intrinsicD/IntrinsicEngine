@@ -241,6 +241,55 @@ TEST(HierarchyStructure, IsDescendant_DetectsAncestry)
     EXPECT_FALSE(Hierarchy::Structure::IsDescendant(reg, c, gp));
 }
 
+TEST(HierarchyStructure, IsDescendant_TerminatesOnCorruptedCycle)
+{
+    // Manually corrupt the hierarchy to create a parent cycle: A -> B -> C -> A.
+    // IsDescendant must terminate (bounded walk) instead of looping forever.
+    entt::registry reg;
+    entt::entity a = reg.create();
+    entt::entity b = reg.create();
+    entt::entity c = reg.create();
+    entt::entity unrelated = reg.create();
+
+    auto& ha = reg.emplace<Hierarchy::Component>(a);
+    auto& hb = reg.emplace<Hierarchy::Component>(b);
+    auto& hc = reg.emplace<Hierarchy::Component>(c);
+    reg.emplace<Hierarchy::Component>(unrelated);
+
+    // Corrupt: A -> B -> C -> A (parent cycle)
+    ha.Parent = c;
+    hb.Parent = a;
+    hc.Parent = b;
+
+    // Query: is 'unrelated' a descendant of 'a'?
+    // Walk from 'unrelated' upward: unrelated.Parent = null → terminates immediately.
+    EXPECT_FALSE(Hierarchy::Structure::IsDescendant(reg, a, unrelated));
+
+    // The critical test: is 'unrelated' an ancestor of 'b'?
+    // Walk from 'b' upward: b→a→c→b→a→c→... (infinite cycle).
+    // Never matches 'unrelated'. Must terminate via bounded walk, returning false.
+    EXPECT_FALSE(Hierarchy::Structure::IsDescendant(reg, unrelated, b));
+    EXPECT_FALSE(Hierarchy::Structure::IsDescendant(reg, unrelated, a));
+    EXPECT_FALSE(Hierarchy::Structure::IsDescendant(reg, unrelated, c));
+}
+
+TEST(HierarchyStructure, ValidateInvariants_DetectsCorruptedChildCount)
+{
+    Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    entt::entity parent = scene.CreateEntity("Parent");
+    entt::entity child = scene.CreateEntity("Child");
+
+    Hierarchy::Attach(reg, child, parent);
+
+    // Corrupt the ChildCount
+    auto& parentHier = reg.get<Hierarchy::Component>(parent);
+    parentHier.ChildCount = 5; // wrong — should be 1
+
+    EXPECT_FALSE(Hierarchy::Structure::ValidateInvariants(reg, parent));
+}
+
 TEST(HierarchyStructure, StressTest_WideTree)
 {
     Scene scene;

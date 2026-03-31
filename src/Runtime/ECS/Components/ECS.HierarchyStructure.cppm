@@ -10,8 +10,12 @@ import :Components.Hierarchy;
 
 export namespace ECS::Components::Hierarchy::Structure
 {
+    /// Maximum ancestor-walk depth before declaring corruption and bailing out.
+    /// 65536 is generous for any real scene (skeletal chains rarely exceed 200).
+    inline constexpr uint32_t kMaxAncestryDepth = 65536;
+
     /// Returns true if 'entity' is an ancestor of 'potentialDescendant'.
-    /// Walk-up bounded by tree depth to prevent infinite loops on corrupted data.
+    /// Walk-up bounded by kMaxAncestryDepth to prevent infinite loops on corrupted data.
     [[nodiscard]] bool IsDescendant(entt::registry& registry, entt::entity entity,
                                     entt::entity potentialDescendant);
 
