@@ -1,45 +1,20 @@
 module;
 
-#include <array>
-#include <algorithm>
 #include <limits>
-#include <iterator>
-#include <utility>
 #include <cstdint>
 #include <span>
-#include <cmath>
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
 
 export module Geometry.Octree;
 
-import Utils.BoundedHeap;
 import Geometry.Properties;
 import Geometry.AABB;
 import Geometry.Primitives;
-import Geometry.Containment;
-import Geometry.Overlap;
-import Geometry.Support;
 
 export namespace Geometry
 {
-    template <typename Shape>
-    concept SpatialQueryShape =
-        requires(const Shape& s, const AABB& box)
-        {
-            { TestOverlap(box, s) } -> std::convertible_to<bool>;
-        };
-
-    template <typename Shape>
-    concept VolumetricSpatialQueryShape =
-        SpatialQueryShape<Shape> &&
-        requires(const Shape& s, const AABB& box)
-        {
-            { Contains(s, box) } -> std::convertible_to<bool>;
-            { Volume(s) } -> std::convertible_to<double>;
-        };
-
     class Octree
     {
     public:
@@ -130,213 +105,22 @@ export namespace Geometry
             return m_ElementIndices;
         }
 
-        /// @brief Build the octree from a span of AABBs.
-        /// @return true if build succeeded, false if input was empty or invalid.
-        [[nodiscard]] bool Build(std::span<const AABB> aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
-                                 const std::size_t maxDepth)
-        {
-            ElementAabbs.assign(aabbs.begin(), aabbs.end());
-            return BuildFromOwned(policy, maxPerNode, maxDepth);
-        }
-
-        /// @brief Build the octree by taking ownership of the AABB storage.
-        /// @return true if build succeeded, false if input was empty or invalid.
-        [[nodiscard]] bool Build(std::vector<AABB>&& aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
-                                 const std::size_t maxDepth)
-        {
-            ElementAabbs = std::move(aabbs);
-            return BuildFromOwned(policy, maxPerNode, maxDepth);
-        }
-
-        /// @brief Build the octree from a point set by lifting each point to a
-        ///        zero-volume AABB.
-        /// @return true if build succeeded, false if input was empty or invalid.
+        [[nodiscard]] bool Build(std::span<const AABB> aabbs, const SplitPolicy& policy, std::size_t maxPerNode,
+                                 std::size_t maxDepth);
+        [[nodiscard]] bool Build(std::vector<AABB>&& aabbs, const SplitPolicy& policy, std::size_t maxPerNode,
+                                 std::size_t maxDepth);
         [[nodiscard]] bool BuildFromPoints(std::span<const glm::vec3> points, const SplitPolicy& policy,
-                                           const std::size_t maxPerNode, const std::size_t maxDepth)
-        {
-            std::vector<AABB> pointAabbs;
-            pointAabbs.reserve(points.size());
-            for (const glm::vec3& p : points)
-            {
-                pointAabbs.push_back(AABB{.Min = p, .Max = p});
-            }
-            return Build(std::move(pointAabbs), policy, maxPerNode, maxDepth);
-        }
+                                           std::size_t maxPerNode, std::size_t maxDepth);
 
-        void QueryRay(const Ray& queryShape, std::vector<size_t>& out) const
-        {
-            Query<Ray>(queryShape, out);
-        }
-
-        void QueryAABB(const AABB& queryShape, std::vector<size_t>& out) const
-        {
-            Query<AABB>(queryShape, out);
-        }
-
-        void QuerySphere(const Sphere& queryShape, std::vector<size_t>& out) const
-        {
-            Query<Sphere>(queryShape, out);
-        }
-
-        template <VolumetricSpatialQueryShape Shape>
-        void Query(const Shape& queryShape, std::vector<size_t>& out) const
-        {
-            out.clear();
-            if (m_Nodes.empty())
-            {
-                return;
-            }
-
-            const auto& nodeData = m_Nodes;
-            const Node* nodePtr = nodeData.data(); // Raw pointer for speed
-
-            constexpr double eps = 0.0; // set to a small positive tolerance if you want numerical slack
-            const auto queryVolume = static_cast<double>(Volume(queryShape));
-
-            // Use a small local stack to avoid heap allocation for the stack itself if possible,
-            // though std::vector is fine given the depth is low (10).
-            // Optimization: Use a fixed array stack since MaxDepth is known/limited.
-            alignas(64) std::array<NodeIndex, 128> stack{};
-            // Depth 10 * 8 children < 64? No, but stack depth is roughly depth*7 in worst case?
-            // Actually for DFS, stack size is proportional to Depth. 64 is plenty for depth 10.
-            int stackTop = 0;
-            stack[stackTop++] = 0; // Push Root (Index 0)
-
-            while (stackTop > 0)
-            {
-                const size_t nodeIdx = stack[--stackTop];
-                const Node& node = nodePtr[nodeIdx];
-
-                if (!TestOverlap(node.Aabb, queryShape)) continue;
-
-                const double nodeVolume = node.Aabb.GetVolume();
-                const double strictlyLarger = (queryVolume > nodeVolume + eps);
-
-                if (strictlyLarger && Contains(queryShape, node.Aabb))
-                {
-                    // Optimization: Batch copy
-                    const size_t end = node.FirstElement + node.NumElements;
-                    for (size_t i = node.FirstElement; i < end; ++i)
-                    {
-                        out.push_back(m_ElementIndices[i]);
-                    }
-                    continue;
-                }
-
-                // Process Elements (Leaf or Straddlers)
-                size_t elemEnd = node.FirstElement + (node.IsLeaf ? node.NumElements : node.NumStraddlers);
-                for (size_t i = node.FirstElement; i < elemEnd; ++i)
-                {
-                    size_t ei = m_ElementIndices[i];
-                    if (TestOverlap(ElementAabbs[ei], queryShape))
-                    {
-                        out.push_back(ei);
-                    }
-                }
-
-                if (!node.IsLeaf && node.BaseChildIndex != kInvalidIndex)
-                {
-                    uint32_t childOffset = 0;
-                    for (int i = 0; i < 8; ++i)
-                    {
-                        // Check if the i-th octant exists
-                        if (node.ChildExists(i))
-                        {
-                            // Calculate absolute index in m_Nodes
-                            const NodeIndex childIndex = node.BaseChildIndex + childOffset;
-
-                            // Optimization: Check child AABB before pushing to stack
-                            if (TestOverlap(nodePtr[childIndex].Aabb, queryShape))
-                            {
-                                stack[stackTop++] = childIndex;
-                            }
-
-                            // Move to the next existing child in the contiguous block
-                            childOffset++;
-                        }
-                    }
-                }
-            }
-        }
-
-        template <SpatialQueryShape Shape>
-        void Query(const Shape& queryShape, std::vector<size_t>& out) const
-            requires (!VolumetricSpatialQueryShape<Shape>)
-        {
-            out.clear();
-            if (m_Nodes.empty()) return;
-
-            const Node* nodePtr = m_Nodes.data();
-
-            // OPTIMIZATION: Use std::array stack here too for performance consistency
-            alignas(64) std::array<NodeIndex, 128> stack{};
-            int stackTop = 0;
-            stack[stackTop++] = 0;
-
-            while (stackTop > 0)
-            {
-                const NodeIndex nodeIdx = stack[--stackTop];
-                const Node& node = nodePtr[nodeIdx];
-
-                if (!TestOverlap(node.Aabb, queryShape)) continue;
-
-                if (node.IsLeaf)
-                {
-                    for (size_t i = 0; i < node.NumElements; ++i)
-                    {
-                        std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        if (TestOverlap(ElementAabbs[ei], queryShape))
-                        {
-                            out.push_back(ei);
-                        }
-                    }
-                }
-                else
-                {
-                    for (size_t i = 0; i < node.NumStraddlers; ++i)
-                    {
-                        std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        if (TestOverlap(ElementAabbs[ei], queryShape))
-                        {
-                            out.push_back(ei);
-                        }
-                    }
-
-                    if (node.BaseChildIndex != kInvalidIndex)
-                    {
-                        uint32_t childOffset = 0;
-                        for (int i = 0; i < 8; ++i)
-                        {
-                            // Check if the i-th octant exists
-                            if (node.ChildExists(i))
-                            {
-                                // Calculate absolute index in m_Nodes
-                                const NodeIndex childIndex = node.BaseChildIndex + childOffset;
-
-                                // Optimization: Check child AABB before pushing to stack
-                                if (childIndex != kInvalidIndex && TestOverlap(nodePtr[childIndex].Aabb, queryShape))
-                                {
-                                    stack[stackTop++] = childIndex;
-                                }
-
-                                // Move to the next existing child in the contiguous block
-                                childOffset++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        void QueryRay(const Ray& queryShape, std::vector<size_t>& out) const;
+        void QueryAABB(const AABB& queryShape, std::vector<size_t>& out) const;
+        void QuerySphere(const Sphere& queryShape, std::vector<size_t>& out) const;
 
         void QueryKNN(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const;
 
         void QueryNearest(const glm::vec3& queryPoint, std::size_t& out) const;
 
-        [[nodiscard]] bool ValidateStructure() const
-        {
-            if (NodeProperties.Empty()) return m_ElementIndices.empty();
-            return ValidateNode(0);
-        }
+        [[nodiscard]] bool ValidateStructure() const;
 
     private:
         [[nodiscard]] bool BuildFromOwned(const SplitPolicy& policy, const std::size_t maxPerNode,
@@ -344,12 +128,7 @@ export namespace Geometry
 
         [[nodiscard]] bool ValidateNode(NodeIndex nodeIdx) const;
 
-        NodeIndex CreateNode()
-        {
-            const auto idx = static_cast<NodeIndex>(m_Nodes.size());
-            m_Nodes.emplace_back();
-            return idx;
-        }
+        NodeIndex CreateNode();
 
         void SubdivideVolume(const NodeIndex nodeIdx, std::size_t depth, std::vector<size_t>& scratch);
 
