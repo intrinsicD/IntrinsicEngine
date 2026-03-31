@@ -21,15 +21,15 @@ namespace Runtime
         Core::Telemetry::TelemetrySystem::Get().SetGpuMemoryBudgets(memSnap);
 
         // Fire once-per-transition warnings when a heap crosses the configured threshold.
-        // Baseline is 80%; feature toggles can raise/lower this.
-        double warningThreshold = 0.80;
-        if (m_Features.IsEnabled(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold70))
+        // Baseline is 80%; feature toggles select alternate presets.
+        const auto thresholdConfig = Runtime::SystemFeatureCatalog::ResolveGpuMemoryWarningThreshold(m_Features);
+        const double warningThreshold = thresholdConfig.ThresholdFraction;
+        if (!m_LoggedGpuMemoryThresholdConflict && thresholdConfig.EnabledPresetCount > 1u)
         {
-            warningThreshold = 0.70;
-        }
-        if (m_Features.IsEnabled(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold90))
-        {
-            warningThreshold = 0.90;
+            Core::Log::Warn(
+                "Multiple GPU memory warning threshold presets are enabled; using {:.0f}% by precedence.",
+                warningThreshold * 100.0);
+            m_LoggedGpuMemoryThresholdConflict = true;
         }
 
         for (uint32_t i = 0; i < memSnap.HeapCount && i < kMaxHeaps; ++i)
