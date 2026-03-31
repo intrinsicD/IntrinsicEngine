@@ -17,7 +17,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - Selection, post, and debug visualization decoupled from a single lighting path.
 - Only recipe-required intermediate resources allocated per frame.
 - Migration hardened by graph compile tests, contract tests, and at least one integration test.
-- Depth prepass available for both forward and deferred paths. ✓
 - At least one shadow-casting light type with validated resource contracts.
 - All implemented geometry operators reachable from the editor UI.
 - Undo/redo wired to transform, inspector, and geometry operator actions.
@@ -50,14 +49,12 @@ These close critical gaps in the rendering pipeline that block or de-risk later 
 **Dependency graph:**
 
 ```
-A1 (Depth Prepass) ✓ ──→ A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
-                     └─→ future SSAO (see P2 C6)
-                     └─→ future HiZ (see P2 C4)
+A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
 ```
 
 #### A2. Cascaded Shadow Maps (CSM)
 
-Shadow mapping is the single largest visual fidelity gap. CSM for the directional light is the minimal viable target. **Depends on A1** (reuses depth-only pipeline pattern and resource contracts).
+Shadow mapping is the single largest visual fidelity gap. CSM for the directional light is the minimal viable target.
 
 Split into two sub-phases to keep commits reviewable:
 
@@ -74,40 +71,6 @@ Split into two sub-phases to keep commits reviewable:
 - [ ] Add PCF sampling in forward `surface.frag` and deferred `deferred_lighting.frag`.
 - [ ] Stabilized cascade frusta (texel snapping to reduce shimmer).
 - [ ] Update `rendering-three-pass.md` pass contract table with `ShadowPass`.
-
-### C. Compile-Time Hotspot Refactors (Build Throughput)
-
-Target the currently observed worst compile edges (`build/ci/.ninja_log`) and reduce full rebuild latency by shrinking module import closures and exported surface area.
-
-- [x] **C1 — `Geometry.Octree.cppm` split (≈91.9s edge)**
-  - [x] Create `Geometry.Octree` as a thin API partition (types + non-template signatures only).
-  - [x] Move query/build internals into `Geometry.Octree.Impl` (`.cpp`) and keep only minimal exported wrappers.
-  - [x] Factor `Geometry.SpatialQueries` module shared by Octree/KDTree/BVH: unified `SpatialQueryShape` concept and shared result types (`SpatialBuildResult`, `SpatialKNNResult`, `SpatialRadiusResult`).
-  - [x] Add CI-tracked compile-edge reduction benchmark.
-
-- [x] **C2 — `ECS.Systems.Transform.cpp` import-closure reduction (≈90.9s edge)**
-  - [x] Introduce a slim `ECS.TransformGraphContracts` module for pass registration contracts; keep EnTT-heavy traversal in impl partition only.
-  - [x] Split hierarchy walk into `ECS.HierarchyTraversal` utility with non-exported implementation to decouple from system registration TU.
-  - [x] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
-  - [x] Add `ECS.ComponentForwardDecls` partition so `ECS.TransformGraphContracts` no longer imports full Transform/Hierarchy component modules.
-  - [x] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
-
-- [x] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**
-  - [x] Split SDF interface/implementation so importers parse declarations only while heavy math lives in `Geometry.SDF.cpp`.
-  - [x] Keep heavy GLM/algorithm code out of exported interface by confining bodies/factory logic to impl.
-  - [x] Add explicit degenerate-shape guards ($\|b-a\|^2 < \varepsilon$ for capsules/segments, zero radii clamps) and unit tests.
-  - [x] Add compile/perf telemetry marker pair for SDF evaluation paths (CPU and compute-stub marker for future queue path).
-
-- [x] **C5 — `ECS.Scene.cpp` constructor path decoupling (≈81.4s edge)**
-  - [x] Move entity default-component wiring into `ECS.SceneBootstrap` impl partition.
-  - [x] `Scene.cpp` now imports narrow `SceneBootstrap` instead of broad `Components` bundle.
-  - [x] Add tests for deterministic entity bootstrap invariants.
-
-- [x] **C6 — `ECS.Components.Hierarchy.cpp` algorithm split (≈79.0s edge)**
-  - [x] Separate structural mutations (`HierarchyStructure` partition: `AttachToParent`, `DetachFromParent`, `IsDescendant`) from transform propagation math.
-  - [x] Introduce cycle/degenerate checks with clear invariants (`Parent != self`, acyclic ancestry, `ChildCount` consistency) and bounded-cost `ValidateInvariants`. Walk depth bounded by exported `kMaxAncestryDepth`.
-  - [x] `Hierarchy.cpp` is now a thin composition layer; structural ops have no Transform import.
-  - [x] Add stress tests: wide tree (500 children), deep chain (100 entities), corrupted cycle termination, corrupted ChildCount detection.
 
 ### B. Frame Pipeline Hardening (O2 ADR Continuation)
 
@@ -290,11 +253,9 @@ Begin alongside A1 for fast shader iteration during rendering mode and shadow de
 - [ ] Scope: graphics pipelines only (compute hot-reload can follow later).
 - [ ] Update ROADMAP "Ongoing" section to cross-reference this item.
 
-#### E2. GPU Memory Budget Tracking ✓
+#### E2. GPU Memory Budget Warning Configuration
 
-GPU memory budget tracking is implemented. Per-heap usage/budget is queried once per frame via VMA (`vmaGetHeapBudgets`), published to `Core::Telemetry`, and displayed in the Performance panel. Warning fires once per heap per transition at 80% threshold.
-
-Remaining: make the 80% warning threshold configurable via `FeatureRegistry` (currently hardcoded).
+- [ ] Make the 80% GPU memory warning threshold configurable via `FeatureRegistry` (currently hardcoded).
 
 ### F. UI Architecture & Feature Wiring
 
