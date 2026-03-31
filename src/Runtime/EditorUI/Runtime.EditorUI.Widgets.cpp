@@ -37,6 +37,7 @@ import Graphics.Geometry;
 import Graphics.OctreeDebugDraw;
 import Graphics.PropertyEnumerator;
 import Graphics.VisualizationConfig;
+import Graphics.OverlayEntityFactory;
 
 import Geometry.MeshUtils;
 import Geometry.Octree;
@@ -967,23 +968,19 @@ bool VectorFieldWidget(Graphics::VisualizationConfig& config,
             ImGui::SameLine();
             if (ImGui::SmallButton("X"))
             {
-                if (vf.ChildEntity != entt::null && registry && registry->valid(vf.ChildEntity))
-                    registry->destroy(vf.ChildEntity);
+                if (registry)
+                    Graphics::OverlayEntityFactory::DestroyOverlay(*registry, vf.ChildEntity);
                 config.VectorFields.erase(config.VectorFields.begin() + static_cast<ptrdiff_t>(i));
                 changed = true;
                 ImGui::PopID();
                 continue;
             }
 
+            // Domain is fixed at creation time and shown as read-only label.
+            // Changing the domain would invalidate PropertySet references.
             static constexpr const char* kDomainNames[] = {"Vertex", "Edge", "Face"};
-            int domainIdx = static_cast<int>(vf.Domain);
-            if (domainIdx < 0 || domainIdx > 2)
-                domainIdx = 0;
-            if (ImGui::Combo("Domain", &domainIdx, kDomainNames, 3))
-            {
-                vf.Domain = static_cast<Graphics::VectorFieldDomain>(domainIdx);
-                changed = true;
-            }
+            const auto domainIdx = static_cast<size_t>(vf.Domain);
+            ImGui::TextDisabled("Domain: %s", domainIdx < std::size(kDomainNames) ? kDomainNames[domainIdx] : "?");
 
             auto* props = domainProps(vf.Domain);
             const auto vectorProps = domainVecProps(props);
