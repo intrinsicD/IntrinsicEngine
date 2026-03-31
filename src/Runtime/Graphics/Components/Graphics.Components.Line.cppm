@@ -18,6 +18,14 @@ import Geometry.Handle;
 
 export namespace ECS::Line
 {
+    /// Identifies which data authority populated this Line::Component.
+    /// Set by lifecycle systems; used by picking and property extraction.
+    enum class Domain : uint8_t
+    {
+        MeshEdge,       ///< Derived from Mesh::Data via MeshEdgeView.
+        GraphEdge,      ///< Derived from Graph::Data via GraphLifecycle.
+    };
+
     struct Component
     {
         Component() noexcept
@@ -71,5 +79,9 @@ export namespace ECS::Line
         // When empty, LinePass uses uniform Color.
         // For graph entities, edge colors come from Graph::Data::CachedEdgeColors.
         std::vector<uint32_t> CachedEdgeColors;
+
+        // ---- Domain Hint ----
+        // Set by the lifecycle system that populated this component.
+        Domain SourceDomain = Domain::MeshEdge;
     };
 }

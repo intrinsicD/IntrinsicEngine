@@ -425,6 +425,7 @@ namespace Runtime::PointCloudKMeans
             reg.emplace_or_replace<ECS::Components::Transform::WorldMatrix>(centroidEntity);
             reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(centroidEntity);
             reg.emplace_or_replace<ECS::Components::Hierarchy::Component>(centroidEntity);
+            reg.emplace_or_replace<ECS::DataAuthority::PointCloudTag>(centroidEntity);
             reg.emplace_or_replace<ECS::PointCloud::Data>(centroidEntity);
             ECS::Components::Hierarchy::Attach(reg, centroidEntity, sourceEntity);
             SetCentroidEntity(target, centroidEntity);

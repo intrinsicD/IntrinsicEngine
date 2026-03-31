@@ -40,6 +40,10 @@ namespace Graphics::Systems::MeshRendererLifecycle
 
         for (auto [entity, mr, world] : view.each())
         {
+            // Ensure DataAuthority tag is present for mesh entities.
+            if (!registry.all_of<ECS::DataAuthority::MeshTag>(entity))
+                registry.emplace<ECS::DataAuthority::MeshTag>(entity);
+
             // Allocate slot for newly-added components.
             if (mr.GpuSlot == ECS::kInvalidGpuSlot)
             {

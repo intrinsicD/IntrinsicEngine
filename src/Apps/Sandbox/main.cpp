@@ -1247,6 +1247,7 @@ private:
         auto& scene = GetSceneManager().GetScene();
         entt::entity entity = scene.CreateEntity("Demo Point Cloud");
 
+        scene.GetRegistry().emplace<ECS::DataAuthority::PointCloudTag>(entity);
         auto& pcd = scene.GetRegistry().emplace<ECS::PointCloud::Data>(entity);
         pcd.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(std::move(cloud));
         pcd.GpuDirty = true;

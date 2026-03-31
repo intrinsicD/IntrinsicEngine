@@ -146,6 +146,10 @@ namespace Graphics::Systems::PointCloudLifecycle
                 registry, entity, gpuScene, geometryStorage,
                 pcData.GpuSlot, pcData.GpuGeometry);
 
+            // Ensure DataAuthority tag is present.
+            if (!registry.all_of<ECS::DataAuthority::PointCloudTag>(entity))
+                registry.emplace<ECS::DataAuthority::PointCloudTag>(entity);
+
             // -----------------------------------------------------------------
             // Phase 3: Populate Point::Component from PointCloud::Data.
             // -----------------------------------------------------------------
@@ -160,6 +164,7 @@ namespace Graphics::Systems::PointCloudLifecycle
                     pt.HasPerPointColors  = !pcData.CachedColors.empty();
                     pt.HasPerPointRadii   = pcData.HasRadii();
                     pt.HasPerPointNormals = pcData.HasRenderableNormals();
+                    pt.SourceDomain       = ECS::Point::Domain::CloudPoint;
                 });
         }
     }

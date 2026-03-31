@@ -147,6 +147,10 @@ void VectorFieldManager::SyncVectorFields(
             }
         }
 
+        // Ensure DataAuthority tag is present on the child entity.
+        if (!registry.all_of<ECS::DataAuthority::GraphTag>(entry.ChildEntity))
+            registry.emplace<ECS::DataAuthority::GraphTag>(entry.ChildEntity);
+
         // Set up Graph::Data on the child entity.
         auto& graphData = registry.get_or_emplace<ECS::Graph::Data>(entry.ChildEntity);
         graphData.GraphRef = std::move(graph);

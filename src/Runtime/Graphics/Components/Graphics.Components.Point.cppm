@@ -7,6 +7,7 @@
 // (FlatDisc, Surfel, EWA, Sphere).
 
 module;
+#include <cstdint>
 #include <glm/glm.hpp>
 
 export module Graphics.Components.Point;
@@ -16,6 +17,16 @@ import Geometry.PointCloudUtils;
 
 export namespace ECS::Point
 {
+    /// Identifies which data authority populated this Point::Component.
+    /// Set by lifecycle systems; used by picking and property extraction
+    /// to avoid probing multiple Data types at runtime.
+    enum class Domain : uint8_t
+    {
+        MeshVertex,     ///< Derived from Mesh::Data via MeshVertexView.
+        GraphNode,      ///< Derived from Graph::Data via GraphLifecycle.
+        CloudPoint,     ///< Derived from PointCloud::Data via PointCloudLifecycle.
+    };
+
     struct Component
     {
         // ---- Geometry Handle ----
@@ -36,5 +47,10 @@ export namespace ECS::Point
         bool HasPerPointColors  = false;
         bool HasPerPointRadii   = false;
         bool HasPerPointNormals = false;  // Required for Surfel mode
+
+        // ---- Domain Hint ----
+        // Set by the lifecycle system that populated this component.
+        // Eliminates need to probe Data authority types at query time.
+        Domain SourceDomain = Domain::CloudPoint;
     };
 }

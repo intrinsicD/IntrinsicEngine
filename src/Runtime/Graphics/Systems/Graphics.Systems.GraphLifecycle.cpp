@@ -281,6 +281,10 @@ namespace Graphics::Systems::GraphLifecycle
             // -----------------------------------------------------------------
             const bool gpuValid = graphData.GpuGeometry.IsValid();
 
+            // Ensure DataAuthority tag is present.
+            if (!registry.all_of<ECS::DataAuthority::GraphTag>(entity))
+                registry.emplace<ECS::DataAuthority::GraphTag>(entity);
+
             PopulateOrRemovePassComponent<ECS::Line::Component>(
                 registry, entity, graphData.Visible, gpuValid,
                 [&](ECS::Line::Component& line) {
@@ -291,6 +295,7 @@ namespace Graphics::Systems::GraphLifecycle
                     line.Width            = graphData.EdgeWidth;
                     line.Overlay          = graphData.EdgesOverlay;
                     line.HasPerEdgeColors = !graphData.CachedEdgeColors.empty();
+                    line.SourceDomain     = ECS::Line::Domain::GraphEdge;
                 });
 
             PopulateOrRemovePassComponent<ECS::Point::Component>(
@@ -303,6 +308,7 @@ namespace Graphics::Systems::GraphLifecycle
                     pt.Mode              = graphData.NodeRenderMode;
                     pt.HasPerPointColors = !graphData.CachedNodeColors.empty();
                     pt.HasPerPointRadii  = !graphData.CachedNodeRadii.empty();
+                    pt.SourceDomain      = ECS::Point::Domain::GraphNode;
                 });
         }
     }

@@ -1,4 +1,5 @@
 module;
+#include <cassert>
 #include <string>
 #include <cstdint>
 #include <type_traits>
@@ -154,6 +155,7 @@ namespace Runtime
 
                 if (geo && geo->GetTopology() == Graphics::PrimitiveTopology::Points)
                 {
+                    m_Scene.GetRegistry().emplace<ECS::DataAuthority::PointCloudTag>(targetEntity);
                     auto& pcd = m_Scene.GetRegistry().emplace<ECS::PointCloud::Data>(targetEntity);
                     pcd.GpuGeometry = handle;
                     pcd.GpuDirty = false; // Already uploaded by ModelLoader.
@@ -163,6 +165,7 @@ namespace Runtime
                 }
                 else
                 {
+                    m_Scene.GetRegistry().emplace<ECS::DataAuthority::MeshTag>(targetEntity);
                     auto& sc = m_Scene.GetRegistry().emplace<ECS::Surface::Component>(targetEntity);
                     sc.Geometry = handle;
                     sc.Material = materialHandle;
