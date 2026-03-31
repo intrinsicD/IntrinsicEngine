@@ -53,6 +53,14 @@ jobs:
       - name: Build
         run: cmake --build build
 
+      - name: Compile hotspot benchmark gate
+        run: |
+          python3 ./tools/compile_hotspots.py \
+            --build-dir build \
+            --top 40 \
+            --json-out build/compile_hotspots_report.json \
+            --baseline-json tools/compile_hotspot_baseline.json
+
       - name: Test
         run: ctest --test-dir build --output-on-failure
 

@@ -83,14 +83,14 @@ Target the currently observed worst compile edges (`build/ci/.ninja_log`) and re
   - [x] Create `Geometry.Octree` as a thin API partition (types + non-template signatures only).
   - [x] Move query/build internals into `Geometry.Octree.Impl` (`.cpp`) and keep only minimal exported wrappers.
   - [x] Factor `Geometry.SpatialQueries` module shared by Octree/KDTree/BVH: unified `SpatialQueryShape` concept and shared result types (`SpatialBuildResult`, `SpatialKNNResult`, `SpatialRadiusResult`).
-  - [ ] Add CI-tracked compile-edge reduction benchmark.
+  - [x] Add CI-tracked compile-edge reduction benchmark.
 
-- [ ] **C2 — `ECS.Systems.Transform.cpp` import-closure reduction (≈90.9s edge)**
+- [x] **C2 — `ECS.Systems.Transform.cpp` import-closure reduction (≈90.9s edge)**
   - [x] Introduce a slim `ECS.TransformGraphContracts` module for pass registration contracts; keep EnTT-heavy traversal in impl partition only.
   - [x] Split hierarchy walk into `ECS.HierarchyTraversal` utility with non-exported implementation to decouple from system registration TU.
   - [x] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
   - [x] Add `ECS.ComponentForwardDecls` partition so `ECS.TransformGraphContracts` no longer imports full Transform/Hierarchy component modules.
-  - [ ] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
+  - [x] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
 
 - [x] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**
   - [x] Split SDF interface/implementation so importers parse declarations only while heavy math lives in `Geometry.SDF.cpp`.
