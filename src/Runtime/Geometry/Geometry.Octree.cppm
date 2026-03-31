@@ -12,6 +12,7 @@ export module Geometry.Octree;
 import Geometry.Properties;
 import Geometry.AABB;
 import Geometry.Primitives;
+import Geometry.SpatialQueries;
 
 export namespace Geometry
 {

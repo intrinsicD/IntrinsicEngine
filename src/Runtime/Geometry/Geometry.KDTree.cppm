@@ -15,16 +15,10 @@ import Geometry.AABB;
 import Geometry.Primitives;
 import Geometry.Containment;
 import Geometry.Overlap;
+import Geometry.SpatialQueries;
 
 export namespace Geometry
 {
-    template <typename Shape>
-    concept SpatialQueryShape =
-        requires(const Shape& s, const AABB& box)
-        {
-            { TestOverlap(box, s) } -> std::convertible_to<bool>;
-        };
-
     struct KDTreeBuildParams
     {
         std::uint32_t LeafSize{16};
@@ -32,27 +26,9 @@ export namespace Geometry
         float MinSplitExtent{1.0e-12f};
     };
 
-    struct KDTreeBuildResult
-    {
-        std::size_t ElementCount{0};
-        std::size_t NodeCount{0};
-        std::uint32_t MaxDepthReached{0};
-    };
-
-    struct KDTreeKNNResult
-    {
-        std::size_t ReturnedCount{0};
-        std::size_t VisitedNodes{0};
-        std::size_t DistanceEvaluations{0};
-        float MaxDistanceSquared{0.0f};
-    };
-
-    struct KDTreeRadiusResult
-    {
-        std::size_t ReturnedCount{0};
-        std::size_t VisitedNodes{0};
-        std::size_t DistanceEvaluations{0};
-    };
+    using KDTreeBuildResult = SpatialBuildResult;
+    using KDTreeKNNResult = SpatialKNNResult;
+    using KDTreeRadiusResult = SpatialRadiusResult;
 
     class KDTree
     {
