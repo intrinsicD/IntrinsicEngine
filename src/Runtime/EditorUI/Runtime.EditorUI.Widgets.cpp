@@ -1796,7 +1796,7 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
 
     bool changed = false;
     const auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
-    const auto* meshData = reg.try_get<ECS::Mesh>(entity);
+    const auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
     const std::size_t inputFaceCount = (meshData && meshData->MeshRef) ? meshData->MeshRef->FaceCount() : 0u;
 
     std::size_t requestedFaces = inputFaceCount;
