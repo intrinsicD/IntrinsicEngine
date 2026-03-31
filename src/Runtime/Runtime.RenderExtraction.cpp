@@ -124,10 +124,6 @@ namespace Runtime
 
             for (auto [entity, transform, line] : view.each())
             {
-                // Only graph entities emit line picking packets.
-                // Mesh wireframe edges are not independently pickable as lines.
-                if (line.SourceDomain != ECS::Line::Domain::GraphEdge)
-                    continue;
                 if (!line.Geometry.IsValid() || !line.EdgeView.IsValid() || line.EdgeCount == 0u)
                     continue;
 
@@ -156,10 +152,6 @@ namespace Runtime
 
             for (auto [entity, transform, point] : view.each())
             {
-                // Only standalone point cloud entities emit point picking packets.
-                // Mesh vertex dots and graph nodes are picked through their parent domain.
-                if (point.SourceDomain != ECS::Point::Domain::CloudPoint)
-                    continue;
                 if (!point.Geometry.IsValid())
                     continue;
 
@@ -198,16 +190,14 @@ namespace Runtime
 
                 if (const auto* line = registry.try_get<ECS::Line::Component>(entity))
                 {
-                    return line->SourceDomain == ECS::Line::Domain::GraphEdge &&
-                           line->Geometry.IsValid() &&
+                    return line->Geometry.IsValid() &&
                            line->EdgeView.IsValid() &&
                            line->EdgeCount > 0u;
                 }
 
                 if (const auto* point = registry.try_get<ECS::Point::Component>(entity))
                 {
-                    return point->SourceDomain == ECS::Point::Domain::CloudPoint &&
-                           point->Geometry.IsValid();
+                    return point->Geometry.IsValid();
                 }
 
                 return false;

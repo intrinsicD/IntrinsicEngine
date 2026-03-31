@@ -544,6 +544,7 @@ TEST(SelectionOutline, HierarchySelectionResolvesRenderableChildPickIds)
     const entt::entity root = scene.CreateEntity("Root");
     const entt::entity childMesh = scene.CreateEntity("ChildMesh");
     const entt::entity childVectorField = scene.CreateEntity("ChildVectorField");
+    const entt::entity childSpherePoints = scene.CreateEntity("ChildSpherePoints");
 
     reg.emplace<ECS::Components::Selection::SelectedTag>(root);
     reg.emplace<ECS::Components::Selection::HoveredTag>(root);
@@ -562,14 +563,22 @@ TEST(SelectionOutline, HierarchySelectionResolvesRenderableChildPickIds)
     reg.emplace<ECS::Components::Selection::PickID>(childVectorField, 1001u);
     ECS::Components::Hierarchy::Attach(reg, childVectorField, root);
 
+    auto& point = reg.emplace<ECS::Point::Component>(childSpherePoints);
+    point.SourceDomain = ECS::Point::Domain::MeshVertex;
+    point.Geometry = Geometry::GeometryHandle{4u, 1u};
+    point.Mode = Geometry::PointCloud::RenderMode::Sphere;
+    reg.emplace<ECS::Components::Selection::PickID>(childSpherePoints, 1002u);
+    ECS::Components::Hierarchy::Attach(reg, childSpherePoints, root);
+
     uint32_t selectedIds[Graphics::Passes::SelectionOutlinePass::kMaxSelectedIds] = {};
     const uint32_t count = Graphics::Passes::AppendOutlineRenderablePickIds(reg, root, selectedIds);
 
-    ASSERT_EQ(count, 2u);
+    ASSERT_EQ(count, 3u);
     EXPECT_EQ(selectedIds[0], 42u);
     EXPECT_EQ(selectedIds[1], 1001u);
+    EXPECT_EQ(selectedIds[2], 1002u);
     const uint32_t resolved = Graphics::Passes::ResolveOutlineRenderablePickId(reg, root);
-    EXPECT_TRUE(resolved == 42u || resolved == 1001u);
+    EXPECT_TRUE(resolved == 42u || resolved == 1001u || resolved == 1002u);
 }
 
 TEST(SelectionOutline, DebugStateDefaultsToSafeValues)

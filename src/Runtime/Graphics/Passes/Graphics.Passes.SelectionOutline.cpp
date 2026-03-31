@@ -89,16 +89,14 @@ namespace Graphics::Passes
 
             if (const auto* line = registry.try_get<ECS::Line::Component>(entity))
             {
-                return line->SourceDomain == ECS::Line::Domain::GraphEdge &&
-                       line->Geometry.IsValid() &&
+                return line->Geometry.IsValid() &&
                        line->EdgeView.IsValid() &&
                        line->EdgeCount > 0u;
             }
 
             if (const auto* point = registry.try_get<ECS::Point::Component>(entity))
             {
-                return point->SourceDomain == ECS::Point::Domain::CloudPoint &&
-                       point->Geometry.IsValid();
+                return point->Geometry.IsValid();
             }
 
             return false;
