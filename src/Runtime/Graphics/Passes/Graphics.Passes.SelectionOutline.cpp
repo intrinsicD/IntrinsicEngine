@@ -81,8 +81,25 @@ namespace Graphics::Passes
 
         [[nodiscard]] bool CanEmitOutlinePickId(const entt::registry& registry, entt::entity entity)
         {
-            return registry.valid(entity) &&
-                   registry.all_of<ECS::Surface::Component, ECS::Components::Selection::PickID>(entity);
+            if (!registry.valid(entity) || !registry.all_of<ECS::Components::Selection::PickID>(entity))
+                return false;
+
+            if (const auto* surface = registry.try_get<ECS::Surface::Component>(entity))
+                return surface->Geometry.IsValid();
+
+            if (const auto* line = registry.try_get<ECS::Line::Component>(entity))
+            {
+                return line->Geometry.IsValid() &&
+                       line->EdgeView.IsValid() &&
+                       line->EdgeCount > 0u;
+            }
+
+            if (const auto* point = registry.try_get<ECS::Point::Component>(entity))
+            {
+                return point->Geometry.IsValid();
+            }
+
+            return false;
         }
     }
 

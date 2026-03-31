@@ -1167,3 +1167,53 @@ TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_ClearsResolvedGpuP
     Runtime::FrameContext& slot1_post = ring.BeginFrame(3u, vp);
     EXPECT_FALSE(slot1_post.ResolvedGpuProfile.has_value());
 }
+
+TEST(RenderExtraction, ExtractRenderWorld_SelectionOutlineIncludesMeshLineAndPointOverlays)
+{
+    Runtime::SceneManager sceneManager;
+    auto& registry = sceneManager.GetRegistry();
+
+    const entt::entity root = registry.create();
+    registry.emplace<ECS::Components::Selection::SelectedTag>(root);
+    registry.emplace<ECS::Components::Selection::HoveredTag>(root);
+    registry.emplace<ECS::Components::Selection::PickID>(root, ECS::Components::Selection::PickID{.Value = 900u});
+
+    const entt::entity meshLineOverlay = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(meshLineOverlay);
+    registry.emplace<ECS::Components::Selection::PickID>(meshLineOverlay, ECS::Components::Selection::PickID{.Value = 901u});
+    auto& line = registry.emplace<ECS::Line::Component>(meshLineOverlay);
+    line.SourceDomain = ECS::Line::Domain::MeshEdge;
+    line.Geometry = Geometry::GeometryHandle{101u, 1u};
+    line.EdgeView = Geometry::GeometryHandle{102u, 1u};
+    line.EdgeCount = 3u;
+    ECS::Components::Hierarchy::Attach(registry, meshLineOverlay, root);
+
+    const entt::entity meshPointOverlay = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(meshPointOverlay);
+    registry.emplace<ECS::Components::Selection::PickID>(meshPointOverlay, ECS::Components::Selection::PickID{.Value = 902u});
+    auto& point = registry.emplace<ECS::Point::Component>(meshPointOverlay);
+    point.SourceDomain = ECS::Point::Domain::MeshVertex;
+    point.Geometry = Geometry::GeometryHandle{103u, 1u};
+    point.Mode = Geometry::PointCloud::RenderMode::Sphere;
+    ECS::Components::Hierarchy::Attach(registry, meshPointOverlay, root);
+
+    sceneManager.CommitFixedTick();
+
+    Graphics::CameraComponent camera{};
+    const Runtime::RenderWorld renderWorld = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        camera,
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 640, .Height = 480},
+        0.0));
+
+    EXPECT_TRUE(renderWorld.IsValid());
+    ASSERT_EQ(renderWorld.LinePicking.size(), 1u);
+    EXPECT_EQ(renderWorld.LinePicking.front().EntityId, 901u);
+    ASSERT_EQ(renderWorld.PointPicking.size(), 1u);
+    EXPECT_EQ(renderWorld.PointPicking.front().EntityId, 902u);
+    EXPECT_EQ(renderWorld.SelectionOutline.SelectedPickIds.size(), 2u);
+    EXPECT_EQ(renderWorld.SelectionOutline.SelectedPickIds[0], 901u);
+    EXPECT_EQ(renderWorld.SelectionOutline.SelectedPickIds[1], 902u);
+    EXPECT_TRUE(renderWorld.SelectionOutline.HoveredPickId == 901u ||
+                renderWorld.SelectionOutline.HoveredPickId == 902u);
+}

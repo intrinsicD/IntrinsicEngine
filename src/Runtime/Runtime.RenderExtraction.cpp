@@ -124,10 +124,6 @@ namespace Runtime
 
             for (auto [entity, transform, line] : view.each())
             {
-                // Only graph entities emit line picking packets.
-                // Mesh wireframe edges are not independently pickable as lines.
-                if (line.SourceDomain != ECS::Line::Domain::GraphEdge)
-                    continue;
                 if (!line.Geometry.IsValid() || !line.EdgeView.IsValid() || line.EdgeCount == 0u)
                     continue;
 
@@ -156,10 +152,6 @@ namespace Runtime
 
             for (auto [entity, transform, point] : view.each())
             {
-                // Only standalone point cloud entities emit point picking packets.
-                // Mesh vertex dots and graph nodes are picked through their parent domain.
-                if (point.SourceDomain != ECS::Point::Domain::CloudPoint)
-                    continue;
                 if (!point.Geometry.IsValid())
                     continue;
 
@@ -190,8 +182,25 @@ namespace Runtime
             const entt::registry& registry = *world.Registry;
             auto canEmitPickId = [&](entt::entity entity)
             {
-                return registry.valid(entity) &&
-                    registry.all_of<ECS::Surface::Component, ECS::Components::Selection::PickID>(entity);
+                if (!registry.valid(entity) || !registry.all_of<ECS::Components::Selection::PickID>(entity))
+                    return false;
+
+                if (const auto* surface = registry.try_get<ECS::Surface::Component>(entity))
+                    return surface->Geometry.IsValid();
+
+                if (const auto* line = registry.try_get<ECS::Line::Component>(entity))
+                {
+                    return line->Geometry.IsValid() &&
+                           line->EdgeView.IsValid() &&
+                           line->EdgeCount > 0u;
+                }
+
+                if (const auto* point = registry.try_get<ECS::Point::Component>(entity))
+                {
+                    return point->Geometry.IsValid();
+                }
+
+                return false;
             };
 
             auto visitSubtree = [&](entt::entity root, auto&& visitor)
