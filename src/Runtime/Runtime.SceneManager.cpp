@@ -16,6 +16,8 @@ import Graphics.Components;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import Graphics.Model;
+import Graphics.VectorFieldManager;
+import Graphics.VisualizationConfig;
 
 import ECS;
 
@@ -78,6 +80,14 @@ namespace Runtime
         ReleaseGpuSlot(*m_GpuHookContext.GpuScene, comp);
     }
 
+    template <typename T>
+    void SceneManager::OnDataComponentDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        auto& comp = registry.get<T>(entity);
+        if (!comp.Visualization.VectorFields.empty())
+            Graphics::VectorFieldManager::DestroyAllVectorFields(registry, comp.Visualization);
+    }
+
     void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene
 #ifdef INTRINSIC_HAS_CUDA
                                        , RHI::CudaDevice* cudaDevice
@@ -96,6 +106,12 @@ namespace Runtime
         reg.on_destroy<ECS::MeshVertexView::Component>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>(*this);
         reg.on_destroy<ECS::Graph::Data>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::Graph::Data>>(*this);
         reg.on_destroy<ECS::PointCloud::Data>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::PointCloud::Data>>(*this);
+
+        // Vector field child cleanup: destroy child Graph entities when the
+        // parent data component is removed, preventing orphaned entities.
+        reg.on_destroy<ECS::Mesh::Data>().connect<&SceneManager::OnDataComponentDestroyed<ECS::Mesh::Data>>(*this);
+        reg.on_destroy<ECS::Graph::Data>().connect<&SceneManager::OnDataComponentDestroyed<ECS::Graph::Data>>(*this);
+        reg.on_destroy<ECS::PointCloud::Data>().connect<&SceneManager::OnDataComponentDestroyed<ECS::PointCloud::Data>>(*this);
     }
 
     void SceneManager::DisconnectGpuHooks()
@@ -106,6 +122,11 @@ namespace Runtime
         reg.on_destroy<ECS::MeshVertexView::Component>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>(*this);
         reg.on_destroy<ECS::Graph::Data>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::Graph::Data>>(*this);
         reg.on_destroy<ECS::PointCloud::Data>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::PointCloud::Data>>(*this);
+
+        reg.on_destroy<ECS::Mesh::Data>().disconnect<&SceneManager::OnDataComponentDestroyed<ECS::Mesh::Data>>(*this);
+        reg.on_destroy<ECS::Graph::Data>().disconnect<&SceneManager::OnDataComponentDestroyed<ECS::Graph::Data>>(*this);
+        reg.on_destroy<ECS::PointCloud::Data>().disconnect<&SceneManager::OnDataComponentDestroyed<ECS::PointCloud::Data>>(*this);
+
         m_GpuHookContext.GpuScene = nullptr;
 #ifdef INTRINSIC_HAS_CUDA
         m_GpuHookContext.CudaDevice = nullptr;

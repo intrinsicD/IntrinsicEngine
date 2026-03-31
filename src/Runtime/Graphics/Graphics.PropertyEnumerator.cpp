@@ -30,6 +30,19 @@ namespace
         if (name == "f:halfedge" || name == "f:normal") return true;
         return false;
     }
+
+    // Connectivity/position internals that should never appear in any UI.
+    // Normals are excluded here because they are valid vector field sources.
+    [[nodiscard]] bool IsConnectivityProperty(std::string_view name) noexcept
+    {
+        if (name == "v:position" || name == "v:tex") return true;
+        if (name == "p:position") return true;
+        if (name == "h:next" || name == "h:prev" || name == "h:vertex" ||
+            name == "h:face" || name == "h:edge") return true;
+        if (name == "e:halfedge") return true;
+        if (name == "f:halfedge") return true;
+        return false;
+    }
 }
 
 template <class PropertySetT>
@@ -80,7 +93,10 @@ static std::vector<PropertyInfo> EnumerateVectorPropertiesImpl(const PropertySet
 
     for (const auto& name : names)
     {
-        if (IsInternalProperty(name))
+        // Use the less restrictive filter: normals (v:normal, f:normal,
+        // p:normal) are valid vector field sources even though they are
+        // filtered from color-mapping enumeration.
+        if (IsConnectivityProperty(name))
             continue;
 
         if (ps.template Get<glm::vec3>(name).IsValid())

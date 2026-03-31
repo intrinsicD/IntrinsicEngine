@@ -14,10 +14,14 @@ import Graphics.Components;
 import Graphics.GpuColor;
 import Graphics.ColorMapper;
 import Graphics.VisualizationConfig;
+import Graphics.VectorFieldManager;
 
 import Geometry.Properties;
 import Geometry.Graph;
+import Geometry.HalfedgeMesh;
 import Geometry.PointCloud;
+
+import ECS;
 
 import Core.Hash;
 import Core.Logging;
@@ -153,12 +157,24 @@ namespace Graphics::Systems::PropertySetDirtySync
     // =====================================================================
     static void SyncPositionsDirty(entt::registry& registry)
     {
+        // Mesh entities
+        {
+            auto view = registry.view<ECS::DirtyTag::VertexPositions, ECS::Mesh::Data>();
+            for (auto [entity, meshData] : view.each())
+            {
+                if (!meshData.Visualization.VectorFields.empty())
+                    meshData.Visualization.VectorFieldsDirty = true;
+            }
+        }
+
         // Graph entities
         {
             auto view = registry.view<ECS::DirtyTag::VertexPositions, ECS::Graph::Data>();
             for (auto [entity, graphData] : view.each())
             {
                 graphData.GpuDirty = true;
+                if (!graphData.Visualization.VectorFields.empty())
+                    graphData.Visualization.VectorFieldsDirty = true;
             }
         }
 
@@ -169,6 +185,8 @@ namespace Graphics::Systems::PropertySetDirtySync
             {
                 ++pcData.PositionRevision;
                 pcData.GpuDirty = true;
+                if (!pcData.Visualization.VectorFields.empty())
+                    pcData.Visualization.VectorFieldsDirty = true;
             }
         }
     }
@@ -310,6 +328,117 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
+    // Vector field sync: create/update/destroy child Graph entities for
+    // each entity type that has VectorFieldsDirty or position changes.
+    // =====================================================================
+    static void SyncVectorFields(entt::registry& registry)
+    {
+        // Helper to get entity display name.
+        auto getName = [&](entt::entity e) -> std::string
+        {
+            if (auto* name = registry.try_get<ECS::Components::NameTag::Component>(e))
+                return name->Name;
+            return "Entity";
+        };
+
+        // Mesh entities
+        {
+            auto view = registry.view<ECS::Mesh::Data>();
+            for (auto [entity, meshData] : view.each())
+            {
+                auto& viz = meshData.Visualization;
+                if (!viz.VectorFieldsDirty)
+                    continue;
+
+                if (meshData.MeshRef)
+                {
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity,
+                        meshData.MeshRef->Positions(),
+                        meshData.MeshRef->VertexProperties(),
+                        viz,
+                        getName(entity));
+                    viz.VectorFieldsDirty = false;
+                }
+                else
+                {
+                    viz.VectorFieldsDirty = false;
+                }
+            }
+        }
+
+        // Graph entities — skip vector field children (which also have
+        // Graph::Data) by requiring VectorFieldsDirty, which is only set
+        // by the UI or position-change handlers on source entities.
+        {
+            auto view = registry.view<ECS::Graph::Data>();
+            for (auto [entity, graphData] : view.each())
+            {
+                auto& viz = graphData.Visualization;
+                if (!viz.VectorFieldsDirty)
+                    continue;
+
+                if (graphData.GraphRef)
+                {
+                    auto& graph = *graphData.GraphRef;
+                    const std::size_t vSize = graph.VerticesSize();
+
+                    // Include ALL vertices (even deleted) to maintain index
+                    // alignment with PropertySet vectors. Deleted vertices
+                    // produce zero-length arrows which is harmless.
+                    std::vector<glm::vec3> positions(vSize);
+                    for (std::size_t i = 0; i < vSize; ++i)
+                    {
+                        const Geometry::VertexHandle v{
+                            static_cast<Geometry::PropertyIndex>(i)};
+                        positions[i] = graph.IsDeleted(v)
+                            ? glm::vec3(0.0f)
+                            : graph.VertexPosition(v);
+                    }
+
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity,
+                        positions,
+                        graph.VertexProperties(),
+                        viz,
+                        getName(entity));
+                    viz.VectorFieldsDirty = false;
+                }
+                else
+                {
+                    viz.VectorFieldsDirty = false;
+                }
+            }
+        }
+
+        // PointCloud entities
+        {
+            auto view = registry.view<ECS::PointCloud::Data>();
+            for (auto [entity, pcData] : view.each())
+            {
+                auto& viz = pcData.Visualization;
+                if (!viz.VectorFieldsDirty)
+                    continue;
+
+                if (pcData.CloudRef)
+                {
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity,
+                        pcData.CloudRef->Positions(),
+                        pcData.CloudRef->PointProperties(),
+                        viz,
+                        getName(entity));
+                    viz.VectorFieldsDirty = false;
+                }
+                else
+                {
+                    viz.VectorFieldsDirty = false;
+                }
+            }
+        }
+    }
+
+    // =====================================================================
     // Main entry point.
     // =====================================================================
     void OnUpdate(entt::registry& registry)
@@ -333,7 +462,11 @@ namespace Graphics::Systems::PropertySetDirtySync
         SyncMeshFaceAttributes(registry);
         SyncFaceAttributesDirty(registry);
 
-        // 3. Clear all dirty tags. Bulk clear is efficient with EnTT.
+        // 3. Vector field sync: create/update/destroy child Graph entities.
+        //    Runs after attribute extraction so source properties are fresh.
+        SyncVectorFields(registry);
+
+        // 4. Clear all dirty tags. Bulk clear is efficient with EnTT.
         registry.clear<ECS::DirtyTag::VertexPositions>();
         registry.clear<ECS::DirtyTag::VertexAttributes>();
         registry.clear<ECS::DirtyTag::EdgeTopology>();
@@ -348,7 +481,9 @@ namespace Graphics::Systems::PropertySetDirtySync
         graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::PropertySetDirtySync,
             [](Core::FrameGraphBuilder& builder)
             {
-                // Writes to data components (GpuDirty, cached attributes).
+                // Writes to data components (GpuDirty, cached attributes,
+                // VectorFieldsDirty).
+                builder.Write<ECS::Mesh::Data>();
                 builder.Write<ECS::Graph::Data>();
                 builder.Write<ECS::PointCloud::Data>();
                 builder.Write<ECS::Surface::Component>();

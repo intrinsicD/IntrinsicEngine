@@ -80,5 +80,9 @@ export namespace Graphics
         /// Multiple vector fields can be active simultaneously.
         /// Each spawns a separate child Graph entity.
         std::vector<VectorFieldEntry> VectorFields;
+
+        /// Set true when VectorFields entries change or source data changes.
+        /// Consumed by PropertySetDirtySync to trigger SyncVectorFields.
+        bool VectorFieldsDirty = false;
     };
 }

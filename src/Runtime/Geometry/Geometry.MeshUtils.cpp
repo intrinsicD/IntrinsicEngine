@@ -390,6 +390,42 @@ namespace Geometry::MeshUtils
         return (len > 1e-8f) ? (n / len) : glm::vec3(0.0f, 1.0f, 0.0f);
     }
 
+    std::size_t PublishVertexNormals(Halfedge::Mesh& mesh)
+    {
+        auto normalProp = mesh.VertexProperties().GetOrAdd<glm::vec3>(
+            "v:normal", glm::vec3(0.0f, 1.0f, 0.0f));
+
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+        {
+            VertexHandle vh{static_cast<PropertyIndex>(i)};
+            if (mesh.IsDeleted(vh))
+                continue;
+            normalProp[i] = VertexNormal(mesh, vh);
+            ++count;
+        }
+        return count;
+    }
+
+    std::size_t PublishFaceNormals(Halfedge::Mesh& mesh)
+    {
+        auto normalProp = mesh.FaceProperties().GetOrAdd<glm::vec3>(
+            "f:normal", glm::vec3(0.0f, 1.0f, 0.0f));
+
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+        {
+            FaceHandle fh{static_cast<PropertyIndex>(i)};
+            if (mesh.IsDeleted(fh))
+                continue;
+            glm::vec3 fn = FaceNormal(mesh, fh);
+            float len = glm::length(fn);
+            normalProp[i] = (len > 1e-8f) ? (fn / len) : glm::vec3(0.0f, 1.0f, 0.0f);
+            ++count;
+        }
+        return count;
+    }
+
     int TargetValence(const Halfedge::Mesh& mesh, VertexHandle v)
     {
         return mesh.IsBoundary(v) ? 4 : 6;
