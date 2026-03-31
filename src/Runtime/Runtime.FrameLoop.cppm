@@ -288,8 +288,9 @@ export namespace Runtime
     class RuntimeMaintenanceLaneHost final : public IMaintenanceLaneHost
     {
     public:
-        RuntimeMaintenanceLaneHost(SceneManager& scene, RenderOrchestrator& renderer, GraphicsBackend& graphics)
-            : m_Maintenance(scene, renderer, graphics)
+        RuntimeMaintenanceLaneHost(SceneManager& scene, RenderOrchestrator& renderer, GraphicsBackend& graphics,
+                                   Core::FeatureRegistry& features)
+            : m_Maintenance(scene, renderer, graphics, features)
         {
         }
 

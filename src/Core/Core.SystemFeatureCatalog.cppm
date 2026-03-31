@@ -49,6 +49,18 @@ export namespace Runtime::SystemFeatureCatalog
         Core::FeatureCategory::System,
         "Syncs PropertySet dirty domains to GPU buffers (per-domain incremental)");
 
+    inline constexpr Core::FeatureDescriptor GpuMemoryWarnThreshold70 = MakeFeatureDescriptor(
+        "GpuMemoryWarnThreshold70",
+        Core::FeatureCategory::System,
+        "Use 70% GPU memory warning threshold instead of the 80% baseline",
+        false);
+
+    inline constexpr Core::FeatureDescriptor GpuMemoryWarnThreshold90 = MakeFeatureDescriptor(
+        "GpuMemoryWarnThreshold90",
+        Core::FeatureCategory::System,
+        "Use 90% GPU memory warning threshold instead of the 80% baseline",
+        false);
+
     // -------------------------------------------------------------------------
     // Pass Names — single source of truth for FrameGraph pass name strings.
     // Use these in RegisterSystem() calls instead of string literals to
