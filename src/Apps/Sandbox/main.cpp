@@ -1273,6 +1273,7 @@ int main(int argc, char* argv[])
     config.AppName = "Sandbox";
     config.Width = 1600;
     config.Height = 900;
+    config.MaxActiveFps = 120.0;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -1301,6 +1302,10 @@ int main(int argc, char* argv[])
         else if (arg == "--max-substeps" && i + 1 < argc)
         {
             config.MaxSubstepsPerFrame = std::stoi(argv[++i]);
+        }
+        else if (arg == "--max-active-fps" && i + 1 < argc)
+        {
+            config.MaxActiveFps = std::stod(argv[++i]);
         }
     }
 

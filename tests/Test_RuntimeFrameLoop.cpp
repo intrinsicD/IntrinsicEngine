@@ -453,6 +453,29 @@ TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PumpsEventsAndContinuesWhenWindo
     EXPECT_DOUBLE_EQ(host.WaitSeconds, 0.0);
 }
 
+TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PacesActiveFrameWhenMaxFpsIsSet)
+{
+    FakePlatformFrameHost host;
+    Runtime::FrameClock clock;
+    double sleptSeconds = 0.0;
+
+    Runtime::PlatformFrameCoordinator coordinator{
+        .Host = host,
+        .Clock = clock,
+        .MinimizedWaitSeconds = 0.125,
+        .MaxActiveFps = 10.0,
+        .SleepForSeconds = [&](double seconds) { sleptSeconds += seconds; },
+    };
+
+    // First call seeds the frame clock.
+    (void)coordinator.BeginFrame(Runtime::FrameLoopPolicy{});
+    const Runtime::PlatformFrameResult result = coordinator.BeginFrame(Runtime::FrameLoopPolicy{});
+
+    EXPECT_TRUE(result.ContinueFrame);
+    EXPECT_GE(sleptSeconds, 0.0);
+    EXPECT_NEAR(result.FrameStep.FrameTime, 0.1, 1e-6);
+}
+
 TEST(RuntimeFrameLoop, PlatformFrameCoordinator_WaitsAndSkipsWhenWindowIsMinimized)
 {
     FakePlatformFrameHost host;
