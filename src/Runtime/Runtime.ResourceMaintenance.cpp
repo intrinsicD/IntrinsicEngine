@@ -4,6 +4,7 @@ module;
 module Runtime.ResourceMaintenance;
 
 import Core.Logging;
+import Core.SystemFeatureCatalog;
 import Core.Tasks;
 import Core.Telemetry;
 
@@ -19,14 +20,24 @@ namespace Runtime
         const auto memSnap = device.QueryMemoryBudgets();
         Core::Telemetry::TelemetrySystem::Get().SetGpuMemoryBudgets(memSnap);
 
-        // Fire once-per-transition warnings when any heap exceeds 80%.
-        constexpr double kWarningThreshold = 0.80;
+        // Fire once-per-transition warnings when a heap crosses the configured threshold.
+        // Baseline is 80%; feature toggles can raise/lower this.
+        double warningThreshold = 0.80;
+        if (m_Features.IsEnabled(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold70))
+        {
+            warningThreshold = 0.70;
+        }
+        if (m_Features.IsEnabled(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold90))
+        {
+            warningThreshold = 0.90;
+        }
+
         for (uint32_t i = 0; i < memSnap.HeapCount && i < kMaxHeaps; ++i)
         {
             if (memSnap.Heaps[i].BudgetBytes == 0) continue;
             const double usage = static_cast<double>(memSnap.Heaps[i].UsageBytes)
                                / static_cast<double>(memSnap.Heaps[i].BudgetBytes);
-            const bool over = usage >= kWarningThreshold;
+            const bool over = usage >= warningThreshold;
             if (over && !m_HeapOverBudget[i])
             {
                 const bool deviceLocal = (memSnap.Heaps[i].Flags & Core::Telemetry::kHeapFlagDeviceLocal) != 0;

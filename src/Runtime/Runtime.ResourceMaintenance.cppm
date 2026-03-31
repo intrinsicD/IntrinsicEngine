@@ -4,6 +4,7 @@ module;
 
 export module Runtime.ResourceMaintenance;
 
+import Core.FeatureRegistry;
 import Graphics.Material;
 import Runtime.GraphicsBackend;
 import Runtime.RenderOrchestrator;
@@ -24,11 +25,13 @@ export namespace Runtime
     class ResourceMaintenanceService
     {
     public:
-        ResourceMaintenanceService(SceneManager& scene, RenderOrchestrator& renderer, GraphicsBackend& graphics)
+        ResourceMaintenanceService(SceneManager& scene, RenderOrchestrator& renderer, GraphicsBackend& graphics,
+                                   Core::FeatureRegistry& features)
             : m_Scene(scene)
             , m_Renderer(renderer)
             , m_Graphics(graphics)
             , m_Materials(renderer.GetMaterialRegistry())
+            , m_Features(features)
         {
         }
 
@@ -49,6 +52,7 @@ export namespace Runtime
         RenderOrchestrator& m_Renderer;
         GraphicsBackend& m_Graphics;
         Graphics::MaterialRegistry& m_Materials;
+        Core::FeatureRegistry& m_Features;
         uint64_t m_LastCompletedGraphicsTimelineValue = 0;
         uint64_t m_LastObservedGlobalFrameNumber = 0;
 

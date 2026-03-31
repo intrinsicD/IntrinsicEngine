@@ -298,6 +298,8 @@ namespace Runtime
         registerDescriptor(Runtime::SystemFeatureCatalog::MeshViewLifecycle);
         registerDescriptor(Runtime::SystemFeatureCatalog::GPUSceneSync);
         registerDescriptor(Runtime::SystemFeatureCatalog::PropertySetDirtySync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold70);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold90);
         registerDescriptor(Runtime::FrameLoopFeatureCatalog::StagedPhases);
         registerDescriptor(Runtime::FrameLoopFeatureCatalog::LegacyCompatibility);
 
@@ -353,6 +355,7 @@ namespace Runtime
             *m_SceneManager,
             *m_RenderOrchestrator,
             *m_GraphicsBackend,
+            m_FeatureRegistry,
         };
         const MaintenanceLaneCoordinator maintenanceLane{.Host = maintenanceLaneHost};
         RuntimeRenderLaneHost renderLaneHost{
