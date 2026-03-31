@@ -91,11 +91,6 @@ Target the currently observed worst compile edges (`build/ci/.ninja_log`) and re
   - [ ] Replace broad component imports with minimal forward declarations / narrow module partitions where legal.
   - [ ] Validate frame graph contracts with existing Runtime graph tests and compare compile-edge delta.
 
-- [ ] **C3 — `ECS.Systems.AxisRotator.cpp` hot-loop isolation (≈88.6s edge)**
-  - [ ] Keep exported interface to scheduling contract only; move quaternion update kernel into implementation partition.
-  - [ ] Add SoA-ready update path (`span<quat>`, `span<axis_speed>`) for batch rotation updates to reduce template-heavy view work in the TU.
-  - [ ] Add deterministic regression test for transform dirty-tag propagation + compile-edge tracking.
-
 - [ ] **C4 — `Geometry.SDF.cppm` decomposition (≈85.2s edge)**
   - [ ] Split raw SDF primitives, boolean ops, and gradient/normal estimation into separate partitions.
   - [ ] Keep experimental GLM headers out of exported interface when possible; confine to impl partitions.
