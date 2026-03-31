@@ -494,7 +494,7 @@ namespace RHI
 
         for (uint32_t i = 0; i < result.HeapCount && i < Core::Telemetry::MAX_MEMORY_HEAPS; ++i)
         {
-            result.Heaps[i].UsageBytes = budgets[i].statistics.blockBytes;
+            result.Heaps[i].UsageBytes = budgets[i].usage;
             result.Heaps[i].BudgetBytes = budgets[i].budget;
             result.Heaps[i].Flags = m_CachedHeapFlags[i];
         }

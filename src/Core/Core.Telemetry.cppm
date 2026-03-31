@@ -26,7 +26,7 @@ export namespace Core::Telemetry
 
     struct GpuHeapBudget
     {
-        uint64_t UsageBytes = 0;        // Total device-memory block bytes allocated by VMA (includes internal fragmentation)
+        uint64_t UsageBytes = 0;        // Driver-reported whole-heap usage (includes swapchain, driver, and VMA allocations)
         uint64_t BudgetBytes = 0;       // OS/driver reported budget (or heap size if extension unavailable)
         uint32_t Flags = 0;             // Vulkan VkMemoryHeapFlags (kHeapFlagDeviceLocal = device-local)
     };
