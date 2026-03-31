@@ -542,22 +542,34 @@ TEST(SelectionOutline, HierarchySelectionResolvesRenderableChildPickIds)
     auto& reg = scene.GetRegistry();
 
     const entt::entity root = scene.CreateEntity("Root");
-    const entt::entity child = scene.CreateEntity("ChildMesh");
+    const entt::entity childMesh = scene.CreateEntity("ChildMesh");
+    const entt::entity childVectorField = scene.CreateEntity("ChildVectorField");
 
     reg.emplace<ECS::Components::Selection::SelectedTag>(root);
     reg.emplace<ECS::Components::Selection::HoveredTag>(root);
     reg.emplace<ECS::Components::Selection::PickID>(root, 7u);
 
-    reg.emplace<ECS::Surface::Component>(child);
-    reg.emplace<ECS::Components::Selection::PickID>(child, 42u);
-    ECS::Components::Hierarchy::Attach(reg, child, root);
+    auto& surface = reg.emplace<ECS::Surface::Component>(childMesh);
+    surface.Geometry = Geometry::GeometryHandle{1u, 1u};
+    reg.emplace<ECS::Components::Selection::PickID>(childMesh, 42u);
+    ECS::Components::Hierarchy::Attach(reg, childMesh, root);
+
+    auto& line = reg.emplace<ECS::Line::Component>(childVectorField);
+    line.SourceDomain = ECS::Line::Domain::GraphEdge;
+    line.Geometry = Geometry::GeometryHandle{2u, 1u};
+    line.EdgeView = Geometry::GeometryHandle{3u, 1u};
+    line.EdgeCount = 2u;
+    reg.emplace<ECS::Components::Selection::PickID>(childVectorField, 1001u);
+    ECS::Components::Hierarchy::Attach(reg, childVectorField, root);
 
     uint32_t selectedIds[Graphics::Passes::SelectionOutlinePass::kMaxSelectedIds] = {};
     const uint32_t count = Graphics::Passes::AppendOutlineRenderablePickIds(reg, root, selectedIds);
 
-    ASSERT_EQ(count, 1u);
+    ASSERT_EQ(count, 2u);
     EXPECT_EQ(selectedIds[0], 42u);
-    EXPECT_EQ(Graphics::Passes::ResolveOutlineRenderablePickId(reg, root), 42u);
+    EXPECT_EQ(selectedIds[1], 1001u);
+    const uint32_t resolved = Graphics::Passes::ResolveOutlineRenderablePickId(reg, root);
+    EXPECT_TRUE(resolved == 42u || resolved == 1001u);
 }
 
 TEST(SelectionOutline, DebugStateDefaultsToSafeValues)
