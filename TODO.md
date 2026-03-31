@@ -255,7 +255,7 @@ Begin alongside A1 for fast shader iteration during rendering mode and shadow de
 
 #### E2. GPU Memory Budget Warning Configuration
 
-- [ ] Make the 80% GPU memory warning threshold configurable via `FeatureRegistry` (currently hardcoded).
+- [x] Make the 80% GPU memory warning threshold configurable via `FeatureRegistry` (preset toggles: 70/75/85/90%).
 
 ### F. UI Architecture & Feature Wiring
 

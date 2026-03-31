@@ -299,6 +299,8 @@ namespace Runtime
         registerDescriptor(Runtime::SystemFeatureCatalog::GPUSceneSync);
         registerDescriptor(Runtime::SystemFeatureCatalog::PropertySetDirtySync);
         registerDescriptor(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold70);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold75);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold85);
         registerDescriptor(Runtime::SystemFeatureCatalog::GpuMemoryWarnThreshold90);
         registerDescriptor(Runtime::FrameLoopFeatureCatalog::StagedPhases);
         registerDescriptor(Runtime::FrameLoopFeatureCatalog::LegacyCompatibility);
