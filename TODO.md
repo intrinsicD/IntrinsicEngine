@@ -516,7 +516,7 @@ A dedicated peer-review pass was run against engine-facing module interfaces and
 #### P1 — Tier A migration
 - [x] Introduce PImpl for `Runtime::RenderOrchestrator`.
 - [x] Introduce PImpl for `Graphics::RenderDriver`.
-- [ ] Introduce PImpl for `Runtime::GraphicsBackend`.
+- [x] Introduce PImpl for `Runtime::GraphicsBackend`.
 - [ ] Keep API signatures source-compatible where possible to minimize downstream churn.
 
 #### P2 — Tier B migration
