@@ -38,10 +38,14 @@ namespace Runtime
 
             Selection::PickRequest req{};
             req.WorldRay = Geometry::Ray{worldRay.Origin, worldRay.Direction};
+            req.ViewMatrix = camera.ViewMatrix;
+            req.ProjectionMatrix = camera.ProjectionMatrix;
+            req.CursorPositionPixels = m;
             req.Backend = Selection::PickBackend::CPU;
             req.Mode = mode;
             req.PickRadiusPixels = pickRadiusPixels;
             req.CameraFovYRadians = glm::radians(camera.Fov);
+            req.ViewportWidthPixels = static_cast<float>(std::max(winW, 1u));
             req.ViewportHeightPixels = static_cast<float>(std::max(winH, 1u));
             return req;
         }

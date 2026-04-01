@@ -97,6 +97,65 @@ namespace Runtime::Selection
             return glm::dot(v, v);
         }
 
+        struct ScreenProjection
+        {
+            glm::vec2 Pixel{0.0f};
+            float NdcDepth = 1.0f;
+            bool InFront = false;
+            bool InsideViewport = false;
+        };
+
+        [[nodiscard]] inline std::optional<ScreenProjection> ProjectWorldToScreen(
+            const PickRequest& request, const glm::vec3& worldPoint)
+        {
+            const glm::vec4 clip = request.ProjectionMatrix * request.ViewMatrix * glm::vec4(worldPoint, 1.0f);
+            if (std::abs(clip.w) <= 1.0e-8f)
+                return std::nullopt;
+
+            const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+            const float viewportWidth = std::max(request.ViewportWidthPixels, 1.0f);
+            const float viewportHeight = std::max(request.ViewportHeightPixels, 1.0f);
+            const glm::vec2 pixel{
+                ((ndc.x * 0.5f) + 0.5f) * viewportWidth,
+                ((1.0f - (ndc.y * 0.5f + 0.5f))) * viewportHeight
+            };
+
+            ScreenProjection projection{};
+            projection.Pixel = pixel;
+            projection.NdcDepth = ndc.z;
+            projection.InFront = clip.w > 0.0f;
+            projection.InsideViewport =
+                projection.InFront &&
+                ndc.x >= -1.0f && ndc.x <= 1.0f &&
+                ndc.y >= -1.0f && ndc.y <= 1.0f &&
+                ndc.z >= -1.0f && ndc.z <= 1.0f;
+            return projection;
+        }
+
+        [[nodiscard]] inline float ScreenDistanceSqToCursor(
+            const PickRequest& request, const glm::vec2& screenPointPixels)
+        {
+            const glm::vec2 delta = screenPointPixels - request.CursorPositionPixels;
+            return glm::dot(delta, delta);
+        }
+
+        [[nodiscard]] inline float ScreenDistanceSqPointSegment(
+            const glm::vec2& point, const glm::vec2& a, const glm::vec2& b)
+        {
+            const glm::vec2 ab = b - a;
+            const float abLenSq = glm::dot(ab, ab);
+            if (abLenSq <= 1.0e-12f)
+            {
+                const glm::vec2 d = point - a;
+                return glm::dot(d, d);
+            }
+
+            const float t = glm::clamp(glm::dot(point - a, ab) / abLenSq, 0.0f, 1.0f);
+            const glm::vec2 c = a + t * ab;
+            const glm::vec2 d = point - c;
+            return glm::dot(d, d);
+        }
+
         // Compute the unit normal of a triangle given three world-space vertices.
         // Returns zero for degenerate (collinear/coincident) triangles.
         [[nodiscard]] inline glm::vec3 ComputeTriangleNormal(
@@ -592,14 +651,29 @@ namespace Runtime::Selection
 
             float bestEdgeDistSq = std::numeric_limits<float>::infinity();
             bool foundEdgeWithinRadius = false;
+            const float pixelRadiusSq = request.PickRadiusPixels * request.PickRadiusPixels;
             for (const auto halfedge : mesh.HalfedgesAroundFace(*face))
             {
                 const auto from = mesh.FromVertex(halfedge);
                 const auto to = mesh.ToVertex(halfedge);
                 const glm::vec3 edgeA = TransformPoint(world, mesh.Position(from));
                 const glm::vec3 edgeB = TransformPoint(world, mesh.Position(to));
-                const auto closest = Geometry::ClosestPointSegment(bestWorldPoint, edgeA, edgeB);
-                const bool withinRadius = closest.DistanceSq <= radiusSq;
+                const auto screenA = ProjectWorldToScreen(request, edgeA);
+                const auto screenB = ProjectWorldToScreen(request, edgeB);
+                float edgeMetricSq = std::numeric_limits<float>::infinity();
+                bool withinRadius = false;
+                if (screenA && screenB && screenA->InFront && screenB->InFront)
+                {
+                    edgeMetricSq = ScreenDistanceSqPointSegment(
+                        request.CursorPositionPixels, screenA->Pixel, screenB->Pixel);
+                    withinRadius = edgeMetricSq <= pixelRadiusSq;
+                }
+                else
+                {
+                    const auto closest = Geometry::ClosestPointSegment(bestWorldPoint, edgeA, edgeB);
+                    edgeMetricSq = closest.DistanceSq;
+                    withinRadius = closest.DistanceSq <= radiusSq;
+                }
                 if (!withinRadius && foundEdgeWithinRadius)
                     continue;
 
@@ -611,10 +685,10 @@ namespace Runtime::Selection
                     picked.entity.edge_idx = Picked::Entity::InvalidIndex;
                 }
 
-                if (closest.DistanceSq < bestEdgeDistSq ||
-                    (closest.DistanceSq == bestEdgeDistSq && edgeIndex < picked.entity.edge_idx))
+                if (edgeMetricSq < bestEdgeDistSq ||
+                    (edgeMetricSq == bestEdgeDistSq && edgeIndex < picked.entity.edge_idx))
                 {
-                    bestEdgeDistSq = closest.DistanceSq;
+                    bestEdgeDistSq = edgeMetricSq;
                     picked.entity.edge_idx = edgeIndex;
                 }
             }
@@ -625,8 +699,19 @@ namespace Runtime::Selection
             {
                 const uint32_t vertexIndex = static_cast<uint32_t>(vertex.Index);
                 const glm::vec3 worldVertex = TransformPoint(world, mesh.Position(vertex));
-                const float distSq = SquaredLength(worldVertex - bestWorldPoint);
-                const bool withinRadius = distSq <= radiusSq;
+                const auto screenVertex = ProjectWorldToScreen(request, worldVertex);
+                float vertexMetricSq = std::numeric_limits<float>::infinity();
+                bool withinRadius = false;
+                if (screenVertex && screenVertex->InFront)
+                {
+                    vertexMetricSq = ScreenDistanceSqToCursor(request, screenVertex->Pixel);
+                    withinRadius = vertexMetricSq <= pixelRadiusSq;
+                }
+                else
+                {
+                    vertexMetricSq = SquaredLength(worldVertex - bestWorldPoint);
+                    withinRadius = vertexMetricSq <= radiusSq;
+                }
                 if (!withinRadius && foundVertexWithinRadius)
                     continue;
 
@@ -637,10 +722,10 @@ namespace Runtime::Selection
                     picked.entity.vertex_idx = Picked::Entity::InvalidIndex;
                 }
 
-                if (distSq < bestVertexDistSq ||
-                    (distSq == bestVertexDistSq && vertexIndex < picked.entity.vertex_idx))
+                if (vertexMetricSq < bestVertexDistSq ||
+                    (vertexMetricSq == bestVertexDistSq && vertexIndex < picked.entity.vertex_idx))
                 {
-                    bestVertexDistSq = distSq;
+                    bestVertexDistSq = vertexMetricSq;
                     picked.entity.vertex_idx = vertexIndex;
                 }
             }
@@ -712,9 +797,20 @@ namespace Runtime::Selection
 
             const auto vertex0 = static_cast<uint32_t>(v0.Index);
             const auto vertex1 = static_cast<uint32_t>(v1.Index);
-            const float dist0Sq = SquaredLength(localPoint - localA);
-            const float dist1Sq = SquaredLength(localPoint - localB);
-            picked.entity.vertex_idx = (dist0Sq < dist1Sq || (dist0Sq == dist1Sq && vertex0 <= vertex1)) ? vertex0 : vertex1;
+            const auto screenA = ProjectWorldToScreen(request, worldA);
+            const auto screenB = ProjectWorldToScreen(request, worldB);
+            if (screenA && screenB && screenA->InFront && screenB->InFront)
+            {
+                const float dist0Sq = ScreenDistanceSqToCursor(request, screenA->Pixel);
+                const float dist1Sq = ScreenDistanceSqToCursor(request, screenB->Pixel);
+                picked.entity.vertex_idx = (dist0Sq < dist1Sq || (dist0Sq == dist1Sq && vertex0 <= vertex1)) ? vertex0 : vertex1;
+            }
+            else
+            {
+                const float dist0Sq = SquaredLength(localPoint - localA);
+                const float dist1Sq = SquaredLength(localPoint - localB);
+                picked.entity.vertex_idx = (dist0Sq < dist1Sq || (dist0Sq == dist1Sq && vertex0 <= vertex1)) ? vertex0 : vertex1;
+            }
 
             return picked;
         }
