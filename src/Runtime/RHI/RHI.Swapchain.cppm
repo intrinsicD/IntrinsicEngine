@@ -51,7 +51,7 @@ namespace RHI
     {
     public:
         VulkanSwapchain(std::shared_ptr<VulkanDevice> device, Core::Windowing::Window& window,
-                        PresentPolicy policy = PresentPolicy::LowLatency);
+                        PresentPolicy policy = PresentPolicy::VSync);
         ~VulkanSwapchain();
 
         void Recreate(); // Call this when window resizes
@@ -82,7 +82,7 @@ namespace RHI
         VkFormat m_ImageFormat;
         VkExtent2D m_Extent;
 
-        PresentPolicy m_PresentPolicy = PresentPolicy::LowLatency;
+        PresentPolicy m_PresentPolicy = PresentPolicy::VSync;
         VkPresentModeKHR m_ActivePresentMode = VK_PRESENT_MODE_FIFO_KHR;
 
         void CreateSwapchain();

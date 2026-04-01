@@ -119,6 +119,46 @@ namespace Runtime
         }
     }
 
+    // Forward declaration — defined further down alongside FrameClock.
+    [[nodiscard]] static double SampleFrameClockSeconds();
+
+    // ---------------------------------------------------------------------------
+    // ActivityTracker
+    // ---------------------------------------------------------------------------
+
+    void ActivityTracker::NoteActivity() &
+    {
+        m_HasActivity = true;
+        m_LastActivityTimeSeconds = SampleFrameClockSeconds();
+    }
+
+    double ActivityTracker::EffectiveFpsCap(double currentTimeSeconds) const &
+    {
+        if (!Config.Enabled || Config.IdleFps <= 0.0)
+            return Config.ActiveFps;
+
+        const double idleDuration = currentTimeSeconds - m_LastActivityTimeSeconds;
+        if (!m_HasActivity || idleDuration >= Config.IdleTimeoutSeconds)
+            return Config.IdleFps;
+
+        return Config.ActiveFps;
+    }
+
+    bool ActivityTracker::IsIdle(double currentTimeSeconds) const &
+    {
+        if (!Config.Enabled || Config.IdleFps <= 0.0)
+            return false;
+
+        const double idleDuration = currentTimeSeconds - m_LastActivityTimeSeconds;
+        return !m_HasActivity || idleDuration >= Config.IdleTimeoutSeconds;
+    }
+
+    void ActivityTracker::Reset() &
+    {
+        m_LastActivityTimeSeconds = SampleFrameClockSeconds();
+        m_HasActivity = true;
+    }
+
     FrameLoopMode ResolveFrameLoopMode(const Core::FeatureRegistry& features)
     {
         if (features.IsEnabled(FrameLoopFeatureCatalog::LegacyCompatibility))
@@ -179,21 +219,23 @@ namespace Runtime
         return std::clamp(accumulator / policy.FixedDt, 0.0, 1.0);
     }
 
-    namespace
+    [[nodiscard]] static double SampleFrameClockSeconds()
     {
-        [[nodiscard]] double SampleFrameClockSeconds()
-        {
-            using Seconds = std::chrono::duration<double>;
-            return std::chrono::duration_cast<Seconds>(
-                       std::chrono::high_resolution_clock::now().time_since_epoch())
-                .count();
-        }
+        using Seconds = std::chrono::duration<double>;
+        return std::chrono::duration_cast<Seconds>(
+                   std::chrono::high_resolution_clock::now().time_since_epoch())
+            .count();
     }
 
     void FrameClock::Reset()
     {
         m_LastSampleSeconds = SampleFrameClockSeconds();
         m_HasLastSample = false;
+    }
+
+    void FrameClock::Resample() &
+    {
+        m_LastSampleSeconds = SampleFrameClockSeconds();
     }
 
     FrameTimeStep FrameClock::Advance(const FrameLoopPolicy& policy) &
@@ -318,6 +360,11 @@ namespace Runtime
         return std::exchange(m_ResizeRequested, false);
     }
 
+    bool RuntimePlatformFrameHost::ConsumeInputActivity()
+    {
+        return m_Window.ConsumeInputActivity();
+    }
+
     PlatformFrameResult PlatformFrameCoordinator::BeginFrame(this PlatformFrameCoordinator& self,
                                                              const FrameLoopPolicy& policy)
     {
@@ -333,6 +380,11 @@ namespace Runtime
         }
 
         self.Host.PumpEvents();
+
+        // Feed input activity into the idle tracker (if present).
+        if (self.Activity && self.Host.ConsumeInputActivity())
+            self.Activity->NoteActivity();
+
         const bool resizeRequested = self.Host.HasResizeRequest();
         if (self.Host.ShouldQuit())
         {
@@ -349,12 +401,21 @@ namespace Runtime
         if (!self.Host.IsMinimized())
         {
             FrameTimeStep frameStep = self.Clock.Advance(policy);
-            if (self.MaxActiveFps > 0.0 && std::isfinite(self.MaxActiveFps))
+
+            // Determine effective FPS cap from the activity tracker.
+            const double nowSeconds = SampleFrameClockSeconds();
+            const double effectiveFpsCap =
+                self.Activity ? self.Activity->EffectiveFpsCap(nowSeconds) : 0.0;
+
+            if (effectiveFpsCap > 0.0 && std::isfinite(effectiveFpsCap))
             {
-                const double minFrameSeconds = 1.0 / self.MaxActiveFps;
+                const double minFrameSeconds = 1.0 / effectiveFpsCap;
                 if (frameStep.FrameTime > 0.0 && frameStep.FrameTime < minFrameSeconds)
                 {
                     self.SleepForSeconds(minFrameSeconds - frameStep.FrameTime);
+                    // Re-anchor the clock so the next Advance() does not count
+                    // the sleep as part of the following frame's time.
+                    self.Clock.Resample();
                     frameStep.FrameTime = minFrameSeconds;
                 }
             }

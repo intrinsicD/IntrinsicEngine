@@ -227,7 +227,7 @@ namespace Runtime
 
     RHI::PresentPolicy GraphicsBackend::GetPresentPolicy() const
     {
-        return m_Swapchain ? m_Swapchain->GetPresentPolicy() : RHI::PresentPolicy::LowLatency;
+        return m_Swapchain ? m_Swapchain->GetPresentPolicy() : RHI::PresentPolicy::VSync;
     }
 
     void GraphicsBackend::OnResize()
