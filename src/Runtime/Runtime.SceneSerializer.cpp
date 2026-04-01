@@ -61,6 +61,17 @@ namespace
         return json::array({q.w, q.x, q.y, q.z});
     }
 
+    json SerializeLightEnvironment(const Graphics::LightEnvironmentPacket& lighting)
+    {
+        json j;
+        j["lightDirection"] = Vec3ToJson(lighting.LightDirection);
+        j["lightIntensity"] = lighting.LightIntensity;
+        j["lightColor"] = Vec3ToJson(lighting.LightColor);
+        j["ambientColor"] = Vec3ToJson(lighting.AmbientColor);
+        j["ambientIntensity"] = lighting.AmbientIntensity;
+        return j;
+    }
+
     glm::vec3 JsonToVec3(const json& j)
     {
         return {j[0].get<float>(), j[1].get<float>(), j[2].get<float>()};
@@ -75,6 +86,25 @@ namespace
     {
         // Stored as [w, x, y, z]
         return glm::quat(j[0].get<float>(), j[1].get<float>(), j[2].get<float>(), j[3].get<float>());
+    }
+
+    void ApplyLightEnvironmentFromJson(const json& j, Graphics::LightEnvironmentPacket& lighting)
+    {
+        if (j.contains("lightDirection"))
+        {
+            const glm::vec3 decoded = JsonToVec3(j["lightDirection"]);
+            const float lenSq = glm::dot(decoded, decoded);
+            if (lenSq > 1e-12f)
+                lighting.LightDirection = glm::normalize(decoded);
+        }
+        if (j.contains("lightIntensity"))
+            lighting.LightIntensity = j["lightIntensity"].get<float>();
+        if (j.contains("lightColor"))
+            lighting.LightColor = JsonToVec3(j["lightColor"]);
+        if (j.contains("ambientColor"))
+            lighting.AmbientColor = JsonToVec3(j["ambientColor"]);
+        if (j.contains("ambientIntensity"))
+            lighting.AmbientIntensity = j["ambientIntensity"].get<float>();
     }
 
     // -------------------------------------------------------------------------
@@ -372,6 +402,8 @@ namespace Runtime
             entityArray.push_back(SerializeEntity(reg, entities[i], i, entityToIndex));
         }
         doc["entities"] = entityArray;
+        doc["lighting"] = SerializeLightEnvironment(
+            engine.GetRenderOrchestrator().GetRenderDriver().GetLightEnvironment());
 
         // Serialize to string
         std::string content = doc.dump(2);
@@ -445,6 +477,13 @@ namespace Runtime
         // 4. Clear the current scene
         engine.GetSelection().ClearSelection(engine.GetSceneManager().GetScene());
         engine.GetSceneManager().Clear();
+
+        // Restore scene lighting if present (optional for backward compatibility).
+        if (doc.contains("lighting"))
+        {
+            auto& lighting = engine.GetRenderOrchestrator().GetRenderDriver().GetLightEnvironment();
+            ApplyLightEnvironmentFromJson(doc["lighting"], lighting);
+        }
 
         // 5. Import unique assets first (group entities by source path)
         const auto& entityArray = doc["entities"];
