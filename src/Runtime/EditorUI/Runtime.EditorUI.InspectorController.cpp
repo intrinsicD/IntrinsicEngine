@@ -594,10 +594,14 @@ void InspectorController::Draw()
                     case GeometryProcessingAlgorithm::NormalEstimation:
                         static_cast<void>(DrawNormalEstimationWidget(*m_Engine, selected, m_NormalEstimationUi));
                         break;
+                    case GeometryProcessingAlgorithm::ShortestPath:
+                        static_cast<void>(DrawShortestPathWidget(*m_Engine, selected, m_ShortestPathUi));
+                        break;
                     }
 
                     if (m_GeometryWorkflow && entry.Algorithm != GeometryProcessingAlgorithm::KMeans
-                        && entry.Algorithm != GeometryProcessingAlgorithm::NormalEstimation)
+                        && entry.Algorithm != GeometryProcessingAlgorithm::NormalEstimation
+                        && entry.Algorithm != GeometryProcessingAlgorithm::ShortestPath)
                     {
                         if (ImGui::SmallButton((std::string("Open Dedicated Panel##")
                                              + algoLabel).c_str()))

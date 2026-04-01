@@ -26,6 +26,7 @@ module Runtime.EditorUI;
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
 import Runtime.PointCloudKMeans;
+import Runtime.Selection;
 
 import ECS;
 
@@ -49,6 +50,7 @@ import Geometry.CatmullClark;
 import Geometry.MeshRepair;
 import Geometry.MeshAnalysis;
 import Geometry.NormalEstimation;
+import Geometry.ShortestPath;
 
 import Core.Logging;
 
@@ -1963,6 +1965,167 @@ bool DrawNormalEstimationWidget(Runtime::Engine& engine,
                     result->Normals.size(), result->DegenerateCount, result->FlippedCount);
 
     return true;
+}
+
+bool DrawShortestPathWidget(Runtime::Engine& engine,
+                            entt::entity entity,
+                            ShortestPathWidgetState& state)
+{
+    auto& scene = engine.GetSceneManager().GetScene();
+    auto& reg = scene.GetRegistry();
+    auto& selection = engine.GetSelection();
+    const auto& sub = selection.GetSubElementSelection();
+    const auto elementMode = selection.GetConfig().ElementMode;
+
+    const bool hasMesh = reg.try_get<ECS::Mesh::Data>(entity) != nullptr;
+    const bool hasGraph = reg.try_get<ECS::Graph::Data>(entity) != nullptr;
+    DrawDomainBadges((hasMesh ? GeometryProcessingDomain::MeshVertices : GeometryProcessingDomain::None)
+                    | (hasGraph ? GeometryProcessingDomain::GraphVertices : GeometryProcessingDomain::None));
+
+    if (!hasMesh && !hasGraph)
+    {
+        ImGui::TextDisabled("Shortest Path requires a mesh or graph entity.");
+        return false;
+    }
+
+    if (elementMode != Runtime::Selection::ElementMode::Vertex || sub.Entity != entity)
+    {
+        ImGui::TextDisabled("Switch to Vertex selection mode and select source/target vertices.");
+        return false;
+    }
+
+    std::vector<Geometry::VertexHandle> selectedVertices;
+    selectedVertices.reserve(sub.SelectedVertices.size());
+    for (uint32_t index : sub.SelectedVertices)
+        selectedVertices.emplace_back(static_cast<Geometry::PropertyIndex>(index));
+
+    ImGui::Text("Selected vertices: %zu", selectedVertices.size());
+    if (selectedVertices.size() < 2)
+        ImGui::TextDisabled("Pick at least two vertices (first=source, remaining=targets).");
+
+    ImGui::Checkbox("Stop when all targets settled", &state.StopWhenAllTargetsSettled);
+    ImGui::SliderInt("Max settled vertices (0 = auto)", &state.MaxSettledVertices, 0, 200000);
+
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last shortest-path run failed.");
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Settled vertices: %zu", state.LastSettledVertexCount);
+        ImGui::Text("Relaxed edges: %zu", state.LastRelaxedEdgeCount);
+        ImGui::Text("Reached goals: %zu", state.LastReachedGoalCount);
+        ImGui::Text("Converged: %s", state.LastConverged ? "Yes" : "No");
+        ImGui::Text("Early terminated: %s", state.LastEarlyTerminated ? "Yes" : "No");
+    }
+
+    bool changed = false;
+
+    const bool canRun = selectedVertices.size() >= 2;
+    if (!canRun)
+        ImGui::BeginDisabled();
+    const bool runRequested = ImGui::Button("Compute Shortest Path");
+    if (!canRun)
+        ImGui::EndDisabled();
+
+    if (runRequested && canRun)
+    {
+        const std::span<const Geometry::VertexHandle> sources(selectedVertices.data(), 1);
+        const std::span<const Geometry::VertexHandle> targets(selectedVertices.data() + 1, selectedVertices.size() - 1);
+
+        Geometry::ShortestPath::DijkstraParams params{};
+        params.StopWhenAllTargetsSettled = state.StopWhenAllTargetsSettled;
+        params.MaxSettledVertices = state.MaxSettledVertices > 0
+            ? static_cast<std::size_t>(state.MaxSettledVertices)
+            : 0;
+
+        std::optional<Geometry::ShortestPath::ShortestPathResult> result{};
+        if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity); meshData && meshData->MeshRef)
+            result = Geometry::ShortestPath::Dijkstra(*meshData->MeshRef, sources, targets, params);
+        else if (auto* graphData = reg.try_get<ECS::Graph::Data>(entity); graphData && graphData->GraphRef)
+            result = Geometry::ShortestPath::Dijkstra(*graphData->GraphRef, sources, targets, params);
+
+        if (!result)
+        {
+            state.LastRunFailed = true;
+            state.HasResults = false;
+        }
+        else
+        {
+            state.LastRunFailed = false;
+            state.HasResults = true;
+            state.LastSettledVertexCount = result->SettledVertexCount;
+            state.LastRelaxedEdgeCount = result->RelaxedEdgeCount;
+            state.LastReachedGoalCount = result->ReachedGoalCount;
+            state.LastConverged = result->Converged;
+            state.LastEarlyTerminated = result->EarlyTerminated;
+            state.LastExtractFailed = false;
+            changed = true;
+            Core::Log::Info("ShortestPath: settled={} relaxed={} reached={}",
+                            result->SettledVertexCount,
+                            result->RelaxedEdgeCount,
+                            result->ReachedGoalCount);
+        }
+    }
+
+    if (state.HasResults)
+    {
+        const bool canExtract = selectedVertices.size() >= 2;
+        if (!canExtract)
+            ImGui::BeginDisabled();
+        if (ImGui::Button("Extract Path Graph"))
+        {
+            const std::span<const Geometry::VertexHandle> sources(selectedVertices.data(), 1);
+            const std::span<const Geometry::VertexHandle> targets(selectedVertices.data() + 1, selectedVertices.size() - 1);
+
+            Geometry::ShortestPath::DijkstraParams params{};
+            params.StopWhenAllTargetsSettled = state.StopWhenAllTargetsSettled;
+            params.MaxSettledVertices = state.MaxSettledVertices > 0
+                ? static_cast<std::size_t>(state.MaxSettledVertices)
+                : 0;
+
+            std::optional<Geometry::ShortestPath::ShortestPathResult> result{};
+            std::optional<Geometry::Graph::Graph> extracted{};
+            if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity); meshData && meshData->MeshRef)
+            {
+                result = Geometry::ShortestPath::Dijkstra(*meshData->MeshRef, sources, targets, params);
+                if (result) extracted = Geometry::ShortestPath::ExtractPathGraph(*meshData->MeshRef, *result, sources, targets);
+            }
+            else if (auto* graphData = reg.try_get<ECS::Graph::Data>(entity); graphData && graphData->GraphRef)
+            {
+                result = Geometry::ShortestPath::Dijkstra(*graphData->GraphRef, sources, targets, params);
+                if (result) extracted = Geometry::ShortestPath::ExtractPathGraph(*graphData->GraphRef, *result, sources, targets);
+            }
+
+            if (!extracted)
+            {
+                state.LastExtractFailed = true;
+            }
+            else
+            {
+                entt::entity pathEntity = scene.CreateEntity("Shortest Path Graph");
+                reg.emplace<ECS::DataAuthority::GraphTag>(pathEntity);
+                auto& graphData = reg.emplace<ECS::Graph::Data>(pathEntity);
+                graphData.GraphRef = std::make_shared<Geometry::Graph::Graph>(std::move(*extracted));
+                graphData.GpuDirty = true;
+                reg.emplace<ECS::Components::Selection::SelectableTag>(pathEntity);
+                state.LastExtractFailed = false;
+                state.LastPathVertexCount = graphData.GraphRef->VertexCount();
+                state.LastPathEdgeCount = graphData.GraphRef->EdgeCount();
+                changed = true;
+            }
+        }
+        if (!canExtract)
+            ImGui::EndDisabled();
+
+        if (state.LastExtractFailed)
+            ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Path extraction failed.");
+        if (state.LastPathVertexCount > 0 || state.LastPathEdgeCount > 0)
+            ImGui::Text("Last path graph: %zu vertices, %zu edges",
+                        state.LastPathVertexCount,
+                        state.LastPathEdgeCount);
+    }
+
+    return changed;
 }
 
 // =========================================================================
