@@ -4,6 +4,7 @@ module;
 #include <string>
 #include <optional>
 #include <memory>
+#include <unordered_map>
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
@@ -26,45 +27,66 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
+    struct PipelineLibrary::Impl
+    {
+        Impl(std::shared_ptr<RHI::VulkanDevice> device,
+             RHI::BindlessDescriptorSystem& bindless,
+             RHI::DescriptorLayout& globalSetLayout)
+            : DeviceOwner(std::move(device)),
+              Device(DeviceOwner.get()),
+              Bindless(bindless),
+              GlobalSetLayout(globalSetLayout)
+        {
+        }
+
+        std::shared_ptr<RHI::VulkanDevice> DeviceOwner;
+        RHI::VulkanDevice* Device = nullptr;
+        RHI::BindlessDescriptorSystem& Bindless;
+        RHI::DescriptorLayout& GlobalSetLayout;
+        std::unordered_map<Core::Hash::StringID, std::unique_ptr<RHI::GraphicsPipeline>> Pipelines;
+        VkDescriptorSetLayout Stage1InstanceSetLayout = VK_NULL_HANDLE;
+        VkDescriptorSetLayout CullSetLayout = VK_NULL_HANDLE;
+        std::unique_ptr<RHI::ComputePipeline> CullPipeline;
+        VkDescriptorSetLayout SceneUpdateSetLayout = VK_NULL_HANDLE;
+        std::unique_ptr<RHI::ComputePipeline> SceneUpdatePipeline;
+    };
+
     PipelineLibrary::PipelineLibrary(std::shared_ptr<RHI::VulkanDevice> device,
                                      RHI::BindlessDescriptorSystem& bindless,
                                      RHI::DescriptorLayout& globalSetLayout)
-        : m_DeviceOwner(std::move(device)),
-          m_Device(m_DeviceOwner.get()),
-          m_Bindless(bindless),
-          m_GlobalSetLayout(globalSetLayout)
+        : m_Impl(std::make_unique<Impl>(std::move(device), bindless, globalSetLayout))
     {
     }
 
     PipelineLibrary::~PipelineLibrary()
     {
-        if (!m_Device) return;
+        if (!m_Impl->Device) return;
 
-        VkDevice logicalDevice = m_Device->GetLogicalDevice();
+        VkDevice logicalDevice = m_Impl->Device->GetLogicalDevice();
         if (logicalDevice == VK_NULL_HANDLE) return;
 
         // Clear pipelines first (they reference the layouts).
-        m_Pipelines.clear();
-        m_CullPipeline.reset();
-        m_SceneUpdatePipeline.reset();
+        m_Impl->Pipelines.clear();
+        m_Impl->CullPipeline.reset();
+        m_Impl->SceneUpdatePipeline.reset();
 
         // Destroy descriptor set layouts created in BuildDefaults().
-        if (m_Stage1InstanceSetLayout != VK_NULL_HANDLE)
+        if (m_Impl->Stage1InstanceSetLayout != VK_NULL_HANDLE)
         {
-            vkDestroyDescriptorSetLayout(logicalDevice, m_Stage1InstanceSetLayout, nullptr);
-            m_Stage1InstanceSetLayout = VK_NULL_HANDLE;
+            vkDestroyDescriptorSetLayout(logicalDevice, m_Impl->Stage1InstanceSetLayout, nullptr);
+            m_Impl->Stage1InstanceSetLayout = VK_NULL_HANDLE;
         }
 
-        if (m_CullSetLayout != VK_NULL_HANDLE)
+        if (m_Impl->CullSetLayout != VK_NULL_HANDLE)
         {
-            vkDestroyDescriptorSetLayout(logicalDevice, m_CullSetLayout, nullptr);
-            m_CullSetLayout = VK_NULL_HANDLE;
+            vkDestroyDescriptorSetLayout(logicalDevice, m_Impl->CullSetLayout, nullptr);
+            m_Impl->CullSetLayout = VK_NULL_HANDLE;
         }
 
-        if (m_SceneUpdateSetLayout != VK_NULL_HANDLE)
+        if (m_Impl->SceneUpdateSetLayout != VK_NULL_HANDLE)
         {
-            vkDestroyDescriptorSetLayout(logicalDevice, m_SceneUpdateSetLayout, nullptr);
-            m_SceneUpdateSetLayout = VK_NULL_HANDLE;
+            vkDestroyDescriptorSetLayout(logicalDevice, m_Impl->SceneUpdateSetLayout, nullptr);
+            m_Impl->SceneUpdateSetLayout = VK_NULL_HANDLE;
         }
     }
 
@@ -96,11 +118,11 @@ namespace Graphics
         {
             auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.Frag"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
             RHI::VertexInputDescription inputLayout = {}; // Empty input layout due to BDA.
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({sceneColorFormat});
@@ -114,12 +136,12 @@ namespace Graphics
             // If this ever flips again, revisit the projection Y-flip convention.
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
-            builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
 
             // Stage 1: per-frame instance/visibility SSBOs (set = 2).
             // Create this layout once and reuse it (must match the pipeline layout exactly).
-            if (m_Stage1InstanceSetLayout == VK_NULL_HANDLE)
+            if (m_Impl->Stage1InstanceSetLayout == VK_NULL_HANDLE)
             {
                 VkDescriptorSetLayoutBinding bindings[2]{};
                 bindings[0].binding = 0;
@@ -137,14 +159,14 @@ namespace Graphics
                 layoutInfo.bindingCount = 2;
                 layoutInfo.pBindings = bindings;
 
-                VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr,
-                                                    &m_Stage1InstanceSetLayout));
+                VK_CHECK(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr,
+                                                    &m_Impl->Stage1InstanceSetLayout));
 
                 // NOTE: Do NOT SafeDestroy() this layout. SafeDestroy schedules deletion a frame later,
                 // which will invalidate descriptor allocations while the pipeline (and SurfacePass) are still live.
             }
 
-            builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+            builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -159,7 +181,7 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_Surface] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_Surface] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
@@ -180,11 +202,11 @@ namespace Graphics
             {
                 auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.Frag"_id);
 
-                RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-                RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+                RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+                RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
                 RHI::VertexInputDescription inputLayout = {};
-                RHI::PipelineBuilder builder(m_DeviceOwner);
+                RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
                 builder.SetShaders(&vert, &frag);
                 builder.SetInputLayout(inputLayout);
                 builder.SetColorFormats({sceneColorFormat});
@@ -193,9 +215,9 @@ namespace Graphics
                 builder.EnableDynamicDepthCompareOp();
 
                 builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-                builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
-                builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
-                builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+                builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
+                builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
+                builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
 
                 VkPushConstantRange pushConstant{};
                 pushConstant.offset = 0;
@@ -210,18 +232,18 @@ namespace Graphics
                     std::exit(1);
                 }
 
-                m_Pipelines[kPipeline_SurfaceLines] = std::move(*pipelineResult);
+                m_Impl->Pipelines[kPipeline_SurfaceLines] = std::move(*pipelineResult);
             }
 
             // Points
             {
                 auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.Frag"_id);
 
-                RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-                RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+                RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+                RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
                 RHI::VertexInputDescription inputLayout = {};
-                RHI::PipelineBuilder builder(m_DeviceOwner);
+                RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
                 builder.SetShaders(&vert, &frag);
                 builder.SetInputLayout(inputLayout);
                 builder.SetColorFormats({sceneColorFormat});
@@ -230,9 +252,9 @@ namespace Graphics
                 builder.EnableDynamicDepthCompareOp();
 
                 builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-                builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
-                builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
-                builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+                builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
+                builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
+                builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
 
                 VkPushConstantRange pushConstant{};
                 pushConstant.offset = 0;
@@ -247,7 +269,7 @@ namespace Graphics
                     std::exit(1);
                 }
 
-                m_Pipelines[Graphics::kPipeline_SurfacePoints] = std::move(*pipelineResult);
+                m_Impl->Pipelines[Graphics::kPipeline_SurfacePoints] = std::move(*pipelineResult);
             }
         }
 
@@ -262,11 +284,11 @@ namespace Graphics
         {
             auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.GBuffer.Frag"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
             RHI::VertexInputDescription inputLayout = {};
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({
@@ -277,9 +299,9 @@ namespace Graphics
             builder.SetDepthFormat(depthFormat);
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
             builder.EnableDynamicDepthCompareOp();
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
-            builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
-            builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
+            builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -294,7 +316,7 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_SurfaceGBuffer] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_SurfaceGBuffer] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
@@ -308,11 +330,11 @@ namespace Graphics
         {
             auto [vertPath, fragPath] = resolveVF("DebugSurface.Vert"_id, "DebugSurface.Frag"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
             RHI::VertexInputDescription inputLayout = {};
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({sceneColorFormat});
@@ -320,7 +342,7 @@ namespace Graphics
             builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
             builder.EnableAlphaBlending();
             builder.EnableDepthTest(false); // depth test on, depth write off
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -335,7 +357,7 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_DebugSurface] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_DebugSurface] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
@@ -350,10 +372,10 @@ namespace Graphics
         {
             const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(resolver, "Surface.Vert"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
 
             RHI::VertexInputDescription inputLayout = {};
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, nullptr);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({});
@@ -361,9 +383,9 @@ namespace Graphics
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
             builder.EnableDepthTest(true, VK_COMPARE_OP_LESS);
 
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
-            builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
-            builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
+            builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
 
             // Use VERTEX|FRAGMENT stage flags to match the forward pipeline layout,
             // ensuring pipeline layout compatibility for descriptor set bindings.
@@ -382,7 +404,7 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_DepthPrepass] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_DepthPrepass] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
@@ -391,11 +413,11 @@ namespace Graphics
         {
             auto [vertPath, fragPath] = resolveVF("Picking.Vert"_id, "Picking.Frag"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
             RHI::VertexInputDescription inputLayout = {};
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({VK_FORMAT_R32_UINT});
@@ -404,7 +426,7 @@ namespace Graphics
             // Keep winding convention consistent with the main Surface pass.
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -419,7 +441,7 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_Picking] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_Picking] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
@@ -428,17 +450,17 @@ namespace Graphics
         {
             auto [vertPath, fragPath] = resolveVF("PickMesh.Vert"_id, "PickMesh.Frag"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
             RHI::VertexInputDescription inputLayout = {};
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({VK_FORMAT_R32_UINT, VK_FORMAT_R32_UINT});
             builder.SetDepthFormat(depthFormat);
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -456,7 +478,7 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_PickMesh] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_PickMesh] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
@@ -465,18 +487,18 @@ namespace Graphics
         {
             auto [vertPath, fragPath] = resolveVF("PickLine.Vert"_id, "PickLine.Frag"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
             RHI::VertexInputDescription inputLayout = {};
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({VK_FORMAT_R32_UINT, VK_FORMAT_R32_UINT});
             builder.SetDepthFormat(depthFormat);
             builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
             builder.EnableDepthBias(-1.0f, -1.0f);
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -491,7 +513,7 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_PickLine] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_PickLine] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
@@ -500,18 +522,18 @@ namespace Graphics
         {
             auto [vertPath, fragPath] = resolveVF("PickPoint.Vert"_id, "PickPoint.Frag"_id);
 
-            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Impl->Device, fragPath, RHI::ShaderStage::Fragment);
 
             RHI::VertexInputDescription inputLayout = {};
-            RHI::PipelineBuilder builder(m_DeviceOwner);
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({VK_FORMAT_R32_UINT, VK_FORMAT_R32_UINT});
             builder.SetDepthFormat(depthFormat);
             builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
             builder.EnableDepthBias(-2.0f, -2.0f);
-            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -526,14 +548,14 @@ namespace Graphics
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_PickPoint] = std::move(*pipelineResult);
+            m_Impl->Pipelines[kPipeline_PickPoint] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
         // GPUScene: Scatter update pipeline
         // ---------------------------------------------------------------------
         {
-            if (m_SceneUpdateSetLayout == VK_NULL_HANDLE)
+            if (m_Impl->SceneUpdateSetLayout == VK_NULL_HANDLE)
             {
                 VkDescriptorSetLayoutBinding bindings[3]{};
 
@@ -560,18 +582,18 @@ namespace Graphics
                 layoutInfo.bindingCount = 3;
                 layoutInfo.pBindings = bindings;
 
-                VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_SceneUpdateSetLayout));
+                VK_CHECK(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Impl->SceneUpdateSetLayout));
             }
 
-            if (!m_SceneUpdatePipeline)
+            if (!m_Impl->SceneUpdatePipeline)
             {
                 const std::string compPath = resolveComp("SceneUpdate.Comp"_id);
 
-                RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
+                RHI::ShaderModule comp(*m_Impl->Device, compPath, RHI::ShaderStage::Compute);
 
-                RHI::ComputePipelineBuilder cb(m_DeviceOwner);
+                RHI::ComputePipelineBuilder cb(m_Impl->DeviceOwner);
                 cb.SetShader(&comp);
-                cb.AddDescriptorSetLayout(m_SceneUpdateSetLayout);
+                cb.AddDescriptorSetLayout(m_Impl->SceneUpdateSetLayout);
 
                 VkPushConstantRange pcr{};
                 pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -585,7 +607,7 @@ namespace Graphics
                     Core::Log::Error("Failed to build SceneUpdate compute pipeline: {}", (int)built.error());
                     std::exit(1);
                 }
-                m_SceneUpdatePipeline = std::move(*built);
+                m_Impl->SceneUpdatePipeline = std::move(*built);
             }
         }
 
@@ -593,7 +615,7 @@ namespace Graphics
         // Stage 3: Compute culling pipeline
         // ---------------------------------------------------------------------
         {
-            if (m_CullSetLayout == VK_NULL_HANDLE)
+            if (m_Impl->CullSetLayout == VK_NULL_HANDLE)
             {
                 VkDescriptorSetLayoutBinding bindings[7]{};
                 // binding 1: Instances
@@ -643,18 +665,18 @@ namespace Graphics
                 layoutInfo.bindingCount = 7;
                 layoutInfo.pBindings = bindings;
 
-                VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_CullSetLayout));
+                VK_CHECK(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Impl->CullSetLayout));
             }
 
-            if (!m_CullPipeline)
+            if (!m_Impl->CullPipeline)
             {
                 const std::string compPath = resolveComp("Cull.Comp"_id);
 
-                RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
+                RHI::ShaderModule comp(*m_Impl->Device, compPath, RHI::ShaderStage::Compute);
 
-                RHI::ComputePipelineBuilder cb(m_DeviceOwner);
+                RHI::ComputePipelineBuilder cb(m_Impl->DeviceOwner);
                 cb.SetShader(&comp);
-                cb.AddDescriptorSetLayout(m_CullSetLayout);
+                cb.AddDescriptorSetLayout(m_Impl->CullSetLayout);
 
                 VkPushConstantRange pcr{};
                 pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -668,7 +690,7 @@ namespace Graphics
                     Core::Log::Error("Failed to build Cull compute pipeline: {}", (int)built.error());
                     std::exit(1);
                 }
-                m_CullPipeline = std::move(*built);
+                m_Impl->CullPipeline = std::move(*built);
             }
         }
     }
@@ -676,8 +698,8 @@ namespace Graphics
     std::optional<std::reference_wrapper<RHI::GraphicsPipeline>>
     PipelineLibrary::TryGet(Core::Hash::StringID name)
     {
-        auto it = m_Pipelines.find(name);
-        if (it == m_Pipelines.end() || !it->second)
+        auto it = m_Impl->Pipelines.find(name);
+        if (it == m_Impl->Pipelines.end() || !it->second)
             return std::nullopt;
         return *it->second;
     }
@@ -685,8 +707,8 @@ namespace Graphics
     std::optional<std::reference_wrapper<const RHI::GraphicsPipeline>>
     PipelineLibrary::TryGet(Core::Hash::StringID name) const
     {
-        auto it = m_Pipelines.find(name);
-        if (it == m_Pipelines.end() || !it->second)
+        auto it = m_Impl->Pipelines.find(name);
+        if (it == m_Impl->Pipelines.end() || !it->second)
             return std::nullopt;
         return *it->second;
     }
@@ -711,5 +733,35 @@ namespace Graphics
             std::exit(-1);
         }
         return p->get();
+    }
+
+    bool PipelineLibrary::Contains(Core::Hash::StringID name) const
+    {
+        return m_Impl->Pipelines.contains(name);
+    }
+
+    VkDescriptorSetLayout PipelineLibrary::GetStage1InstanceSetLayout() const
+    {
+        return m_Impl->Stage1InstanceSetLayout;
+    }
+
+    VkDescriptorSetLayout PipelineLibrary::GetCullSetLayout() const
+    {
+        return m_Impl->CullSetLayout;
+    }
+
+    RHI::ComputePipeline* PipelineLibrary::GetCullPipeline() const
+    {
+        return m_Impl->CullPipeline.get();
+    }
+
+    VkDescriptorSetLayout PipelineLibrary::GetSceneUpdateSetLayout() const
+    {
+        return m_Impl->SceneUpdateSetLayout;
+    }
+
+    RHI::ComputePipeline* PipelineLibrary::GetSceneUpdatePipeline() const
+    {
+        return m_Impl->SceneUpdatePipeline.get();
     }
 }

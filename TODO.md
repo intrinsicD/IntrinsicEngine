@@ -521,7 +521,7 @@ A dedicated peer-review pass was run against engine-facing module interfaces and
 
 #### P2 — Tier B migration
 - [x] Introduce PImpl for `Runtime::AssetPipeline`.
-- [ ] Introduce PImpl for `Graphics::PipelineLibrary`.
+- [x] Introduce PImpl for `Graphics::PipelineLibrary`.
 - [ ] Re-run compile metrics and compare against P0 baseline.
 
 #### P3 — Validation & hardening
