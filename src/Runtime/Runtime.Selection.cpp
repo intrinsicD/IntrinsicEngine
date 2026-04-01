@@ -156,6 +156,29 @@ namespace Runtime::Selection
             return glm::dot(d, d);
         }
 
+        [[nodiscard]] inline std::optional<Geometry::Ray> CursorWorldRayFromMatrices(const PickRequest& request)
+        {
+            const float viewportWidth = std::max(request.ViewportWidthPixels, 1.0f);
+            const float viewportHeight = std::max(request.ViewportHeightPixels, 1.0f);
+            const float ndcX = (request.CursorPositionPixels.x / viewportWidth) * 2.0f - 1.0f;
+            const float ndcY = 1.0f - (request.CursorPositionPixels.y / viewportHeight) * 2.0f;
+
+            const glm::mat4 invViewProj = glm::inverse(request.ProjectionMatrix * request.ViewMatrix);
+            const glm::vec4 nearH = invViewProj * glm::vec4(ndcX, ndcY, -1.0f, 1.0f);
+            const glm::vec4 farH = invViewProj * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
+            if (std::abs(nearH.w) <= 1.0e-8f || std::abs(farH.w) <= 1.0e-8f)
+                return std::nullopt;
+
+            const glm::vec3 nearP = glm::vec3(nearH) / nearH.w;
+            const glm::vec3 farP = glm::vec3(farH) / farH.w;
+            const glm::vec3 dir = farP - nearP;
+            const float lenSq = SquaredLength(dir);
+            if (lenSq <= 1.0e-20f)
+                return std::nullopt;
+
+            return Geometry::Validation::Sanitize(Geometry::Ray{nearP, dir / std::sqrt(lenSq)});
+        }
+
         // Compute the unit normal of a triangle given three world-space vertices.
         // Returns zero for degenerate (collinear/coincident) triangles.
         [[nodiscard]] inline glm::vec3 ComputeTriangleNormal(
@@ -577,9 +600,10 @@ namespace Runtime::Selection
 
             const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
             const glm::mat4 invWorld = glm::inverse(world);
+            const Geometry::Ray worldRay = CursorWorldRayFromMatrices(request).value_or(request.WorldRay);
             Geometry::Ray rayLocal{
-                TransformPoint(invWorld, request.WorldRay.Origin),
-                glm::normalize(glm::mat3(invWorld) * request.WorldRay.Direction)
+                TransformPoint(invWorld, worldRay.Origin),
+                glm::normalize(glm::mat3(invWorld) * worldRay.Direction)
             };
             rayLocal = Geometry::Validation::Sanitize(rayLocal);
 
@@ -640,7 +664,6 @@ namespace Runtime::Selection
             }
 
             const float pickRadius = ComputeWorldPickRadius(bestWorldT, request);
-            const float radiusSq = pickRadius * pickRadius;
 
             Picked picked = MakeEntityPicked(entity, pickRadius);
             picked.entity.face_idx = resolvedFaceIndex;
@@ -649,42 +672,43 @@ namespace Runtime::Selection
             picked.spaces.WorldNormal = bestWorldNormal;
             picked.spaces.Barycentric = bestBarycentric;
 
+            glm::vec3 faceNormal{0.0f};
+            for (std::size_t i = 0; i < faceVertices.size(); ++i)
+            {
+                const glm::vec3 p0 = mesh.Position(faceVertices[i]);
+                const glm::vec3 p1 = mesh.Position(faceVertices[(i + 1) % faceVertices.size()]);
+                faceNormal += glm::cross(p0, p1);
+            }
+            const float normalLenSq = SquaredLength(faceNormal);
+            if (normalLenSq > 1.0e-20f)
+                faceNormal /= std::sqrt(normalLenSq);
+
+            glm::vec3 localCursorPoint = bestLocalPoint;
+            if (SquaredLength(faceNormal) > 0.0f)
+            {
+                const float denom = glm::dot(rayLocal.Direction, faceNormal);
+                if (std::abs(denom) > 1.0e-8f)
+                {
+                    const float tPlane = glm::dot(localCentroid - rayLocal.Origin, faceNormal) / denom;
+                    if (std::isfinite(tPlane))
+                        localCursorPoint = rayLocal.Origin + tPlane * rayLocal.Direction;
+                }
+            }
+
+            picked.spaces.Local = localCursorPoint;
+            picked.spaces.World = TransformPoint(world, localCursorPoint);
+
             float bestEdgeDistSq = std::numeric_limits<float>::infinity();
-            bool foundEdgeWithinRadius = false;
-            const float pixelRadiusSq = request.PickRadiusPixels * request.PickRadiusPixels;
             for (const auto halfedge : mesh.HalfedgesAroundFace(*face))
             {
                 const auto from = mesh.FromVertex(halfedge);
                 const auto to = mesh.ToVertex(halfedge);
-                const glm::vec3 edgeA = TransformPoint(world, mesh.Position(from));
-                const glm::vec3 edgeB = TransformPoint(world, mesh.Position(to));
-                const auto screenA = ProjectWorldToScreen(request, edgeA);
-                const auto screenB = ProjectWorldToScreen(request, edgeB);
-                float edgeMetricSq = std::numeric_limits<float>::infinity();
-                bool withinRadius = false;
-                if (screenA && screenB && screenA->InFront && screenB->InFront)
-                {
-                    edgeMetricSq = ScreenDistanceSqPointSegment(
-                        request.CursorPositionPixels, screenA->Pixel, screenB->Pixel);
-                    withinRadius = edgeMetricSq <= pixelRadiusSq;
-                }
-                else
-                {
-                    const auto closest = Geometry::ClosestPointSegment(bestWorldPoint, edgeA, edgeB);
-                    edgeMetricSq = closest.DistanceSq;
-                    withinRadius = closest.DistanceSq <= radiusSq;
-                }
-                if (!withinRadius && foundEdgeWithinRadius)
-                    continue;
+                const glm::vec3 edgeA = mesh.Position(from);
+                const glm::vec3 edgeB = mesh.Position(to);
+                const auto closest = Geometry::ClosestPointSegment(localCursorPoint, edgeA, edgeB);
+                const float edgeMetricSq = closest.DistanceSq;
 
                 const uint32_t edgeIndex = static_cast<uint32_t>(mesh.Edge(halfedge).Index);
-                if (withinRadius && !foundEdgeWithinRadius)
-                {
-                    foundEdgeWithinRadius = true;
-                    bestEdgeDistSq = std::numeric_limits<float>::infinity();
-                    picked.entity.edge_idx = Picked::Entity::InvalidIndex;
-                }
-
                 if (edgeMetricSq < bestEdgeDistSq ||
                     (edgeMetricSq == bestEdgeDistSq && edgeIndex < picked.entity.edge_idx))
                 {
@@ -694,33 +718,11 @@ namespace Runtime::Selection
             }
 
             float bestVertexDistSq = std::numeric_limits<float>::infinity();
-            bool foundVertexWithinRadius = false;
             for (const auto vertex : faceVertices)
             {
                 const uint32_t vertexIndex = static_cast<uint32_t>(vertex.Index);
-                const glm::vec3 worldVertex = TransformPoint(world, mesh.Position(vertex));
-                const auto screenVertex = ProjectWorldToScreen(request, worldVertex);
-                float vertexMetricSq = std::numeric_limits<float>::infinity();
-                bool withinRadius = false;
-                if (screenVertex && screenVertex->InFront)
-                {
-                    vertexMetricSq = ScreenDistanceSqToCursor(request, screenVertex->Pixel);
-                    withinRadius = vertexMetricSq <= pixelRadiusSq;
-                }
-                else
-                {
-                    vertexMetricSq = SquaredLength(worldVertex - bestWorldPoint);
-                    withinRadius = vertexMetricSq <= radiusSq;
-                }
-                if (!withinRadius && foundVertexWithinRadius)
-                    continue;
-
-                if (withinRadius && !foundVertexWithinRadius)
-                {
-                    foundVertexWithinRadius = true;
-                    bestVertexDistSq = std::numeric_limits<float>::infinity();
-                    picked.entity.vertex_idx = Picked::Entity::InvalidIndex;
-                }
+                const glm::vec3 localVertex = mesh.Position(vertex);
+                const float vertexMetricSq = SquaredLength(localVertex - localCursorPoint);
 
                 if (vertexMetricSq < bestVertexDistSq ||
                     (vertexMetricSq == bestVertexDistSq && vertexIndex < picked.entity.vertex_idx))
