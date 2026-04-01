@@ -56,6 +56,8 @@ export namespace Graphics
         SceneColorLDR,
         SelectionMask,
         SelectionOutline,
+        ShadowAtlas,
+        Count,
     };
 
     enum class RenderResourceFormatSource : uint8_t
@@ -142,6 +144,12 @@ export namespace Graphics
             return {resource, "SelectionOutline"_id, VK_FORMAT_UNDEFINED, RenderResourceFormatSource::Swapchain,
                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case ShadowAtlas:
+            return {resource, "ShadowAtlas"_id, VK_FORMAT_UNDEFINED, RenderResourceFormatSource::Depth,
+                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_DEPTH_BIT, RenderResourceLifetime::FrameTransient, true};
+        case Count:
+            break;
         }
         return {};
     }
@@ -178,6 +186,7 @@ export namespace Graphics
                  RenderResource::SceneColorLDR,
                  RenderResource::SelectionMask,
                  RenderResource::SelectionOutline,
+                 RenderResource::ShadowAtlas,
              })
         {
             if (GetRenderResourceName(resource) == name)
@@ -198,6 +207,7 @@ export namespace Graphics
         bool Post = false;
         bool DebugVisualization = false;
         bool SceneColorLDR = false;
+        bool Shadows = false;
         FrameLightingPath LightingPath = FrameLightingPath::None;
 
         [[nodiscard]] bool Requires(RenderResource resource) const
@@ -215,6 +225,8 @@ export namespace Graphics
             case SceneColorLDR: return this->SceneColorLDR;
             case SelectionMask:
             case SelectionOutline: return false;
+            case ShadowAtlas: return Shadows;
+            case Count: return false;
             }
             return false;
         }
@@ -540,6 +552,12 @@ export namespace Graphics
         RGTextureDesc desc{};
         desc.Width = ctx.Resolution.width;
         desc.Height = ctx.Resolution.height;
+        if (resource == RenderResource::ShadowAtlas)
+        {
+            constexpr uint32_t kShadowCascadeResolution = 2048u;
+            desc.Width = kShadowCascadeResolution * ShadowParams::MaxCascades;
+            desc.Height = kShadowCascadeResolution;
+        }
         desc.Format = ResolveRenderResourceFormat(resource, ctx.SwapchainFormat, ctx.DepthFormat);
         desc.Usage = def.Usage;
         desc.Aspect = def.Aspect;

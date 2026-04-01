@@ -106,6 +106,7 @@ namespace Graphics
         recipe.Normals = UsesDeferredComposition(recipe.LightingPath) || debugRequestsNormals;
         recipe.MaterialChannels = UsesDeferredComposition(recipe.LightingPath) || debugRequestsMaterial;
         recipe.SceneColorLDR = recipe.Post || selectionActive || debugActive || inputs.ImGuiPassEnabled;
+        recipe.Shadows = inputs.ShadowsEnabled && hasGeometry && recipe.LightingPath != FrameLightingPath::None;
 
         return recipe;
     }
@@ -449,6 +450,7 @@ namespace Graphics
         inputs.DebugViewPassEnabled = m_Impl->DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass);
         inputs.ImGuiPassEnabled = m_Impl->ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass);
         inputs.CompositionPassEnabled = m_Impl->CompositionPass != nullptr;
+        inputs.ShadowsEnabled = ctx.Lighting.Shadows.Enabled;
         inputs.HasSelectionWork = ctx.HasSelectionWork;
         inputs.DebugViewEnabled = ctx.Debug.Enabled;
         inputs.DebugResource = ctx.Debug.SelectedResource;

@@ -32,6 +32,7 @@ export namespace Graphics
         bool DebugViewPassEnabled = true;
         bool ImGuiPassEnabled = true;
         bool CompositionPassEnabled = true;
+        bool ShadowsEnabled = false;
         bool HasSelectionWork = false;
         bool DebugViewEnabled = false;
         FrameLightingPath RequestedLightingPath = FrameLightingPath::Forward;
