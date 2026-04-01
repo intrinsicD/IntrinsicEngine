@@ -121,8 +121,29 @@ namespace
                 lighting.Shadows.Enabled = shadows["enabled"].get<bool>();
             if (shadows.contains("cascadeCount"))
             {
-                const uint32_t requestedCount = shadows["cascadeCount"].get<uint32_t>();
-                lighting.Shadows.CascadeCount = std::clamp(requestedCount, 1u, Graphics::ShadowParams::MaxCascades);
+                const auto& countJson = shadows["cascadeCount"];
+                int64_t requestedCount = static_cast<int64_t>(lighting.Shadows.CascadeCount);
+                bool hasNumericValue = false;
+
+                if (countJson.is_number_integer())
+                {
+                    requestedCount = countJson.get<int64_t>();
+                    hasNumericValue = true;
+                }
+                else if (countJson.is_number_unsigned())
+                {
+                    requestedCount = static_cast<int64_t>(countJson.get<uint64_t>());
+                    hasNumericValue = true;
+                }
+
+                if (hasNumericValue)
+                {
+                    const int64_t clampedCount = std::clamp(
+                        requestedCount,
+                        int64_t{1},
+                        static_cast<int64_t>(Graphics::ShadowParams::MaxCascades));
+                    lighting.Shadows.CascadeCount = static_cast<uint32_t>(clampedCount);
+                }
             }
             if (shadows.contains("cascadeSplits"))
             {

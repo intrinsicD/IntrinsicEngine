@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <expected>
 #include <span>
+#include <algorithm>
 
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
@@ -200,6 +201,19 @@ TEST(SceneSchema, LightEnvironmentBlock)
     EXPECT_FLOAT_EQ(doc["lighting"]["ambientIntensity"].get<float>(), 0.15f);
     EXPECT_TRUE(doc["lighting"]["shadows"]["enabled"].get<bool>());
     EXPECT_EQ(doc["lighting"]["shadows"]["cascadeCount"].get<uint32_t>(), 4u);
+}
+
+TEST(SceneSchema, ShadowCascadeCount_AllowsSignedInputForRobustClamping)
+{
+    json shadows;
+    shadows["cascadeCount"] = -1;
+
+    ASSERT_TRUE(shadows["cascadeCount"].is_number_integer());
+    EXPECT_NO_THROW({
+        const int64_t requested = shadows["cascadeCount"].get<int64_t>();
+        const int64_t clamped = std::clamp<int64_t>(requested, 1, 4);
+        EXPECT_EQ(clamped, 1);
+    });
 }
 
 TEST(SceneSchema, PointCloudRenderParams)
