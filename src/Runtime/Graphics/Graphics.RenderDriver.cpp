@@ -98,7 +98,7 @@ namespace Graphics
             using enum RenderResource;
             for (RenderResource r : {SceneDepth, EntityId, PrimitiveId,
                  SceneNormal, Albedo, Material0, SceneColorHDR,
-                 SceneColorLDR, SelectionMask, SelectionOutline})
+                 SceneColorLDR, SelectionMask, SelectionOutline, ShadowAtlas})
             {
                 if (GetRenderResourceName(r) != id)
                     continue;
@@ -114,6 +114,8 @@ namespace Graphics
                 case SceneColorLDR:    return "SceneColorLDR";
                 case SelectionMask:    return "SelectionMask";
                 case SelectionOutline: return "SelectionOutline";
+                case ShadowAtlas:      return "ShadowAtlas";
+                case Count:            break;
                 }
             }
             if (id == "Backbuffer"_id) return "Backbuffer";
@@ -192,6 +194,7 @@ namespace Graphics
                  RenderResource::SceneColorLDR,
                  RenderResource::SelectionMask,
                  RenderResource::SelectionOutline,
+                 RenderResource::ShadowAtlas,
              })
         {
             if (!recipe.Requires(resource))
@@ -1220,7 +1223,7 @@ namespace Graphics
 
         struct FrameSetupData
         {
-            std::array<RGResourceHandle, 10> Resources{};
+            std::array<RGResourceHandle, static_cast<size_t>(RenderResource::Count)> Resources{};
             RGResourceHandle Backbuffer;
         };
         m_Impl->m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
@@ -1246,6 +1249,7 @@ namespace Graphics
                                                            RenderResource::SceneColorLDR,
                                                            RenderResource::SelectionMask,
                                                            RenderResource::SelectionOutline,
+                                                           RenderResource::ShadowAtlas,
                                                        })
                                                   {
                                                       if (!stableCtx->Recipe.Requires(resource))

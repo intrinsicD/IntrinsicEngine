@@ -99,6 +99,7 @@ TEST(RenderResources, DefaultPipelineRecipeAllocatesOnlyRequiredCanonicalTargets
     EXPECT_FALSE(recipe.Requires(RenderResource::SelectionOutline));
     EXPECT_TRUE(recipe.Requires(RenderResource::PrimitiveId));
     EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
+    EXPECT_FALSE(recipe.Requires(RenderResource::ShadowAtlas));
 }
 
 TEST(RenderResources, PrimitiveIdIsOptionalWhenPickingIsDisabled)
@@ -788,7 +789,8 @@ TEST(RenderResources, MinimalRecipe_NoPasses_EmptyRecipe)
                    RenderResource::PrimitiveId, RenderResource::SceneNormal,
                    RenderResource::Albedo, RenderResource::Material0,
                    RenderResource::SceneColorHDR, RenderResource::SceneColorLDR,
-                   RenderResource::SelectionMask, RenderResource::SelectionOutline})
+                   RenderResource::SelectionMask, RenderResource::SelectionOutline,
+                   RenderResource::ShadowAtlas})
     {
         EXPECT_FALSE(recipe.Requires(r)) << "Resource should not be required in empty recipe";
     }
@@ -1099,7 +1101,7 @@ TEST(RenderResources, AllCanonicalResourceDefinitionsHaveUniqueNames)
 {
     using namespace Graphics;
 
-    std::array<RenderResource, 10> allResources = {
+    std::array<RenderResource, 11> allResources = {
         RenderResource::SceneDepth,
         RenderResource::EntityId,
         RenderResource::PrimitiveId,
@@ -1110,6 +1112,7 @@ TEST(RenderResources, AllCanonicalResourceDefinitionsHaveUniqueNames)
         RenderResource::SceneColorLDR,
         RenderResource::SelectionMask,
         RenderResource::SelectionOutline,
+        RenderResource::ShadowAtlas,
     };
 
     // All names must be unique (no collisions in the StringID space).
@@ -1182,7 +1185,7 @@ TEST(RenderResources, CanonicalResourceLifetimes)
                    RenderResource::SceneNormal, RenderResource::Albedo,
                    RenderResource::Material0, RenderResource::SceneColorHDR,
                    RenderResource::SceneColorLDR, RenderResource::SelectionMask,
-                   RenderResource::SelectionOutline})
+                   RenderResource::SelectionOutline, RenderResource::ShadowAtlas})
     {
         EXPECT_EQ(GetRenderResourceDefinition(r).Lifetime,
                   RenderResourceLifetime::FrameTransient)
@@ -1202,6 +1205,24 @@ TEST(RenderResources, NonOptionalResourcesAreIdentified)
     EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::EntityId).Optional);
     EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::PrimitiveId).Optional);
     EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::SceneNormal).Optional);
+    EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::ShadowAtlas).Optional);
+}
+
+TEST(RenderResources, ShadowAtlasIsRecipeDrivenByLightingShadowToggle)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.ShadowsEnabled = true;
+    const FrameRecipe enabledRecipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_TRUE(enabledRecipe.Shadows);
+    EXPECT_TRUE(enabledRecipe.Requires(RenderResource::ShadowAtlas));
+
+    inputs.ShadowsEnabled = false;
+    const FrameRecipe disabledRecipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_FALSE(disabledRecipe.Shadows);
+    EXPECT_FALSE(disabledRecipe.Requires(RenderResource::ShadowAtlas));
 }
 
 // =========================================================================
