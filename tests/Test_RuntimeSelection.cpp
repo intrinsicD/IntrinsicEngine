@@ -491,6 +491,60 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshUsesAuthoritativeFaceAndVert
     EXPECT_NE(pickedVertex.entity.edge_idx, Runtime::Selection::Picked::Entity::InvalidIndex);
 }
 
+TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshUsesCpuFaceAnchorForEdgeMode)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity e = scene.CreateEntity("MeshGpuFaceAnchoredEdge");
+    reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    collision->Positions = {
+        {-1.0f, -1.0f, 0.0f}, { 1.0f, -1.0f, 0.0f}, { 0.0f,  1.0f, 0.0f},
+        { 4.0f, -1.0f, 0.0f}, { 6.0f, -1.0f, 0.0f}, { 5.0f,  1.0f, 0.0f},
+    };
+    collision->Indices = {0u, 1u, 2u, 3u, 4u, 5u};
+    collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(6.0f, 1.0f, 0.0f)};
+
+    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
+    const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
+    const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
+    const auto v3 = sourceMesh->AddVertex({ 4.0f, -1.0f, 0.0f});
+    const auto v4 = sourceMesh->AddVertex({ 6.0f, -1.0f, 0.0f});
+    const auto v5 = sourceMesh->AddVertex({ 5.0f,  1.0f, 0.0f});
+    ASSERT_TRUE(sourceMesh->AddTriangle(v0, v1, v2).has_value());
+    ASSERT_TRUE(sourceMesh->AddTriangle(v3, v4, v5).has_value());
+    collision->SourceMesh = sourceMesh;
+
+    auto& collider = reg.emplace<ECS::MeshCollider::Component>(e);
+    collider.CollisionRef = collision;
+    collider.WorldOBB.Center = glm::vec3(2.5f, 0.0f, 0.0f);
+    collider.WorldOBB.Extents = glm::vec3(3.5f, 1.0f, 0.01f);
+
+    auto& meshData = reg.emplace<ECS::Mesh::Data>(e);
+    meshData.MeshRef = sourceMesh;
+
+    Runtime::Selection::PickRequest req{};
+    req.WorldRay = Geometry::Ray{{5.0f, 0.9f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+    req.PickRadiusPixels = 128.0f;
+    req.CameraFovYRadians = glm::radians(45.0f);
+    req.ViewportHeightPixels = 900.0f;
+
+    const auto picked = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::LineSegment, 0u),
+        Runtime::Selection::ElementMode::Edge,
+        &req);
+
+    EXPECT_EQ(picked.entity.face_idx, 1u);
+    EXPECT_NE(picked.entity.edge_idx, Runtime::Selection::Picked::Entity::InvalidIndex);
+    EXPECT_GE(picked.entity.edge_idx, 3u);
+    EXPECT_LE(picked.entity.edge_idx, 5u);
+}
+
 TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshSurfacePrimitiveDoesNotFallbackToWholeMeshRaycast)
 {
     ECS::Scene scene;

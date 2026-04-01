@@ -1646,8 +1646,17 @@ namespace Runtime::Selection
         // the requested element mode when available.
         if (isMesh)
         {
-            if (adoptCpuForRequestedElement())
-                return picked;
+            // Mesh vertex/edge selection should be face-anchored: the CPU pick
+            // resolves the authoritative face first, then derives the closest
+            // vertex/edge in screen space from that face. This keeps mesh sub-
+            // element selection stable even when the rendered pick primitive is
+            // a derived line/point view rather than the topology's canonical ID.
+            if (request != nullptr)
+            {
+                const auto& entityPick = getCpuResult();
+                if (entityPick.Entity == entity && entityPick.PickedData.entity)
+                    return entityPick.PickedData;
+            }
 
             if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::Point)
             {

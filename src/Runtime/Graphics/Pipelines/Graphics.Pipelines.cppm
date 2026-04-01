@@ -11,6 +11,8 @@ import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.FeatureCatalog;
+import Graphics.Passes.SelectionOutlineSettings;
+import Graphics.Passes.PostProcessSettings;
 import RHI.Descriptors;
 import RHI.Device;
 import Core.Hash;
