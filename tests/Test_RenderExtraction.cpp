@@ -654,6 +654,16 @@ TEST(RenderExtraction, LightEnvironmentPacket_DefaultsMatchPreviousHardcodedValu
     EXPECT_EQ(pkt.LightColor, glm::vec3(1.0f));
     EXPECT_EQ(pkt.AmbientColor, glm::vec3(1.0f));
     EXPECT_FLOAT_EQ(pkt.AmbientIntensity, 0.1f);
+    EXPECT_FALSE(pkt.Shadows.Enabled);
+    EXPECT_EQ(pkt.Shadows.CascadeCount, Graphics::ShadowParams::MaxCascades);
+    EXPECT_FLOAT_EQ(pkt.Shadows.CascadeSplits[0], 0.10f);
+    EXPECT_FLOAT_EQ(pkt.Shadows.CascadeSplits[1], 0.25f);
+    EXPECT_FLOAT_EQ(pkt.Shadows.CascadeSplits[2], 0.55f);
+    EXPECT_FLOAT_EQ(pkt.Shadows.CascadeSplits[3], 1.00f);
+    EXPECT_FLOAT_EQ(pkt.Shadows.DepthBias, 0.0015f);
+    EXPECT_FLOAT_EQ(pkt.Shadows.NormalBias, 0.0025f);
+    EXPECT_FLOAT_EQ(pkt.Shadows.PcfFilterRadius, 1.5f);
+    EXPECT_FLOAT_EQ(pkt.Shadows.SplitLambda, 0.85f);
 }
 
 TEST(RenderExtraction, ExtractRenderWorld_PopulatesDefaultLightEnvironmentPacket)
