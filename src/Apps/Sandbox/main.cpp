@@ -677,8 +677,21 @@ private:
         // --- Lighting ---
         {
             auto& lighting = GetRenderOrchestrator().GetRenderDriver().GetLightEnvironment();
+            auto& features = GetFeatureRegistry();
 
             ImGui::SeparatorText("Lighting");
+
+            // Promote lighting-path selection into View Settings for quick access.
+            {
+                constexpr const char* lightingPaths[] = {"Forward", "Deferred"};
+                int lightingPath = features.IsEnabled("DeferredLighting"_id) ? 1 : 0;
+                if (ImGui::Combo("Lighting Path", &lightingPath, lightingPaths, IM_ARRAYSIZE(lightingPaths)))
+                {
+                    const bool deferredEnabled = (lightingPath == 1);
+                    features.SetEnabled("DeferredLighting"_id, deferredEnabled);
+                }
+                Interface::GUI::ItemTooltip("Select the active frame lighting path. Forward renders directly to HDR; Deferred uses G-buffer + composition.");
+            }
 
             // Directional light direction — spherical angles for intuitive control.
             glm::vec3 dir = glm::normalize(lighting.LightDirection);
