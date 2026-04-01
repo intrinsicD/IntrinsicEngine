@@ -166,6 +166,30 @@ TEST(SceneSchema, ComponentPresenceFlags)
     EXPECT_TRUE(entity["components"].contains("meshEdgeView"));
 }
 
+TEST(SceneSchema, LightEnvironmentBlock)
+{
+    json lighting;
+    lighting["lightDirection"] = {0.0f, 1.0f, 0.0f};
+    lighting["lightIntensity"] = 2.5f;
+    lighting["lightColor"] = {1.0f, 0.95f, 0.9f};
+    lighting["ambientColor"] = {0.2f, 0.25f, 0.3f};
+    lighting["ambientIntensity"] = 0.15f;
+
+    json doc;
+    doc["version"] = 1;
+    doc["entities"] = json::array();
+    doc["lighting"] = lighting;
+
+    ASSERT_TRUE(doc.contains("lighting"));
+    ASSERT_TRUE(doc["lighting"].contains("lightDirection"));
+    ASSERT_TRUE(doc["lighting"].contains("lightIntensity"));
+    ASSERT_TRUE(doc["lighting"].contains("lightColor"));
+    ASSERT_TRUE(doc["lighting"].contains("ambientColor"));
+    ASSERT_TRUE(doc["lighting"].contains("ambientIntensity"));
+    EXPECT_FLOAT_EQ(doc["lighting"]["lightIntensity"].get<float>(), 2.5f);
+    EXPECT_FLOAT_EQ(doc["lighting"]["ambientIntensity"].get<float>(), 0.15f);
+}
+
 TEST(SceneSchema, PointCloudRenderParams)
 {
     json cloud;
