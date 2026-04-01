@@ -69,6 +69,15 @@ namespace
         j["lightColor"] = Vec3ToJson(lighting.LightColor);
         j["ambientColor"] = Vec3ToJson(lighting.AmbientColor);
         j["ambientIntensity"] = lighting.AmbientIntensity;
+        j["shadows"] = {
+            {"enabled", lighting.Shadows.Enabled},
+            {"cascadeCount", lighting.Shadows.CascadeCount},
+            {"cascadeSplits", lighting.Shadows.CascadeSplits},
+            {"depthBias", lighting.Shadows.DepthBias},
+            {"normalBias", lighting.Shadows.NormalBias},
+            {"pcfFilterRadius", lighting.Shadows.PcfFilterRadius},
+            {"splitLambda", lighting.Shadows.SplitLambda},
+        };
         return j;
     }
 
@@ -105,6 +114,40 @@ namespace
             lighting.AmbientColor = JsonToVec3(j["ambientColor"]);
         if (j.contains("ambientIntensity"))
             lighting.AmbientIntensity = j["ambientIntensity"].get<float>();
+        if (j.contains("shadows"))
+        {
+            const auto& shadows = j["shadows"];
+            if (shadows.contains("enabled"))
+                lighting.Shadows.Enabled = shadows["enabled"].get<bool>();
+            if (shadows.contains("cascadeCount"))
+            {
+                const uint32_t requestedCount = shadows["cascadeCount"].get<uint32_t>();
+                lighting.Shadows.CascadeCount = std::clamp(requestedCount, 1u, Graphics::ShadowParams::MaxCascades);
+            }
+            if (shadows.contains("cascadeSplits"))
+            {
+                const auto& splits = shadows["cascadeSplits"];
+                const size_t splitCount = std::min(splits.size(), lighting.Shadows.CascadeSplits.size());
+                for (size_t i = 0; i < splitCount; ++i)
+                    lighting.Shadows.CascadeSplits[i] = std::clamp(splits[i].get<float>(), 0.0f, 1.0f);
+
+                // Enforce monotonically non-decreasing splits to keep cascade
+                // intervals valid even when loading hand-edited scene JSON.
+                for (size_t i = 1; i < lighting.Shadows.CascadeSplits.size(); ++i)
+                {
+                    lighting.Shadows.CascadeSplits[i] =
+                        std::max(lighting.Shadows.CascadeSplits[i], lighting.Shadows.CascadeSplits[i - 1]);
+                }
+            }
+            if (shadows.contains("depthBias"))
+                lighting.Shadows.DepthBias = shadows["depthBias"].get<float>();
+            if (shadows.contains("normalBias"))
+                lighting.Shadows.NormalBias = shadows["normalBias"].get<float>();
+            if (shadows.contains("pcfFilterRadius"))
+                lighting.Shadows.PcfFilterRadius = shadows["pcfFilterRadius"].get<float>();
+            if (shadows.contains("splitLambda"))
+                lighting.Shadows.SplitLambda = shadows["splitLambda"].get<float>();
+        }
     }
 
     // -------------------------------------------------------------------------
