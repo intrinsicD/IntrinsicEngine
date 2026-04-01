@@ -64,7 +64,6 @@ Split into two sub-phases to keep commits reviewable:
 - [ ] Add `ShadowPass` render feature: depth-only rendering into cascade viewports using `SurfacePass` geometry.
 - [ ] Compute cascade split distances (practical split scheme: logarithmic/uniform blend).
 - [ ] Pack cascade matrices into a UBO/SSBO readable by lit passes.
-- [ ] Add `ShadowParams` to `LightEnvironmentPacket` (cascade splits, bias, filter size).
 - [ ] Recipe-driven: shadow resources allocated only when shadows are enabled.
 - [ ] Add focused test: shadow pass produces non-trivial depth for a known scene.
 

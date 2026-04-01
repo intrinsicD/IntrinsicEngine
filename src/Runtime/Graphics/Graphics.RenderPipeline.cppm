@@ -2,6 +2,7 @@ module;
 
 #include <unordered_map>
 #include <memory>
+#include <array>
 #include <span>
 #include <optional>
 #include <string>
@@ -254,6 +255,19 @@ export namespace Graphics
     // Extracted once per frame and consumed by all lit render passes (forward
     // surface, deferred composition, point, line).  Values match the previous
     // hardcoded shader constants as defaults so existing visuals are unchanged.
+    struct ShadowParams
+    {
+        static constexpr uint32_t MaxCascades = 4;
+
+        bool Enabled = false;
+        uint32_t CascadeCount = MaxCascades;
+        std::array<float, MaxCascades> CascadeSplits{0.10f, 0.25f, 0.55f, 1.00f};
+        float DepthBias = 0.0015f;
+        float NormalBias = 0.0025f;
+        float PcfFilterRadius = 1.5f;
+        float SplitLambda = 0.85f;
+    };
+
     struct LightEnvironmentPacket
     {
         // Directional light (single scene light for now).
@@ -265,6 +279,9 @@ export namespace Graphics
         // Ambient / environment.
         glm::vec3 AmbientColor   = glm::vec3(1.0f, 1.0f, 1.0f);
         float     AmbientIntensity = 0.1f;
+
+        // Shadow defaults chosen for stable cascaded-shadow-map bootstrapping.
+        ShadowParams Shadows{};
     };
 
     struct PickingSurfacePacket

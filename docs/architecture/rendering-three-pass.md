@@ -76,6 +76,8 @@ Dirty domains drive sync granularity:
 
 Position/topology changes may escalate to full re-upload; pure attribute changes use incremental extraction/upload.
 
+Per-frame lighting is carried by `LightEnvironmentPacket` and currently includes directional + ambient parameters plus typed `ShadowParams` (`Enabled`, `CascadeCount`, cascade splits, depth/normal bias, PCF radius, split lambda). This keeps shadow policy explicit at extraction time and provides a stable contract for upcoming `ShadowPass`/CSM integration without reintroducing ad-hoc shader constants.
+
 ## Pipeline Order
 
 `DefaultPipeline` execution order:

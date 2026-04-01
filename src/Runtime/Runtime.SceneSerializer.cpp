@@ -69,6 +69,15 @@ namespace
         j["lightColor"] = Vec3ToJson(lighting.LightColor);
         j["ambientColor"] = Vec3ToJson(lighting.AmbientColor);
         j["ambientIntensity"] = lighting.AmbientIntensity;
+        j["shadows"] = {
+            {"enabled", lighting.Shadows.Enabled},
+            {"cascadeCount", lighting.Shadows.CascadeCount},
+            {"cascadeSplits", lighting.Shadows.CascadeSplits},
+            {"depthBias", lighting.Shadows.DepthBias},
+            {"normalBias", lighting.Shadows.NormalBias},
+            {"pcfFilterRadius", lighting.Shadows.PcfFilterRadius},
+            {"splitLambda", lighting.Shadows.SplitLambda},
+        };
         return j;
     }
 
@@ -105,6 +114,61 @@ namespace
             lighting.AmbientColor = JsonToVec3(j["ambientColor"]);
         if (j.contains("ambientIntensity"))
             lighting.AmbientIntensity = j["ambientIntensity"].get<float>();
+        if (j.contains("shadows"))
+        {
+            const auto& shadows = j["shadows"];
+            if (shadows.contains("enabled"))
+                lighting.Shadows.Enabled = shadows["enabled"].get<bool>();
+            if (shadows.contains("cascadeCount"))
+            {
+                const auto& countJson = shadows["cascadeCount"];
+                int64_t requestedCount = static_cast<int64_t>(lighting.Shadows.CascadeCount);
+                bool hasNumericValue = false;
+
+                if (countJson.is_number_integer())
+                {
+                    requestedCount = countJson.get<int64_t>();
+                    hasNumericValue = true;
+                }
+                else if (countJson.is_number_unsigned())
+                {
+                    requestedCount = static_cast<int64_t>(countJson.get<uint64_t>());
+                    hasNumericValue = true;
+                }
+
+                if (hasNumericValue)
+                {
+                    const int64_t clampedCount = std::clamp(
+                        requestedCount,
+                        int64_t{1},
+                        static_cast<int64_t>(Graphics::ShadowParams::MaxCascades));
+                    lighting.Shadows.CascadeCount = static_cast<uint32_t>(clampedCount);
+                }
+            }
+            if (shadows.contains("cascadeSplits"))
+            {
+                const auto& splits = shadows["cascadeSplits"];
+                const size_t splitCount = std::min(splits.size(), lighting.Shadows.CascadeSplits.size());
+                for (size_t i = 0; i < splitCount; ++i)
+                    lighting.Shadows.CascadeSplits[i] = std::clamp(splits[i].get<float>(), 0.0f, 1.0f);
+
+                // Enforce monotonically non-decreasing splits to keep cascade
+                // intervals valid even when loading hand-edited scene JSON.
+                for (size_t i = 1; i < lighting.Shadows.CascadeSplits.size(); ++i)
+                {
+                    lighting.Shadows.CascadeSplits[i] =
+                        std::max(lighting.Shadows.CascadeSplits[i], lighting.Shadows.CascadeSplits[i - 1]);
+                }
+            }
+            if (shadows.contains("depthBias"))
+                lighting.Shadows.DepthBias = shadows["depthBias"].get<float>();
+            if (shadows.contains("normalBias"))
+                lighting.Shadows.NormalBias = shadows["normalBias"].get<float>();
+            if (shadows.contains("pcfFilterRadius"))
+                lighting.Shadows.PcfFilterRadius = shadows["pcfFilterRadius"].get<float>();
+            if (shadows.contains("splitLambda"))
+                lighting.Shadows.SplitLambda = shadows["splitLambda"].get<float>();
+        }
     }
 
     // -------------------------------------------------------------------------

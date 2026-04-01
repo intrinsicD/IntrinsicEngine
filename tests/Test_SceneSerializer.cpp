@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <expected>
 #include <span>
+#include <algorithm>
 
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
@@ -174,6 +175,15 @@ TEST(SceneSchema, LightEnvironmentBlock)
     lighting["lightColor"] = {1.0f, 0.95f, 0.9f};
     lighting["ambientColor"] = {0.2f, 0.25f, 0.3f};
     lighting["ambientIntensity"] = 0.15f;
+    lighting["shadows"] = {
+        {"enabled", true},
+        {"cascadeCount", 4},
+        {"cascadeSplits", {0.08f, 0.2f, 0.45f, 1.0f}},
+        {"depthBias", 0.002f},
+        {"normalBias", 0.003f},
+        {"pcfFilterRadius", 2.0f},
+        {"splitLambda", 0.9f}
+    };
 
     json doc;
     doc["version"] = 1;
@@ -186,8 +196,24 @@ TEST(SceneSchema, LightEnvironmentBlock)
     ASSERT_TRUE(doc["lighting"].contains("lightColor"));
     ASSERT_TRUE(doc["lighting"].contains("ambientColor"));
     ASSERT_TRUE(doc["lighting"].contains("ambientIntensity"));
+    ASSERT_TRUE(doc["lighting"].contains("shadows"));
     EXPECT_FLOAT_EQ(doc["lighting"]["lightIntensity"].get<float>(), 2.5f);
     EXPECT_FLOAT_EQ(doc["lighting"]["ambientIntensity"].get<float>(), 0.15f);
+    EXPECT_TRUE(doc["lighting"]["shadows"]["enabled"].get<bool>());
+    EXPECT_EQ(doc["lighting"]["shadows"]["cascadeCount"].get<uint32_t>(), 4u);
+}
+
+TEST(SceneSchema, ShadowCascadeCount_AllowsSignedInputForRobustClamping)
+{
+    json shadows;
+    shadows["cascadeCount"] = -1;
+
+    ASSERT_TRUE(shadows["cascadeCount"].is_number_integer());
+    EXPECT_NO_THROW({
+        const int64_t requested = shadows["cascadeCount"].get<int64_t>();
+        const int64_t clamped = std::clamp<int64_t>(requested, 1, 4);
+        EXPECT_EQ(clamped, 1);
+    });
 }
 
 TEST(SceneSchema, PointCloudRenderParams)
