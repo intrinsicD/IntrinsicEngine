@@ -2,6 +2,7 @@
 module;
 
 #include <limits>
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -13,6 +14,12 @@ import Core.Input;
 
 export namespace Graphics
 {
+    enum class CameraProjectionType : uint8_t
+    {
+        Perspective = 0,
+        Orthographic = 1,
+    };
+
     // --- Pure Data Class ---
     struct CameraComponent
     {
@@ -25,6 +32,9 @@ export namespace Graphics
         float AspectRatio = 1.77f;
         float Near = 0.1f;
         float Far = 1000.0f;
+        CameraProjectionType ProjectionType = CameraProjectionType::Perspective;
+        // Vertical span in world units for orthographic projection.
+        float OrthographicHeight = 10.0f;
 
         glm::mat4 ViewMatrix{1.0f};
         glm::mat4 ProjectionMatrix{1.0f};

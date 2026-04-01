@@ -269,7 +269,7 @@ namespace Graphics
         ImGuizmo::SetRect(0.0f, 0.0f,
                           static_cast<float>(m_ViewportWidth),
                           static_cast<float>(m_ViewportHeight));
-        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetOrthographic(m_Camera.ProjectionType == CameraProjectionType::Orthographic);
         ImGuizmo::AllowAxisFlip(true);
         ImGuizmo::SetGizmoSizeClipSpace(0.12f * m_Config.HandleLength);
 
@@ -339,4 +339,3 @@ namespace Graphics
         (void)manipulated;
     }
 }
-

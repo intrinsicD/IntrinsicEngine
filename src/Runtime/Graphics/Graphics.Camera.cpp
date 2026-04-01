@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
@@ -10,13 +11,31 @@ namespace Graphics
 {
     void UpdateMatrices(CameraComponent& camera, float aspectRatio)
     {
+        camera.AspectRatio = aspectRatio;
+
         // View
         glm::mat4 rotate = glm::toMat4(glm::conjugate(camera.Orientation));
         glm::mat4 translate = glm::translate(glm::mat4(1.0f), -camera.Position);
         camera.ViewMatrix = rotate * translate;
 
-        // Projection (Vulkan: Y flipped, Depth 0..1)
-        camera.ProjectionMatrix = glm::perspective(glm::radians(camera.Fov), aspectRatio, camera.Near, camera.Far);
+        const float safeAspect = (aspectRatio > 0.0f) ? aspectRatio : 1.0f;
+        const float safeNear = std::max(1e-4f, camera.Near);
+        const float safeFar = std::max(safeNear + 1e-3f, camera.Far);
+
+        if (camera.ProjectionType == CameraProjectionType::Orthographic)
+        {
+            const float orthoHeight = std::max(1e-4f, camera.OrthographicHeight);
+            const float halfHeight = 0.5f * orthoHeight;
+            const float halfWidth = halfHeight * safeAspect;
+            camera.ProjectionMatrix = glm::ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, safeNear, safeFar);
+        }
+        else
+        {
+            // Projection (Vulkan: Y flipped, Depth 0..1)
+            const float safeFov = glm::clamp(camera.Fov, 1.0f, 179.0f);
+            camera.ProjectionMatrix = glm::perspective(glm::radians(safeFov), safeAspect, safeNear, safeFar);
+        }
+
         camera.ProjectionMatrix[1][1] *= -1;
     }
 
