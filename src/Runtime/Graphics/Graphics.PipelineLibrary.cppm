@@ -1,8 +1,8 @@
 module;
 
 #include <memory>
-#include <unordered_map>
 #include <optional>
+#include <functional>
 
 #include "RHI.Vulkan.hpp"
 
@@ -49,35 +49,22 @@ export namespace Graphics
         [[nodiscard]] RHI::GraphicsPipeline& GetOrDie(Core::Hash::StringID name);
         [[nodiscard]] const RHI::GraphicsPipeline& GetOrDie(Core::Hash::StringID name) const;
 
-        [[nodiscard]] bool Contains(Core::Hash::StringID name) const { return m_Pipelines.contains(name); }
+        [[nodiscard]] bool Contains(Core::Hash::StringID name) const;
 
         // Stage 1: set=2 layout for instance + visibility SSBOs used by Forward shaders.
-        [[nodiscard]] VkDescriptorSetLayout GetStage1InstanceSetLayout() const { return m_Stage1InstanceSetLayout; }
+        [[nodiscard]] VkDescriptorSetLayout GetStage1InstanceSetLayout() const;
 
         // Stage 3: compute culling pipeline + set layout (set = 0 in compute pipeline).
-        [[nodiscard]] VkDescriptorSetLayout GetCullSetLayout() const { return m_CullSetLayout; }
-        [[nodiscard]] RHI::ComputePipeline* GetCullPipeline() const { return m_CullPipeline.get(); }
+        [[nodiscard]] VkDescriptorSetLayout GetCullSetLayout() const;
+        [[nodiscard]] RHI::ComputePipeline* GetCullPipeline() const;
 
         // GPUScene: scatter updates pipeline + set layout (set = 0).
-        [[nodiscard]] VkDescriptorSetLayout GetSceneUpdateSetLayout() const { return m_SceneUpdateSetLayout; }
-        [[nodiscard]] RHI::ComputePipeline* GetSceneUpdatePipeline() const { return m_SceneUpdatePipeline.get(); }
+        [[nodiscard]] VkDescriptorSetLayout GetSceneUpdateSetLayout() const;
+        [[nodiscard]] RHI::ComputePipeline* GetSceneUpdatePipeline() const;
 
     private:
-        std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
-        RHI::VulkanDevice* m_Device = nullptr;
-
-        RHI::BindlessDescriptorSystem& m_Bindless;
-        RHI::DescriptorLayout& m_GlobalSetLayout;
-
-        std::unordered_map<Core::Hash::StringID, std::unique_ptr<RHI::GraphicsPipeline>> m_Pipelines;
-
-        VkDescriptorSetLayout m_Stage1InstanceSetLayout = VK_NULL_HANDLE;
-
-        VkDescriptorSetLayout m_CullSetLayout = VK_NULL_HANDLE;
-        std::unique_ptr<RHI::ComputePipeline> m_CullPipeline;
-
-        VkDescriptorSetLayout m_SceneUpdateSetLayout = VK_NULL_HANDLE;
-        std::unique_ptr<RHI::ComputePipeline> m_SceneUpdatePipeline;
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
     };
     using namespace Core::Hash;
     // Canonical pipeline IDs used across the engine.
