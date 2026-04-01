@@ -57,6 +57,7 @@ namespace Runtime::EditorUI
                 return true;
             case GeometryProcessingAlgorithm::KMeans:
             case GeometryProcessingAlgorithm::NormalEstimation:
+            case GeometryProcessingAlgorithm::ShortestPath:
             default:
                 return false;
             }
@@ -91,6 +92,7 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::Subdivision: return "Subdivision";
         case GeometryProcessingAlgorithm::Repair: return "Repair";
         case GeometryProcessingAlgorithm::NormalEstimation: return "Normal Estimation";
+        case GeometryProcessingAlgorithm::ShortestPath: return "Shortest Path";
         default: return "Unknown";
         }
     }
@@ -151,6 +153,9 @@ namespace Runtime::EditorUI
             return kMeshTopologyDomains;
         case GeometryProcessingAlgorithm::NormalEstimation:
             return GeometryProcessingDomain::PointCloudPoints;
+        case GeometryProcessingAlgorithm::ShortestPath:
+            return GeometryProcessingDomain::MeshVertices
+                | GeometryProcessingDomain::GraphVertices;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -167,9 +172,10 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
-        static constexpr std::array<GeometryProcessingAlgorithm, 7> kAlgorithmOrder = {
+        static constexpr std::array<GeometryProcessingAlgorithm, 8> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
             GeometryProcessingAlgorithm::NormalEstimation,
+            GeometryProcessingAlgorithm::ShortestPath,
             GeometryProcessingAlgorithm::Remeshing,
             GeometryProcessingAlgorithm::Simplification,
             GeometryProcessingAlgorithm::Smoothing,

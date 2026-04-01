@@ -28,6 +28,7 @@ import Geometry.Handle;
 import Geometry.KMeans;
 import Geometry.Properties;
 import Geometry.Simplification;
+import Geometry.ShortestPath;
 import Geometry.Subdivision;
 import Geometry.PointCloudUtils;
 import Geometry.GraphUtils;
@@ -87,6 +88,7 @@ export namespace Runtime::EditorUI
         Subdivision,
         Repair,
         NormalEstimation,
+        ShortestPath,
     };
 
     struct GeometryProcessingCapabilities
@@ -298,6 +300,22 @@ export namespace Runtime::EditorUI
         std::size_t FlippedCount = 0;
     };
 
+    struct ShortestPathWidgetState
+    {
+        bool StopWhenAllTargetsSettled = true;
+        int MaxSettledVertices = 0;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        std::size_t LastSettledVertexCount = 0;
+        std::size_t LastRelaxedEdgeCount = 0;
+        std::size_t LastReachedGoalCount = 0;
+        bool LastConverged = false;
+        bool LastEarlyTerminated = false;
+        bool LastExtractFailed = false;
+        std::size_t LastPathVertexCount = 0;
+        std::size_t LastPathEdgeCount = 0;
+    };
+
     struct MeshAnalysisWidgetState
     {
         bool HasResults = false;
@@ -340,6 +358,9 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawNormalEstimationWidget(Runtime::Engine& engine,
                                                   entt::entity entity,
                                                   NormalEstimationWidgetState& state);
+    [[nodiscard]] bool DrawShortestPathWidget(Runtime::Engine& engine,
+                                              entt::entity entity,
+                                              ShortestPathWidgetState& state);
 
     // =========================================================================
     // InspectorController — component property inspector panel
@@ -381,6 +402,7 @@ export namespace Runtime::EditorUI
         SubdivisionWidgetState m_SubdivisionUi{};
         MeshAnalysisWidgetState m_MeshAnalysisUi{};
         NormalEstimationWidgetState m_NormalEstimationUi{};
+        ShortestPathWidgetState m_ShortestPathUi{};
     };
 
     // =========================================================================
