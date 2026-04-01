@@ -288,6 +288,72 @@ namespace Graphics
         return result;
     }
 
+    struct RenderDriver::Impl
+    {
+        struct RetiredPipeline
+        {
+            std::unique_ptr<RenderPipeline> Pipeline;
+            uint64_t RetireFrame = 0;
+        };
+
+        RenderDriverConfig m_Config;
+        std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
+        RHI::VulkanDevice* m_Device = nullptr;
+        RHI::VulkanSwapchain& m_Swapchain;
+        RHI::SimpleRenderer& m_Renderer;
+        Core::Memory::ScopeStack* m_FrameScope = nullptr;
+        GlobalResources m_GlobalResources;
+        PresentationSystem m_Presentation;
+        InteractionSystem m_Interaction;
+        RenderGraph m_RenderGraph;
+        GeometryPool& m_GeometryStorage;
+        MaterialRegistry& m_MaterialRegistry;
+        GPUScene* m_GpuScene = nullptr;
+        std::vector<RenderGraphDebugPass> m_LastDebugPasses;
+        std::vector<RenderGraphDebugImage> m_LastDebugImages;
+        FrameRecipe m_LastFrameRecipe{};
+        uint32_t m_ResizeCount = 0;
+        VkExtent2D m_LastResizeExtent{};
+        uint64_t m_LastResizeGlobalFrame = 0;
+        VkExtent2D m_LastBuiltGraphExtent{};
+        uint32_t m_LastBuiltFrameIndex = 0;
+        uint32_t m_LastBuiltImageIndex = 0;
+        LightEnvironmentPacket m_LightEnvironment{};
+        std::unique_ptr<RenderPipeline> m_ActivePipeline;
+        std::unique_ptr<RenderPipeline> m_PendingPipeline;
+        std::vector<RetiredPipeline> m_RetiredPipelines;
+
+        Impl(const RenderDriverConfig& config,
+             std::shared_ptr<RHI::VulkanDevice> device,
+             RHI::VulkanSwapchain& swapchain,
+             RHI::SimpleRenderer& renderer,
+             RHI::BindlessDescriptorSystem& bindlessSystem,
+             RHI::DescriptorAllocator& descriptorPool,
+             RHI::DescriptorLayout& descriptorLayout,
+             PipelineLibrary& pipelineLibrary,
+             const ShaderRegistry& shaderRegistry,
+             Core::Memory::LinearArena& frameArena,
+             Core::Memory::ScopeStack& frameScope,
+             GeometryPool& geometryStorage,
+             MaterialRegistry& materialRegistry)
+            : m_Config(config)
+            , m_DeviceOwner(std::move(device))
+            , m_Device(m_DeviceOwner.get())
+            , m_Swapchain(swapchain)
+            , m_Renderer(renderer)
+            , m_FrameScope(&frameScope)
+            , m_GlobalResources(m_DeviceOwner, descriptorPool, descriptorLayout, bindlessSystem, shaderRegistry, pipelineLibrary, renderer.GetFramesInFlight())
+            , m_Presentation(m_DeviceOwner, swapchain, renderer)
+            , m_Interaction({.MaxFramesInFlight = renderer.GetFramesInFlight()}, m_DeviceOwner)
+            , m_RenderGraph(m_DeviceOwner, frameArena, frameScope)
+            , m_GeometryStorage(geometryStorage)
+            , m_MaterialRegistry(materialRegistry)
+        {}
+
+        void ApplyPendingPipelineSwap(uint32_t width, uint32_t height);
+        void GarbageCollectRetiredPipelines();
+    };
+
     RenderDriver::RenderDriver(const RenderDriverConfig& config,
                                std::shared_ptr<RHI::VulkanDevice> device,
                                RHI::VulkanSwapchain& swapchain,
@@ -301,40 +367,37 @@ namespace Graphics
                                Core::Memory::ScopeStack& frameScope,
                                GeometryPool& geometryStorage,
                                MaterialRegistry& materialRegistry)
-        : m_Config(config)
-          , m_DeviceOwner(std::move(device))
-          , m_Device(m_DeviceOwner.get())
-          , m_Swapchain(swapchain)
-          , m_Renderer(renderer)
-          // Initial binding uses the caller's ECS-scope allocators as placeholders.
-          // PrepareFrame() rebinds to FrameContext-owned per-slot allocators before BuildGraph.
-          , m_FrameScope(&frameScope)
-          // Sub-Systems (must match declaration order)
-          , m_GlobalResources(m_DeviceOwner, descriptorPool, descriptorLayout, bindlessSystem, shaderRegistry,
-                              pipelineLibrary, renderer.GetFramesInFlight())
-          , m_Presentation(m_DeviceOwner, swapchain, renderer)
-          , m_Interaction({.MaxFramesInFlight = renderer.GetFramesInFlight()}, m_DeviceOwner)
-          , m_RenderGraph(m_DeviceOwner, frameArena, frameScope)
-          , m_GeometryStorage(geometryStorage)
-          , m_MaterialRegistry(materialRegistry)
+        : m_Impl(std::make_unique<Impl>(config,
+                                        std::move(device),
+                                        swapchain,
+                                        renderer,
+                                        bindlessSystem,
+                                        descriptorPool,
+                                        descriptorLayout,
+                                        pipelineLibrary,
+                                        shaderRegistry,
+                                        frameArena,
+                                        frameScope,
+                                        geometryStorage,
+                                        materialRegistry))
 
     {
         // Wire GPU profiler into RenderGraph for per-pass timestamp scoping.
         if (auto* profiler = renderer.GetGpuProfiler())
-            m_RenderGraph.SetGpuProfiler(profiler);
+            m_Impl->m_RenderGraph.SetGpuProfiler(profiler);
         // Register UI panel
         Interface::GUI::RegisterPanel("Render Target Viewer",
                                       [this]()
                                       {
-                                          auto& debugView = m_Interaction.GetDebugViewStateMut();
-                                          const VkExtent2D presentationExtent = m_Presentation.GetResolution();
-                                          const VkExtent2D swapchainExtent = m_Swapchain.GetExtent();
-                                          const auto lastPick = m_Interaction.GetLastPickResult();
-                                          const auto pipelineDebug = m_ActivePipeline
-                                              ? std::optional<RenderPipelineDebugState>(m_ActivePipeline->GetDebugState())
+                                          auto& debugView = m_Impl->m_Interaction.GetDebugViewStateMut();
+                                          const VkExtent2D presentationExtent = m_Impl->m_Presentation.GetResolution();
+                                          const VkExtent2D swapchainExtent = m_Impl->m_Swapchain.GetExtent();
+                                          const auto lastPick = m_Impl->m_Interaction.GetLastPickResult();
+                                          const auto pipelineDebug = m_Impl->m_ActivePipeline
+                                              ? std::optional<RenderPipelineDebugState>(m_Impl->m_ActivePipeline->GetDebugState())
                                               : std::nullopt;
-                                          const auto* outlineDebug = m_ActivePipeline ? m_ActivePipeline->GetSelectionOutlineDebugState() : nullptr;
-                                          const auto* postDebug = m_ActivePipeline ? m_ActivePipeline->GetPostProcessDebugState() : nullptr;
+                                          const auto* outlineDebug = m_Impl->m_ActivePipeline ? m_Impl->m_ActivePipeline->GetSelectionOutlineDebugState() : nullptr;
+                                          const auto* postDebug = m_Impl->m_ActivePipeline ? m_Impl->m_ActivePipeline->GetPostProcessDebugState() : nullptr;
 
                                           auto drawBool = [](const char* label, bool value)
                                           {
@@ -380,19 +443,19 @@ namespace Graphics
 
                                           if (ImGui::CollapsingHeader("Frame State", ImGuiTreeNodeFlags_DefaultOpen))
                                           {
-                                              ImGui::Text("Global Frame: %llu", static_cast<unsigned long long>(m_Device->GetGlobalFrameNumber()));
-                                              ImGui::Text("Presentation Frame/Image: %u / %u", m_Presentation.GetFrameIndex(), m_Presentation.GetImageIndex());
-                                              ImGui::Text("Last Built Frame/Image: %u / %u", m_LastBuiltFrameIndex, m_LastBuiltImageIndex);
+                                              ImGui::Text("Global Frame: %llu", static_cast<unsigned long long>(m_Impl->m_Device->GetGlobalFrameNumber()));
+                                              ImGui::Text("Presentation Frame/Image: %u / %u", m_Impl->m_Presentation.GetFrameIndex(), m_Impl->m_Presentation.GetImageIndex());
+                                              ImGui::Text("Last Built Frame/Image: %u / %u", m_Impl->m_LastBuiltFrameIndex, m_Impl->m_LastBuiltImageIndex);
                                               ImGui::Text("Swapchain Extent: %ux%u", swapchainExtent.width, swapchainExtent.height);
                                               ImGui::Text("Presentation Extent: %ux%u", presentationExtent.width, presentationExtent.height);
-                                              ImGui::Text("Last Graph Extent: %ux%u", m_LastBuiltGraphExtent.width, m_LastBuiltGraphExtent.height);
-                                              ImGui::Text("Swapchain Format: %s", FormatVkFormatName(m_Swapchain.GetImageFormat()));
-                                              ImGui::Text("Backbuffer Format: %s", FormatVkFormatName(m_Presentation.GetBackbufferFormat()));
-                                              ImGui::Text("Resize Count: %u", m_ResizeCount);
-                                              ImGui::Text("Last Resize Extent: %ux%u", m_LastResizeExtent.width, m_LastResizeExtent.height);
-                                              ImGui::Text("Last Resize Global Frame: %llu", static_cast<unsigned long long>(m_LastResizeGlobalFrame));
+                                              ImGui::Text("Last Graph Extent: %ux%u", m_Impl->m_LastBuiltGraphExtent.width, m_Impl->m_LastBuiltGraphExtent.height);
+                                              ImGui::Text("Swapchain Format: %s", FormatVkFormatName(m_Impl->m_Swapchain.GetImageFormat()));
+                                              ImGui::Text("Backbuffer Format: %s", FormatVkFormatName(m_Impl->m_Presentation.GetBackbufferFormat()));
+                                              ImGui::Text("Resize Count: %u", m_Impl->m_ResizeCount);
+                                              ImGui::Text("Last Resize Extent: %ux%u", m_Impl->m_LastResizeExtent.width, m_Impl->m_LastResizeExtent.height);
+                                              ImGui::Text("Last Resize Global Frame: %llu", static_cast<unsigned long long>(m_Impl->m_LastResizeGlobalFrame));
                                               ImGui::Text("Last Pick Result: hit=%s entity=%u", lastPick.HasHit ? "true" : "false", lastPick.EntityID);
-                                              ImGui::Text("Compiled Passes / Images: %zu / %zu", m_LastDebugPasses.size(), m_LastDebugImages.size());
+                                              ImGui::Text("Compiled Passes / Images: %zu / %zu", m_Impl->m_LastDebugPasses.size(), m_Impl->m_LastDebugImages.size());
 
                                               if (ImGui::BeginTable("##frame_recipe", 2,
                                                   ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
@@ -400,15 +463,15 @@ namespace Graphics
                                                   ImGui::TableSetupColumn("Recipe Flag");
                                                   ImGui::TableSetupColumn("Enabled", ImGuiTableColumnFlags_WidthFixed, 80.0f);
                                                   ImGui::TableHeadersRow();
-                                                  drawRecipeFlag("Depth", m_LastFrameRecipe.Depth);
-                                                  drawRecipeFlag("EntityId", m_LastFrameRecipe.EntityId);
-                                                  drawRecipeFlag("PrimitiveId", m_LastFrameRecipe.PrimitiveId);
-                                                  drawRecipeFlag("Normals", m_LastFrameRecipe.Normals);
-                                                  drawRecipeFlag("MaterialChannels", m_LastFrameRecipe.MaterialChannels);
-                                                  drawRecipeFlag("Post", m_LastFrameRecipe.Post);
-                                                  drawRecipeFlag("SceneColorLDR", m_LastFrameRecipe.SceneColorLDR);
-                                                  drawRecipeFlag("Selection", m_LastFrameRecipe.Selection);
-                                                  drawRecipeFlag("DebugVisualization", m_LastFrameRecipe.DebugVisualization);
+                                                  drawRecipeFlag("Depth", m_Impl->m_LastFrameRecipe.Depth);
+                                                  drawRecipeFlag("EntityId", m_Impl->m_LastFrameRecipe.EntityId);
+                                                  drawRecipeFlag("PrimitiveId", m_Impl->m_LastFrameRecipe.PrimitiveId);
+                                                  drawRecipeFlag("Normals", m_Impl->m_LastFrameRecipe.Normals);
+                                                  drawRecipeFlag("MaterialChannels", m_Impl->m_LastFrameRecipe.MaterialChannels);
+                                                  drawRecipeFlag("Post", m_Impl->m_LastFrameRecipe.Post);
+                                                  drawRecipeFlag("SceneColorLDR", m_Impl->m_LastFrameRecipe.SceneColorLDR);
+                                                  drawRecipeFlag("Selection", m_Impl->m_LastFrameRecipe.Selection);
+                                                  drawRecipeFlag("DebugVisualization", m_Impl->m_LastFrameRecipe.DebugVisualization);
                                                   ImGui::EndTable();
                                               }
                                           }
@@ -426,21 +489,21 @@ namespace Graphics
                                                   ImGui::TableSetupColumn("Compiled", ImGuiTableColumnFlags_WidthFixed, 70.0f);
                                                   ImGui::TableHeadersRow();
                                                   drawFeatureRow("PickingPass", pipelineDebug->PickingPass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "Pick"));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "Pick"));
                                                   drawFeatureRow("SurfacePass", pipelineDebug->SurfacePass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "Surface"));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "Surface"));
                                                   drawFeatureRow("SelectionOutlinePass", pipelineDebug->SelectionOutlinePass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "SelectionOutline"));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "SelectionOutline"));
                                                   drawFeatureRow("LinePass", pipelineDebug->LinePass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "Line"));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "Line"));
                                                   drawFeatureRow("PointPass", pipelineDebug->PointPass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "Point"));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "Point"));
                                                   drawFeatureRow("PostProcessPass", pipelineDebug->PostProcessPass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "Post."));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "Post."));
                                                   drawFeatureRow("DebugViewPass", pipelineDebug->DebugViewPass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "DebugView"));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "DebugView"));
                                                   drawFeatureRow("ImGuiPass", pipelineDebug->ImGuiPass,
-                                                                 CompiledPassNameContains(m_LastDebugPasses, "ImGui"));
+                                                                 CompiledPassNameContains(m_Impl->m_LastDebugPasses, "ImGui"));
                                                   ImGui::EndTable();
                                               }
                                           }
@@ -533,7 +596,7 @@ namespace Graphics
 
                                           const auto findDebugImageByName = [&](Core::Hash::StringID id) -> const RenderGraphDebugImage*
                                           {
-                                              for (const auto& img : m_LastDebugImages)
+                                              for (const auto& img : m_Impl->m_LastDebugImages)
                                               {
                                                   if (img.Name == id)
                                                       return &img;
@@ -574,7 +637,7 @@ namespace Graphics
                                           };
 
                                           uint32_t viewportEligibleCount = 0;
-                                          for (const auto& img : m_LastDebugImages)
+                                          for (const auto& img : m_Impl->m_LastDebugImages)
                                           {
                                               if (isViewportEligible(img))
                                                   ++viewportEligibleCount;
@@ -603,7 +666,7 @@ namespace Graphics
                                           if (ImGui::BeginCombo("Viewport debug source", selectedViewportLabel))
                                           {
                                               bool anyViewportEligible = false;
-                                              for (const auto& img : m_LastDebugImages)
+                                              for (const auto& img : m_Impl->m_LastDebugImages)
                                               {
                                                   if (!isViewportEligible(img))
                                                       continue;
@@ -626,14 +689,14 @@ namespace Graphics
 
                                           ImGui::TextDisabled("Viewport can preview %u / %zu compiled images (sampled only).",
                                                               viewportEligibleCount,
-                                                              m_LastDebugImages.size());
+                                                              m_Impl->m_LastDebugImages.size());
                                           if (selectedDebugImage && !isViewportEligible(*selectedDebugImage))
                                               ImGui::TextDisabled("The current selection is diagnostics-only; the viewport pass falls back to a valid sampled target.");
 
                                           // --- Pass-organized resource browser ---
                                           if (ImGui::CollapsingHeader("Per-Pass Attachments", ImGuiTreeNodeFlags_DefaultOpen))
                                           {
-                                              for (const auto& pass : m_LastDebugPasses)
+                                              for (const auto& pass : m_Impl->m_LastDebugPasses)
                                               {
                                                   if (!ImGui::TreeNode(pass.Name))
                                                       continue;
@@ -714,7 +777,7 @@ namespace Graphics
                                                   ImGui::TableSetupColumn("Alive", ImGuiTableColumnFlags_WidthFixed, 60.0f);
                                                   ImGui::TableHeadersRow();
 
-                                                  for (const auto& img : m_LastDebugImages)
+                                                  for (const auto& img : m_Impl->m_LastDebugImages)
                                                   {
                                                       ImGui::TableNextRow();
 
@@ -776,11 +839,11 @@ namespace Graphics
                                           {
                                               // Determine total pass count for scaling
                                               uint32_t maxPass = 0;
-                                              for (const auto& img : m_LastDebugImages)
+                                              for (const auto& img : m_Impl->m_LastDebugImages)
                                                   maxPass = std::max(maxPass, img.EndPass);
                                               const uint32_t totalPasses = maxPass + 1;
 
-                                              if (totalPasses > 0 && !m_LastDebugImages.empty())
+                                              if (totalPasses > 0 && !m_Impl->m_LastDebugImages.empty())
                                               {
                                                   // Pass name header
                                                   const float labelWidth = 120.0f;
@@ -793,7 +856,7 @@ namespace Graphics
                                                   ImGui::Dummy(ImVec2(labelWidth, 0.0f));
                                                   ImGui::SameLine();
                                                   ImVec2 headerPos = ImGui::GetCursorScreenPos();
-                                                  for (uint32_t p = 0; p < totalPasses && p < m_LastDebugPasses.size(); p++)
+                                                  for (uint32_t p = 0; p < totalPasses && p < m_Impl->m_LastDebugPasses.size(); p++)
                                                   {
                                                       float x = headerPos.x + p * passWidth;
                                                       if (passWidth >= 30.0f) // Only show labels if enough room
@@ -801,14 +864,14 @@ namespace Graphics
                                                           ImGui::GetWindowDrawList()->AddText(
                                                               ImVec2(x + 2.0f, headerPos.y),
                                                               IM_COL32(180, 180, 180, 200),
-                                                              m_LastDebugPasses[p].Name);
+                                                              m_Impl->m_LastDebugPasses[p].Name);
                                                       }
                                                   }
                                                   ImGui::Dummy(ImVec2(availWidth, barHeight));
 
                                                   // Resource bars
                                                   auto* drawList = ImGui::GetWindowDrawList();
-                                                  for (const auto& img : m_LastDebugImages)
+                                                  for (const auto& img : m_Impl->m_LastDebugImages)
                                                   {
                                                       // Resource name label
                                                       const char* rName = resolveName(img.Name);
@@ -904,34 +967,34 @@ namespace Graphics
                                       0,
                                       false);
 
-        m_RenderGraph.SetTransientAllocator(m_GlobalResources.GetTransientAllocator());
-        m_GpuScene = nullptr;
+        m_Impl->m_RenderGraph.SetTransientAllocator(m_Impl->m_GlobalResources.GetTransientAllocator());
+        m_Impl->m_GpuScene = nullptr;
     }
 
     RenderDriver::~RenderDriver()
     {
-        if (m_Device) vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        if (m_Impl->m_Device) vkDeviceWaitIdle(m_Impl->m_Device->GetLogicalDevice());
 
-        if (m_ActivePipeline) m_ActivePipeline->Shutdown();
-        if (m_PendingPipeline) m_PendingPipeline->Shutdown();
-        for (auto& p : m_RetiredPipelines)
+        if (m_Impl->m_ActivePipeline) m_Impl->m_ActivePipeline->Shutdown();
+        if (m_Impl->m_PendingPipeline) m_Impl->m_PendingPipeline->Shutdown();
+        for (auto& p : m_Impl->m_RetiredPipelines)
         {
             if (p.Pipeline) p.Pipeline->Shutdown();
         }
 
-        m_RetiredPipelines.clear();
-        m_ActivePipeline.reset();
-        m_PendingPipeline.reset();
+        m_Impl->m_RetiredPipelines.clear();
+        m_Impl->m_ActivePipeline.reset();
+        m_Impl->m_PendingPipeline.reset();
     }
 
     void RenderDriver::RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline)
     {
-        if (m_PendingPipeline)
-            m_PendingPipeline->Shutdown();
-        m_PendingPipeline = std::move(pipeline);
+        if (m_Impl->m_PendingPipeline)
+            m_Impl->m_PendingPipeline->Shutdown();
+        m_Impl->m_PendingPipeline = std::move(pipeline);
     }
 
-    void RenderDriver::ApplyPendingPipelineSwap(uint32_t width, uint32_t height)
+    void RenderDriver::Impl::ApplyPendingPipelineSwap(uint32_t width, uint32_t height)
     {
         if (!m_PendingPipeline)
             return;
@@ -956,7 +1019,7 @@ namespace Graphics
         }
     }
 
-    void RenderDriver::GarbageCollectRetiredPipelines()
+    void RenderDriver::Impl::GarbageCollectRetiredPipelines()
     {
         if (!m_Device)
             return;
@@ -981,30 +1044,38 @@ namespace Graphics
         m_RetiredPipelines.erase(it, m_RetiredPipelines.end());
     }
 
+    RHI::VulkanBuffer* RenderDriver::GetGlobalUBO() const { return m_Impl->m_GlobalResources.GetCameraUBO(); }
+    void RenderDriver::SetGpuScene(GPUScene* scene) { m_Impl->m_GpuScene = scene; }
+    InteractionSystem& RenderDriver::GetInteraction() { return m_Impl->m_Interaction; }
+    const InteractionSystem& RenderDriver::GetInteraction() const { return m_Impl->m_Interaction; }
+    GlobalResources& RenderDriver::GetGlobalResources() { return m_Impl->m_GlobalResources; }
+    LightEnvironmentPacket& RenderDriver::GetLightEnvironment() { return m_Impl->m_LightEnvironment; }
+    const LightEnvironmentPacket& RenderDriver::GetLightEnvironment() const { return m_Impl->m_LightEnvironment; }
+
     void RenderDriver::RequestPick(uint32_t x, uint32_t y)
     {
-        m_Interaction.RequestPick(x, y, m_Presentation.GetFrameIndex(), m_Device->GetGlobalFrameNumber());
+        m_Impl->m_Interaction.RequestPick(x, y, m_Impl->m_Presentation.GetFrameIndex(), m_Impl->m_Device->GetGlobalFrameNumber());
     }
 
     RenderDriver::PickResultGpu RenderDriver::GetLastPickResult() const
     {
-        auto res = m_Interaction.GetLastPickResult();
+        auto res = m_Impl->m_Interaction.GetLastPickResult();
         return {res.HasHit, res.EntityID};
     }
 
     Passes::SelectionOutlineSettings* RenderDriver::GetSelectionOutlineSettings()
     {
-        return m_ActivePipeline ? m_ActivePipeline->GetSelectionOutlineSettings() : nullptr;
+        return m_Impl->m_ActivePipeline ? m_Impl->m_ActivePipeline->GetSelectionOutlineSettings() : nullptr;
     }
 
     Passes::PostProcessSettings* RenderDriver::GetPostProcessSettings()
     {
-        return m_ActivePipeline ? m_ActivePipeline->GetPostProcessSettings() : nullptr;
+        return m_Impl->m_ActivePipeline ? m_Impl->m_ActivePipeline->GetPostProcessSettings() : nullptr;
     }
 
     const Passes::HistogramReadback* RenderDriver::GetHistogramReadback() const
     {
-        return m_ActivePipeline ? m_ActivePipeline->GetHistogramReadback() : nullptr;
+        return m_Impl->m_ActivePipeline ? m_Impl->m_ActivePipeline->GetHistogramReadback() : nullptr;
     }
 
     // -------------------------------------------------------------------------
@@ -1013,11 +1084,11 @@ namespace Graphics
 
     void RenderDriver::BeginFrame(uint64_t currentFrame)
     {
-        m_GeometryStorage.ProcessDeletions(currentFrame);
-        GarbageCollectRetiredPipelines();
+        m_Impl->m_GeometryStorage.ProcessDeletions(currentFrame);
+        m_Impl->GarbageCollectRetiredPipelines();
 
         // Apply deferred bindless updates before any render graph recording.
-        m_GlobalResources.GetBindlessSystem().FlushPending();
+        m_Impl->m_GlobalResources.GetBindlessSystem().FlushPending();
 
         // NOTE: ProcessReadbacks was moved to after AcquireFrame (fence wait) to ensure
         // the GPU has actually completed writing to the readback buffer before we read it.
@@ -1029,7 +1100,7 @@ namespace Graphics
 
     bool RenderDriver::AcquireFrame()
     {
-        if (!m_Presentation.BeginFrame())
+        if (!m_Impl->m_Presentation.BeginFrame())
         {
             // GUI frame was started during extraction; discard without rendering.
             if (Interface::GUI::IsFrameActive())
@@ -1045,15 +1116,15 @@ namespace Graphics
         // The fence guarantees that the GPU has completed writing to the readback buffer
         // for the previous use of this frame index. Using (currentFrame - framesInFlight)
         // as the completed frame ensures we only consume results that are definitely done.
-        const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
+        const uint32_t framesInFlight = m_Impl->m_Renderer.GetFramesInFlight();
         const uint64_t safeCompleted = (currentFrame > framesInFlight)
             ? (currentFrame - framesInFlight)
             : 0;
-        m_Interaction.ProcessReadbacks(safeCompleted);
+        m_Impl->m_Interaction.ProcessReadbacks(safeCompleted);
 
         // Fire GpuPickCompleted event when a readback result is available.
         // Consumers (SelectionModule) receive this via dispatcher sink instead of polling.
-        if (auto pick = m_Interaction.TryConsumePickResult())
+        if (auto pick = m_Impl->m_Interaction.TryConsumePickResult())
         {
             scene.GetDispatcher().enqueue<ECS::Events::GpuPickCompleted>(
                 {pick->EntityID, pick->PrimitiveID, pick->HasHit});
@@ -1062,57 +1133,57 @@ namespace Graphics
 
     void RenderDriver::UpdateGlobals(const CameraComponent& camera, const LightEnvironmentPacket& lighting)
     {
-        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
-        const auto extent = m_Presentation.GetResolution();
+        const uint32_t frameIndex = m_Impl->m_Presentation.GetFrameIndex();
+        const auto extent = m_Impl->m_Presentation.GetResolution();
 
-        m_GlobalResources.BeginFrame(frameIndex);
-        m_GlobalResources.Update(camera, lighting, frameIndex);
+        m_Impl->m_GlobalResources.BeginFrame(frameIndex);
+        m_Impl->m_GlobalResources.Update(camera, lighting, frameIndex);
 
-        ApplyPendingPipelineSwap(extent.width, extent.height);
+        m_Impl->ApplyPendingPipelineSwap(extent.width, extent.height);
     }
 
     void RenderDriver::BuildGraph(Core::Assets::AssetManager& assetManager,
                                   const BuildGraphInput& input)
     {
-        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
-        m_RenderGraph.Reset(frameIndex);
+        const uint32_t frameIndex = m_Impl->m_Presentation.GetFrameIndex();
+        m_Impl->m_RenderGraph.Reset(frameIndex);
 
-        const uint32_t imageIndex = m_Presentation.GetImageIndex();
-        const auto extent = m_Presentation.GetResolution();
-        m_LastBuiltFrameIndex = frameIndex;
-        m_LastBuiltImageIndex = imageIndex;
-        m_LastBuiltGraphExtent = extent;
+        const uint32_t imageIndex = m_Impl->m_Presentation.GetImageIndex();
+        const auto extent = m_Impl->m_Presentation.GetResolution();
+        m_Impl->m_LastBuiltFrameIndex = frameIndex;
+        m_Impl->m_LastBuiltImageIndex = imageIndex;
+        m_Impl->m_LastBuiltGraphExtent = extent;
         RenderBlackboard blackboard;
-        auto stableBlackboard = m_FrameScope->New<RenderBlackboard>(blackboard);
+        auto stableBlackboard = m_Impl->m_FrameScope->New<RenderBlackboard>(blackboard);
         RenderBlackboard* activeBlackboard = stableBlackboard ? *stableBlackboard : &blackboard;
 
         RenderPassContext ctx{
-            m_RenderGraph,
+            m_Impl->m_RenderGraph,
             *activeBlackboard,
             assetManager,
-            m_GeometryStorage,
-            m_MaterialRegistry,
-            m_GpuScene,
+            m_Impl->m_GeometryStorage,
+            m_Impl->m_MaterialRegistry,
+            m_Impl->m_GpuScene,
             frameIndex,
             extent,
             {},
             imageIndex,
-            m_Swapchain.GetImageFormat(),
-            m_Presentation.GetDepthBuffer().GetFormat(),
+            m_Impl->m_Swapchain.GetImageFormat(),
+            m_Impl->m_Presentation.GetDepthBuffer().GetFormat(),
             VK_FORMAT_R16G16B16A16_SFLOAT,
-            m_Renderer,
-            m_GlobalResources.GetCameraUBO(),
-            m_GlobalResources.GetGlobalDescriptorSet(),
-            m_GlobalResources.GetDynamicUBOOffset(frameIndex),
-            m_GlobalResources.GetBindlessSystem(),
+            m_Impl->m_Renderer,
+            m_Impl->m_GlobalResources.GetCameraUBO(),
+            m_Impl->m_GlobalResources.GetGlobalDescriptorSet(),
+            m_Impl->m_GlobalResources.GetDynamicUBOOffset(frameIndex),
+            m_Impl->m_GlobalResources.GetBindlessSystem(),
             input.PickRequest,
             input.DebugView,
-            m_LastDebugImages,
-            m_LastDebugPasses,
+            m_Impl->m_LastDebugImages,
+            m_Impl->m_LastDebugPasses,
             input.Camera.ViewMatrix,
             input.Camera.ProjectionMatrix,
             input.Lighting,
-            m_Interaction.GetReadbackBuffer(frameIndex),
+            m_Impl->m_Interaction.GetReadbackBuffer(frameIndex),
         };
         ctx.HasSelectionWork = input.HasSelectionWork;
         ctx.SelectionOutline = input.SelectionOutline;
@@ -1130,11 +1201,11 @@ namespace Graphics
         ctx.DebugDrawTriangles = input.DebugDrawTriangles;
         ctx.EditorOverlay = input.EditorOverlay;
 
-        auto stable = m_FrameScope->New<RenderPassContext>(ctx);
+        auto stable = m_Impl->m_FrameScope->New<RenderPassContext>(ctx);
         RenderPassContext* stableCtx = stable ? *stable : &ctx;
 
-        if (m_ActivePipeline)
-            stableCtx->Recipe = m_ActivePipeline->BuildFrameRecipe(*stableCtx);
+        if (m_Impl->m_ActivePipeline)
+            stableCtx->Recipe = m_Impl->m_ActivePipeline->BuildFrameRecipe(*stableCtx);
         else
         {
             stableCtx->Recipe.Depth = true;
@@ -1145,21 +1216,21 @@ namespace Graphics
             stableCtx->Recipe.Post = true;
             stableCtx->Recipe.SceneColorLDR = true;
         }
-        m_LastFrameRecipe = stableCtx->Recipe;
+        m_Impl->m_LastFrameRecipe = stableCtx->Recipe;
 
         struct FrameSetupData
         {
             std::array<RGResourceHandle, 10> Resources{};
             RGResourceHandle Backbuffer;
         };
-        m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
+        m_Impl->m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
                                               [this, extent, stableCtx, activeBlackboard](FrameSetupData& data, RGBuilder& builder)
                                               {
                                                   data.Backbuffer = builder.ImportTexture(
                                                       "Backbuffer"_id,
-                                                      m_Presentation.GetBackbuffer(),
-                                                      m_Presentation.GetBackbufferView(),
-                                                      m_Presentation.GetBackbufferFormat(),
+                                                      m_Impl->m_Presentation.GetBackbuffer(),
+                                                      m_Impl->m_Presentation.GetBackbufferView(),
+                                                      m_Impl->m_Presentation.GetBackbufferFormat(),
                                                       extent,
                                                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
                                                   activeBlackboard->Add("Backbuffer"_id, data.Backbuffer);
@@ -1184,7 +1255,7 @@ namespace Graphics
                                                       const auto def = GetRenderResourceDefinition(resource);
                                                       if (def.Lifetime == RenderResourceLifetime::Imported)
                                                       {
-                                                          auto& depthImg = m_Presentation.GetDepthBuffer();
+                                                          auto& depthImg = m_Impl->m_Presentation.GetDepthBuffer();
                                                           data.Resources[index] = builder.ImportTexture(
                                                               def.Name,
                                                               depthImg.GetHandle(),
@@ -1211,45 +1282,45 @@ namespace Graphics
         {
             int _dummy = 0;
         };
-        m_RenderGraph.AddPass<SceneUpdateData>("SceneUpdate",
+        m_Impl->m_RenderGraph.AddPass<SceneUpdateData>("SceneUpdate",
                                                [&](SceneUpdateData&, RGBuilder& builder)
                                                {
-                                                   if (!m_GpuScene) return;
+                                                   if (!m_Impl->m_GpuScene) return;
                                                    builder.Write(
                                                        builder.ImportBuffer(
-                                                           "GPUScene.Scene"_id, m_GpuScene->GetSceneBuffer()),
+                                                           "GPUScene.Scene"_id, m_Impl->m_GpuScene->GetSceneBuffer()),
                                                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                                                        VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
                                                    builder.Write(
                                                        builder.ImportBuffer(
-                                                           "GPUScene.Bounds"_id, m_GpuScene->GetBoundsBuffer()),
+                                                           "GPUScene.Bounds"_id, m_Impl->m_GpuScene->GetBoundsBuffer()),
                                                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                                                        VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
                                                },
                                                [this, frameIndex](const SceneUpdateData&, const RGRegistry&, VkCommandBuffer cmd)
                                                {
-                                                   if (m_GpuScene) m_GpuScene->Sync(cmd, frameIndex);
+                                                   if (m_Impl->m_GpuScene) m_Impl->m_GpuScene->Sync(cmd, frameIndex);
                                                });
 
 
-        if (m_ActivePipeline)
+        if (m_Impl->m_ActivePipeline)
         {
-            m_ActivePipeline->SetupFrame(*stableCtx);
+            m_Impl->m_ActivePipeline->SetupFrame(*stableCtx);
         }
     }
 
     void RenderDriver::ExecuteGraph()
     {
-        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
+        const uint32_t frameIndex = m_Impl->m_Presentation.GetFrameIndex();
 
-        m_RenderGraph.Compile(frameIndex);
+        m_Impl->m_RenderGraph.Compile(frameIndex);
 
-        m_LastDebugPasses = m_RenderGraph.BuildDebugPassList();
-        m_LastDebugImages = m_RenderGraph.BuildDebugImageList();
+        m_Impl->m_LastDebugPasses = m_Impl->m_RenderGraph.BuildDebugPassList();
+        m_Impl->m_LastDebugImages = m_Impl->m_RenderGraph.BuildDebugImageList();
 
         // Structured render graph validation with imported-resource write policies.
         const auto validationResult = ValidateCompiledGraph(
-            m_LastFrameRecipe, m_LastDebugPasses, m_LastDebugImages);
+            m_Impl->m_LastFrameRecipe, m_Impl->m_LastDebugPasses, m_Impl->m_LastDebugImages);
         for (const auto& diag : validationResult.Diagnostics)
         {
             if (diag.Severity == RenderGraphValidationSeverity::Error)
@@ -1258,16 +1329,16 @@ namespace Graphics
                 Core::Log::Warn("RenderGraph validation: {}", diag.Message);
         }
 
-        if (m_Config.EnableRenderAuditLogging)
-            LogRenderAudit(m_LastDebugPasses, m_LastDebugImages);
+        if (m_Impl->m_Config.EnableRenderAuditLogging)
+            LogRenderAudit(m_Impl->m_LastDebugPasses, m_Impl->m_LastDebugImages);
 
-        if (m_ActivePipeline)
-            m_ActivePipeline->PostCompile(frameIndex, m_LastDebugImages, m_LastDebugPasses);
+        if (m_Impl->m_ActivePipeline)
+            m_Impl->m_ActivePipeline->PostCompile(frameIndex, m_Impl->m_LastDebugImages, m_Impl->m_LastDebugPasses);
 
-        m_RenderGraph.Execute(m_Presentation.GetCommandBuffer());
+        m_Impl->m_RenderGraph.Execute(m_Impl->m_Presentation.GetCommandBuffer());
 
         // Feed per-pass CPU timings from RenderGraph into Telemetry.
-        const auto& passTimings = m_RenderGraph.GetLastPassTimings();
+        const auto& passTimings = m_Impl->m_RenderGraph.GetLastPassTimings();
         if (!passTimings.empty())
         {
             std::vector<std::pair<std::string, uint64_t>> cpuTimings;
@@ -1280,32 +1351,32 @@ namespace Graphics
 
     void RenderDriver::EndFrame()
     {
-        m_Presentation.EndFrame();
+        m_Impl->m_Presentation.EndFrame();
     }
 
     void RenderDriver::RebindFrameAllocators(Core::Memory::LinearArena& arena,
                                               Core::Memory::ScopeStack& scope)
     {
-        m_FrameScope = &scope;
-        m_RenderGraph.RebindAllocators(arena, scope);
+        m_Impl->m_FrameScope = &scope;
+        m_Impl->m_RenderGraph.RebindAllocators(arena, scope);
     }
 
     void RenderDriver::OnResize()
     {
-        ++m_ResizeCount;
-        m_LastResizeExtent = m_Presentation.GetResolution();
-        m_LastResizeGlobalFrame = m_Device ? m_Device->GetGlobalFrameNumber() : 0;
-        m_RenderGraph.Trim();
-        m_Presentation.OnResize();
-        auto extent = m_Presentation.GetResolution();
-        m_LastResizeExtent = extent;
-        if (m_ActivePipeline) m_ActivePipeline->OnResize(extent.width, extent.height);
+        ++m_Impl->m_ResizeCount;
+        m_Impl->m_LastResizeExtent = m_Impl->m_Presentation.GetResolution();
+        m_Impl->m_LastResizeGlobalFrame = m_Impl->m_Device ? m_Impl->m_Device->GetGlobalFrameNumber() : 0;
+        m_Impl->m_RenderGraph.Trim();
+        m_Impl->m_Presentation.OnResize();
+        auto extent = m_Impl->m_Presentation.GetResolution();
+        m_Impl->m_LastResizeExtent = extent;
+        if (m_Impl->m_ActivePipeline) m_Impl->m_ActivePipeline->OnResize(extent.width, extent.height);
     }
 
     // -------------------------------------------------------------------------
     std::optional<RHI::GpuTimestampFrame> RenderDriver::ConsumeResolvedGpuProfile()
     {
-        return m_Renderer.ConsumeResolvedGpuProfile();
+        return m_Impl->m_Renderer.ConsumeResolvedGpuProfile();
     }
 
     // DumpRenderGraphToString — human-readable render graph snapshot
@@ -1334,10 +1405,10 @@ namespace Graphics
 
         // --- Pass execution order ---
         out += std::format("=== Render Graph Dump ({} passes, {} images) ===\n\n",
-                           m_LastDebugPasses.size(), m_LastDebugImages.size());
+                           m_Impl->m_LastDebugPasses.size(), m_Impl->m_LastDebugImages.size());
 
         out += "--- Pass Execution Order ---\n";
-        for (const auto& pass : m_LastDebugPasses)
+        for (const auto& pass : m_Impl->m_LastDebugPasses)
         {
             out += std::format("  [{}] {}\n", pass.PassIndex, pass.Name);
             for (const auto& att : pass.Attachments)
@@ -1355,7 +1426,7 @@ namespace Graphics
 
         // --- Resource lifetimes ---
         out += "\n--- Resource Lifetimes ---\n";
-        for (const auto& img : m_LastDebugImages)
+        for (const auto& img : m_Impl->m_LastDebugImages)
         {
             out += std::format("  0x{:08X}  {}x{}  fmt={}  {}  alive=[{},{}]",
                                img.Name.Value,
