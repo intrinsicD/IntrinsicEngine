@@ -3,6 +3,7 @@ module;
 #include <unordered_map>
 #include <memory>
 #include <array>
+#include <cstdint>
 #include <span>
 #include <optional>
 #include <string>
@@ -267,6 +268,15 @@ export namespace Graphics
         float PcfFilterRadius = 1.5f;
         float SplitLambda = 0.85f;
     };
+
+    // Practical split scheme for CSM:
+    // d_i = λ * d_log + (1-λ) * d_uniform, normalized into [0, 1]
+    // where i in [1, cascadeCount].
+    [[nodiscard]] std::array<float, ShadowParams::MaxCascades> ComputeCascadeSplitDistances(
+        float nearPlane,
+        float farPlane,
+        uint32_t cascadeCount,
+        float splitLambda);
 
     struct LightEnvironmentPacket
     {

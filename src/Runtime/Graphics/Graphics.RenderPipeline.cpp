@@ -1,6 +1,7 @@
 module;
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -41,6 +42,36 @@ namespace
 
 namespace Graphics
 {
+    std::array<float, ShadowParams::MaxCascades> ComputeCascadeSplitDistances(
+        float nearPlane,
+        float farPlane,
+        uint32_t cascadeCount,
+        float splitLambda)
+    {
+        std::array<float, ShadowParams::MaxCascades> splits{};
+        splits.fill(1.0f);
+
+        const uint32_t clampedCascadeCount = std::clamp(cascadeCount, 1u, ShadowParams::MaxCascades);
+        const float clampedLambda = std::clamp(splitLambda, 0.0f, 1.0f);
+        const float n = std::max(nearPlane, 1.0e-4f);
+        const float f = std::max(farPlane, n + 1.0e-4f);
+        const float range = f - n;
+        const float ratio = f / n;
+
+        for (uint32_t i = 0; i < clampedCascadeCount; ++i)
+        {
+            const float p = static_cast<float>(i + 1) / static_cast<float>(clampedCascadeCount);
+            const float logSplit = n * std::pow(ratio, p);
+            const float uniformSplit = n + range * p;
+            const float blended = clampedLambda * logSplit + (1.0f - clampedLambda) * uniformSplit;
+            splits[i] = std::clamp((blended - n) / range, 0.0f, 1.0f);
+            if (i > 0)
+                splits[i] = std::max(splits[i], splits[i - 1]);
+        }
+
+        return splits;
+    }
+
     void ResolveDrawPacketBounds(
         std::span<LineDrawPacket> lines,
         std::span<PointDrawPacket> points,
