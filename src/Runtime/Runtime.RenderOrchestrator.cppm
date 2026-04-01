@@ -1,36 +1,44 @@
 module;
 #include <memory>
 #include <cstddef>
+#include <cstdint>
 #include <span>
-
-#include "RHI.Vulkan.hpp"
+#include <utility>
 
 export module Runtime.RenderOrchestrator;
 
+import Core.Assets;
+import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.Memory;
-import Core.Assets;
-import Core.Hash;
-import Core.FeatureRegistry;
-import RHI.Bindless;
-import RHI.Descriptors;
-import RHI.Device;
-import RHI.Renderer;
-import RHI.Swapchain;
-import RHI.Texture;
-import RHI.TextureManager;
 import RHI.Transfer;
-import Graphics.DebugDraw;
 import Graphics.Geometry;
-import Graphics.GPUScene;
-import Graphics.MaterialRegistry;
-import Graphics.PipelineLibrary;
 import Graphics.RenderDriver;
-import Graphics.RenderPipeline;
-import Graphics.ShaderRegistry;
 import Geometry.Handle;
-import ECS;
 import Runtime.RenderExtraction;
+
+export namespace RHI
+{
+    class VulkanDevice;
+    class VulkanSwapchain;
+    class SimpleRenderer;
+    class BindlessDescriptorSystem;
+    class DescriptorAllocator;
+    class DescriptorLayout;
+    class TextureManager;
+    class TransferManager;
+    struct TransferToken;
+} // namespace RHI
+
+export namespace Graphics
+{
+    class GPUScene;
+    class PipelineLibrary;
+    class MaterialRegistry;
+    class ShaderRegistry;
+    class GeometryPool;
+    class DebugDraw;
+} // namespace Graphics
 
 export namespace Runtime
 {
@@ -63,36 +71,34 @@ export namespace Runtime
         RenderOrchestrator& operator=(RenderOrchestrator&&) = delete;
 
         // --- Accessors ---
-        [[nodiscard]] Graphics::RenderDriver& GetRenderDriver() { return *m_RenderDriver; }
-        [[nodiscard]] const Graphics::RenderDriver& GetRenderDriver() const { return *m_RenderDriver; }
+        [[nodiscard]] Graphics::RenderDriver& GetRenderDriver();
+        [[nodiscard]] const Graphics::RenderDriver& GetRenderDriver() const;
 
-        [[nodiscard]] Graphics::GPUScene& GetGPUScene() { return *m_GpuScene; }
-        [[nodiscard]] const Graphics::GPUScene& GetGPUScene() const { return *m_GpuScene; }
-        [[nodiscard]] Graphics::GPUScene* GetGPUScenePtr() const { return m_GpuScene.get(); }
+        [[nodiscard]] Graphics::GPUScene& GetGPUScene();
+        [[nodiscard]] const Graphics::GPUScene& GetGPUScene() const;
+        [[nodiscard]] Graphics::GPUScene* GetGPUScenePtr() const;
 
-        [[nodiscard]] Graphics::PipelineLibrary& GetPipelineLibrary() { return *m_PipelineLibrary; }
-        [[nodiscard]] const Graphics::PipelineLibrary& GetPipelineLibrary() const { return *m_PipelineLibrary; }
+        [[nodiscard]] Graphics::PipelineLibrary& GetPipelineLibrary();
+        [[nodiscard]] const Graphics::PipelineLibrary& GetPipelineLibrary() const;
 
-        [[nodiscard]] Graphics::MaterialRegistry& GetMaterialRegistry() { return *m_MaterialRegistry; }
-        [[nodiscard]] const Graphics::MaterialRegistry& GetMaterialRegistry() const { return *m_MaterialRegistry; }
+        [[nodiscard]] Graphics::MaterialRegistry& GetMaterialRegistry();
+        [[nodiscard]] const Graphics::MaterialRegistry& GetMaterialRegistry() const;
 
-        [[nodiscard]] Graphics::ShaderRegistry& GetShaderRegistry() { return m_ShaderRegistry; }
-        [[nodiscard]] const Graphics::ShaderRegistry& GetShaderRegistry() const { return m_ShaderRegistry; }
+        [[nodiscard]] Graphics::ShaderRegistry& GetShaderRegistry();
+        [[nodiscard]] const Graphics::ShaderRegistry& GetShaderRegistry() const;
 
-        [[nodiscard]] Core::FrameGraph& GetFrameGraph() { return m_FrameGraph; }
-        [[nodiscard]] const Core::FrameGraph& GetFrameGraph() const { return m_FrameGraph; }
+        [[nodiscard]] Core::FrameGraph& GetFrameGraph();
+        [[nodiscard]] const Core::FrameGraph& GetFrameGraph() const;
 
-        [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_GeometryStorage; }
-        [[nodiscard]] const Graphics::GeometryPool& GetGeometryStorage() const { return m_GeometryStorage; }
+        [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage();
+        [[nodiscard]] const Graphics::GeometryPool& GetGeometryStorage() const;
 
-        // CPU-side FrameGraph allocators (ECS system closures).
-        // Render-graph allocators are per-FrameContext; see FrameContext::GetRenderArena/Scope.
-        [[nodiscard]] Core::Memory::LinearArena& GetFrameArena() { return m_FrameArena; }
-        [[nodiscard]] Core::Memory::ScopeStack& GetFrameScope() { return m_FrameScope; }
+        [[nodiscard]] Core::Memory::LinearArena& GetFrameArena();
+        [[nodiscard]] Core::Memory::ScopeStack& GetFrameScope();
 
-        [[nodiscard]] Graphics::DebugDraw& GetDebugDraw() { return m_DebugDraw; }
-        [[nodiscard]] const Graphics::DebugDraw& GetDebugDraw() const { return m_DebugDraw; }
-        [[nodiscard]] uint32_t GetFrameContextCount() const { return m_FrameContextRing.GetFramesInFlight(); }
+        [[nodiscard]] Graphics::DebugDraw& GetDebugDraw();
+        [[nodiscard]] const Graphics::DebugDraw& GetDebugDraw() const;
+        [[nodiscard]] uint32_t GetFrameContextCount() const;
 
         // --- Per-frame maintenance ---
         void OnResize();
@@ -127,48 +133,7 @@ export namespace Runtime
                            Graphics::GeometryUploadMode uploadMode = Graphics::GeometryUploadMode::Staged);
 
     private:
-        // Per-frame scratch memory for CPU-side FrameGraph (ECS system closures).
-        // Render-graph allocators are per-FrameContext (owned by FrameContextRing).
-        Core::Memory::LinearArena m_FrameArena;
-        Core::Memory::ScopeStack m_FrameScope;
-        Core::FrameGraph m_FrameGraph;
-
-        // Geometry pool (mesh data storage).
-        Graphics::GeometryPool m_GeometryStorage;
-
-        // Shader path registry (populated during init, read-only afterwards).
-        Graphics::ShaderRegistry m_ShaderRegistry;
-
-        // Immediate-mode debug drawing accumulator (reset each frame).
-        Graphics::DebugDraw m_DebugDraw;
-
-        // Pipeline state objects.
-        std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
-
-        // Material system (texture binding, hot-reload).
-        std::unique_ptr<Graphics::MaterialRegistry> m_MaterialRegistry;
-
-        // Retained-mode GPU scene (persistent SSBOs, slot allocator).
-        std::unique_ptr<Graphics::GPUScene> m_GpuScene;
-
-        // Full render driver (owns RenderGraph, presentation, interaction).
-        std::unique_ptr<Graphics::RenderDriver> m_RenderDriver;
-
-        // Borrowed references to GraphicsBackend infrastructure.
-        std::shared_ptr<RHI::VulkanDevice> m_Device;
-        RHI::VulkanSwapchain& m_Swapchain;
-        RHI::BindlessDescriptorSystem& m_Bindless;
-        RHI::DescriptorLayout& m_DescriptorLayout;
-        Core::Assets::AssetManager& m_AssetManager;
-
-        // Borrowed reference to the engine-wide feature registry (nullable).
-        Core::FeatureRegistry* m_FeatureRegistry = nullptr;
-        mutable FrameContextRing m_FrameContextRing;
-
-        void InitPipeline(RHI::VulkanSwapchain& swapchain,
-                          RHI::SimpleRenderer& renderer,
-                          RHI::BindlessDescriptorSystem& bindless,
-                          RHI::DescriptorAllocator& descriptorPool,
-                          RHI::DescriptorLayout& descriptorLayout);
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
     };
 }

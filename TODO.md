@@ -514,7 +514,7 @@ A dedicated peer-review pass was run against engine-facing module interfaces and
 - [ ] Record module fan-out for Tier A/B interfaces.
 
 #### P1 — Tier A migration
-- [ ] Introduce PImpl for `Runtime::RenderOrchestrator`.
+- [x] Introduce PImpl for `Runtime::RenderOrchestrator`.
 - [ ] Introduce PImpl for `Graphics::RenderDriver`.
 - [ ] Introduce PImpl for `Runtime::GraphicsBackend`.
 - [ ] Keep API signatures source-compatible where possible to minimize downstream churn.

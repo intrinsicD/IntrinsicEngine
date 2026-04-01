@@ -78,6 +78,151 @@ namespace Runtime
         }
     }
 
+    struct RenderOrchestrator::Impl
+    {
+        Impl(std::shared_ptr<RHI::VulkanDevice> inDevice,
+             RHI::VulkanSwapchain& inSwapchain,
+             RHI::SimpleRenderer& renderer,
+             RHI::BindlessDescriptorSystem& bindless,
+             RHI::DescriptorAllocator& descriptorPool,
+             RHI::DescriptorLayout& descriptorLayout,
+             RHI::TextureManager& textureManager,
+             Core::Assets::AssetManager& inAssetManager,
+             Core::FeatureRegistry* inFeatureRegistry,
+             size_t frameArenaSize,
+             uint32_t frameContextCount)
+            : FrameArena(frameArenaSize)
+            , FrameScope(frameArenaSize)
+            , FrameGraph(FrameScope)
+            , Device(std::move(inDevice))
+            , Swapchain(inSwapchain)
+            , Bindless(bindless)
+            , DescriptorLayoutRef(descriptorLayout)
+            , AssetManagerRef(inAssetManager)
+            , FeatureRegistryRef(inFeatureRegistry)
+            , FrameContextRing(frameContextCount, frameArenaSize)
+        {
+            MaterialRegistry = std::make_unique<Graphics::MaterialRegistry>(textureManager, inAssetManager);
+            InitPipeline(renderer, descriptorPool);
+
+            if (PipelineLibrary && Device)
+            {
+                if (auto* p = PipelineLibrary->GetSceneUpdatePipeline();
+                    p && PipelineLibrary->GetSceneUpdateSetLayout() != VK_NULL_HANDLE)
+                {
+                    GpuScene = std::make_unique<Graphics::GPUScene>(
+                        *Device, *p, PipelineLibrary->GetSceneUpdateSetLayout());
+
+                    if (RenderDriver)
+                        RenderDriver->SetGpuScene(GpuScene.get());
+                }
+            }
+        }
+
+        void InitPipeline(RHI::SimpleRenderer& renderer, RHI::DescriptorAllocator& descriptorPool)
+        {
+            struct ShaderRegistration
+            {
+                Core::Hash::StringID Id;
+                std::string_view Path;
+            };
+
+            constexpr std::array kShaderRegistrations = {
+                ShaderRegistration{"Surface.Vert"_id, "shaders/surface.vert.spv"},
+                ShaderRegistration{"Surface.Frag"_id, "shaders/surface.frag.spv"},
+                ShaderRegistration{"Surface.GBuffer.Frag"_id, "shaders/surface_gbuffer.frag.spv"},
+                ShaderRegistration{"Deferred.Lighting.Frag"_id, "shaders/deferred_lighting.frag.spv"},
+                ShaderRegistration{"Picking.Vert"_id, "shaders/pick_id.vert.spv"},
+                ShaderRegistration{"Picking.Frag"_id, "shaders/pick_id.frag.spv"},
+                ShaderRegistration{"PickMesh.Vert"_id, "shaders/pick_mesh.vert.spv"},
+                ShaderRegistration{"PickMesh.Frag"_id, "shaders/pick_mesh.frag.spv"},
+                ShaderRegistration{"PickLine.Vert"_id, "shaders/pick_line.vert.spv"},
+                ShaderRegistration{"PickLine.Frag"_id, "shaders/pick_line.frag.spv"},
+                ShaderRegistration{"PickPoint.Vert"_id, "shaders/pick_point.vert.spv"},
+                ShaderRegistration{"PickPoint.Frag"_id, "shaders/pick_point.frag.spv"},
+                ShaderRegistration{"Debug.Vert"_id, "shaders/debug_view.vert.spv"},
+                ShaderRegistration{"Debug.Frag"_id, "shaders/debug_view.frag.spv"},
+                ShaderRegistration{"Debug.Comp"_id, "shaders/debug_view.comp.spv"},
+                ShaderRegistration{"Outline.Vert"_id, "shaders/debug_view.vert.spv"},
+                ShaderRegistration{"Outline.Frag"_id, "shaders/selection_outline.frag.spv"},
+                ShaderRegistration{"Line.Vert"_id, "shaders/line.vert.spv"},
+                ShaderRegistration{"Line.Frag"_id, "shaders/line.frag.spv"},
+                ShaderRegistration{"PointCloud.Vert"_id, "shaders/point.vert.spv"},
+                ShaderRegistration{"PointCloud.Frag"_id, "shaders/point.frag.spv"},
+                ShaderRegistration{"Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv"},
+                ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv"},
+                ShaderRegistration{"RetainedPoint.Vert"_id, "shaders/point_retained.vert.spv"},
+                ShaderRegistration{"RetainedPoint.Frag"_id, "shaders/point_retained.frag.spv"},
+                ShaderRegistration{"Point.FlatDisc.Vert"_id, "shaders/point_flatdisc.vert.spv"},
+                ShaderRegistration{"Point.FlatDisc.Frag"_id, "shaders/point_flatdisc.frag.spv"},
+                ShaderRegistration{"Point.Surfel.Vert"_id, "shaders/point_surfel.vert.spv"},
+                ShaderRegistration{"Point.Surfel.Frag"_id, "shaders/point_surfel.frag.spv"},
+                ShaderRegistration{"Point.Sphere.Vert"_id, "shaders/point_sphere.vert.spv"},
+                ShaderRegistration{"Point.Sphere.Frag"_id, "shaders/point_sphere.frag.spv"},
+                ShaderRegistration{"Post.Fullscreen.Vert"_id, "shaders/post_fullscreen.vert.spv"},
+                ShaderRegistration{"Post.ToneMap.Frag"_id, "shaders/post_tonemap.frag.spv"},
+                ShaderRegistration{"Post.FXAA.Frag"_id, "shaders/post_fxaa.frag.spv"},
+                ShaderRegistration{"Post.SMAA.Edge.Frag"_id, "shaders/post_smaa_edge.frag.spv"},
+                ShaderRegistration{"Post.SMAA.Blend.Frag"_id, "shaders/post_smaa_blend.frag.spv"},
+                ShaderRegistration{"Post.SMAA.Resolve.Frag"_id, "shaders/post_smaa_resolve.frag.spv"},
+                ShaderRegistration{"Post.BloomDown.Frag"_id, "shaders/post_bloom_downsample.frag.spv"},
+                ShaderRegistration{"Post.BloomUp.Frag"_id, "shaders/post_bloom_upsample.frag.spv"},
+                ShaderRegistration{"Post.Histogram.Comp"_id, "shaders/post_histogram.comp.spv"},
+                ShaderRegistration{"DebugSurface.Vert"_id, "shaders/debug_surface.vert.spv"},
+                ShaderRegistration{"DebugSurface.Frag"_id, "shaders/debug_surface.frag.spv"},
+            };
+
+            for (const auto& registration : kShaderRegistrations)
+                ShaderRegistry.Register(registration.Id, registration.Path.data());
+
+            PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(
+                Device, Bindless, DescriptorLayoutRef);
+            PipelineLibrary->BuildDefaults(ShaderRegistry,
+                                           Swapchain.GetImageFormat(),
+                                           RHI::VulkanImage::FindDepthFormat(*Device));
+
+            Core::Log::Info("RenderOrchestrator: Creating RenderDriver...");
+            Graphics::RenderDriverConfig rsConfig{};
+            RenderDriver = std::make_unique<Graphics::RenderDriver>(
+                rsConfig,
+                Device,
+                Swapchain,
+                renderer,
+                Bindless,
+                descriptorPool,
+                DescriptorLayoutRef,
+                *PipelineLibrary,
+                ShaderRegistry,
+                FrameArena,
+                FrameScope,
+                GeometryStorage,
+                *MaterialRegistry);
+            Core::Log::Info("RenderOrchestrator: RenderDriver created successfully.");
+
+            auto defaultPipeline = std::make_unique<Graphics::DefaultPipeline>();
+            defaultPipeline->SetFeatureRegistry(FeatureRegistryRef);
+            RenderDriver->RequestPipelineSwap(std::move(defaultPipeline));
+        }
+
+        Core::Memory::LinearArena FrameArena;
+        Core::Memory::ScopeStack FrameScope;
+        Core::FrameGraph FrameGraph;
+        Graphics::GeometryPool GeometryStorage;
+        Graphics::ShaderRegistry ShaderRegistry;
+        Graphics::DebugDraw DebugDraw;
+        std::unique_ptr<Graphics::PipelineLibrary> PipelineLibrary;
+        std::unique_ptr<Graphics::MaterialRegistry> MaterialRegistry;
+        std::unique_ptr<Graphics::GPUScene> GpuScene;
+        std::unique_ptr<Graphics::RenderDriver> RenderDriver;
+        std::shared_ptr<RHI::VulkanDevice> Device;
+        RHI::VulkanSwapchain& Swapchain;
+        RHI::BindlessDescriptorSystem& Bindless;
+        RHI::DescriptorLayout& DescriptorLayoutRef;
+        Core::Assets::AssetManager& AssetManagerRef;
+        Core::FeatureRegistry* FeatureRegistryRef = nullptr;
+        mutable FrameContextRing FrameContextRing;
+    };
+
     RenderOrchestrator::RenderOrchestrator(
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::VulkanSwapchain& swapchain,
@@ -90,179 +235,67 @@ namespace Runtime
         Core::FeatureRegistry* featureRegistry,
         size_t frameArenaSize,
         uint32_t frameContextCount)
-        : m_FrameArena(frameArenaSize)
-        , m_FrameScope(frameArenaSize)
-        , m_FrameGraph(m_FrameScope)
-        , m_Device(std::move(device))
-        , m_Swapchain(swapchain)
-        , m_Bindless(bindless)
-        , m_DescriptorLayout(descriptorLayout)
-        , m_AssetManager(assetManager)
-        , m_FeatureRegistry(featureRegistry)
-        , m_FrameContextRing(frameContextCount, frameArenaSize)
     {
         Core::Log::Info("RenderOrchestrator: Initializing...");
+        m_Impl = std::make_unique<Impl>(std::move(device),
+                                        swapchain,
+                                        renderer,
+                                        bindless,
+                                        descriptorPool,
+                                        descriptorLayout,
+                                        textureManager,
+                                        assetManager,
+                                        featureRegistry,
+                                        frameArenaSize,
+                                        frameContextCount);
         Core::Log::Info("RenderOrchestrator: frame-context ring configured for {} slots.",
-                        m_FrameContextRing.GetFramesInFlight());
-
-        // 1. MaterialRegistry (depends on TextureManager + AssetManager)
-        m_MaterialRegistry = std::make_unique<Graphics::MaterialRegistry>(textureManager, assetManager);
-
-        // 2. Pipelines & RenderDriver
-        InitPipeline(swapchain, renderer, bindless, descriptorPool, descriptorLayout);
-
-        // 3. Retained-mode GPUScene
-        if (m_PipelineLibrary && m_Device)
-        {
-            if (auto* p = m_PipelineLibrary->GetSceneUpdatePipeline();
-                p && m_PipelineLibrary->GetSceneUpdateSetLayout() != VK_NULL_HANDLE)
-            {
-                m_GpuScene = std::make_unique<Graphics::GPUScene>(
-                    *m_Device, *p, m_PipelineLibrary->GetSceneUpdateSetLayout());
-
-                if (m_RenderDriver)
-                    m_RenderDriver->SetGpuScene(m_GpuScene.get());
-            }
-        }
+                        m_Impl->FrameContextRing.GetFramesInFlight());
 
         Core::Log::Info("RenderOrchestrator: Initialization complete.");
     }
 
     RenderOrchestrator::~RenderOrchestrator()
     {
-        // Destroy GPU systems in reverse dependency order.
-        m_GpuScene.reset();
-        m_RenderDriver.reset();
-        m_PipelineLibrary.reset();
-        m_MaterialRegistry.reset();
-
-        // Clear geometry storage before device destruction.
-        m_GeometryStorage.Clear();
-
-        // Destroy per-frame transient RHI objects while VulkanDevice is still alive.
-        // Per-FrameContext render-graph scopes are cleaned up by FrameContextRing's
-        // implicit destruction (runs after WaitForGraphicsIdle in RenderDriver dtor).
-        m_FrameScope.Reset();
-
         Core::Log::Info("RenderOrchestrator: Shutdown complete.");
     }
 
-    void RenderOrchestrator::InitPipeline(
-        RHI::VulkanSwapchain& swapchain,
-        RHI::SimpleRenderer& renderer,
-        RHI::BindlessDescriptorSystem& bindless,
-        RHI::DescriptorAllocator& descriptorPool,
-        RHI::DescriptorLayout& descriptorLayout)
-    {
-        struct ShaderRegistration
-        {
-            Core::Hash::StringID Id;
-            std::string_view Path;
-        };
-
-        constexpr std::array kShaderRegistrations = {
-            ShaderRegistration{"Surface.Vert"_id, "shaders/surface.vert.spv"},
-            ShaderRegistration{"Surface.Frag"_id, "shaders/surface.frag.spv"},
-            ShaderRegistration{"Surface.GBuffer.Frag"_id, "shaders/surface_gbuffer.frag.spv"},
-            ShaderRegistration{"Deferred.Lighting.Frag"_id, "shaders/deferred_lighting.frag.spv"},
-            ShaderRegistration{"Picking.Vert"_id, "shaders/pick_id.vert.spv"},
-            ShaderRegistration{"Picking.Frag"_id, "shaders/pick_id.frag.spv"},
-            ShaderRegistration{"PickMesh.Vert"_id, "shaders/pick_mesh.vert.spv"},
-            ShaderRegistration{"PickMesh.Frag"_id, "shaders/pick_mesh.frag.spv"},
-            ShaderRegistration{"PickLine.Vert"_id, "shaders/pick_line.vert.spv"},
-            ShaderRegistration{"PickLine.Frag"_id, "shaders/pick_line.frag.spv"},
-            ShaderRegistration{"PickPoint.Vert"_id, "shaders/pick_point.vert.spv"},
-            ShaderRegistration{"PickPoint.Frag"_id, "shaders/pick_point.frag.spv"},
-            ShaderRegistration{"Debug.Vert"_id, "shaders/debug_view.vert.spv"},
-            ShaderRegistration{"Debug.Frag"_id, "shaders/debug_view.frag.spv"},
-            ShaderRegistration{"Debug.Comp"_id, "shaders/debug_view.comp.spv"},
-            ShaderRegistration{"Outline.Vert"_id, "shaders/debug_view.vert.spv"}, // Reuse fullscreen triangle
-            ShaderRegistration{"Outline.Frag"_id, "shaders/selection_outline.frag.spv"},
-            ShaderRegistration{"Line.Vert"_id, "shaders/line.vert.spv"},
-            ShaderRegistration{"Line.Frag"_id, "shaders/line.frag.spv"},
-            ShaderRegistration{"PointCloud.Vert"_id, "shaders/point.vert.spv"},
-            ShaderRegistration{"PointCloud.Frag"_id, "shaders/point.frag.spv"},
-            ShaderRegistration{"Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv"},
-            ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv"},
-            ShaderRegistration{"RetainedPoint.Vert"_id, "shaders/point_retained.vert.spv"},
-            ShaderRegistration{"RetainedPoint.Frag"_id, "shaders/point_retained.frag.spv"},
-            ShaderRegistration{"Point.FlatDisc.Vert"_id, "shaders/point_flatdisc.vert.spv"},
-            ShaderRegistration{"Point.FlatDisc.Frag"_id, "shaders/point_flatdisc.frag.spv"},
-            ShaderRegistration{"Point.Surfel.Vert"_id, "shaders/point_surfel.vert.spv"},
-            ShaderRegistration{"Point.Surfel.Frag"_id, "shaders/point_surfel.frag.spv"},
-            ShaderRegistration{"Point.Sphere.Vert"_id, "shaders/point_sphere.vert.spv"},
-            ShaderRegistration{"Point.Sphere.Frag"_id, "shaders/point_sphere.frag.spv"},
-            ShaderRegistration{"Post.Fullscreen.Vert"_id, "shaders/post_fullscreen.vert.spv"},
-            ShaderRegistration{"Post.ToneMap.Frag"_id, "shaders/post_tonemap.frag.spv"},
-            ShaderRegistration{"Post.FXAA.Frag"_id, "shaders/post_fxaa.frag.spv"},
-            ShaderRegistration{"Post.SMAA.Edge.Frag"_id, "shaders/post_smaa_edge.frag.spv"},
-            ShaderRegistration{"Post.SMAA.Blend.Frag"_id, "shaders/post_smaa_blend.frag.spv"},
-            ShaderRegistration{"Post.SMAA.Resolve.Frag"_id, "shaders/post_smaa_resolve.frag.spv"},
-            ShaderRegistration{"Post.BloomDown.Frag"_id, "shaders/post_bloom_downsample.frag.spv"},
-            ShaderRegistration{"Post.BloomUp.Frag"_id, "shaders/post_bloom_upsample.frag.spv"},
-            ShaderRegistration{"Post.Histogram.Comp"_id, "shaders/post_histogram.comp.spv"},
-            ShaderRegistration{"DebugSurface.Vert"_id, "shaders/debug_surface.vert.spv"},
-            ShaderRegistration{"DebugSurface.Frag"_id, "shaders/debug_surface.frag.spv"},
-        };
-
-        for (const auto& registration : kShaderRegistrations)
-            m_ShaderRegistry.Register(registration.Id, registration.Path.data());
-
-        // Pipeline library (owns PSOs)
-        m_PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(
-            m_Device, bindless, descriptorLayout);
-        m_PipelineLibrary->BuildDefaults(m_ShaderRegistry,
-                                         swapchain.GetImageFormat(),
-                                         RHI::VulkanImage::FindDepthFormat(*m_Device));
-
-        // RenderDriver (borrows PSOs via PipelineLibrary)
-        Core::Log::Info("RenderOrchestrator: Creating RenderDriver...");
-        Graphics::RenderDriverConfig rsConfig{};
-        m_RenderDriver = std::make_unique<Graphics::RenderDriver>(
-            rsConfig,
-            m_Device,
-            swapchain,
-            renderer,
-            bindless,
-            descriptorPool,
-            descriptorLayout,
-            *m_PipelineLibrary,
-            m_ShaderRegistry,
-            m_FrameArena,
-            m_FrameScope,
-            m_GeometryStorage,
-            *m_MaterialRegistry
-        );
-        Core::Log::Info("RenderOrchestrator: RenderDriver created successfully.");
-
-        if (!m_RenderDriver)
-        {
-            Core::Log::Error("RenderOrchestrator: Failed to create RenderDriver!");
-            std::exit(1);
-        }
-
-        // Default Render Pipeline (hot-swappable)
-        auto defaultPipeline = std::make_unique<Graphics::DefaultPipeline>();
-        defaultPipeline->SetFeatureRegistry(m_FeatureRegistry);
-        m_RenderDriver->RequestPipelineSwap(std::move(defaultPipeline));
-    }
+    Graphics::RenderDriver& RenderOrchestrator::GetRenderDriver() { return *m_Impl->RenderDriver; }
+    const Graphics::RenderDriver& RenderOrchestrator::GetRenderDriver() const { return *m_Impl->RenderDriver; }
+    Graphics::GPUScene& RenderOrchestrator::GetGPUScene() { return *m_Impl->GpuScene; }
+    const Graphics::GPUScene& RenderOrchestrator::GetGPUScene() const { return *m_Impl->GpuScene; }
+    Graphics::GPUScene* RenderOrchestrator::GetGPUScenePtr() const { return m_Impl->GpuScene.get(); }
+    Graphics::PipelineLibrary& RenderOrchestrator::GetPipelineLibrary() { return *m_Impl->PipelineLibrary; }
+    const Graphics::PipelineLibrary& RenderOrchestrator::GetPipelineLibrary() const { return *m_Impl->PipelineLibrary; }
+    Graphics::MaterialRegistry& RenderOrchestrator::GetMaterialRegistry() { return *m_Impl->MaterialRegistry; }
+    const Graphics::MaterialRegistry& RenderOrchestrator::GetMaterialRegistry() const { return *m_Impl->MaterialRegistry; }
+    Graphics::ShaderRegistry& RenderOrchestrator::GetShaderRegistry() { return m_Impl->ShaderRegistry; }
+    const Graphics::ShaderRegistry& RenderOrchestrator::GetShaderRegistry() const { return m_Impl->ShaderRegistry; }
+    Core::FrameGraph& RenderOrchestrator::GetFrameGraph() { return m_Impl->FrameGraph; }
+    const Core::FrameGraph& RenderOrchestrator::GetFrameGraph() const { return m_Impl->FrameGraph; }
+    Graphics::GeometryPool& RenderOrchestrator::GetGeometryStorage() { return m_Impl->GeometryStorage; }
+    const Graphics::GeometryPool& RenderOrchestrator::GetGeometryStorage() const { return m_Impl->GeometryStorage; }
+    Core::Memory::LinearArena& RenderOrchestrator::GetFrameArena() { return m_Impl->FrameArena; }
+    Core::Memory::ScopeStack& RenderOrchestrator::GetFrameScope() { return m_Impl->FrameScope; }
+    Graphics::DebugDraw& RenderOrchestrator::GetDebugDraw() { return m_Impl->DebugDraw; }
+    const Graphics::DebugDraw& RenderOrchestrator::GetDebugDraw() const { return m_Impl->DebugDraw; }
+    uint32_t RenderOrchestrator::GetFrameContextCount() const { return m_Impl->FrameContextRing.GetFramesInFlight(); }
 
     void RenderOrchestrator::OnResize()
     {
-        if (m_RenderDriver)
-            m_RenderDriver->OnResize();
+        if (m_Impl->RenderDriver)
+            m_Impl->RenderDriver->OnResize();
 
         // After the GPU has been drained and the swapchain recreated, reset all
         // frame-context slots so the next BeginFrame does not attempt to wait on
         // stale timeline values from before the resize.
-        m_FrameContextRing.InvalidateAfterResize();
+        m_Impl->FrameContextRing.InvalidateAfterResize();
     }
 
     void RenderOrchestrator::ResetFrameState()
     {
-        m_FrameScope.Reset();
-        m_FrameArena.Reset();
-        m_DebugDraw.Reset();
+        m_Impl->FrameScope.Reset();
+        m_Impl->FrameArena.Reset();
+        m_Impl->DebugDraw.Reset();
     }
 
     Graphics::EditorOverlayPacket RenderOrchestrator::PrepareEditorOverlay() const
@@ -274,14 +307,14 @@ namespace Runtime
 
     FrameContext& RenderOrchestrator::BeginFrame() const
     {
-        const VkExtent2D extent = m_Swapchain.GetExtent();
-        FrameContext& frame = m_FrameContextRing.BeginFrame(
-            m_Device ? m_Device->GetGlobalFrameNumber() : 0u,
+        const VkExtent2D extent = m_Impl->Swapchain.GetExtent();
+        FrameContext& frame = m_Impl->FrameContextRing.BeginFrame(
+            m_Impl->Device ? m_Impl->Device->GetGlobalFrameNumber() : 0u,
             RenderViewport{
                 .Width = extent.width,
                 .Height = extent.height,
             });
-        WaitForFrameContextReuseIfNeeded(m_Device, frame);
+        WaitForFrameContextReuseIfNeeded(m_Impl->Device, frame);
 
         // Flush per-slot deferred deletions now that the GPU has confirmed
         // completion of this slot's previous work.  Must happen BEFORE
@@ -291,7 +324,7 @@ namespace Runtime
         // has confirmed completion) or when there is no device (headless/test
         // — nothing is in flight).  Skip on first-cycle slots that were never
         // submitted to avoid flushing deletions before any GPU work ran.
-        if (frame.ReusedSubmittedSlot || !m_Device)
+        if (frame.ReusedSubmittedSlot || !m_Impl->Device)
             frame.FlushDeferredDeletions();
 
         // Push the stored GPU profiling sample from this slot's previous
@@ -326,14 +359,14 @@ namespace Runtime
 
         // Override the default lighting with the driver-owned settings
         // so UI-driven changes propagate into the rendered frame.
-        world.Lighting = m_RenderDriver->GetLightEnvironment();
+        world.Lighting = m_Impl->RenderDriver->GetLightEnvironment();
 
         // Snapshot transient debug draw data into immutable vectors so render
         // passes consume frozen state instead of the live DebugDraw accumulator.
-        auto lines = m_DebugDraw.GetLines();
-        auto overlayLines = m_DebugDraw.GetOverlayLines();
-        auto points = m_DebugDraw.GetPoints();
-        auto triangles = m_DebugDraw.GetTriangles();
+        auto lines = m_Impl->DebugDraw.GetLines();
+        auto overlayLines = m_Impl->DebugDraw.GetOverlayLines();
+        auto points = m_Impl->DebugDraw.GetPoints();
+        auto triangles = m_Impl->DebugDraw.GetTriangles();
         if (!lines.empty())
             world.DebugDrawLines.assign(lines.begin(), lines.end());
         if (!overlayLines.empty())
@@ -345,7 +378,7 @@ namespace Runtime
 
         // Resolve interaction state during extraction so BuildGraph consumes
         // immutable extracted state rather than querying live InteractionSystem.
-        const auto& interaction = m_RenderDriver->GetInteraction();
+        const auto& interaction = m_Impl->RenderDriver->GetInteraction();
 
         const auto& pendingPick = interaction.GetPendingPick();
         world.PickRequest = Graphics::PickRequestSnapshot{
@@ -367,8 +400,8 @@ namespace Runtime
         // Snapshot retained GPUScene state so frame-recipe decisions use
         // extraction-time state rather than late live queries.
         world.GpuScene = Graphics::GpuSceneSnapshot{
-            .Available = m_GpuScene != nullptr,
-            .ActiveCountApprox = m_GpuScene ? m_GpuScene->GetActiveCountApprox() : 0u,
+            .Available = m_Impl->GpuScene != nullptr,
+            .ActiveCountApprox = m_Impl->GpuScene ? m_Impl->GpuScene->GetActiveCountApprox() : 0u,
         };
 
         return world;
@@ -397,9 +430,9 @@ namespace Runtime
             return;
         }
 
-        const uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : frame.FrameNumber;
-        m_RenderDriver->BeginFrame(currentFrame);
-        if (!m_RenderDriver->AcquireFrame())
+        const uint64_t currentFrame = m_Impl->Device ? m_Impl->Device->GetGlobalFrameNumber() : frame.FrameNumber;
+        m_Impl->RenderDriver->BeginFrame(currentFrame);
+        if (!m_Impl->RenderDriver->AcquireFrame())
             return;
 
         // Rebind render-graph allocators to this FrameContext's per-slot memory.
@@ -411,9 +444,9 @@ namespace Runtime
                              frame.SlotIndex);
             return;
         }
-        m_RenderDriver->RebindFrameAllocators(frame.GetRenderArena(), frame.GetRenderScope());
+        m_Impl->RenderDriver->RebindFrameAllocators(frame.GetRenderArena(), frame.GetRenderScope());
 
-        m_RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
+        m_Impl->RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
 
         // B1: Resolve bounding spheres from GeometryPool into draw packets so
         // they are self-contained for CPU frustum culling.
@@ -421,7 +454,7 @@ namespace Runtime
             RenderWorld* mutableWorld = frame.GetPreparedRenderWorld();
             Graphics::ResolveDrawPacketBounds(mutableWorld->LineDraws,
                                                mutableWorld->PointDraws,
-                                               m_GeometryStorage);
+                                               m_Impl->GeometryStorage);
         }
 
         // B1: Centralized CPU frustum cull for Line/Point packets.
@@ -458,7 +491,7 @@ namespace Runtime
             .DebugDrawTriangles = preparedRenderWorld->DebugDrawTriangles,
             .EditorOverlay = preparedRenderWorld->EditorOverlay,
         };
-        m_RenderDriver->BuildGraph(m_AssetManager, graphInput);
+        m_Impl->RenderDriver->BuildGraph(m_Impl->AssetManagerRef, graphInput);
         frame.Prepared = true;
     }
 
@@ -477,14 +510,14 @@ namespace Runtime
             return;
         }
 
-        m_RenderDriver->ExecuteGraph();
-        m_RenderDriver->EndFrame();
+        m_Impl->RenderDriver->ExecuteGraph();
+        m_Impl->RenderDriver->EndFrame();
         frame.Submitted = true;
     }
 
     void RenderOrchestrator::EndFrame(FrameContext& frame)
     {
-        frame.LastSubmittedTimelineValue = (frame.Submitted && m_Device) ? m_Device->GetGraphicsTimelineValue() : 0u;
+        frame.LastSubmittedTimelineValue = (frame.Submitted && m_Impl->Device) ? m_Impl->Device->GetGraphicsTimelineValue() : 0u;
 
         // Consume the resolved GPU profiling sample from the renderer and
         // store it under this FrameContext's ownership (B4.9).  The sample
@@ -494,8 +527,8 @@ namespace Runtime
         // context ring rather than going directly to a global sink.
         // Only consume when the frame was actually submitted to avoid
         // misattributing stale profiling data to unsubmitted frames.
-        if (frame.Submitted && m_RenderDriver)
-            frame.ResolvedGpuProfile = m_RenderDriver->ConsumeResolvedGpuProfile();
+        if (frame.Submitted && m_Impl->RenderDriver)
+            frame.ResolvedGpuProfile = m_Impl->RenderDriver->ConsumeResolvedGpuProfile();
 
         frame.ResetPreparedState();
     }
@@ -519,14 +552,14 @@ namespace Runtime
         req.Topology = topology;
         req.UploadMode = uploadMode;
 
-        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(m_Device, transferManager, req, &m_GeometryStorage);
+        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(m_Impl->Device, transferManager, req, &m_Impl->GeometryStorage);
         if (!gpuData)
         {
             Core::Log::Error("RenderOrchestrator::CreateGeometryView: GPU data creation failed.");
             return { {}, {} };
         }
 
-        const auto h = m_GeometryStorage.Add(std::move(gpuData));
+        const auto h = m_Impl->GeometryStorage.Add(std::move(gpuData));
         return { h, token };
     }
 }
