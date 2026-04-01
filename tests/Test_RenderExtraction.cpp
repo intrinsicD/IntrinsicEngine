@@ -666,6 +666,36 @@ TEST(RenderExtraction, LightEnvironmentPacket_DefaultsMatchPreviousHardcodedValu
     EXPECT_FLOAT_EQ(pkt.Shadows.SplitLambda, 0.85f);
 }
 
+TEST(RenderExtraction, ComputeCascadeSplitDistances_PracticalSchemeProducesMonotonicNormalizedSplits)
+{
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        0.1f,
+        100.0f,
+        Graphics::ShadowParams::MaxCascades,
+        0.85f);
+
+    EXPECT_GE(splits[0], 0.0f);
+    EXPECT_LE(splits[3], 1.0f);
+    EXPECT_LE(splits[0], splits[1]);
+    EXPECT_LE(splits[1], splits[2]);
+    EXPECT_LE(splits[2], splits[3]);
+    EXPECT_FLOAT_EQ(splits[3], 1.0f);
+}
+
+TEST(RenderExtraction, ComputeCascadeSplitDistances_HandlesDegenerateAndOutOfRangeInputs)
+{
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        0.0f,   // invalid near
+        0.0f,   // invalid far
+        0u,     // invalid cascade count
+        2.0f);  // invalid lambda
+
+    EXPECT_FLOAT_EQ(splits[0], 1.0f);
+    EXPECT_FLOAT_EQ(splits[1], 1.0f);
+    EXPECT_FLOAT_EQ(splits[2], 1.0f);
+    EXPECT_FLOAT_EQ(splits[3], 1.0f);
+}
+
 TEST(RenderExtraction, ExtractRenderWorld_PopulatesDefaultLightEnvironmentPacket)
 {
     Runtime::SceneManager sceneManager;
