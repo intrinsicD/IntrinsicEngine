@@ -436,3 +436,102 @@ The engine already has compute culling shaders (`instance_cull.comp`, `instance_
 - [ ] Ensure frame-recipe-relevant settings are serializable where appropriate.
 - [ ] Plan material serialization compatibility with the future rewrite.
 - [ ] Plan debug/editor-only render state separation from scene state.
+
+---
+
+## 1.5. Compile-Time & Binary-Boundary Hardening — PImpl Refactor Program (NEW)
+
+### Why now
+
+The runtime module interfaces currently expose many heavyweight concrete members (`std::vector`, `std::mutex`, `std::unique_ptr` trees, Vulkan handles, large imported module surfaces) directly in exported class layouts. That increases compile fan-out whenever implementation details change, because importers must rebuild for ABI/layout deltas even when behavior/API is unchanged.
+
+For high-churn orchestration classes, move detail-heavy state behind stable, thin exported shells using the PImpl idiom (`class X { struct Impl; std::unique_ptr<Impl> m_Impl; ... }`).
+
+### Subagent design-review summary (architecture + build focus)
+
+A dedicated peer-review pass was run against engine-facing module interfaces and subsystem boundaries. Consensus:
+
+- PImpl is **most valuable** at composition-root/runtime seams where implementation churn is high and dependency fan-out is wide.
+- PImpl is **not universally good**: avoid it for tiny POD-like types, hot per-entity data, and trivial re-export modules where indirection adds cost without reducing rebuild scope.
+- For this codebase, PImpl should be applied selectively to **orchestration/manager** classes, not to data-oriented geometry kernels or ECS component structs.
+
+### Candidate audit (priority-ordered)
+
+#### Tier A — Do first (highest rebuild impact, best architecture win)
+
+1. **`Runtime::RenderOrchestrator`** (`src/Runtime/Runtime.RenderOrchestrator.cppm`)
+   - Problem: exported class currently carries many heavyweight members (`FrameGraph`, arenas, `GeometryPool`, `DebugDraw`, pipeline/registry ownership, frame-context ring).
+   - Impact: churn in render orchestration internals likely triggers broad importer recompiles.
+   - PImpl plan: keep only ctor/dtor + narrow accessor API exported; move all concrete state and helper methods into `Impl` in `.cpp`.
+
+2. **`Graphics::RenderDriver`** (`src/Runtime/Graphics/Graphics.RenderDriver.cppm`)
+   - Problem: exported surface includes multiple subsystem objects, cached debug vectors, pipeline retirement storage, and frame-state caches.
+   - Impact: frequent rendering feature iteration causes high interface volatility.
+   - PImpl plan: stabilize exported contract around frame lifecycle + query API; hide render-graph internals, cache vectors, and pipeline retirement policy in `Impl`.
+
+3. **`Runtime::GraphicsBackend`** (`src/Runtime/Runtime.GraphicsBackend.cppm`)
+   - Problem: Vulkan ownership graph is directly visible in exported layout (`Context`, `Device`, `Swapchain`, descriptors, bindless, texture manager, optional CUDA, `VkSurfaceKHR`).
+   - Impact: backend maintenance or startup/shutdown ordering changes can force module rebuild cascades.
+   - PImpl plan: move GPU stack ownership and teardown ordering into `Impl`; keep accessor-based API stable.
+
+#### Tier B — Do next (good payoff, moderate complexity)
+
+4. **`Runtime::AssetPipeline`** (`src/Runtime/Runtime.AssetPipeline.cppm`)
+   - Problem: mutexes, vectors, pending-load structs, and queue internals are exported implementation detail.
+   - Impact: async ingestion iteration invalidates dependents unnecessarily.
+   - PImpl plan: hide synchronization containers and completion machinery behind `Impl`; preserve thread-safe API.
+
+5. **`Graphics::PipelineLibrary`** (`src/Runtime/Graphics/Graphics.PipelineLibrary.cppm`)
+   - Problem: pipeline maps, descriptor-set layouts, and compute pipeline ownership are in the exported class layout.
+   - Impact: pipeline compilation/reload work changes headers often.
+   - PImpl plan: expose lookup/build API only; move map/storage and layout lifecycle to `Impl`.
+
+#### Tier C — Usually avoid / case-by-case
+
+6. **`Graphics::GPUScene`** (`src/Runtime/Graphics/Graphics.GPUScene.cppm`)
+   - Mixed case: could benefit from encapsulation, but this type is used in tight render loops and allocator/update hot paths.
+   - Decision: defer PImpl unless compile metrics show it as top rebuild offender; prefer maintaining direct data-oriented clarity first.
+
+7. **`Graphics::DebugDraw`** (`src/Runtime/Graphics/Graphics.DebugDraw.cppm`)
+   - Avoid PImpl: immediate-mode container with hot per-frame append/query path. Extra indirection likely hurts without meaningful compile-time win.
+
+8. **Thin/re-export modules** (example: `Graphics.MaterialRegistry.cppm`)
+   - Avoid PImpl: no concrete layout to hide; zero practical benefit.
+
+### Refactor strategy & invariants
+
+- Preserve all existing public behavior and ownership semantics; this is a compile-boundary refactor, not a feature rewrite.
+- Keep constructors explicit about borrowed vs owned dependencies.
+- Ensure destructors remain in exactly one TU (vtable anchor rule still applies where virtual types exist).
+- Maintain no-exception / `std::expected` error propagation style.
+- Verify no extra allocations in per-frame hot paths (allocate `Impl` at subsystem construction only).
+
+### Execution plan
+
+#### P0 — Baseline measurement (before code changes)
+- [ ] Capture clean build time and no-op incremental build time.
+- [ ] Capture representative “touch one render source file” incremental build time.
+- [ ] Record module fan-out for Tier A/B interfaces.
+
+#### P1 — Tier A migration
+- [ ] Introduce PImpl for `Runtime::RenderOrchestrator`.
+- [ ] Introduce PImpl for `Graphics::RenderDriver`.
+- [ ] Introduce PImpl for `Runtime::GraphicsBackend`.
+- [ ] Keep API signatures source-compatible where possible to minimize downstream churn.
+
+#### P2 — Tier B migration
+- [ ] Introduce PImpl for `Runtime::AssetPipeline`.
+- [ ] Introduce PImpl for `Graphics::PipelineLibrary`.
+- [ ] Re-run compile metrics and compare against P0 baseline.
+
+#### P3 — Validation & hardening
+- [ ] Run architecture tests + rendering integration tests for frame build/execute/present rhythm.
+- [ ] Validate shutdown ordering and deferred destruction still pass under ASan/validation-enabled runs.
+- [ ] Audit for accidental hot-path heap churn after PImpl introduction.
+- [ ] Update `PATTERNS.md` with a new “Selective PImpl for module-boundary stability” pattern once stabilized.
+
+### Acceptance criteria
+
+- Measurable reduction in incremental rebuild time for render/runtime internal changes (target: meaningful drop vs P0 baseline).
+- No regressions in runtime correctness, frame construction contracts, or shutdown safety.
+- Public module interfaces become materially smaller and less volatile for orchestration subsystems.
