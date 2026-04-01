@@ -675,6 +675,52 @@ private:
     // =========================================================================
     void DrawViewSettingsPanel()
     {
+        // --- Camera ---
+        {
+            auto& registry = GetSceneManager().GetScene().GetRegistry();
+            if (registry.valid(m_CameraEntity))
+            {
+                if (auto* camera = registry.try_get<Graphics::CameraComponent>(m_CameraEntity))
+                {
+                    ImGui::SeparatorText("Camera");
+
+                    constexpr const char* projectionTypes[] = {"Perspective", "Orthographic"};
+                    int projectionType = static_cast<int>(camera->ProjectionType);
+                    if (ImGui::Combo("Projection", &projectionType, projectionTypes, IM_ARRAYSIZE(projectionTypes)))
+                    {
+                        camera->ProjectionType = static_cast<Graphics::CameraProjectionType>(projectionType);
+                    }
+                    Interface::GUI::ItemTooltip("Projection model used by the active camera.");
+
+                    ImGui::DragFloat("Near Clip", &camera->Near, 0.01f, 1e-4f, 1000.0f, "%.4f",
+                                     ImGuiSliderFlags_Logarithmic);
+                    Interface::GUI::ItemTooltip("Near clipping plane distance in world units.");
+                    ImGui::DragFloat("Far Clip", &camera->Far, 1.0f, 0.01f, 100000.0f, "%.2f",
+                                     ImGuiSliderFlags_Logarithmic);
+                    Interface::GUI::ItemTooltip("Far clipping plane distance in world units.");
+                    if (camera->Far <= camera->Near)
+                        camera->Far = camera->Near + 0.001f;
+
+                    if (camera->ProjectionType == Graphics::CameraProjectionType::Perspective)
+                    {
+                        ImGui::SliderFloat("Field of View (deg)", &camera->Fov, 10.0f, 140.0f, "%.1f");
+                        Interface::GUI::ItemTooltip("Vertical field of view in degrees for perspective projection.");
+                    }
+                    else
+                    {
+                        ImGui::DragFloat("Ortho Height", &camera->OrthographicHeight, 0.05f, 0.01f, 10000.0f, "%.3f",
+                                         ImGuiSliderFlags_Logarithmic);
+                        Interface::GUI::ItemTooltip("Vertical world-space span of the orthographic frustum.");
+                        camera->OrthographicHeight = std::max(camera->OrthographicHeight, 0.01f);
+                    }
+
+                    const glm::vec3 forward = camera->GetForward();
+                    ImGui::Text("Eye: (%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
+                    ImGui::Text("Forward: (%.3f, %.3f, %.3f)", forward.x, forward.y, forward.z);
+                }
+            }
+        }
+
         // --- Lighting ---
         {
             auto& lighting = GetRenderOrchestrator().GetRenderDriver().GetLightEnvironment();
