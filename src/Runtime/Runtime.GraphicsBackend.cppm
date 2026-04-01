@@ -8,7 +8,6 @@ module;
 export module Runtime.GraphicsBackend;
 
 import Core.Window;
-import Core.Logging;
 import RHI.Bindless;
 import RHI.Context;
 #ifdef INTRINSIC_HAS_CUDA
@@ -48,21 +47,21 @@ export namespace Runtime
         GraphicsBackend& operator=(GraphicsBackend&&) = delete;
 
         // --- Accessors (non-owning references) ---
-        [[nodiscard]] RHI::VulkanContext& GetContext() const { return *m_Context; }
+        [[nodiscard]] RHI::VulkanContext& GetContext() const;
         // Borrowed device access for runtime hot paths.
-        [[nodiscard]] RHI::VulkanDevice& GetDevice() const { return *m_Device; }
+        [[nodiscard]] RHI::VulkanDevice& GetDevice() const;
         // Explicit owning access for APIs that still require shared ownership.
-        [[nodiscard]] const std::shared_ptr<RHI::VulkanDevice>& GetDeviceShared() const { return m_Device; }
-        [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
-        [[nodiscard]] RHI::SimpleRenderer& GetRenderer() const { return *m_Renderer; }
-        [[nodiscard]] RHI::TransferManager& GetTransferManager() const { return *m_TransferManager; }
-        [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return *m_DescriptorLayout; }
-        [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return *m_DescriptorPool; }
-        [[nodiscard]] RHI::BindlessDescriptorSystem& GetBindlessSystem() const { return *m_BindlessSystem; }
-        [[nodiscard]] RHI::TextureManager& GetTextureManager() const { return *m_TextureManager; }
-        [[nodiscard]] uint32_t GetDefaultTextureIndex() const { return m_DefaultTextureIndex; }
+        [[nodiscard]] const std::shared_ptr<RHI::VulkanDevice>& GetDeviceShared() const;
+        [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const;
+        [[nodiscard]] RHI::SimpleRenderer& GetRenderer() const;
+        [[nodiscard]] RHI::TransferManager& GetTransferManager() const;
+        [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const;
+        [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const;
+        [[nodiscard]] RHI::BindlessDescriptorSystem& GetBindlessSystem() const;
+        [[nodiscard]] RHI::TextureManager& GetTextureManager() const;
+        [[nodiscard]] uint32_t GetDefaultTextureIndex() const;
 #ifdef INTRINSIC_HAS_CUDA
-        [[nodiscard]] RHI::CudaDevice* GetCudaDevice() const { return m_CudaDevice.get(); }
+        [[nodiscard]] RHI::CudaDevice* GetCudaDevice() const;
 #endif
 
         // --- Present policy ---
@@ -83,43 +82,7 @@ export namespace Runtime
         void ClearTextureManager();
 
     private:
-        // Vulkan instance & debug layers.
-        std::unique_ptr<RHI::VulkanContext> m_Context;
-
-        // Logical device + frame-in-flight tracking.
-        std::shared_ptr<RHI::VulkanDevice> m_Device;
-
-        // Window surface for presentation.
-        VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
-
-        // Swapchain & presentation.
-        std::unique_ptr<RHI::VulkanSwapchain> m_Swapchain;
-        std::unique_ptr<RHI::SimpleRenderer> m_Renderer;
-
-        // Async GPU transfer manager (staging belt + timeline semaphores).
-        std::unique_ptr<RHI::TransferManager> m_TransferManager;
-
-        // Descriptor plumbing.
-        std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
-        std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
-
-        // Bindless descriptor indexing.
-        std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
-
-        // Texture pooling + bindless slot management.
-        std::unique_ptr<RHI::TextureManager> m_TextureManager;
-
-        // Engine-owned default 1x1 white texture (bindless slot 0).
-        std::shared_ptr<RHI::Texture> m_DefaultTexture;
-        uint32_t m_DefaultTextureIndex = 0;
-
-#ifdef INTRINSIC_HAS_CUDA
-        std::unique_ptr<RHI::CudaDevice> m_CudaDevice;
-#endif
-
-        // Back-reference to the window (needed for surface destruction).
-        Core::Windowing::Window* m_Window = nullptr;
-
-        void CreateDefaultTexture();
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
     };
 }
