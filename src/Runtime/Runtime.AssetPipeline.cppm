@@ -1,10 +1,7 @@
 module;
 #include <memory>
-#include <string>
+#include <utility>
 #include <vector>
-#include <mutex>
-
-#include "RHI.Vulkan.hpp"
 
 export module Runtime.AssetPipeline;
 
@@ -32,8 +29,8 @@ export namespace Runtime
         AssetPipeline& operator=(AssetPipeline&&) = delete;
 
         // --- Accessors ---
-        [[nodiscard]] Core::Assets::AssetManager& GetAssetManager() { return m_AssetManager; }
-        [[nodiscard]] const Core::Assets::AssetManager& GetAssetManager() const { return m_AssetManager; }
+        [[nodiscard]] Core::Assets::AssetManager& GetAssetManager();
+        [[nodiscard]] const Core::Assets::AssetManager& GetAssetManager() const;
 
         // --- Per-frame processing (call from main thread) ---
 
@@ -53,20 +50,16 @@ export namespace Runtime
         template <typename F>
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token, F&& onComplete)
         {
-            std::lock_guard lock(m_LoadMutex);
-            PendingLoad l{};
-            l.Handle = handle;
-            l.Token = token;
-            l.OnComplete = Core::Tasks::LocalTask(std::forward<F>(onComplete));
-            m_PendingLoads.push_back(std::move(l));
+            RegisterAssetLoadWithCallback(handle,
+                                          token,
+                                          Core::Tasks::LocalTask(std::forward<F>(onComplete)));
         }
 
         // Queue a task for execution on the main thread (thread-safe).
         template <typename F>
         void RunOnMainThread(F&& task)
         {
-            std::lock_guard lock(m_MainThreadQueueMutex);
-            m_MainThreadQueue.emplace_back(Core::Tasks::LocalTask(std::forward<F>(task)));
+            EnqueueMainThreadTask(Core::Tasks::LocalTask(std::forward<F>(task)));
         }
 
         // --- Material keep-alive ---
@@ -75,35 +68,18 @@ export namespace Runtime
         void TrackMaterial(Core::Assets::AssetHandle handle);
 
         // Access the tracked material list (for teardown).
-        [[nodiscard]] const std::vector<Core::Assets::AssetHandle>& GetLoadedMaterials() const { return m_LoadedMaterials; }
+        [[nodiscard]] const std::vector<Core::Assets::AssetHandle>& GetLoadedMaterials() const;
 
         // Clear tracked materials (call during shutdown).
-        void ClearLoadedMaterials() { m_LoadedMaterials.clear(); }
+        void ClearLoadedMaterials();
 
     private:
-        // Core asset database.
-        Core::Assets::AssetManager m_AssetManager;
+        void RegisterAssetLoadWithCallback(Core::Assets::AssetHandle handle,
+                                           RHI::TransferToken token,
+                                           Core::Tasks::LocalTask onComplete);
+        void EnqueueMainThreadTask(Core::Tasks::LocalTask task);
 
-        // Internal tracking struct (POD).
-        struct PendingLoad
-        {
-            Core::Assets::AssetHandle Handle;
-            RHI::TransferToken Token;
-            Core::Tasks::LocalTask OnComplete{}; // optional main-thread completion work
-        };
-
-        // Protected by mutex because loaders call RegisterAssetLoad from worker threads.
-        std::mutex m_LoadMutex;
-        std::vector<PendingLoad> m_PendingLoads;
-
-        // Main-thread task queue (deferred work from worker threads).
-        std::mutex m_MainThreadQueueMutex;
-        std::vector<Core::Tasks::LocalTask> m_MainThreadQueue;
-
-        // Keep-alive list for runtime-created materials (handle-based).
-        std::vector<Core::Assets::AssetHandle> m_LoadedMaterials;
-
-        // Borrowed reference to the GPU transfer manager.
-        RHI::TransferManager& m_TransferManager;
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
     };
 }

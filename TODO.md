@@ -520,7 +520,7 @@ A dedicated peer-review pass was run against engine-facing module interfaces and
 - [ ] Keep API signatures source-compatible where possible to minimize downstream churn.
 
 #### P2 — Tier B migration
-- [ ] Introduce PImpl for `Runtime::AssetPipeline`.
+- [x] Introduce PImpl for `Runtime::AssetPipeline`.
 - [ ] Introduce PImpl for `Graphics::PipelineLibrary`.
 - [ ] Re-run compile metrics and compare against P0 baseline.
 
