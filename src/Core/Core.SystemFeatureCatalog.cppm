@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <array>
 #include <string_view>
 
 export module Core.SystemFeatureCatalog;
@@ -74,10 +75,18 @@ export namespace Runtime::SystemFeatureCatalog
         "Use 90% GPU memory warning threshold instead of the 80% baseline",
         false);
 
+    inline constexpr std::array<Core::FeatureDescriptor, 4> GpuMemoryWarnThresholdPresets{
+        GpuMemoryWarnThreshold70,
+        GpuMemoryWarnThreshold75,
+        GpuMemoryWarnThreshold85,
+        GpuMemoryWarnThreshold90,
+    };
+
     struct GpuMemoryWarningThresholdConfig
     {
         double ThresholdFraction = 0.80;
         uint32_t EnabledPresetCount = 0;
+        std::string_view ActivePresetName = "default-80";
     };
 
     [[nodiscard]] inline GpuMemoryWarningThresholdConfig ResolveGpuMemoryWarningThreshold(
@@ -89,21 +98,25 @@ export namespace Runtime::SystemFeatureCatalog
         {
             config.ThresholdFraction = 0.70;
             ++config.EnabledPresetCount;
+            config.ActivePresetName = "70";
         }
         if (features.IsEnabled(GpuMemoryWarnThreshold75))
         {
             config.ThresholdFraction = 0.75;
             ++config.EnabledPresetCount;
+            config.ActivePresetName = "75";
         }
         if (features.IsEnabled(GpuMemoryWarnThreshold85))
         {
             config.ThresholdFraction = 0.85;
             ++config.EnabledPresetCount;
+            config.ActivePresetName = "85";
         }
         if (features.IsEnabled(GpuMemoryWarnThreshold90))
         {
             config.ThresholdFraction = 0.90;
             ++config.EnabledPresetCount;
+            config.ActivePresetName = "90";
         }
 
         return config;

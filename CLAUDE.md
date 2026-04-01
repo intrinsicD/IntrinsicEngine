@@ -359,6 +359,12 @@ Do not leave markdown drift:
 
 `TODO.md` active-only policy is enforced automatically in CI by `tools/check_todo_active_only.sh`.
 
+For architecture-touching PRs, run the post-merge audit flow before requesting review:
+
+1. Review `docs/architecture/post-merge-audit-checklist.md`.
+2. Run `tools/check_ui_contract_guard.sh origin/main 120` when EditorUI controllers are touched.
+3. Ensure README/TODO/ADR links are synchronized in the same PR when contracts change.
+
 ---
 
 ## Continuous Self-Evaluation

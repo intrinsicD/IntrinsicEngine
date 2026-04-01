@@ -27,8 +27,9 @@ namespace Runtime
         if (!m_LoggedGpuMemoryThresholdConflict && thresholdConfig.EnabledPresetCount > 1u)
         {
             Core::Log::Warn(
-                "Multiple GPU memory warning threshold presets are enabled; using {:.0f}% by precedence.",
-                warningThreshold * 100.0);
+                "Multiple GPU memory warning threshold presets are enabled; using {:.0f}% (preset {}).",
+                warningThreshold * 100.0,
+                thresholdConfig.ActivePresetName);
             m_LoggedGpuMemoryThresholdConflict = true;
         }
 
