@@ -1596,6 +1596,45 @@ namespace Runtime::Selection
         const bool hasLine = reg.all_of<ECS::Line::Component>(entity);
         const bool hasPoint = reg.all_of<ECS::Point::Component>(entity);
 
+        // Robustness-first policy: when we have a full CPU pick request, prefer
+        // the CPU-refined sub-element tuple for the active mode. This avoids
+        // depending on GPU primitive-ID domain encoding details and guarantees
+        // that selection IDs map to authoritative mesh/graph/point-cloud IDs.
+        //
+        // We still keep GPU primitive IDs as a low-latency fallback when CPU
+        // refinement is unavailable or inconclusive.
+        const auto adoptCpuForRequestedElement = [&]() -> bool
+        {
+            if (request == nullptr)
+                return false;
+
+            const auto& entityPick = getCpuResult();
+            if (entityPick.Entity != entity || !entityPick.PickedData.entity)
+                return false;
+
+            const auto& cpuPickedEntity = entityPick.PickedData.entity;
+            switch (elementMode)
+            {
+            case ElementMode::Vertex:
+                if (cpuPickedEntity.vertex_idx == Picked::Entity::InvalidIndex)
+                    return false;
+                break;
+            case ElementMode::Edge:
+                if (cpuPickedEntity.edge_idx == Picked::Entity::InvalidIndex)
+                    return false;
+                break;
+            case ElementMode::Face:
+                if (cpuPickedEntity.face_idx == Picked::Entity::InvalidIndex)
+                    return false;
+                break;
+            case ElementMode::Entity:
+                break;
+            }
+
+            picked = entityPick.PickedData;
+            return true;
+        };
+
         if (elementMode == ElementMode::Entity)
         {
             if (request != nullptr)
@@ -1603,10 +1642,13 @@ namespace Runtime::Selection
             return picked;
         }
 
-        // Meshes: GPU surface-face ID is authoritative. CPU is refinement-only:
-        // compute local/world hit point and nearest edge/vertex from that point.
+        // Meshes/graphs/point clouds: prefer CPU-refined authoritative IDs for
+        // the requested element mode when available.
         if (isMesh)
         {
+            if (adoptCpuForRequestedElement())
+                return picked;
+
             if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::Point)
             {
                 if (elementMode == ElementMode::Vertex && hasPoint)
@@ -1709,10 +1751,11 @@ namespace Runtime::Selection
             return picked;
         }
 
-        // Graphs: GPU edge ID is authoritative. CPU is refinement-only for
-        // nearest vertex and hit-space payload.
         if (isGraph)
         {
+            if (adoptCpuForRequestedElement())
+                return picked;
+
             if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::LineSegment)
             {
                 if (hasLine)
@@ -1746,9 +1789,11 @@ namespace Runtime::Selection
             return picked;
         }
 
-        // Point clouds already render point PrimitiveID directly.
         if (isPointCloud)
         {
+            if (adoptCpuForRequestedElement())
+                return picked;
+
             if (elementMode == ElementMode::Vertex && hasPrimitiveID)
             {
                 if (primitiveHint.Domain == PrimitivePickDomain::Point ||
