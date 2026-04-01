@@ -78,16 +78,16 @@ export namespace Graphics
         void RebindFrameAllocators(Core::Memory::LinearArena& arena,
                                    Core::Memory::ScopeStack& scope);
 
-        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalResources.GetCameraUBO(); }
+        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const;
 
         // Retained-mode scene is owned by Runtime::Engine. RenderDriver consumes it during rendering.
-        void SetGpuScene(GPUScene* scene) { m_GpuScene = scene; }
+        void SetGpuScene(GPUScene* scene);
 
 
         // Accessors
-        [[nodiscard]] InteractionSystem& GetInteraction() { return m_Interaction; }
-        [[nodiscard]] const InteractionSystem& GetInteraction() const { return m_Interaction; }
-        [[nodiscard]] GlobalResources& GetGlobalResources() { return m_GlobalResources; }
+        [[nodiscard]] InteractionSystem& GetInteraction();
+        [[nodiscard]] const InteractionSystem& GetInteraction() const;
+        [[nodiscard]] GlobalResources& GetGlobalResources();
 
         // Picking API Facade (Delegates to InteractionSystem)
         using PickResultGpu = InteractionSystem::PickResultGpu;
@@ -106,8 +106,8 @@ export namespace Graphics
         // Mutable scene lighting state.  UI panels modify this directly;
         // RenderOrchestrator::ExtractRenderWorld() copies the current value
         // into RenderWorld::Lighting each frame.
-        [[nodiscard]] LightEnvironmentPacket& GetLightEnvironment() { return m_LightEnvironment; }
-        [[nodiscard]] const LightEnvironmentPacket& GetLightEnvironment() const { return m_LightEnvironment; }
+        [[nodiscard]] LightEnvironmentPacket& GetLightEnvironment();
+        [[nodiscard]] const LightEnvironmentPacket& GetLightEnvironment() const;
 
         // Consume the last resolved GPU profiling result (moves ownership to the caller).
         // Returns std::nullopt if no resolved result is available yet.
@@ -118,59 +118,8 @@ export namespace Graphics
         [[nodiscard]] std::string DumpRenderGraphToString() const;
 
     private:
-        RenderDriverConfig m_Config;
-
-        // Ownership stays with the caller, but we avoid ref-count ops in hot code.
-        std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
-        RHI::VulkanDevice* m_Device = nullptr;
-
-        RHI::VulkanSwapchain& m_Swapchain;
-        RHI::SimpleRenderer& m_Renderer;
-
-        // Per-frame scratch allocators (non-owning, rebound per frame via FrameContext).
-        // - ScopeStack : destructor-safe closures + frame-stable context snapshots
-        Core::Memory::ScopeStack* m_FrameScope;
-
-        // Sub-Systems
-        GlobalResources m_GlobalResources; // Holds UBOs, Descriptors, Allocators
-        PresentationSystem m_Presentation;
-        InteractionSystem m_Interaction;
-
-        RenderGraph m_RenderGraph;
-        GeometryPool& m_GeometryStorage;
-        MaterialRegistry& m_MaterialRegistry;
-
-        // Retained-mode GPU scene (persistent SSBOs + sparse updates). Non-owning.
-        GPUScene* m_GpuScene = nullptr;
-
-        // Cached frame lists for UI and debug resolve selection.
-        std::vector<RenderGraphDebugPass> m_LastDebugPasses;
-        std::vector<RenderGraphDebugImage> m_LastDebugImages;
-        FrameRecipe m_LastFrameRecipe{};
-        uint32_t m_ResizeCount = 0;
-        VkExtent2D m_LastResizeExtent{};
-        uint64_t m_LastResizeGlobalFrame = 0;
-        VkExtent2D m_LastBuiltGraphExtent{};
-        uint32_t m_LastBuiltFrameIndex = 0;
-        uint32_t m_LastBuiltImageIndex = 0;
-
-        // Scene lighting state, editable from View Settings panel.
-        LightEnvironmentPacket m_LightEnvironment{};
-
-        // Pipeline (hot-swappable)
-        std::unique_ptr<RenderPipeline> m_ActivePipeline;
-        std::unique_ptr<RenderPipeline> m_PendingPipeline;
-
-        struct RetiredPipeline
-        {
-            std::unique_ptr<RenderPipeline> Pipeline;
-            uint64_t RetireFrame = 0;
-        };
-        std::vector<RetiredPipeline> m_RetiredPipelines;
-
-        void ApplyPendingPipelineSwap(uint32_t width, uint32_t height);
-        void GarbageCollectRetiredPipelines();
-
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
     };
 
     [[nodiscard]] RenderGraphValidationResult ValidateCompiledGraph(
