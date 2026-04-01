@@ -57,6 +57,7 @@ target_sources(${target_name}
         Graphics.GlobalResources.cppm
         Graphics.Colormap.cppm
         Graphics.VisualizationConfig.cppm
+        Graphics.SubElementHighlightSettings.cppm
         Graphics.PropertyEnumerator.cppm
         Graphics.ColorMapper.cppm
         Graphics.VectorFieldManager.cppm

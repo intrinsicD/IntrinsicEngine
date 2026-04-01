@@ -14,6 +14,7 @@ import ECS;
 import Graphics.Camera;
 import Graphics.RenderDriver;
 import Runtime.Selection;
+import Graphics.SubElementHighlightSettings;
 
 export namespace Runtime
 {
@@ -85,8 +86,13 @@ export namespace Runtime
         [[nodiscard]] Selection::SubElementSelection& GetSubElementSelection() { return m_SubElements; }
         void ClearSubElementSelection() { m_SubElements.Clear(); }
 
+        // Sub-element highlight appearance (colors, sizes).
+        [[nodiscard]] Graphics::SubElementHighlightSettings& GetHighlightSettings() { return m_HighlightSettings; }
+        [[nodiscard]] const Graphics::SubElementHighlightSettings& GetHighlightSettings() const { return m_HighlightSettings; }
+
     private:
         Config m_Config;
+        Graphics::SubElementHighlightSettings m_HighlightSettings;
 
         // Click mode captured at the time the GPU pick was requested,
         // so the correct mode is applied when the async result arrives.
