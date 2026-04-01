@@ -11,18 +11,6 @@ import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.FeatureCatalog;
-import Graphics.Passes.DebugView;
-import Graphics.Passes.Surface;
-import Graphics.Passes.ImGui;
-import Graphics.Passes.Line;
-import Graphics.Passes.Picking;
-import Graphics.Passes.Point;
-import Graphics.Passes.HtexPatchPreview;
-import Graphics.Passes.SelectionOutline;
-import Graphics.Passes.SelectionOutlineSettings;
-import Graphics.Passes.PostProcessSettings;
-import Graphics.Passes.PostProcess;
-import Graphics.Passes.Composition;
 import RHI.Descriptors;
 import RHI.Device;
 import Core.Hash;
@@ -53,6 +41,7 @@ export namespace Graphics
     class DefaultPipeline final : public RenderPipeline
     {
     public:
+        DefaultPipeline();
         ~DefaultPipeline() override;
 
         void SetFeatureRegistry(const Core::FeatureRegistry* registry) { m_Registry = registry; }
@@ -73,53 +62,22 @@ export namespace Graphics
                          std::span<const RenderGraphDebugImage> debugImages,
                          std::span<const RenderGraphDebugPass> debugPasses) override;
 
-        Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() override
-        {
-            return m_SelectionOutlinePass ? &m_SelectionOutlinePass->GetSettings() : nullptr;
-        }
-
-        Passes::PostProcessSettings* GetPostProcessSettings() override
-        {
-            return m_PostProcessPass ? &m_PostProcessPass->GetSettings() : nullptr;
-        }
-
-        const Passes::HistogramReadback* GetHistogramReadback() const override
-        {
-            return m_PostProcessPass ? &m_PostProcessPass->GetHistogram() : nullptr;
-        }
+        Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() override;
+        Passes::PostProcessSettings* GetPostProcessSettings() override;
+        const Passes::HistogramReadback* GetHistogramReadback() const override;
 
         [[nodiscard]] RenderPipelineDebugState GetDebugState() const override;
-        [[nodiscard]] const Passes::SelectionOutlineDebugState* GetSelectionOutlineDebugState() const override
-        {
-            return m_SelectionOutlinePass ? &m_SelectionOutlinePass->GetDebugState() : nullptr;
-        }
-
-        [[nodiscard]] const Passes::PostProcessDebugState* GetPostProcessDebugState() const override
-        {
-            return m_PostProcessPass ? &m_PostProcessPass->GetDebugState() : nullptr;
-        }
+        [[nodiscard]] const Passes::SelectionOutlineDebugState* GetSelectionOutlineDebugState() const override;
+        [[nodiscard]] const Passes::PostProcessDebugState* GetPostProcessDebugState() const override;
 
     private:
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
         const Core::FeatureRegistry* m_Registry = nullptr;
-
-        std::unique_ptr<Passes::PickingPass> m_PickingPass;
-        std::unique_ptr<Passes::SurfacePass> m_SurfacePass;
-        std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;
-        std::unique_ptr<Passes::LinePass> m_LinePass;
-        std::unique_ptr<Passes::PointPass> m_PointPass;
-        std::unique_ptr<Passes::HtexPatchPreviewPass> m_HtexPatchPreviewPass;
-        std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
-        std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
-        std::unique_ptr<Passes::PostProcessPass> m_PostProcessPass;
-        std::unique_ptr<Passes::CompositionPass> m_CompositionPass;
-
-        RenderPath m_Path;
-        bool m_PathDirty = true;
 
         [[nodiscard]] bool IsFeatureEnabled(const Core::FeatureDescriptor& descriptor) const;
 
         void RebuildPath();
     };
 
-    DefaultPipeline::~DefaultPipeline() = default;
 }
