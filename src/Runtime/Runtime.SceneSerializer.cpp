@@ -25,6 +25,7 @@ import Core.Tasks;
 import Graphics.Geometry;
 import Graphics.Model;
 import Graphics.Components;
+import Graphics.RenderPipeline;
 
 import ECS;
 

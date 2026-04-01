@@ -55,6 +55,7 @@ import Interface;
 
 
 using namespace Core;
+using namespace Core::Hash;
 using namespace Runtime;
 
 // =============================================================================

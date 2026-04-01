@@ -4,6 +4,7 @@ module;
 #include <glm/gtc/quaternion.hpp>
 #include <algorithm>
 #include <array>
+#include <span>
 
 module ECS:Systems.AxisRotator.Impl;
 import :Systems.AxisRotator;
