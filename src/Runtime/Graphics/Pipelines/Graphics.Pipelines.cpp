@@ -37,6 +37,25 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
+    struct DefaultPipeline::Impl
+    {
+        std::unique_ptr<Passes::PickingPass> PickingPass;
+        std::unique_ptr<Passes::SurfacePass> SurfacePass;
+        std::unique_ptr<Passes::SelectionOutlinePass> SelectionOutlinePass;
+        std::unique_ptr<Passes::LinePass> LinePass;
+        std::unique_ptr<Passes::PointPass> PointPass;
+        std::unique_ptr<Passes::HtexPatchPreviewPass> HtexPatchPreviewPass;
+        std::unique_ptr<Passes::DebugViewPass> DebugViewPass;
+        std::unique_ptr<Passes::ImGuiPass> ImGuiPass;
+        std::unique_ptr<Passes::PostProcessPass> PostProcessPass;
+        std::unique_ptr<Passes::CompositionPass> CompositionPass;
+        RenderPath Path;
+        bool PathDirty = true;
+    };
+
+    DefaultPipeline::DefaultPipeline() : m_Impl(std::make_unique<Impl>()) {}
+    DefaultPipeline::~DefaultPipeline() = default;
+
     [[nodiscard]] FrameRecipe BuildDefaultPipelineRecipe(const DefaultPipelineRecipeInputs& inputs)
     {
         const bool hasGeometry = inputs.SurfacePassEnabled || inputs.LinePassEnabled || inputs.PointPassEnabled;
@@ -94,27 +113,27 @@ namespace Graphics
 
     void DefaultPipeline::Shutdown()
     {
-        if (m_PickingPass)          m_PickingPass->Shutdown();
-        if (m_SurfacePass)          m_SurfacePass->Shutdown();
-        if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
-        if (m_LinePass)             m_LinePass->Shutdown();
-        if (m_PointPass)            m_PointPass->Shutdown();
-        if (m_HtexPatchPreviewPass) m_HtexPatchPreviewPass->Shutdown();
-        if (m_PostProcessPass)      m_PostProcessPass->Shutdown();
-        if (m_CompositionPass)      m_CompositionPass->Shutdown();
-        if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
-        if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
+        if (m_Impl->PickingPass)          m_Impl->PickingPass->Shutdown();
+        if (m_Impl->SurfacePass)          m_Impl->SurfacePass->Shutdown();
+        if (m_Impl->SelectionOutlinePass) m_Impl->SelectionOutlinePass->Shutdown();
+        if (m_Impl->LinePass)             m_Impl->LinePass->Shutdown();
+        if (m_Impl->PointPass)            m_Impl->PointPass->Shutdown();
+        if (m_Impl->HtexPatchPreviewPass) m_Impl->HtexPatchPreviewPass->Shutdown();
+        if (m_Impl->PostProcessPass)      m_Impl->PostProcessPass->Shutdown();
+        if (m_Impl->CompositionPass)      m_Impl->CompositionPass->Shutdown();
+        if (m_Impl->DebugViewPass)        m_Impl->DebugViewPass->Shutdown();
+        if (m_Impl->ImGuiPass)            m_Impl->ImGuiPass->Shutdown();
 
-        m_PickingPass.reset();
-        m_SurfacePass.reset();
-        m_SelectionOutlinePass.reset();
-        m_LinePass.reset();
-        m_PointPass.reset();
-        m_HtexPatchPreviewPass.reset();
-        m_PostProcessPass.reset();
-        m_CompositionPass.reset();
-        m_DebugViewPass.reset();
-        m_ImGuiPass.reset();
+        m_Impl->PickingPass.reset();
+        m_Impl->SurfacePass.reset();
+        m_Impl->SelectionOutlinePass.reset();
+        m_Impl->LinePass.reset();
+        m_Impl->PointPass.reset();
+        m_Impl->HtexPatchPreviewPass.reset();
+        m_Impl->PostProcessPass.reset();
+        m_Impl->CompositionPass.reset();
+        m_Impl->DebugViewPass.reset();
+        m_Impl->ImGuiPass.reset();
     }
 
     void DefaultPipeline::Initialize(RHI::VulkanDevice& device,
@@ -123,60 +142,60 @@ namespace Graphics
                                     const ShaderRegistry& shaderRegistry,
                                     PipelineLibrary& pipelineLibrary)
     {
-        m_PickingPass          = std::make_unique<Passes::PickingPass>();
-        m_SurfacePass          = std::make_unique<Passes::SurfacePass>();
-        m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
-        m_LinePass             = std::make_unique<Passes::LinePass>();
-        m_PointPass            = std::make_unique<Passes::PointPass>();
-        m_HtexPatchPreviewPass = std::make_unique<Passes::HtexPatchPreviewPass>();
-        m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
-        m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
-        m_PostProcessPass      = std::make_unique<Passes::PostProcessPass>();
-        m_CompositionPass      = std::make_unique<Passes::CompositionPass>();
+        m_Impl->PickingPass          = std::make_unique<Passes::PickingPass>();
+        m_Impl->SurfacePass          = std::make_unique<Passes::SurfacePass>();
+        m_Impl->SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
+        m_Impl->LinePass             = std::make_unique<Passes::LinePass>();
+        m_Impl->PointPass            = std::make_unique<Passes::PointPass>();
+        m_Impl->HtexPatchPreviewPass = std::make_unique<Passes::HtexPatchPreviewPass>();
+        m_Impl->DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
+        m_Impl->ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
+        m_Impl->PostProcessPass      = std::make_unique<Passes::PostProcessPass>();
+        m_Impl->CompositionPass      = std::make_unique<Passes::CompositionPass>();
 
-        m_PickingPass->Initialize(device, descriptorPool, globalLayout);
-        m_SurfacePass->Initialize(device, descriptorPool, globalLayout);
-        m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
-        m_LinePass->Initialize(device, descriptorPool, globalLayout);
-        m_PointPass->Initialize(device, descriptorPool, globalLayout);
-        m_HtexPatchPreviewPass->Initialize(device, descriptorPool, globalLayout);
-        m_PostProcessPass->Initialize(device, descriptorPool, globalLayout);
-        m_CompositionPass->Initialize(device, descriptorPool, globalLayout);
-        m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
-        m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->PickingPass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->SurfacePass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->LinePass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->PointPass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->HtexPatchPreviewPass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->PostProcessPass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->CompositionPass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->DebugViewPass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
-        m_PickingPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Picking));
-        m_PickingPass->SetMeshPickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickMesh));
-        m_PickingPass->SetLinePickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickLine));
-        m_PickingPass->SetPointPickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickPoint));
+        m_Impl->PickingPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Picking));
+        m_Impl->PickingPass->SetMeshPickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickMesh));
+        m_Impl->PickingPass->SetLinePickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickLine));
+        m_Impl->PickingPass->SetPointPickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickPoint));
 
-        m_SurfacePass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Surface));
-        m_SurfacePass->SetLinePipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceLines));
-        m_SurfacePass->SetPointPipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfacePoints));
-        m_SurfacePass->SetInstanceSetLayout(pipelineLibrary.GetStage1InstanceSetLayout());
-        m_SurfacePass->SetCullPipeline(pipelineLibrary.GetCullPipeline());
-        m_SurfacePass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
+        m_Impl->SurfacePass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Surface));
+        m_Impl->SurfacePass->SetLinePipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceLines));
+        m_Impl->SurfacePass->SetPointPipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfacePoints));
+        m_Impl->SurfacePass->SetInstanceSetLayout(pipelineLibrary.GetStage1InstanceSetLayout());
+        m_Impl->SurfacePass->SetCullPipeline(pipelineLibrary.GetCullPipeline());
+        m_Impl->SurfacePass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
 
-        m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
-        m_LinePass->SetShaderRegistry(shaderRegistry);
-        m_PointPass->SetShaderRegistry(shaderRegistry);
-        m_DebugViewPass->SetShaderRegistry(shaderRegistry);
-        m_PostProcessPass->SetShaderRegistry(shaderRegistry);
-        m_CompositionPass->SetShaderRegistry(shaderRegistry);
+        m_Impl->SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
+        m_Impl->LinePass->SetShaderRegistry(shaderRegistry);
+        m_Impl->PointPass->SetShaderRegistry(shaderRegistry);
+        m_Impl->DebugViewPass->SetShaderRegistry(shaderRegistry);
+        m_Impl->PostProcessPass->SetShaderRegistry(shaderRegistry);
+        m_Impl->CompositionPass->SetShaderRegistry(shaderRegistry);
 
         // Wire G-buffer pipeline to SurfacePass for deferred path.
         if (pipelineLibrary.Contains(kPipeline_SurfaceGBuffer))
-            m_SurfacePass->SetGBufferPipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceGBuffer));
+            m_Impl->SurfacePass->SetGBufferPipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceGBuffer));
 
         // Wire debug surface pipeline for transient triangle visualization.
         if (pipelineLibrary.Contains(kPipeline_DebugSurface))
-            m_SurfacePass->SetDebugSurfacePipeline(&pipelineLibrary.GetOrDie(kPipeline_DebugSurface));
+            m_Impl->SurfacePass->SetDebugSurfacePipeline(&pipelineLibrary.GetOrDie(kPipeline_DebugSurface));
 
         // Wire depth prepass pipeline for early-Z fill.
         if (pipelineLibrary.Contains(kPipeline_DepthPrepass))
-            m_SurfacePass->SetDepthPrepassPipeline(&pipelineLibrary.GetOrDie(kPipeline_DepthPrepass));
+            m_Impl->SurfacePass->SetDepthPrepassPipeline(&pipelineLibrary.GetOrDie(kPipeline_DepthPrepass));
 
-        m_PathDirty = true;
+        m_Impl->PathDirty = true;
     }
 
     bool DefaultPipeline::IsFeatureEnabled(const Core::FeatureDescriptor& descriptor) const
@@ -195,20 +214,20 @@ namespace Graphics
 
     void DefaultPipeline::RebuildPath()
     {
-        m_Path.Clear();
+        m_Impl->Path.Clear();
 
         // ==================================================================
         // 1. Picking (Readback) — entity/primitive ID for click queries.
         // ==================================================================
-        if (m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass))
-            m_Path.AddFeature("Picking", m_PickingPass.get());
+        if (m_Impl->PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass))
+            m_Impl->Path.AddFeature("Picking", m_Impl->PickingPass.get());
 
         // ==================================================================
         // 2. Surface Pass — face rendering via SurfacePass (triangles / lines /
         //    point geometry).
         // ==================================================================
-        if (m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass))
-            m_Path.AddFeature("MeshPass.Surface", m_SurfacePass.get());
+        if (m_Impl->SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass))
+            m_Impl->Path.AddFeature("MeshPass.Surface", m_Impl->SurfacePass.get());
 
         // ==================================================================
         // 3. Composition — deferred lighting.
@@ -223,20 +242,20 @@ namespace Graphics
         //    future transparent/special materials). Running composition first
         //    preserves their SceneColorHDR LOAD/accumulate contract.
         // ==================================================================
-        if (m_CompositionPass)
-            m_Path.AddFeature("Composition", m_CompositionPass.get());
+        if (m_Impl->CompositionPass)
+            m_Impl->Path.AddFeature("Composition", m_Impl->CompositionPass.get());
 
         // ==================================================================
         // 4. LinePass — unified BDA-based line rendering.
         //    Consolidates retained wireframe/graph edges and transient DebugDraw
         //    lines into a single forward-overlay lane on SceneColorHDR.
         // ==================================================================
-        if (m_LinePass && IsFeatureEnabled(FeatureCatalog::LinePass))
+        if (m_Impl->LinePass && IsFeatureEnabled(FeatureCatalog::LinePass))
         {
-            m_Path.AddStage("LinePass", [this](RenderPassContext& ctx)
+            m_Impl->Path.AddStage("LinePass", [this](RenderPassContext& ctx)
             {
-                m_LinePass->SetGeometryStorage(&ctx.GeometryStorage);
-                m_LinePass->AddPasses(ctx);
+                m_Impl->LinePass->SetGeometryStorage(&ctx.GeometryStorage);
+                m_Impl->LinePass->AddPasses(ctx);
             });
         }
 
@@ -247,12 +266,12 @@ namespace Graphics
         //    is part of the forward-overlay lane that composes after deferred
         //    lighting when the frame recipe selects that path.
         // ==================================================================
-        if (m_PointPass && IsFeatureEnabled(FeatureCatalog::PointPass))
+        if (m_Impl->PointPass && IsFeatureEnabled(FeatureCatalog::PointPass))
         {
-            m_Path.AddStage("Points", [this](RenderPassContext& ctx)
+            m_Impl->Path.AddStage("Points", [this](RenderPassContext& ctx)
             {
-                m_PointPass->SetGeometryStorage(&ctx.GeometryStorage);
-                m_PointPass->AddPasses(ctx);
+                m_Impl->PointPass->SetGeometryStorage(&ctx.GeometryStorage);
+                m_Impl->PointPass->AddPasses(ctx);
             });
         }
 
@@ -261,11 +280,11 @@ namespace Graphics
         //    Renders a low-res proxy of the selected texture region for debugging
         //    texture streaming and LOD transitions.
         // ==================================================================
-        if (m_HtexPatchPreviewPass && IsFeatureEnabled(FeatureCatalog::HtexPatchPreviewPass))
+        if (m_Impl->HtexPatchPreviewPass && IsFeatureEnabled(FeatureCatalog::HtexPatchPreviewPass))
         {
-            m_Path.AddStage("HtexPatchPreview", [this](RenderPassContext& ctx)
+            m_Impl->Path.AddStage("HtexPatchPreview", [this](RenderPassContext& ctx)
             {
-                m_HtexPatchPreviewPass->AddPasses(ctx);
+                m_Impl->HtexPatchPreviewPass->AddPasses(ctx);
             });
         }
 
@@ -275,34 +294,34 @@ namespace Graphics
         //    Final presentation to the imported swapchain image happens in the
         //    dedicated Present stage below.
         // ==================================================================
-        if (m_PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass))
-            m_Path.AddFeature("PostProcess", m_PostProcessPass.get());
+        if (m_Impl->PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass))
+            m_Impl->Path.AddFeature("PostProcess", m_Impl->PostProcessPass.get());
 
         // ==================================================================
         // 8. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
-        if (m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass))
-            m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
+        if (m_Impl->SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass))
+            m_Impl->Path.AddFeature("SelectionOutline", m_Impl->SelectionOutlinePass.get());
 
         // ==================================================================
         // 9. Debug View — conditional texture inspector overlay.
         // ==================================================================
-        if (m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass))
+        if (m_Impl->DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass))
         {
-            m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
+            m_Impl->Path.AddStage("DebugView", [this](RenderPassContext& ctx)
             {
                 if (ctx.Debug.Enabled)
-                    m_DebugViewPass->AddPasses(ctx);
+                    m_Impl->DebugViewPass->AddPasses(ctx);
             });
         }
 
         // ==================================================================
         // 10. ImGui — editor UI overlay.
         // ==================================================================
-        if (m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass))
-            m_Path.AddFeature("ImGui", m_ImGuiPass.get());
+        if (m_Impl->ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass))
+            m_Impl->Path.AddFeature("ImGui", m_Impl->ImGuiPass.get());
 
-        m_Path.AddStage("Present", [](RenderPassContext& ctx)
+        m_Impl->Path.AddStage("Present", [](RenderPassContext& ctx)
         {
             const RGResourceHandle src = ctx.Blackboard.Get(RenderResource::SceneColorLDR);
             const RGResourceHandle dst = ctx.Blackboard.Get("Backbuffer"_id);
@@ -381,55 +400,55 @@ namespace Graphics
     {
         // When a FeatureRegistry is connected, rebuild every frame so that
         // runtime enable/disable changes take effect immediately.
-        if (m_PathDirty || m_Registry)
+        if (m_Impl->PathDirty || m_Registry)
         {
             RebuildPath();
-            m_PathDirty = false;
+            m_Impl->PathDirty = false;
         }
 
-        m_Path.Execute(ctx);
+        m_Impl->Path.Execute(ctx);
     }
 
     void DefaultPipeline::OnResize(uint32_t width, uint32_t height)
     {
-        if (m_PickingPass)          m_PickingPass->OnResize(width, height);
-        if (m_SurfacePass)          m_SurfacePass->OnResize(width, height);
-        if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
-        if (m_LinePass)             m_LinePass->OnResize(width, height);
-        if (m_PointPass)            m_PointPass->OnResize(width, height);
-        if (m_HtexPatchPreviewPass) m_HtexPatchPreviewPass->OnResize(width, height);
-        if (m_PostProcessPass)      m_PostProcessPass->OnResize(width, height);
-        if (m_CompositionPass)      m_CompositionPass->OnResize(width, height);
-        if (m_DebugViewPass)        m_DebugViewPass->OnResize(width, height);
-        if (m_ImGuiPass)            m_ImGuiPass->OnResize(width, height);
+        if (m_Impl->PickingPass)          m_Impl->PickingPass->OnResize(width, height);
+        if (m_Impl->SurfacePass)          m_Impl->SurfacePass->OnResize(width, height);
+        if (m_Impl->SelectionOutlinePass) m_Impl->SelectionOutlinePass->OnResize(width, height);
+        if (m_Impl->LinePass)             m_Impl->LinePass->OnResize(width, height);
+        if (m_Impl->PointPass)            m_Impl->PointPass->OnResize(width, height);
+        if (m_Impl->HtexPatchPreviewPass) m_Impl->HtexPatchPreviewPass->OnResize(width, height);
+        if (m_Impl->PostProcessPass)      m_Impl->PostProcessPass->OnResize(width, height);
+        if (m_Impl->CompositionPass)      m_Impl->CompositionPass->OnResize(width, height);
+        if (m_Impl->DebugViewPass)        m_Impl->DebugViewPass->OnResize(width, height);
+        if (m_Impl->ImGuiPass)            m_Impl->ImGuiPass->OnResize(width, height);
     }
 
     void DefaultPipeline::PostCompile(uint32_t frameIndex,
                                      std::span<const RenderGraphDebugImage> debugImages,
                                      std::span<const RenderGraphDebugPass>)
     {
-        if (m_PostProcessPass)
-            m_PostProcessPass->PostCompile(frameIndex, debugImages);
-        if (m_CompositionPass)
-            m_CompositionPass->PostCompile(frameIndex, debugImages);
-        if (m_SelectionOutlinePass)
-            m_SelectionOutlinePass->PostCompile(frameIndex, debugImages);
-        if (m_DebugViewPass)
-            m_DebugViewPass->PostCompile(frameIndex, debugImages);
+        if (m_Impl->PostProcessPass)
+            m_Impl->PostProcessPass->PostCompile(frameIndex, debugImages);
+        if (m_Impl->CompositionPass)
+            m_Impl->CompositionPass->PostCompile(frameIndex, debugImages);
+        if (m_Impl->SelectionOutlinePass)
+            m_Impl->SelectionOutlinePass->PostCompile(frameIndex, debugImages);
+        if (m_Impl->DebugViewPass)
+            m_Impl->DebugViewPass->PostCompile(frameIndex, debugImages);
     }
 
     FrameRecipe DefaultPipeline::BuildFrameRecipe(const RenderPassContext& ctx) const
     {
         DefaultPipelineRecipeInputs inputs{};
-        inputs.PickingPassEnabled = m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass);
-        inputs.SurfacePassEnabled = m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass);
-        inputs.LinePassEnabled = m_LinePass && IsFeatureEnabled(FeatureCatalog::LinePass);
-        inputs.PointPassEnabled = m_PointPass && IsFeatureEnabled(FeatureCatalog::PointPass);
-        inputs.PostProcessPassEnabled = m_PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass);
-        inputs.SelectionOutlinePassEnabled = m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass);
-        inputs.DebugViewPassEnabled = m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass);
-        inputs.ImGuiPassEnabled = m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass);
-        inputs.CompositionPassEnabled = m_CompositionPass != nullptr;
+        inputs.PickingPassEnabled = m_Impl->PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass);
+        inputs.SurfacePassEnabled = m_Impl->SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass);
+        inputs.LinePassEnabled = m_Impl->LinePass && IsFeatureEnabled(FeatureCatalog::LinePass);
+        inputs.PointPassEnabled = m_Impl->PointPass && IsFeatureEnabled(FeatureCatalog::PointPass);
+        inputs.PostProcessPassEnabled = m_Impl->PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass);
+        inputs.SelectionOutlinePassEnabled = m_Impl->SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass);
+        inputs.DebugViewPassEnabled = m_Impl->DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass);
+        inputs.ImGuiPassEnabled = m_Impl->ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass);
+        inputs.CompositionPassEnabled = m_Impl->CompositionPass != nullptr;
         inputs.HasSelectionWork = ctx.HasSelectionWork;
         inputs.DebugViewEnabled = ctx.Debug.Enabled;
         inputs.DebugResource = ctx.Debug.SelectedResource;
@@ -453,17 +472,42 @@ namespace Graphics
     {
         RenderPipelineDebugState state{};
         state.HasFeatureRegistry = (m_Registry != nullptr);
-        state.PathDirty = m_PathDirty;
+        state.PathDirty = m_Impl->PathDirty;
 
-        state.PickingPass = {m_PickingPass != nullptr, m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass)};
-        state.DepthPrepass = {m_SurfacePass != nullptr, m_SurfacePass && IsFeatureEnabled(FeatureCatalog::DepthPrepass)};
-        state.SurfacePass = {m_SurfacePass != nullptr, m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass)};
-        state.SelectionOutlinePass = {m_SelectionOutlinePass != nullptr, m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass)};
-        state.LinePass = {m_LinePass != nullptr, m_LinePass && IsFeatureEnabled(FeatureCatalog::LinePass)};
-        state.PointPass = {m_PointPass != nullptr, m_PointPass && IsFeatureEnabled(FeatureCatalog::PointPass)};
-        state.PostProcessPass = {m_PostProcessPass != nullptr, m_PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass)};
-        state.DebugViewPass = {m_DebugViewPass != nullptr, m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass)};
-        state.ImGuiPass = {m_ImGuiPass != nullptr, m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass)};
+        state.PickingPass = {m_Impl->PickingPass != nullptr, m_Impl->PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass)};
+        state.DepthPrepass = {m_Impl->SurfacePass != nullptr, m_Impl->SurfacePass && IsFeatureEnabled(FeatureCatalog::DepthPrepass)};
+        state.SurfacePass = {m_Impl->SurfacePass != nullptr, m_Impl->SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass)};
+        state.SelectionOutlinePass = {m_Impl->SelectionOutlinePass != nullptr, m_Impl->SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass)};
+        state.LinePass = {m_Impl->LinePass != nullptr, m_Impl->LinePass && IsFeatureEnabled(FeatureCatalog::LinePass)};
+        state.PointPass = {m_Impl->PointPass != nullptr, m_Impl->PointPass && IsFeatureEnabled(FeatureCatalog::PointPass)};
+        state.PostProcessPass = {m_Impl->PostProcessPass != nullptr, m_Impl->PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass)};
+        state.DebugViewPass = {m_Impl->DebugViewPass != nullptr, m_Impl->DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass)};
+        state.ImGuiPass = {m_Impl->ImGuiPass != nullptr, m_Impl->ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass)};
         return state;
+    }
+
+    Passes::SelectionOutlineSettings* DefaultPipeline::GetSelectionOutlineSettings()
+    {
+        return m_Impl->SelectionOutlinePass ? &m_Impl->SelectionOutlinePass->GetSettings() : nullptr;
+    }
+
+    Passes::PostProcessSettings* DefaultPipeline::GetPostProcessSettings()
+    {
+        return m_Impl->PostProcessPass ? &m_Impl->PostProcessPass->GetSettings() : nullptr;
+    }
+
+    const Passes::HistogramReadback* DefaultPipeline::GetHistogramReadback() const
+    {
+        return m_Impl->PostProcessPass ? &m_Impl->PostProcessPass->GetHistogram() : nullptr;
+    }
+
+    [[nodiscard]] const Passes::SelectionOutlineDebugState* DefaultPipeline::GetSelectionOutlineDebugState() const
+    {
+        return m_Impl->SelectionOutlinePass ? &m_Impl->SelectionOutlinePass->GetDebugState() : nullptr;
+    }
+
+    [[nodiscard]] const Passes::PostProcessDebugState* DefaultPipeline::GetPostProcessDebugState() const
+    {
+        return m_Impl->PostProcessPass ? &m_Impl->PostProcessPass->GetDebugState() : nullptr;
     }
 }

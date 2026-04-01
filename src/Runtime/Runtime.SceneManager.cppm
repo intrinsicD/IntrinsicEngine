@@ -6,10 +6,8 @@ module;
 export module Runtime.SceneManager;
 
 import Core.Assets;
-import Graphics.Components;
 import Graphics.Geometry;
 import Graphics.GPUScene;
-import Graphics.VisualizationConfig;
 import ECS;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;
