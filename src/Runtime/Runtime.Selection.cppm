@@ -99,6 +99,9 @@ export namespace Runtime::Selection
     struct PickRequest
     {
         Geometry::Ray WorldRay{};
+        glm::mat4 ViewMatrix{1.0f};
+        glm::mat4 ProjectionMatrix{1.0f};
+        glm::vec2 CursorPositionPixels{0.0f};
         PickBackend Backend = PickBackend::CPU;
         PickMode Mode = PickMode::Replace;
 
@@ -114,6 +117,7 @@ export namespace Runtime::Selection
 
         // Camera snapshot captured when the pick request is issued.
         float CameraFovYRadians = glm::radians(45.0f);
+        float ViewportWidthPixels = 1600.0f;
         float ViewportHeightPixels = 900.0f;
     };
 
