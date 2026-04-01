@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cstdio>
 #include <cstddef>
 #include <set>
@@ -24,6 +25,7 @@ import Graphics.Components;
 import Runtime.PointCloudKMeans;
 import Runtime.Selection;
 import Runtime.SelectionModule;
+import Graphics.SubElementHighlightSettings;
 import Runtime.SceneSerializer;
 
 import Geometry.Geodesic;
@@ -481,6 +483,36 @@ namespace Runtime::EditorUI
                                  ? Runtime::SelectionModule::Activation::Enabled
                                  : Runtime::SelectionModule::Activation::Disabled;
 
+            // --- Highlight Appearance ---
+            ImGui::SeparatorText("Highlight Appearance");
+            {
+                auto& hl = sel.GetHighlightSettings();
+
+                if (ImGui::TreeNodeEx("Vertex##hl", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    ColorEdit4("Color##hl_vtx", hl.VertexColor);
+                    ColorEdit4("Geodesic Color##hl_vtx", hl.VertexGeodesicColor);
+                    ImGui::SliderFloat("Sphere Radius##hl", &hl.VertexSphereRadius, 0.001f, 0.05f, "%.4f");
+                    int seg = static_cast<int>(hl.VertexSphereSegments);
+                    if (ImGui::SliderInt("Sphere Segments##hl", &seg, 6, 48))
+                        hl.VertexSphereSegments = static_cast<uint32_t>(seg);
+                    ImGui::TreePop();
+                }
+
+                if (ImGui::TreeNodeEx("Edge##hl", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    ColorEdit4("Color##hl_edge", hl.EdgeColor);
+                    ImGui::TreePop();
+                }
+
+                if (ImGui::TreeNodeEx("Face##hl", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    ColorEdit4("Outline Color##hl_face", hl.FaceOutlineColor);
+                    ColorEdit4("Fill Color##hl_face", hl.FaceFillColor);
+                    ImGui::TreePop();
+                }
+            }
+
             ImGui::SeparatorText("State");
             const entt::entity selected = sel.GetSelectedEntity(engine.GetSceneManager().GetScene());
             ImGui::Text("Selected entity: %u", (uint32_t)selected);
@@ -663,20 +695,26 @@ namespace Runtime::EditorUI
             return;
 
         auto& dd = engine.GetRenderOrchestrator().GetDebugDraw();
+        const auto& hl = sel.GetHighlightSettings();
+
+        // Pack glm::vec4 RGBA to uint32 ABGR for DebugDraw.
+        auto pack = [](const glm::vec4& c) {
+            return Graphics::DebugDraw::PackColorF(c.r, c.g, c.b, c.a);
+        };
 
         // Compute world transform for the entity.
         glm::mat4 world{1.0f};
         if (auto* xf = reg.try_get<ECS::Components::Transform::Component>(entity))
             world = ECS::Components::Transform::GetMatrix(*xf);
 
-        // Sphere radius for vertex markers (world-space).
-        constexpr float kVertexSphereRadius = 0.005f;
-        constexpr uint32_t kVertexColor = Graphics::DebugDraw::PackColor(255, 40, 40); // Red
-        constexpr uint32_t kGeodesicSourceColor = Graphics::DebugDraw::PackColor(40, 255, 120);
-        // Green (geodesic source)
-        constexpr uint32_t kEdgeColor = Graphics::DebugDraw::PackColor(255, 200, 40); // Yellow
-        constexpr uint32_t kFaceColor = Graphics::DebugDraw::PackColor(40, 120, 255, 160); // Blue (semi-transparent)
-        const bool geodesicActive = s_PanelState.GeodesicActive;
+        const float vertexRadius    = std::max(hl.VertexSphereRadius, 0.0001f);
+        const uint32_t vertexSegs   = std::clamp(hl.VertexSphereSegments, 6u, 128u);
+        const uint32_t vertexColor  = pack(hl.VertexColor);
+        const uint32_t geodesicColor = pack(hl.VertexGeodesicColor);
+        const uint32_t edgeColor    = pack(hl.EdgeColor);
+        const uint32_t faceOutline  = pack(hl.FaceOutlineColor);
+        const uint32_t faceFill     = pack(hl.FaceFillColor);
+        const bool geodesicActive   = s_PanelState.GeodesicActive;
 
         // --- Mesh-based highlights ---
         if (auto* md = reg.try_get<ECS::Mesh::Data>(entity))
@@ -687,15 +725,15 @@ namespace Runtime::EditorUI
             auto& mesh = *md->MeshRef;
 
             // Vertex highlights: overlay spheres
-            // In geodesic mode, source vertices are green; otherwise red.
+            // In geodesic mode, source vertices are green; otherwise configurable color.
             for (uint32_t vi : sub.SelectedVertices)
             {
                 if (vi >= mesh.VerticesSize() || mesh.IsDeleted(Geometry::VertexHandle{vi}))
                     continue;
                 const glm::vec3 localPos = mesh.Position(Geometry::VertexHandle{vi});
                 const glm::vec3 worldPos = glm::vec3(world * glm::vec4(localPos, 1.0f));
-                const uint32_t color = geodesicActive ? kGeodesicSourceColor : kVertexColor;
-                dd.OverlaySphere(worldPos, kVertexSphereRadius, color);
+                const uint32_t color = geodesicActive ? geodesicColor : vertexColor;
+                dd.OverlaySphere(worldPos, vertexRadius, color, vertexSegs);
             }
 
             // Edge highlights: overlay lines
@@ -708,7 +746,7 @@ namespace Runtime::EditorUI
                 const auto v1 = mesh.ToVertex(h);
                 const glm::vec3 wA = glm::vec3(world * glm::vec4(mesh.Position(v0), 1.0f));
                 const glm::vec3 wB = glm::vec3(world * glm::vec4(mesh.Position(v1), 1.0f));
-                dd.OverlayLine(wA, wB, kEdgeColor);
+                dd.OverlayLine(wA, wB, edgeColor);
             }
 
             // Face highlights: overlay triangle edges (thick outline)
@@ -725,7 +763,7 @@ namespace Runtime::EditorUI
                 for (size_t i = 0; i < faceVerts.size(); ++i)
                 {
                     const size_t j = (i + 1) % faceVerts.size();
-                    dd.OverlayLine(faceVerts[i], faceVerts[j], kFaceColor);
+                    dd.OverlayLine(faceVerts[i], faceVerts[j], faceOutline);
                 }
 
                 // Draw filled triangles for face tinting (fan-triangulate)
@@ -734,7 +772,7 @@ namespace Runtime::EditorUI
                     glm::vec3 n = glm::normalize(glm::cross(faceVerts[1] - faceVerts[0],
                                                             faceVerts[2] - faceVerts[0]));
                     for (size_t i = 1; i + 1 < faceVerts.size(); ++i)
-                        dd.Triangle(faceVerts[0], faceVerts[i], faceVerts[i + 1], n, kFaceColor);
+                        dd.Triangle(faceVerts[0], faceVerts[i], faceVerts[i + 1], n, faceFill);
                 }
             }
 
@@ -753,7 +791,7 @@ namespace Runtime::EditorUI
                 if (vi >= positions.size())
                     continue;
                 const glm::vec3 worldPos = glm::vec3(world * glm::vec4(positions[vi], 1.0f));
-                dd.OverlaySphere(worldPos, kVertexSphereRadius, kVertexColor);
+                dd.OverlaySphere(worldPos, vertexRadius, vertexColor, vertexSegs);
             }
             return;
         }
@@ -773,7 +811,7 @@ namespace Runtime::EditorUI
                     continue;
                 const glm::vec3 localPos = graph.VertexPosition(Geometry::VertexHandle{vi});
                 const glm::vec3 worldPos = glm::vec3(world * glm::vec4(localPos, 1.0f));
-                dd.OverlaySphere(worldPos, kVertexSphereRadius, kVertexColor);
+                dd.OverlaySphere(worldPos, vertexRadius, vertexColor, vertexSegs);
             }
 
             // Edge highlights
@@ -786,7 +824,7 @@ namespace Runtime::EditorUI
                 const auto v1 = graph.ToVertex(graph.Halfedge(Geometry::EdgeHandle{ei}, 1));
                 const glm::vec3 wA = glm::vec3(world * glm::vec4(graph.VertexPosition(v0), 1.0f));
                 const glm::vec3 wB = glm::vec3(world * glm::vec4(graph.VertexPosition(v1), 1.0f));
-                dd.OverlayLine(wA, wB, kEdgeColor);
+                dd.OverlayLine(wA, wB, edgeColor);
             }
         }
     }
