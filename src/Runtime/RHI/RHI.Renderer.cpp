@@ -170,11 +170,22 @@ namespace RHI
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
         {
             m_Swapchain.Recreate();
+            m_IsFrameStarted = false;
+            return;
+        }
+        if (result == VK_SUBOPTIMAL_KHR)
+        {
+            // Keep startup/resize behavior deterministic: rebuild on acquire-side
+            // suboptimal and skip this frame so all framebuffer-sized resources
+            // are recreated from a single coherent extent.
+            m_Swapchain.Recreate();
+            m_IsFrameStarted = false;
             return;
         }
         if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         {
             Core::Log::Error("Failed to acquire swapchain image!");
+            m_IsFrameStarted = false;
             return;
         }
 
