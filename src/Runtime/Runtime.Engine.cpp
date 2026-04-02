@@ -315,18 +315,37 @@ namespace Runtime
 
         const int startupFbWidth = m_Window->GetFramebufferWidth();
         const int startupFbHeight = m_Window->GetFramebufferHeight();
-        const bool startupResizePerformed = startupFbWidth > 0 && startupFbHeight > 0;
-        if (startupResizePerformed)
+        const VkExtent2D startupSwapchainExtent = m_GraphicsBackend->GetSwapchain().GetExtent();
+        const bool startupFramebufferValid = startupFbWidth > 0 && startupFbHeight > 0;
+        const bool startupExtentMismatch =
+            startupFramebufferValid &&
+            (startupSwapchainExtent.width != static_cast<uint32_t>(startupFbWidth) ||
+             startupSwapchainExtent.height != static_cast<uint32_t>(startupFbHeight));
+
+        if (startupExtentMismatch)
         {
-            Core::Log::Info("Engine startup resize: framebuffer={}x{}", startupFbWidth, startupFbHeight);
+            Core::Log::Info("Engine startup resize: framebuffer={}x{} swapchain={}x{}",
+                            startupFbWidth,
+                            startupFbHeight,
+                            startupSwapchainExtent.width,
+                            startupSwapchainExtent.height);
             m_GraphicsBackend->OnResize();
             m_RenderOrchestrator->OnResize();
         }
+        else
+        {
+            Core::Log::Info("Engine startup resize: skipped (framebuffer={}x{}, swapchain={}x{}, validFb={})",
+                            startupFbWidth,
+                            startupFbHeight,
+                            startupSwapchainExtent.width,
+                            startupSwapchainExtent.height,
+                            startupFramebufferValid);
+        }
 
-        // Bootstrap the renderer through the same path as a real framebuffer resize.
-        // The flag stays armed even if we already performed the startup resize so the
-        // first pumped frame still exercises the normal resize branch after WSI settles.
-        m_FramebufferResized = true;
+        // Bootstrap the normal resize path on first frame only when startup did
+        // not already perform a concrete extent reconciliation. This avoids
+        // redundant back-to-back swapchain recreation during startup.
+        m_FramebufferResized = !startupExtentMismatch;
 
         double accumulator = 0.0;
         const FrameLoopPolicy frameLoopPolicy = MakeFrameLoopPolicy(
