@@ -14,6 +14,8 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 - `docs/architecture/feature-module-playbook.md` — standard feature-module contract, layering rules, and refactor workflow for reusable development.
 - `docs/architecture/post-merge-audit-checklist.md` — stabilization checklist for architecture-touching merges and required post-merge validation gates.
 - `docs/architecture/vectorfield-overlay-lifecycle-invariants.md` — explicit lifecycle invariants for vector-field overlays (factory, ECS tags, lifecycle sync, extraction).
+- `docs/architecture/ground-up-redesign-blueprint-2026.md` — full-state redesign blueprint for a 3-graph runtime (CPU tasks, GPU frame graph, async streaming), robust geometry contracts, and migration gates.
+- `docs/architecture/ground-up-redesign-vision.md` — deep architectural assessment of what to preserve, what to change (10 areas), and a phased implementation priority stack.
 
 Runtime code follows a subsystem-first access policy: `Engine` acts as the composition root and frame-loop orchestrator, while lower-level GPU, scene, asset, and render state is accessed through the owning subsystem getters (`GetGraphicsBackend()`, `GetAssetPipeline()`, `GetSceneManager()`, `GetRenderOrchestrator()`).
 
