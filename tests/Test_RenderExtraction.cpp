@@ -1072,9 +1072,32 @@ TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_FlushesDeferredDel
     Runtime::FrameContext& frame1 = ring.BeginFrame(1u, vp);
     frame1.DeferDeletion([&counter]() { counter += 10; });
 
+    // Simulate previously-submitted slots: InvalidateAfterResize flushes
+    // callbacks only for submitted frame-contexts.
+    frame0.Submitted = true;
+    frame1.Submitted = true;
+
     EXPECT_EQ(counter, 0);
     ring.InvalidateAfterResize();
     EXPECT_EQ(counter, 11);
+}
+
+TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_UnsubmittedSlotsClearDeferredDeletionsWithoutInvocation)
+{
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 640, .Height = 480};
+
+    Runtime::FrameContext& frame0 = ring.BeginFrame(0u, vp);
+    int counter = 0;
+    frame0.DeferDeletion([&counter]() { ++counter; });
+    ASSERT_FALSE(frame0.Submitted);
+
+    ring.InvalidateAfterResize();
+    EXPECT_EQ(counter, 0);
+
+    Runtime::FrameContext& frame0Again = ring.BeginFrame(2u, vp);
+    frame0Again.FlushDeferredDeletions();
+    EXPECT_EQ(counter, 0);
 }
 
 TEST(RenderExtraction, FrameContext_DeferredDeletions_SurviveSlotReuse)
