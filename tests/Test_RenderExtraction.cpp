@@ -1032,6 +1032,19 @@ TEST(RenderExtraction, FrameContext_FlushDeferredDeletions_EmptyQueueIsNoOp)
     frame.FlushDeferredDeletions();
 }
 
+TEST(RenderExtraction, FrameContext_DeferredDeletions_IgnoreEmptyCallbacks)
+{
+    Runtime::FrameContext frame{};
+    int counter = 0;
+
+    Core::InplaceFunction<void()> empty{};
+    frame.DeferDeletion(std::move(empty));
+    frame.DeferDeletion([&counter]() { ++counter; });
+
+    frame.FlushDeferredDeletions();
+    EXPECT_EQ(counter, 1);
+}
+
 TEST(RenderExtraction, FrameContext_DeferredDeletions_ExecuteInOrder)
 {
     Runtime::FrameContext frame{};
