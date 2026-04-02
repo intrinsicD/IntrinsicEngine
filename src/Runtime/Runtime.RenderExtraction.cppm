@@ -156,6 +156,8 @@ export namespace Runtime
         // (i.e. FramesInFlight frames later).
         void DeferDeletion(Core::InplaceFunction<void()>&& fn)
         {
+            if (!fn)
+                return;
             DeferredDeletions.push_back(std::move(fn));
         }
 
@@ -176,7 +178,11 @@ export namespace Runtime
             std::vector<Core::InplaceFunction<void()>> batch;
             batch.swap(DeferredDeletions);
             for (auto& fn : batch)
+            {
+                if (!fn)
+                    continue;
                 fn();
+            }
         }
 
         [[nodiscard]] bool HasAllocators() const

@@ -13,6 +13,7 @@ module;
 module Runtime.RenderExtraction;
 
 import Core.Memory;
+import Core.Logging;
 import Graphics.Components;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshUtils;
@@ -622,8 +623,22 @@ namespace Runtime
     {
         for (auto& ctx : m_Contexts)
         {
-            // GPU is idle — safe to flush any pending per-slot deletions.
-            ctx.FlushDeferredDeletions();
+            if (ctx.Submitted)
+            {
+                // GPU is idle — safe to flush per-slot deletions that belong to
+                // previously submitted work on this slot.
+                ctx.FlushDeferredDeletions();
+            }
+            else if (!ctx.DeferredDeletions.empty())
+            {
+                // Defensive guard: unsubmitted slots should not own deferred
+                // callbacks. If they do, clear and continue safely.
+                Core::Log::Warn(
+                    "FrameContextRing::InvalidateAfterResize: slot {} had {} deferred deletions while unsubmitted; clearing without invocation.",
+                    ctx.SlotIndex,
+                    ctx.DeferredDeletions.size());
+                ctx.DeferredDeletions.clear();
+            }
 
             ctx.LastSubmittedTimelineValue = 0;
             ctx.Submitted = false;
@@ -645,6 +660,19 @@ namespace Runtime
         const bool previouslySubmitted = frame.Submitted;
         const bool hasPreviousFrame = frame.Prepared || frame.Submitted || frame.Viewport.IsValid() ||
             frame.FrameNumber != 0u || frame.PreviousFrameNumber != InvalidFrameNumber;
+
+        // Defensive invariant: a never-submitted slot should not carry deferred
+        // deletions. Drop stale entries so startup/resize paths cannot execute
+        // callbacks from invalid ownership state.
+        if (!previouslySubmitted && !frame.DeferredDeletions.empty())
+        {
+            Core::Log::Warn(
+                "FrameContextRing::BeginFrame: dropping {} deferred deletions from never-submitted slot {} (frame {}).",
+                frame.DeferredDeletions.size(),
+                slotIndex,
+                frameNumber);
+            frame.DeferredDeletions.clear();
+        }
 
         frame.ResetPreparedState();
         frame.FrameNumber = frameNumber;
