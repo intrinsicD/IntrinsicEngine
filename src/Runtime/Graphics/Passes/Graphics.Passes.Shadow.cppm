@@ -7,6 +7,7 @@ import Graphics.RenderGraph;
 
 import RHI.Descriptors;
 import RHI.Device;
+import RHI.Pipeline;
 
 export namespace Graphics::Passes
 {
@@ -19,6 +20,10 @@ export namespace Graphics::Passes
         {
         }
 
+        void SetPipeline(RHI::GraphicsPipeline* p) { m_Pipeline = p; }
         void AddPasses(RenderPassContext& ctx) override;
+
+    private:
+        RHI::GraphicsPipeline* m_Pipeline = nullptr; // owned by PipelineLibrary
     };
 }

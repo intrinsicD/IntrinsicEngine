@@ -170,6 +170,7 @@ namespace Runtime
                 ShaderRegistration{"Post.Histogram.Comp"_id, "shaders/post_histogram.comp.spv"},
                 ShaderRegistration{"DebugSurface.Vert"_id, "shaders/debug_surface.vert.spv"},
                 ShaderRegistration{"DebugSurface.Frag"_id, "shaders/debug_surface.frag.spv"},
+                ShaderRegistration{"Shadow.Depth.Vert"_id, "shaders/shadow_depth.vert.spv"},
             };
 
             for (const auto& registration : kShaderRegistrations)
