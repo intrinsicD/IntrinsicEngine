@@ -696,6 +696,36 @@ TEST(RenderExtraction, ComputeCascadeSplitDistances_HandlesDegenerateAndOutOfRan
     EXPECT_FLOAT_EQ(splits[3], 1.0f);
 }
 
+TEST(RenderExtraction, PackShadowCascadeData_SanitizesAndPacksForGpuConsumption)
+{
+    Graphics::ShadowParams shadows{};
+    shadows.CascadeCount = 0u; // invalid, should clamp to 1
+    shadows.CascadeSplits = {0.6f, 0.2f, 1.4f, 0.7f}; // non-monotonic and out of range
+    shadows.DepthBias = 0.003f;
+    shadows.NormalBias = 0.004f;
+    shadows.PcfFilterRadius = 2.0f;
+
+    const std::array<glm::mat4, 2> matrices{
+        glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 2.0f, 3.0f)),
+        glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f))
+    };
+
+    const Graphics::ShadowCascadeData packed = Graphics::PackShadowCascadeData(shadows, matrices);
+
+    EXPECT_EQ(packed.CascadeCount, 1u);
+    EXPECT_FLOAT_EQ(packed.DepthBias, 0.003f);
+    EXPECT_FLOAT_EQ(packed.NormalBias, 0.004f);
+    EXPECT_FLOAT_EQ(packed.PcfFilterRadius, 2.0f);
+    EXPECT_FLOAT_EQ(packed.SplitDistances[0], 0.6f);
+    EXPECT_FLOAT_EQ(packed.SplitDistances[1], 0.6f);
+    EXPECT_FLOAT_EQ(packed.SplitDistances[2], 1.0f);
+    EXPECT_FLOAT_EQ(packed.SplitDistances[3], 1.0f);
+    EXPECT_EQ(packed.LightViewProjection[0], matrices[0]);
+    EXPECT_EQ(packed.LightViewProjection[1], matrices[1]);
+    EXPECT_EQ(packed.LightViewProjection[2], glm::mat4(1.0f));
+    EXPECT_EQ(packed.LightViewProjection[3], glm::mat4(1.0f));
+}
+
 TEST(RenderExtraction, ExtractRenderWorld_PopulatesDefaultLightEnvironmentPacket)
 {
     Runtime::SceneManager sceneManager;

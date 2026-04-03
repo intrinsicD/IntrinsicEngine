@@ -72,6 +72,38 @@ namespace Graphics
         return splits;
     }
 
+    ShadowCascadeData PackShadowCascadeData(
+        const ShadowParams& shadowParams,
+        std::span<const glm::mat4> cascadeMatrices)
+    {
+        ShadowCascadeData packed{};
+        packed.CascadeCount = std::clamp(shadowParams.CascadeCount, 1u, ShadowParams::MaxCascades);
+        packed.DepthBias = shadowParams.DepthBias;
+        packed.NormalBias = shadowParams.NormalBias;
+        packed.PcfFilterRadius = shadowParams.PcfFilterRadius;
+        packed.SplitDistances = shadowParams.CascadeSplits;
+
+        // Enforce monotonic normalized split distances for robust shader-side
+        // cascade selection even when edited values are partially invalid.
+        packed.SplitDistances[0] = std::clamp(packed.SplitDistances[0], 0.0f, 1.0f);
+        for (uint32_t i = 1; i < ShadowParams::MaxCascades; ++i)
+        {
+            packed.SplitDistances[i] = std::clamp(packed.SplitDistances[i], 0.0f, 1.0f);
+            packed.SplitDistances[i] = std::max(packed.SplitDistances[i], packed.SplitDistances[i - 1]);
+        }
+        packed.SplitDistances[ShadowParams::MaxCascades - 1] = 1.0f;
+
+        for (uint32_t i = 0; i < ShadowParams::MaxCascades; ++i)
+        {
+            if (i < cascadeMatrices.size())
+                packed.LightViewProjection[i] = cascadeMatrices[i];
+            else
+                packed.LightViewProjection[i] = glm::mat4(1.0f);
+        }
+
+        return packed;
+    }
+
     void ResolveDrawPacketBounds(
         std::span<LineDrawPacket> lines,
         std::span<PointDrawPacket> points,
