@@ -630,6 +630,11 @@ TEST(HtexPatchPreview, FeatureDescriptorIsEnabledByDefault)
     EXPECT_TRUE(Graphics::FeatureCatalog::HtexPatchPreviewPass.DefaultEnabled);
 }
 
+TEST(ShadowPass, FeatureDescriptorIsEnabledByDefault)
+{
+    EXPECT_TRUE(Graphics::FeatureCatalog::ShadowPass.DefaultEnabled);
+}
+
 TEST(DefaultPipeline, DebugStateReportsFeatureAvailability)
 {
     Graphics::DefaultPipeline pipeline;

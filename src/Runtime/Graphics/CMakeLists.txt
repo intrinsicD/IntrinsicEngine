@@ -68,6 +68,7 @@ target_sources(${target_name}
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
         Passes/Graphics.Passes.Surface.cppm
+        Passes/Graphics.Passes.Shadow.cppm
         Passes/Graphics.Passes.SelectionOutlineSettings.cppm
         Passes/Graphics.Passes.SelectionOutline.cppm
         Passes/Graphics.Passes.HtexPatchPreview.cppm
@@ -136,6 +137,7 @@ target_sources(${target_name}
         Systems/Graphics.Systems.PropertySetDirtySync.cpp
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Surface.cpp
+        Passes/Graphics.Passes.Shadow.cpp
         Passes/Graphics.Passes.SelectionOutline.cpp
         Passes/Graphics.Passes.HtexPatchPreview.cpp
         Passes/Graphics.Passes.Line.cpp
