@@ -388,23 +388,31 @@ namespace Runtime
         if (m_GraphicsBackend)
             m_GraphicsBackend->GetRenderer().RequestShutdown();
 
-        m_GraphicsBackend->WaitIdle();
+        if (m_GraphicsBackend)
+            m_GraphicsBackend->WaitIdle();
 
         // Disconnect entity destruction hooks before tearing down GPU systems.
-        m_SceneManager->DisconnectGpuHooks();
+        if (m_SceneManager)
+            m_SceneManager->DisconnectGpuHooks();
 
         // Order matters!
         Core::Tasks::Scheduler::Shutdown();
         Core::Filesystem::FileWatcher::Shutdown();
 
         // Process material deletions before RenderOrchestrator destroys MaterialRegistry.
-        auto& matSys = m_RenderOrchestrator->GetMaterialRegistry();
-        matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
+        if (m_RenderOrchestrator && m_GraphicsBackend)
+        {
+            auto& matSys = m_RenderOrchestrator->GetMaterialRegistry();
+            matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
+        }
 
-        m_SceneManager->Clear();
-        m_AssetPipeline->GetAssetManager().Clear();
+        if (m_SceneManager)
+            m_SceneManager->Clear();
+        if (m_AssetPipeline)
+            m_AssetPipeline->GetAssetManager().Clear();
 
-        m_AssetPipeline->ClearLoadedMaterials();
+        if (m_AssetPipeline)
+            m_AssetPipeline->ClearLoadedMaterials();
 
         // AssetIngestService borrows runtime subsystems; release it before tearing them down.
         m_AssetIngestService.reset();
@@ -605,6 +613,11 @@ namespace Runtime
 
                 if (!platformResult.ContinueFrame)
                 {
+                    if (platformResult.ThreadViolation)
+                    {
+                        Core::Log::Error("Engine::Run aborting due to platform frame thread violation.");
+                        m_Running = false;
+                    }
                     Core::Telemetry::TelemetrySystem::Get().EndFrame();
                     continue;
                 }
