@@ -1,9 +1,30 @@
-# IntrinsicEngine: Ground-Up Redesign Architecture Vision
+# IntrinsicEngine: Ground-Up Redesign Vision and Priority Stack
 
 - **Status:** Proposed vision document
 - **Date:** 2026-04-02
 - **Audience:** Runtime, Rendering, Geometry, Tools
-- **Intent:** Ground-up redesign assessment based on current codebase and architecture docs
+- **Intent:** Near- and mid-term architectural guidance based on the current codebase and architecture docs
+
+---
+
+## 0) How to read this document
+
+This document is the **decision-making layer** between the current codebase and the long-horizon redesign blueprint.
+
+Use it to answer:
+
+- what should be preserved,
+- what should change next,
+- what should stay out of scope for now,
+- and which ideas are strategic end-states rather than immediate migration prerequisites.
+
+Relationship to the other architecture documents:
+
+- **Current canonical docs** describe the runtime and rendering contracts that are true today.
+- **This vision** prioritizes the next architectural moves and the order in which they should be approached.
+- **`ground-up-redesign-blueprint-2026.md`** describes the eventual target shape and should be treated as an end-state reference, not as an immediate rewrite mandate.
+
+The intended workflow is: vision item -> ADR -> phased implementation plan -> tests / telemetry / rollback gate.
 
 ---
 
@@ -52,6 +73,8 @@ $$
 - **GPU Frame Graph (transient DAG):** virtual resources, aliasing, barrier synthesis, queue scheduling.
 - **Async Streaming Graph:** IO, transcoding, background geometry jobs, cache preparation.
 
+This 3-graph view is a useful architecture lens today. It should guide interfaces and ownership boundaries even where the concrete orchestration remains staged and partially separated.
+
 ---
 
 ## 2) What is already excellent (preserve as-is)
@@ -78,11 +101,11 @@ DAGScheduler usage, expected-based error handling, subsystem ownership boundarie
 
 ### 3.1 Promote Geometry and ECS to top-level libraries
 
-**Today:** Physical layout puts Geometry/ECS under Runtime despite logical independence.
+**Today:** Geometry and ECS are already logically reusable, but their physical placement still suggests they are subordinate to Runtime.
 
-**Change:** Move to standalone top-level libraries and CMake targets (`Geometry`, `ECS`) and split editor-heavy graphics code from runtime graphics core.
+**Change:** Move toward standalone top-level libraries and CMake targets (`Geometry`, `ECS`) and split editor-heavy graphics code from the runtime graphics core.
 
-**Why:** Better dependency hygiene, build parallelism, and future Python/tool consumption.
+**Why:** Better dependency hygiene, clearer layering, easier tool and Python integration, and more honest build-graph boundaries.
 
 **Cost:** Medium.
 
@@ -90,9 +113,9 @@ DAGScheduler usage, expected-based error handling, subsystem ownership boundarie
 
 **Today:** Some extraction still depends on live registry views.
 
-**Change:** `ExtractRenderWorld()` materializes flat SoA packets with no back pointers into ECS.
+**Change:** `ExtractRenderWorld()` materializes flat SoA packets with no back-pointers into ECS.
 
-**Why:** Enforces $\partial \mathcal{R}/\partial t=0$ physically, not just by convention.
+**Why:** Enforces $\partial \mathcal{R}/\partial t = 0$ physically, not just by convention.
 
 **Cost:** Medium.
 
@@ -100,15 +123,17 @@ DAGScheduler usage, expected-based error handling, subsystem ownership boundarie
 
 **Today:** CPU FrameGraph and GPU RenderGraph are separate orchestration layers with implicit sequencing at the top loop.
 
-**Change:** Introduce a super-graph orchestration layer that schedules CPU and GPU tasks via typed resources and explicit dependencies.
+**Change:** Move toward a super-graph orchestration layer that schedules CPU and GPU work through typed products and explicit dependencies.
 
 **Why:** Makes overlap and critical-path optimization explicit.
+
+**Interpretation:** strategic end-state, not a prerequisite for the current staged runtime migration.
 
 **Cost:** High.
 
 ### 3.4 Material permutation architecture
 
-**Today:** Material model is functionally narrow for long-term shading variety.
+**Today:** The material model is functionally narrow for long-term shading variety.
 
 **Change:** Template + permutation-key system:
 
@@ -128,13 +153,13 @@ PSO cache keyed by $K$, instance parameters in SSBO slots.
 
 **Change:** Default to compute culling + indirect count draws; keep CPU fallback behind feature flags.
 
-**Why:** Better scaling for large scene/entity counts.
+**Why:** Better scaling for large scene and entity counts.
 
 **Cost:** Medium.
 
 ### 3.6 Memory: thread-local arenas + upload coalescing
 
-**Change:** Per-worker frame arenas from a pooled allocator and a coalescing upload ledger that minimizes copy/barrier churn.
+**Change:** Per-worker frame arenas from a pooled allocator and a coalescing upload ledger that minimizes copy and barrier churn.
 
 **Why:** Lower synchronization pressure and better scale under parallel system execution.
 
@@ -150,7 +175,7 @@ PSO cache keyed by $K$, instance parameters in SSBO slots.
 
 ### 3.8 Asset pipeline binary cache + budgets
 
-**Change:** Raw parse once, binary cache for subsequent loads, plus budgeted/cancellable streaming priorities.
+**Change:** Raw parse once, binary cache for subsequent loads, plus budgeted and cancellable streaming priorities.
 
 **Why:** Major load-time wins for large datasets and better responsiveness.
 
@@ -158,7 +183,7 @@ PSO cache keyed by $K$, instance parameters in SSBO slots.
 
 ### 3.9 Rendering verification in CI
 
-**Change:** Headless GPU tests + golden-image regression + extraction boundary contract tests.
+**Change:** Headless GPU tests + golden-image regression + extraction-boundary contract tests.
 
 **Why:** Rendering correctness currently lacks sufficient automated regression visibility.
 
@@ -176,7 +201,7 @@ PSO cache keyed by $K$, instance parameters in SSBO slots.
 
 ## 4) What not to change
 
-- Do **not** rewrite language/runtime wholesale.
+- Do **not** interpret these recommendations as a mandate to rewrite the language/runtime wholesale.
 - Do **not** over-abstract away Vulkan-native strengths (BDA, explicit Sync2 semantics).
 - Do **not** pursue multi-API support before core roadmap goals are reached.
 - Do **not** discard EnTT without evidence of concrete bottlenecks in this workload class.
@@ -250,9 +275,9 @@ ZoneScopedN("GPU.IndirectSubmit");
 
 Required counters:
 
-- CPU critical-path frame time (target < 2 ms).
+- CPU critical-path frame time on the named benchmark profile.
 - Packet build cost.
-- Upload bytes / frame and copy command count.
+- Upload bytes per frame and copy command count.
 - GPU queue occupancy and bubble time.
 - Async streaming backlog depth and cancellation rate.
 
@@ -262,17 +287,17 @@ Required counters:
 
 1. Immutable extraction packets (Medium, highest leverage).
 2. GPU-driven default submission (Medium, immediate scale gain).
-3. Material permutation system (High, rendering roadmap unlock).
-4. Thread-local arenas + upload coalescing (Low/Medium, predictable wins).
-5. CI rendering regression stack (Medium, safety multiplier).
-6. Physical module/library separation (High, long-term hygiene).
+3. Thread-local arenas + upload coalescing (Low/Medium, predictable wins).
+4. CI rendering regression stack (Medium, safety multiplier).
+5. Physical module/library separation (High, long-term hygiene).
+6. Material permutation system (High, rendering roadmap unlock).
 7. Unified orchestration super-graph (High, strategic end-state).
 
 ---
 
 ## 9) Implementation plan
 
-1. Land this vision document as reference architecture guidance.
-2. Translate top 3 priorities into ADR-backed, phased migration milestones.
-3. Gate each milestone with contract tests + performance budget checks + rollback switch.
-
+1. Keep the current staged runtime contracts as the active migration baseline.
+2. Translate the top priorities into ADR-backed, phased milestones.
+3. Gate each milestone with contract tests, performance budget checks, and a rollback switch.
+4. Revisit strategic end-state ideas only after the staged path is landed and measured.
