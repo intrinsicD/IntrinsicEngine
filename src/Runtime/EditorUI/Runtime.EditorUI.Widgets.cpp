@@ -54,6 +54,7 @@ import Geometry.NormalEstimation;
 import Geometry.ShortestPath;
 import Geometry.ConvexHullBuilder;
 import Geometry.SurfaceReconstruction;
+import Geometry.VectorHeatMethod;
 
 import Core.Logging;
 
@@ -2698,6 +2699,196 @@ bool DrawSurfaceReconstructionWidget(Runtime::Engine& engine,
     }
 
     return false;
+}
+
+bool DrawVectorHeatWidget(Runtime::Engine& engine,
+                          entt::entity entity,
+                          VectorHeatWidgetState& state)
+{
+    auto& scene = engine.GetSceneManager().GetScene();
+    auto& reg = scene.GetRegistry();
+    auto& selection = engine.GetSelection();
+    const auto& sub = selection.GetSubElementSelection();
+    const auto elementMode = selection.GetConfig().ElementMode;
+
+    auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+    DrawDomainBadges(meshData ? GeometryProcessingDomain::MeshVertices
+                              : GeometryProcessingDomain::None);
+
+    if (!meshData || !meshData->MeshRef)
+    {
+        ImGui::TextDisabled("Vector Heat Method requires a mesh entity with halfedge data.");
+        return false;
+    }
+
+    if (elementMode != Runtime::Selection::ElementMode::Vertex || sub.Entity != entity)
+    {
+        ImGui::TextDisabled("Switch to Vertex selection mode and select source vertices.");
+        return false;
+    }
+
+    std::vector<std::size_t> selectedVertices;
+    selectedVertices.reserve(sub.SelectedVertices.size());
+    for (uint32_t index : sub.SelectedVertices)
+        selectedVertices.push_back(static_cast<std::size_t>(index));
+
+    ImGui::Text("Selected vertices: %zu", selectedVertices.size());
+
+    // --- Parameters ---
+    ImGui::SeparatorText("Parameters");
+
+    double timeStep = state.TimeStep;
+    if (ImGui::InputDouble("Time step (0 = auto h\xc2\xb2)", &timeStep, 0.0, 0.0, "%.6g"))
+        state.TimeStep = std::max(timeStep, 0.0);
+    ImGui::SetItemTooltip("Heat diffusion time. 0 uses mean-edge-length squared (recommended).");
+
+    float tol = state.SolverTolerance;
+    if (ImGui::InputFloat("Solver tolerance", &tol, 0.0f, 0.0f, "%.2e"))
+        state.SolverTolerance = std::clamp(tol, 1e-15f, 1e-2f);
+
+    ImGui::SliderInt("Max solver iterations", &state.MaxSolverIterations, 100, 10000);
+
+    // --- Results section ---
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last Vector Heat run failed.");
+
+    if (state.HasTransportResults)
+    {
+        ImGui::SeparatorText("Last Result (Transport)");
+        ImGui::Text("Solve iterations: %zu", state.LastTransportIterations);
+        ImGui::Text("Converged: %s", state.LastConverged ? "Yes" : "No");
+    }
+    else if (state.HasLogMapResults)
+    {
+        ImGui::SeparatorText("Last Result (Log Map)");
+        ImGui::Text("Vector solve iterations: %zu", state.LastVectorSolveIterations);
+        ImGui::Text("Scalar solve iterations: %zu", state.LastScalarSolveIterations);
+        ImGui::Text("Poisson solve iterations: %zu", state.LastPoissonSolveIterations);
+        ImGui::Text("Converged: %s", state.LastConverged ? "Yes" : "No");
+    }
+
+    bool changed = false;
+
+    // --- Transport Vectors button ---
+    {
+        const bool canRun = !selectedVertices.empty();
+        if (!canRun) ImGui::BeginDisabled();
+
+        if (ImGui::Button("Transport Vectors"))
+        {
+            auto& mesh = *meshData->MeshRef;
+            // Use first outgoing halfedge direction as default source tangent
+            // vector to transport from each source vertex.
+            std::vector<glm::vec3> sourceVectors;
+            sourceVectors.reserve(selectedVertices.size());
+            for (std::size_t vi : selectedVertices)
+            {
+                auto vh = Geometry::VertexHandle(static_cast<Geometry::PropertyIndex>(vi));
+                auto he = mesh.Halfedge(vh);
+                if (he.IsValid())
+                {
+                    auto target = mesh.ToVertex(he);
+                    glm::vec3 edge = mesh.Position(target) - mesh.Position(vh);
+                    float len = glm::length(edge);
+                    if (len > 1e-8f)
+                        sourceVectors.push_back(edge / len);
+                    else
+                        sourceVectors.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
+                }
+                else
+                {
+                    sourceVectors.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
+                }
+            }
+
+            Geometry::VectorHeatMethod::VectorHeatParams params{};
+            params.TimeStep = state.TimeStep;
+            params.SolverTolerance = static_cast<double>(state.SolverTolerance);
+            params.MaxSolverIterations = static_cast<std::size_t>(std::max(1, state.MaxSolverIterations));
+
+            auto result = Geometry::VectorHeatMethod::TransportVectors(
+                mesh,
+                std::span<const std::size_t>(selectedVertices),
+                std::span<const glm::vec3>(sourceVectors),
+                params);
+
+            state.HasLogMapResults = false;
+            if (!result)
+            {
+                state.LastRunFailed = true;
+                state.HasTransportResults = false;
+            }
+            else
+            {
+                state.LastRunFailed = false;
+                state.HasTransportResults = true;
+                state.LastTransportIterations = result->SolveIterations;
+                state.LastConverged = result->Converged;
+
+                meshData->AttributesDirty = true;
+                meshData->Visualization.VertexColors.PropertyName = "v:transported_angle";
+                reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+                changed = true;
+
+                Core::Log::Info("VectorHeat: TransportVectors iterations={} converged={}",
+                                result->SolveIterations, result->Converged);
+            }
+        }
+
+        if (!canRun) ImGui::EndDisabled();
+    }
+
+    ImGui::SameLine();
+
+    // --- Compute Log Map button ---
+    {
+        const bool canRun = (selectedVertices.size() == 1);
+        if (!canRun) ImGui::BeginDisabled();
+
+        if (ImGui::Button("Compute Log Map"))
+        {
+            auto& mesh = *meshData->MeshRef;
+
+            Geometry::VectorHeatMethod::VectorHeatParams params{};
+            params.TimeStep = state.TimeStep;
+            params.SolverTolerance = static_cast<double>(state.SolverTolerance);
+            params.MaxSolverIterations = static_cast<std::size_t>(std::max(1, state.MaxSolverIterations));
+
+            auto result = Geometry::VectorHeatMethod::ComputeLogMap(
+                mesh, selectedVertices[0], params);
+
+            state.HasTransportResults = false;
+            if (!result)
+            {
+                state.LastRunFailed = true;
+                state.HasLogMapResults = false;
+            }
+            else
+            {
+                state.LastRunFailed = false;
+                state.HasLogMapResults = true;
+                state.LastVectorSolveIterations = result->VectorSolveIterations;
+                state.LastScalarSolveIterations = result->ScalarSolveIterations;
+                state.LastPoissonSolveIterations = result->PoissonSolveIterations;
+                state.LastConverged = result->Converged;
+
+                meshData->AttributesDirty = true;
+                meshData->Visualization.VertexColors.PropertyName = "v:geodesic_distance";
+                reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+                changed = true;
+
+                Core::Log::Info("VectorHeat: ComputeLogMap vecIter={} scalarIter={} poissonIter={} converged={}",
+                                result->VectorSolveIterations, result->ScalarSolveIterations,
+                                result->PoissonSolveIterations, result->Converged);
+            }
+        }
+
+        if (!canRun) ImGui::EndDisabled();
+        if (selectedVertices.size() != 1)
+            ImGui::SetItemTooltip("Log Map requires exactly 1 selected source vertex.");
+    }
+
+    return changed;
 }
 
 } // namespace Runtime::EditorUI

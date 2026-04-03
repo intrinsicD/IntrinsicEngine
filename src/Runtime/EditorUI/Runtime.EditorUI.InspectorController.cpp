@@ -138,6 +138,7 @@ void InspectorController::Draw()
         m_ShortestPathUi = {};
         m_ConvexHullUi = {};
         m_SurfaceReconstructionUi = {};
+        m_VectorHeatUi = {};
     }
 
     // === Entity ID (always shown at top) ===
@@ -673,13 +674,17 @@ void InspectorController::Draw()
                     case GeometryProcessingAlgorithm::SurfaceReconstruction:
                         static_cast<void>(DrawSurfaceReconstructionWidget(*m_Engine, selected, m_SurfaceReconstructionUi));
                         break;
+                    case GeometryProcessingAlgorithm::VectorHeat:
+                        static_cast<void>(DrawVectorHeatWidget(*m_Engine, selected, m_VectorHeatUi));
+                        break;
                     }
 
                     if (m_GeometryWorkflow && entry.Algorithm != GeometryProcessingAlgorithm::KMeans
                         && entry.Algorithm != GeometryProcessingAlgorithm::NormalEstimation
                         && entry.Algorithm != GeometryProcessingAlgorithm::ShortestPath
                         && entry.Algorithm != GeometryProcessingAlgorithm::ConvexHull
-                        && entry.Algorithm != GeometryProcessingAlgorithm::SurfaceReconstruction)
+                        && entry.Algorithm != GeometryProcessingAlgorithm::SurfaceReconstruction
+                        && entry.Algorithm != GeometryProcessingAlgorithm::VectorHeat)
                     {
                         if (ImGui::SmallButton((std::string("Open Dedicated Panel##")
                                              + algoLabel).c_str()))
