@@ -168,7 +168,7 @@ Synchronous, immediate resource cleanup when a component is removed.
 ```cpp
 // Runtime.SceneManager.cpp
 registry.on_destroy<ECS::Surface::Component>().connect<&OnSurfaceDestroyed>();
-// Hook frees GPUScene slot immediately — no deferred event
+// Hook frees GPUScene slot + geometry pool entries immediately — no deferred event
 ```
 
 **Canonical examples:**
