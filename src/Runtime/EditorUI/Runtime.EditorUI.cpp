@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cstdio>
 #include <cstddef>
+#include <format>
 #include <set>
 #include <glm/glm.hpp>
 #include <imgui.h>
@@ -774,13 +775,15 @@ namespace Runtime::EditorUI
             Core::CommandHistory& history = engine.GetCommandHistory();
             const bool canUndo = history.CanUndo();
             const bool canRedo = history.CanRedo();
+            const std::string undoLabel = std::format("Undo ({})", history.UndoCount());
+            const std::string redoLabel = std::format("Redo ({})", history.RedoCount());
 
             if (ImGui::BeginMenu("Edit"))
             {
-                if (ImGui::MenuItem("Undo", "Ctrl+Z", false, canUndo))
+                if (ImGui::MenuItem(undoLabel.c_str(), "Ctrl+Z", false, canUndo))
                     (void)history.Undo();
 
-                if (ImGui::MenuItem("Redo", "Ctrl+Shift+Z", false, canRedo))
+                if (ImGui::MenuItem(redoLabel.c_str(), "Ctrl+Shift+Z", false, canRedo))
                     (void)history.Redo();
 
                 ImGui::EndMenu();

@@ -645,6 +645,13 @@ private:
                     const bool deferred = GetFeatureRegistry().IsEnabled("DeferredLighting"_id);
                     ImGui::Text("Lighting: %s", deferred ? "Deferred" : "Forward");
                 }
+                VerticalSeparator();
+
+                // Undo/redo depth
+                {
+                    const Core::CommandHistory& history = GetCommandHistory();
+                    ImGui::Text("Undo: %zu  Redo: %zu", history.UndoCount(), history.RedoCount());
+                }
             }
             ImGui::End();
             ImGui::PopStyleVar();
