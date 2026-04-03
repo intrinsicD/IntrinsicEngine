@@ -9,6 +9,7 @@ module;
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <limits>
@@ -155,7 +156,7 @@ export namespace Geometry
         [[nodiscard]] std::vector<std::string> PropertyNames() const;
 
         /// Clears all properties and their data.
-        inline void Clear() { m_Size = 0; m_Storages.clear(); }
+        inline void Clear() { m_Size = 0; m_Storages.clear(); m_NameIndex.clear(); }
         /// Reserves storage slots for property arrays.
         inline void Reserve(size_t n) { m_Storages.reserve(n); }
 
@@ -186,12 +187,11 @@ export namespace Geometry
         }
 
         /// Finds a property by name; returns nullopt if not found.
+        /// O(1) average via internal hash map.
         [[nodiscard]] std::optional<PropertyId> Find(std::string_view name) const
         {
-            for (size_t i = 0; i < m_Storages.size(); ++i)
-            {
-                if (m_Storages[i] && m_Storages[i]->Name() == name) return i;
-            }
+            auto it = m_NameIndex.find(name);
+            if (it != m_NameIndex.end()) return it->second;
             return std::nullopt;
         }
 
@@ -243,7 +243,22 @@ export namespace Geometry
         template <class T>
         [[nodiscard]] const Internal::PropertyStorage<T>* Storage(PropertyId id) const noexcept;
 
+        /// Transparent hasher for string_view lookups into string-keyed maps.
+        struct StringHash
+        {
+            using is_transparent = void;
+            [[nodiscard]] size_t operator()(std::string_view sv) const noexcept
+            {
+                return std::hash<std::string_view>{}(sv);
+            }
+            [[nodiscard]] size_t operator()(const std::string& s) const noexcept
+            {
+                return std::hash<std::string_view>{}(std::string_view(s));
+            }
+        };
+
         std::vector<std::unique_ptr<Internal::PropertyStorageBase>> m_Storages;
+        std::unordered_map<std::string, PropertyId, StringHash, std::equal_to<>> m_NameIndex;
         size_t m_Size{0};
     };
 
@@ -429,8 +444,10 @@ export namespace Geometry
         auto storage = std::make_unique<Internal::PropertyStorage<T>>(std::move(name), std::move(m_Defaultvalue));
         storage->Resize(m_Size);
         auto* raw = storage.get();
+        PropertyId id = m_Storages.size();
+        m_NameIndex.emplace(std::string(raw->Name()), id);
         m_Storages.push_back(std::move(storage));
-        return PropertyBuffer<T>(m_Storages.size() - 1U, raw);
+        return PropertyBuffer<T>(id, raw);
     }
 
     template <class T>
