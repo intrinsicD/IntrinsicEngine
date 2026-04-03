@@ -280,6 +280,7 @@ namespace Runtime
         };
 
         registerDescriptor(Graphics::FeatureCatalog::SurfacePass);
+        registerDescriptor(Graphics::FeatureCatalog::ShadowPass);
         registerDescriptor(Graphics::FeatureCatalog::PickingPass);
         registerDescriptor(Graphics::FeatureCatalog::SelectionOutlinePass);
         registerDescriptor(Graphics::FeatureCatalog::LinePass);

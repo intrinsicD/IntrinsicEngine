@@ -16,6 +16,7 @@ import Graphics.Geometry;
 
 import Graphics.Passes.Picking;
 import Graphics.Passes.Surface;
+import Graphics.Passes.Shadow;
 import Graphics.Passes.SelectionOutline;
 import Graphics.Passes.Line;
 import Graphics.Passes.Point;
@@ -41,6 +42,7 @@ namespace Graphics
     {
         std::unique_ptr<Passes::PickingPass> PickingPass;
         std::unique_ptr<Passes::SurfacePass> SurfacePass;
+        std::unique_ptr<Passes::ShadowPass> ShadowPass;
         std::unique_ptr<Passes::SelectionOutlinePass> SelectionOutlinePass;
         std::unique_ptr<Passes::LinePass> LinePass;
         std::unique_ptr<Passes::PointPass> PointPass;
@@ -116,6 +118,7 @@ namespace Graphics
     {
         if (m_Impl->PickingPass)          m_Impl->PickingPass->Shutdown();
         if (m_Impl->SurfacePass)          m_Impl->SurfacePass->Shutdown();
+        if (m_Impl->ShadowPass)           m_Impl->ShadowPass->Shutdown();
         if (m_Impl->SelectionOutlinePass) m_Impl->SelectionOutlinePass->Shutdown();
         if (m_Impl->LinePass)             m_Impl->LinePass->Shutdown();
         if (m_Impl->PointPass)            m_Impl->PointPass->Shutdown();
@@ -127,6 +130,7 @@ namespace Graphics
 
         m_Impl->PickingPass.reset();
         m_Impl->SurfacePass.reset();
+        m_Impl->ShadowPass.reset();
         m_Impl->SelectionOutlinePass.reset();
         m_Impl->LinePass.reset();
         m_Impl->PointPass.reset();
@@ -145,6 +149,7 @@ namespace Graphics
     {
         m_Impl->PickingPass          = std::make_unique<Passes::PickingPass>();
         m_Impl->SurfacePass          = std::make_unique<Passes::SurfacePass>();
+        m_Impl->ShadowPass           = std::make_unique<Passes::ShadowPass>();
         m_Impl->SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
         m_Impl->LinePass             = std::make_unique<Passes::LinePass>();
         m_Impl->PointPass            = std::make_unique<Passes::PointPass>();
@@ -156,6 +161,7 @@ namespace Graphics
 
         m_Impl->PickingPass->Initialize(device, descriptorPool, globalLayout);
         m_Impl->SurfacePass->Initialize(device, descriptorPool, globalLayout);
+        m_Impl->ShadowPass->Initialize(device, descriptorPool, globalLayout);
         m_Impl->SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_Impl->LinePass->Initialize(device, descriptorPool, globalLayout);
         m_Impl->PointPass->Initialize(device, descriptorPool, globalLayout);
@@ -231,7 +237,13 @@ namespace Graphics
             m_Impl->Path.AddFeature("MeshPass.Surface", m_Impl->SurfacePass.get());
 
         // ==================================================================
-        // 3. Composition — deferred lighting.
+        // 3. ShadowPass — shadow-atlas depth lane (CSM phase-1 scaffold).
+        // ==================================================================
+        if (m_Impl->ShadowPass && IsFeatureEnabled(FeatureCatalog::ShadowPass))
+            m_Impl->Path.AddFeature("ShadowPass", m_Impl->ShadowPass.get());
+
+        // ==================================================================
+        // 4. Composition — deferred lighting.
         //    Reads G-buffer (SceneNormal, Albedo, Material0) + SceneDepth
         //    and writes SceneColorHDR via a fullscreen deferred lighting pass.
         //    No-op when the frame recipe selects the forward lighting path
@@ -247,7 +259,7 @@ namespace Graphics
             m_Impl->Path.AddFeature("Composition", m_Impl->CompositionPass.get());
 
         // ==================================================================
-        // 4. LinePass — unified BDA-based line rendering.
+        // 5. LinePass — unified BDA-based line rendering.
         //    Consolidates retained wireframe/graph edges and transient DebugDraw
         //    lines into a single forward-overlay lane on SceneColorHDR.
         // ==================================================================
@@ -261,7 +273,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 5. PointPass — unified BDA-based point rendering.
+        // 6. PointPass — unified BDA-based point rendering.
         //    Iterates ECS::Point::Component for retained draws and
         //    DebugDraw::GetPoints() for transient markers. Like LinePass, this
         //    is part of the forward-overlay lane that composes after deferred
@@ -277,7 +289,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 6. HtexPatchPreview — hierarchical texture patch preview.
+        // 7. HtexPatchPreview — hierarchical texture patch preview.
         //    Renders a low-res proxy of the selected texture region for debugging
         //    texture streaming and LOD transitions.
         // ==================================================================
@@ -290,7 +302,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 7. Post-Processing — HDR tone mapping + optional FXAA.
+        // 8. Post-Processing — HDR tone mapping + optional FXAA.
         //    Reads canonical SceneColorHDR and writes canonical SceneColorLDR.
         //    Final presentation to the imported swapchain image happens in the
         //    dedicated Present stage below.
@@ -299,13 +311,13 @@ namespace Graphics
             m_Impl->Path.AddFeature("PostProcess", m_Impl->PostProcessPass.get());
 
         // ==================================================================
-        // 8. Selection Outline — post-process overlay for selected entities.
+        // 9. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
         if (m_Impl->SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass))
             m_Impl->Path.AddFeature("SelectionOutline", m_Impl->SelectionOutlinePass.get());
 
         // ==================================================================
-        // 9. Debug View — conditional texture inspector overlay.
+        // 10. Debug View — conditional texture inspector overlay.
         // ==================================================================
         if (m_Impl->DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass))
         {
@@ -317,7 +329,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 10. ImGui — editor UI overlay.
+        // 11. ImGui — editor UI overlay.
         // ==================================================================
         if (m_Impl->ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass))
             m_Impl->Path.AddFeature("ImGui", m_Impl->ImGuiPass.get());
@@ -414,6 +426,7 @@ namespace Graphics
     {
         if (m_Impl->PickingPass)          m_Impl->PickingPass->OnResize(width, height);
         if (m_Impl->SurfacePass)          m_Impl->SurfacePass->OnResize(width, height);
+        if (m_Impl->ShadowPass)           m_Impl->ShadowPass->OnResize(width, height);
         if (m_Impl->SelectionOutlinePass) m_Impl->SelectionOutlinePass->OnResize(width, height);
         if (m_Impl->LinePass)             m_Impl->LinePass->OnResize(width, height);
         if (m_Impl->PointPass)            m_Impl->PointPass->OnResize(width, height);

@@ -18,6 +18,11 @@ export namespace Graphics::FeatureCatalog
         Core::FeatureCategory::RenderFeature,
         "Main surface PBR rendering pass");
 
+    inline constexpr Core::FeatureDescriptor ShadowPass = MakeFeatureDescriptor(
+        "ShadowPass",
+        Core::FeatureCategory::RenderFeature,
+        "CSM shadow-atlas depth pass");
+
     inline constexpr Core::FeatureDescriptor SelectionOutlinePass = MakeFeatureDescriptor(
         "SelectionOutlinePass",
         Core::FeatureCategory::RenderFeature,
