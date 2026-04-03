@@ -17,6 +17,20 @@ layout(set = 0, binding = 1) uniform sampler2D uAlbedo;    // Albedo (RGBA8)
 layout(set = 0, binding = 2) uniform sampler2D uMaterial;  // Material0 (RGBA16F)
 layout(set = 0, binding = 3) uniform sampler2D uDepth;     // SceneDepth
 
+// Global set (set = 1): Camera UBO + Shadow Atlas.
+layout(set = 1, binding = 0) uniform CameraBuffer {
+    mat4 view;
+    mat4 proj;
+    vec4 _lightDirAndIntensity;
+    vec4 _lightColor;
+    vec4 _ambientColorAndIntensity;
+    mat4 shadowCascadeMatrices[4];
+    vec4 shadowCascadeSplitsAndCount;
+    vec4 shadowBiasAndFilter;
+} camera;
+
+layout(set = 1, binding = 1) uniform sampler2DShadow shadowAtlas;
+
 layout(push_constant) uniform Push
 {
     mat4  InvViewProj;    // Inverse of (Proj * View) for position reconstruction
@@ -25,6 +39,8 @@ layout(push_constant) uniform Push
     vec4  LightColor;              // xyz = light color
     vec4  AmbientColorAndIntensity; // xyz = ambient color, w = ambient intensity
 } pc;
+
+#include "shadow_sampling.glsl"
 
 vec3 ReconstructWorldPos(vec2 uv, float depth)
 {
@@ -62,7 +78,18 @@ void main()
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lColor;
 
-    vec3 result = (ambient + diffuse) * albedo.rgb;
+    // Reconstruct world position for shadow sampling.
+    vec3 worldPos = ReconstructWorldPos(vUV, depth);
+
+    // Shadow attenuation (PCF cascaded shadow maps).
+    float shadow = ComputeShadowFactor(
+        shadowAtlas, worldPos, norm,
+        camera.view, camera.proj,
+        camera.shadowCascadeMatrices,
+        camera.shadowCascadeSplitsAndCount,
+        camera.shadowBiasAndFilter);
+
+    vec3 result = (ambient + diffuse * shadow) * albedo.rgb;
 
     outColor = vec4(result, albedo.a);
 }

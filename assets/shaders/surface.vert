@@ -4,13 +4,16 @@
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
-// Set 0, Binding 0 is Camera UBO
+// Set 0, Binding 0 is Camera UBO (includes shadow cascade data)
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
     mat4 proj;
     vec4 lightDirAndIntensity;
     vec4 lightColor;
     vec4 ambientColorAndIntensity;
+    mat4 shadowCascadeMatrices[4];
+    vec4 shadowCascadeSplitsAndCount;   // x/y/z/w = split distances
+    vec4 shadowBiasAndFilter;           // x = depth bias, y = normal bias, z = PCF radius, w = cascade count
 } camera;
 
 layout(buffer_reference, scalar) readonly buffer PosBuf  { vec3 v[]; };
@@ -55,6 +58,7 @@ layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) flat out uint fragTexID;
 layout(location = 3) out vec4 fragVertexColor;
 layout(location = 4) out vec3 fragObjectPos;
+layout(location = 5) out vec3 fragWorldPos;
 
 void main() {
     PosBuf  pBuf = PosBuf(push.PtrPositions);
@@ -72,7 +76,8 @@ void main() {
     uint globalInstanceID = visibility.VisibleRemap[push.VisibilityBase + gl_InstanceIndex];
     InstanceData inst = instances.Data[globalInstanceID];
 
-    gl_Position = camera.proj * camera.view * inst.Model * vec4(inPos, 1.0);
+    vec4 worldPos = inst.Model * vec4(inPos, 1.0);
+    gl_Position = camera.proj * camera.view * worldPos;
 
     // Forward pass point rendering: fixed pixel-size points.
     // The pipeline variant is created with POINT_LIST topology.
@@ -106,6 +111,9 @@ void main() {
 
     // Object-space position for nearest-vertex Voronoi rendering.
     fragObjectPos = inPos;
+
+    // World-space position for shadow coordinate computation.
+    fragWorldPos = worldPos.xyz;
 
     fragTexCoord = inUV;
     fragTexID = inst.TextureID;
