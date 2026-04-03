@@ -45,6 +45,7 @@ import Graphics.Passes.SelectionOutline;
 import Graphics.Passes.SelectionOutlineSettings;
 import Graphics.Passes.PostProcessSettings;
 import Graphics.Pipelines;
+import Graphics.RenderDriver;
 import Graphics.RenderPipeline;
 import Graphics.TextureLoader;
 import Graphics.TransformGizmo;
@@ -719,6 +720,29 @@ private:
                     ImGui::Text("Forward: (%.3f, %.3f, %.3f)", forward.x, forward.y, forward.z);
                 }
             }
+        }
+
+        // --- Rendering ---
+        {
+            auto& renderDriver = GetRenderOrchestrator().GetRenderDriver();
+            ImGui::SeparatorText("Rendering");
+
+            constexpr const char* renderModes[] = {
+                "None",
+                "Shaded",
+                "Wireframe",
+                "Wireframe + Shaded",
+                "Points",
+                "Flat"
+            };
+
+            int renderMode = static_cast<int>(renderDriver.GetGlobalRenderModeOverride());
+            if (ImGui::Combo("Render Mode Override", &renderMode, renderModes, IM_ARRAYSIZE(renderModes)))
+            {
+                renderDriver.SetGlobalRenderModeOverride(
+                    static_cast<Graphics::GlobalRenderModeOverride>(renderMode));
+            }
+            Interface::GUI::ItemTooltip("Viewport-wide rendering override. None keeps per-entity Surface/Line/Point visibility. Flat currently maps to the shaded surface path.");
         }
 
         // --- Lighting ---

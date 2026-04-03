@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <memory>
 #include <span>
@@ -36,6 +37,16 @@ import ECS;
 
 export namespace Graphics
 {
+    enum class GlobalRenderModeOverride : uint8_t
+    {
+        None = 0,          // Per-entity visibility only (default behavior)
+        Shaded,            // Surface pass only
+        Wireframe,         // Line pass only
+        WireframeShaded,   // Surface + line passes
+        Points,            // Point pass only
+        Flat,              // Flat shading intent (currently maps to shaded path)
+    };
+
     struct RenderDriverConfig
     {
         bool EnableRenderAuditLogging = false;
@@ -108,6 +119,8 @@ export namespace Graphics
         // into RenderWorld::Lighting each frame.
         [[nodiscard]] LightEnvironmentPacket& GetLightEnvironment();
         [[nodiscard]] const LightEnvironmentPacket& GetLightEnvironment() const;
+        void SetGlobalRenderModeOverride(GlobalRenderModeOverride mode);
+        [[nodiscard]] GlobalRenderModeOverride GetGlobalRenderModeOverride() const;
 
         // Consume the last resolved GPU profiling result (moves ownership to the caller).
         // Returns std::nullopt if no resolved result is available yet.
