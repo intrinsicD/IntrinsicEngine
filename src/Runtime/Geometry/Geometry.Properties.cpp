@@ -23,17 +23,19 @@ namespace Geometry
         return out;
     }
 
-    PropertyRegistry::PropertyRegistry(const PropertyRegistry& other) : m_Storages(), m_Size(other.m_Size)
+    PropertyRegistry::PropertyRegistry(const PropertyRegistry& other) : m_Storages(), m_NameIndex(), m_Size(other.m_Size)
     {
         m_Storages.reserve(other.m_Storages.size());
-        for (const auto& storage : other.m_Storages)
+        for (size_t i = 0; i < other.m_Storages.size(); ++i)
         {
+            const auto& storage = other.m_Storages[i];
             if (!storage)
             {
                 m_Storages.emplace_back(nullptr);
                 continue;
             }
             m_Storages.push_back(storage->Clone());
+            m_NameIndex.emplace(std::string(m_Storages.back()->Name()), i);
         }
     }
 
@@ -43,15 +45,18 @@ namespace Geometry
 
         m_Size = other.m_Size;
         m_Storages.clear();
+        m_NameIndex.clear();
         m_Storages.reserve(other.m_Storages.size());
-        for (const auto& storage : other.m_Storages)
+        for (size_t i = 0; i < other.m_Storages.size(); ++i)
         {
+            const auto& storage = other.m_Storages[i];
             if (!storage)
             {
                 m_Storages.emplace_back(nullptr);
                 continue;
             }
             m_Storages.push_back(storage->Clone());
+            m_NameIndex.emplace(std::string(m_Storages.back()->Name()), i);
         }
         return *this;
     }
@@ -68,6 +73,8 @@ namespace Geometry
             return false;
         }
 
+        // Remove from name index before clearing storage.
+        m_NameIndex.erase(std::string(m_Storages[id]->Name()));
         // Preserve IDs by leaving an empty slot.
         m_Storages[id].reset();
         return true;

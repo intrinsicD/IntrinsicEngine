@@ -437,6 +437,62 @@ The engine already has compute culling shaders (`instance_cull.comp`, `instance_
 - [ ] Plan material serialization compatibility with the future rewrite.
 - [ ] Plan debug/editor-only render state separation from scene state.
 
+### C11. Dependency-Graph ECS System Scheduler
+
+Automatic ECS system execution ordering from declared data dependencies (inspired by RD_Engine's `DependencyGraph` + `SystemScheduler` pattern). Systems declare which ECS component types they read/write; a topological sort resolves RAW/WAW/WAR hazards and partitions into parallelizable stages.
+
+- [ ] Design a `SystemDependencyGraph` that takes declared component read/write sets.
+- [ ] Produce a topologically-sorted execution plan with parallelizable stage grouping.
+- [ ] Replace manual string-based `"after"` annotations in FrameGraph system ordering.
+- [ ] Reuse the same dependency infrastructure for asset pipeline load ordering.
+- [ ] Validate that existing ordering invariants (e.g., `PropertySetDirtySync` before lifecycle systems) are preserved by the automatic resolution.
+
+### C12. Asset / Scene Registry Separation
+
+Separate asset identity from scene instances using a dual-registry ECS pattern (inspired by RD_Engine's `AssetDatabase` + `Scene` split).
+
+- [ ] Introduce an `AssetRegistry` (second `entt::registry`) for imported asset metadata (path, format, import settings, dependencies, revision).
+- [ ] Scene entities reference asset entities via handles instead of storing filesystem paths (`AssetSourceRef`).
+- [ ] Evaluate impact on `SceneSerializer` and `AssetIngestService`.
+- [ ] Plan prefab / instancing model on top of asset-identity separation.
+
+### C13. Generational GPU Resource Handles
+
+Add generation-counted handles for GPU resources to prevent use-after-free of stale references (inspired by RD_Engine's `ResourceSlot<T>` pattern).
+
+- [ ] Add a `Generation` counter to `TextureManager` and `MaterialRegistry` pool slots.
+- [ ] Stale handles with wrong generation silently fail instead of corrupting.
+- [ ] Evaluate for `GeometryPool` handle safety under async texture upload and hot-reload.
+
+### C14. GMM Spectral Framework (Mesh-Free Spectral Analysis)
+
+Gaussian Mixture Model based spectral methods for point cloud analysis without requiring a mesh (inspired by Engine24's Galerkin Laplacian assembly on Gaussian mixtures).
+
+- [ ] Implement EM fitting with regularized covariances in a `Geometry.GaussianMixture` module.
+- [ ] Implement Galerkin Laplacian assembly: Octree spatial indexing → pair discovery → Gaussian product → sparse matrix assembly.
+- [ ] Integrate with existing `Geometry.Octree` for spatial queries and `Geometry.DEC` sparse matrix types.
+- [ ] Store per-point GMM membership weights via existing `PropertySet` system.
+- [ ] Add spectral eigensolve support (requires sparse eigensolver — evaluate Spectra or implement shift-invert Lanczos).
+
+### C15. ICP Point Cloud Registration
+
+Point-to-point and point-to-plane Iterative Closest Point registration for scan alignment.
+
+- [ ] Implement `Geometry.Registration` module following the operator pattern (Params struct + Result struct with convergence diagnostics).
+- [ ] Use existing `Geometry.KDTree` for nearest-neighbor correspondence.
+- [ ] SVD-based rigid alignment per iteration.
+- [ ] Extend to point-to-plane ICP using estimated normals.
+- [ ] Wire to editor UI as a geometry operator.
+
+### C16. GPU Compute Shader Normal Estimation
+
+GPU-accelerated point cloud normal estimation for large point clouds (>1M points).
+
+- [ ] Implement KNN query on GPU via compute shader (requires GPU-side spatial index or brute-force for small neighborhoods).
+- [ ] Per-point covariance → eigendecomposition → normal extraction in compute shader.
+- [ ] Integrate with existing `PointCloudLifecycleSystem` for on-upload normal computation.
+- [ ] Benchmark against CPU `Geometry.NormalEstimation` at varying point counts.
+
 ---
 
 ## 1.5. Compile-Time & Binary-Boundary Hardening — PImpl Refactor Program (NEW)

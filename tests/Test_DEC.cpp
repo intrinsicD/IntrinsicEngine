@@ -767,3 +767,163 @@ TEST(DEC_EdgeCases, SubdividedTriangleMixedBoundary)
         EXPECT_NEAR(result[i], 0.0, 1e-10) << "Vertex " << i;
     }
 }
+
+// =============================================================================
+// LaplacianCache — cached derived matrix forms for spectral workflows
+// =============================================================================
+
+TEST(DEC_LaplacianCache, BuildFromRegularTetrahedron)
+{
+    auto mesh = MakeTetrahedron();
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh);
+
+    EXPECT_TRUE(cache.IsValid());
+    EXPECT_FALSE(cache.MassInverse.IsEmpty());
+    EXPECT_FALSE(cache.MassSqrtInverse.IsEmpty());
+    EXPECT_FALSE(cache.SymmetricNormalizedLaplacian.IsEmpty());
+
+    // Dimensions should all be #V × #V
+    const std::size_t nV = mesh.VerticesSize();
+    EXPECT_EQ(cache.MassInverse.Size, nV);
+    EXPECT_EQ(cache.MassSqrtInverse.Size, nV);
+    EXPECT_EQ(cache.SymmetricNormalizedLaplacian.Rows, nV);
+    EXPECT_EQ(cache.SymmetricNormalizedLaplacian.Cols, nV);
+}
+
+TEST(DEC_LaplacianCache, MassInverseIsConsistentWithHodge0)
+{
+    auto mesh = MakeTetrahedron();
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh);
+
+    const auto& h0 = cache.Operators.Hodge0;
+    const auto& mInv = cache.MassInverse;
+
+    for (std::size_t i = 0; i < h0.Size; ++i)
+    {
+        if (h0.Diagonal[i] > 1e-12)
+        {
+            EXPECT_NEAR(h0.Diagonal[i] * mInv.Diagonal[i], 1.0, 1e-10) << "Vertex " << i;
+        }
+    }
+}
+
+TEST(DEC_LaplacianCache, MassSqrtInverseIsConsistentWithHodge0)
+{
+    auto mesh = MakeTetrahedron();
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh);
+
+    const auto& h0 = cache.Operators.Hodge0;
+    const auto& mSqrtInv = cache.MassSqrtInverse;
+
+    for (std::size_t i = 0; i < h0.Size; ++i)
+    {
+        if (h0.Diagonal[i] > 1e-12)
+        {
+            double product = h0.Diagonal[i] * mSqrtInv.Diagonal[i] * mSqrtInv.Diagonal[i];
+            EXPECT_NEAR(product, 1.0, 1e-10) << "Vertex " << i;
+        }
+    }
+}
+
+TEST(DEC_LaplacianCache, SymNormalizedLaplacianIsSymmetric)
+{
+    auto mesh = MakeTetrahedron();
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh);
+
+    const auto& Lsym = cache.SymmetricNormalizedLaplacian;
+
+    // Verify L_sym[i,j] == L_sym[j,i]
+    for (std::size_t i = 0; i < Lsym.Rows; ++i)
+    {
+        for (std::size_t k = Lsym.RowOffsets[i]; k < Lsym.RowOffsets[i + 1]; ++k)
+        {
+            std::size_t j = Lsym.ColIndices[k];
+            double lij = Lsym.Values[k];
+
+            // Find L_sym[j,i]
+            double lji = 0.0;
+            for (std::size_t m = Lsym.RowOffsets[j]; m < Lsym.RowOffsets[j + 1]; ++m)
+            {
+                if (Lsym.ColIndices[m] == i)
+                {
+                    lji = Lsym.Values[m];
+                    break;
+                }
+            }
+
+            EXPECT_NEAR(lij, lji, 1e-10)
+                << "L_sym[" << i << "," << j << "] != L_sym[" << j << "," << i << "]";
+        }
+    }
+}
+
+TEST(DEC_LaplacianCache, SymNormalizedRowSumsAreZero)
+{
+    auto mesh = MakeSubdividedTriangle();
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh);
+
+    const auto& Lsym = cache.SymmetricNormalizedLaplacian;
+    const auto& dSqrt = cache.Operators.Hodge0;
+
+    // L_sym * D^{1/2} * 1 should be zero (since L * 1 = 0 implies
+    // D^{-1/2} L D^{-1/2} * D^{1/2} * 1 = D^{-1/2} L * 1 = 0)
+    std::vector<double> dSqrt1(Lsym.Cols);
+    for (std::size_t i = 0; i < Lsym.Cols; ++i)
+        dSqrt1[i] = (dSqrt.Diagonal[i] > 1e-12) ? std::sqrt(dSqrt.Diagonal[i]) : 0.0;
+
+    std::vector<double> result(Lsym.Rows, 999.0);
+    Lsym.Multiply(dSqrt1, result);
+
+    for (std::size_t i = 0; i < Lsym.Rows; ++i)
+    {
+        EXPECT_NEAR(result[i], 0.0, 1e-8) << "Vertex " << i;
+    }
+}
+
+// =============================================================================
+// AnalyzeLaplacian — structural diagnostics
+// =============================================================================
+
+TEST(DEC_Diagnostics, RegularTetrahedronPassesAll)
+{
+    auto mesh = MakeTetrahedron();
+    auto L = Geometry::DEC::BuildLaplacian(mesh);
+    auto diag = Geometry::DEC::AnalyzeLaplacian(L);
+
+    EXPECT_TRUE(diag.AllPassed());
+    EXPECT_TRUE(diag.IsSymmetric);
+    EXPECT_TRUE(diag.HasZeroRowSums);
+    EXPECT_TRUE(diag.HasNonPositiveOffDiag);
+    EXPECT_TRUE(diag.HasPositiveDiagonal);
+    EXPECT_TRUE(diag.IsDiagonallyDominant);
+    EXPECT_LT(diag.MaxSymmetryError, 1e-10);
+    EXPECT_LT(diag.MaxRowSumError, 1e-10);
+    EXPECT_DOUBLE_EQ(diag.MaxOffDiagPositive, 0.0);
+}
+
+TEST(DEC_Diagnostics, SubdividedTrianglePassesAll)
+{
+    auto mesh = MakeSubdividedTriangle();
+    auto L = Geometry::DEC::BuildLaplacian(mesh);
+    auto diag = Geometry::DEC::AnalyzeLaplacian(L);
+
+    EXPECT_TRUE(diag.AllPassed());
+}
+
+TEST(DEC_Diagnostics, SingleTrianglePassesAll)
+{
+    auto mesh = MakeSingleTriangle();
+    auto L = Geometry::DEC::BuildLaplacian(mesh);
+    auto diag = Geometry::DEC::AnalyzeLaplacian(L);
+
+    EXPECT_TRUE(diag.AllPassed());
+}
+
+TEST(DEC_Diagnostics, EmptyMatrixDoesNotCrash)
+{
+    Geometry::DEC::SparseMatrix empty;
+    auto diag = Geometry::DEC::AnalyzeLaplacian(empty);
+
+    // Empty matrix should fail all checks (nothing to validate)
+    EXPECT_FALSE(diag.AllPassed());
+}
