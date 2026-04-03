@@ -93,6 +93,7 @@ export namespace Runtime::EditorUI
         ConvexHull,
         SurfaceReconstruction,
         VectorHeat,
+        Parameterization,
     };
 
     struct GeometryProcessingCapabilities
@@ -352,6 +353,22 @@ export namespace Runtime::EditorUI
         std::size_t GridNZ = 0;
     };
 
+    struct ParameterizationWidgetState
+    {
+        bool AutoSelectPins = true;
+        double SolverTolerance = 1e-8;
+        int MaxIterations = 5000;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        double MeanDistortion = 0.0;
+        double MaxDistortion = 0.0;
+        std::size_t FlippedCount = 0;
+        std::size_t CGIterations = 0;
+        bool LastConverged = false;
+        std::size_t PinVertex0Used = 0;
+        std::size_t PinVertex1Used = 0;
+    };
+
     struct VectorHeatWidgetState
     {
         double TimeStep = 0.0;
@@ -439,6 +456,9 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawVectorHeatWidget(Runtime::Engine& engine,
                                             entt::entity entity,
                                             VectorHeatWidgetState& state);
+    [[nodiscard]] bool DrawParameterizationWidget(Runtime::Engine& engine,
+                                                   entt::entity entity,
+                                                   ParameterizationWidgetState& state);
 
     // =========================================================================
     // InspectorController — component property inspector panel
@@ -485,6 +505,7 @@ export namespace Runtime::EditorUI
         ConvexHullWidgetState m_ConvexHullUi{};
         SurfaceReconstructionWidgetState m_SurfaceReconstructionUi{};
         VectorHeatWidgetState m_VectorHeatUi{};
+        ParameterizationWidgetState m_ParameterizationUi{};
     };
 
     // =========================================================================
@@ -514,6 +535,7 @@ export namespace Runtime::EditorUI
         SimplificationWidgetState m_SimplificationUi{};
         SmoothingWidgetState m_SmoothingUi{};
         SubdivisionWidgetState m_SubdivisionUi{};
+        ParameterizationWidgetState m_ParameterizationUi{};
 
         struct SelectionContext
         {
@@ -534,6 +556,7 @@ export namespace Runtime::EditorUI
         void OpenSubdivisionPanel();
         void OpenRepairPanel();
         void OpenMeshQualityPanel();
+        void OpenParameterizationPanel();
         void OpenWorkflowStack();
 
 
@@ -545,6 +568,7 @@ export namespace Runtime::EditorUI
         void DrawSubdivisionPanel();
         void DrawRepairPanel();
         void DrawMeshQualityPanel();
+        void DrawParameterizationPanel();
         void DrawMeshSpectralPanel();
         void DrawGraphSpectralPanel();
     };

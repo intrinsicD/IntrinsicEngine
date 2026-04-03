@@ -50,6 +50,9 @@ void GeometryWorkflowController::OpenAlgorithmPanel(GeometryProcessingAlgorithm 
     case GeometryProcessingAlgorithm::Repair:
         OpenRepairPanel();
         break;
+    case GeometryProcessingAlgorithm::Parameterization:
+        OpenParameterizationPanel();
+        break;
     case GeometryProcessingAlgorithm::KMeans:
     default:
         OpenWorkflowPanel();
@@ -146,6 +149,12 @@ void GeometryWorkflowController::OpenMeshQualityPanel()
     Interface::GUI::OpenPanel("Geometry - Mesh Quality");
 }
 
+void GeometryWorkflowController::OpenParameterizationPanel()
+{
+    Interface::GUI::RegisterPanel("Geometry - Parameterization", [this]() { DrawParameterizationPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Parameterization");
+}
+
 void GeometryWorkflowController::OpenMeshSpectralPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Mesh Spectral", [this]() { DrawMeshSpectralPanel(); });
@@ -169,6 +178,7 @@ void GeometryWorkflowController::OpenWorkflowStack()
     OpenSubdivisionPanel();
     OpenRepairPanel();
     OpenMeshQualityPanel();
+    OpenParameterizationPanel();
 }
 
 // --- Menu ---
@@ -245,6 +255,13 @@ void GeometryWorkflowController::DrawMenu()
     {
         if (ImGui::MenuItem("Mesh Quality"))
             OpenMeshQualityPanel();
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Parameterization"))
+    {
+        if (ImGui::MenuItem("LSCM"))
+            OpenParameterizationPanel();
         ImGui::EndMenu();
     }
 
@@ -383,6 +400,18 @@ void GeometryWorkflowController::DrawMeshQualityPanel()
                                 "Compute aggregate mesh quality diagnostics and per-metric histograms for angle, aspect ratio, edge length, valence, and area."))
     {
         static_cast<void>(DrawMeshQualityWidget(*m_Engine, context.Selected, m_MeshQualityUi));
+    }
+}
+
+void GeometryWorkflowController::DrawParameterizationPanel()
+{
+    const auto context = GetSelectionContext();
+    if (DrawOperatorPanelHeader(context,
+                                "Compute UV coordinates using Least Squares Conformal Maps (LSCM). "
+                                "Requires a triangle mesh with disk topology (exactly one boundary loop). "
+                                "Two boundary vertices are pinned to fix translation, rotation, and scale."))
+    {
+        static_cast<void>(DrawParameterizationWidget(*m_Engine, context.Selected, m_ParameterizationUi));
     }
 }
 

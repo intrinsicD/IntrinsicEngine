@@ -102,6 +102,7 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::ConvexHull: return "Convex Hull";
         case GeometryProcessingAlgorithm::SurfaceReconstruction: return "Surface Reconstruction";
         case GeometryProcessingAlgorithm::VectorHeat: return "Vector Heat Method";
+        case GeometryProcessingAlgorithm::Parameterization: return "Parameterization";
         default: return "Unknown";
         }
     }
@@ -172,6 +173,9 @@ namespace Runtime::EditorUI
             return GeometryProcessingDomain::PointCloudPoints;
         case GeometryProcessingAlgorithm::VectorHeat:
             return GeometryProcessingDomain::MeshVertices;
+        case GeometryProcessingAlgorithm::Parameterization:
+            return GeometryProcessingDomain::MeshVertices
+                | GeometryProcessingDomain::MeshFaces;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -188,11 +192,12 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
-        static constexpr std::array<GeometryProcessingAlgorithm, 11> kAlgorithmOrder = {
+        static constexpr std::array<GeometryProcessingAlgorithm, 12> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
             GeometryProcessingAlgorithm::NormalEstimation,
             GeometryProcessingAlgorithm::ShortestPath,
             GeometryProcessingAlgorithm::VectorHeat,
+            GeometryProcessingAlgorithm::Parameterization,
             GeometryProcessingAlgorithm::ConvexHull,
             GeometryProcessingAlgorithm::SurfaceReconstruction,
             GeometryProcessingAlgorithm::Remeshing,

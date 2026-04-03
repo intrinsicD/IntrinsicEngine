@@ -132,7 +132,7 @@ The editor UI foundation is in place: programmatic default dock layout (Hierarch
 
 Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Feature Wiring):
 
-- **Wire remaining geometry operators** (LSCM, CSG) — `TODO.md` F1. (Shortest Path, Mesh Quality, Normal Estimation, Geodesic Distance, K-Means, Mesh Analysis, Remeshing, Simplification, Smoothing, Subdivision, Repair, Benchmark Runner, Convex Hull, Surface Reconstruction, and Vector Heat Method are already wired.)
+- **Wire remaining geometry operators** (CSG) — `TODO.md` F1. (Shortest Path, Mesh Quality, Normal Estimation, Geodesic Distance, K-Means, Mesh Analysis, Remeshing, Simplification, Smoothing, Subdivision, Repair, Benchmark Runner, Convex Hull, Surface Reconstruction, Vector Heat Method, and LSCM Parameterization are already wired.)
 - **Rendering controls** — `TODO.md` F2. (Light environment serialization, camera property editor, global render mode override, and lighting path selector are complete.)
 - **Undo/redo integration** (CommandHistory wired to gizmo, inspector, operators) — `TODO.md` F3. (CommandHistory, Edit menu shortcuts, transform gizmo commands, inspector property commands, and stack depth indicators are complete. Remaining: entity creation/deletion and geometry operator undo.)
 - **Hierarchy refinements** (drag-and-drop reparenting, multi-select, expand/collapse all) — `TODO.md` F4.
