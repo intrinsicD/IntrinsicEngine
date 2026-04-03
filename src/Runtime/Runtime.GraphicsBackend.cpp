@@ -150,6 +150,12 @@ namespace Runtime
 
         // 3. Device
         m_Impl->Device = std::make_shared<RHI::VulkanDevice>(*m_Impl->Context, m_Impl->Surface);
+        if (!m_Impl->Device || !m_Impl->Device->IsValid() ||
+            m_Impl->Device->GetLogicalDevice() == VK_NULL_HANDLE)
+        {
+            Core::Log::Error("FATAL: Failed to initialize Vulkan device for app '{}'.", config.AppName);
+            std::exit(-1);
+        }
 
 #ifdef INTRINSIC_HAS_CUDA
         if (auto cudaDevice = RHI::CudaDevice::Create(); cudaDevice)
@@ -191,7 +197,7 @@ namespace Runtime
             return;
         }
 
-        if (m_Impl->Device)
+        if (m_Impl->Device && m_Impl->Device->GetLogicalDevice() != VK_NULL_HANDLE)
         {
             vkDeviceWaitIdle(m_Impl->Device->GetLogicalDevice());
         }
