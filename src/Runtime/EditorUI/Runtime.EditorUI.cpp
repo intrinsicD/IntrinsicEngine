@@ -231,6 +231,9 @@ namespace Runtime::EditorUI
         char SavePath[512] = "";
         char SaveAsPath[512] = "scene.json";
         char LoadPath[512] = "scene.json";
+        char BenchmarkOutputPath[512] = "benchmark.json";
+        int BenchmarkFrameCount = 300;
+        int BenchmarkWarmupFrames = 30;
 
         // Feature browser
         int FeatureCategory = 0;
@@ -542,6 +545,94 @@ namespace Runtime::EditorUI
         }, true, 0, false);
     }
 
+    static void RegisterBenchmarkPanel(Runtime::Engine& engine)
+    {
+        const Runtime::EngineConfig& cfg = engine.GetEngineConfig();
+        s_PanelState.BenchmarkFrameCount = static_cast<int>(std::max(1u, cfg.BenchmarkFrames));
+        s_PanelState.BenchmarkWarmupFrames = static_cast<int>(cfg.BenchmarkWarmupFrames);
+        std::snprintf(s_PanelState.BenchmarkOutputPath,
+                      sizeof(s_PanelState.BenchmarkOutputPath),
+                      "%s",
+                      cfg.BenchmarkOutputPath.c_str());
+
+        Interface::GUI::RegisterPanel("Benchmark", [&engine]()
+        {
+            auto& runner = engine.GetBenchmarkRunner();
+
+            ImGui::TextDisabled("Capture telemetry stats to JSON.");
+            ImGui::Separator();
+
+            ImGui::InputInt("Frame Count", &s_PanelState.BenchmarkFrameCount);
+            ImGui::InputInt("Warmup Frames", &s_PanelState.BenchmarkWarmupFrames);
+            ImGui::InputText("Output Path",
+                             s_PanelState.BenchmarkOutputPath,
+                             sizeof(s_PanelState.BenchmarkOutputPath));
+
+            s_PanelState.BenchmarkFrameCount = std::max(1, s_PanelState.BenchmarkFrameCount);
+            s_PanelState.BenchmarkWarmupFrames = std::max(0, s_PanelState.BenchmarkWarmupFrames);
+
+            if (ImGui::Button("Run Benchmark"))
+            {
+                Core::Benchmark::BenchmarkConfig runCfg{};
+                runCfg.FrameCount = static_cast<uint32_t>(s_PanelState.BenchmarkFrameCount);
+                runCfg.WarmupFrames = static_cast<uint32_t>(s_PanelState.BenchmarkWarmupFrames);
+                runCfg.OutputPath = s_PanelState.BenchmarkOutputPath;
+                runner.Configure(runCfg);
+                runner.Start();
+                Core::Log::Info("Benchmark panel: started run (frames={}, warmup={}, output='{}').",
+                                runCfg.FrameCount,
+                                runCfg.WarmupFrames,
+                                runCfg.OutputPath);
+            }
+
+            ImGui::SameLine();
+            ImGui::TextUnformatted(runner.IsRunning() ? "Status: Running" : "Status: Idle");
+            ImGui::Text("Recorded Frames: %u", runner.FramesRecorded());
+            ImGui::Text("Warmup: %s", runner.IsWarmingUp() ? "Yes" : "No");
+
+            if (!runner.IsRunning() && runner.FramesRecorded() > 0)
+            {
+                const auto stats = runner.ComputeStats();
+                ImGui::SeparatorText("Summary");
+                ImGui::Text("Frames: %u", stats.TotalFrames);
+                ImGui::Text("Avg / Min / Max (ms): %.3f / %.3f / %.3f",
+                            stats.AvgFrameTimeMs,
+                            stats.MinFrameTimeMs,
+                            stats.MaxFrameTimeMs);
+                ImGui::Text("p95 / p99 (ms): %.3f / %.3f", stats.P95FrameTimeMs, stats.P99FrameTimeMs);
+                ImGui::Text("Avg CPU / GPU (ms): %.3f / %.3f", stats.AvgCpuTimeMs, stats.AvgGpuTimeMs);
+                ImGui::Text("Avg FPS: %.2f", stats.AvgFPS);
+
+                if (ImGui::CollapsingHeader("Per-Pass Averages", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    if (ImGui::BeginTable("##benchmark_passes", 3,
+                                          ImGuiTableFlags_Borders |
+                                              ImGuiTableFlags_RowBg |
+                                              ImGuiTableFlags_Resizable |
+                                              ImGuiTableFlags_SizingStretchSame))
+                    {
+                        ImGui::TableSetupColumn("Pass");
+                        ImGui::TableSetupColumn("GPU (ms)");
+                        ImGui::TableSetupColumn("CPU (ms)");
+                        ImGui::TableHeadersRow();
+
+                        for (const auto& pass : stats.PassAverages)
+                        {
+                            ImGui::TableNextRow();
+                            ImGui::TableSetColumnIndex(0);
+                            ImGui::TextUnformatted(pass.Name.c_str());
+                            ImGui::TableSetColumnIndex(1);
+                            ImGui::Text("%.3f", pass.AvgGpuMs);
+                            ImGui::TableSetColumnIndex(2);
+                            ImGui::Text("%.3f", pass.AvgCpuMs);
+                        }
+                        ImGui::EndTable();
+                    }
+                }
+            }
+        }, true, 0, false);
+    }
+
     static void RegisterSceneFileMenu(Runtime::Engine& engine)
     {
         Interface::GUI::RegisterMainMenuBar("File", [&engine]
@@ -680,6 +771,7 @@ namespace Runtime::EditorUI
         RegisterFeatureBrowserPanel(engine);
         RegisterFrameGraphInspectorPanel(engine);
         RegisterSelectionPanel(engine);
+        RegisterBenchmarkPanel(engine);
         RegisterSceneFileMenu(engine);
     }
 

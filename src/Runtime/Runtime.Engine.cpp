@@ -522,14 +522,16 @@ namespace Runtime
                 // captured by the maintenance lane via CaptureFrameTelemetry).
                 Core::Telemetry::TelemetrySystem::Get().EndFrame();
 
-                // Benchmark mode: record frame and exit when complete.
-                if (m_EngineConfig.BenchmarkMode)
+                // Benchmark capture: supports both CLI benchmark mode and
+                // interactive editor-triggered runs.
+                if (m_BenchmarkRunner.IsRunning())
                 {
                     m_BenchmarkRunner.RecordFrame(Core::Telemetry::TelemetrySystem::Get());
                     if (m_BenchmarkRunner.IsComplete())
                     {
                         m_BenchmarkRunner.Finalize();
-                        m_Running = false;
+                        if (m_EngineConfig.BenchmarkMode)
+                            m_Running = false;
                     }
                 }
             }

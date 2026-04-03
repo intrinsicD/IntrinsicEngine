@@ -165,6 +165,9 @@ export namespace Runtime
         [[nodiscard]] Core::IO::IIOBackend& GetIOBackend() { return *m_IOBackend; }
         [[nodiscard]] const Graphics::IORegistry& GetIORegistry() const { return m_IORegistry; }
         [[nodiscard]] Graphics::IORegistry& GetIORegistry() { return m_IORegistry; }
+        [[nodiscard]] Core::Benchmark::BenchmarkRunner& GetBenchmarkRunner() { return m_BenchmarkRunner; }
+        [[nodiscard]] const Core::Benchmark::BenchmarkRunner& GetBenchmarkRunner() const { return m_BenchmarkRunner; }
+        [[nodiscard]] const EngineConfig& GetEngineConfig() const { return m_EngineConfig; }
 
 
     protected:
