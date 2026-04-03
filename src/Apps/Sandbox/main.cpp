@@ -32,6 +32,7 @@ import Runtime.Selection;
 import Runtime.EditorUI;
 
 import Core.Logging;
+import Core.Commands;
 import Core.Filesystem;
 import Core.Assets;
 import Core.FrameGraph;
@@ -134,6 +135,9 @@ public:
         auto& sceneManager = GetSceneManager();
         auto& scene = sceneManager.GetScene();
         auto& registry = scene.GetRegistry();
+
+        if (auto completed = m_Gizmo.ConsumeCompletedInteraction(); completed && !completed->Changes.empty())
+            CommitGizmoCommand(registry, std::move(*completed));
 
         GetAssetPipeline().GetAssetManager().Update();
 
@@ -301,6 +305,45 @@ private:
     // =========================================================================
     // Asset loading helpers
     // =========================================================================
+    void CommitGizmoCommand(entt::registry& registry, Graphics::TransformGizmo::CompletedInteraction interaction)
+    {
+        auto toLabel = [](Graphics::GizmoMode mode) -> const char*
+        {
+            switch (mode)
+            {
+            case Graphics::GizmoMode::Translate: return "Move";
+            case Graphics::GizmoMode::Rotate: return "Rotate";
+            case Graphics::GizmoMode::Scale: return "Scale";
+            default: return "Transform";
+            }
+        };
+
+        Core::EditorCommand command{};
+        command.name = std::string(toLabel(interaction.Mode));
+        command.redo = [&registry, changes = interaction.Changes]()
+        {
+            for (const auto& change : changes)
+            {
+                if (!registry.valid(change.Entity))
+                    continue;
+                registry.emplace_or_replace<ECS::Components::Transform::Component>(change.Entity, change.After);
+                registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(change.Entity);
+            }
+        };
+        command.undo = [&registry, changes = std::move(interaction.Changes)]()
+        {
+            for (const auto& change : changes)
+            {
+                if (!registry.valid(change.Entity))
+                    continue;
+                registry.emplace_or_replace<ECS::Components::Transform::Component>(change.Entity, change.Before);
+                registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(change.Entity);
+            }
+        };
+
+        (void)GetCommandHistory().Execute(std::move(command));
+    }
+
     void LoadDuckAssets(GraphicsBackend& gfx)
     {
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
