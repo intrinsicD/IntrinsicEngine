@@ -248,6 +248,17 @@ void GeometryWorkflowController::DrawMenu()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Construction"))
+    {
+        ImGui::TextDisabled("Operators that produce new entities from selected geometry.");
+        ImGui::Separator();
+        if (ImGui::MenuItem("Convex Hull"))
+            Interface::GUI::OpenPanel("Inspector");
+        if (ImGui::MenuItem("Surface Reconstruction"))
+            Interface::GUI::OpenPanel("Inspector");
+        ImGui::EndMenu();
+    }
+
     ImGui::EndMenu();
 }
 

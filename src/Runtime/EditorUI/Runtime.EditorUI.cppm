@@ -90,6 +90,8 @@ export namespace Runtime::EditorUI
         Repair,
         NormalEstimation,
         ShortestPath,
+        ConvexHull,
+        SurfaceReconstruction,
     };
 
     struct GeometryProcessingCapabilities
@@ -320,6 +322,35 @@ export namespace Runtime::EditorUI
         double LastPathLength = 0.0;
     };
 
+    struct ConvexHullWidgetState
+    {
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        std::size_t InputPointCount = 0;
+        std::size_t HullVertexCount = 0;
+        std::size_t HullFaceCount = 0;
+        std::size_t HullEdgeCount = 0;
+        std::size_t InteriorPointCount = 0;
+    };
+
+    struct SurfaceReconstructionWidgetState
+    {
+        int Resolution = 64;
+        int KNeighbors = 1;
+        float BoundingBoxPadding = 0.1f;
+        bool EstimateNormals = true;
+        int NormalKNeighbors = 15;
+        float NormalAgreementPower = 2.0f;
+        float KernelSigmaScale = 2.0f;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        std::size_t OutputVertexCount = 0;
+        std::size_t OutputFaceCount = 0;
+        std::size_t GridNX = 0;
+        std::size_t GridNY = 0;
+        std::size_t GridNZ = 0;
+    };
+
     struct MeshAnalysisWidgetState
     {
         bool HasResults = false;
@@ -381,6 +412,12 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawMeshQualityWidget(Runtime::Engine& engine,
                                              entt::entity entity,
                                              MeshQualityWidgetState& state);
+    [[nodiscard]] bool DrawConvexHullWidget(Runtime::Engine& engine,
+                                            entt::entity entity,
+                                            ConvexHullWidgetState& state);
+    [[nodiscard]] bool DrawSurfaceReconstructionWidget(Runtime::Engine& engine,
+                                                       entt::entity entity,
+                                                       SurfaceReconstructionWidgetState& state);
 
     // =========================================================================
     // InspectorController — component property inspector panel
@@ -424,6 +461,8 @@ export namespace Runtime::EditorUI
         MeshAnalysisWidgetState m_MeshAnalysisUi{};
         NormalEstimationWidgetState m_NormalEstimationUi{};
         ShortestPathWidgetState m_ShortestPathUi{};
+        ConvexHullWidgetState m_ConvexHullUi{};
+        SurfaceReconstructionWidgetState m_SurfaceReconstructionUi{};
     };
 
     // =========================================================================

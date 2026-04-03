@@ -98,6 +98,8 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::Repair: return "Repair";
         case GeometryProcessingAlgorithm::NormalEstimation: return "Normal Estimation";
         case GeometryProcessingAlgorithm::ShortestPath: return "Shortest Path";
+        case GeometryProcessingAlgorithm::ConvexHull: return "Convex Hull";
+        case GeometryProcessingAlgorithm::SurfaceReconstruction: return "Surface Reconstruction";
         default: return "Unknown";
         }
     }
@@ -161,6 +163,11 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::ShortestPath:
             return GeometryProcessingDomain::MeshVertices
                 | GeometryProcessingDomain::GraphVertices;
+        case GeometryProcessingAlgorithm::ConvexHull:
+            return GeometryProcessingDomain::MeshVertices
+                | GeometryProcessingDomain::PointCloudPoints;
+        case GeometryProcessingAlgorithm::SurfaceReconstruction:
+            return GeometryProcessingDomain::PointCloudPoints;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -177,10 +184,12 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
-        static constexpr std::array<GeometryProcessingAlgorithm, 8> kAlgorithmOrder = {
+        static constexpr std::array<GeometryProcessingAlgorithm, 10> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
             GeometryProcessingAlgorithm::NormalEstimation,
             GeometryProcessingAlgorithm::ShortestPath,
+            GeometryProcessingAlgorithm::ConvexHull,
+            GeometryProcessingAlgorithm::SurfaceReconstruction,
             GeometryProcessingAlgorithm::Remeshing,
             GeometryProcessingAlgorithm::Simplification,
             GeometryProcessingAlgorithm::Smoothing,
