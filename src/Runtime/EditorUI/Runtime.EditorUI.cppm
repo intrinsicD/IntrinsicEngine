@@ -448,6 +448,7 @@ export namespace Runtime::EditorUI
         entt::entity* m_CachedSelected = nullptr;
         MeshSpectralWidgetState m_MeshSpectralUi{};
         GraphSpectralWidgetState m_GraphSpectralUi{};
+        MeshQualityWidgetState m_MeshQualityUi{};
         RemeshingWidgetState m_RemeshingUi{};
         SimplificationWidgetState m_SimplificationUi{};
         SmoothingWidgetState m_SmoothingUi{};

@@ -45,7 +45,11 @@ namespace Runtime
 
     namespace
     {
-        void CreateDefaultTexture(GraphicsBackend::Impl& impl)
+        // Helper: create the fallback white-pixel texture used for untextured
+        // surfaces.  Declared with a deduced parameter to avoid naming the
+        // private GraphicsBackend::Impl type, which Clang 20 modules enforce
+        // access control on even inside the implementation unit.
+        void CreateDefaultTexture(auto& impl)
         {
             const RHI::TextureHandle handle = impl.TextureManager->CreatePending(1, 1, VK_FORMAT_R8G8B8A8_SRGB);
             impl.DefaultTexture = std::make_shared<RHI::Texture>(*impl.TextureManager, *impl.Device, handle);
