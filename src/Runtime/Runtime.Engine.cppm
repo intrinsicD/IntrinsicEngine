@@ -1,5 +1,6 @@
 module;
 #include <memory>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <entt/entity/entity.hpp>
@@ -16,6 +17,7 @@ import Core.Assets;
 import Core.Memory;
 import Core.FeatureRegistry;
 import Core.IOBackend;
+import Core.Commands;
 import Core.Benchmark;
 import RHI.Buffer;
 #ifdef INTRINSIC_HAS_CUDA
@@ -39,6 +41,20 @@ import Runtime.RenderOrchestrator;
 
 export namespace Runtime
 {
+    enum class EngineConfigIssueSeverity : uint8_t
+    {
+        Warning = 0,
+        Error,
+    };
+
+    struct EngineConfigIssue
+    {
+        EngineConfigIssueSeverity Severity = EngineConfigIssueSeverity::Warning;
+        std::string Field;
+        std::string Message;
+        std::string Remediation;
+    };
+
     struct EngineConfig
     {
         std::string AppName = "Intrinsic App";
@@ -66,6 +82,15 @@ export namespace Runtime
         uint32_t BenchmarkWarmupFrames = 30;
         std::string BenchmarkOutputPath = "benchmark.json";
     };
+
+    struct EngineConfigValidationResult
+    {
+        EngineConfig Sanitized{};
+        std::vector<EngineConfigIssue> Issues{};
+        [[nodiscard]] bool HasErrors() const;
+    };
+
+    [[nodiscard]] EngineConfigValidationResult ValidateEngineConfig(const EngineConfig& config);
 
     class Engine
     {
@@ -165,6 +190,11 @@ export namespace Runtime
         [[nodiscard]] Core::IO::IIOBackend& GetIOBackend() { return *m_IOBackend; }
         [[nodiscard]] const Graphics::IORegistry& GetIORegistry() const { return m_IORegistry; }
         [[nodiscard]] Graphics::IORegistry& GetIORegistry() { return m_IORegistry; }
+        [[nodiscard]] Core::Benchmark::BenchmarkRunner& GetBenchmarkRunner() { return m_BenchmarkRunner; }
+        [[nodiscard]] const Core::Benchmark::BenchmarkRunner& GetBenchmarkRunner() const { return m_BenchmarkRunner; }
+        [[nodiscard]] Core::CommandHistory& GetCommandHistory() { return m_CommandHistory; }
+        [[nodiscard]] const Core::CommandHistory& GetCommandHistory() const { return m_CommandHistory; }
+        [[nodiscard]] const EngineConfig& GetEngineConfig() const { return m_EngineConfig; }
 
 
     protected:
@@ -173,6 +203,7 @@ export namespace Runtime
 
         // Benchmark runner (active when EngineConfig::BenchmarkMode is true).
         Core::Benchmark::BenchmarkRunner m_BenchmarkRunner;
+        Core::CommandHistory m_CommandHistory;
 
     private:
         EngineConfig m_EngineConfig;

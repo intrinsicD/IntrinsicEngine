@@ -302,31 +302,32 @@ Pick-request, debug-view, and GPU-scene state are resolved during `RenderOrchest
 
 ## Build & Test Workflow
 
-The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 20+), and builds the **library targets only** — not test executables. This keeps session setup fast.
+The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 20+), and builds the **library targets only** — not test executables. This keeps session setup fast. Run it at the start of every new session if the build directory does not exist.
 
 **Sanitizers:** ASan + UBSan are auto-detected at configure time. If `libclang_rt.asan` is not installed (common in containers), sanitizers are automatically disabled. No link failures. Override with `-DINTRINSIC_ENABLE_SANITIZERS=ON/OFF`.
 
 ### Targeted builds during development
 
-Always build only the targets you need. Never run a bare `ninja` or `cmake --build .` which rebuilds everything:
+Always build only the targets you need. Never run a bare `ninja` or `cmake --build .` which rebuilds everything. Use the CMake presets defined in `CMakePresets.json`:
 
 ```bash
-# Reconfigure (only needed after CMakeLists.txt changes):
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-      -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
+# Configure (only needed once or after CMakeLists.txt changes):
+cmake --preset dev
 
 # Build a specific library you touched:
-ninja -C build IntrinsicGeometry
+cmake --build --preset dev --target IntrinsicGeometry
 
 # Build and link the test executable:
-ninja -C build IntrinsicTests
+cmake --build --preset dev --target IntrinsicTests
 
 # Run only the tests matching your work (fast — skips unrelated tests):
-./build/bin/IntrinsicTests --gtest_filter="DEC_*"
+./build/dev/bin/IntrinsicTests --gtest_filter="DEC_*"
 
 # Run the full test suite when ready:
-./build/bin/IntrinsicTests
+./build/dev/bin/IntrinsicTests
 ```
+
+For CUDA-enabled builds, substitute `dev-cuda` for `dev` in the commands above.
 
 ### Test targets
 
@@ -339,10 +340,24 @@ ninja -C build IntrinsicTests
 
 ### Key principles
 
+- **Build after every file edit.** C++23 modules require explicit imports — transitive visibility rules differ from header-based builds. Build the touched target after every module interface or implementation change **before moving to the next file**. This catches missing imports immediately instead of accumulating errors across multiple files.
 - **Build incrementally.** Ninja tracks file dependencies — after editing one `.cppm`/`.cpp`, only the affected targets recompile.
 - **Filter tests.** Use `--gtest_filter=` to run only the tests relevant to your change. Don't run the full suite on every iteration.
 - **Build the Sandbox target.** The `Sandbox` vtable link failure from Clang 18 (§4.4 in TODO.md) is resolved with Clang 20.
 - **Keep building through the session.** Long compile times are expected for C++23 modules on first build (~2-5 min). Incremental rebuilds after editing a single file are fast (~5-15s). Do not abandon a session because a build takes time — use `--parallel $(nproc)` and wait.
+- **No `EXPECT_NO_THROW`.** The project builds with `-fno-exceptions`. Use direct result checking in tests instead of exception-based assertions.
+
+### Common Agent Errors to Avoid
+
+These are the most frequent errors observed in recent agent-authored commits, ranked by frequency. Internalize these before writing code:
+
+1. **Missing module imports.** When referencing any type, function, or constant from another module, verify the `import` statement exists. C++23 modules have no implicit inclusion — every dependency must be explicitly imported. Build after each file edit to catch this immediately.
+
+2. **Incomplete struct/component updates.** When adding a new field to a data struct, grep for all construction sites (designated initializers, aggregate init) and update them. When adding a feature that needs per-entity state, audit **all** lifecycle hooks (`on_destroy`, sync systems, extraction) for completeness — not just the primary code path.
+
+3. **Incomplete GPU resource cleanup.** `on_destroy` hooks must release **all** owned GPU resources: both GPUScene slots (`GPUScene::Free()`) **and** geometry pool handles (`GeometryPool::Remove()`). Forgetting geometry pool handles causes progressive GPU memory leaks proportional to scene churn.
+
+4. **Clang 20 module access control.** Anonymous-namespace helpers in `.cpp` implementation units cannot name a class's private `Impl` type directly — Clang 20 enforces access control even inside the owning TU. Use `auto&` parameter deduction instead. Also: do not forward-declare types that are already visible from an imported module — Clang 20 rejects the redeclaration.
 
 ## Architecture & Markdown Sync Contract
 
@@ -355,9 +370,10 @@ When architecture state changes, keep the architecture markdown documents synchr
 For any implementation/configuration change that affects developer workflow, also update user-facing markdown docs in the same PR (at minimum **`README.md`**, and **`CLAUDE.md`** when agent behavior/contracts change).
 
 Do not leave markdown drift:
-- If a TODO is completed, remove it from `TODO.md` and capture any roadmap ordering impact in `ROADMAP.md` when relevant (completion details remain in git history).
-- If build/configure flags or commands change, update README examples immediately.
+- If a TODO is completed, remove it from `TODO.md` **and** check `ROADMAP.md` for stale references to that item (completion details remain in git history).
+- If build/configure flags or commands change, update both `README.md` and `CLAUDE.md` build examples immediately.
 - If coding/review contracts change, update `CLAUDE.md` in the same commit series.
+- If a feature listed as "unwired" or "remaining" in `ROADMAP.md` is implemented, update the ROADMAP entry in the same PR.
 
 `TODO.md` active-only policy is enforced automatically in CI by `tools/check_todo_active_only.sh`.
 

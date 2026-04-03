@@ -200,6 +200,7 @@ namespace
     {
         collision.LocalVertexLookupPoints.clear();
         collision.LocalVertexLookupIndices.clear();
+        collision.LocalVertexKdTree = {};
 
         if (collision.SourceMesh)
         {
@@ -292,9 +293,17 @@ namespace
         Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices,
                                               newNormals);
 
-        auto aabbs = Geometry::ToAABB(collider->CollisionRef->Positions);
-        collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
+        if (!collider->CollisionRef->Positions.empty())
+        {
+            auto aabbs = Geometry::ToAABB(collider->CollisionRef->Positions);
+            collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
+        }
+        else
+        {
+            collider->CollisionRef->LocalAABB = Geometry::AABB{};
+        }
 
+        collider->CollisionRef->LocalOctree = Geometry::Octree{};
         std::vector<Geometry::AABB> primitiveBounds;
         primitiveBounds.reserve(collider->CollisionRef->Indices.size() / 3);
         for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
@@ -302,6 +311,12 @@ namespace
             const uint32_t i0 = collider->CollisionRef->Indices[i];
             const uint32_t i1 = collider->CollisionRef->Indices[i + 1];
             const uint32_t i2 = collider->CollisionRef->Indices[i + 2];
+            if (i0 >= collider->CollisionRef->Positions.size()
+                || i1 >= collider->CollisionRef->Positions.size()
+                || i2 >= collider->CollisionRef->Positions.size())
+            {
+                continue;
+            }
             auto aabb = Geometry::AABB{
                 collider->CollisionRef->Positions[i0], collider->CollisionRef->Positions[i0]
             };
@@ -309,8 +324,11 @@ namespace
             aabb = Geometry::Union(aabb, collider->CollisionRef->Positions[i2]);
             primitiveBounds.push_back(aabb);
         }
-        static_cast<void>(collider->CollisionRef->LocalOctree.Build(
-            primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+        if (!primitiveBounds.empty())
+        {
+            static_cast<void>(collider->CollisionRef->LocalOctree.Build(
+                primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+        }
         RebuildCollisionVertexLookup(*collider->CollisionRef);
 
         Graphics::GeometryUploadRequest uploadReq;
@@ -2034,8 +2052,25 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
         selectedVertices.emplace_back(static_cast<Geometry::PropertyIndex>(index));
 
     ImGui::Text("Selected vertices: %zu", selectedVertices.size());
-    if (selectedVertices.size() < 2)
-        ImGui::TextDisabled("Pick at least two vertices (first=source, remaining=targets).");
+    if (selectedVertices.empty())
+    {
+        ImGui::TextDisabled("Pick at least one source vertex.");
+    }
+    else
+    {
+        state.SourceCount = std::clamp(state.SourceCount, 1, static_cast<int>(selectedVertices.size()));
+        ImGui::SliderInt("Source vertices (prefix count)",
+                         &state.SourceCount,
+                         1,
+                         static_cast<int>(selectedVertices.size()));
+
+        const std::size_t sourceCount = static_cast<std::size_t>(std::max(1, state.SourceCount));
+        const std::size_t targetCount = selectedVertices.size() > sourceCount
+            ? (selectedVertices.size() - sourceCount)
+            : 0;
+        ImGui::TextDisabled("Sources: first %zu selected vertices", sourceCount);
+        ImGui::TextDisabled("Targets: %zu (%s)", targetCount, targetCount == 0 ? "optional full tree" : "explicit");
+    }
 
     ImGui::Checkbox("Stop when all targets settled", &state.StopWhenAllTargetsSettled);
     ImGui::SliderInt("Max settled vertices (0 = auto)", &state.MaxSettledVertices, 0, 200000);
@@ -2050,11 +2085,15 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
         ImGui::Text("Reached goals: %zu", state.LastReachedGoalCount);
         ImGui::Text("Converged: %s", state.LastConverged ? "Yes" : "No");
         ImGui::Text("Early terminated: %s", state.LastEarlyTerminated ? "Yes" : "No");
+        if (state.LastPathLengthValid)
+            ImGui::Text("Path length: %.6f", state.LastPathLength);
+        else
+            ImGui::TextDisabled("Path length: n/a (no reachable explicit target)");
     }
 
     bool changed = false;
 
-    const bool canRun = selectedVertices.size() >= 2;
+    const bool canRun = !selectedVertices.empty();
     if (!canRun)
         ImGui::BeginDisabled();
     const bool runRequested = ImGui::Button("Compute Shortest Path");
@@ -2063,8 +2102,11 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
 
     if (runRequested && canRun)
     {
-        const std::span<const Geometry::VertexHandle> sources(selectedVertices.data(), 1);
-        const std::span<const Geometry::VertexHandle> targets(selectedVertices.data() + 1, selectedVertices.size() - 1);
+        const std::size_t sourceCount = static_cast<std::size_t>(std::max(1, std::min(state.SourceCount,
+            static_cast<int>(selectedVertices.size()))));
+        const std::span<const Geometry::VertexHandle> sources(selectedVertices.data(), sourceCount);
+        const std::span<const Geometry::VertexHandle> targets(selectedVertices.data() + sourceCount,
+                                                              selectedVertices.size() - sourceCount);
 
         Geometry::ShortestPath::DijkstraParams params{};
         params.StopWhenAllTargetsSettled = state.StopWhenAllTargetsSettled;
@@ -2093,23 +2135,60 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
             state.LastConverged = result->Converged;
             state.LastEarlyTerminated = result->EarlyTerminated;
             state.LastExtractFailed = false;
+            state.LastPathLengthValid = false;
+            state.LastPathLength = 0.0;
+
+            if (!targets.empty())
+            {
+                double minDistance = std::numeric_limits<double>::infinity();
+                for (const auto target : targets)
+                {
+                    const auto distance = result->Distances[target];
+                    if (std::isfinite(distance) && distance < minDistance)
+                        minDistance = distance;
+                }
+
+                if (std::isfinite(minDistance))
+                {
+                    state.LastPathLengthValid = true;
+                    state.LastPathLength = minDistance;
+                }
+            }
+
+            if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity); meshData && meshData->MeshRef)
+            {
+                meshData->AttributesDirty = true;
+                meshData->Visualization.VertexColors.PropertyName = "v:shortest_path_distance";
+                reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+            }
+            if (auto* graphData = reg.try_get<ECS::Graph::Data>(entity); graphData && graphData->GraphRef)
+            {
+                graphData->GpuDirty = true;
+                graphData->Visualization.VertexColors.PropertyName = "v:shortest_path_distance";
+                reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+            }
+
             changed = true;
-            Core::Log::Info("ShortestPath: settled={} relaxed={} reached={}",
+            Core::Log::Info("ShortestPath: settled={} relaxed={} reached={} pathLength={}",
                             result->SettledVertexCount,
                             result->RelaxedEdgeCount,
-                            result->ReachedGoalCount);
+                            result->ReachedGoalCount,
+                            state.LastPathLengthValid ? state.LastPathLength : -1.0);
         }
     }
 
     if (state.HasResults)
     {
-        const bool canExtract = selectedVertices.size() >= 2;
+        const bool canExtract = !selectedVertices.empty();
         if (!canExtract)
             ImGui::BeginDisabled();
         if (ImGui::Button("Extract Path Graph"))
         {
-            const std::span<const Geometry::VertexHandle> sources(selectedVertices.data(), 1);
-            const std::span<const Geometry::VertexHandle> targets(selectedVertices.data() + 1, selectedVertices.size() - 1);
+            const std::size_t sourceCount = static_cast<std::size_t>(std::max(1, std::min(state.SourceCount,
+                static_cast<int>(selectedVertices.size()))));
+            const std::span<const Geometry::VertexHandle> sources(selectedVertices.data(), sourceCount);
+            const std::span<const Geometry::VertexHandle> targets(selectedVertices.data() + sourceCount,
+                                                                  selectedVertices.size() - sourceCount);
 
             Geometry::ShortestPath::DijkstraParams params{};
             params.StopWhenAllTargetsSettled = state.StopWhenAllTargetsSettled;

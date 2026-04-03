@@ -13,8 +13,12 @@
 #include <memory>
 #include <filesystem>
 #include <algorithm>
+#include <charconv>
 #include <cmath>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
@@ -28,6 +32,7 @@ import Runtime.Selection;
 import Runtime.EditorUI;
 
 import Core.Logging;
+import Core.Commands;
 import Core.Filesystem;
 import Core.Assets;
 import Core.FrameGraph;
@@ -45,6 +50,7 @@ import Graphics.Passes.SelectionOutline;
 import Graphics.Passes.SelectionOutlineSettings;
 import Graphics.Passes.PostProcessSettings;
 import Graphics.Pipelines;
+import Graphics.RenderDriver;
 import Graphics.RenderPipeline;
 import Graphics.TextureLoader;
 import Graphics.TransformGizmo;
@@ -129,6 +135,9 @@ public:
         auto& sceneManager = GetSceneManager();
         auto& scene = sceneManager.GetScene();
         auto& registry = scene.GetRegistry();
+
+        if (auto completed = m_Gizmo.ConsumeCompletedInteraction(); completed && !completed->Changes.empty())
+            CommitGizmoCommand(registry, std::move(*completed));
 
         GetAssetPipeline().GetAssetManager().Update();
 
@@ -296,6 +305,45 @@ private:
     // =========================================================================
     // Asset loading helpers
     // =========================================================================
+    void CommitGizmoCommand(entt::registry& registry, Graphics::TransformGizmo::CompletedInteraction interaction)
+    {
+        auto toLabel = [](Graphics::GizmoMode mode) -> const char*
+        {
+            switch (mode)
+            {
+            case Graphics::GizmoMode::Translate: return "Move";
+            case Graphics::GizmoMode::Rotate: return "Rotate";
+            case Graphics::GizmoMode::Scale: return "Scale";
+            default: return "Transform";
+            }
+        };
+
+        Core::EditorCommand command{};
+        command.name = std::string(toLabel(interaction.Mode));
+        command.redo = [&registry, changes = interaction.Changes]()
+        {
+            for (const auto& change : changes)
+            {
+                if (!registry.valid(change.Entity))
+                    continue;
+                registry.emplace_or_replace<ECS::Components::Transform::Component>(change.Entity, change.After);
+                registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(change.Entity);
+            }
+        };
+        command.undo = [&registry, changes = std::move(interaction.Changes)]()
+        {
+            for (const auto& change : changes)
+            {
+                if (!registry.valid(change.Entity))
+                    continue;
+                registry.emplace_or_replace<ECS::Components::Transform::Component>(change.Entity, change.Before);
+                registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(change.Entity);
+            }
+        };
+
+        (void)GetCommandHistory().Execute(std::move(command));
+    }
+
     void LoadDuckAssets(GraphicsBackend& gfx)
     {
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
@@ -597,6 +645,13 @@ private:
                     const bool deferred = GetFeatureRegistry().IsEnabled("DeferredLighting"_id);
                     ImGui::Text("Lighting: %s", deferred ? "Deferred" : "Forward");
                 }
+                VerticalSeparator();
+
+                // Undo/redo depth
+                {
+                    const Core::CommandHistory& history = GetCommandHistory();
+                    ImGui::Text("Undo: %zu  Redo: %zu", history.UndoCount(), history.RedoCount());
+                }
             }
             ImGui::End();
             ImGui::PopStyleVar();
@@ -719,6 +774,29 @@ private:
                     ImGui::Text("Forward: (%.3f, %.3f, %.3f)", forward.x, forward.y, forward.z);
                 }
             }
+        }
+
+        // --- Rendering ---
+        {
+            auto& renderDriver = GetRenderOrchestrator().GetRenderDriver();
+            ImGui::SeparatorText("Rendering");
+
+            constexpr const char* renderModes[] = {
+                "None",
+                "Shaded",
+                "Wireframe",
+                "Wireframe + Shaded",
+                "Points",
+                "Flat"
+            };
+
+            int renderMode = static_cast<int>(renderDriver.GetGlobalRenderModeOverride());
+            if (ImGui::Combo("Render Mode Override", &renderMode, renderModes, IM_ARRAYSIZE(renderModes)))
+            {
+                renderDriver.SetGlobalRenderModeOverride(
+                    static_cast<Graphics::GlobalRenderModeOverride>(renderMode));
+            }
+            Interface::GUI::ItemTooltip("Viewport-wide rendering override. None keeps per-entity Surface/Line/Point visibility. Flat currently maps to the shaded surface path.");
         }
 
         // --- Lighting ---
@@ -1329,6 +1407,55 @@ private:
 // =============================================================================
 int main(int argc, char* argv[])
 {
+    const auto printUsage = []()
+    {
+        Log::Info("Sandbox CLI options:");
+        Log::Info("  --benchmark <frames>      Run benchmark mode for N frames.");
+        Log::Info("  --warmup <frames>         Benchmark warmup frame count.");
+        Log::Info("  --out <path>              Benchmark output JSON path.");
+        Log::Info("  --fixed-hz <hz>           Fixed simulation rate (e.g. 60, 120).");
+        Log::Info("  --max-frame-dt <sec>      Clamp frame delta in seconds.");
+        Log::Info("  --max-substeps <count>    Maximum fixed ticks per frame.");
+        Log::Info("  --max-active-fps <fps>    Active FPS cap (0 = VSync only).");
+        Log::Info("  --idle-fps <fps>          Idle FPS cap.");
+        Log::Info("  --idle-timeout <sec>      Seconds before idle throttling.");
+        Log::Info("  --no-idle-throttle        Disable activity-aware idle pacing.");
+        Log::Info("  --help                    Print this help.");
+    };
+
+    const auto parseUInt = [](std::string_view text) -> std::optional<uint32_t>
+    {
+        uint32_t value = 0;
+        const auto* first = text.data();
+        const auto* last = first + text.size();
+        const auto [ptr, ec] = std::from_chars(first, last, value);
+        if (ec != std::errc{} || ptr != last)
+            return std::nullopt;
+        return value;
+    };
+
+    const auto parseInt = [](std::string_view text) -> std::optional<int>
+    {
+        int value = 0;
+        const auto* first = text.data();
+        const auto* last = first + text.size();
+        const auto [ptr, ec] = std::from_chars(first, last, value);
+        if (ec != std::errc{} || ptr != last)
+            return std::nullopt;
+        return value;
+    };
+
+    const auto parseDouble = [](std::string_view text) -> std::optional<double>
+    {
+        double value = 0.0;
+        const auto* first = text.data();
+        const auto* last = first + text.size();
+        const auto [ptr, ec] = std::from_chars(first, last, value);
+        if (ec != std::errc{} || ptr != last)
+            return std::nullopt;
+        return value;
+    };
+
     Runtime::EngineConfig config{};
     config.AppName = "Sandbox";
     config.Width = 1600;
@@ -1344,51 +1471,161 @@ int main(int argc, char* argv[])
 
     for (int i = 1; i < argc; ++i)
     {
-        const std::string arg = argv[i];
-        if (arg == "--benchmark" && i + 1 < argc)
+        const std::string_view arg = argv[i];
+        const auto requireValue = [&](std::string_view flag) -> std::optional<std::string_view>
+        {
+            if (i + 1 >= argc)
+            {
+                Log::Error("Missing value for {}", flag);
+                Log::Error("Fix: provide {} <value>.", flag);
+                return std::nullopt;
+            }
+            return std::string_view(argv[++i]);
+        };
+
+        if (arg == "--benchmark")
         {
             config.BenchmarkMode = true;
-            config.BenchmarkFrames = static_cast<uint32_t>(std::stoul(argv[++i]));
+            const auto value = requireValue("--benchmark");
+            if (!value) return 2;
+            const auto parsed = parseUInt(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid integer for --benchmark: '{}'", *value);
+                Log::Error("Fix: use a positive integer frame count, e.g. --benchmark 300.");
+                return 2;
+            }
+            config.BenchmarkFrames = *parsed;
         }
-        else if (arg == "--warmup" && i + 1 < argc)
+        else if (arg == "--warmup")
         {
-            config.BenchmarkWarmupFrames = static_cast<uint32_t>(std::stoul(argv[++i]));
+            const auto value = requireValue("--warmup");
+            if (!value) return 2;
+            const auto parsed = parseUInt(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid integer for --warmup: '{}'", *value);
+                Log::Error("Fix: use a non-negative integer frame count, e.g. --warmup 30.");
+                return 2;
+            }
+            config.BenchmarkWarmupFrames = *parsed;
         }
-        else if (arg == "--out" && i + 1 < argc)
+        else if (arg == "--out")
         {
-            config.BenchmarkOutputPath = argv[++i];
+            const auto value = requireValue("--out");
+            if (!value) return 2;
+            config.BenchmarkOutputPath = std::string(*value);
         }
-        else if (arg == "--fixed-hz" && i + 1 < argc)
+        else if (arg == "--fixed-hz")
         {
-            config.FixedStepHz = std::stod(argv[++i]);
+            const auto value = requireValue("--fixed-hz");
+            if (!value) return 2;
+            const auto parsed = parseDouble(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid floating-point value for --fixed-hz: '{}'", *value);
+                Log::Error("Fix: use a finite numeric value, e.g. --fixed-hz 60.");
+                return 2;
+            }
+            config.FixedStepHz = *parsed;
         }
-        else if (arg == "--max-frame-dt" && i + 1 < argc)
+        else if (arg == "--max-frame-dt")
         {
-            config.MaxFrameDeltaSeconds = std::stod(argv[++i]);
+            const auto value = requireValue("--max-frame-dt");
+            if (!value) return 2;
+            const auto parsed = parseDouble(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid floating-point value for --max-frame-dt: '{}'", *value);
+                Log::Error("Fix: use a positive value in seconds, e.g. --max-frame-dt 0.25.");
+                return 2;
+            }
+            config.MaxFrameDeltaSeconds = *parsed;
         }
-        else if (arg == "--max-substeps" && i + 1 < argc)
+        else if (arg == "--max-substeps")
         {
-            config.MaxSubstepsPerFrame = std::stoi(argv[++i]);
+            const auto value = requireValue("--max-substeps");
+            if (!value) return 2;
+            const auto parsed = parseInt(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid integer for --max-substeps: '{}'", *value);
+                Log::Error("Fix: use a positive integer, e.g. --max-substeps 8.");
+                return 2;
+            }
+            config.MaxSubstepsPerFrame = *parsed;
         }
-        else if (arg == "--max-active-fps" && i + 1 < argc)
+        else if (arg == "--max-active-fps")
         {
-            config.FramePacing.ActiveFps = std::stod(argv[++i]);
+            const auto value = requireValue("--max-active-fps");
+            if (!value) return 2;
+            const auto parsed = parseDouble(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid floating-point value for --max-active-fps: '{}'", *value);
+                Log::Error("Fix: use 0 or a positive value, e.g. --max-active-fps 144.");
+                return 2;
+            }
+            config.FramePacing.ActiveFps = *parsed;
         }
-        else if (arg == "--idle-fps" && i + 1 < argc)
+        else if (arg == "--idle-fps")
         {
-            config.FramePacing.IdleFps = std::stod(argv[++i]);
+            const auto value = requireValue("--idle-fps");
+            if (!value) return 2;
+            const auto parsed = parseDouble(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid floating-point value for --idle-fps: '{}'", *value);
+                Log::Error("Fix: use 0 or a positive value, e.g. --idle-fps 15.");
+                return 2;
+            }
+            config.FramePacing.IdleFps = *parsed;
         }
-        else if (arg == "--idle-timeout" && i + 1 < argc)
+        else if (arg == "--idle-timeout")
         {
-            config.FramePacing.IdleTimeoutSeconds = std::stod(argv[++i]);
+            const auto value = requireValue("--idle-timeout");
+            if (!value) return 2;
+            const auto parsed = parseDouble(*value);
+            if (!parsed)
+            {
+                Log::Error("Invalid floating-point value for --idle-timeout: '{}'", *value);
+                Log::Error("Fix: use a non-negative timeout in seconds, e.g. --idle-timeout 2.0.");
+                return 2;
+            }
+            config.FramePacing.IdleTimeoutSeconds = *parsed;
         }
         else if (arg == "--no-idle-throttle")
         {
             config.FramePacing.Enabled = false;
         }
+        else if (arg == "--help")
+        {
+            printUsage();
+            return 0;
+        }
+        else
+        {
+            Log::Error("Unknown CLI option '{}'.", arg);
+            printUsage();
+            return 2;
+        }
     }
 
-    SandboxApp app(config);
+    const Runtime::EngineConfigValidationResult configValidation = Runtime::ValidateEngineConfig(config);
+    if (configValidation.HasErrors())
+    {
+        for (const auto& issue : configValidation.Issues)
+        {
+            if (issue.Severity == Runtime::EngineConfigIssueSeverity::Error)
+            {
+                Log::Error("Invalid config [{}]: {} | Fix: {}", issue.Field, issue.Message, issue.Remediation);
+            }
+        }
+        Log::Error("Sandbox startup aborted due to invalid configuration.");
+        return 2;
+    }
+
+    SandboxApp app(configValidation.Sanitized);
     app.Run();
     return 0;
 }

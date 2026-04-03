@@ -1,4 +1,6 @@
 module;
+#include <algorithm>
+#include <cmath>
 #include <type_traits>
 #include <variant>
 #include <glm/glm.hpp>
@@ -47,19 +49,186 @@ namespace Runtime
         }
     }
 
+    bool EngineConfigValidationResult::HasErrors() const
+    {
+        for (const EngineConfigIssue& issue : Issues)
+        {
+            if (issue.Severity == EngineConfigIssueSeverity::Error)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    EngineConfigValidationResult ValidateEngineConfig(const EngineConfig& config)
+    {
+        EngineConfigValidationResult result{};
+        result.Sanitized = config;
+
+        if (result.Sanitized.AppName.empty())
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "AppName",
+                .Message = "Application name is empty.",
+                .Remediation = "Set EngineConfig::AppName to a non-empty value; using fallback 'Intrinsic App'.",
+            });
+            result.Sanitized.AppName = "Intrinsic App";
+        }
+
+        if (result.Sanitized.Width <= 0 || result.Sanitized.Height <= 0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Error,
+                .Field = "WindowSize",
+                .Message = "Window dimensions must be positive.",
+                .Remediation = "Use --width/--height values greater than zero (or set EngineConfig::Width/Height accordingly).",
+            });
+        }
+
+        constexpr size_t MinFrameArenaSizeBytes = 64u * 1024u;
+        if (result.Sanitized.FrameArenaSize < MinFrameArenaSizeBytes)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "FrameArenaSize",
+                .Message = "Frame arena size is below 64 KiB and may underflow frame allocations.",
+                .Remediation = "Increase EngineConfig::FrameArenaSize; using 1 MiB fallback.",
+            });
+            result.Sanitized.FrameArenaSize = 1024u * 1024u;
+        }
+
+        if (result.Sanitized.FrameContextCount == 0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Error,
+                .Field = "FrameContextCount",
+                .Message = "FrameContextCount must be at least 1.",
+                .Remediation = "Use 2 for default double-buffered frame contexts or 3 for high-throughput modes.",
+            });
+        }
+
+        if (!std::isfinite(result.Sanitized.FixedStepHz) || result.Sanitized.FixedStepHz <= 0.0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "FixedStepHz",
+                .Message = "Fixed-step rate is invalid.",
+                .Remediation = "Use a positive finite value; defaulting to 60 Hz.",
+            });
+            result.Sanitized.FixedStepHz = DefaultFixedStepHz;
+        }
+        if (!std::isfinite(result.Sanitized.MaxFrameDeltaSeconds) || result.Sanitized.MaxFrameDeltaSeconds <= 0.0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "MaxFrameDeltaSeconds",
+                .Message = "Max frame delta is invalid.",
+                .Remediation = "Use a positive finite value; defaulting to 0.25 s.",
+            });
+            result.Sanitized.MaxFrameDeltaSeconds = DefaultMaxFrameDeltaSeconds;
+        }
+        if (result.Sanitized.MaxSubstepsPerFrame <= 0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "MaxSubstepsPerFrame",
+                .Message = "Max substeps must be positive.",
+                .Remediation = "Use a value like 4, 8, or 16; defaulting to 8.",
+            });
+            result.Sanitized.MaxSubstepsPerFrame = DefaultMaxSubstepsPerFrame;
+        }
+
+        if (result.Sanitized.BenchmarkMode)
+        {
+            if (result.Sanitized.BenchmarkFrames == 0)
+            {
+                result.Issues.push_back({
+                    .Severity = EngineConfigIssueSeverity::Error,
+                    .Field = "BenchmarkFrames",
+                    .Message = "Benchmark mode is enabled but frame count is zero.",
+                    .Remediation = "Set --benchmark <frames> with frames > 0.",
+                });
+            }
+            if (result.Sanitized.BenchmarkOutputPath.empty())
+            {
+                result.Issues.push_back({
+                    .Severity = EngineConfigIssueSeverity::Error,
+                    .Field = "BenchmarkOutputPath",
+                    .Message = "Benchmark mode is enabled but output path is empty.",
+                    .Remediation = "Set --out <file> (for example --out benchmark.json).",
+                });
+            }
+        }
+
+        if (!std::isfinite(result.Sanitized.FramePacing.ActiveFps) || result.Sanitized.FramePacing.ActiveFps < 0.0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "FramePacing.ActiveFps",
+                .Message = "Active FPS cap is invalid.",
+                .Remediation = "Use 0 (VSync-only) or a positive finite value; defaulting to 60.",
+            });
+            result.Sanitized.FramePacing.ActiveFps = 60.0;
+        }
+        if (!std::isfinite(result.Sanitized.FramePacing.IdleFps) || result.Sanitized.FramePacing.IdleFps < 0.0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "FramePacing.IdleFps",
+                .Message = "Idle FPS cap is invalid.",
+                .Remediation = "Use 0 to disable idle cap or a positive finite value; defaulting to 15.",
+            });
+            result.Sanitized.FramePacing.IdleFps = 15.0;
+        }
+        if (!std::isfinite(result.Sanitized.FramePacing.IdleTimeoutSeconds) || result.Sanitized.FramePacing.IdleTimeoutSeconds < 0.0)
+        {
+            result.Issues.push_back({
+                .Severity = EngineConfigIssueSeverity::Warning,
+                .Field = "FramePacing.IdleTimeoutSeconds",
+                .Message = "Idle timeout is invalid.",
+                .Remediation = "Use a non-negative finite timeout in seconds; defaulting to 2.0.",
+            });
+            result.Sanitized.FramePacing.IdleTimeoutSeconds = 2.0;
+        }
+
+        return result;
+    }
+
     Engine::Engine(const EngineConfig& config)
         : m_EngineConfig(config)
     {
+        const EngineConfigValidationResult validation = ValidateEngineConfig(config);
+        m_EngineConfig = validation.Sanitized;
+        for (const EngineConfigIssue& issue : validation.Issues)
+        {
+            const char* severity = issue.Severity == EngineConfigIssueSeverity::Error ? "ERROR" : "WARN";
+            if (issue.Severity == EngineConfigIssueSeverity::Error)
+            {
+                Core::Log::Error("Engine config {} [{}]: {} | Fix: {}", severity, issue.Field, issue.Message, issue.Remediation);
+            }
+            else
+            {
+                Core::Log::Warn("Engine config {} [{}]: {} | Fix: {}", severity, issue.Field, issue.Message, issue.Remediation);
+            }
+        }
+        if (validation.HasErrors())
+        {
+            Core::Log::Error("Engine startup aborted: invalid EngineConfig. Fix the configuration and restart.");
+            std::exit(-1);
+        }
+
         // Configure benchmark runner if benchmark mode is enabled.
-        if (config.BenchmarkMode)
+        if (m_EngineConfig.BenchmarkMode)
         {
             Core::Benchmark::BenchmarkConfig benchCfg{};
-            benchCfg.FrameCount = config.BenchmarkFrames;
-            benchCfg.WarmupFrames = config.BenchmarkWarmupFrames;
-            benchCfg.OutputPath = config.BenchmarkOutputPath;
+            benchCfg.FrameCount = m_EngineConfig.BenchmarkFrames;
+            benchCfg.WarmupFrames = m_EngineConfig.BenchmarkWarmupFrames;
+            benchCfg.OutputPath = m_EngineConfig.BenchmarkOutputPath;
             m_BenchmarkRunner.Configure(benchCfg);
             Core::Log::Info("Benchmark mode enabled: {} frames + {} warmup -> {}",
-                            config.BenchmarkFrames, config.BenchmarkWarmupFrames, config.BenchmarkOutputPath);
+                            m_EngineConfig.BenchmarkFrames, m_EngineConfig.BenchmarkWarmupFrames, m_EngineConfig.BenchmarkOutputPath);
         }
         Core::Tasks::Scheduler::Initialize();
         Core::Filesystem::FileWatcher::Initialize();
@@ -102,12 +271,16 @@ namespace Runtime
         }
 
         // 2. Window
-        Core::Windowing::WindowProps props{config.AppName, config.Width, config.Height};
+        Core::Windowing::WindowProps props{m_EngineConfig.AppName, m_EngineConfig.Width, m_EngineConfig.Height};
         m_Window = std::make_unique<Core::Windowing::Window>(props);
 
         if (!m_Window->IsValid())
         {
-            Core::Log::Error("FATAL: Window initialization failed");
+            Core::Log::Error("FATAL: Window initialization failed ({}x{}, app='{}').",
+                            m_EngineConfig.Width,
+                            m_EngineConfig.Height,
+                            m_EngineConfig.AppName);
+            Core::Log::Error("Fix: verify desktop/windowing environment availability and use positive --width/--height values.");
             std::exit(-1);
         }
 
@@ -149,7 +322,7 @@ namespace Runtime
 #else
         bool enableValidation = true;
 #endif
-        GraphicsBackendConfig gfxConfig{config.AppName, enableValidation};
+        GraphicsBackendConfig gfxConfig{m_EngineConfig.AppName, enableValidation};
         m_GraphicsBackend = std::make_unique<GraphicsBackend>(*m_Window, gfxConfig);
 
         // 4. AssetPipeline (AssetManager, pending transfers, main-thread queue)
@@ -173,15 +346,16 @@ namespace Runtime
             m_GraphicsBackend->GetTextureManager(),
             m_AssetPipeline->GetAssetManager(),
             &m_FeatureRegistry,
-            config.FrameArenaSize,
-            config.FrameContextCount);
+            m_EngineConfig.FrameArenaSize,
+            m_EngineConfig.FrameContextCount);
 
         // 7. Connect EnTT on_destroy hook for immediate GPU slot reclaim (via SceneManager).
         //    Also provide the geometry pool so SpawnModel can inspect topology.
         m_SceneManager->SetGeometryStorage(&m_RenderOrchestrator->GetGeometryStorage());
         if (m_RenderOrchestrator->GetGPUScenePtr())
         {
-            m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene()
+            m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene(),
+                                            m_GraphicsBackend->GetDevice()
 #ifdef INTRINSIC_HAS_CUDA
                                             , m_GraphicsBackend->GetCudaDevice()
 #endif
@@ -215,23 +389,31 @@ namespace Runtime
         if (m_GraphicsBackend)
             m_GraphicsBackend->GetRenderer().RequestShutdown();
 
-        m_GraphicsBackend->WaitIdle();
+        if (m_GraphicsBackend)
+            m_GraphicsBackend->WaitIdle();
 
         // Disconnect entity destruction hooks before tearing down GPU systems.
-        m_SceneManager->DisconnectGpuHooks();
+        if (m_SceneManager)
+            m_SceneManager->DisconnectGpuHooks();
 
         // Order matters!
         Core::Tasks::Scheduler::Shutdown();
         Core::Filesystem::FileWatcher::Shutdown();
 
         // Process material deletions before RenderOrchestrator destroys MaterialRegistry.
-        auto& matSys = m_RenderOrchestrator->GetMaterialRegistry();
-        matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
+        if (m_RenderOrchestrator && m_GraphicsBackend)
+        {
+            auto& matSys = m_RenderOrchestrator->GetMaterialRegistry();
+            matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
+        }
 
-        m_SceneManager->Clear();
-        m_AssetPipeline->GetAssetManager().Clear();
+        if (m_SceneManager)
+            m_SceneManager->Clear();
+        if (m_AssetPipeline)
+            m_AssetPipeline->GetAssetManager().Clear();
 
-        m_AssetPipeline->ClearLoadedMaterials();
+        if (m_AssetPipeline)
+            m_AssetPipeline->ClearLoadedMaterials();
 
         // AssetIngestService borrows runtime subsystems; release it before tearing them down.
         m_AssetIngestService.reset();
@@ -432,6 +614,11 @@ namespace Runtime
 
                 if (!platformResult.ContinueFrame)
                 {
+                    if (platformResult.ThreadViolation)
+                    {
+                        Core::Log::Error("Engine::Run aborting due to platform frame thread violation.");
+                        m_Running = false;
+                    }
                     Core::Telemetry::TelemetrySystem::Get().EndFrame();
                     continue;
                 }
@@ -522,14 +709,16 @@ namespace Runtime
                 // captured by the maintenance lane via CaptureFrameTelemetry).
                 Core::Telemetry::TelemetrySystem::Get().EndFrame();
 
-                // Benchmark mode: record frame and exit when complete.
-                if (m_EngineConfig.BenchmarkMode)
+                // Benchmark capture: supports both CLI benchmark mode and
+                // interactive editor-triggered runs.
+                if (m_BenchmarkRunner.IsRunning())
                 {
                     m_BenchmarkRunner.RecordFrame(Core::Telemetry::TelemetrySystem::Get());
                     if (m_BenchmarkRunner.IsComplete())
                     {
                         m_BenchmarkRunner.Finalize();
-                        m_Running = false;
+                        if (m_EngineConfig.BenchmarkMode)
+                            m_Running = false;
                     }
                 }
             }

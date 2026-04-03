@@ -201,6 +201,8 @@ namespace Graphics
         // Wire depth prepass pipeline for early-Z fill.
         if (pipelineLibrary.Contains(kPipeline_DepthPrepass))
             m_Impl->SurfacePass->SetDepthPrepassPipeline(&pipelineLibrary.GetOrDie(kPipeline_DepthPrepass));
+        if (pipelineLibrary.Contains(kPipeline_ShadowDepth))
+            m_Impl->ShadowPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_ShadowDepth));
 
         m_Impl->PathDirty = true;
     }

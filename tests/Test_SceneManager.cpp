@@ -232,8 +232,8 @@ TEST_F(SceneManagerGpuHooksHeadlessTest, GpuDestroyHooksRemainInstanceScopedAcro
     auto gpuSceneA = CreateGpuScene();
     auto gpuSceneB = CreateGpuScene();
 
-    mgrA.ConnectGpuHooks(*gpuSceneA);
-    mgrB.ConnectGpuHooks(*gpuSceneB);
+    mgrA.ConnectGpuHooks(*gpuSceneA, *m_Device);
+    mgrB.ConnectGpuHooks(*gpuSceneB, *m_Device);
 
     const uint32_t slotA = gpuSceneA->AllocateSlot();
     const uint32_t slotB = gpuSceneB->AllocateSlot();
@@ -259,8 +259,8 @@ TEST_F(SceneManagerGpuHooksHeadlessTest, DisconnectingOneManagerDoesNotDisableAn
     auto gpuSceneA = CreateGpuScene();
     auto gpuSceneB = CreateGpuScene();
 
-    mgrA.ConnectGpuHooks(*gpuSceneA);
-    mgrB.ConnectGpuHooks(*gpuSceneB);
+    mgrA.ConnectGpuHooks(*gpuSceneA, *m_Device);
+    mgrB.ConnectGpuHooks(*gpuSceneB, *m_Device);
     mgrA.DisconnectGpuHooks();
 
     const uint32_t slotB = gpuSceneB->AllocateSlot();

@@ -61,7 +61,7 @@ Split into two sub-phases to keep commits reviewable:
 
 **Phase 1 — Shadow atlas + depth-only rendering:**
 - [x] Define `ShadowAtlas` transient resource (depth-only, e.g. 2048x2048 x 4 cascades).
-- [ ] Add `ShadowPass` render feature: depth-only rendering into cascade viewports using `SurfacePass` geometry.
+- [x] Add `ShadowPass` render feature: depth-only rendering into cascade viewports using `SurfacePass` geometry.
 - [x] Compute cascade split distances (practical split scheme: logarithmic/uniform blend).
 - [x] Pack cascade matrices into a UBO/SSBO readable by lit passes.
 - [x] Recipe-driven: shadow resources allocated only when shadows are enabled.
@@ -277,7 +277,7 @@ F7 (Render Target Viewer) — no hard deps; memory footprint sub-item soft-depen
 
 Six geometry operators and one profiling tool have full backends but no editor panel or trigger button. Wire each using the existing `GeometryWorkflowController` + `Widgets` pattern. (Note: Geodesic Distance, K-Means, Mesh Analysis, Normal Estimation, Remeshing, Simplification, Smoothing, Subdivision, and Repair are already wired.)
 
-- [ ] **Shortest Path (Dijkstra):** Add widget in Inspector Geometry Processing section. Source vertices from `SubElementSelection`. Target vertices optional (empty = full tree). Display result path length, vertex count. Publish `v:shortest_path_distance` and auto-switch color source. "Extract Path Graph" button materializes result as a new `Graph::Graph` entity (requires entity-creation plumbing similar to `SpawnDemoPointCloud`).
+- [x] **Shortest Path (Dijkstra):** Add widget in Inspector Geometry Processing section. Source vertices from `SubElementSelection`. Target vertices optional (empty = full tree). Display result path length, vertex count. Publish `v:shortest_path_distance` and auto-switch color source. "Extract Path Graph" button materializes result as a new `Graph::Graph` entity (requires entity-creation plumbing similar to `SpawnDemoPointCloud`).
 - [ ] **Parameterization (LSCM):** Add dedicated Geometry → Parameterization panel. Pin vertex selection from `SubElementSelection` (or auto-pin boundary). Display conformal energy, flipped triangle count. Publish `v:texcoord` and offer UV checker visualization toggle.
 - [ ] **Boolean CSG:** Add Geometry → Boolean panel. Entity A = selected, Entity B = chosen via entity combo box (no secondary pick API exists). Operation combo (Union/Intersection/Difference). Display vertex/face counts of result. Warn on partial overlap (baseline limitation).
 - [ ] **Convex Hull Builder:** Add "Compute Convex Hull" button in Inspector Geometry Processing section. Materialize result as new `Halfedge::Mesh` entity. Display hull vertex/face counts and volume. (Complements the existing wireframe debug visualization in `SpatialDebugController`.)
@@ -285,7 +285,7 @@ Six geometry operators and one profiling tool have full backends but no editor p
 - [ ] **Vector Heat Method:** Add widget in Inspector Geometry Processing section (Vertex mode). Source vertices from `SubElementSelection`. Two buttons: "Transport Vectors" and "Compute Log Map". Display per-vertex `v:transported_vector`/`v:logmap_coords` properties. Auto-switch color source to angle/distance.
 
 - [x] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel (distinct from the existing Mesh Analysis defect-marker panel). Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Per-metric histograms via ImGui `PlotHistogram`. Summary diagnostics only — no per-element property publishing.
-- [ ] **Benchmark Runner Panel:** Add a Benchmark panel via `GUI::RegisterPanel`. Expose frame count, warmup frames, and output path inputs. "Run Benchmark" button calls `BenchmarkRunner::Configure()` + `Start()`. Display `BenchmarkStats` summary (avg/min/max/p95/p99 frame time, avg FPS, per-pass averages) in a table after completion. Currently CLI-only (`--benchmark`).
+- [x] **Benchmark Runner Panel:** Add a Benchmark panel via `GUI::RegisterPanel`. Expose frame count, warmup frames, and output path inputs. "Run Benchmark" button calls `BenchmarkRunner::Configure()` + `Start()`. Display `BenchmarkStats` summary (avg/min/max/p95/p99 frame time, avg FPS, per-pass averages) in a table after completion. Currently CLI-only (`--benchmark`).
 
 #### F2. Rendering Controls UI
 
@@ -293,20 +293,20 @@ The lighting environment, camera properties, and render mode are controlled prog
 
 - [x] **Light Environment Serialization:** Extend `Runtime::SceneSerializer` to persist light environment fields. Separate commit from the panel itself.
 - [x] **Camera Property Editor:** Add View Settings → Camera section. Expose FOV (degrees slider), near/far clip planes, projection type (perspective/orthographic). Orthographic zoom factor when in ortho mode. Display current eye position and look direction read-only.
-- [ ] **Global Render Mode Override:** Add a viewport-level render mode dropdown (Shaded/Wireframe/Wireframe+Shaded/Points/Flat). This is a *global* override distinct from the existing per-entity Surface/Wireframe/Vertex visibility toggles in the Inspector. Set a global override in `VisualizationConfig` that passes consume during draw.
+- [x] **Global Render Mode Override:** Add a viewport-level render mode dropdown (Shaded/Wireframe/Wireframe+Shaded/Points/Flat). This is a *global* override distinct from the existing per-entity Surface/Wireframe/Vertex visibility toggles in the Inspector. Back this with a renderer-owned global override consumed when building frame draw packet spans.
 - [x] **Lighting Path Selector:** Move the `FrameLightingPath` toggle (Forward/Deferred) from the Feature Browser into a prominent View Settings → Rendering combo box. The FeatureRegistry entry remains the backing store; this adds a more discoverable access point.
 
 #### F3. Undo/Redo Integration
 
 `Core::CommandHistory` and `CmdComponentChange<T>` are implemented and tested but not wired to any editor action.
 
-- [ ] Wire `CommandHistory` into `Engine` or `SceneManager` as a singleton accessible to all editor controllers.
-- [ ] Add Edit → Undo / Redo menu items with Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) keyboard shortcuts.
-- [ ] Wrap `TransformGizmo` drag completion (mouse release) as a `TransformCommand` capturing before/after `Transform::Component` snapshots for all affected entities.
-- [ ] Wrap Inspector numeric field edits (point size, line width, color changes) as property commands via `MakeComponentChangeCommand<T>()`.
+- [x] Wire `CommandHistory` into `Engine` or `SceneManager` as a singleton accessible to all editor controllers.
+- [x] Add Edit → Undo / Redo menu items with Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) keyboard shortcuts.
+- [x] Wrap `TransformGizmo` drag completion (mouse release) as a `TransformCommand` capturing before/after `Transform::Component` snapshots for all affected entities.
+- [x] Wrap Inspector numeric field edits (point size, line width, color changes) as property commands via `MakeComponentChangeCommand<T>()`.
 - [ ] Wrap entity creation/deletion from hierarchy context menu as commands.
 - [ ] Wrap geometry operator applications (simplify, remesh, smooth, subdivide, repair) as commands capturing mesh state before/after. Note: full mesh deep-copy snapshots are expensive for large meshes. Evaluate shallow CoW or diff-based approach if memory pressure is measured. Consider deferring to P2 if the snapshot cost is prohibitive.
-- [ ] Display undo/redo stack depth in status bar or Edit menu (e.g. "Undo: Scale (3 remaining)").
+- [x] Display undo/redo stack depth in status bar or Edit menu (e.g. "Undo: Scale (3 remaining)").
 
 #### F4. Hierarchy Panel Improvements
 
@@ -343,6 +343,100 @@ The Render Target Viewer panel is already implemented with frame state, recipe f
 - [ ] Add a visual resource lifetime timeline bar per resource (first producer pass → last consumer pass) alongside the existing resource table.
 - [ ] Add zoomable texture preview on resource click (currently only viewport debug source selection is supported).
 - [ ] When E2 (GPU Memory Budget) lands, show per-resource estimated memory footprint in the resource table.
+
+### G. Compile-Time & Binary-Boundary Hardening — PImpl Refactor Program
+
+#### Why now
+
+The runtime module interfaces currently expose many heavyweight concrete members (`std::vector`, `std::mutex`, `std::unique_ptr` trees, Vulkan handles, large imported module surfaces) directly in exported class layouts. That increases compile fan-out whenever implementation details change, because importers must rebuild for ABI/layout deltas even when behavior/API is unchanged.
+
+For high-churn orchestration classes, move detail-heavy state behind stable, thin exported shells using the PImpl idiom (`class X { struct Impl; std::unique_ptr<Impl> m_Impl; ... }`).
+
+#### Subagent design-review summary (architecture + build focus)
+
+A dedicated peer-review pass was run against engine-facing module interfaces and subsystem boundaries. Consensus:
+
+- PImpl is **most valuable** at composition-root/runtime seams where implementation churn is high and dependency fan-out is wide.
+- PImpl is **not universally good**: avoid it for tiny POD-like types, hot per-entity data, and trivial re-export modules where indirection adds cost without reducing rebuild scope.
+- For this codebase, PImpl should be applied selectively to **orchestration/manager** classes, not to data-oriented geometry kernels or ECS component structs.
+
+#### Candidate audit (priority-ordered)
+
+**Tier A — Do first (highest rebuild impact, best architecture win)**
+
+1. **`Runtime::RenderOrchestrator`** (`src/Runtime/Runtime.RenderOrchestrator.cppm`)
+   - Problem: exported class currently carries many heavyweight members (`FrameGraph`, arenas, `GeometryPool`, `DebugDraw`, pipeline/registry ownership, frame-context ring).
+   - Impact: churn in render orchestration internals likely triggers broad importer recompiles.
+   - PImpl plan: keep only ctor/dtor + narrow accessor API exported; move all concrete state and helper methods into `Impl` in `.cpp`.
+
+2. **`Graphics::RenderDriver`** (`src/Runtime/Graphics/Graphics.RenderDriver.cppm`)
+   - Problem: exported surface includes multiple subsystem objects, cached debug vectors, pipeline retirement storage, and frame-state caches.
+   - Impact: frequent rendering feature iteration causes high interface volatility.
+   - PImpl plan: stabilize exported contract around frame lifecycle + query API; hide render-graph internals, cache vectors, and pipeline retirement policy in `Impl`.
+
+3. **`Runtime::GraphicsBackend`** (`src/Runtime/Runtime.GraphicsBackend.cppm`)
+   - Problem: Vulkan ownership graph is directly visible in exported layout (`Context`, `Device`, `Swapchain`, descriptors, bindless, texture manager, optional CUDA, `VkSurfaceKHR`).
+   - Impact: backend maintenance or startup/shutdown ordering changes can force module rebuild cascades.
+   - PImpl plan: move GPU stack ownership and teardown ordering into `Impl`; keep accessor-based API stable.
+
+**Tier B — Do next (good payoff, moderate complexity)**
+
+4. **`Runtime::AssetPipeline`** (`src/Runtime/Runtime.AssetPipeline.cppm`)
+   - Problem: mutexes, vectors, pending-load structs, and queue internals are exported implementation detail.
+   - Impact: async ingestion iteration invalidates dependents unnecessarily.
+   - PImpl plan: hide synchronization containers and completion machinery behind `Impl`; preserve thread-safe API.
+
+5. **`Graphics::PipelineLibrary`** (`src/Runtime/Graphics/Graphics.PipelineLibrary.cppm`)
+   - Problem: pipeline maps, descriptor-set layouts, and compute pipeline ownership are in the exported class layout.
+   - Impact: pipeline compilation/reload work changes headers often.
+   - PImpl plan: expose lookup/build API only; move map/storage and layout lifecycle to `Impl`.
+
+**Tier C — Usually avoid / case-by-case**
+
+6. **`Graphics::GPUScene`** — defer PImpl unless compile metrics show it as top rebuild offender; prefer direct data-oriented clarity.
+7. **`Graphics::DebugDraw`** — avoid PImpl: immediate-mode container with hot per-frame append/query path.
+8. **Thin/re-export modules** (example: `Graphics.MaterialRegistry.cppm`) — avoid PImpl: no concrete layout to hide.
+
+#### Refactor strategy & invariants
+
+- Preserve all existing public behavior and ownership semantics; this is a compile-boundary refactor, not a feature rewrite.
+- Keep constructors explicit about borrowed vs owned dependencies.
+- Ensure destructors remain in exactly one TU (vtable anchor rule still applies where virtual types exist).
+- Maintain no-exception / `std::expected` error propagation style.
+- Verify no extra allocations in per-frame hot paths (allocate `Impl` at subsystem construction only).
+
+#### Execution plan
+
+**P0 — Baseline measurement (before code changes)**
+- [ ] Capture clean build time and no-op incremental build time.
+- [ ] Capture representative "touch one render source file" incremental build time.
+- [x] Record module fan-out for Tier A/B interfaces. (`tools/module_fanout_baseline_2026-04-03.md`)
+
+Baseline status note (2026-04-03):
+- Local `cmake --preset dev` configure is currently blocked in this container by missing X11 RandR development headers (`libxrandr`), so the two build-time measurements above remain pending until that dependency is installed.
+
+**P1 — Tier A migration**
+- [x] Introduce PImpl for `Runtime::RenderOrchestrator`.
+- [x] Introduce PImpl for `Graphics::RenderDriver`.
+- [x] Introduce PImpl for `Runtime::GraphicsBackend`.
+- [ ] Keep API signatures source-compatible where possible to minimize downstream churn.
+
+**P2 — Tier B migration**
+- [x] Introduce PImpl for `Runtime::AssetPipeline`.
+- [x] Introduce PImpl for `Graphics::PipelineLibrary`.
+- [ ] Re-run compile metrics and compare against P0 baseline.
+
+**P3 — Validation & hardening**
+- [ ] Run architecture tests + rendering integration tests for frame build/execute/present rhythm.
+- [ ] Validate shutdown ordering and deferred destruction still pass under ASan/validation-enabled runs.
+- [ ] Audit for accidental hot-path heap churn after PImpl introduction.
+- [ ] Update `PATTERNS.md` with a new "Selective PImpl for module-boundary stability" pattern once stabilized.
+
+#### Acceptance criteria
+
+- Measurable reduction in incremental rebuild time for render/runtime internal changes (target: meaningful drop vs P0 baseline).
+- No regressions in runtime correctness, frame construction contracts, or shutdown safety.
+- Public module interfaces become materially smaller and less volatile for orchestration subsystems.
 
 ---
 

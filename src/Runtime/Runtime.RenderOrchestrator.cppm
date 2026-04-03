@@ -11,34 +11,23 @@ import Core.Assets;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.Memory;
+import RHI.Bindless;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Renderer;
+import RHI.Swapchain;
+import RHI.TextureManager;
 import RHI.Transfer;
+import Graphics.DebugDraw;
 import Graphics.Geometry;
+import Graphics.GPUScene;
+import Graphics.Material;
+import Graphics.PipelineLibrary;
 import Graphics.RenderDriver;
+import Graphics.RenderPipeline;
+import Graphics.ShaderRegistry;
 import Geometry.Handle;
 import Runtime.RenderExtraction;
-
-export namespace RHI
-{
-    class VulkanDevice;
-    class VulkanSwapchain;
-    class SimpleRenderer;
-    class BindlessDescriptorSystem;
-    class DescriptorAllocator;
-    class DescriptorLayout;
-    class TextureManager;
-    class TransferManager;
-    struct TransferToken;
-} // namespace RHI
-
-export namespace Graphics
-{
-    class GPUScene;
-    class PipelineLibrary;
-    class MaterialRegistry;
-    class ShaderRegistry;
-    class GeometryPool;
-    class DebugDraw;
-} // namespace Graphics
 
 export namespace Runtime
 {

@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -12,6 +13,7 @@ export module Graphics.TransformGizmo;
 
 import Graphics.Camera;
 import Core.Input;
+import ECS;
 
 export namespace Graphics
 {
@@ -74,6 +76,19 @@ export namespace Graphics
     class TransformGizmo
     {
     public:
+        struct TransformChange
+        {
+            entt::entity Entity = entt::null;
+            ECS::Components::Transform::Component Before{};
+            ECS::Components::Transform::Component After{};
+        };
+
+        struct CompletedInteraction
+        {
+            GizmoMode Mode = GizmoMode::Translate;
+            std::vector<TransformChange> Changes{};
+        };
+
         TransformGizmo() = default;
 
         // Captures selection/camera/viewport state before rendering.
@@ -98,11 +113,13 @@ export namespace Graphics
         [[nodiscard]] GizmoAxis  GetHoveredAxis() const { return m_HoveredAxis; }
         [[nodiscard]] GizmoAxis  GetActiveAxis() const { return m_ActiveAxis; }
         [[nodiscard]] bool IsActive() const { return m_State == GizmoState::Active; }
+        [[nodiscard]] std::optional<CompletedInteraction> ConsumeCompletedInteraction();
 
     private:
         struct EntityTransformCache
         {
             entt::entity Entity = entt::null;
+            ECS::Components::Transform::Component InitialLocalTransform{};
             glm::mat4    InitialWorldMatrix{1.0f};
             glm::mat4    InitialParentWorldMatrix{1.0f};
             bool         HasInitialParentWorldMatrix = false;
@@ -124,6 +141,7 @@ export namespace Graphics
         glm::mat4       m_ManipulationStartPivotMatrix{1.0f};
         glm::mat4       m_CurrentManipulatedPivotMatrix{1.0f};
         std::vector<EntityTransformCache> m_CachedTransforms{};
+        std::optional<CompletedInteraction> m_CompletedInteraction{};
 
         [[nodiscard]] bool ComputeSelectionSnapshot(entt::registry& registry, bool refreshCache);
         void ApplyManipulatedPivotMatrix(const glm::mat4& manipulatedPivotMatrix);

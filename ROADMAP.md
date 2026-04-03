@@ -132,9 +132,9 @@ The editor UI foundation is in place: programmatic default dock layout (Hierarch
 
 Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Feature Wiring):
 
-- **Wire remaining geometry operators** (Shortest Path, LSCM, CSG, Convex Hull, Surface Reconstruction, Vector Heat, Normal Estimation, Mesh Quality) — `TODO.md` F1.
-- **Rendering controls** (light environment, camera properties, render mode toolbar) — `TODO.md` F2.
-- **Undo/redo integration** (CommandHistory wired to gizmo, inspector, operators) — `TODO.md` F3.
+- **Wire remaining geometry operators** (LSCM, CSG, Convex Hull, Surface Reconstruction, Vector Heat) — `TODO.md` F1. (Shortest Path, Mesh Quality, Normal Estimation, Geodesic Distance, K-Means, Mesh Analysis, Remeshing, Simplification, Smoothing, Subdivision, Repair, and Benchmark Runner are already wired.)
+- **Rendering controls** — `TODO.md` F2. (Light environment serialization, camera property editor, global render mode override, and lighting path selector are complete.)
+- **Undo/redo integration** (CommandHistory wired to gizmo, inspector, operators) — `TODO.md` F3. (CommandHistory, Edit menu shortcuts, transform gizmo commands, inspector property commands, and stack depth indicators are complete. Remaining: entity creation/deletion and geometry operator undo.)
 - **Hierarchy refinements** (drag-and-drop reparenting, multi-select, expand/collapse all) — `TODO.md` F4.
 - **Viewport context menus** — `TODO.md` F5.
 - **Editor polish** (log panel, keyboard shortcuts reference panel, multi-object editing, remaining tooltip coverage) — `TODO.md` F6.
@@ -175,7 +175,7 @@ Currently only a single forward PBR pass (metallic-roughness) exists via `Surfac
 
 ### Shadow Mapping
 
-CSM foundation (depth prepass + directional cascade shadow pass + PCF) is promoted to near-term priority and tracked in `TODO.md` P1/A1–A2. Remaining items after CSM lands:
+CSM foundation is tracked in `TODO.md` P1/A2 (Phase 1 shadow atlas + depth rasterization is complete; Phase 2 PCF sampling is next). Remaining items after CSM lands:
 
 - Point light shadow maps (cubemap or dual-paraboloid) if point lights are added.
 - Variance shadow maps (VSM) as an alternative to PCF.

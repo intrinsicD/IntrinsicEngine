@@ -168,7 +168,7 @@ Synchronous, immediate resource cleanup when a component is removed.
 ```cpp
 // Runtime.SceneManager.cpp
 registry.on_destroy<ECS::Surface::Component>().connect<&OnSurfaceDestroyed>();
-// Hook frees GPUScene slot immediately — no deferred event
+// Hook frees GPUScene slot + geometry pool entries immediately — no deferred event
 ```
 
 **Canonical examples:**
@@ -428,12 +428,12 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 | 11 | **Lifecycle System** | `Graphics.Systems.MeshViewLifecycle.cppm`, `Graphics.Systems.GraphLifecycle.cppm` | New geometry type → GPU pipeline |
 | 12 | **Vtable Anchor** | `Graphics.IORegistry.cpp`, `Graphics.Pipelines.cppm` | Virtual interfaces in modules |
 | 13 | **BDA Shared-Buffer** | Surface/Line/Point passes, `ReuseVertexBuffersFrom()` | Shared vertex data with multiple topology views |
+| 14 | **Commit Hygiene for Render Contracts** | `Graphics.Pipelines.cpp`, `Test_RuntimeGraphics.cpp` | Separating cross-cutting renderer contract changes from feature work |
+| 15 | **Command Pattern (Undo/Redo)** | `Core.Commands.cppm`, `Test_CoreCommands.cpp` | Reversible editor operations |
 
 ---
 
-## Worth Adopting — Patterns Not Yet In the Codebase
-
-### 14. Command Pattern for Undo/Redo (P1)
+## 15. Command Pattern for Undo/Redo
 
 **Status:** Implemented in `src/Core/Core.Commands.cppm` and covered by `tests/Test_CoreCommands.cpp`.
 
@@ -491,7 +491,8 @@ The existing `Utils::LockFreeQueue<T>` (`Utils.LockFreeQueue.cppm`) is **already
 | 11 | Lifecycle System | Implemented | — | Geometry → GPU pipeline |
 | 12 | Vtable Anchor | Implemented | — | Virtual interfaces in modules |
 | 13 | BDA Shared-Buffer | Implemented | — | Shared vertex data topology views |
-| 14 | Command Pattern (Undo/Redo) | Implemented | P1 | Reversible editor operations |
+| 14 | Commit Hygiene for Render Contracts | Implemented | — | Separating cross-cutting renderer contract changes |
+| 15 | Command Pattern (Undo/Redo) | Implemented | — | Reversible editor operations |
 | ~~15~~ | ~~Enumerate/Zip Utilities~~ | Dropped | — | C++23 `std::views::enumerate`/`zip` covers this natively |
 | ~~16~~ | ~~ComponentGui Dispatch~~ | Dropped | — | Only 6 component checks; not justified at current scale |
 | ~~17~~ | ~~Policy-Based Composition~~ | Dropped | — | `std::variant` dispatch (Pattern doc) already covers the need |

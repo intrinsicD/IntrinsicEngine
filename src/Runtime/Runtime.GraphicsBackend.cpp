@@ -45,7 +45,11 @@ namespace Runtime
 
     namespace
     {
-        void CreateDefaultTexture(GraphicsBackend::Impl& impl)
+        // Helper: create the fallback white-pixel texture used for untextured
+        // surfaces.  Declared with a deduced parameter to avoid naming the
+        // private GraphicsBackend::Impl type, which Clang 20 modules enforce
+        // access control on even inside the implementation unit.
+        void CreateDefaultTexture(auto& impl)
         {
             const RHI::TextureHandle handle = impl.TextureManager->CreatePending(1, 1, VK_FORMAT_R8G8B8A8_SRGB);
             impl.DefaultTexture = std::make_shared<RHI::Texture>(*impl.TextureManager, *impl.Device, handle);
@@ -142,12 +146,20 @@ namespace Runtime
         // 2. Surface
         if (!window.CreateSurface(m_Impl->Context->GetInstance(), nullptr, &m_Impl->Surface))
         {
-            Core::Log::Error("FATAL: Failed to create Vulkan Surface");
+            Core::Log::Error("FATAL: Failed to create Vulkan surface for app '{}'.", config.AppName);
+            Core::Log::Error("Fix: ensure the window system and GPU driver support Vulkan surface creation "
+                             "(Wayland/X11/Win32) and that the process has display access.");
             std::exit(-1);
         }
 
         // 3. Device
         m_Impl->Device = std::make_shared<RHI::VulkanDevice>(*m_Impl->Context, m_Impl->Surface);
+        if (!m_Impl->Device || !m_Impl->Device->IsValid() ||
+            m_Impl->Device->GetLogicalDevice() == VK_NULL_HANDLE)
+        {
+            Core::Log::Error("FATAL: Failed to initialize Vulkan device for app '{}'.", config.AppName);
+            std::exit(-1);
+        }
 
 #ifdef INTRINSIC_HAS_CUDA
         if (auto cudaDevice = RHI::CudaDevice::Create(); cudaDevice)
@@ -189,7 +201,7 @@ namespace Runtime
             return;
         }
 
-        if (m_Impl->Device)
+        if (m_Impl->Device && m_Impl->Device->GetLogicalDevice() != VK_NULL_HANDLE)
         {
             vkDeviceWaitIdle(m_Impl->Device->GetLogicalDevice());
         }
