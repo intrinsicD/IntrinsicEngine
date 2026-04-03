@@ -248,6 +248,13 @@ void GeometryWorkflowController::DrawMenu()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Transport"))
+    {
+        if (ImGui::MenuItem("Vector Heat Method"))
+            Interface::GUI::OpenPanel("Inspector");
+        ImGui::EndMenu();
+    }
+
     if (ImGui::BeginMenu("Construction"))
     {
         ImGui::TextDisabled("Operators that produce new entities from selected geometry.");

@@ -92,6 +92,7 @@ export namespace Runtime::EditorUI
         ShortestPath,
         ConvexHull,
         SurfaceReconstruction,
+        VectorHeat,
     };
 
     struct GeometryProcessingCapabilities
@@ -351,6 +352,23 @@ export namespace Runtime::EditorUI
         std::size_t GridNZ = 0;
     };
 
+    struct VectorHeatWidgetState
+    {
+        double TimeStep = 0.0;
+        float SolverTolerance = 1e-8f;
+        int MaxSolverIterations = 2000;
+        bool HasTransportResults = false;
+        bool HasLogMapResults = false;
+        bool LastRunFailed = false;
+        bool LastConverged = false;
+        // Transport result
+        std::size_t LastTransportIterations = 0;
+        // LogMap results (three separate CG solves)
+        std::size_t LastVectorSolveIterations = 0;
+        std::size_t LastScalarSolveIterations = 0;
+        std::size_t LastPoissonSolveIterations = 0;
+    };
+
     struct MeshAnalysisWidgetState
     {
         bool HasResults = false;
@@ -418,6 +436,9 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawSurfaceReconstructionWidget(Runtime::Engine& engine,
                                                        entt::entity entity,
                                                        SurfaceReconstructionWidgetState& state);
+    [[nodiscard]] bool DrawVectorHeatWidget(Runtime::Engine& engine,
+                                            entt::entity entity,
+                                            VectorHeatWidgetState& state);
 
     // =========================================================================
     // InspectorController — component property inspector panel
@@ -463,6 +484,7 @@ export namespace Runtime::EditorUI
         ShortestPathWidgetState m_ShortestPathUi{};
         ConvexHullWidgetState m_ConvexHullUi{};
         SurfaceReconstructionWidgetState m_SurfaceReconstructionUi{};
+        VectorHeatWidgetState m_VectorHeatUi{};
     };
 
     // =========================================================================
