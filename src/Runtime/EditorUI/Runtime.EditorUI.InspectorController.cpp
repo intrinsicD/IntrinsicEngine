@@ -135,6 +135,9 @@ void InspectorController::Draw()
         m_SubdivisionUi = {};
         m_MeshAnalysisUi = {};
         m_NormalEstimationUi = {};
+        m_ShortestPathUi = {};
+        m_ConvexHullUi = {};
+        m_SurfaceReconstructionUi = {};
     }
 
     // === Entity ID (always shown at top) ===
@@ -664,11 +667,19 @@ void InspectorController::Draw()
                     case GeometryProcessingAlgorithm::ShortestPath:
                         static_cast<void>(DrawShortestPathWidget(*m_Engine, selected, m_ShortestPathUi));
                         break;
+                    case GeometryProcessingAlgorithm::ConvexHull:
+                        static_cast<void>(DrawConvexHullWidget(*m_Engine, selected, m_ConvexHullUi));
+                        break;
+                    case GeometryProcessingAlgorithm::SurfaceReconstruction:
+                        static_cast<void>(DrawSurfaceReconstructionWidget(*m_Engine, selected, m_SurfaceReconstructionUi));
+                        break;
                     }
 
                     if (m_GeometryWorkflow && entry.Algorithm != GeometryProcessingAlgorithm::KMeans
                         && entry.Algorithm != GeometryProcessingAlgorithm::NormalEstimation
-                        && entry.Algorithm != GeometryProcessingAlgorithm::ShortestPath)
+                        && entry.Algorithm != GeometryProcessingAlgorithm::ShortestPath
+                        && entry.Algorithm != GeometryProcessingAlgorithm::ConvexHull
+                        && entry.Algorithm != GeometryProcessingAlgorithm::SurfaceReconstruction)
                     {
                         if (ImGui::SmallButton((std::string("Open Dedicated Panel##")
                                              + algoLabel).c_str()))

@@ -52,6 +52,8 @@ import Geometry.MeshAnalysis;
 import Geometry.MeshQuality;
 import Geometry.NormalEstimation;
 import Geometry.ShortestPath;
+import Geometry.ConvexHullBuilder;
+import Geometry.SurfaceReconstruction;
 
 import Core.Logging;
 
@@ -2387,6 +2389,315 @@ void TransformAABB(const glm::vec3& lo, const glm::vec3& hi, const glm::mat4& m,
     const Geometry::AABB result = Geometry::TransformAABB(src, m);
     outLo = result.Min;
     outHi = result.Max;
+}
+
+// =========================================================================
+// Helper: Create a standalone mesh entity from a Halfedge::Mesh
+// =========================================================================
+
+namespace
+{
+    [[nodiscard]] entt::entity SpawnMeshEntity(Runtime::Engine& engine,
+                                                const char* name,
+                                                Geometry::Halfedge::Mesh mesh)
+    {
+        auto& scene = engine.GetSceneManager().GetScene();
+        auto& reg = scene.GetRegistry();
+
+        std::vector<glm::vec3> positions;
+        std::vector<uint32_t> indices;
+        std::vector<glm::vec4> aux;
+        Geometry::MeshUtils::ExtractIndexedTriangles(mesh, positions, indices, &aux);
+
+        if (positions.empty() || indices.empty())
+            return entt::null;
+
+        std::vector<glm::vec3> normals(positions.size(), glm::vec3(0, 1, 0));
+        Geometry::MeshUtils::CalculateNormals(positions, indices, normals);
+
+        entt::entity entity = scene.CreateEntity(name);
+        reg.emplace<ECS::DataAuthority::MeshTag>(entity);
+        reg.emplace<ECS::Components::Selection::SelectableTag>(entity);
+
+        // Build collision data.
+        auto collisionRef = std::make_shared<Graphics::GeometryCollisionData>();
+        collisionRef->Positions = positions;
+        collisionRef->Indices = indices;
+        collisionRef->Aux = aux;
+        collisionRef->SourceMesh = std::make_shared<Geometry::Halfedge::Mesh>(std::move(mesh));
+
+        if (!positions.empty())
+        {
+            auto aabbs = Geometry::ToAABB(positions);
+            collisionRef->LocalAABB = Geometry::Union(aabbs);
+        }
+
+        std::vector<Geometry::AABB> primitiveBounds;
+        primitiveBounds.reserve(indices.size() / 3);
+        for (std::size_t i = 0; i + 2 < indices.size(); i += 3)
+        {
+            const uint32_t i0 = indices[i];
+            const uint32_t i1 = indices[i + 1];
+            const uint32_t i2 = indices[i + 2];
+            if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size())
+                continue;
+            auto aabb = Geometry::AABB{positions[i0], positions[i0]};
+            aabb = Geometry::Union(aabb, positions[i1]);
+            aabb = Geometry::Union(aabb, positions[i2]);
+            primitiveBounds.push_back(aabb);
+        }
+        if (!primitiveBounds.empty())
+        {
+            static_cast<void>(collisionRef->LocalOctree.Build(
+                primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+        }
+        RebuildCollisionVertexLookup(*collisionRef);
+
+        auto& col = reg.emplace<ECS::MeshCollider::Component>(entity);
+        col.CollisionRef = collisionRef;
+        col.WorldOBB.Center = collisionRef->LocalAABB.GetCenter();
+
+        // Upload geometry to GPU.
+        Graphics::GeometryUploadRequest uploadReq;
+        uploadReq.Positions = collisionRef->Positions;
+        uploadReq.Indices = collisionRef->Indices;
+        uploadReq.Normals = normals;
+        uploadReq.Aux = collisionRef->Aux;
+        uploadReq.Topology = Graphics::PrimitiveTopology::Triangles;
+        uploadReq.UploadMode = Graphics::GeometryUploadMode::Staged;
+
+        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
+            engine.GetGraphicsBackend().GetDeviceShared(),
+            engine.GetGraphicsBackend().GetTransferManager(),
+            uploadReq,
+            &engine.GetRenderOrchestrator().GetGeometryStorage());
+
+        auto& surface = reg.emplace<ECS::Surface::Component>(entity);
+        surface.Geometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
+
+        auto& meshData = reg.emplace<ECS::Mesh::Data>(entity);
+        meshData.MeshRef = collisionRef->SourceMesh;
+        meshData.AttributesDirty = true;
+
+        auto& bvh = reg.emplace<ECS::PrimitiveBVH::Data>(entity);
+        bvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
+        bvh.Dirty = true;
+
+        scene.GetDispatcher().enqueue<ECS::Events::EntitySpawned>({entity});
+        return entity;
+    }
+} // anonymous namespace
+
+// =========================================================================
+// Convex Hull Widget
+// =========================================================================
+
+bool DrawConvexHullWidget(Runtime::Engine& engine,
+                          entt::entity entity,
+                          ConvexHullWidgetState& state)
+{
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+
+    const bool hasMesh = [&]() {
+        if (auto* md = reg.try_get<ECS::Mesh::Data>(entity); md && md->MeshRef)
+            return true;
+        if (auto* col = reg.try_get<ECS::MeshCollider::Component>(entity);
+            col && col->CollisionRef && !col->CollisionRef->Positions.empty())
+            return true;
+        return false;
+    }();
+
+    const bool hasPointCloud = [&]() {
+        auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity);
+        return pcd && pcd->CloudRef && !pcd->CloudRef->IsEmpty();
+    }();
+
+    DrawDomainBadges(
+        (hasMesh ? GeometryProcessingDomain::MeshVertices : GeometryProcessingDomain::None)
+        | (hasPointCloud ? GeometryProcessingDomain::PointCloudPoints : GeometryProcessingDomain::None));
+
+    if (!hasMesh && !hasPointCloud)
+    {
+        ImGui::TextDisabled("Convex Hull requires a mesh or point cloud entity.");
+        return false;
+    }
+
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Input points: %zu", state.InputPointCount);
+        ImGui::Text("Hull vertices: %zu", state.HullVertexCount);
+        ImGui::Text("Hull faces: %zu", state.HullFaceCount);
+        ImGui::Text("Hull edges: %zu", state.HullEdgeCount);
+        ImGui::Text("Interior points: %zu", state.InteriorPointCount);
+    }
+
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last convex hull computation failed (degenerate input).");
+
+    if (ImGui::Button("Compute Convex Hull"))
+    {
+        Geometry::ConvexHullBuilder::ConvexHullParams params{};
+        params.BuildMesh = true;
+        params.ComputePlanes = true;
+
+        std::optional<Geometry::ConvexHullBuilder::ConvexHullResult> result{};
+
+        if (auto* md = reg.try_get<ECS::Mesh::Data>(entity); md && md->MeshRef)
+        {
+            result = Geometry::ConvexHullBuilder::BuildFromMesh(*md->MeshRef, params);
+        }
+        else if (auto* col = reg.try_get<ECS::MeshCollider::Component>(entity);
+                 col && col->CollisionRef && !col->CollisionRef->Positions.empty())
+        {
+            result = Geometry::ConvexHullBuilder::Build(col->CollisionRef->Positions, params);
+        }
+        else if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity); pcd && pcd->CloudRef)
+        {
+            auto positions = pcd->CloudRef->Positions();
+            std::vector<glm::vec3> pts(positions.begin(), positions.end());
+            result = Geometry::ConvexHullBuilder::Build(pts, params);
+        }
+
+        if (!result)
+        {
+            state.LastRunFailed = true;
+            state.HasResults = false;
+        }
+        else
+        {
+            state.LastRunFailed = false;
+            state.HasResults = true;
+            state.InputPointCount = result->InputPointCount;
+            state.HullVertexCount = result->HullVertexCount;
+            state.HullFaceCount = result->HullFaceCount;
+            state.HullEdgeCount = result->HullEdgeCount;
+            state.InteriorPointCount = result->InteriorPointCount;
+
+            entt::entity hullEntity = SpawnMeshEntity(
+                engine, "Convex Hull", std::move(result->Mesh));
+
+            if (hullEntity != entt::null)
+            {
+                Core::Log::Info("ConvexHull: spawned hull entity with {} vertices, {} faces",
+                                state.HullVertexCount, state.HullFaceCount);
+            }
+            else
+            {
+                state.LastRunFailed = true;
+                Core::Log::Warn("ConvexHull: failed to create hull mesh entity (empty geometry).");
+            }
+        }
+    }
+
+    return false;
+}
+
+// =========================================================================
+// Surface Reconstruction Widget
+// =========================================================================
+
+bool DrawSurfaceReconstructionWidget(Runtime::Engine& engine,
+                                      entt::entity entity,
+                                      SurfaceReconstructionWidgetState& state)
+{
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+    auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity);
+
+    DrawDomainBadges(
+        (pcd && pcd->CloudRef && !pcd->CloudRef->IsEmpty())
+            ? GeometryProcessingDomain::PointCloudPoints
+            : GeometryProcessingDomain::None);
+
+    if (!pcd || !pcd->CloudRef || pcd->CloudRef->IsEmpty())
+    {
+        ImGui::TextDisabled("Surface Reconstruction requires a point cloud entity.");
+        return false;
+    }
+
+    ImGui::SeparatorText("Parameters");
+    ImGui::SliderInt("Grid Resolution", &state.Resolution, 16, 256);
+    ImGui::SetItemTooltip("Number of grid cells along longest axis. Higher = finer detail, more memory.");
+    ImGui::SliderInt("K Neighbors (SDF)", &state.KNeighbors, 1, 32);
+    ImGui::SetItemTooltip("Neighbors for signed distance. k=1 is fast; k>1 smooths noisy data.");
+    ImGui::SliderFloat("Bounding Box Padding", &state.BoundingBoxPadding, 0.0f, 0.5f, "%.2f");
+    ImGui::Checkbox("Estimate Normals", &state.EstimateNormals);
+    if (state.EstimateNormals)
+    {
+        ImGui::SliderInt("Normal K Neighbors", &state.NormalKNeighbors, 5, 50);
+    }
+    if (state.KNeighbors > 1)
+    {
+        ImGui::SliderFloat("Normal Agreement Power", &state.NormalAgreementPower, 0.5f, 8.0f, "%.1f");
+        ImGui::SliderFloat("Kernel Sigma Scale", &state.KernelSigmaScale, 0.5f, 8.0f, "%.1f");
+    }
+
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Output vertices: %zu", state.OutputVertexCount);
+        ImGui::Text("Output faces: %zu", state.OutputFaceCount);
+        ImGui::Text("Grid: %zu x %zu x %zu", state.GridNX, state.GridNY, state.GridNZ);
+    }
+
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last reconstruction failed.");
+
+    if (ImGui::Button("Reconstruct Surface"))
+    {
+        auto positions = pcd->CloudRef->Positions();
+        auto normals = pcd->CloudRef->Normals();
+
+        Geometry::SurfaceReconstruction::ReconstructionParams params{};
+        params.Resolution = static_cast<std::size_t>(std::max(8, state.Resolution));
+        params.KNeighbors = static_cast<std::size_t>(std::max(1, state.KNeighbors));
+        params.BoundingBoxPadding = state.BoundingBoxPadding;
+        params.EstimateNormals = state.EstimateNormals;
+        params.NormalKNeighbors = static_cast<std::size_t>(std::max(3, state.NormalKNeighbors));
+        params.NormalAgreementPower = state.NormalAgreementPower;
+        params.KernelSigmaScale = state.KernelSigmaScale;
+
+        std::vector<glm::vec3> posVec(positions.begin(), positions.end());
+        std::vector<glm::vec3> normVec(normals.begin(), normals.end());
+
+        auto result = Geometry::SurfaceReconstruction::Reconstruct(
+            posVec,
+            state.EstimateNormals ? std::span<const glm::vec3>{} : std::span<const glm::vec3>(normVec),
+            params);
+
+        if (!result)
+        {
+            state.LastRunFailed = true;
+            state.HasResults = false;
+        }
+        else
+        {
+            state.LastRunFailed = false;
+            state.HasResults = true;
+            state.OutputVertexCount = result->OutputVertexCount;
+            state.OutputFaceCount = result->OutputFaceCount;
+            state.GridNX = result->GridNX;
+            state.GridNY = result->GridNY;
+            state.GridNZ = result->GridNZ;
+
+            entt::entity meshEntity = SpawnMeshEntity(
+                engine, "Reconstructed Surface", std::move(result->OutputMesh));
+
+            if (meshEntity != entt::null)
+            {
+                Core::Log::Info("SurfaceReconstruction: {} vertices, {} faces (grid {}x{}x{})",
+                                state.OutputVertexCount, state.OutputFaceCount,
+                                state.GridNX, state.GridNY, state.GridNZ);
+            }
+            else
+            {
+                state.LastRunFailed = true;
+                Core::Log::Warn("SurfaceReconstruction: failed to create mesh entity (empty geometry).");
+            }
+        }
+    }
+
+    return false;
 }
 
 } // namespace Runtime::EditorUI
