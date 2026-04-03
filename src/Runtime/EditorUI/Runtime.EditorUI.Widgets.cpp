@@ -56,6 +56,7 @@ import Geometry.ConvexHullBuilder;
 import Geometry.SurfaceReconstruction;
 import Geometry.VectorHeatMethod;
 import Geometry.Parameterization;
+import Geometry.Boolean;
 
 import Core.Logging;
 
@@ -3026,6 +3027,252 @@ bool DrawParameterizationWidget(Runtime::Engine& engine,
     }
 
     return changed;
+}
+
+// =========================================================================
+// Boolean CSG Widget
+// =========================================================================
+
+bool DrawBooleanWidget(Runtime::Engine& engine,
+                       entt::entity entity,
+                       BooleanWidgetState& state)
+{
+    auto& scene = engine.GetSceneManager().GetScene();
+    auto& reg = scene.GetRegistry();
+
+    // Entity A must be a mesh.
+    const auto* meshDataA = reg.try_get<ECS::Mesh::Data>(entity);
+    const Geometry::Halfedge::Mesh* meshA = nullptr;
+    if (meshDataA && meshDataA->MeshRef)
+        meshA = meshDataA->MeshRef.get();
+
+    if (!meshA)
+    {
+        if (auto* col = reg.try_get<ECS::MeshCollider::Component>(entity);
+            col && col->CollisionRef && col->CollisionRef->SourceMesh)
+        {
+            meshA = col->CollisionRef->SourceMesh.get();
+        }
+    }
+
+    DrawDomainBadges(meshA ? GeometryProcessingDomain::MeshVertices : GeometryProcessingDomain::None);
+
+    if (!meshA)
+    {
+        ImGui::TextDisabled("Boolean CSG requires the selected entity to have a mesh.");
+        return false;
+    }
+
+    // --- Entity B selection via combo box ---
+    ImGui::SeparatorText("Operands");
+    ImGui::Text("Entity A: %u (selected)",
+                static_cast<uint32_t>(static_cast<entt::id_type>(entity)));
+
+    {
+        // Build label for Entity B preview.
+        const char* previewLabel = "(None)";
+        char previewBuf[128]{};
+        if (state.EntityB != entt::null && reg.valid(state.EntityB))
+        {
+            if (auto* nameTag = reg.try_get<ECS::Components::NameTag::Component>(state.EntityB))
+            {
+                std::snprintf(previewBuf, sizeof(previewBuf), "%s [%u]",
+                              nameTag->Name.c_str(),
+                              static_cast<uint32_t>(static_cast<entt::id_type>(state.EntityB)));
+            }
+            else
+            {
+                std::snprintf(previewBuf, sizeof(previewBuf), "Entity %u",
+                              static_cast<uint32_t>(static_cast<entt::id_type>(state.EntityB)));
+            }
+            previewLabel = previewBuf;
+        }
+
+        if (ImGui::BeginCombo("Entity B", previewLabel))
+        {
+            // List all mesh-bearing entities except entity A.
+            for (auto [candidate, md] : reg.view<ECS::Mesh::Data>().each())
+            {
+                if (candidate == entity)
+                    continue;
+                if (!md.MeshRef)
+                    continue;
+
+                char label[128]{};
+                if (auto* nameTag = reg.try_get<ECS::Components::NameTag::Component>(candidate))
+                {
+                    std::snprintf(label, sizeof(label), "%s [%u]",
+                                  nameTag->Name.c_str(),
+                                  static_cast<uint32_t>(static_cast<entt::id_type>(candidate)));
+                }
+                else
+                {
+                    std::snprintf(label, sizeof(label), "Entity %u",
+                                  static_cast<uint32_t>(static_cast<entt::id_type>(candidate)));
+                }
+
+                const bool isSelected = (candidate == state.EntityB);
+                if (ImGui::Selectable(label, isSelected))
+                    state.EntityB = candidate;
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+
+            // Also check collider-backed meshes not in the Mesh::Data view.
+            for (auto [candidate, col] : reg.view<ECS::MeshCollider::Component>().each())
+            {
+                if (candidate == entity || reg.all_of<ECS::Mesh::Data>(candidate))
+                    continue;
+                if (!col.CollisionRef || !col.CollisionRef->SourceMesh)
+                    continue;
+
+                char label[128]{};
+                if (auto* nameTag = reg.try_get<ECS::Components::NameTag::Component>(candidate))
+                {
+                    std::snprintf(label, sizeof(label), "%s [%u]",
+                                  nameTag->Name.c_str(),
+                                  static_cast<uint32_t>(static_cast<entt::id_type>(candidate)));
+                }
+                else
+                {
+                    std::snprintf(label, sizeof(label), "Entity %u",
+                                  static_cast<uint32_t>(static_cast<entt::id_type>(candidate)));
+                }
+
+                const bool isSelected = (candidate == state.EntityB);
+                if (ImGui::Selectable(label, isSelected))
+                    state.EntityB = candidate;
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::EndCombo();
+        }
+    }
+
+    // --- Operation selector ---
+    ImGui::SeparatorText("Operation");
+    static constexpr const char* kOperationLabels[] = {"Union", "Intersection", "Difference"};
+    ImGui::Combo("Operation", &state.Operation, kOperationLabels, 3);
+
+    // --- Parameters ---
+    ImGui::DragFloat("Epsilon", &state.Epsilon, 1e-6f, 1e-8f, 1e-2f, "%.1e");
+
+    // --- Results display ---
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Output vertices: %zu", state.OutputVertexCount);
+        ImGui::Text("Output faces: %zu", state.OutputFaceCount);
+        if (state.LastExactResult)
+            ImGui::TextColored({0.2f, 0.8f, 0.2f, 1.0f}, "Exact result.");
+        if (state.LastUsedFallback)
+            ImGui::TextColored({0.8f, 0.6f, 0.2f, 1.0f}, "Used conservative fallback classifier.");
+    }
+
+    if (state.LastRunFailed)
+    {
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Boolean operation failed.");
+    }
+
+    if (state.LastPartialOverlap)
+    {
+        ImGui::TextColored({0.8f, 0.7f, 0.0f, 1.0f},
+                           "Partial overlap: not yet supported. Boolean CSG currently handles "
+                           "disjoint volumes and full containment only.");
+    }
+
+    // --- Apply button ---
+    const bool hasValidB = state.EntityB != entt::null && reg.valid(state.EntityB);
+    if (!hasValidB)
+        ImGui::TextDisabled("Select Entity B above to enable the operation.");
+
+    const bool canApply = meshA && hasValidB;
+    if (!canApply)
+        ImGui::BeginDisabled();
+
+    if (ImGui::Button("Apply Boolean"))
+    {
+        state.HasResults = false;
+        state.LastRunFailed = false;
+        state.LastPartialOverlap = false;
+
+        // Resolve mesh B.
+        const Geometry::Halfedge::Mesh* meshB = nullptr;
+        if (auto* mdB = reg.try_get<ECS::Mesh::Data>(state.EntityB); mdB && mdB->MeshRef)
+            meshB = mdB->MeshRef.get();
+        if (!meshB)
+        {
+            if (auto* colB = reg.try_get<ECS::MeshCollider::Component>(state.EntityB);
+                colB && colB->CollisionRef && colB->CollisionRef->SourceMesh)
+            {
+                meshB = colB->CollisionRef->SourceMesh.get();
+            }
+        }
+
+        if (!meshB)
+        {
+            state.LastRunFailed = true;
+        }
+        else
+        {
+            const auto op = static_cast<Geometry::Boolean::Operation>(state.Operation);
+            Geometry::Boolean::BooleanParams params{};
+            params.Epsilon = state.Epsilon;
+
+            Geometry::Halfedge::Mesh outMesh;
+            auto result = Geometry::Boolean::Compute(*meshA, *meshB, op, outMesh, params);
+
+            if (!result)
+            {
+                state.LastRunFailed = true;
+                state.LastPartialOverlap = true;
+            }
+            else
+            {
+                state.HasResults = true;
+                state.LastExactResult = result->ExactResult;
+                state.LastUsedFallback = result->UsedFallback;
+
+                // Spawn a new entity with the result mesh.
+                const char* opLabel = kOperationLabels[state.Operation];
+                char entityName[64]{};
+                std::snprintf(entityName, sizeof(entityName), "Boolean %s", opLabel);
+
+                entt::entity resultEntity = SpawnMeshEntity(
+                    engine, entityName, std::move(outMesh));
+
+                if (resultEntity != entt::null)
+                {
+                    // Count output stats from the spawned mesh.
+                    if (auto* md = reg.try_get<ECS::Mesh::Data>(resultEntity); md && md->MeshRef)
+                    {
+                        state.OutputVertexCount = md->MeshRef->VertexCount();
+                        state.OutputFaceCount = md->MeshRef->FaceCount();
+                    }
+                    else if (auto* col = reg.try_get<ECS::MeshCollider::Component>(resultEntity);
+                             col && col->CollisionRef && col->CollisionRef->SourceMesh)
+                    {
+                        state.OutputVertexCount = col->CollisionRef->SourceMesh->VertexCount();
+                        state.OutputFaceCount = col->CollisionRef->SourceMesh->FaceCount();
+                    }
+
+                    Core::Log::Info("BooleanCSG: {} -> {} vertices, {} faces",
+                                    opLabel, state.OutputVertexCount, state.OutputFaceCount);
+                }
+                else
+                {
+                    state.LastRunFailed = true;
+                    Core::Log::Warn("BooleanCSG: failed to create result mesh entity (empty geometry).");
+                }
+            }
+        }
+    }
+
+    if (!canApply)
+        ImGui::EndDisabled();
+
+    return false;
 }
 
 } // namespace Runtime::EditorUI

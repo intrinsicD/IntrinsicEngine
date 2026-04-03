@@ -94,6 +94,7 @@ export namespace Runtime::EditorUI
         SurfaceReconstruction,
         VectorHeat,
         Parameterization,
+        BooleanCSG,
     };
 
     struct GeometryProcessingCapabilities
@@ -386,6 +387,20 @@ export namespace Runtime::EditorUI
         std::size_t LastPoissonSolveIterations = 0;
     };
 
+    struct BooleanWidgetState
+    {
+        int Operation = 0; // 0=Union, 1=Intersection, 2=Difference
+        entt::entity EntityB = entt::null;
+        float Epsilon = 1e-5f;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        bool LastPartialOverlap = false;
+        bool LastExactResult = false;
+        bool LastUsedFallback = false;
+        std::size_t OutputVertexCount = 0;
+        std::size_t OutputFaceCount = 0;
+    };
+
     struct MeshAnalysisWidgetState
     {
         bool HasResults = false;
@@ -459,6 +474,9 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawParameterizationWidget(Runtime::Engine& engine,
                                                    entt::entity entity,
                                                    ParameterizationWidgetState& state);
+    [[nodiscard]] bool DrawBooleanWidget(Runtime::Engine& engine,
+                                         entt::entity entity,
+                                         BooleanWidgetState& state);
 
     // =========================================================================
     // InspectorController — component property inspector panel
@@ -506,6 +524,7 @@ export namespace Runtime::EditorUI
         SurfaceReconstructionWidgetState m_SurfaceReconstructionUi{};
         VectorHeatWidgetState m_VectorHeatUi{};
         ParameterizationWidgetState m_ParameterizationUi{};
+        BooleanWidgetState m_BooleanUi{};
     };
 
     // =========================================================================
@@ -536,6 +555,7 @@ export namespace Runtime::EditorUI
         SmoothingWidgetState m_SmoothingUi{};
         SubdivisionWidgetState m_SubdivisionUi{};
         ParameterizationWidgetState m_ParameterizationUi{};
+        BooleanWidgetState m_BooleanUi{};
 
         struct SelectionContext
         {
@@ -557,6 +577,7 @@ export namespace Runtime::EditorUI
         void OpenRepairPanel();
         void OpenMeshQualityPanel();
         void OpenParameterizationPanel();
+        void OpenBooleanPanel();
         void OpenWorkflowStack();
 
 
@@ -569,6 +590,7 @@ export namespace Runtime::EditorUI
         void DrawRepairPanel();
         void DrawMeshQualityPanel();
         void DrawParameterizationPanel();
+        void DrawBooleanPanel();
         void DrawMeshSpectralPanel();
         void DrawGraphSpectralPanel();
     };

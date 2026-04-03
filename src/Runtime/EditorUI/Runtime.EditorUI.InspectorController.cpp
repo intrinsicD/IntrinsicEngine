@@ -140,6 +140,7 @@ void InspectorController::Draw()
         m_SurfaceReconstructionUi = {};
         m_VectorHeatUi = {};
         m_ParameterizationUi = {};
+        m_BooleanUi = {};
     }
 
     // === Entity ID (always shown at top) ===
@@ -680,6 +681,9 @@ void InspectorController::Draw()
                         break;
                     case GeometryProcessingAlgorithm::Parameterization:
                         static_cast<void>(DrawParameterizationWidget(*m_Engine, selected, m_ParameterizationUi));
+                        break;
+                    case GeometryProcessingAlgorithm::BooleanCSG:
+                        static_cast<void>(DrawBooleanWidget(*m_Engine, selected, m_BooleanUi));
                         break;
                     }
 

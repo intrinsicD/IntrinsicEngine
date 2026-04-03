@@ -67,6 +67,7 @@ namespace Runtime::EditorUI
             case GeometryProcessingAlgorithm::Parameterization:
             case GeometryProcessingAlgorithm::ConvexHull:
             case GeometryProcessingAlgorithm::SurfaceReconstruction:
+            case GeometryProcessingAlgorithm::BooleanCSG:
             default:
                 return false;
             }
@@ -106,6 +107,7 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::SurfaceReconstruction: return "Surface Reconstruction";
         case GeometryProcessingAlgorithm::VectorHeat: return "Vector Heat Method";
         case GeometryProcessingAlgorithm::Parameterization: return "Parameterization";
+        case GeometryProcessingAlgorithm::BooleanCSG: return "Boolean CSG";
         default: return "Unknown";
         }
     }
@@ -179,6 +181,9 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::Parameterization:
             return GeometryProcessingDomain::MeshVertices
                 | GeometryProcessingDomain::MeshFaces;
+        case GeometryProcessingAlgorithm::BooleanCSG:
+            return GeometryProcessingDomain::MeshVertices
+                | GeometryProcessingDomain::MeshFaces;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -195,7 +200,7 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
-        static constexpr std::array<GeometryProcessingAlgorithm, 12> kAlgorithmOrder = {
+        static constexpr std::array<GeometryProcessingAlgorithm, 13> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
             GeometryProcessingAlgorithm::NormalEstimation,
             GeometryProcessingAlgorithm::ShortestPath,
@@ -203,6 +208,7 @@ namespace Runtime::EditorUI
             GeometryProcessingAlgorithm::Parameterization,
             GeometryProcessingAlgorithm::ConvexHull,
             GeometryProcessingAlgorithm::SurfaceReconstruction,
+            GeometryProcessingAlgorithm::BooleanCSG,
             GeometryProcessingAlgorithm::Remeshing,
             GeometryProcessingAlgorithm::Simplification,
             GeometryProcessingAlgorithm::Smoothing,

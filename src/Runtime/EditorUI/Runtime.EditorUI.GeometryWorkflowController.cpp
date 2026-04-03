@@ -53,6 +53,9 @@ void GeometryWorkflowController::OpenAlgorithmPanel(GeometryProcessingAlgorithm 
     case GeometryProcessingAlgorithm::Parameterization:
         OpenParameterizationPanel();
         break;
+    case GeometryProcessingAlgorithm::BooleanCSG:
+        OpenBooleanPanel();
+        break;
     case GeometryProcessingAlgorithm::KMeans:
     default:
         OpenWorkflowPanel();
@@ -153,6 +156,12 @@ void GeometryWorkflowController::OpenParameterizationPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Parameterization", [this]() { DrawParameterizationPanel(); });
     Interface::GUI::OpenPanel("Geometry - Parameterization");
+}
+
+void GeometryWorkflowController::OpenBooleanPanel()
+{
+    Interface::GUI::RegisterPanel("Geometry - Boolean CSG", [this]() { DrawBooleanPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Boolean CSG");
 }
 
 void GeometryWorkflowController::OpenMeshSpectralPanel()
@@ -279,6 +288,8 @@ void GeometryWorkflowController::DrawMenu()
         if (ImGui::MenuItem("Convex Hull"))
             Interface::GUI::OpenPanel("Inspector");
         if (ImGui::MenuItem("Surface Reconstruction"))
+            Interface::GUI::OpenPanel("Inspector");
+        if (ImGui::MenuItem("Boolean CSG"))
             Interface::GUI::OpenPanel("Inspector");
         ImGui::EndMenu();
     }
@@ -449,6 +460,27 @@ void GeometryWorkflowController::DrawGraphSpectralPanel()
 
     ImGui::Separator();
     static_cast<void>(DrawGraphSpectralWidget(*m_Engine, context.Selected, m_GraphSpectralUi));
+}
+
+void GeometryWorkflowController::DrawBooleanPanel()
+{
+    const auto context = GetSelectionContext();
+
+    ImGui::TextWrapped(
+        "Boolean CSG: combine two closed mesh volumes using Union, Intersection, or Difference. "
+        "Currently supports disjoint volumes and full containment. Partial overlap is detected but not yet handled.");
+    ImGui::Spacing();
+
+    if (!context.HasSelection)
+    {
+        ImGui::TextDisabled("Select a mesh entity (Entity A) to apply a Boolean operation.");
+        return;
+    }
+
+    ImGui::Text("Selected Entity: %u",
+                static_cast<uint32_t>(static_cast<entt::id_type>(context.Selected)));
+    ImGui::Separator();
+    static_cast<void>(DrawBooleanWidget(*m_Engine, context.Selected, m_BooleanUi));
 }
 
 } // namespace Runtime::EditorUI
