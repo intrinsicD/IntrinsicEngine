@@ -200,6 +200,7 @@ namespace
     {
         collision.LocalVertexLookupPoints.clear();
         collision.LocalVertexLookupIndices.clear();
+        collision.LocalVertexKdTree = {};
 
         if (collision.SourceMesh)
         {
@@ -292,9 +293,17 @@ namespace
         Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices,
                                               newNormals);
 
-        auto aabbs = Geometry::ToAABB(collider->CollisionRef->Positions);
-        collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
+        if (!collider->CollisionRef->Positions.empty())
+        {
+            auto aabbs = Geometry::ToAABB(collider->CollisionRef->Positions);
+            collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
+        }
+        else
+        {
+            collider->CollisionRef->LocalAABB = Geometry::AABB{};
+        }
 
+        collider->CollisionRef->LocalOctree = Geometry::Octree{};
         std::vector<Geometry::AABB> primitiveBounds;
         primitiveBounds.reserve(collider->CollisionRef->Indices.size() / 3);
         for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
@@ -302,6 +311,12 @@ namespace
             const uint32_t i0 = collider->CollisionRef->Indices[i];
             const uint32_t i1 = collider->CollisionRef->Indices[i + 1];
             const uint32_t i2 = collider->CollisionRef->Indices[i + 2];
+            if (i0 >= collider->CollisionRef->Positions.size()
+                || i1 >= collider->CollisionRef->Positions.size()
+                || i2 >= collider->CollisionRef->Positions.size())
+            {
+                continue;
+            }
             auto aabb = Geometry::AABB{
                 collider->CollisionRef->Positions[i0], collider->CollisionRef->Positions[i0]
             };
@@ -309,8 +324,11 @@ namespace
             aabb = Geometry::Union(aabb, collider->CollisionRef->Positions[i2]);
             primitiveBounds.push_back(aabb);
         }
-        static_cast<void>(collider->CollisionRef->LocalOctree.Build(
-            primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+        if (!primitiveBounds.empty())
+        {
+            static_cast<void>(collider->CollisionRef->LocalOctree.Build(
+                primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+        }
         RebuildCollisionVertexLookup(*collider->CollisionRef);
 
         Graphics::GeometryUploadRequest uploadReq;
