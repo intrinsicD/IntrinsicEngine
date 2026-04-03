@@ -11,6 +11,7 @@ module;
 
 #include <cstring>
 #include <string>
+#include <utility>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
@@ -19,6 +20,7 @@ module;
 module Runtime.EditorUI;
 
 import Runtime.Engine;
+import Core.Commands;
 import Graphics.Components;
 import Graphics.Geometry;
 import Geometry.MeshAnalysis;
@@ -52,6 +54,31 @@ namespace
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.3f, 1.0f), "[%s]", name);
         }
+    }
+
+    template <typename T, typename Fn>
+    void ApplyComponentCommand(Runtime::Engine& engine,
+                               entt::registry& registry,
+                               entt::entity entity,
+                               const char* commandName,
+                               Fn&& editFn)
+    {
+        auto* component = registry.try_get<T>(entity);
+        if (!component)
+            return;
+
+        T before = *component;
+        if (!editFn(*component))
+            return;
+
+        T after = *component;
+        auto cmd = Core::MakeComponentChangeCommand<T>(
+            commandName,
+            &registry,
+            entity,
+            std::move(before),
+            std::move(after));
+        (void)engine.GetCommandHistory().Execute(std::move(cmd));
     }
 }
 
@@ -210,8 +237,16 @@ void InspectorController::Draw()
                 if (auto* line = reg.try_get<ECS::Line::Component>(selected))
                 {
                     ImGui::SeparatorText("Wireframe Settings");
-                    ColorEdit4("Wire Color", line->Color);
-                    ImGui::SliderFloat("Wire Width", &line->Width, 0.5f, 32.0f, "%.1f");
+                    ApplyComponentCommand<ECS::Line::Component>(*m_Engine, reg, selected, "Inspector: Wire Color",
+                        [](auto& component)
+                        {
+                            return ColorEdit4("Wire Color", component.Color);
+                        });
+                    ApplyComponentCommand<ECS::Line::Component>(*m_Engine, reg, selected, "Inspector: Wire Width",
+                        [](auto& component)
+                        {
+                            return ImGui::SliderFloat("Wire Width", &component.Width, 0.5f, 32.0f, "%.1f");
+                        });
                     ImGui::Checkbox("Overlay##Wire", &line->Overlay);
                     if (line->HasPerEdgeColors)
                         ImGui::Checkbox("Per-Edge Colors", &line->ShowPerEdgeColors);
@@ -222,11 +257,23 @@ void InspectorController::Draw()
                 {
                     ImGui::SeparatorText("Vertex Settings");
                     PointRenderModeCombo("Render Mode##Point", pt->Mode);
-                    ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0001f, 1.0f, "%.5f",
-                                       ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat("Size Multiplier##Point", &pt->SizeMultiplier, 0.1f, 10.0f, "%.2f",
-                                       ImGuiSliderFlags_Logarithmic);
-                    ColorEdit4("Vertex Color", pt->Color);
+                    ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Vertex Size",
+                        [](auto& component)
+                        {
+                            return ImGui::SliderFloat("Vertex Size", &component.Size, 0.0001f, 1.0f, "%.5f",
+                                                      ImGuiSliderFlags_Logarithmic);
+                        });
+                    ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Vertex Size Multiplier",
+                        [](auto& component)
+                        {
+                            return ImGui::SliderFloat("Size Multiplier##Point", &component.SizeMultiplier, 0.1f, 10.0f, "%.2f",
+                                                      ImGuiSliderFlags_Logarithmic);
+                        });
+                    ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Vertex Color",
+                        [](auto& component)
+                        {
+                            return ColorEdit4("Vertex Color", component.Color);
+                        });
                 }
             }
         }
@@ -526,8 +573,16 @@ void InspectorController::Draw()
         {
             if (ImGui::CollapsingHeader("Line Rendering"))
             {
-                ColorEdit4("Line Color", line->Color);
-                ImGui::SliderFloat("Line Width", &line->Width, 0.5f, 32.0f, "%.1f");
+                ApplyComponentCommand<ECS::Line::Component>(*m_Engine, reg, selected, "Inspector: Line Color",
+                    [](auto& component)
+                    {
+                        return ColorEdit4("Line Color", component.Color);
+                    });
+                ApplyComponentCommand<ECS::Line::Component>(*m_Engine, reg, selected, "Inspector: Line Width",
+                    [](auto& component)
+                    {
+                        return ImGui::SliderFloat("Line Width", &component.Width, 0.5f, 32.0f, "%.1f");
+                    });
                 ImGui::Checkbox("Overlay##Line", &line->Overlay);
                 ImGui::Text("Edge Count: %u", line->EdgeCount);
 
@@ -541,11 +596,23 @@ void InspectorController::Draw()
             if (ImGui::CollapsingHeader("Point Rendering"))
             {
                 PointRenderModeCombo("Render Mode##StandalonePoint", pt->Mode);
-                ImGui::SliderFloat("Point Size", &pt->Size, 0.0001f, 1.0f, "%.5f",
-                                   ImGuiSliderFlags_Logarithmic);
-                ImGui::SliderFloat("Size Multiplier##StandalonePoint", &pt->SizeMultiplier, 0.1f, 10.0f, "%.2f",
-                                   ImGuiSliderFlags_Logarithmic);
-                ColorEdit4("Point Color", pt->Color);
+                ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Point Size",
+                    [](auto& component)
+                    {
+                        return ImGui::SliderFloat("Point Size", &component.Size, 0.0001f, 1.0f, "%.5f",
+                                                  ImGuiSliderFlags_Logarithmic);
+                    });
+                ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Point Size Multiplier",
+                    [](auto& component)
+                    {
+                        return ImGui::SliderFloat("Size Multiplier##StandalonePoint", &component.SizeMultiplier, 0.1f, 10.0f, "%.2f",
+                                                  ImGuiSliderFlags_Logarithmic);
+                    });
+                ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Point Color",
+                    [](auto& component)
+                    {
+                        return ColorEdit4("Point Color", component.Color);
+                    });
             }
         }
     }
