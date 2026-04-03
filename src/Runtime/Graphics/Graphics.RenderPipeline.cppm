@@ -301,6 +301,29 @@ export namespace Graphics
         uint32_t cascadeCount,
         float splitLambda);
 
+    // Computes per-cascade light-view-projection matrices by fitting a tight
+    // orthographic frustum around each cascade's camera-frustum slice in light
+    // space.  Applies texel snapping to stabilize shadow edges when the camera
+    // moves (eliminates sub-texel shimmer).
+    //
+    // Parameters:
+    //   cameraView / cameraProj — current camera matrices (Vulkan Y-flip convention).
+    //   lightDir               — normalized direction *toward* the light.
+    //   splits                 — normalized cascade split distances (output of ComputeCascadeSplitDistances).
+    //   cascadeCount           — number of active cascades (1–4).
+    //   cascadeResolution      — per-cascade shadow map width/height in texels (e.g. 2048).
+    //   nearPlane / farPlane   — camera near/far clip distances.
+    [[nodiscard]] std::array<glm::mat4, ShadowParams::MaxCascades>
+    ComputeCascadeViewProjections(
+        const glm::mat4& cameraView,
+        const glm::mat4& cameraProj,
+        const glm::vec3& lightDir,
+        const std::array<float, ShadowParams::MaxCascades>& splits,
+        uint32_t cascadeCount,
+        uint32_t cascadeResolution,
+        float nearPlane,
+        float farPlane);
+
     // Packs shadow cascade state into a GPU-friendly payload that can be
     // copied into global UBO/SSBO resources consumed by lit passes.
     [[nodiscard]] ShadowCascadeData PackShadowCascadeData(

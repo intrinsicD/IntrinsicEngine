@@ -3,6 +3,7 @@ module;
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <vector>
 #include <glm/glm.hpp>
@@ -70,6 +71,118 @@ namespace Graphics
         }
 
         return splits;
+    }
+
+    std::array<glm::mat4, ShadowParams::MaxCascades>
+    ComputeCascadeViewProjections(
+        const glm::mat4& cameraView,
+        const glm::mat4& cameraProj,
+        const glm::vec3& lightDir,
+        const std::array<float, ShadowParams::MaxCascades>& splits,
+        uint32_t cascadeCount,
+        uint32_t cascadeResolution,
+        float nearPlane,
+        float farPlane)
+    {
+        std::array<glm::mat4, ShadowParams::MaxCascades> result{};
+        for (auto& m : result) m = glm::mat4(1.0f);
+
+        const uint32_t count = std::clamp(cascadeCount, 1u, ShadowParams::MaxCascades);
+        const float n = std::max(nearPlane, 1e-4f);
+        const float f = std::max(farPlane, n + 1e-4f);
+
+        // Camera inverse VP to unproject NDC corners back to world space.
+        const glm::mat4 invVP = glm::inverse(cameraProj * cameraView);
+
+        // Light view matrix: look from origin along the light direction.
+        // lightDir points *toward* the light, so the light looks along -lightDir.
+        const glm::vec3 up = (std::abs(glm::dot(lightDir, glm::vec3(0, 1, 0))) > 0.99f)
+            ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
+        const glm::mat4 lightView = glm::lookAt(glm::vec3(0.0f), -lightDir, up);
+
+        for (uint32_t c = 0; c < count; ++c)
+        {
+            // Cascade near/far in absolute depth.
+            const float cascadeNear = (c == 0) ? n : glm::mix(n, f, splits[c - 1]);
+            const float cascadeFar  = glm::mix(n, f, splits[c]);
+
+            // Convert near/far to NDC z (Vulkan: depth in [0,1]).
+            // z_ndc = (Proj[2][2]*ze + Proj[3][2]) / (-ze)  where ze is view-space z (negative).
+            auto depthToNDC = [&](float depth) -> float {
+                float ze = -depth; // view-space z is negative
+                return (cameraProj[2][2] * ze + cameraProj[3][2]) / (-ze);
+            };
+            const float zNear = depthToNDC(cascadeNear);
+            const float zFar  = depthToNDC(cascadeFar);
+
+            // 8 corners of the cascade frustum slice in NDC, then unproject to world space.
+            glm::vec3 corners[8];
+            int idx = 0;
+            for (float z : {zNear, zFar})
+            {
+                for (float y : {-1.0f, 1.0f})
+                {
+                    for (float x : {-1.0f, 1.0f})
+                    {
+                        glm::vec4 ndc(x, y, z, 1.0f);
+                        glm::vec4 world = invVP * ndc;
+                        corners[idx++] = glm::vec3(world) / world.w;
+                    }
+                }
+            }
+
+            // Transform corners to light space and find AABB.
+            glm::vec3 minBounds(std::numeric_limits<float>::max());
+            glm::vec3 maxBounds(std::numeric_limits<float>::lowest());
+            for (int i = 0; i < 8; ++i)
+            {
+                glm::vec3 lsCorner = glm::vec3(lightView * glm::vec4(corners[i], 1.0f));
+                minBounds = glm::min(minBounds, lsCorner);
+                maxBounds = glm::max(maxBounds, lsCorner);
+            }
+
+            // Extend Z range for shadow casters behind the camera frustum.
+            const float zMargin = (maxBounds.z - minBounds.z) * 0.5f;
+            minBounds.z -= zMargin;
+
+            // Orthographic projection in light space.
+            glm::mat4 lightProj = glm::ortho(
+                minBounds.x, maxBounds.x,
+                minBounds.y, maxBounds.y,
+                -maxBounds.z, -minBounds.z); // negate z: glm::ortho expects near < far (positive)
+            lightProj[1][1] *= -1.0f; // Vulkan Y-flip
+
+            // --- Texel snapping: quantize the shadow-map origin in NDC space ---
+            // The standard technique (used by MJP / TheRealMJP) rounds the XY
+            // translation of the final LightViewProj to the nearest texel boundary
+            // in post-projection shadow-map space.  This eliminates sub-texel jitter
+            // from camera movement while preserving the cascade extent.
+            glm::mat4 shadowMatrix = lightProj * lightView;
+            if (cascadeResolution > 0u)
+            {
+                const float halfRes = static_cast<float>(cascadeResolution) * 0.5f;
+
+                // Project the origin through the shadow matrix to find its position
+                // in shadow-map texels, round to the nearest texel, then compute
+                // the fractional offset to apply back.
+                glm::vec4 originNDC = shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+                // NDC xy in [-1,1] → texel coords in [0, resolution].
+                float texelX = originNDC.x * halfRes;
+                float texelY = originNDC.y * halfRes;
+                float roundedX = std::round(texelX);
+                float roundedY = std::round(texelY);
+                float offsetX = (roundedX - texelX) / halfRes;
+                float offsetY = (roundedY - texelY) / halfRes;
+
+                // Apply the correction to the projection's translation component.
+                shadowMatrix[3][0] += offsetX;
+                shadowMatrix[3][1] += offsetY;
+            }
+
+            result[c] = shadowMatrix;
+        }
+
+        return result;
     }
 
     ShadowCascadeData PackShadowCascadeData(
