@@ -454,6 +454,130 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 
 ---
 
+## 16. Geometry Operator UI Wiring Pattern
+
+**What:** Wiring an existing geometry backend operator (Pattern #3) into the editor UI so users can invoke it from the Inspector or a dedicated Geometry panel. This is a mechanical multi-file checklist — every touchpoint must be updated together.
+
+**Checklist (all required unless noted):**
+
+| Step | File | What to add |
+|------|------|------------|
+| 1 | `Runtime.EditorUI.cppm` | New enum entry in `GeometryProcessingAlgorithm` |
+| 2 | `Runtime.EditorUI.cppm` | New `XxxWidgetState` struct with UI params + diagnostic fields |
+| 3 | `Runtime.EditorUI.cppm` | `[[nodiscard]] bool DrawXxxWidget(Engine&, entity, XxxWidgetState&)` declaration |
+| 4 | `Runtime.EditorUI.cppm` | Add `XxxWidgetState m_XxxUi{}` member to `InspectorController` |
+| 5 | `Runtime.EditorUI.cpp` | Add label in `GeometryProcessingAlgorithmLabel()` switch |
+| 6 | `Runtime.EditorUI.cpp` | Add domain support in `GetSupportedDomains()` switch |
+| 7 | `Runtime.EditorUI.cpp` | Add to `kAlgorithmOrder` array (**update the array size**) |
+| 8 | `Runtime.EditorUI.cpp` | If topology-modifying, add to `IsSurfaceTopologyAlgorithm()` (do not rely on default fallback) |
+| 9 | `Runtime.EditorUI.Widgets.cpp` | Add `import Geometry.Xxx;` if not already imported |
+| 10 | `Runtime.EditorUI.Widgets.cpp` | Implement `DrawXxxWidget()` following the existing widget template |
+| 11 | `Runtime.EditorUI.InspectorController.cpp` | Add `case` in the algorithm `switch` |
+| 12 | `Runtime.EditorUI.InspectorController.cpp` | Add to "Open Dedicated Panel" exclusion list if inspector-only |
+| 13 | `Runtime.EditorUI.InspectorController.cpp` | Add `m_XxxUi = {};` in the entity-change reset block |
+| 14 | *(optional)* `Runtime.EditorUI.GeometryWorkflowController.cpp` | Add dedicated panel + menu entry if the operator deserves one |
+| 15 | `tests/Test_EditorUI.cpp` | Update `ASSERT_EQ(entries.size(),Nu)` and algorithm ordering assertions |
+| 16 | `TODO.md` + `ROADMAP.md` | Remove completed item from TODO, update ROADMAP wired-operator list |
+
+**Widget template:** Widgets follow a common skeleton:
+
+```cpp
+bool DrawXxxWidget(Runtime::Engine& engine, entt::entity entity, XxxWidgetState& state)
+{
+    // 1. Domain badges
+    DrawDomainBadges(supportedDomains);
+    // 2. Validate entity capabilities; ImGui::TextDisabled if not applicable
+    // 3. Draw parameter UI (sliders, combos, checkboxes) bound to state
+    // 4. Show last-result diagnostics if state.HasResults
+    // 5. "Run" button → call backend API → populate state diagnostics
+    //    For in-place: use ApplySurfaceMeshOperator()
+    //    For new entity: use SpawnMeshEntity() or scene.CreateEntity() + ECS setup
+    // 6. Return true if entity was modified, false otherwise
+}
+```
+
+**Canonical examples:**
+- `DrawShortestPathWidget()` — analysis + entity creation (Graph), SubElementSelection input.
+- `DrawRemeshingWidget()` — in-place mesh modification via `ApplySurfaceMeshOperator()`.
+- `DrawConvexHullWidget()` — entity creation (Mesh) via `SpawnMeshEntity()`.
+- `DrawSurfaceReconstructionWidget()` — point-cloud-only guard, entity creation (Mesh).
+- `DrawNormalEstimationWidget()` — point-cloud-only, attribute-only (no entity creation).
+
+**Use when:**
+- Any geometry backend operator (Pattern #3) needs to become accessible from the editor UI.
+
+---
+
+## 17. Standalone Entity Creation from Geometry Results
+
+**What:** When a geometry operator produces a new mesh, graph, or point cloud (rather than modifying the selected entity in-place), it must create a standalone ECS entity with all components needed for rendering, picking, and selection.
+
+### Mesh entity creation recipe
+
+Use the `SpawnMeshEntity()` helper in `Runtime.EditorUI.Widgets.cpp` (anonymous namespace). It handles the full pipeline:
+
+1. Extract indexed triangles + normals from `Halfedge::Mesh`
+2. Build collision data (`GeometryCollisionData` with AABB, octree, vertex lookup)
+3. Upload geometry to GPU via `GeometryGpuData::CreateAsync` (staged mode)
+4. Emplace all required ECS components:
+
+| Component | Purpose |
+|-----------|---------|
+| `NameTag::Component` | Entity display name |
+| `Transform::Component` + `WorldMatrix` | Spatial placement |
+| `DataAuthority::MeshTag` | Single-authority invariant |
+| `Selection::SelectableTag` | Enables click selection |
+| `Selection::PickID` | **Required** for immediate GPU picking (explicit, not deferred) |
+| `MeshCollider::Component` | CPU raycasting + collision data |
+| `Surface::Component` | Enters `MeshRendererLifecycle` for GPU rendering (must have valid `Geometry` handle) |
+| `Mesh::Data` | Halfedge mesh reference + dirty flags |
+| `PrimitiveBVH::Data` | Broadphase acceleration for picking |
+
+Fire `ECS::Events::EntitySpawned` after creation.
+
+**Critical:** `Surface::Component.Geometry` must hold a **valid uploaded handle** — the lifecycle system skips entities with `!Geometry.IsValid()`. Upload geometry inline during entity creation, not deferred.
+
+**Critical:** Emplace `PickID` explicitly. The `SelectionModule` auto-assignment sweep has a multi-frame delay and uses a different ID namespace than `SceneManager`.
+
+### Graph entity creation recipe
+
+Simpler — `GraphLifecycleSystem` handles GPU upload when `GpuDirty = true`:
+
+```cpp
+entt::entity e = scene.CreateEntity("Name");
+reg.emplace<ECS::DataAuthority::GraphTag>(e);
+auto& gd = reg.emplace<ECS::Graph::Data>(e);
+gd.GraphRef = std::make_shared<Geometry::Graph::Graph>(std::move(graph));
+gd.GpuDirty = true;
+reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+```
+
+### Point cloud entity creation recipe
+
+Similar to Graph — `PointCloudLifecycleSystem` handles GPU upload:
+
+```cpp
+entt::entity e = scene.CreateEntity("Name");
+reg.emplace<ECS::DataAuthority::PointCloudTag>(e);
+auto& pcd = reg.emplace<ECS::PointCloud::Data>(e);
+pcd.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(std::move(cloud));
+pcd.GpuDirty = true;
+reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+```
+
+**`TransferToken` note:** `GeometryGpuData::CreateAsync()` returns a `[gpuData, token]` pair. The token can be safely dropped — the `TransferManager` tracks in-flight transfers internally. This matches all existing call sites including `ApplySurfaceMeshOperator`.
+
+**Canonical examples:**
+- `SpawnMeshEntity()` in `Runtime.EditorUI.Widgets.cpp` — full mesh creation with GPU upload.
+- `DrawShortestPathWidget()` line 2218 — graph entity creation.
+- `SpawnDemoPointCloud()` in `main.cpp` — point cloud entity creation.
+- `OverlayEntityFactory::CreateMeshOverlay()` — child mesh overlay (with hierarchy attachment).
+
+**Use when:**
+- A geometry operator produces a new geometry result that should appear as a separate entity in the scene.
+
+---
+
 ### Rejected Patterns (with rationale)
 
 #### ~~15. Enumerate/Zip Iteration Utilities~~ — DROPPED
@@ -493,6 +617,8 @@ The existing `Utils::LockFreeQueue<T>` (`Utils.LockFreeQueue.cppm`) is **already
 | 13 | BDA Shared-Buffer | Implemented | — | Shared vertex data topology views |
 | 14 | Commit Hygiene for Render Contracts | Implemented | — | Separating cross-cutting renderer contract changes |
 | 15 | Command Pattern (Undo/Redo) | Implemented | — | Reversible editor operations |
+| 16 | Geometry Operator UI Wiring | Implemented | — | Connecting geometry algorithms to editor UI |
+| 17 | Standalone Entity Creation | Implemented | — | Spawning mesh/graph/point cloud entities from results |
 | ~~15~~ | ~~Enumerate/Zip Utilities~~ | Dropped | — | C++23 `std::views::enumerate`/`zip` covers this natively |
 | ~~16~~ | ~~ComponentGui Dispatch~~ | Dropped | — | Only 6 component checks; not justified at current scale |
 | ~~17~~ | ~~Policy-Based Composition~~ | Dropped | — | `std::variant` dispatch (Pattern doc) already covers the need |
