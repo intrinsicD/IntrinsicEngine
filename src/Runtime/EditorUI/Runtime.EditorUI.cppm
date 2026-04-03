@@ -305,6 +305,7 @@ export namespace Runtime::EditorUI
     {
         bool StopWhenAllTargetsSettled = true;
         int MaxSettledVertices = 0;
+        int SourceCount = 1;
         bool HasResults = false;
         bool LastRunFailed = false;
         std::size_t LastSettledVertexCount = 0;
@@ -315,6 +316,8 @@ export namespace Runtime::EditorUI
         bool LastExtractFailed = false;
         std::size_t LastPathVertexCount = 0;
         std::size_t LastPathEdgeCount = 0;
+        bool LastPathLengthValid = false;
+        double LastPathLength = 0.0;
     };
 
     struct MeshAnalysisWidgetState
