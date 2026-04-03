@@ -440,8 +440,10 @@ namespace Runtime
         if (!frame.HasAllocators())
         {
             Core::Log::Error("RenderOrchestrator::PrepareFrame: FrameContext slot {} has no render allocators — "
-                             "skipping frame. FrameContextRing::Configure() must allocate per-slot arenas.",
+                             "skipping frame. FrameContextRing::Configure() must allocate per-slot arenas. "
+                             "Ending acquired renderer frame to keep acquire/present rhythm consistent.",
                              frame.SlotIndex);
+            m_Impl->RenderDriver->EndFrame();
             return;
         }
         m_Impl->RenderDriver->RebindFrameAllocators(frame.GetRenderArena(), frame.GetRenderScope());
