@@ -540,7 +540,10 @@ A dedicated peer-review pass was run against engine-facing module interfaces and
 #### P0 — Baseline measurement (before code changes)
 - [ ] Capture clean build time and no-op incremental build time.
 - [ ] Capture representative “touch one render source file” incremental build time.
-- [ ] Record module fan-out for Tier A/B interfaces.
+- [x] Record module fan-out for Tier A/B interfaces. (`tools/module_fanout_baseline_2026-04-03.md`)
+
+Baseline status note (2026-04-03):
+- Local `cmake --preset dev` configure is currently blocked in this container by missing X11 RandR development headers (`libxrandr`), so the two build-time measurements above remain pending until that dependency is installed.
 
 #### P1 — Tier A migration
 - [x] Introduce PImpl for `Runtime::RenderOrchestrator`.
