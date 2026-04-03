@@ -653,6 +653,11 @@ namespace Graphics::Passes
                                         data.Color = builder.WriteColor(sceneColor, colorInfo);
                                         data.Depth = builder.WriteDepth(depth, depthInfo);
 
+                                        // Read shadow atlas for PCF sampling (dependency on ShadowPass output).
+                                        const RGResourceHandle shadowAtlas = ctx.Blackboard.Get(RenderResource::ShadowAtlas);
+                                        if (shadowAtlas.IsValid())
+                                            builder.Read(shadowAtlas, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+
                                         // Declare dependencies on the GPU-culled buffers to enforce
                                         // compute→graphics barriers between ForwardCull and ForwardRaster.
                                         if (m_Stage3IndirectPacked[fi])
@@ -911,8 +916,6 @@ namespace Graphics::Passes
             [this, &ctx, depthPipeline = m_DepthPrepassPipeline, stream]
             (const DepthPrepassData&, const RGRegistry&, VkCommandBuffer cmd)
             {
-                const uint32_t fi = ctx.FrameIndex % FRAMES;
-
                 if (stream->Batches.empty())
                     return;
 

@@ -34,6 +34,9 @@ export namespace Graphics::Passes
                         RHI::DescriptorAllocator& descriptorPool,
                         RHI::DescriptorLayout& globalLayout) override;
 
+        // Store the global descriptor set layout for deferred pipeline (set 1 = Camera UBO + shadow atlas).
+        void SetGlobalSetLayout(VkDescriptorSetLayout layout) { m_GlobalSetLayout = layout; }
+
         void Shutdown() override;
         void AddPasses(RenderPassContext& ctx) override;
         void OnResize(uint32_t width, uint32_t height) override { (void)width; (void)height; }
@@ -66,6 +69,9 @@ export namespace Graphics::Passes
 
         // Dummy image for safe initial descriptor bindings.
         std::unique_ptr<RHI::VulkanImage> m_DummySampled;
+
+        // Global descriptor set layout (set 1 in deferred pipeline: Camera UBO + shadow atlas).
+        VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
 
         // Track G-buffer resource handles from last AddPasses for PostCompile.
         RGResourceHandle m_LastNormalHandle{};

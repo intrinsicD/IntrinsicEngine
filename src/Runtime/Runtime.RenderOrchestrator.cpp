@@ -33,6 +33,7 @@ import Graphics.MaterialRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.Pipelines;
 import Graphics.RenderDriver;
+import Graphics.RenderPipeline;
 import Graphics.ShaderRegistry;
 import Interface;
 import Runtime.RenderExtraction;
@@ -361,6 +362,30 @@ namespace Runtime
         // Override the default lighting with the driver-owned settings
         // so UI-driven changes propagate into the rendered frame.
         world.Lighting = m_Impl->RenderDriver->GetLightEnvironment();
+
+        // Compute cascade light-view-projection matrices from camera state.
+        if (world.Lighting.Shadows.Enabled && world.Lighting.Shadows.CascadeCount > 0)
+        {
+            const auto& cam = world.View.Camera;
+            const auto splits = Graphics::ComputeCascadeSplitDistances(
+                cam.Near, cam.Far, world.Lighting.Shadows.CascadeCount,
+                world.Lighting.Shadows.SplitLambda);
+            world.Lighting.Shadows.CascadeSplits = splits;
+
+            constexpr uint32_t kCascadeResolution = 2048u;
+            const auto cascadeMatrices = Graphics::ComputeCascadeViewProjections(
+                cam.ViewMatrix, cam.ProjectionMatrix,
+                world.Lighting.LightDirection,
+                splits,
+                world.Lighting.Shadows.CascadeCount,
+                kCascadeResolution,
+                cam.Near, cam.Far);
+
+            for (uint32_t i = 0; i < Graphics::ShadowParams::MaxCascades; ++i)
+                world.Lighting.ShadowCascades.LightViewProjection[i] = cascadeMatrices[i];
+            world.Lighting.ShadowCascades.SplitDistances = splits;
+            world.Lighting.ShadowCascades.CascadeCount = world.Lighting.Shadows.CascadeCount;
+        }
 
         // Snapshot transient debug draw data into immutable vectors so render
         // passes consume frozen state instead of the live DebugDraw accumulator.

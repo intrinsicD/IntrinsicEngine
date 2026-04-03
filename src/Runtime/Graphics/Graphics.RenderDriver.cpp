@@ -1348,6 +1348,21 @@ namespace Graphics
         if (m_Impl->m_ActivePipeline)
             m_Impl->m_ActivePipeline->PostCompile(frameIndex, m_Impl->m_LastDebugImages, m_Impl->m_LastDebugPasses);
 
+        // Update global descriptor set shadow atlas binding with the compiled atlas view.
+        {
+            VkImageView shadowAtlasView = VK_NULL_HANDLE;
+            const auto shadowAtlasName = GetRenderResourceName(RenderResource::ShadowAtlas);
+            for (const auto& img : m_Impl->m_LastDebugImages)
+            {
+                if (img.Name == shadowAtlasName && img.View != VK_NULL_HANDLE)
+                {
+                    shadowAtlasView = img.View;
+                    break;
+                }
+            }
+            m_Impl->m_GlobalResources.UpdateShadowAtlasBinding(shadowAtlasView);
+        }
+
         m_Impl->m_RenderGraph.Execute(m_Impl->m_Presentation.GetCommandBuffer());
 
         // Feed per-pass CPU timings from RenderGraph into Telemetry.

@@ -189,12 +189,19 @@ namespace Graphics::Passes
                 data.Material = builder.Read(material, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                 data.Depth    = builder.Read(depth,    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
+                // Read shadow atlas for PCF sampling (dependency on ShadowPass output).
+                const RGResourceHandle shadowAtlas = ctx.Blackboard.Get(RenderResource::ShadowAtlas);
+                if (shadowAtlas.IsValid())
+                    builder.Read(shadowAtlas, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+
                 RGAttachmentInfo colorInfo{};
                 colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                 colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                 data.HDR = builder.WriteColor(hdr, colorInfo);
             },
-            [this, fi, resolution = ctx.Resolution, pc]
+            [this, fi, resolution = ctx.Resolution, pc,
+             globalSet = ctx.GlobalDescriptorSet,
+             globalDynOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset)]
             (const PassData&, const RGRegistry&, VkCommandBuffer cmd)
             {
                 SetViewportScissor(cmd, resolution);
@@ -205,6 +212,15 @@ namespace Graphics::Passes
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                         m_DeferredPipeline->GetLayout(),
                                         0, 1, &m_Sets[fi], 0, nullptr);
+
+                // Bind global set (set 1) for shadow cascade data + shadow atlas sampler.
+                if (globalSet != VK_NULL_HANDLE && m_GlobalSetLayout != VK_NULL_HANDLE)
+                {
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                            m_DeferredPipeline->GetLayout(),
+                                            1, 1, &globalSet,
+                                            1, &globalDynOffset);
+                }
 
                 vkCmdPushConstants(cmd, m_DeferredPipeline->GetLayout(),
                                    VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
@@ -279,6 +295,8 @@ namespace Graphics::Passes
         pb.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
         pb.SetColorFormats({outputFormat});
         pb.AddDescriptorSetLayout(m_SetLayout); // set = 0: G-buffer samplers
+        if (m_GlobalSetLayout != VK_NULL_HANDLE)
+            pb.AddDescriptorSetLayout(m_GlobalSetLayout); // set = 1: Camera UBO + shadow atlas
 
         VkPushConstantRange pcr{};
         pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
