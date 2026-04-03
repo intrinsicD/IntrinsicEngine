@@ -67,6 +67,13 @@ export namespace RHI
         alignas(16) glm::vec4 LightDirAndIntensity;   // xyz = normalised direction to light, w = intensity
         alignas(16) glm::vec4 LightColor;              // xyz = light color, w = unused
         alignas(16) glm::vec4 AmbientColorAndIntensity; // xyz = ambient color, w = ambient intensity
+
+        // Cascaded shadow state for lit passes.
+        alignas(16) glm::mat4 ShadowCascadeMatrices[4];
+        // x/y/z/w = split distances in [0,1], monotonic and with w = 1.
+        alignas(16) glm::vec4 ShadowCascadeSplitsAndCount;
+        // x = depth bias, y = normal bias, z = PCF radius, w = cascade count.
+        alignas(16) glm::vec4 ShadowBiasAndFilter;
     };
 
     // WARNING: This block is 128 bytes — the Vulkan guaranteed minimum.

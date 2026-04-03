@@ -281,6 +281,17 @@ export namespace Graphics
         float SplitLambda = 0.85f;
     };
 
+    struct ShadowCascadeData
+    {
+        std::array<glm::mat4, ShadowParams::MaxCascades> LightViewProjection{
+            glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f)};
+        std::array<float, ShadowParams::MaxCascades> SplitDistances{1.0f, 1.0f, 1.0f, 1.0f};
+        uint32_t CascadeCount = 0;
+        float DepthBias = 0.0f;
+        float NormalBias = 0.0f;
+        float PcfFilterRadius = 0.0f;
+    };
+
     // Practical split scheme for CSM:
     // d_i = λ * d_log + (1-λ) * d_uniform, normalized into [0, 1]
     // where i in [1, cascadeCount].
@@ -289,6 +300,12 @@ export namespace Graphics
         float farPlane,
         uint32_t cascadeCount,
         float splitLambda);
+
+    // Packs shadow cascade state into a GPU-friendly payload that can be
+    // copied into global UBO/SSBO resources consumed by lit passes.
+    [[nodiscard]] ShadowCascadeData PackShadowCascadeData(
+        const ShadowParams& shadowParams,
+        std::span<const glm::mat4> cascadeMatrices);
 
     struct LightEnvironmentPacket
     {
@@ -304,6 +321,7 @@ export namespace Graphics
 
         // Shadow defaults chosen for stable cascaded-shadow-map bootstrapping.
         ShadowParams Shadows{};
+        ShadowCascadeData ShadowCascades{};
     };
 
     struct PickingSurfacePacket

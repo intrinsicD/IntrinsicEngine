@@ -105,11 +105,26 @@ namespace Graphics
     void GlobalResources::Update(const CameraComponent& camera, const LightEnvironmentPacket& lighting, uint32_t frameIndex)
     {
         RHI::CameraBufferObject ubo{};
+        const ShadowCascadeData packedShadowCascades =
+            PackShadowCascadeData(lighting.Shadows, lighting.ShadowCascades.LightViewProjection);
+
         ubo.View = camera.ViewMatrix;
         ubo.Proj = camera.ProjectionMatrix;
         ubo.LightDirAndIntensity = glm::vec4(lighting.LightDirection, lighting.LightIntensity);
         ubo.LightColor = glm::vec4(lighting.LightColor, 0.0f);
         ubo.AmbientColorAndIntensity = glm::vec4(lighting.AmbientColor, lighting.AmbientIntensity);
+        for (uint32_t i = 0; i < ShadowParams::MaxCascades; ++i)
+            ubo.ShadowCascadeMatrices[i] = packedShadowCascades.LightViewProjection[i];
+        ubo.ShadowCascadeSplitsAndCount = glm::vec4(
+            packedShadowCascades.SplitDistances[0],
+            packedShadowCascades.SplitDistances[1],
+            packedShadowCascades.SplitDistances[2],
+            packedShadowCascades.SplitDistances[3]);
+        ubo.ShadowBiasAndFilter = glm::vec4(
+            packedShadowCascades.DepthBias,
+            packedShadowCascades.NormalBias,
+            packedShadowCascades.PcfFilterRadius,
+            static_cast<float>(packedShadowCascades.CascadeCount));
 
         const size_t dynamicOffset = frameIndex * m_CameraAlignedSize;
 
