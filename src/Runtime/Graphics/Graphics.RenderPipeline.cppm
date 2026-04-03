@@ -365,6 +365,7 @@ export namespace Graphics
     struct SurfaceDrawPacket
     {
         Geometry::GeometryHandle Geometry{};
+        glm::mat4 WorldMatrix{1.0f};
         std::vector<uint32_t> FaceColors{};
         std::vector<uint32_t> VertexColors{};
         std::vector<uint32_t> VertexLabels{};

@@ -354,7 +354,8 @@ namespace Runtime
         m_SceneManager->SetGeometryStorage(&m_RenderOrchestrator->GetGeometryStorage());
         if (m_RenderOrchestrator->GetGPUScenePtr())
         {
-            m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene()
+            m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene(),
+                                            m_GraphicsBackend->GetDevice()
 #ifdef INTRINSIC_HAS_CUDA
                                             , m_GraphicsBackend->GetCudaDevice()
 #endif

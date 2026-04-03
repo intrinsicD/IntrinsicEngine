@@ -74,10 +74,50 @@ namespace Runtime
         }
 #endif
 
-        if (comp.GpuSlot == ECS::kInvalidGpuSlot)
-            return;
+        if (comp.GpuSlot != ECS::kInvalidGpuSlot)
+            ReleaseGpuSlot(*m_GpuHookContext.GpuScene, comp);
 
-        ReleaseGpuSlot(*m_GpuHookContext.GpuScene, comp);
+        // Release geometry pool entries to prevent GPU memory leaks.
+        // Without this, GeometryGpuData (owning VkBuffer GPU memory) would
+        // remain active in the ResourcePool until pool destruction at shutdown.
+        if (m_GeometryStorage && m_GpuHookContext.Device)
+        {
+            const uint64_t frame = m_GpuHookContext.Device->GetGlobalFrameNumber();
+
+            if constexpr (std::is_same_v<T, ECS::Graph::Data>)
+            {
+                if (comp.GpuGeometry.IsValid())
+                {
+                    m_GeometryStorage->Remove(comp.GpuGeometry, frame);
+                    comp.GpuGeometry = {};
+                }
+                if (comp.GpuEdgeGeometry.IsValid())
+                {
+                    m_GeometryStorage->Remove(comp.GpuEdgeGeometry, frame);
+                    comp.GpuEdgeGeometry = {};
+                }
+            }
+            else if constexpr (std::is_same_v<T, ECS::PointCloud::Data>)
+            {
+                if (comp.GpuGeometry.IsValid())
+                {
+                    m_GeometryStorage->Remove(comp.GpuGeometry, frame);
+                    comp.GpuGeometry = {};
+                }
+            }
+            else if constexpr (std::is_same_v<T, ECS::MeshEdgeView::Component>
+                            || std::is_same_v<T, ECS::MeshVertexView::Component>)
+            {
+                if (comp.Geometry.IsValid())
+                {
+                    m_GeometryStorage->Remove(comp.Geometry, frame);
+                    comp.Geometry = {};
+                }
+            }
+            // Note: Surface::Component geometry is owned by the model loader
+            // and shared across submeshes; it is not removed here because
+            // multiple entities may reference the same geometry handle.
+        }
     }
 
     template <typename T>
@@ -88,7 +128,8 @@ namespace Runtime
             Graphics::VectorFieldManager::DestroyAllVectorFields(registry, comp.Visualization);
     }
 
-    void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene
+    void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene,
+                                       RHI::VulkanDevice& device
 #ifdef INTRINSIC_HAS_CUDA
                                        , RHI::CudaDevice* cudaDevice
 #endif
@@ -97,6 +138,7 @@ namespace Runtime
         DisconnectGpuHooks();
 
         m_GpuHookContext.GpuScene = &gpuScene;
+        m_GpuHookContext.Device = &device;
 #ifdef INTRINSIC_HAS_CUDA
         m_GpuHookContext.CudaDevice = cudaDevice;
 #endif
@@ -128,6 +170,7 @@ namespace Runtime
         reg.on_destroy<ECS::PointCloud::Data>().disconnect<&SceneManager::OnDataComponentDestroyed<ECS::PointCloud::Data>>(*this);
 
         m_GpuHookContext.GpuScene = nullptr;
+        m_GpuHookContext.Device = nullptr;
 #ifdef INTRINSIC_HAS_CUDA
         m_GpuHookContext.CudaDevice = nullptr;
 #endif

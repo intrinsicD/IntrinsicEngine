@@ -15,6 +15,7 @@ module Runtime.EditorUI;
 
 import Interface;
 
+import Core.Benchmark;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.Hash;

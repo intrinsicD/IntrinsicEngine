@@ -289,7 +289,6 @@ namespace Runtime
 
             for (auto [entity, surface] : view.each())
             {
-                (void)entity;
                 if (!surface.Geometry.IsValid())
                     continue;
 
@@ -299,6 +298,7 @@ namespace Runtime
                 {
                     packets.push_back(Graphics::SurfaceDrawPacket{
                         .Geometry = surface.Geometry,
+                        .WorldMatrix = ResolveDrawWorldMatrix(registry, entity),
                     });
                 }
 

@@ -209,11 +209,9 @@ TEST(SceneSchema, ShadowCascadeCount_AllowsSignedInputForRobustClamping)
     shadows["cascadeCount"] = -1;
 
     ASSERT_TRUE(shadows["cascadeCount"].is_number_integer());
-    EXPECT_NO_THROW({
-        const int64_t requested = shadows["cascadeCount"].get<int64_t>();
-        const int64_t clamped = std::clamp<int64_t>(requested, 1, 4);
-        EXPECT_EQ(clamped, 1);
-    });
+    const int64_t requested = shadows["cascadeCount"].get<int64_t>();
+    const int64_t clamped = std::clamp<int64_t>(requested, 1, 4);
+    EXPECT_EQ(clamped, 1);
 }
 
 TEST(SceneSchema, PointCloudRenderParams)

@@ -13,6 +13,7 @@ import Graphics;
 import RHI;
 import Core;
 import ECS;
+import Geometry;
 // Mock Device would be needed for a full GPU test,
 // but here we verify logic correctness via unit tests on CpuData
 

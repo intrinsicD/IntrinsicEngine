@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 import Runtime.Engine;
+import Runtime.FrameLoop;
 
 TEST(RuntimeEngineConfig, ValidateEngineConfig_ReportsErrorsForHardInvalidFields)
 {

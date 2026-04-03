@@ -8,6 +8,7 @@ export module Runtime.SceneManager;
 import Core.Assets;
 import Graphics.Geometry;
 import Graphics.GPUScene;
+import RHI.Device;
 import ECS;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;
@@ -73,9 +74,11 @@ export namespace Runtime
 
         // --- GPU hook management ---
 
-        // Connect the EnTT on_destroy<MeshRenderer> hook so that GPU slots
-        // are reclaimed immediately when entities are destroyed.
-        void ConnectGpuHooks(Graphics::GPUScene& gpuScene
+        // Connect the EnTT on_destroy hooks so that GPU scene slots and
+        // geometry pool entries are reclaimed immediately when entities
+        // are destroyed.
+        void ConnectGpuHooks(Graphics::GPUScene& gpuScene,
+                             RHI::VulkanDevice& device
 #ifdef INTRINSIC_HAS_CUDA
                              , RHI::CudaDevice* cudaDevice = nullptr
 #endif
@@ -103,6 +106,7 @@ export namespace Runtime
         struct GpuHookContext
         {
             Graphics::GPUScene* GpuScene = nullptr;
+            RHI::VulkanDevice* Device = nullptr;
 #ifdef INTRINSIC_HAS_CUDA
             RHI::CudaDevice* CudaDevice = nullptr;
 #endif
