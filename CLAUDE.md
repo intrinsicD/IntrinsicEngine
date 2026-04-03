@@ -359,6 +359,8 @@ These are the most frequent errors observed in recent agent-authored commits, ra
 
 4. **Clang 20 module access control.** Anonymous-namespace helpers in `.cpp` implementation units cannot name a class's private `Impl` type directly — Clang 20 enforces access control even inside the owning TU. Use `auto&` parameter deduction instead. Also: do not forward-declare types that are already visible from an imported module — Clang 20 rejects the redeclaration.
 
+5. **Hardcoded counts in tests and registration arrays.** When extending an enum or adding entries to a registration list (e.g., `GeometryProcessingAlgorithm`, `kAlgorithmOrder`), grep for all test assertions and array sizes that depend on the count. Hardcoded values like `ASSERT_EQ(entries.size(), 8u)` or fixed-size `std::array<..., 8>` silently break when new entries are added. Prefer `static_assert` on enum/array size where possible, and always search tests for the old count.
+
 ## Architecture & Markdown Sync Contract
 
 When architecture state changes, keep the architecture markdown documents synchronized in the same change:
