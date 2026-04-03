@@ -10,6 +10,7 @@ import RHI.Bindless;
 import RHI.Buffer;
 import RHI.Descriptors;
 import RHI.Device;
+import RHI.Image;
 import RHI.TransientAllocator;
 import Graphics.Camera;
 import Graphics.RenderPipeline;
@@ -40,6 +41,11 @@ export namespace Graphics
 
         // Called to reset per-frame transient allocators.
         void BeginFrame(uint32_t frameIndex);
+
+        // Update the shadow atlas sampler binding in the global descriptor set.
+        // Called after render graph compilation when the actual atlas image view
+        // is available. Pass VK_NULL_HANDLE to bind the dummy (shadows disabled).
+        void UpdateShadowAtlasBinding(VkImageView atlasView);
 
         // -----------------------------------------------------------------
         // Accessors
@@ -72,6 +78,12 @@ export namespace Graphics
         
         // Transient GPU memory (page allocator).
         std::unique_ptr<RHI::TransientAllocator> m_TransientAllocator;
+
+        // Shadow atlas comparison sampler for hardware-accelerated PCF.
+        VkSampler m_ShadowComparisonSampler = VK_NULL_HANDLE;
+
+        // 1x1 dummy depth image for safe initial shadow atlas binding.
+        std::unique_ptr<RHI::VulkanImage> m_DummyShadowImage;
 
         size_t m_MinUboAlignment = 0;
         size_t m_CameraDataSize = 0;

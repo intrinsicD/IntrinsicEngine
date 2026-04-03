@@ -34,6 +34,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `Albedo` | `R8G8B8A8_UNORM` | Frame transient | Deferred-capable surface albedo target |
 | `Material0` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface material/shading parameters |
 | `SceneColorHDR` | `R16G16B16A16_SFLOAT` | Frame transient | Geometry/lighting output |
+| `ShadowAtlas` | `D32_SFLOAT` | Frame transient | Cascade shadow depth atlas (horizontal strip, one cascade per column block). Produced by `ShadowPass`, sampled by `SurfacePass` (forward) and `CompositionPass` (deferred) |
 | `SceneColorLDR` | Swapchain format | Frame transient | Post-process + overlay composition target |
 | `SelectionMask` | `R8_UNORM` | Frame transient | Reserved for future outline mask split |
 | `SelectionOutline` | Swapchain format | Frame transient | Reserved for future standalone outline target |
@@ -47,8 +48,9 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 |------|--------|---------|----------------------------|
 | `PickingPass` | `SceneDepth` | `EntityId` | Clears both; no swapchain ownership |
 | `DepthPrepass` | GPUScene buffers | `SceneDepth` | Depth-only early-Z fill (triangle-list geometry only). Clears depth to 1.0. Recipe-driven: active only when `FrameRecipe::DepthPrepass` is true. Internal to `SurfacePass` (shares draw stream and GPU culling infrastructure) |
-| `SurfacePass` | `SceneDepth`, GPUScene buffers | forward: `SceneColorHDR`; deferred: `SceneNormal` + `Albedo` + `Material0`, `SceneDepth` | Opaque surface lane. When depth prepass is active, loads existing depth and uses `VK_COMPARE_OP_EQUAL` (zero overdraw). Otherwise clears depth with `VK_COMPARE_OP_LESS` |
-| `CompositionPass` | deferred: `SceneNormal`, `Albedo`, `Material0`, `SceneDepth` | deferred: `SceneColorHDR` | Fullscreen deferred lighting. No-op in forward mode |
+| `ShadowPass` | GPUScene buffers, `ShadowCascadeData` (push constants) | `ShadowAtlas` | Renders depth-only from each cascade's light-space VP into a horizontal-strip atlas (`CascadeCount × Resolution` wide). Uses dedicated depth pipeline with `VK_CULL_MODE_FRONT_BIT` to reduce self-shadowing. Recipe-gated by `ShadowParams::Enabled`. Texel-snapped cascade frusta computed in `ComputeCascadeViewProjections()` |
+| `SurfacePass` | `SceneDepth`, `ShadowAtlas` (sampled), GPUScene buffers | forward: `SceneColorHDR`; deferred: `SceneNormal` + `Albedo` + `Material0`, `SceneDepth` | Opaque surface lane. Forward path samples `ShadowAtlas` via global set (binding 1, `sampler2DShadow` with `VK_COMPARE_OP_LESS_OR_EQUAL`). When depth prepass is active, loads existing depth and uses `VK_COMPARE_OP_EQUAL` (zero overdraw). Otherwise clears depth with `VK_COMPARE_OP_LESS` |
+| `CompositionPass` | deferred: `SceneNormal`, `Albedo`, `Material0`, `SceneDepth`, `ShadowAtlas` (sampled via global set 1) | deferred: `SceneColorHDR` | Fullscreen deferred lighting with PCF shadow sampling from cascade atlas. No-op in forward mode |
 | `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for wireframe/graph/debug lines; accumulates via `LOAD` |
 | `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for point clouds/debug points; accumulates via `LOAD` |
 | `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR` | Initializes LDR target; internal temp when FXAA enabled |
@@ -76,7 +78,7 @@ Dirty domains drive sync granularity:
 
 Position/topology changes may escalate to full re-upload; pure attribute changes use incremental extraction/upload.
 
-Per-frame lighting is carried by `LightEnvironmentPacket` and currently includes directional + ambient parameters plus typed `ShadowParams` (`Enabled`, `CascadeCount`, cascade splits, depth/normal bias, PCF radius, split lambda). This keeps shadow policy explicit at extraction time and provides a stable contract for upcoming `ShadowPass`/CSM integration without reintroducing ad-hoc shader constants.
+Per-frame lighting is carried by `LightEnvironmentPacket` and includes directional + ambient parameters plus typed `ShadowParams` (`Enabled`, `CascadeCount`, cascade splits, depth/normal bias, PCF radius, split lambda). Shadow cascade view-projection matrices and split distances are computed by `ComputeCascadeViewProjections()` with texel-snapped orthographic frusta, packed into `ShadowCascadeData`, and uploaded to the global camera UBO (`CameraBufferObject` fields: `ShadowViewProj[4]`, `ShadowSplits`, `ShadowBiasAndFilter`). The shadow atlas is bound at global set binding 1 as a `sampler2DShadow` with `VK_COMPARE_OP_LESS_OR_EQUAL` for hardware-accelerated PCF. Both forward (`surface.frag`) and deferred (`deferred_lighting.frag`) paths share `shadow_sampling.glsl` for cascade selection and 3×3 PCF sampling.
 
 ## Pipeline Order
 
@@ -84,8 +86,9 @@ Per-frame lighting is carried by `LightEnvironmentPacket` and currently includes
 
 1. `PickingPass`
 2. `DepthPrepass` (internal to `SurfacePass`, recipe-gated)
-3. `SurfacePass`
-4. `CompositionPass`
+3. `ShadowPass` (recipe-gated by `ShadowParams::Enabled`)
+4. `SurfacePass`
+5. `CompositionPass`
 5. `LinePass`
 6. `PointPass`
 7. `PostProcessPass`

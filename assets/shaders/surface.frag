@@ -10,6 +10,7 @@ layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) flat in uint fragTexID;
 layout(location = 3) in vec4 fragVertexColor;
 layout(location = 4) in vec3 fragObjectPos;
+layout(location = 5) in vec3 fragWorldPos;
 
 layout(location = 0) out vec4 outColor;
 
@@ -39,18 +40,26 @@ layout(push_constant) uniform PushConsts {
     uint64_t PtrCentroids;
 } push;
 
-// Binding 0 = Camera + Lighting (UBO), Binding 1 = Bindless Array
+// Set 0: Global (Camera UBO + Shadow Atlas)
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
     mat4 proj;
     vec4 lightDirAndIntensity;
     vec4 lightColor;
     vec4 ambientColorAndIntensity;
+    mat4 shadowCascadeMatrices[4];
+    vec4 shadowCascadeSplitsAndCount;   // x/y/z/w = split distances
+    vec4 shadowBiasAndFilter;           // x = depth bias, y = normal bias, z = PCF radius, w = cascade count
 } camera;
 
+// Shadow atlas comparison sampler (hardware PCF).
+layout(set = 0, binding = 1) uniform sampler2DShadow shadowAtlas;
+
+// Set 1: Bindless textures
 layout(set = 1, binding = 0) uniform sampler2D globalTextures[];
 
 #include "surface_color_resolve.glsl"
+#include "shadow_sampling.glsl"
 
 void main() {
     vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
@@ -66,9 +75,17 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lColor;
 
+    // Shadow attenuation (PCF cascaded shadow maps).
+    float shadow = ComputeShadowFactor(
+        shadowAtlas, fragWorldPos, norm,
+        camera.view, camera.proj,
+        camera.shadowCascadeMatrices,
+        camera.shadowCascadeSplitsAndCount,
+        camera.shadowBiasAndFilter);
+
     vec4 baseColor = ResolveSurfaceBaseColor();
 
-    vec3 result = (ambient + diffuse) * baseColor.rgb;
+    vec3 result = (ambient + diffuse * shadow) * baseColor.rgb;
 
     outColor = vec4(result, baseColor.a);
 }

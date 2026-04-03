@@ -189,6 +189,7 @@ namespace Graphics
         m_Impl->DebugViewPass->SetShaderRegistry(shaderRegistry);
         m_Impl->PostProcessPass->SetShaderRegistry(shaderRegistry);
         m_Impl->CompositionPass->SetShaderRegistry(shaderRegistry);
+        m_Impl->CompositionPass->SetGlobalSetLayout(globalLayout.GetHandle());
 
         // Wire G-buffer pipeline to SurfacePass for deferred path.
         if (pipelineLibrary.Contains(kPipeline_SurfaceGBuffer))

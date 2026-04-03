@@ -18,6 +18,7 @@ layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) flat in uint fragTexID;
 layout(location = 3) in vec4 fragVertexColor;
 layout(location = 4) in vec3 fragObjectPos;
+layout(location = 5) in vec3 fragWorldPos;
 
 // G-buffer MRT outputs.
 layout(location = 0) out vec4 outNormal;    // SceneNormal

@@ -17,10 +17,19 @@ namespace RHI {
         uboBinding.descriptorCount = 1;
         uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
+        // Binding 1: shadow atlas comparison sampler (PCF shadow mapping).
+        VkDescriptorSetLayoutBinding shadowSamplerBinding{};
+        shadowSamplerBinding.binding = 1;
+        shadowSamplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        shadowSamplerBinding.descriptorCount = 1;
+        shadowSamplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        const VkDescriptorSetLayoutBinding bindings[] = { uboBinding, shadowSamplerBinding };
+
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 1;
-        layoutInfo.pBindings = &uboBinding;
+        layoutInfo.bindingCount = static_cast<uint32_t>(std::size(bindings));
+        layoutInfo.pBindings = bindings;
 
         if (vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor set layout!");

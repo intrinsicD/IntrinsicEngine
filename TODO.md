@@ -68,9 +68,9 @@ Split into two sub-phases to keep commits reviewable:
 - [ ] Add focused test: shadow pass produces non-trivial depth for a known scene.
 
 **Phase 2 — PCF sampling + integration:**
-- [ ] Add PCF sampling in forward `surface.frag` and deferred `deferred_lighting.frag`.
-- [ ] Stabilized cascade frusta (texel snapping to reduce shimmer).
-- [ ] Update `rendering-three-pass.md` pass contract table with `ShadowPass`.
+- [x] Add PCF sampling in forward `surface.frag` and deferred `deferred_lighting.frag`.
+- [x] Stabilized cascade frusta (texel snapping to reduce shimmer).
+- [x] Update `rendering-three-pass.md` pass contract table with `ShadowPass`.
 
 ### B. Frame Pipeline Hardening (O2 ADR Continuation)
 
