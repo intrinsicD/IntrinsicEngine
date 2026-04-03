@@ -2418,6 +2418,8 @@ namespace
         entt::entity entity = scene.CreateEntity(name);
         reg.emplace<ECS::DataAuthority::MeshTag>(entity);
         reg.emplace<ECS::Components::Selection::SelectableTag>(entity);
+        static uint32_t s_SpawnedMeshPickId = 1000000u;
+        reg.emplace<ECS::Components::Selection::PickID>(entity, s_SpawnedMeshPickId++);
 
         // Build collision data.
         auto collisionRef = std::make_shared<Graphics::GeometryCollisionData>();
@@ -2554,9 +2556,7 @@ bool DrawConvexHullWidget(Runtime::Engine& engine,
         }
         else if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity); pcd && pcd->CloudRef)
         {
-            auto positions = pcd->CloudRef->Positions();
-            std::vector<glm::vec3> pts(positions.begin(), positions.end());
-            result = Geometry::ConvexHullBuilder::Build(pts, params);
+            result = Geometry::ConvexHullBuilder::Build(pcd->CloudRef->Positions(), params);
         }
 
         if (!result)
