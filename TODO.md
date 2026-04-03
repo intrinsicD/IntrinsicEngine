@@ -446,10 +446,11 @@ Gaussian Mixture Model based spectral methods for point cloud analysis without r
 - [ ] Integrate with existing `Geometry.Octree` for spatial queries and `Geometry.DEC` sparse matrix types.
 - [ ] Store per-point GMM membership weights via existing `PropertySet` system.
 - [ ] Add spectral eigensolve support (requires sparse eigensolver — evaluate Spectra or implement shift-invert Lanczos).
+- [ ] **Hierarchical EM (HEM):** Progressive Gaussian mixture reduction (Engine24 CUDA `hem.cuh`). BVH-accelerated KL-divergence nearest-pair merging for multi-resolution GMM pyramids. Enables LOD for point cloud spectral analysis. GPU path via Vulkan compute (after D1 or C14); CPU fallback with Octree KNN.
 
 ### C12. ICP Point Cloud Registration
 
-Point-to-point and point-to-plane Iterative Closest Point registration for scan alignment.
+Point-to-point and point-to-plane Iterative Closest Point registration for scan alignment. See also C16 (CPD) for probabilistic non-rigid extension.
 
 - [ ] Implement `Geometry.Registration` module following the operator pattern (Params struct + Result struct with convergence diagnostics).
 - [ ] Use existing `Geometry.KDTree` for nearest-neighbor correspondence.
@@ -465,6 +466,78 @@ GPU-accelerated point cloud normal estimation for large point clouds (>1M points
 - [ ] Per-point covariance → eigendecomposition → normal extraction in compute shader.
 - [ ] Integrate with existing `PointCloudLifecycleSystem` for on-upload normal computation.
 - [ ] Benchmark against CPU `Geometry.NormalEstimation` at varying point counts.
+
+### C14. GPU LBVH Construction (Vulkan Compute)
+
+Port the Morton-code Linear BVH construction algorithm (Karras 2012, implemented in Engine24 CUDA and torch-mesh-isect_fork) to Vulkan compute shaders. Enables GPU-driven broadphase for culling, picking, and collision without CUDA dependency.
+
+- [ ] Implement 30-bit 3D Morton code encoding via bit-expansion in a compute shader (`morton_encode.comp`).
+- [ ] GPU radix sort of Morton codes (evaluate `VkSortKHR` or implement a simple GPU radix sort).
+- [ ] Karras internal-node construction: one thread per internal node, longest common prefix via `findMSB(key1 ^ key2)`.
+- [ ] Bottom-up AABB propagation with atomic parent visit counters.
+- [ ] Stack-based BVH traversal kernel for range and nearest-neighbor queries.
+- [ ] Adopt the `rightmost` node pointer trick (from torch-mesh-isect) for self-intersection deduplication — skip subtrees whose rightmost leaf ≤ query leaf.
+- [ ] Integrate as an alternative to CPU `Geometry.BVH` for entities exceeding a triangle-count threshold.
+- [ ] Benchmark: GPU LBVH build + query vs CPU BVH at 100K+ triangles.
+
+### C15. Point Cloud Robustness Operators
+
+Edge-preserving filtering and statistical quality analysis for noisy/incomplete point cloud data (patterns from basics_lab).
+
+- [ ] **Bilateral filter:** Edge-preserving point cloud smoothing using spatial + normal-space Gaussian weighting. Preserves sharp features that uniform Laplacian smoothing destroys. Implement in `Geometry.PointCloudUtils` following the operator pattern.
+- [ ] **Outlier probability estimation:** Per-point outlier score from local density deviation. Flag statistical outliers using Mahalanobis distance from neighborhood covariance. Publish as `p:outlier_score` property.
+- [ ] **Kernel density estimation:** Per-point density via Gaussian KDE with adaptive bandwidth (Silverman's rule). Publish as `p:density` property for downstream weighting (reconstruction, registration).
+- [ ] Wire all three to editor UI as point cloud geometry operators (F1-style panel).
+
+### C16. Non-Rigid Point Cloud Registration (CPD)
+
+Coherent Point Drift (Myronenko & Song 2010) for deformable point cloud alignment. Extends C12's rigid ICP with probabilistic non-rigid correspondence.
+
+- [ ] Implement `Geometry.Registration` CPD variant: treat one point set as GMM centroids, fit to the other via EM.
+- [ ] Rigid CPD (rotation + translation) as a robust alternative to ICP under noise/outliers.
+- [ ] Affine CPD extension for scale + shear recovery.
+- [ ] Non-rigid CPD with motion coherence regularization (Gaussian kernel smoothing of displacement field).
+- [ ] Convergence diagnostics in Result struct: sigma², negative log-likelihood, iteration count.
+- [ ] Wire to editor UI alongside ICP (C12) in a unified Registration panel.
+
+### C17. Heat Kernel Graph Laplacian
+
+Extend the existing DEC module with adaptive edge weighting variants from Engine24's `GraphLaplacianOperator`.
+
+- [ ] **Heat kernel weights:** `w_ij = exp(-||p_i - p_j||² / 4t)` with automatic time parameter selection (e.g. mean edge length squared). Provides distance-adaptive smoothing for irregular graph/mesh connectivity.
+- [ ] **GMM-weighted Laplacian:** Mahalanobis-distance edge weights from per-vertex covariance matrices. Enables anisotropy-aware spectral analysis. Requires per-vertex covariance computation from local neighborhoods.
+- [ ] Integrate both variants into `LaplacianCache` as alternative `BuildOperators()` modes selectable via enum.
+- [ ] Validate via `AnalyzeLaplacian()` — both variants must satisfy symmetry and row-sum invariants.
+
+### C18. SPIR-V Shader Reflection for Automatic Pipeline Layout
+
+Eliminate manual descriptor set layout specification by reflecting SPIR-V bytecode at pipeline creation time (pattern from RD_Engine's `ShaderReflector`).
+
+- [ ] Integrate SPIRV-Reflect (or spirv-cross) as a build dependency.
+- [ ] Implement `RHI::ReflectShaderLayout()`: given a set of SPIR-V modules, extract descriptor set layouts (set/binding/type/stage) and push constant ranges.
+- [ ] Use reflected layout as the **default** in `PipelineBuilder` when no explicit layout is provided. Explicit layout overrides reflection (preserving current manual control for specialized passes).
+- [ ] Cache reflected layouts by shader content hash to avoid redundant reflection.
+- [ ] Validate: reflected layout matches hand-authored layout for existing pipelines (regression test).
+
+### C19. Automatic Differentiation for Geometry Optimization
+
+Integrate a lightweight C++ automatic differentiation library for gradient-based geometry processing without hand-derived Jacobians. Engine23 used TinyAD; evaluate modern alternatives.
+
+- [ ] Evaluate AD libraries: TinyAD (geometry-focused, Eigen-based), CppAD, or a minimal forward-mode AD header.
+- [ ] Integrate as an optional dependency (conditional CMake, like CUDA).
+- [ ] First application: ARAP (As-Rigid-As-Possible) mesh deformation — local rotation fitting + global position solve with AD-computed energy gradients.
+- [ ] Second application: improve LSCM parameterization (C1/F1) with AD-based conformal energy minimization.
+- [ ] Benchmark AD-based vs hand-derived gradient for cotan Laplacian assembly to verify acceptable overhead.
+
+### C20. Mesh Self-Intersection Detection
+
+Fast mesh self-intersection detection using BVH-accelerated triangle-triangle overlap testing (from torch-mesh-isect_fork).
+
+- [ ] Implement 17-axis SAT for triangle-triangle intersection (2 face normals + 9 edge cross products + 6 normal-cross-edge). More robust than Moller-Trumbore for coplanar/near-coplanar cases.
+- [ ] CPU path: use existing `Geometry.BVH` for broadphase, 17-axis SAT for narrowphase. Report intersecting triangle pairs.
+- [ ] GPU path (after C14 lands): use GPU LBVH with `rightmost` dedup for large meshes.
+- [ ] Publish `f:self_intersecting` boolean property and visualize via face highlight overlay.
+- [ ] Wire to Mesh Analysis panel (extends existing defect-marker UI).
 
 ---
 
