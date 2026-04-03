@@ -64,6 +64,9 @@ namespace Runtime::EditorUI
             case GeometryProcessingAlgorithm::NormalEstimation:
             case GeometryProcessingAlgorithm::ShortestPath:
             case GeometryProcessingAlgorithm::VectorHeat:
+            case GeometryProcessingAlgorithm::Parameterization:
+            case GeometryProcessingAlgorithm::ConvexHull:
+            case GeometryProcessingAlgorithm::SurfaceReconstruction:
             default:
                 return false;
             }
