@@ -142,7 +142,9 @@ namespace Runtime
         // 2. Surface
         if (!window.CreateSurface(m_Impl->Context->GetInstance(), nullptr, &m_Impl->Surface))
         {
-            Core::Log::Error("FATAL: Failed to create Vulkan Surface");
+            Core::Log::Error("FATAL: Failed to create Vulkan surface for app '{}'.", config.AppName);
+            Core::Log::Error("Fix: ensure the window system and GPU driver support Vulkan surface creation "
+                             "(Wayland/X11/Win32) and that the process has display access.");
             std::exit(-1);
         }
 

@@ -1,5 +1,6 @@
 module;
 #include <memory>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <entt/entity/entity.hpp>
@@ -40,6 +41,20 @@ import Runtime.RenderOrchestrator;
 
 export namespace Runtime
 {
+    enum class EngineConfigIssueSeverity : uint8_t
+    {
+        Warning = 0,
+        Error,
+    };
+
+    struct EngineConfigIssue
+    {
+        EngineConfigIssueSeverity Severity = EngineConfigIssueSeverity::Warning;
+        std::string Field;
+        std::string Message;
+        std::string Remediation;
+    };
+
     struct EngineConfig
     {
         std::string AppName = "Intrinsic App";
@@ -67,6 +82,15 @@ export namespace Runtime
         uint32_t BenchmarkWarmupFrames = 30;
         std::string BenchmarkOutputPath = "benchmark.json";
     };
+
+    struct EngineConfigValidationResult
+    {
+        EngineConfig Sanitized{};
+        std::vector<EngineConfigIssue> Issues{};
+        [[nodiscard]] bool HasErrors() const;
+    };
+
+    [[nodiscard]] EngineConfigValidationResult ValidateEngineConfig(const EngineConfig& config);
 
     class Engine
     {
