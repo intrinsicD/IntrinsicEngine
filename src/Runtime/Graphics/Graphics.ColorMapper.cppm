@@ -14,9 +14,10 @@ import Geometry.Properties;
 // Generic PropertySet → packed ABGR color mapping.
 //
 // Reads a named property from a PropertySet and produces packed ABGR colors
-// suitable for direct upload to the GPU aux buffer. Handles three property
+// suitable for direct upload to the GPU aux buffer. Handles four property
 // types:
-//   float    → normalize to [0,1] via range, apply colormap + optional binning
+//   float     → normalize to [0,1] via range, apply colormap + optional binning
+//   glm::vec2 → interpret as RG (UV coordinates), pack as (R=x, G=y, B=0, A=1)
 //   glm::vec3 → interpret as RGB, pack with alpha=1
 //   glm::vec4 → interpret as RGBA, pack directly
 //

@@ -55,6 +55,7 @@ import Geometry.ShortestPath;
 import Geometry.ConvexHullBuilder;
 import Geometry.SurfaceReconstruction;
 import Geometry.VectorHeatMethod;
+import Geometry.Parameterization;
 
 import Core.Logging;
 
@@ -2886,6 +2887,142 @@ bool DrawVectorHeatWidget(Runtime::Engine& engine,
         if (!canRun) ImGui::EndDisabled();
         if (selectedVertices.size() != 1)
             ImGui::SetItemTooltip("Log Map requires exactly 1 selected source vertex.");
+    }
+
+    return changed;
+}
+
+// =========================================================================
+// Parameterization (LSCM)
+// =========================================================================
+
+bool DrawParameterizationWidget(Runtime::Engine& engine,
+                                entt::entity entity,
+                                ParameterizationWidgetState& state)
+{
+    auto& scene = engine.GetSceneManager().GetScene();
+    auto& reg = scene.GetRegistry();
+
+    auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+    DrawDomainBadges(meshData ? (GeometryProcessingDomain::MeshVertices
+                                | GeometryProcessingDomain::MeshFaces)
+                              : GeometryProcessingDomain::None);
+
+    if (!meshData || !meshData->MeshRef)
+    {
+        ImGui::TextDisabled("Parameterization requires a mesh entity with halfedge data.");
+        return false;
+    }
+
+    const auto& mesh = *meshData->MeshRef;
+    ImGui::Text("Vertices: %zu  Faces: %zu", mesh.VertexCount(), mesh.FaceCount());
+
+    // --- Parameters ---
+    ImGui::SeparatorText("Parameters");
+
+    ImGui::Checkbox("Auto-select pin vertices", &state.AutoSelectPins);
+    ImGui::SetItemTooltip(
+        "When enabled, two boundary vertices with maximum arc-length separation "
+        "are automatically chosen as pins. Disable to use selected vertices.");
+
+    if (!state.AutoSelectPins)
+    {
+        auto& selection = engine.GetSelection();
+        const auto& sub = selection.GetSubElementSelection();
+        const auto elementMode = selection.GetConfig().ElementMode;
+
+        if (elementMode == Runtime::Selection::ElementMode::Vertex && sub.Entity == entity
+            && sub.SelectedVertices.size() >= 2)
+        {
+            auto it = sub.SelectedVertices.begin();
+            const std::size_t v0 = static_cast<std::size_t>(*it++);
+            const std::size_t v1 = static_cast<std::size_t>(*it);
+            ImGui::Text("Pin Vertex 0: %zu", v0);
+            ImGui::Text("Pin Vertex 1: %zu", v1);
+        }
+        else
+        {
+            ImGui::TextColored({0.9f, 0.7f, 0.2f, 1.0f},
+                "Select exactly 2 boundary vertices in Vertex mode to use as pins.");
+        }
+    }
+
+    {
+        float tol = static_cast<float>(state.SolverTolerance);
+        if (ImGui::InputFloat("Solver tolerance", &tol, 0.0f, 0.0f, "%.2e"))
+            state.SolverTolerance = static_cast<double>(std::clamp(tol, 1e-15f, 1e-2f));
+    }
+    ImGui::SliderInt("Max iterations", &state.MaxIterations, 100, 20000);
+
+    // --- Results section ---
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f},
+            "Parameterization failed. Requires triangle mesh with disk topology (exactly one boundary loop).");
+
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Results");
+        ImGui::Text("Pin vertices: %zu, %zu", state.PinVertex0Used, state.PinVertex1Used);
+        ImGui::Text("Mean conformal distortion: %.6f", state.MeanDistortion);
+        ImGui::Text("Max conformal distortion: %.6f", state.MaxDistortion);
+        ImGui::Text("Flipped triangles: %zu", state.FlippedCount);
+        ImGui::Text("CG iterations: %zu  Converged: %s",
+                     state.CGIterations, state.LastConverged ? "Yes" : "No");
+        ImGui::TextDisabled("UV coordinates published to 'v:texcoord'.");
+    }
+
+    // --- Run button ---
+    bool changed = false;
+
+    if (ImGui::Button("Compute LSCM Parameterization"))
+    {
+        Geometry::Parameterization::ParameterizationParams params;
+        params.SolverTolerance = state.SolverTolerance;
+        params.MaxSolverIterations = static_cast<std::size_t>(std::max(state.MaxIterations, 1));
+
+        if (!state.AutoSelectPins)
+        {
+            auto& selection = engine.GetSelection();
+            const auto& sub = selection.GetSubElementSelection();
+            const auto elementMode = selection.GetConfig().ElementMode;
+
+            if (elementMode == Runtime::Selection::ElementMode::Vertex && sub.Entity == entity
+                && sub.SelectedVertices.size() >= 2)
+            {
+                auto it = sub.SelectedVertices.begin();
+                params.PinVertex0 = static_cast<std::size_t>(*it++);
+                params.PinVertex1 = static_cast<std::size_t>(*it);
+            }
+        }
+
+        auto result = Geometry::Parameterization::ComputeLSCM(*meshData->MeshRef, params);
+
+        if (!result)
+        {
+            state.HasResults = false;
+            state.LastRunFailed = true;
+        }
+        else
+        {
+            state.HasResults = true;
+            state.LastRunFailed = false;
+            state.MeanDistortion = result->MeanConformalDistortion;
+            state.MaxDistortion = result->MaxConformalDistortion;
+            state.FlippedCount = result->FlippedTriangleCount;
+            state.CGIterations = result->CGIterations;
+            state.LastConverged = result->Converged;
+            state.PinVertex0Used = result->PinVertex0;
+            state.PinVertex1Used = result->PinVertex1;
+
+            meshData->AttributesDirty = true;
+            meshData->Visualization.VertexColors.PropertyName = "v:texcoord";
+            reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+            changed = true;
+
+            Core::Log::Info("LSCM: converged={} iterations={} meanDistortion={:.6f} flipped={}",
+                            result->Converged, result->CGIterations,
+                            result->MeanConformalDistortion, result->FlippedTriangleCount);
+        }
     }
 
     return changed;

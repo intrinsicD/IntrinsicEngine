@@ -139,6 +139,7 @@ void InspectorController::Draw()
         m_ConvexHullUi = {};
         m_SurfaceReconstructionUi = {};
         m_VectorHeatUi = {};
+        m_ParameterizationUi = {};
     }
 
     // === Entity ID (always shown at top) ===
@@ -676,6 +677,9 @@ void InspectorController::Draw()
                         break;
                     case GeometryProcessingAlgorithm::VectorHeat:
                         static_cast<void>(DrawVectorHeatWidget(*m_Engine, selected, m_VectorHeatUi));
+                        break;
+                    case GeometryProcessingAlgorithm::Parameterization:
+                        static_cast<void>(DrawParameterizationWidget(*m_Engine, selected, m_ParameterizationUi));
                         break;
                     }
 

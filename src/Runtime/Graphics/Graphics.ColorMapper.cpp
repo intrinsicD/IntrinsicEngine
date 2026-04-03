@@ -104,6 +104,34 @@ namespace
     }
 
     template <class PropertySetT>
+    [[nodiscard]] std::optional<ColorMapper::MappingResult> MapVec2(
+        const PropertySetT& ps,
+        const ColorSource& config,
+        const std::function<bool(size_t)>& skipDeleted)
+    {
+        auto prop = ps.template Get<glm::vec2>(config.PropertyName);
+        if (!prop.IsValid())
+            return std::nullopt;
+
+        const auto& data = prop.Vector();
+        const size_t count = data.size();
+
+        ColorMapper::MappingResult result;
+        result.Colors.reserve(count);
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (skipDeleted && skipDeleted(i))
+                continue;
+
+            const auto& c = data[i];
+            result.Colors.push_back(GpuColor::PackColorF(c.x, c.y, 0.0f, 1.0f));
+        }
+
+        return result;
+    }
+
+    template <class PropertySetT>
     [[nodiscard]] std::optional<ColorMapper::MappingResult> MapVec3(
         const PropertySetT& ps,
         const ColorSource& config,
@@ -177,12 +205,14 @@ std::optional<ColorMapper::MappingResult> ColorMapper::MapProperty(
         return std::nullopt;
 
     // Try each type. float first (most common for scalar fields),
-    // then vec4 (RGBA color), then vec3 (RGB).
+    // then vec4 (RGBA color), then vec3 (RGB), then vec2 (UV → RG).
     if (auto r = MapScalar(ps, config, skipDeleted))
         return r;
     if (auto r = MapVec4(ps, config, skipDeleted))
         return r;
     if (auto r = MapVec3(ps, config, skipDeleted))
+        return r;
+    if (auto r = MapVec2(ps, config, skipDeleted))
         return r;
 
     return std::nullopt;
