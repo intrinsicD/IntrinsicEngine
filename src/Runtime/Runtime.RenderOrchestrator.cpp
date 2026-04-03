@@ -448,6 +448,26 @@ namespace Runtime
 
         m_Impl->RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
 
+        const Graphics::GlobalRenderModeOverride renderModeOverride =
+            m_Impl->RenderDriver->GetGlobalRenderModeOverride();
+
+        const bool showSurfaceDraws = renderModeOverride == Graphics::GlobalRenderModeOverride::None
+            || renderModeOverride == Graphics::GlobalRenderModeOverride::Shaded
+            || renderModeOverride == Graphics::GlobalRenderModeOverride::WireframeShaded
+            || renderModeOverride == Graphics::GlobalRenderModeOverride::Flat;
+        const bool showLineDraws = renderModeOverride == Graphics::GlobalRenderModeOverride::None
+            || renderModeOverride == Graphics::GlobalRenderModeOverride::Wireframe
+            || renderModeOverride == Graphics::GlobalRenderModeOverride::WireframeShaded;
+        const bool showPointDraws = renderModeOverride == Graphics::GlobalRenderModeOverride::None
+            || renderModeOverride == Graphics::GlobalRenderModeOverride::Points;
+
+        const std::span<const Graphics::SurfaceDrawPacket> surfaceDraws =
+            showSurfaceDraws ? std::span<const Graphics::SurfaceDrawPacket>(preparedRenderWorld->SurfaceDraws) : std::span<const Graphics::SurfaceDrawPacket>{};
+        const std::span<const Graphics::LineDrawPacket> lineDraws =
+            showLineDraws ? std::span<const Graphics::LineDrawPacket>(preparedRenderWorld->LineDraws) : std::span<const Graphics::LineDrawPacket>{};
+        const std::span<const Graphics::PointDrawPacket> pointDraws =
+            showPointDraws ? std::span<const Graphics::PointDrawPacket>(preparedRenderWorld->PointDraws) : std::span<const Graphics::PointDrawPacket>{};
+
         // B1: Resolve bounding spheres from GeometryPool into draw packets so
         // they are self-contained for CPU frustum culling.
         {
@@ -461,8 +481,8 @@ namespace Runtime
         // Surface packets are excluded — SurfacePass uses GPU-driven culling.
         const bool cullingEnabled = !preparedRenderWorld->DebugView.DisableCulling;
         Graphics::CulledDrawList culledDraws = Graphics::CullDrawPackets(
-            preparedRenderWorld->LineDraws,
-            preparedRenderWorld->PointDraws,
+            lineDraws,
+            pointDraws,
             preparedRenderWorld->View.ProjectionMatrix,
             preparedRenderWorld->View.ViewMatrix,
             cullingEnabled);
@@ -480,9 +500,9 @@ namespace Runtime
             .SurfacePicking = preparedRenderWorld->SurfacePicking,
             .LinePicking = preparedRenderWorld->LinePicking,
             .PointPicking = preparedRenderWorld->PointPicking,
-            .SurfaceDraws = preparedRenderWorld->SurfaceDraws,
-            .LineDraws = preparedRenderWorld->LineDraws,
-            .PointDraws = preparedRenderWorld->PointDraws,
+            .SurfaceDraws = surfaceDraws,
+            .LineDraws = lineDraws,
+            .PointDraws = pointDraws,
             .CulledDraws = std::move(culledDraws),
             .HtexPatchPreview = preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr,
             .DebugDrawLines = preparedRenderWorld->DebugDrawLines,

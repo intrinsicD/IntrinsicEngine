@@ -322,6 +322,7 @@ namespace Graphics
         uint32_t m_LastBuiltFrameIndex = 0;
         uint32_t m_LastBuiltImageIndex = 0;
         LightEnvironmentPacket m_LightEnvironment{};
+        GlobalRenderModeOverride m_GlobalRenderModeOverride = GlobalRenderModeOverride::None;
         std::unique_ptr<RenderPipeline> m_ActivePipeline;
         std::unique_ptr<RenderPipeline> m_PendingPipeline;
         std::vector<RetiredPipeline> m_RetiredPipelines;
@@ -1054,6 +1055,14 @@ namespace Graphics
     GlobalResources& RenderDriver::GetGlobalResources() { return m_Impl->m_GlobalResources; }
     LightEnvironmentPacket& RenderDriver::GetLightEnvironment() { return m_Impl->m_LightEnvironment; }
     const LightEnvironmentPacket& RenderDriver::GetLightEnvironment() const { return m_Impl->m_LightEnvironment; }
+    void RenderDriver::SetGlobalRenderModeOverride(GlobalRenderModeOverride mode)
+    {
+        m_Impl->m_GlobalRenderModeOverride = mode;
+    }
+    GlobalRenderModeOverride RenderDriver::GetGlobalRenderModeOverride() const
+    {
+        return m_Impl->m_GlobalRenderModeOverride;
+    }
 
     void RenderDriver::RequestPick(uint32_t x, uint32_t y)
     {
