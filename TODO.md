@@ -300,8 +300,8 @@ The lighting environment, camera properties, and render mode are controlled prog
 
 `Core::CommandHistory` and `CmdComponentChange<T>` are implemented and tested but not wired to any editor action.
 
-- [ ] Wire `CommandHistory` into `Engine` or `SceneManager` as a singleton accessible to all editor controllers.
-- [ ] Add Edit → Undo / Redo menu items with Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) keyboard shortcuts.
+- [x] Wire `CommandHistory` into `Engine` or `SceneManager` as a singleton accessible to all editor controllers.
+- [x] Add Edit → Undo / Redo menu items with Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) keyboard shortcuts.
 - [ ] Wrap `TransformGizmo` drag completion (mouse release) as a `TransformCommand` capturing before/after `Transform::Component` snapshots for all affected entities.
 - [ ] Wrap Inspector numeric field edits (point size, line width, color changes) as property commands via `MakeComponentChangeCommand<T>()`.
 - [ ] Wrap entity creation/deletion from hierarchy context menu as commands.

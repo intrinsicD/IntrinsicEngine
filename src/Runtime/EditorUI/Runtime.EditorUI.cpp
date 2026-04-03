@@ -19,6 +19,7 @@ import Core.FrameGraph;
 import Core.Hash;
 import Core.Logging;
 import Core.IOBackend;
+import Core.Commands;
 
 import Graphics.Components;
 
@@ -766,6 +767,38 @@ namespace Runtime::EditorUI
         });
     }
 
+    static void RegisterEditMenu(Runtime::Engine& engine)
+    {
+        Interface::GUI::RegisterMainMenuBar("Edit", [&engine]
+        {
+            Core::CommandHistory& history = engine.GetCommandHistory();
+            const bool canUndo = history.CanUndo();
+            const bool canRedo = history.CanRedo();
+
+            if (ImGui::BeginMenu("Edit"))
+            {
+                if (ImGui::MenuItem("Undo", "Ctrl+Z", false, canUndo))
+                    (void)history.Undo();
+
+                if (ImGui::MenuItem("Redo", "Ctrl+Shift+Z", false, canRedo))
+                    (void)history.Redo();
+
+                ImGui::EndMenu();
+            }
+
+            const ImGuiIO& io = ImGui::GetIO();
+            if (!io.WantTextInput && !ImGui::IsAnyItemActive())
+            {
+                if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false) && canRedo)
+                    (void)history.Redo();
+                else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false) && canRedo)
+                    (void)history.Redo();
+                else if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z, false) && canUndo)
+                    (void)history.Undo();
+            }
+        });
+    }
+
     void RegisterDefaultPanels(Runtime::Engine& engine)
     {
         RegisterFeatureBrowserPanel(engine);
@@ -773,6 +806,7 @@ namespace Runtime::EditorUI
         RegisterSelectionPanel(engine);
         RegisterBenchmarkPanel(engine);
         RegisterSceneFileMenu(engine);
+        RegisterEditMenu(engine);
     }
 
     // =========================================================================
