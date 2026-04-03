@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <optional>
 
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -78,6 +79,34 @@ namespace
     [[nodiscard]] ImGuizmo::MODE ToImGuizmoMode(Graphics::GizmoSpace space)
     {
         return (space == Graphics::GizmoSpace::Local) ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+    }
+
+    [[nodiscard]] bool NearlyEqual(float a, float b, float epsilon = 1e-5f)
+    {
+        return std::abs(a - b) <= epsilon;
+    }
+
+    [[nodiscard]] bool NearlyEqual(const glm::vec3& a, const glm::vec3& b, float epsilon = 1e-5f)
+    {
+        return NearlyEqual(a.x, b.x, epsilon) &&
+               NearlyEqual(a.y, b.y, epsilon) &&
+               NearlyEqual(a.z, b.z, epsilon);
+    }
+
+    [[nodiscard]] bool NearlyEqualRotation(const glm::quat& a, const glm::quat& b, float epsilon = 1e-5f)
+    {
+        const glm::quat na = glm::normalize(a);
+        const glm::quat nb = glm::normalize(b);
+        return std::abs(glm::dot(na, nb)) >= (1.0f - epsilon);
+    }
+
+    [[nodiscard]] bool NearlyEqual(const ECS::Components::Transform::Component& a,
+                                   const ECS::Components::Transform::Component& b,
+                                   float epsilon = 1e-5f)
+    {
+        return NearlyEqual(a.Position, b.Position, epsilon) &&
+               NearlyEqualRotation(a.Rotation, b.Rotation, epsilon) &&
+               NearlyEqual(a.Scale, b.Scale, epsilon);
     }
 
     [[nodiscard]] Graphics::GizmoAxis DetectHoveredAxis(Graphics::GizmoMode mode)
@@ -159,6 +188,7 @@ namespace Graphics
             {
                 EntityTransformCache cache;
                 cache.Entity = entity;
+                cache.InitialLocalTransform = localTransform;
                 cache.InitialWorldMatrix = ResolveWorldMatrix(registry, entity);
                 cache.HasInitialParentWorldMatrix = TryResolveParentWorldMatrix(registry, entity, cache.InitialParentWorldMatrix);
                 m_CachedTransforms.push_back(cache);
@@ -331,11 +361,43 @@ namespace Graphics
         }
         else
         {
+            if (wasActive)
+            {
+                CompletedInteraction interaction{};
+                interaction.Mode = m_Config.Mode;
+
+                for (const auto& cache : m_CachedTransforms)
+                {
+                    if (!m_Registry->valid(cache.Entity))
+                        continue;
+
+                    const auto* current = m_Registry->try_get<ECS::Components::Transform::Component>(cache.Entity);
+                    if (!current || NearlyEqual(cache.InitialLocalTransform, *current))
+                        continue;
+
+                    interaction.Changes.push_back(TransformChange{
+                        .Entity = cache.Entity,
+                        .Before = cache.InitialLocalTransform,
+                        .After = *current,
+                    });
+                }
+
+                if (!interaction.Changes.empty())
+                    m_CompletedInteraction = std::move(interaction);
+            }
+
             m_CurrentManipulatedPivotMatrix = m_PivotMatrix;
             m_ActiveAxis = GizmoAxis::None;
             m_State = isOver ? GizmoState::Hovered : GizmoState::Idle;
         }
 
         (void)manipulated;
+    }
+
+    std::optional<TransformGizmo::CompletedInteraction> TransformGizmo::ConsumeCompletedInteraction()
+    {
+        std::optional<CompletedInteraction> out = std::move(m_CompletedInteraction);
+        m_CompletedInteraction.reset();
+        return out;
     }
 }
