@@ -16,6 +16,7 @@ import Core.Assets;
 import Core.Memory;
 import Core.FeatureRegistry;
 import Core.IOBackend;
+import Core.Commands;
 import Core.Benchmark;
 import RHI.Buffer;
 #ifdef INTRINSIC_HAS_CUDA
@@ -167,6 +168,8 @@ export namespace Runtime
         [[nodiscard]] Graphics::IORegistry& GetIORegistry() { return m_IORegistry; }
         [[nodiscard]] Core::Benchmark::BenchmarkRunner& GetBenchmarkRunner() { return m_BenchmarkRunner; }
         [[nodiscard]] const Core::Benchmark::BenchmarkRunner& GetBenchmarkRunner() const { return m_BenchmarkRunner; }
+        [[nodiscard]] Core::CommandHistory& GetCommandHistory() { return m_CommandHistory; }
+        [[nodiscard]] const Core::CommandHistory& GetCommandHistory() const { return m_CommandHistory; }
         [[nodiscard]] const EngineConfig& GetEngineConfig() const { return m_EngineConfig; }
 
 
@@ -176,6 +179,7 @@ export namespace Runtime
 
         // Benchmark runner (active when EngineConfig::BenchmarkMode is true).
         Core::Benchmark::BenchmarkRunner m_BenchmarkRunner;
+        Core::CommandHistory m_CommandHistory;
 
     private:
         EngineConfig m_EngineConfig;
