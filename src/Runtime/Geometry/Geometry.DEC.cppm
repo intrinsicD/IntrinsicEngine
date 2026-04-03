@@ -211,4 +211,67 @@ export namespace Geometry::DEC
         std::span<double> x,
         const CGParams& params = {});
 
+    // -------------------------------------------------------------------------
+    // LaplacianCache — lazy-computed derived matrices for spectral workflows
+    // -------------------------------------------------------------------------
+    // Caches the assembled DECOperators plus derived matrix forms that are
+    // expensive to recompute (inverse mass, symmetric-normalized Laplacian).
+    // Inspired by the LaplacianMatrices pattern from RD_Engine/Engine24.
+    //
+    // Usage: build once from a mesh, then reuse for repeated spectral solves
+    // (heat method, spectral clustering, shape descriptors, implicit smoothing).
+
+    struct LaplacianCache
+    {
+        DECOperators Operators{};
+
+        // Derived forms (lazy-computed on first access via Build())
+        DiagonalMatrix MassInverse{};        // ⋆0⁻¹  (inverse Voronoi areas)
+        DiagonalMatrix MassSqrtInverse{};    // ⋆0^{-1/2}  (for symmetric normalization)
+
+        // L_sym = ⋆0^{-1/2} L ⋆0^{-1/2}  — symmetric-normalized Laplacian.
+        // Stored as a SparseMatrix because the normalization destroys diagonal structure.
+        // Useful for spectral embeddings on irregular-degree topologies where
+        // the combinatorial Laplacian would be hub-dominated.
+        SparseMatrix SymmetricNormalizedLaplacian{};
+
+        [[nodiscard]] bool IsValid() const noexcept { return Operators.IsValid(); }
+    };
+
+    /// Build a LaplacianCache from a mesh: assembles all DEC operators plus
+    /// derived inverse-mass and symmetric-normalized Laplacian forms.
+    [[nodiscard]] LaplacianCache BuildLaplacianCache(const Halfedge::Mesh& mesh);
+
+    // -------------------------------------------------------------------------
+    // Laplacian Diagnostics — structural validation for debugging
+    // -------------------------------------------------------------------------
+    // Verifies the mathematical invariants of a cotan Laplacian matrix.
+    // Intended for test suites and debug assertions, not hot-path code.
+
+    struct LaplacianDiagnostics
+    {
+        bool IsSymmetric{false};           // L[i,j] == L[j,i] within tolerance
+        bool HasZeroRowSums{false};        // L * 1 = 0 (constant in kernel)
+        bool HasNonPositiveOffDiag{false}; // All off-diagonal entries <= 0
+        bool HasPositiveDiagonal{false};   // All diagonal entries >= 0
+        bool IsDiagonallyDominant{false};  // |L[i,i]| >= Σ_{j≠i} |L[i,j]|
+
+        double MaxSymmetryError{0.0};      // max |L[i,j] - L[j,i]|
+        double MaxRowSumError{0.0};        // max |Σ_j L[i,j]|
+        double MaxOffDiagPositive{0.0};    // max positive off-diagonal value (should be 0)
+
+        [[nodiscard]] bool AllPassed() const noexcept
+        {
+            return IsSymmetric && HasZeroRowSums
+                && HasNonPositiveOffDiag && HasPositiveDiagonal
+                && IsDiagonallyDominant;
+        }
+    };
+
+    /// Analyze a Laplacian matrix for structural correctness.
+    /// tolerance controls floating-point comparison thresholds.
+    [[nodiscard]] LaplacianDiagnostics AnalyzeLaplacian(
+        const SparseMatrix& L,
+        double tolerance = 1e-10);
+
 } // namespace Geometry::DEC

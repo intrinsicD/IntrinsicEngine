@@ -688,4 +688,182 @@ namespace Geometry::DEC
         return result;
     }
 
+    // -------------------------------------------------------------------------
+    // BuildLaplacianCache
+    // -------------------------------------------------------------------------
+
+    LaplacianCache BuildLaplacianCache(const Halfedge::Mesh& mesh)
+    {
+        LaplacianCache cache;
+        cache.Operators = BuildOperators(mesh);
+
+        if (!cache.Operators.IsValid())
+            return cache;
+
+        const auto& hodge0 = cache.Operators.Hodge0;
+        const std::size_t nV = hodge0.Size;
+
+        // MassInverse: ⋆0⁻¹[i] = 1 / ⋆0[i]
+        cache.MassInverse.Size = nV;
+        cache.MassInverse.Diagonal.resize(nV);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            double a = hodge0.Diagonal[i];
+            cache.MassInverse.Diagonal[i] = (std::abs(a) > 1e-12) ? (1.0 / a) : 0.0;
+        }
+
+        // MassSqrtInverse: ⋆0^{-1/2}[i] = 1 / sqrt(⋆0[i])
+        cache.MassSqrtInverse.Size = nV;
+        cache.MassSqrtInverse.Diagonal.resize(nV);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            double a = hodge0.Diagonal[i];
+            cache.MassSqrtInverse.Diagonal[i] = (a > 1e-12) ? (1.0 / std::sqrt(a)) : 0.0;
+        }
+
+        // SymmetricNormalizedLaplacian: L_sym = D^{-1/2} L D^{-1/2}
+        // where D = ⋆0 (diagonal mass matrix).
+        // L_sym[i,j] = L[i,j] / sqrt(⋆0[i] * ⋆0[j])
+        const auto& L = cache.Operators.Laplacian;
+        auto& Lsym = cache.SymmetricNormalizedLaplacian;
+        Lsym.Rows = L.Rows;
+        Lsym.Cols = L.Cols;
+        Lsym.RowOffsets = L.RowOffsets;  // Same sparsity pattern
+        Lsym.ColIndices = L.ColIndices;
+        Lsym.Values.resize(L.Values.size());
+
+        const auto& dInvSqrt = cache.MassSqrtInverse.Diagonal;
+        for (std::size_t i = 0; i < L.Rows; ++i)
+        {
+            double di = dInvSqrt[i];
+            for (std::size_t k = L.RowOffsets[i]; k < L.RowOffsets[i + 1]; ++k)
+            {
+                std::size_t j = L.ColIndices[k];
+                double dj = dInvSqrt[j];
+                Lsym.Values[k] = L.Values[k] * di * dj;
+            }
+        }
+
+        return cache;
+    }
+
+    // -------------------------------------------------------------------------
+    // AnalyzeLaplacian
+    // -------------------------------------------------------------------------
+
+    LaplacianDiagnostics AnalyzeLaplacian(const SparseMatrix& L, double tolerance)
+    {
+        LaplacianDiagnostics diag;
+
+        if (L.IsEmpty() || L.Rows != L.Cols)
+            return diag;
+
+        const std::size_t n = L.Rows;
+
+        // Build a quick lookup: for each (i,j), find the value.
+        // We'll iterate the CSR structure.
+
+        // 1. Symmetry check: for each L[i,j], verify L[j,i] exists and matches.
+        diag.IsSymmetric = true;
+        diag.MaxSymmetryError = 0.0;
+
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            for (std::size_t k = L.RowOffsets[i]; k < L.RowOffsets[i + 1]; ++k)
+            {
+                std::size_t j = L.ColIndices[k];
+                double lij = L.Values[k];
+
+                // Find L[j,i]
+                double lji = 0.0;
+                bool found = false;
+                for (std::size_t m = L.RowOffsets[j]; m < L.RowOffsets[j + 1]; ++m)
+                {
+                    if (L.ColIndices[m] == i)
+                    {
+                        lji = L.Values[m];
+                        found = true;
+                        break;
+                    }
+                }
+
+                double err = found ? std::abs(lij - lji) : std::abs(lij);
+                diag.MaxSymmetryError = std::max(diag.MaxSymmetryError, err);
+                if (err > tolerance)
+                    diag.IsSymmetric = false;
+            }
+        }
+
+        // 2. Row sum check: each row should sum to zero.
+        diag.HasZeroRowSums = true;
+        diag.MaxRowSumError = 0.0;
+
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            double rowSum = 0.0;
+            for (std::size_t k = L.RowOffsets[i]; k < L.RowOffsets[i + 1]; ++k)
+                rowSum += L.Values[k];
+
+            double err = std::abs(rowSum);
+            diag.MaxRowSumError = std::max(diag.MaxRowSumError, err);
+            if (err > tolerance)
+                diag.HasZeroRowSums = false;
+        }
+
+        // 3. Off-diagonal non-positive and diagonal positive checks.
+        diag.HasNonPositiveOffDiag = true;
+        diag.HasPositiveDiagonal = true;
+        diag.MaxOffDiagPositive = 0.0;
+
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            bool hasDiag = false;
+            for (std::size_t k = L.RowOffsets[i]; k < L.RowOffsets[i + 1]; ++k)
+            {
+                std::size_t j = L.ColIndices[k];
+                double val = L.Values[k];
+
+                if (j == i)
+                {
+                    hasDiag = true;
+                    if (val < -tolerance)
+                        diag.HasPositiveDiagonal = false;
+                }
+                else
+                {
+                    if (val > tolerance)
+                    {
+                        diag.HasNonPositiveOffDiag = false;
+                        diag.MaxOffDiagPositive = std::max(diag.MaxOffDiagPositive, val);
+                    }
+                }
+            }
+
+            // Empty row (deleted/isolated vertex): skip diagonal check
+            if (!hasDiag && L.RowOffsets[i] < L.RowOffsets[i + 1])
+                diag.HasPositiveDiagonal = false;
+        }
+
+        // 4. Diagonal dominance: |L[i,i]| >= Σ_{j≠i} |L[i,j]|
+        diag.IsDiagonallyDominant = true;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            double diagVal = 0.0;
+            double offDiagSum = 0.0;
+
+            for (std::size_t k = L.RowOffsets[i]; k < L.RowOffsets[i + 1]; ++k)
+            {
+                if (L.ColIndices[k] == i)
+                    diagVal = std::abs(L.Values[k]);
+                else
+                    offDiagSum += std::abs(L.Values[k]);
+            }
+
+            if (diagVal + tolerance < offDiagSum)
+                diag.IsDiagonallyDominant = false;
+        }
+
+        return diag;
+    }
+
 } // namespace Geometry::DEC
