@@ -246,4 +246,81 @@ namespace Geometry::MeshQuality
         return result;
     }
 
+    std::optional<QualityDistributions> ComputeDistributions(
+        const Halfedge::Mesh& mesh,
+        const QualityParams& params)
+    {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0)
+            return std::nullopt;
+
+        QualityDistributions distributions{};
+        if (params.ComputeAngles)
+            distributions.AnglesDeg.reserve(mesh.FaceCount() * 3u);
+        if (params.ComputeAspectRatios)
+            distributions.AspectRatios.reserve(mesh.FaceCount());
+        if (params.ComputeEdgeLengths)
+            distributions.EdgeLengths.reserve(mesh.EdgeCount());
+        if (params.ComputeValence)
+            distributions.Valences.reserve(mesh.VertexCount());
+        if (params.ComputeAreas)
+            distributions.FaceAreas.reserve(mesh.FaceCount());
+
+        if (params.ComputeEdgeLengths)
+        {
+            for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+            {
+                const EdgeHandle eh{static_cast<PropertyIndex>(ei)};
+                if (mesh.IsDeleted(eh))
+                    continue;
+                const HalfedgeHandle h{static_cast<PropertyIndex>(2u * ei)};
+                const auto p0 = mesh.Position(mesh.FromVertex(h));
+                const auto p1 = mesh.Position(mesh.ToVertex(h));
+                distributions.EdgeLengths.push_back(static_cast<double>(glm::distance(p0, p1)));
+            }
+        }
+
+        if (params.ComputeValence)
+        {
+            for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+            {
+                const VertexHandle vh{static_cast<PropertyIndex>(vi)};
+                if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
+                    continue;
+                distributions.Valences.push_back(static_cast<double>(mesh.Valence(vh)));
+            }
+        }
+
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle fh{static_cast<PropertyIndex>(fi)};
+            MeshUtils::TriangleFaceView tri{};
+            if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri))
+                continue;
+
+            const double area = TriangleArea(tri.P0, tri.P1, tri.P2);
+            if (params.ComputeAreas)
+                distributions.FaceAreas.push_back(area);
+
+            if (params.ComputeAngles)
+            {
+                distributions.AnglesDeg.push_back(TriangleAngleAt(tri.P1, tri.P0, tri.P2) * kRadToDeg);
+                distributions.AnglesDeg.push_back(TriangleAngleAt(tri.P0, tri.P1, tri.P2) * kRadToDeg);
+                distributions.AnglesDeg.push_back(TriangleAngleAt(tri.P0, tri.P2, tri.P1) * kRadToDeg);
+            }
+
+            if (params.ComputeAspectRatios && area > params.DegenerateAreaEpsilon)
+            {
+                const double la = static_cast<double>(glm::distance(tri.P1, tri.P2));
+                const double lb = static_cast<double>(glm::distance(tri.P0, tri.P2));
+                const double lc = static_cast<double>(glm::distance(tri.P0, tri.P1));
+                const double longest = std::max({la, lb, lc});
+                const double s = (la + lb + lc) / 2.0;
+                const double inradius = area / s;
+                distributions.AspectRatios.push_back(longest / (2.0 * kSqrt3 * inradius));
+            }
+        }
+
+        return distributions;
+    }
+
 } // namespace Geometry::MeshQuality
