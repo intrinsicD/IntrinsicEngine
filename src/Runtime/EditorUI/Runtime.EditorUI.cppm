@@ -29,6 +29,7 @@ import Geometry.KMeans;
 import Geometry.Properties;
 import Geometry.Simplification;
 import Geometry.ShortestPath;
+import Geometry.MeshQuality;
 import Geometry.Subdivision;
 import Geometry.PointCloudUtils;
 import Geometry.GraphUtils;
@@ -332,6 +333,19 @@ export namespace Runtime::EditorUI
         std::size_t NonFiniteElements = 0;
     };
 
+    struct MeshQualityWidgetState
+    {
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        Geometry::MeshQuality::QualityResult LastResult{};
+        std::vector<float> AngleHistogram{};
+        std::vector<float> AspectRatioHistogram{};
+        std::vector<float> EdgeLengthHistogram{};
+        std::vector<float> ValenceHistogram{};
+        std::vector<float> FaceAreaHistogram{};
+        int HistogramBinCount = 32;
+    };
+
     [[nodiscard]] bool DrawKMeansWidget(Runtime::Engine& engine,
                                         entt::entity entity,
                                         KMeansWidgetState& state);
@@ -361,6 +375,9 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawShortestPathWidget(Runtime::Engine& engine,
                                               entt::entity entity,
                                               ShortestPathWidgetState& state);
+    [[nodiscard]] bool DrawMeshQualityWidget(Runtime::Engine& engine,
+                                             entt::entity entity,
+                                             MeshQualityWidgetState& state);
 
     // =========================================================================
     // InspectorController — component property inspector panel
@@ -400,6 +417,7 @@ export namespace Runtime::EditorUI
         SimplificationWidgetState m_SimplificationUi{};
         SmoothingWidgetState m_SmoothingUi{};
         SubdivisionWidgetState m_SubdivisionUi{};
+        MeshQualityWidgetState m_MeshQualityUi{};
         MeshAnalysisWidgetState m_MeshAnalysisUi{};
         NormalEstimationWidgetState m_NormalEstimationUi{};
         ShortestPathWidgetState m_ShortestPathUi{};
@@ -450,6 +468,7 @@ export namespace Runtime::EditorUI
         void OpenSmoothingPanel();
         void OpenSubdivisionPanel();
         void OpenRepairPanel();
+        void OpenMeshQualityPanel();
         void OpenWorkflowStack();
 
 
@@ -460,6 +479,7 @@ export namespace Runtime::EditorUI
         void DrawSmoothingPanel();
         void DrawSubdivisionPanel();
         void DrawRepairPanel();
+        void DrawMeshQualityPanel();
         void DrawMeshSpectralPanel();
         void DrawGraphSpectralPanel();
     };

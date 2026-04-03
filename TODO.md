@@ -284,7 +284,7 @@ Six geometry operators and one profiling tool have full backends but no editor p
 - [ ] **Surface Reconstruction:** Add Geometry → Reconstruct Surface panel. Expose `KNeighbors`, `GridResolution`, `Padding` params. Enable only for point cloud entities. Display reconstructed mesh vertex/face count. Materialize as new mesh entity.
 - [ ] **Vector Heat Method:** Add widget in Inspector Geometry Processing section (Vertex mode). Source vertices from `SubElementSelection`. Two buttons: "Transport Vectors" and "Compute Log Map". Display per-vertex `v:transported_vector`/`v:logmap_coords` properties. Auto-switch color source to angle/distance.
 
-- [ ] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel (distinct from the existing Mesh Analysis defect-marker panel). Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Per-metric histograms via ImGui `PlotHistogram`. Summary diagnostics only — no per-element property publishing.
+- [x] **Mesh Quality Panel:** Add dedicated Geometry → Mesh Quality panel (distinct from the existing Mesh Analysis defect-marker panel). Display aggregate statistics table (min/max/mean angle, aspect ratio, edge length, valence, area, volume). Per-metric histograms via ImGui `PlotHistogram`. Summary diagnostics only — no per-element property publishing.
 - [ ] **Benchmark Runner Panel:** Add a Benchmark panel via `GUI::RegisterPanel`. Expose frame count, warmup frames, and output path inputs. "Run Benchmark" button calls `BenchmarkRunner::Configure()` + `Start()`. Display `BenchmarkStats` summary (avg/min/max/p95/p99 frame time, avg FPS, per-pass averages) in a table after completion. Currently CLI-only (`--benchmark`).
 
 #### F2. Rendering Controls UI

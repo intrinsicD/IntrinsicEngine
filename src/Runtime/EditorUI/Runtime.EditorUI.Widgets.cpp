@@ -49,6 +49,7 @@ import Geometry.Smoothing;
 import Geometry.CatmullClark;
 import Geometry.MeshRepair;
 import Geometry.MeshAnalysis;
+import Geometry.MeshQuality;
 import Geometry.NormalEstimation;
 import Geometry.ShortestPath;
 
@@ -770,6 +771,39 @@ namespace
             v[vh] = positions[i].y;
             radius[vh] = glm::length(positions[i]);
         }
+    }
+
+    template <typename T>
+    void BuildHistogram(std::span<const T> samples,
+                        int binCount,
+                        std::vector<float>& outHistogram)
+    {
+        outHistogram.assign(static_cast<std::size_t>(std::max(binCount, 1)), 0.0f);
+        if (samples.empty())
+            return;
+
+        auto [minIt, maxIt] = std::minmax_element(samples.begin(), samples.end());
+        const double minValue = static_cast<double>(*minIt);
+        const double maxValue = static_cast<double>(*maxIt);
+        if (!std::isfinite(minValue) || !std::isfinite(maxValue))
+            return;
+
+        const double range = std::max(maxValue - minValue, 1.0e-12);
+        const double invRange = 1.0 / range;
+
+        for (const auto value : samples)
+        {
+            const double normalized = (static_cast<double>(value) - minValue) * invRange;
+            const double clamped = std::clamp(normalized, 0.0, 1.0);
+            const std::size_t index = std::min(
+                outHistogram.size() - 1,
+                static_cast<std::size_t>(clamped * static_cast<double>(outHistogram.size() - 1)));
+            outHistogram[index] += 1.0f;
+        }
+
+        const float invCount = 1.0f / static_cast<float>(samples.size());
+        for (auto& bin : outHistogram)
+            bin *= invCount;
     }
 }
 
@@ -2126,6 +2160,99 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
     }
 
     return changed;
+}
+
+bool DrawMeshQualityWidget(Runtime::Engine& engine,
+                           entt::entity entity,
+                           MeshQualityWidgetState& state)
+{
+    DrawDomainBadges(HasSurfaceInput(engine, entity) ? kMeshTopologyDomains
+                                                     : GeometryProcessingDomain::None);
+    if (!HasSurfaceInput(engine, entity))
+    {
+        ImGui::TextDisabled("Mesh Quality requires a selected surface mesh with collider-backed authority.");
+        return false;
+    }
+
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+    const auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+    if (!meshData || !meshData->MeshRef)
+    {
+        ImGui::TextDisabled("No editable halfedge mesh available on the selected entity.");
+        return false;
+    }
+
+    ImGui::TextDisabled("Aggregate diagnostics for mesh quality (angles, aspect ratios, lengths, valence, area).");
+    ImGui::SliderInt("Histogram bins", &state.HistogramBinCount, 8, 128);
+
+    if (ImGui::Button("Run Mesh Quality Analysis"))
+    {
+        Geometry::MeshQuality::QualityParams params{};
+        auto quality = Geometry::MeshQuality::ComputeQuality(*meshData->MeshRef, params);
+        auto distributions = Geometry::MeshQuality::ComputeDistributions(*meshData->MeshRef, params);
+        if (!quality)
+        {
+            state.LastRunFailed = true;
+            state.HasResults = false;
+            return false;
+        }
+        if (!distributions)
+        {
+            state.LastRunFailed = true;
+            state.HasResults = false;
+            return false;
+        }
+
+        state.LastRunFailed = false;
+        state.HasResults = true;
+        state.LastResult = *quality;
+
+        BuildHistogram(std::span<const double>(distributions->AnglesDeg), state.HistogramBinCount, state.AngleHistogram);
+        BuildHistogram(std::span<const double>(distributions->AspectRatios), state.HistogramBinCount, state.AspectRatioHistogram);
+        BuildHistogram(std::span<const double>(distributions->EdgeLengths), state.HistogramBinCount, state.EdgeLengthHistogram);
+        BuildHistogram(std::span<const double>(distributions->Valences), state.HistogramBinCount, state.ValenceHistogram);
+        BuildHistogram(std::span<const double>(distributions->FaceAreas), state.HistogramBinCount, state.FaceAreaHistogram);
+    }
+
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Mesh quality analysis failed.");
+    if (!state.HasResults)
+        return false;
+
+    const auto& q = state.LastResult;
+    ImGui::SeparatorText("Aggregate Statistics");
+    ImGui::Text("Angles (deg): min %.3f / max %.3f / mean %.3f", q.MinAngle, q.MaxAngle, q.MeanAngle);
+    ImGui::Text("Aspect ratio: min %.3f / max %.3f / mean %.3f",
+                q.MinAspectRatio, q.MaxAspectRatio, q.MeanAspectRatio);
+    ImGui::Text("Edge length: min %.5f / max %.5f / mean %.5f / std %.5f",
+                q.MinEdgeLength, q.MaxEdgeLength, q.MeanEdgeLength, q.StdDevEdgeLength);
+    ImGui::Text("Valence: min %zu / max %zu / mean %.3f", q.MinValence, q.MaxValence, q.MeanValence);
+    ImGui::Text("Face area: min %.8f / max %.8f / mean %.8f", q.MinFaceArea, q.MaxFaceArea, q.MeanFaceArea);
+    ImGui::Text("Total area: %.8f", q.TotalArea);
+    ImGui::Text("Volume: %.8f (%s)", q.Volume, q.IsClosed ? "closed mesh" : "open mesh");
+    ImGui::Text("Degenerate faces: %zu", q.DegenerateFaceCount);
+    ImGui::Text("Small/Large angles: %zu / %zu", q.SmallAngleCount, q.LargeAngleCount);
+    ImGui::Text("Topology: V=%zu E=%zu F=%zu, boundary loops=%zu, Euler=%d",
+                q.VertexCount, q.EdgeCount, q.FaceCount, q.BoundaryLoopCount, q.EulerCharacteristic);
+
+    const ImVec2 histogramSize{0.0f, 80.0f};
+    if (!state.AngleHistogram.empty())
+        ImGui::PlotHistogram("Angle distribution", state.AngleHistogram.data(),
+                             static_cast<int>(state.AngleHistogram.size()), 0, nullptr, 0.0f, 0.2f, histogramSize);
+    if (!state.AspectRatioHistogram.empty())
+        ImGui::PlotHistogram("Aspect ratio distribution", state.AspectRatioHistogram.data(),
+                             static_cast<int>(state.AspectRatioHistogram.size()), 0, nullptr, 0.0f, 0.2f, histogramSize);
+    if (!state.EdgeLengthHistogram.empty())
+        ImGui::PlotHistogram("Edge length distribution", state.EdgeLengthHistogram.data(),
+                             static_cast<int>(state.EdgeLengthHistogram.size()), 0, nullptr, 0.0f, 0.2f, histogramSize);
+    if (!state.ValenceHistogram.empty())
+        ImGui::PlotHistogram("Valence distribution", state.ValenceHistogram.data(),
+                             static_cast<int>(state.ValenceHistogram.size()), 0, nullptr, 0.0f, 0.4f, histogramSize);
+    if (!state.FaceAreaHistogram.empty())
+        ImGui::PlotHistogram("Face area distribution", state.FaceAreaHistogram.data(),
+                             static_cast<int>(state.FaceAreaHistogram.size()), 0, nullptr, 0.0f, 0.2f, histogramSize);
+
+    return false;
 }
 
 // =========================================================================

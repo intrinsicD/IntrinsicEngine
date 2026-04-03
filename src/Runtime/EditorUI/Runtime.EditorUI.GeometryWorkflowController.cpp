@@ -140,6 +140,12 @@ void GeometryWorkflowController::OpenRepairPanel()
     Interface::GUI::OpenPanel("Geometry - Repair");
 }
 
+void GeometryWorkflowController::OpenMeshQualityPanel()
+{
+    Interface::GUI::RegisterPanel("Geometry - Mesh Quality", [this]() { DrawMeshQualityPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Mesh Quality");
+}
+
 void GeometryWorkflowController::OpenMeshSpectralPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Mesh Spectral", [this]() { DrawMeshSpectralPanel(); });
@@ -162,6 +168,7 @@ void GeometryWorkflowController::OpenWorkflowStack()
     OpenSmoothingPanel();
     OpenSubdivisionPanel();
     OpenRepairPanel();
+    OpenMeshQualityPanel();
 }
 
 // --- Menu ---
@@ -234,6 +241,13 @@ void GeometryWorkflowController::DrawMenu()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Analysis"))
+    {
+        if (ImGui::MenuItem("Mesh Quality"))
+            OpenMeshQualityPanel();
+        ImGui::EndMenu();
+    }
+
     ImGui::EndMenu();
 }
 
@@ -280,6 +294,9 @@ void GeometryWorkflowController::DrawWorkflowPanel()
     ImGui::SameLine();
     if (ImGui::Button("Open Repair"))
         OpenRepairPanel();
+    ImGui::SameLine();
+    if (ImGui::Button("Open Mesh Quality"))
+        OpenMeshQualityPanel();
 
     ImGui::SeparatorText("Approach Map");
     ImGui::BulletText("Spectral: Mesh modes publish scalar vertex fields; graph spectral layout can publish properties or rewrite node positions.");
@@ -338,6 +355,16 @@ void GeometryWorkflowController::DrawRepairPanel()
                                 "Repair stays as a standalone cleanup pass so it can be inserted before or after heavier operators without dragging the rest of the geometry UI along."))
     {
         static_cast<void>(DrawRepairWidget(*m_Engine, context.Selected));
+    }
+}
+
+void GeometryWorkflowController::DrawMeshQualityPanel()
+{
+    const auto context = GetSelectionContext();
+    if (DrawOperatorPanelHeader(context,
+                                "Compute aggregate mesh quality diagnostics and per-metric histograms for angle, aspect ratio, edge length, valence, and area."))
+    {
+        static_cast<void>(DrawMeshQualityWidget(*m_Engine, context.Selected, m_MeshQualityUi));
     }
 }
 

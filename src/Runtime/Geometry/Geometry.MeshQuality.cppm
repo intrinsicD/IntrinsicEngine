@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <optional>
+#include <vector>
 
 export module Geometry.MeshQuality;
 
@@ -84,12 +85,25 @@ export namespace Geometry::MeshQuality
         int EulerCharacteristic{0};
     };
 
+    struct QualityDistributions
+    {
+        std::vector<double> AnglesDeg{};
+        std::vector<double> AspectRatios{};
+        std::vector<double> EdgeLengths{};
+        std::vector<double> Valences{};
+        std::vector<double> FaceAreas{};
+    };
+
     // -------------------------------------------------------------------------
     // Compute mesh quality metrics.
     //
     // Returns nullopt if the mesh is empty or has no faces.
     // -------------------------------------------------------------------------
     [[nodiscard]] std::optional<QualityResult> ComputeQuality(
+        const Halfedge::Mesh& mesh,
+        const QualityParams& params = {});
+
+    [[nodiscard]] std::optional<QualityDistributions> ComputeDistributions(
         const Halfedge::Mesh& mesh,
         const QualityParams& params = {});
 
