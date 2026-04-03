@@ -437,6 +437,35 @@ The engine already has compute culling shaders (`instance_cull.comp`, `instance_
 - [ ] Plan material serialization compatibility with the future rewrite.
 - [ ] Plan debug/editor-only render state separation from scene state.
 
+### C11. GMM Spectral Framework (Mesh-Free Spectral Analysis)
+
+Gaussian Mixture Model based spectral methods for point cloud analysis without requiring a mesh (inspired by Engine24's Galerkin Laplacian assembly on Gaussian mixtures).
+
+- [ ] Implement EM fitting with regularized covariances in a `Geometry.GaussianMixture` module.
+- [ ] Implement Galerkin Laplacian assembly: Octree spatial indexing → pair discovery → Gaussian product → sparse matrix assembly.
+- [ ] Integrate with existing `Geometry.Octree` for spatial queries and `Geometry.DEC` sparse matrix types.
+- [ ] Store per-point GMM membership weights via existing `PropertySet` system.
+- [ ] Add spectral eigensolve support (requires sparse eigensolver — evaluate Spectra or implement shift-invert Lanczos).
+
+### C12. ICP Point Cloud Registration
+
+Point-to-point and point-to-plane Iterative Closest Point registration for scan alignment.
+
+- [ ] Implement `Geometry.Registration` module following the operator pattern (Params struct + Result struct with convergence diagnostics).
+- [ ] Use existing `Geometry.KDTree` for nearest-neighbor correspondence.
+- [ ] SVD-based rigid alignment per iteration.
+- [ ] Extend to point-to-plane ICP using estimated normals.
+- [ ] Wire to editor UI as a geometry operator.
+
+### C13. GPU Compute Shader Normal Estimation
+
+GPU-accelerated point cloud normal estimation for large point clouds (>1M points).
+
+- [ ] Implement KNN query on GPU via compute shader (requires GPU-side spatial index or brute-force for small neighborhoods).
+- [ ] Per-point covariance → eigendecomposition → normal extraction in compute shader.
+- [ ] Integrate with existing `PointCloudLifecycleSystem` for on-upload normal computation.
+- [ ] Benchmark against CPU `Geometry.NormalEstimation` at varying point counts.
+
 ---
 
 ## 1.5. Compile-Time & Binary-Boundary Hardening — PImpl Refactor Program (NEW)
