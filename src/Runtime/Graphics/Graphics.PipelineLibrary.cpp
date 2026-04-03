@@ -408,6 +408,44 @@ namespace Graphics
         }
 
         // ---------------------------------------------------------------------
+        // Shadow depth pipeline (CSM phase-1 rasterization)
+        //
+        // Depth-only pass writing into the shadow atlas. Uses a dedicated vertex
+        // shader that projects geometry into per-cascade light clip space via
+        // camera.ShadowCascadeMatrices[cascade].
+        // ---------------------------------------------------------------------
+        {
+            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(resolver, "Shadow.Depth.Vert"_id);
+
+            RHI::ShaderModule vert(*m_Impl->Device, vertPath, RHI::ShaderStage::Vertex);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_Impl->DeviceOwner);
+            builder.SetShaders(&vert, nullptr);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({});
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
+            builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
+
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = 80; // mat4 + 1xBDA + cascade index
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build ShadowDepth pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Impl->Pipelines[kPipeline_ShadowDepth] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
         // Picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         {

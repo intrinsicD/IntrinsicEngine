@@ -79,4 +79,5 @@ export namespace Graphics
     inline constexpr StringID kPipeline_SurfaceGBuffer = "Pipeline.SurfaceGBuffer"_id;
     inline constexpr StringID kPipeline_DebugSurface = "Pipeline.DebugSurface"_id;
     inline constexpr StringID kPipeline_DepthPrepass = "Pipeline.DepthPrepass"_id;
+    inline constexpr StringID kPipeline_ShadowDepth = "Pipeline.ShadowDepth"_id;
 }

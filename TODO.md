@@ -61,7 +61,7 @@ Split into two sub-phases to keep commits reviewable:
 
 **Phase 1 — Shadow atlas + depth-only rendering:**
 - [x] Define `ShadowAtlas` transient resource (depth-only, e.g. 2048x2048 x 4 cascades).
-- [ ] Add `ShadowPass` render feature: depth-only rendering into cascade viewports using `SurfacePass` geometry.
+- [x] Add `ShadowPass` render feature: depth-only rendering into cascade viewports using `SurfacePass` geometry.
 - [x] Compute cascade split distances (practical split scheme: logarithmic/uniform blend).
 - [x] Pack cascade matrices into a UBO/SSBO readable by lit passes.
 - [x] Recipe-driven: shadow resources allocated only when shadows are enabled.
