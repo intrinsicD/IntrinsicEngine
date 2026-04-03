@@ -15,8 +15,14 @@ namespace Core::Benchmark
 {
     bool BenchmarkRunner::RecordFrame(const Telemetry::TelemetrySystem& telemetry)
     {
-        if (IsComplete())
+        if (!m_IsRunning)
             return false;
+
+        if (IsComplete())
+        {
+            m_IsRunning = false;
+            return false;
+        }
 
         const uint32_t frameIndex = m_FrameIndex;
         m_FrameIndex = frameIndex + 1;
@@ -182,6 +188,7 @@ namespace Core::Benchmark
 
     bool BenchmarkRunner::Finalize()
     {
+        m_IsRunning = false;
         return WriteJSON(m_Config.OutputPath);
     }
 }

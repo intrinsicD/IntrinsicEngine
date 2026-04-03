@@ -63,6 +63,17 @@ export namespace Core::Benchmark
             m_Snapshots.clear();
             m_PassAccum.clear();
             m_FrameIndex = 0;
+            m_IsRunning = true;
+        }
+
+        // Starts (or restarts) benchmark capture using the currently configured
+        // frame/warmup/output settings.
+        void Start()
+        {
+            m_Snapshots.clear();
+            m_PassAccum.clear();
+            m_FrameIndex = 0;
+            m_IsRunning = true;
         }
 
         // Call once per frame during the benchmark run.
@@ -78,6 +89,7 @@ export namespace Core::Benchmark
         // Convenience: compute stats and write to configured output path.
         bool Finalize();
 
+        [[nodiscard]] bool IsRunning() const { return m_IsRunning; }
         [[nodiscard]] bool IsComplete() const { return m_FrameIndex >= m_Config.WarmupFrames + m_Config.FrameCount; }
         [[nodiscard]] bool IsWarmingUp() const { return m_FrameIndex < m_Config.WarmupFrames; }
         [[nodiscard]] uint32_t FramesRecorded() const { return static_cast<uint32_t>(m_Snapshots.size()); }
@@ -96,5 +108,6 @@ export namespace Core::Benchmark
             uint32_t SampleCount = 0;
         };
         std::vector<PassAccum> m_PassAccum;
+        bool m_IsRunning = false;
     };
 }
