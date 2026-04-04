@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cstdio>
 #include <cstddef>
+#include <cstring>
 #include <format>
 #include <set>
 #include <glm/glm.hpp>
@@ -806,6 +807,136 @@ namespace Runtime::EditorUI
         });
     }
 
+    static void RegisterKeyboardShortcutsPanel()
+    {
+        Interface::GUI::RegisterPanel("Keyboard Shortcuts", []()
+        {
+            // Each entry: Category, Shortcut, Description
+            struct ShortcutEntry
+            {
+                const char* Category;
+                const char* Shortcut;
+                const char* Description;
+            };
+
+            static constexpr ShortcutEntry kShortcuts[] = {
+                // Gizmo (wired in Sandbox OnUpdate)
+                {"Gizmo",       "W",              "Translate mode"},
+                {"Gizmo",       "E",              "Rotate mode"},
+                {"Gizmo",       "R",              "Scale mode"},
+                {"Gizmo",       "X",              "Toggle World / Local space"},
+
+                // Camera (wired in Sandbox OnUpdate)
+                {"Camera",      "F",              "Focus camera on selection (fit in view)"},
+                {"Camera",      "C",              "Center camera on selection (orbit target)"},
+                {"Camera",      "Q",              "Reset camera to defaults"},
+
+                // Selection (wired in SelectionModule + Sandbox)
+                {"Selection",   "Click",          "Select entity / sub-element"},
+                {"Selection",   "Shift+Click",    "Toggle add / remove sub-element"},
+                {"Selection",   "Ctrl+Click",     "Toggle entity in multi-selection"},
+                {"Selection",   "Shift+Click",    "Range select in hierarchy panel"},
+
+                // Edit (global hotkeys, wired in Edit menu)
+                {"Edit",        "Ctrl+Z",         "Undo"},
+                {"Edit",        "Ctrl+Shift+Z",   "Redo"},
+                {"Edit",        "Ctrl+Y",         "Redo (alternative)"},
+                {"Edit",        "Escape",         "Cancel rename"},
+
+                // Context menu actions (via right-click context menu)
+                {"Context",     "Ctrl+D",         "Duplicate selected (context menu)"},
+                {"Context",     "Del",            "Delete selected (context menu)"},
+
+                // Scene (via File menu)
+                {"Scene",       "Ctrl+S",         "Save scene (File menu)"},
+                {"Scene",       "Ctrl+Shift+S",   "Save scene as... (File menu)"},
+                {"Scene",       "Ctrl+O",         "Load scene (File menu)"},
+            };
+
+            ImGui::TextDisabled("All keyboard shortcuts available in the editor.");
+            ImGui::Separator();
+
+            if (ImGui::BeginTable("##shortcuts", 3,
+                                  ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
+                                  ImGuiTableFlags_SizingStretchProp))
+            {
+                ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+                ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 180.0f);
+                ImGui::TableSetupColumn("Action",   ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableHeadersRow();
+
+                const char* prevCategory = nullptr;
+                for (const auto& entry : kShortcuts)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+
+                    // Only show category label on first row of each group
+                    if (!prevCategory || std::strcmp(prevCategory, entry.Category) != 0)
+                        ImGui::TextUnformatted(entry.Category);
+                    prevCategory = entry.Category;
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 1.0f), "%s", entry.Shortcut);
+
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TextUnformatted(entry.Description);
+                }
+
+                ImGui::EndTable();
+            }
+        }, true, 0, false);
+    }
+
+    static void RegisterHelpMenu()
+    {
+        Interface::GUI::RegisterMainMenuBar("Help", []
+        {
+            static bool s_ShowAbout = false;
+
+            if (ImGui::BeginMenu("Help"))
+            {
+                if (ImGui::MenuItem("Keyboard Shortcuts"))
+                {
+                    Interface::GUI::OpenPanel("Keyboard Shortcuts");
+                }
+
+                ImGui::Separator();
+
+                if (ImGui::MenuItem("About IntrinsicEngine"))
+                    s_ShowAbout = true;
+
+                ImGui::EndMenu();
+            }
+
+            // About popup — opened via flag to avoid ID stack scoping issues.
+            if (s_ShowAbout)
+            {
+                ImGui::OpenPopup("AboutIntrinsicEngine");
+                s_ShowAbout = false;
+            }
+
+            if (ImGui::BeginPopupModal("AboutIntrinsicEngine", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::Text("IntrinsicEngine");
+                ImGui::Separator();
+                ImGui::TextWrapped(
+                    "A state-of-the-art research and rendering engine built on "
+                    "C++23 modules, Vulkan 1.3, and a mathematically rigorous "
+                    "geometry kernel.");
+                ImGui::Spacing();
+                ImGui::TextDisabled("Vulkan 1.3 | C++23 Modules | Bindless Rendering");
+
+                ImGui::Spacing();
+                if (ImGui::Button("Close", ImVec2(120, 0)))
+                    ImGui::CloseCurrentPopup();
+
+                ImGui::EndPopup();
+            }
+        });
+    }
+
     static void RegisterEditMenu(Runtime::Engine& engine)
     {
         Interface::GUI::RegisterMainMenuBar("Edit", [&engine]
@@ -948,8 +1079,10 @@ namespace Runtime::EditorUI
         RegisterSelectionPanel(engine);
         RegisterBenchmarkPanel(engine);
         RegisterConsolePanel();
+        RegisterKeyboardShortcutsPanel();
         RegisterSceneFileMenu(engine);
         RegisterEditMenu(engine);
+        RegisterHelpMenu();
     }
 
     // =========================================================================
