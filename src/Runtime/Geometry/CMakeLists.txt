@@ -58,6 +58,7 @@ target_sources(${target_name}
         Geometry.Grid.cppm
         Geometry.MarchingCubes.cppm
         Geometry.MeshBoundary.cppm
+        Geometry.ImplicitPlaneField.cppm
         Geometry.SurfaceReconstruction.cppm
         Geometry.Parameterization.cppm
         Geometry.MeshQuality.cppm
@@ -98,6 +99,7 @@ target_sources(${target_name}
         Geometry.MeshRepair.cpp
         Geometry.MarchingCubes.cpp
         Geometry.MeshBoundary.cpp
+        Geometry.ImplicitPlaneField.cpp
         Geometry.SurfaceReconstruction.cpp
         Geometry.Parameterization.cpp
         Geometry.MeshQuality.cpp
