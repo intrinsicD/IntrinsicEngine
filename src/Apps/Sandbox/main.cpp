@@ -16,6 +16,7 @@
 #include <charconv>
 #include <cmath>
 #include <optional>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -293,6 +294,11 @@ private:
     // --- Editor / Selection ---
     entt::entity m_CachedSelectedEntity = entt::null;
     int m_SelectMouseButton = 0;
+
+    // --- Hierarchy panel state ---
+    entt::entity m_RenameEntity = entt::null;
+    char m_RenameBuffer[256] = {};
+    int m_HierarchyCollapseRequest = 0; // +1 = expand all, -1 = collapse all, 0 = none
 
     // --- Extracted subsystem controllers ---
     EditorUI::SpatialDebugController m_SpatialDebug{};
@@ -1061,6 +1067,39 @@ private:
         return "[o] ";  // Empty/other
     }
 
+    // Toggle the Visible flag on all render components of an entity.
+    static void ToggleEntityVisibility(entt::registry& reg, entt::entity e)
+    {
+        // Determine current state: visible if any render component is visible.
+        bool isVisible = false;
+        if (const auto* sc = reg.try_get<ECS::Surface::Component>(e))
+            isVisible |= sc->Visible;
+        if (const auto* gd = reg.try_get<ECS::Graph::Data>(e))
+            isVisible |= gd->Visible;
+        if (const auto* pcd = reg.try_get<ECS::PointCloud::Data>(e))
+            isVisible |= pcd->Visible;
+
+        const bool newVisible = !isVisible;
+        if (auto* sc = reg.try_get<ECS::Surface::Component>(e))
+            sc->Visible = newVisible;
+        if (auto* gd = reg.try_get<ECS::Graph::Data>(e))
+            gd->Visible = newVisible;
+        if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(e))
+            pcd->Visible = newVisible;
+    }
+
+    // Check if an entity has any visible render components.
+    static bool IsEntityVisible(const entt::registry& reg, entt::entity e)
+    {
+        if (const auto* sc = reg.try_get<ECS::Surface::Component>(e))
+            if (sc->Visible) return true;
+        if (const auto* gd = reg.try_get<ECS::Graph::Data>(e))
+            if (gd->Visible) return true;
+        if (const auto* pcd = reg.try_get<ECS::PointCloud::Data>(e))
+            if (pcd->Visible) return true;
+        return false;
+    }
+
     // Recursively draw one entity and its hierarchy children.
     void DrawEntityNode(entt::entity entityID)
     {
@@ -1091,23 +1130,78 @@ private:
         if (!hasChildren)
             flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 
+        // Expand/collapse all request
+        if (m_HierarchyCollapseRequest != 0)
+            ImGui::SetNextItemOpen(m_HierarchyCollapseRequest > 0);
+
         bool opened = ImGui::TreeNodeEx(
             reinterpret_cast<void*>(static_cast<entt::id_type>(entityID)),
             flags, "%s", displayName.c_str());
 
+        // --- Click to select ---
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         {
             GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), entityID);
         }
 
-        // Context menu per entity
+        // --- Drag source for reparenting ---
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+        {
+            ImGui::SetDragDropPayload("HIERARCHY_ENTITY", &entityID, sizeof(entt::entity));
+            ImGui::Text("%s", displayName.c_str());
+            ImGui::EndDragDropSource();
+        }
+
+        // --- Drop target for reparenting ---
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY"))
+            {
+                entt::entity droppedEntity = *static_cast<const entt::entity*>(payload->Data);
+                if (droppedEntity != entityID && reg.valid(droppedEntity))
+                {
+                    (void)GetCommandHistory().Execute(
+                        Runtime::EditorUI::MakeReparentEntityCommand(*this, droppedEntity, entityID));
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        // --- Context menu per entity ---
+        bool wantRename = false;
         if (ImGui::BeginPopupContextItem())
         {
             if (ImGui::MenuItem("Focus Camera"))
             {
                 GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), entityID);
-                // F key handling in HandleCameraShortcuts will process on next frame
             }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Duplicate"))
+            {
+                (void)GetCommandHistory().Execute(
+                    Runtime::EditorUI::MakeDuplicateEntityCommand(*this, entityID));
+            }
+            if (ImGui::MenuItem("Rename"))
+            {
+                m_RenameEntity = entityID;
+                std::strncpy(m_RenameBuffer, name.c_str(), sizeof(m_RenameBuffer) - 1);
+                m_RenameBuffer[sizeof(m_RenameBuffer) - 1] = '\0';
+                wantRename = true;
+            }
+            if (ImGui::MenuItem("Create Child"))
+            {
+                (void)GetCommandHistory().Execute(
+                    Runtime::EditorUI::MakeCreateChildEntityCommand(*this, "Child Entity", entityID));
+            }
+            ImGui::Separator();
+            {
+                const bool visible = IsEntityVisible(reg, entityID);
+                if (ImGui::MenuItem(visible ? "Hide" : "Show"))
+                {
+                    ToggleEntityVisibility(reg, entityID);
+                }
+            }
+            ImGui::Separator();
             if (ImGui::MenuItem("Delete"))
             {
                 (void)GetCommandHistory().Execute(
@@ -1118,6 +1212,42 @@ private:
                 return;
             }
             ImGui::EndPopup();
+        }
+
+        // Open rename popup outside the context menu so the ID stack matches.
+        if (wantRename)
+            ImGui::OpenPopup("RenameEntityPopup");
+
+        // --- Inline rename popup ---
+        if (m_RenameEntity == entityID)
+        {
+            if (ImGui::BeginPopup("RenameEntityPopup"))
+            {
+                ImGui::Text("Rename:");
+                if (ImGui::InputText("##rename", m_RenameBuffer, sizeof(m_RenameBuffer),
+                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+                {
+                    std::string newName(m_RenameBuffer);
+                    if (!newName.empty() && newName != name)
+                    {
+                        (void)GetCommandHistory().Execute(
+                            Runtime::EditorUI::MakeRenameEntityCommand(*this, entityID, newName));
+                    }
+                    m_RenameEntity = entt::null;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+                {
+                    m_RenameEntity = entt::null;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+            else
+            {
+                // Popup was closed externally
+                m_RenameEntity = entt::null;
+            }
         }
 
         if (opened && hasChildren)
@@ -1146,6 +1276,14 @@ private:
         auto& reg = GetSceneManager().GetScene().GetRegistry();
         const entt::entity selected = m_CachedSelectedEntity;
 
+        // --- Toolbar: Expand All / Collapse All ---
+        if (ImGui::SmallButton("Expand All"))
+            m_HierarchyCollapseRequest = +1;
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Collapse All"))
+            m_HierarchyCollapseRequest = -1;
+        ImGui::Separator();
+
         // Collect root entities (no parent, or no Hierarchy component).
         reg.view<entt::entity>().each([&](auto entityID)
         {
@@ -1161,6 +1299,34 @@ private:
 
             DrawEntityNode(entityID);
         });
+
+        // Clear the expand/collapse request after one frame.
+        m_HierarchyCollapseRequest = 0;
+
+        // --- Drop on empty space = reparent to root ---
+        // Use an invisible button spanning remaining space as a proper drop target.
+        {
+            const float remainingHeight = ImGui::GetContentRegionAvail().y;
+            if (remainingHeight > 1.0f)
+            {
+                ImGui::InvisibleButton("##hierarchy_drop_area",
+                                       ImVec2(ImGui::GetContentRegionAvail().x,
+                                              remainingHeight));
+                if (ImGui::BeginDragDropTarget())
+                {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_ENTITY"))
+                    {
+                        entt::entity droppedEntity = *static_cast<const entt::entity*>(payload->Data);
+                        if (reg.valid(droppedEntity))
+                        {
+                            (void)GetCommandHistory().Execute(
+                                Runtime::EditorUI::MakeReparentEntityCommand(*this, droppedEntity, entt::null));
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+            }
+        }
 
         // Click on empty space to deselect
         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())

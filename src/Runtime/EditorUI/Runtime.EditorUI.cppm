@@ -496,6 +496,26 @@ export namespace Runtime::EditorUI
     [[nodiscard]] Core::EditorCommand MakeDeleteEntityCommand(
         Runtime::Engine& engine, entt::entity target);
 
+    // Create an undoable command that reparents an entity. Preserves world
+    // position via TryComputeLocalTransform. Pass entt::null as newParent
+    // to detach to the scene root.
+    [[nodiscard]] Core::EditorCommand MakeReparentEntityCommand(
+        Runtime::Engine& engine, entt::entity child, entt::entity newParent);
+
+    // Create an undoable command that renames an entity.
+    [[nodiscard]] Core::EditorCommand MakeRenameEntityCommand(
+        Runtime::Engine& engine, entt::entity target, const std::string& newName);
+
+    // Create an undoable command that duplicates an entity (shallow copy of
+    // component state). The duplicate is selected after creation.
+    [[nodiscard]] Core::EditorCommand MakeDuplicateEntityCommand(
+        Runtime::Engine& engine, entt::entity source);
+
+    // Create an undoable compound command that creates a new child entity
+    // under the given parent. Single undo unit (unlike separate create + reparent).
+    [[nodiscard]] Core::EditorCommand MakeCreateChildEntityCommand(
+        Runtime::Engine& engine, const std::string& name, entt::entity parent);
+
     // =========================================================================
     // InspectorController — component property inspector panel
     // =========================================================================

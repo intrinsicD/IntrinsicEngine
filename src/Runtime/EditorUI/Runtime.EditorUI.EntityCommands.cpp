@@ -314,4 +314,158 @@ namespace Runtime::EditorUI
             },
         };
     }
+    Core::EditorCommand MakeReparentEntityCommand(Runtime::Engine& engine,
+                                                  entt::entity child,
+                                                  entt::entity newParent)
+    {
+        auto& scene = engine.GetSceneManager().GetScene();
+        auto& reg = scene.GetRegistry();
+        assert(reg.valid(child) && "MakeReparentEntityCommand: child must be valid");
+
+        // Capture the old parent before reparenting.
+        entt::entity oldParent = entt::null;
+        if (const auto* h = reg.try_get<ECS::Components::Hierarchy::Component>(child))
+            oldParent = h->Parent;
+
+        std::string childName = "Entity";
+        if (const auto* nt = reg.try_get<ECS::Components::NameTag::Component>(child))
+            childName = nt->Name;
+
+        auto handle = std::make_shared<entt::entity>(child);
+        auto oldP = std::make_shared<entt::entity>(oldParent);
+        auto newP = std::make_shared<entt::entity>(newParent);
+
+        return Core::EditorCommand{
+            .name = "Reparent " + childName,
+            .redo = [&engine, handle, newP]()
+            {
+                auto& r = engine.GetSceneManager().GetScene().GetRegistry();
+                if (*handle != entt::null && r.valid(*handle))
+                    ECS::Components::Hierarchy::Attach(r, *handle, *newP);
+            },
+            .undo = [&engine, handle, oldP]()
+            {
+                auto& r = engine.GetSceneManager().GetScene().GetRegistry();
+                if (*handle != entt::null && r.valid(*handle))
+                {
+                    if (*oldP == entt::null)
+                        ECS::Components::Hierarchy::Detach(r, *handle);
+                    else if (r.valid(*oldP))
+                        ECS::Components::Hierarchy::Attach(r, *handle, *oldP);
+                }
+            },
+        };
+    }
+
+    Core::EditorCommand MakeRenameEntityCommand(Runtime::Engine& engine,
+                                                entt::entity target,
+                                                const std::string& newName)
+    {
+        auto& scene = engine.GetSceneManager().GetScene();
+        auto& reg = scene.GetRegistry();
+        assert(reg.valid(target) && "MakeRenameEntityCommand: target must be valid");
+
+        std::string oldName;
+        if (const auto* nt = reg.try_get<ECS::Components::NameTag::Component>(target))
+            oldName = nt->Name;
+
+        auto handle = std::make_shared<entt::entity>(target);
+
+        return Core::EditorCommand{
+            .name = "Rename to " + newName,
+            .redo = [&engine, handle, newName]()
+            {
+                auto& r = engine.GetSceneManager().GetScene().GetRegistry();
+                if (*handle != entt::null && r.valid(*handle))
+                    if (auto* nt = r.try_get<ECS::Components::NameTag::Component>(*handle))
+                        nt->Name = newName;
+            },
+            .undo = [&engine, handle, oldName]()
+            {
+                auto& r = engine.GetSceneManager().GetScene().GetRegistry();
+                if (*handle != entt::null && r.valid(*handle))
+                    if (auto* nt = r.try_get<ECS::Components::NameTag::Component>(*handle))
+                        nt->Name = oldName;
+            },
+        };
+    }
+
+    Core::EditorCommand MakeDuplicateEntityCommand(Runtime::Engine& engine,
+                                                   entt::entity source)
+    {
+        auto& scene = engine.GetSceneManager().GetScene();
+        auto& reg = scene.GetRegistry();
+        assert(reg.valid(source) && "MakeDuplicateEntityCommand: source must be valid");
+
+        // Capture state from source at command creation time.
+        auto snapshot = std::make_shared<EntitySnapshot>(CaptureEntity(reg, source));
+        auto handle = std::make_shared<entt::entity>(entt::null);
+
+        std::string entityName = snapshot->Name.empty() ? "Entity" : snapshot->Name;
+
+        return Core::EditorCommand{
+            .name = "Duplicate " + entityName,
+            .redo = [&engine, handle, snapshot]()
+            {
+                auto& sc = engine.GetSceneManager().GetScene();
+                auto& r = sc.GetRegistry();
+
+                *handle = sc.CreateEntity(snapshot->Name + " Copy");
+                RestoreEntity(r, *handle, *snapshot);
+
+                engine.GetSelection().SetSelectedEntity(sc, *handle);
+            },
+            .undo = [&engine, handle]()
+            {
+                auto& sc = engine.GetSceneManager().GetScene();
+                auto& r = sc.GetRegistry();
+                if (*handle != entt::null && r.valid(*handle))
+                {
+                    DetachAllChildren(r, *handle);
+                    if (r.all_of<ECS::Components::Hierarchy::Component>(*handle))
+                        ECS::Components::Hierarchy::Detach(r, *handle);
+                    r.destroy(*handle);
+                }
+                engine.GetSelection().ClearSelection(sc);
+                *handle = entt::null;
+            },
+        };
+    }
+    Core::EditorCommand MakeCreateChildEntityCommand(Runtime::Engine& engine,
+                                                    const std::string& name,
+                                                    entt::entity parent)
+    {
+        // Compound command: create entity + reparent, as a single undo unit.
+        auto handle = std::make_shared<entt::entity>(entt::null);
+
+        return Core::EditorCommand{
+            .name = "Create Child " + name,
+            .redo = [&engine, handle, name, parent]()
+            {
+                auto& scene = engine.GetSceneManager().GetScene();
+                auto& reg = scene.GetRegistry();
+                *handle = scene.CreateEntity(name);
+                reg.emplace_or_replace<ECS::Components::Selection::SelectableTag>(*handle);
+
+                if (parent != entt::null && reg.valid(parent))
+                    ECS::Components::Hierarchy::Attach(reg, *handle, parent);
+
+                engine.GetSelection().SetSelectedEntity(scene, *handle);
+            },
+            .undo = [&engine, handle]()
+            {
+                auto& scene = engine.GetSceneManager().GetScene();
+                auto& reg = scene.GetRegistry();
+                if (*handle != entt::null && reg.valid(*handle))
+                {
+                    DetachAllChildren(reg, *handle);
+                    if (reg.all_of<ECS::Components::Hierarchy::Component>(*handle))
+                        ECS::Components::Hierarchy::Detach(reg, *handle);
+                    reg.destroy(*handle);
+                }
+                engine.GetSelection().ClearSelection(scene);
+                *handle = entt::null;
+            },
+        };
+    }
 } // namespace Runtime::EditorUI
