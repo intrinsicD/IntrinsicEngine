@@ -14,6 +14,8 @@
 #include <filesystem>
 #include <algorithm>
 #include <charconv>
+#include <set>
+#include <span>
 #include <cmath>
 #include <optional>
 #include <cstring>
@@ -55,8 +57,12 @@ import Graphics.RenderDriver;
 import Graphics.RenderPipeline;
 import Graphics.TextureLoader;
 import Graphics.TransformGizmo;
+import Graphics.Geometry;
+import Graphics.OverlayEntityFactory;
 import Geometry;
 import ECS;
+import RHI.Device;
+import RHI.Transfer;
 import RHI.Texture;
 import Interface;
 
@@ -723,6 +729,12 @@ private:
         Interface::GUI::RegisterOverlay("Transform Gizmo", [this]()
         {
             m_Gizmo.DrawImGui();
+        });
+
+        // Viewport context menu overlay (right-click on 3D viewport)
+        Interface::GUI::RegisterOverlay("Viewport Context Menu", [this]()
+        {
+            DrawViewportContextMenu();
         });
 
         // View Settings panel
@@ -1469,6 +1481,113 @@ private:
     }
 
     // =========================================================================
+    // Camera helpers (Focus, Center, Reset)
+    // =========================================================================
+
+    // Compute entity world-space center and bounding radius.
+    // Returns false if the entity has no computable bounds.
+    bool ComputeEntityBounds(entt::entity entity, glm::vec3& outCenter, float& outRadius)
+    {
+        auto& reg = GetSceneManager().GetScene().GetRegistry();
+        if (entity == entt::null || !reg.valid(entity)) return false;
+
+        // 1) Mesh entity: use world OBB.
+        if (auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity))
+        {
+            if (collider->CollisionRef)
+            {
+                outCenter = collider->WorldOBB.Center;
+                outRadius = glm::length(collider->WorldOBB.Extents);
+                return true;
+            }
+        }
+
+        // 2) Point cloud entity: compute AABB from cloud positions.
+        if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity))
+        {
+            if (pcd->CloudRef && !pcd->CloudRef->IsEmpty())
+            {
+                auto positions = pcd->CloudRef->Positions();
+                Geometry::AABB aabb;
+                for (const auto& p : positions)
+                {
+                    aabb.Min = glm::min(aabb.Min, p);
+                    aabb.Max = glm::max(aabb.Max, p);
+                }
+                if (auto* xf = reg.try_get<ECS::Components::Transform::Component>(entity))
+                {
+                    glm::mat4 world = GetMatrix(*xf);
+                    glm::vec3 wLo, wHi;
+                    Runtime::EditorUI::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
+                    outCenter = (wLo + wHi) * 0.5f;
+                    outRadius = glm::length((wHi - wLo) * 0.5f);
+                }
+                else
+                {
+                    outCenter = aabb.GetCenter();
+                    outRadius = glm::length(aabb.GetExtents());
+                }
+                return true;
+            }
+        }
+
+        // 3) Graph entity: compute AABB from node positions.
+        if (auto* gd = reg.try_get<ECS::Graph::Data>(entity))
+        {
+            if (gd->GraphRef && gd->GraphRef->VertexCount() > 0)
+            {
+                Geometry::AABB aabb;
+                for (std::size_t i = 0; i < gd->GraphRef->VerticesSize(); ++i)
+                {
+                    Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                    if (gd->GraphRef->IsValid(v))
+                    {
+                        glm::vec3 p = gd->GraphRef->VertexPosition(v);
+                        aabb.Min = glm::min(aabb.Min, p);
+                        aabb.Max = glm::max(aabb.Max, p);
+                    }
+                }
+                if (auto* xf = reg.try_get<ECS::Components::Transform::Component>(entity))
+                {
+                    glm::mat4 world = GetMatrix(*xf);
+                    glm::vec3 wLo, wHi;
+                    Runtime::EditorUI::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
+                    outCenter = (wLo + wHi) * 0.5f;
+                    outRadius = glm::length((wHi - wLo) * 0.5f);
+                }
+                else
+                {
+                    outCenter = aabb.GetCenter();
+                    outRadius = glm::length(aabb.GetExtents());
+                }
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void FocusCameraOnEntity(entt::entity entity)
+    {
+        auto* cam = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::CameraComponent>(m_CameraEntity);
+        auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity);
+        if (!cam || !orbit) return;
+
+        glm::vec3 center;
+        float radius;
+        if (!ComputeEntityBounds(entity, center, radius)) return;
+        if (radius < 0.001f) radius = 1.0f;
+
+        orbit->Target = center;
+        float halfFov = glm::radians(cam->Fov) * 0.5f;
+        float fitDistance = radius / glm::tan(halfFov);
+        orbit->Distance = fitDistance * 1.5f;
+
+        glm::vec3 viewDir = glm::normalize(cam->Position - orbit->Target);
+        cam->Position = orbit->Target + viewDir * orbit->Distance;
+    }
+
+    // =========================================================================
     // Camera shortcuts (F=Focus, C=Center, Q=Reset)
     // =========================================================================
     void HandleCameraShortcuts(bool uiCapturesKeyboard, Graphics::CameraComponent* cameraComponent)
@@ -1479,125 +1598,694 @@ private:
         const bool cPressed = !uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::C);
         if (fPressed || cPressed)
         {
-            if (auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+            auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity);
+            if (!orbit) return;
+
+            glm::vec3 center;
+            float radius;
+            if (!ComputeEntityBounds(m_CachedSelectedEntity, center, radius)) return;
+            if (radius < 0.001f) radius = 1.0f;
+
+            orbit->Target = center;
+
+            if (fPressed)
             {
-                const entt::entity selected = m_CachedSelectedEntity;
-                if (selected != entt::null && GetSceneManager().GetScene().GetRegistry().valid(selected))
-                {
-                    glm::vec3 center{0.0f};
-                    float radius = 0.0f;
-                    bool found = false;
-
-                    auto& reg = GetSceneManager().GetScene().GetRegistry();
-
-                    // 1) Mesh entity: use world OBB.
-                    if (auto* collider = reg.try_get<ECS::MeshCollider::Component>(selected))
-                    {
-                        if (collider->CollisionRef)
-                        {
-                            center = collider->WorldOBB.Center;
-                            radius = glm::length(collider->WorldOBB.Extents);
-                            found = true;
-                        }
-                    }
-
-                    // 2) Point cloud entity: compute AABB from cloud positions.
-                    if (!found)
-                    {
-                        if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(selected))
-                        {
-                            if (pcd->CloudRef && !pcd->CloudRef->IsEmpty())
-                            {
-                                auto positions = pcd->CloudRef->Positions();
-                                Geometry::AABB aabb;
-                                for (const auto& p : positions)
-                                {
-                                    aabb.Min = glm::min(aabb.Min, p);
-                                    aabb.Max = glm::max(aabb.Max, p);
-                                }
-                                if (auto* xf = reg.try_get<ECS::Components::Transform::Component>(selected))
-                                {
-                                    glm::mat4 world = GetMatrix(*xf);
-                                    glm::vec3 wLo, wHi;
-                                    Runtime::EditorUI::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
-                                    center = (wLo + wHi) * 0.5f;
-                                    radius = glm::length((wHi - wLo) * 0.5f);
-                                }
-                                else
-                                {
-                                    center = aabb.GetCenter();
-                                    radius = glm::length(aabb.GetExtents());
-                                }
-                                found = true;
-                            }
-                        }
-                    }
-
-                    // 3) Graph entity: compute AABB from node positions.
-                    if (!found)
-                    {
-                        if (auto* gd = reg.try_get<ECS::Graph::Data>(selected))
-                        {
-                            if (gd->GraphRef && gd->GraphRef->VertexCount() > 0)
-                            {
-                                Geometry::AABB aabb;
-                                for (std::size_t i = 0; i < gd->GraphRef->VerticesSize(); ++i)
-                                {
-                                    Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-                                    if (gd->GraphRef->IsValid(v))
-                                    {
-                                        glm::vec3 p = gd->GraphRef->VertexPosition(v);
-                                        aabb.Min = glm::min(aabb.Min, p);
-                                        aabb.Max = glm::max(aabb.Max, p);
-                                    }
-                                }
-                                if (auto* xf = reg.try_get<ECS::Components::Transform::Component>(selected))
-                                {
-                                    glm::mat4 world = GetMatrix(*xf);
-                                    glm::vec3 wLo, wHi;
-                                    Runtime::EditorUI::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
-                                    center = (wLo + wHi) * 0.5f;
-                                    radius = glm::length((wHi - wLo) * 0.5f);
-                                }
-                                else
-                                {
-                                    center = aabb.GetCenter();
-                                    radius = glm::length(aabb.GetExtents());
-                                }
-                                found = true;
-                            }
-                        }
-                    }
-
-                    if (found)
-                    {
-                        if (radius < 0.001f) radius = 1.0f;
-                        orbit->Target = center;
-
-                        if (fPressed)
-                        {
-                            float halfFov = glm::radians(cameraComponent->Fov) * 0.5f;
-                            float fitDistance = radius / glm::tan(halfFov);
-                            orbit->Distance = fitDistance * 1.5f;
-                        }
-
-                        glm::vec3 viewDir = glm::normalize(cameraComponent->Position - orbit->Target);
-                        cameraComponent->Position = orbit->Target + viewDir * orbit->Distance;
-                    }
-                }
+                float halfFov = glm::radians(cameraComponent->Fov) * 0.5f;
+                float fitDistance = radius / glm::tan(halfFov);
+                orbit->Distance = fitDistance * 1.5f;
             }
+
+            glm::vec3 viewDir = glm::normalize(cameraComponent->Position - orbit->Target);
+            cameraComponent->Position = orbit->Target + viewDir * orbit->Distance;
         }
 
         // Q Key: Reset camera to defaults
         if (!uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::Q))
         {
-            if (auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+            ResetCamera();
+        }
+    }
+
+    // =========================================================================
+    // Viewport Context Menu — right-click on 3D viewport
+    // =========================================================================
+    // State for distinguishing right-click from right-drag (orbit camera).
+    bool m_RightMousePressedInViewport = false;
+    glm::vec2 m_RightMousePressPos{0.0f};
+
+    void DrawViewportContextMenu()
+    {
+        // Track right-click press in viewport.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+            !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) &&
+            !Interface::GUI::WantCaptureMouse())
+        {
+            m_RightMousePressedInViewport = true;
+            m_RightMousePressPos = {ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y};
+        }
+
+        // Open context menu only on release, if no significant drag occurred.
+        if (m_RightMousePressedInViewport && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+        {
+            m_RightMousePressedInViewport = false;
+            const glm::vec2 releasePos{ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y};
+            const float dragDist = glm::length(releasePos - m_RightMousePressPos);
+            constexpr float kDragThreshold = 5.0f; // pixels
+            if (dragDist < kDragThreshold)
+                ImGui::OpenPopup("##ViewportContextMenu");
+        }
+
+        if (!ImGui::BeginPopup("##ViewportContextMenu"))
+            return;
+
+        auto& scene = GetSceneManager().GetScene();
+        auto& reg = scene.GetRegistry();
+        const auto& selConfig = GetSelection().GetConfig();
+        const bool isEntityMode = selConfig.ElementMode == Runtime::Selection::ElementMode::Entity;
+
+        // Gather all entities currently carrying SelectedTag.
+        const auto selectedEntities = GetSelection().GetSelectedEntities(scene);
+        const entt::entity primary = m_CachedSelectedEntity;
+        const bool hasPrimary = (primary != entt::null) && reg.valid(primary);
+
+        if (isEntityMode)
+        {
+            DrawEntityContextMenuItems(reg, scene, selectedEntities, primary, hasPrimary);
+        }
+        else
+        {
+            DrawSubElementContextMenuItems(reg);
+        }
+
+        ImGui::EndPopup();
+    }
+
+    void DrawEntityContextMenuItems(entt::registry& reg, ECS::Scene& scene,
+                                    const std::vector<entt::entity>& selectedEntities,
+                                    entt::entity primary, bool hasPrimary)
+    {
+        // --- Entity actions (enabled when something is selected) ---
+        if (ImGui::MenuItem("Focus Camera", "F", false, hasPrimary))
+        {
+            FocusCameraOnEntity(primary);
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Duplicate", "Ctrl+D", false, hasPrimary))
+        {
+            for (auto e : selectedEntities)
             {
-                orbit->Target = glm::vec3(0.0f);
-                orbit->Distance = 5.0f;
-                cameraComponent->Position = glm::vec3(0.0f, 0.0f, 4.0f);
-                cameraComponent->Orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                if (reg.valid(e))
+                    (void)GetCommandHistory().Execute(
+                        Runtime::EditorUI::MakeDuplicateEntityCommand(*this, e));
             }
+        }
+
+        if (ImGui::MenuItem("Select Children", nullptr, false, hasPrimary))
+        {
+            SelectAllChildren(reg, scene, primary);
+        }
+
+        ImGui::Separator();
+
+        {
+            const bool anyVisible = std::any_of(selectedEntities.begin(), selectedEntities.end(),
+                [&reg](entt::entity e) { return IsEntityVisible(reg, e); });
+            if (ImGui::MenuItem(anyVisible ? "Hide" : "Show", "H", false, hasPrimary))
+            {
+                for (auto e : selectedEntities)
+                {
+                    if (reg.valid(e))
+                        ToggleEntityVisibility(reg, e);
+                }
+            }
+        }
+
+        if (ImGui::MenuItem("Isolate", nullptr, false, hasPrimary))
+        {
+            IsolateEntities(reg, selectedEntities);
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Delete", "Del", false, hasPrimary))
+        {
+            // Delete all selected entities (in reverse to avoid hierarchy issues)
+            for (auto it = selectedEntities.rbegin(); it != selectedEntities.rend(); ++it)
+            {
+                if (reg.valid(*it))
+                    (void)GetCommandHistory().Execute(
+                        Runtime::EditorUI::MakeDeleteEntityCommand(*this, *it));
+            }
+        }
+
+        ImGui::Separator();
+        DrawCreatePrimitiveMenu(scene);
+
+        ImGui::Separator();
+        if (ImGui::MenuItem("Reset Camera", "Q"))
+        {
+            ResetCamera();
+        }
+    }
+
+    void DrawSubElementContextMenuItems(entt::registry& reg)
+    {
+        const entt::entity entity = m_CachedSelectedEntity;
+        const bool hasMesh = (entity != entt::null) && reg.valid(entity) &&
+                             reg.all_of<ECS::Mesh::Data>(entity);
+        const auto& selConfig = GetSelection().GetConfig();
+
+        if (ImGui::MenuItem("Select Connected", nullptr, false, hasMesh))
+        {
+            GrowSelectionToConnected(reg, entity, selConfig.ElementMode);
+        }
+        if (ImGui::MenuItem("Grow Selection", "+", false, hasMesh))
+        {
+            GrowSelection(reg, entity, selConfig.ElementMode);
+        }
+        if (ImGui::MenuItem("Shrink Selection", "-", false, hasMesh))
+        {
+            ShrinkSelection(reg, entity, selConfig.ElementMode);
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Clear Sub-Element Selection"))
+        {
+            GetSelection().ClearSubElementSelection();
+        }
+    }
+
+    void DrawCreatePrimitiveMenu(ECS::Scene& /*scene*/)
+    {
+        if (ImGui::BeginMenu("Create Primitive"))
+        {
+            if (ImGui::MenuItem("Cube"))
+                SpawnPrimitiveMesh("Cube", Geometry::AABB{glm::vec3(-0.5f), glm::vec3(0.5f)});
+            if (ImGui::MenuItem("Sphere"))
+                SpawnPrimitiveMesh("Sphere", Geometry::Sphere{glm::vec3(0.0f), 0.5f});
+            if (ImGui::MenuItem("Cylinder"))
+                SpawnPrimitiveMesh("Cylinder", Geometry::Cylinder{glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f, 0.5f, 0.0f), 0.5f});
+            if (ImGui::MenuItem("Plane"))
+            {
+                // Thin box (non-degenerate) approximating a plane
+                SpawnPrimitiveMesh("Plane", Geometry::AABB{glm::vec3(-1.0f, -0.001f, -1.0f), glm::vec3(1.0f, 0.001f, 1.0f)});
+            }
+            if (ImGui::MenuItem("Icosahedron"))
+                SpawnPrimitiveMeshFromHalfedge("Icosahedron", Geometry::Halfedge::MakeMeshIcosahedron());
+            if (ImGui::MenuItem("Octahedron"))
+                SpawnPrimitiveMeshFromHalfedge("Octahedron", Geometry::Halfedge::MakeMeshOctahedron());
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::MenuItem("Create Empty Entity"))
+        {
+            (void)GetCommandHistory().Execute(
+                Runtime::EditorUI::MakeCreateEntityCommand(*this, "Empty Entity"));
+        }
+    }
+
+    // =========================================================================
+    // Primitive mesh spawning
+    // =========================================================================
+    template <typename PrimitiveT>
+    void SpawnPrimitiveMesh(const char* name, const PrimitiveT& primitive)
+    {
+        auto meshOpt = Geometry::Halfedge::MakeMesh(primitive);
+        if (!meshOpt)
+        {
+            Log::Warn("Failed to create {} primitive mesh.", name);
+            return;
+        }
+        SpawnPrimitiveMeshFromHalfedge(name, std::move(*meshOpt));
+    }
+
+    void SpawnPrimitiveMeshFromHalfedge(const char* name, Geometry::Halfedge::Mesh mesh)
+    {
+        auto meshShared = std::make_shared<Geometry::Halfedge::Mesh>(std::move(mesh));
+
+        // Shared handle between redo/undo lambdas (avoids dangling reference).
+        auto entityHandle = std::make_shared<entt::entity>(entt::null);
+
+        Core::EditorCommand command{};
+        command.name = std::string("Create ") + name;
+
+        command.redo = [this, meshShared, entityHandle, entityName = std::string(name)]()
+        {
+            auto& sc = GetSceneManager().GetScene();
+            auto& r = sc.GetRegistry();
+            auto& g = GetGraphicsBackend();
+
+            entt::entity entity = sc.CreateEntity(entityName);
+            r.emplace<ECS::Components::Selection::SelectableTag>(entity);
+            r.emplace<ECS::DataAuthority::MeshTag>(entity);
+
+            auto& md = r.emplace<ECS::Mesh::Data>(entity);
+            md.MeshRef = meshShared;
+            md.AttributesDirty = true;
+
+            auto& surface = r.emplace<ECS::Surface::Component>(entity);
+
+            std::vector<glm::vec3> positions;
+            std::vector<uint32_t> indices;
+            std::vector<glm::vec4> aux;
+            Geometry::MeshUtils::ExtractIndexedTriangles(*meshShared, positions, indices, &aux);
+
+            if (!positions.empty() && !indices.empty())
+            {
+                std::vector<glm::vec3> normals(positions.size(), glm::vec3(0.0f, 1.0f, 0.0f));
+                Geometry::MeshUtils::CalculateNormals(positions, indices, normals);
+
+                Graphics::GeometryUploadRequest upload{};
+                upload.Positions = positions;
+                upload.Normals = normals;
+                upload.Aux = aux;
+                upload.Indices = indices;
+                upload.Topology = Graphics::PrimitiveTopology::Triangles;
+                upload.UploadMode = Graphics::GeometryUploadMode::Staged;
+
+                auto& geomStorage = GetRenderOrchestrator().GetGeometryStorage();
+                auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
+                    g.GetDeviceShared(), g.GetTransferManager(), upload, &geomStorage);
+                (void)token;
+
+                if (gpuData && gpuData->GetVertexBuffer() && gpuData->GetIndexBuffer())
+                    surface.Geometry = geomStorage.Add(std::move(gpuData));
+            }
+
+            auto collisionData = std::make_shared<Graphics::GeometryCollisionData>();
+            collisionData->SourceMesh = meshShared;
+            collisionData->Positions = positions;
+            collisionData->Indices = indices;
+            collisionData->LocalAABB = Geometry::Union(Geometry::ToAABB(
+                std::span<const glm::vec3>(positions)));
+
+            // Build octree for CPU raycast picking
+            if (indices.size() >= 3)
+            {
+                std::vector<Geometry::AABB> primBounds;
+                primBounds.reserve(indices.size() / 3);
+                for (size_t ti = 0; ti + 2 < indices.size(); ti += 3)
+                {
+                    auto triAabb = Geometry::AABB{positions[indices[ti]], positions[indices[ti]]};
+                    triAabb = Geometry::Union(triAabb, positions[indices[ti + 1]]);
+                    triAabb = Geometry::Union(triAabb, positions[indices[ti + 2]]);
+                    primBounds.push_back(triAabb);
+                }
+                if (!primBounds.empty())
+                    static_cast<void>(collisionData->LocalOctree.Build(
+                        primBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+            }
+
+            // Build vertex lookup KD-tree for sub-element picking
+            collisionData->LocalVertexLookupPoints.reserve(meshShared->VertexCount());
+            collisionData->LocalVertexLookupIndices.reserve(meshShared->VertexCount());
+            for (std::size_t vi = 0; vi < meshShared->VerticesSize(); ++vi)
+            {
+                Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(vi)};
+                if (!meshShared->IsValid(vh) || meshShared->IsDeleted(vh)) continue;
+                collisionData->LocalVertexLookupPoints.push_back(meshShared->Position(vh));
+                collisionData->LocalVertexLookupIndices.push_back(static_cast<uint32_t>(vh.Index));
+            }
+            if (!collisionData->LocalVertexLookupPoints.empty())
+                static_cast<void>(collisionData->LocalVertexKdTree.BuildFromPoints(
+                    collisionData->LocalVertexLookupPoints));
+
+            auto& collider = r.emplace<ECS::MeshCollider::Component>(entity);
+            collider.CollisionRef = collisionData;
+            collider.WorldOBB.Center = collisionData->LocalAABB.GetCenter();
+            collider.WorldOBB.Extents = collisionData->LocalAABB.GetExtents();
+
+            GetSelection().SetSelectedEntity(sc, entity);
+            *entityHandle = entity;
+        };
+
+        command.undo = [this, entityHandle]()
+        {
+            auto& sc = GetSceneManager().GetScene();
+            auto& r = sc.GetRegistry();
+            if (*entityHandle != entt::null && r.valid(*entityHandle))
+            {
+                // Detach from hierarchy before destroying (prevents dangling sibling refs).
+                ECS::Components::Hierarchy::Detach(r, *entityHandle);
+                r.destroy(*entityHandle);
+                *entityHandle = entt::null;
+                GetSelection().ClearSelection(sc);
+            }
+        };
+
+        (void)GetCommandHistory().Execute(std::move(command));
+    }
+
+    // =========================================================================
+    // Entity selection helpers
+    // =========================================================================
+    void SelectAllChildren(entt::registry& reg, ECS::Scene& scene, entt::entity parent)
+    {
+        if (parent == entt::null || !reg.valid(parent)) return;
+
+        auto* hierarchy = reg.try_get<ECS::Components::Hierarchy::Component>(parent);
+        if (!hierarchy) return;
+
+        entt::entity child = hierarchy->FirstChild;
+        uint32_t safety = 0;
+        while (child != entt::null && reg.valid(child) && safety < 10000)
+        {
+            Runtime::Selection::ApplySelection(scene, child, Runtime::Selection::PickMode::Add);
+
+            // Recursively select grandchildren and advance to next sibling.
+            // Cache NextSibling before recursion in case the child list is modified.
+            entt::entity nextSibling = entt::null;
+            if (auto* childH = reg.try_get<ECS::Components::Hierarchy::Component>(child))
+            {
+                nextSibling = childH->NextSibling;
+                SelectAllChildren(reg, scene, child);
+            }
+            child = nextSibling;
+            ++safety;
+        }
+    }
+
+    void IsolateEntities(entt::registry& reg, const std::vector<entt::entity>& keepVisible)
+    {
+        // Hide all entities, then show only the selected ones.
+        reg.view<entt::entity>().each([&](auto entityID)
+        {
+            if (reg.all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
+                return;
+
+            // Check if this entity is in the keep-visible list
+            bool keep = false;
+            for (auto e : keepVisible)
+            {
+                if (e == entityID)
+                {
+                    keep = true;
+                    break;
+                }
+            }
+
+            if (keep)
+            {
+                // Ensure visible
+                if (auto* sc = reg.try_get<ECS::Surface::Component>(entityID))
+                    sc->Visible = true;
+                if (auto* gd = reg.try_get<ECS::Graph::Data>(entityID))
+                    gd->Visible = true;
+                if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(entityID))
+                    pcd->Visible = true;
+            }
+            else
+            {
+                // Hide
+                if (auto* sc = reg.try_get<ECS::Surface::Component>(entityID))
+                    sc->Visible = false;
+                if (auto* gd = reg.try_get<ECS::Graph::Data>(entityID))
+                    gd->Visible = false;
+                if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(entityID))
+                    pcd->Visible = false;
+            }
+        });
+    }
+
+    void ResetCamera()
+    {
+        auto& reg = GetSceneManager().GetScene().GetRegistry();
+        auto* cam = reg.try_get<Graphics::CameraComponent>(m_CameraEntity);
+        auto* orbit = reg.try_get<Graphics::OrbitControlComponent>(m_CameraEntity);
+        if (cam && orbit)
+        {
+            orbit->Target = glm::vec3(0.0f);
+            orbit->Distance = 5.0f;
+            cam->Position = glm::vec3(0.0f, 0.0f, 4.0f);
+            cam->Orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        }
+    }
+
+    // =========================================================================
+    // Sub-element selection helpers (Grow / Shrink / Select Connected)
+    // =========================================================================
+    void GrowSelectionToConnected(entt::registry& reg, entt::entity entity,
+                                  Runtime::Selection::ElementMode mode)
+    {
+        auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+        if (!meshData || !meshData->MeshRef) return;
+        const auto& mesh = *meshData->MeshRef;
+        auto& subSel = GetSelection().GetSubElementSelection();
+
+        if (mode == Runtime::Selection::ElementMode::Vertex)
+        {
+            // Flood fill from selected vertices through edge connectivity
+            const uint32_t safetyLimit = static_cast<uint32_t>(mesh.VertexCount()) * 2 + 1;
+            uint32_t iterations = 0;
+            std::vector<uint32_t> frontier(subSel.SelectedVertices.begin(), subSel.SelectedVertices.end());
+            while (!frontier.empty() && iterations++ < safetyLimit)
+            {
+                std::vector<uint32_t> next;
+                for (uint32_t vi : frontier)
+                {
+                    auto vh = Geometry::VertexHandle(vi);
+                    if (!mesh.IsValid(vh)) continue;
+                    for (auto he : mesh.HalfedgesAroundVertex(vh))
+                    {
+                        auto target = mesh.ToVertex(he);
+                        uint32_t ti = target.IsValid() ? target.Index : UINT32_MAX;
+                        if (ti != UINT32_MAX && subSel.SelectedVertices.find(ti) == subSel.SelectedVertices.end())
+                        {
+                            subSel.SelectedVertices.insert(ti);
+                            next.push_back(ti);
+                        }
+                    }
+                }
+                frontier = std::move(next);
+            }
+        }
+        else if (mode == Runtime::Selection::ElementMode::Face)
+        {
+            // Flood fill from selected faces through shared edges
+            const uint32_t safetyLimit = static_cast<uint32_t>(mesh.FaceCount()) * 2 + 1;
+            uint32_t iterations = 0;
+            std::vector<uint32_t> frontier(subSel.SelectedFaces.begin(), subSel.SelectedFaces.end());
+            while (!frontier.empty() && iterations++ < safetyLimit)
+            {
+                std::vector<uint32_t> next;
+                for (uint32_t fi : frontier)
+                {
+                    auto fh = Geometry::FaceHandle(fi);
+                    if (!mesh.IsValid(fh)) continue;
+                    for (auto he : mesh.HalfedgesAroundFace(fh))
+                    {
+                        auto opp = mesh.OppositeHalfedge(he);
+                        if (!opp.IsValid()) continue;
+                        auto adjFace = mesh.Face(opp);
+                        if (!adjFace.IsValid()) continue;
+                        uint32_t ai = adjFace.Index;
+                        if (subSel.SelectedFaces.find(ai) == subSel.SelectedFaces.end())
+                        {
+                            subSel.SelectedFaces.insert(ai);
+                            next.push_back(ai);
+                        }
+                    }
+                }
+                frontier = std::move(next);
+            }
+        }
+        else if (mode == Runtime::Selection::ElementMode::Edge)
+        {
+            // Flood fill edges through shared vertices
+            const uint32_t safetyLimit = static_cast<uint32_t>(mesh.EdgeCount()) * 2 + 1;
+            uint32_t iterations = 0;
+            std::vector<uint32_t> frontier(subSel.SelectedEdges.begin(), subSel.SelectedEdges.end());
+            while (!frontier.empty() && iterations++ < safetyLimit)
+            {
+                std::vector<uint32_t> next;
+                for (uint32_t ei : frontier)
+                {
+                    auto eh = Geometry::EdgeHandle(ei);
+                    if (!mesh.IsValid(eh)) continue;
+                    auto he0 = mesh.Halfedge(eh, 0);
+                    if (!he0.IsValid()) continue;
+                    auto he1 = mesh.OppositeHalfedge(he0);
+
+                    // Get both endpoint vertices and find adjacent edges
+                    for (auto endpointHe : {he0, he1})
+                    {
+                        if (!endpointHe.IsValid()) continue;
+                        auto v = mesh.ToVertex(endpointHe);
+                        if (!v.IsValid()) continue;
+                        for (auto vhe : mesh.HalfedgesAroundVertex(v))
+                        {
+                            auto adjEdge = mesh.Edge(vhe);
+                            if (!adjEdge.IsValid()) continue;
+                            uint32_t ai = adjEdge.Index;
+                            if (subSel.SelectedEdges.find(ai) == subSel.SelectedEdges.end())
+                            {
+                                subSel.SelectedEdges.insert(ai);
+                                next.push_back(ai);
+                            }
+                        }
+                    }
+                }
+                frontier = std::move(next);
+            }
+        }
+    }
+
+    void GrowSelection(entt::registry& reg, entt::entity entity,
+                        Runtime::Selection::ElementMode mode)
+    {
+        auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+        if (!meshData || !meshData->MeshRef) return;
+        const auto& mesh = *meshData->MeshRef;
+        auto& subSel = GetSelection().GetSubElementSelection();
+
+        if (mode == Runtime::Selection::ElementMode::Vertex)
+        {
+            std::set<uint32_t> toAdd;
+            for (uint32_t vi : subSel.SelectedVertices)
+            {
+                auto vh = Geometry::VertexHandle(vi);
+                if (!mesh.IsValid(vh)) continue;
+                for (auto he : mesh.HalfedgesAroundVertex(vh))
+                {
+                    auto target = mesh.ToVertex(he);
+                    if (target.IsValid())
+                        toAdd.insert(target.Index);
+                }
+            }
+            subSel.SelectedVertices.insert(toAdd.begin(), toAdd.end());
+        }
+        else if (mode == Runtime::Selection::ElementMode::Face)
+        {
+            std::set<uint32_t> toAdd;
+            for (uint32_t fi : subSel.SelectedFaces)
+            {
+                auto fh = Geometry::FaceHandle(fi);
+                if (!mesh.IsValid(fh)) continue;
+                for (auto he : mesh.HalfedgesAroundFace(fh))
+                {
+                    auto opp = mesh.OppositeHalfedge(he);
+                    if (!opp.IsValid()) continue;
+                    auto adjFace = mesh.Face(opp);
+                    if (adjFace.IsValid())
+                        toAdd.insert(adjFace.Index);
+                }
+            }
+            subSel.SelectedFaces.insert(toAdd.begin(), toAdd.end());
+        }
+        else if (mode == Runtime::Selection::ElementMode::Edge)
+        {
+            std::set<uint32_t> toAdd;
+            for (uint32_t ei : subSel.SelectedEdges)
+            {
+                auto eh = Geometry::EdgeHandle(ei);
+                if (!mesh.IsValid(eh)) continue;
+                auto he0 = mesh.Halfedge(eh, 0);
+                if (!he0.IsValid()) continue;
+                auto he1 = mesh.OppositeHalfedge(he0);
+                for (auto endpointHe : {he0, he1})
+                {
+                    if (!endpointHe.IsValid()) continue;
+                    auto v = mesh.ToVertex(endpointHe);
+                    if (!v.IsValid()) continue;
+                    for (auto vhe : mesh.HalfedgesAroundVertex(v))
+                    {
+                        auto adjEdge = mesh.Edge(vhe);
+                        if (adjEdge.IsValid())
+                            toAdd.insert(adjEdge.Index);
+                    }
+                }
+            }
+            subSel.SelectedEdges.insert(toAdd.begin(), toAdd.end());
+        }
+    }
+
+    void ShrinkSelection(entt::registry& reg, entt::entity entity,
+                          Runtime::Selection::ElementMode mode)
+    {
+        auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+        if (!meshData || !meshData->MeshRef) return;
+        const auto& mesh = *meshData->MeshRef;
+        auto& subSel = GetSelection().GetSubElementSelection();
+
+        if (mode == Runtime::Selection::ElementMode::Vertex)
+        {
+            // Remove vertices that have any unselected neighbor
+            std::set<uint32_t> toRemove;
+            for (uint32_t vi : subSel.SelectedVertices)
+            {
+                auto vh = Geometry::VertexHandle(vi);
+                if (!mesh.IsValid(vh)) { toRemove.insert(vi); continue; }
+                for (auto he : mesh.HalfedgesAroundVertex(vh))
+                {
+                    auto target = mesh.ToVertex(he);
+                    if (target.IsValid() &&
+                        subSel.SelectedVertices.find(target.Index) == subSel.SelectedVertices.end())
+                    {
+                        toRemove.insert(vi);
+                        break;
+                    }
+                }
+            }
+            for (uint32_t v : toRemove)
+                subSel.SelectedVertices.erase(v);
+        }
+        else if (mode == Runtime::Selection::ElementMode::Face)
+        {
+            std::set<uint32_t> toRemove;
+            for (uint32_t fi : subSel.SelectedFaces)
+            {
+                auto fh = Geometry::FaceHandle(fi);
+                if (!mesh.IsValid(fh)) { toRemove.insert(fi); continue; }
+                for (auto he : mesh.HalfedgesAroundFace(fh))
+                {
+                    auto opp = mesh.OppositeHalfedge(he);
+                    if (!opp.IsValid()) { toRemove.insert(fi); break; }
+                    auto adjFace = mesh.Face(opp);
+                    if (!adjFace.IsValid() ||
+                        subSel.SelectedFaces.find(adjFace.Index) == subSel.SelectedFaces.end())
+                    {
+                        toRemove.insert(fi);
+                        break;
+                    }
+                }
+            }
+            for (uint32_t f : toRemove)
+                subSel.SelectedFaces.erase(f);
+        }
+        else if (mode == Runtime::Selection::ElementMode::Edge)
+        {
+            std::set<uint32_t> toRemove;
+            for (uint32_t ei : subSel.SelectedEdges)
+            {
+                auto eh = Geometry::EdgeHandle(ei);
+                if (!mesh.IsValid(eh)) { toRemove.insert(ei); continue; }
+                auto he0 = mesh.Halfedge(eh, 0);
+                if (!he0.IsValid()) { toRemove.insert(ei); continue; }
+                auto he1 = mesh.OppositeHalfedge(he0);
+                bool boundary = false;
+                for (auto endpointHe : {he0, he1})
+                {
+                    if (!endpointHe.IsValid()) continue;
+                    auto v = mesh.ToVertex(endpointHe);
+                    if (!v.IsValid()) continue;
+                    for (auto vhe : mesh.HalfedgesAroundVertex(v))
+                    {
+                        auto adjEdge = mesh.Edge(vhe);
+                        if (adjEdge.IsValid() &&
+                            subSel.SelectedEdges.find(adjEdge.Index) == subSel.SelectedEdges.end())
+                        {
+                            boundary = true;
+                            break;
+                        }
+                    }
+                    if (boundary) break;
+                }
+                if (boundary)
+                    toRemove.insert(ei);
+            }
+            for (uint32_t e : toRemove)
+                subSel.SelectedEdges.erase(e);
         }
     }
 
