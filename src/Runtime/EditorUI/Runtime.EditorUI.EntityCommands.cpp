@@ -410,8 +410,14 @@ namespace Runtime::EditorUI
                 auto& sc = engine.GetSceneManager().GetScene();
                 auto& r = sc.GetRegistry();
 
-                *handle = sc.CreateEntity(snapshot->Name + " Copy");
+                std::string copyName = snapshot->Name + " Copy";
+                *handle = sc.CreateEntity(copyName);
                 RestoreEntity(r, *handle, *snapshot);
+
+                // RestoreEntity overwrites the name from the snapshot;
+                // re-apply the " Copy" suffix.
+                if (auto* nt = r.try_get<ECS::Components::NameTag::Component>(*handle))
+                    nt->Name = copyName;
 
                 engine.GetSelection().SetSelectedEntity(sc, *handle);
             },
