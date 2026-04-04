@@ -8,6 +8,8 @@ module;
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -15,6 +17,7 @@ module;
 
 module Geometry.MarchingCubes;
 
+import Geometry.Grid;
 import Geometry.HalfedgeMesh;
 import Geometry.Handle;
 import Geometry.Properties;
@@ -656,6 +659,244 @@ namespace Geometry::MarchingCubes
             mesh.GarbageCollection();
 
         return mesh;
+    }
+
+    // =========================================================================
+    // ScalarGrid -> DenseGrid conversion
+    // =========================================================================
+
+    Grid::DenseGrid ScalarGrid::ToDenseGrid() const
+    {
+        Grid::GridDimensions dims;
+        dims.NX = NX;
+        dims.NY = NY;
+        dims.NZ = NZ;
+        dims.Origin = Origin;
+        dims.Spacing = Spacing;
+
+        Grid::DenseGrid grid(dims);
+        auto scalar = grid.AddProperty<float>("scalar", 0.0f);
+
+        const std::size_t count = (NX + 1) * (NY + 1) * (NZ + 1);
+        for (std::size_t i = 0; i < count && i < Values.size(); ++i)
+            scalar[i] = Values[i];
+
+        return grid;
+    }
+
+    // =========================================================================
+    // DenseGrid extraction
+    // =========================================================================
+
+    // Internal helper: shared gradient computation using DenseGrid + property.
+    static glm::vec3 ComputeGradientDense(
+        const Grid::DenseGrid& grid,
+        const Property<float>& scalar,
+        std::size_t x, std::size_t y, std::size_t z)
+    {
+        const auto& dims = grid.Dimensions();
+        const auto nx = dims.NX;
+        const auto ny = dims.NY;
+        const auto nz = dims.NZ;
+
+        auto at = [&](std::size_t ax, std::size_t ay, std::size_t az) -> float
+        {
+            return scalar[dims.LinearIndex(ax, ay, az)];
+        };
+
+        float gx, gy, gz;
+
+        if (x == 0)
+            gx = (at(x + 1, y, z) - at(x, y, z)) / dims.Spacing.x;
+        else if (x == nx)
+            gx = (at(x, y, z) - at(x - 1, y, z)) / dims.Spacing.x;
+        else
+            gx = (at(x + 1, y, z) - at(x - 1, y, z)) / (2.0f * dims.Spacing.x);
+
+        if (y == 0)
+            gy = (at(x, y + 1, z) - at(x, y, z)) / dims.Spacing.y;
+        else if (y == ny)
+            gy = (at(x, y, z) - at(x, y - 1, z)) / dims.Spacing.y;
+        else
+            gy = (at(x, y + 1, z) - at(x, y - 1, z)) / (2.0f * dims.Spacing.y);
+
+        if (z == 0)
+            gz = (at(x, y, z + 1) - at(x, y, z)) / dims.Spacing.z;
+        else if (z == nz)
+            gz = (at(x, y, z) - at(x, y, z - 1)) / dims.Spacing.z;
+        else
+            gz = (at(x, y, z + 1) - at(x, y, z - 1)) / (2.0f * dims.Spacing.z);
+
+        return {gx, gy, gz};
+    }
+
+    std::optional<MarchingCubesResult> Extract(
+        const Grid::DenseGrid& grid,
+        const MarchingCubesParams& params,
+        std::string_view scalarPropertyName)
+    {
+        const auto& dims = grid.Dimensions();
+        if (!dims.IsValid())
+            return std::nullopt;
+
+        // Get the scalar property.
+        auto scalarProp = grid.GetProperty<float>(scalarPropertyName);
+        if (!scalarProp.IsValid())
+            return std::nullopt;
+
+        if (grid.Cells().Size() != dims.VertexCount())
+            return std::nullopt;
+
+        const auto nx = dims.NX;
+        const auto ny = dims.NY;
+        const auto nz = dims.NZ;
+        const float iso = params.Isovalue;
+
+        MarchingCubesResult result;
+
+        // Vertex welding map
+        const std::size_t totalGridVerts = dims.VertexCount();
+        const std::size_t edgeMapSize = 3 * totalGridVerts;
+        constexpr std::size_t kNoVertex = std::numeric_limits<std::size_t>::max();
+        std::vector<std::size_t> edgeVertexMap(edgeMapSize, kNoVertex);
+
+        auto edgeSlot = [&](std::size_t gx, std::size_t gy, std::size_t gz, int axis) -> std::size_t
+        {
+            return 3 * (gz * (ny + 1) * (nx + 1) + gy * (nx + 1) + gx)
+                   + static_cast<std::size_t>(axis);
+        };
+
+        // Pre-compute gradients at grid vertices (if normals requested)
+        std::vector<glm::vec3> gradients;
+        if (params.ComputeNormals)
+        {
+            gradients.resize(totalGridVerts);
+            for (std::size_t z = 0; z <= nz; ++z)
+                for (std::size_t y = 0; y <= ny; ++y)
+                    for (std::size_t x = 0; x <= nx; ++x)
+                        gradients[dims.LinearIndex(x, y, z)] =
+                            ComputeGradientDense(grid, scalarProp, x, y, z);
+        }
+
+        // Accessor lambda for the scalar field
+        auto at = [&](std::size_t ax, std::size_t ay, std::size_t az) -> float
+        {
+            return scalarProp[dims.LinearIndex(ax, ay, az)];
+        };
+
+        // Process each cell
+        for (std::size_t cz = 0; cz < nz; ++cz)
+        {
+            for (std::size_t cy = 0; cy < ny; ++cy)
+            {
+                for (std::size_t cx = 0; cx < nx; ++cx)
+                {
+                    uint8_t cubeIndex = 0;
+                    std::array<float, 8> val{};
+                    for (int v = 0; v < 8; ++v)
+                    {
+                        std::size_t gx = cx + static_cast<std::size_t>(kVertexOffsets[v][0]);
+                        std::size_t gy = cy + static_cast<std::size_t>(kVertexOffsets[v][1]);
+                        std::size_t gz = cz + static_cast<std::size_t>(kVertexOffsets[v][2]);
+                        val[static_cast<std::size_t>(v)] = at(gx, gy, gz);
+                        if (val[static_cast<std::size_t>(v)] < iso)
+                            cubeIndex |= static_cast<uint8_t>(1u << v);
+                    }
+
+                    uint16_t edges = kEdgeTable[cubeIndex];
+                    if (edges == 0)
+                        continue;
+
+                    std::array<std::size_t, 12> vertIdx{};
+
+                    for (int e = 0; e < 12; ++e)
+                    {
+                        if (!(edges & (1u << e)))
+                            continue;
+
+                        const auto& ek = kEdgeKeys[e];
+                        std::size_t gx = cx + static_cast<std::size_t>(ek.dx);
+                        std::size_t gy = cy + static_cast<std::size_t>(ek.dy);
+                        std::size_t gz = cz + static_cast<std::size_t>(ek.dz);
+                        std::size_t slot = edgeSlot(gx, gy, gz, ek.axis);
+
+                        if (edgeVertexMap[slot] != kNoVertex)
+                        {
+                            vertIdx[static_cast<std::size_t>(e)] = edgeVertexMap[slot];
+                        }
+                        else
+                        {
+                            int v0 = kEdgeVertices[e][0];
+                            int v1 = kEdgeVertices[e][1];
+                            float f0 = val[static_cast<std::size_t>(v0)];
+                            float f1 = val[static_cast<std::size_t>(v1)];
+
+                            float t = 0.5f;
+                            float denom = f1 - f0;
+                            if (std::abs(denom) > 1e-10f)
+                                t = (iso - f0) / denom;
+                            t = std::clamp(t, 0.0f, 1.0f);
+
+                            auto gv0 = [&]() -> std::array<std::size_t, 3>
+                            {
+                                return {cx + static_cast<std::size_t>(kVertexOffsets[v0][0]),
+                                        cy + static_cast<std::size_t>(kVertexOffsets[v0][1]),
+                                        cz + static_cast<std::size_t>(kVertexOffsets[v0][2])};
+                            };
+                            auto gv1 = [&]() -> std::array<std::size_t, 3>
+                            {
+                                return {cx + static_cast<std::size_t>(kVertexOffsets[v1][0]),
+                                        cy + static_cast<std::size_t>(kVertexOffsets[v1][1]),
+                                        cz + static_cast<std::size_t>(kVertexOffsets[v1][2])};
+                            };
+
+                            auto [x0, y0, z0] = gv0();
+                            auto [x1, y1, z1] = gv1();
+
+                            glm::vec3 p0 = dims.WorldPosition(x0, y0, z0);
+                            glm::vec3 p1 = dims.WorldPosition(x1, y1, z1);
+                            glm::vec3 pos = p0 + t * (p1 - p0);
+
+                            std::size_t newIdx = result.Vertices.size();
+                            result.Vertices.push_back(pos);
+
+                            if (params.ComputeNormals)
+                            {
+                                glm::vec3 g0 = gradients[dims.LinearIndex(x0, y0, z0)];
+                                glm::vec3 g1 = gradients[dims.LinearIndex(x1, y1, z1)];
+                                glm::vec3 grad = g0 + t * (g1 - g0);
+                                float len = glm::length(grad);
+                                if (len > 1e-10f)
+                                    result.Normals.push_back(grad / len);
+                                else
+                                    result.Normals.push_back({0.0f, 1.0f, 0.0f});
+                            }
+
+                            edgeVertexMap[slot] = newIdx;
+                            vertIdx[static_cast<std::size_t>(e)] = newIdx;
+                        }
+                    }
+
+                    const int8_t* tri = kTriTable[cubeIndex];
+                    for (int i = 0; tri[i] != -1; i += 3)
+                    {
+                        result.Triangles.push_back({
+                            vertIdx[static_cast<std::size_t>(tri[i])],
+                            vertIdx[static_cast<std::size_t>(tri[i + 1])],
+                            vertIdx[static_cast<std::size_t>(tri[i + 2])]
+                        });
+                    }
+                }
+            }
+        }
+
+        if (result.Triangles.empty())
+            return std::nullopt;
+
+        result.VertexCount = result.Vertices.size();
+        result.TriangleCount = result.Triangles.size();
+
+        return result;
     }
 
 } // namespace Geometry::MarchingCubes

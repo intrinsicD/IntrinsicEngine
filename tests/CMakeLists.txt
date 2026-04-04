@@ -131,6 +131,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_GeometryQueries.cpp
         Test_PcaPrimitives.cpp
         Test_Overlap.cpp
+        Test_Grid.cpp
         Test_MarchingCubes.cpp
         Test_GJK.cpp
         Test_SDF.cpp
