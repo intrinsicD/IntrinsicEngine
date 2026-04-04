@@ -7,25 +7,28 @@
 import Geometry;
 
 using namespace Geometry::MarchingCubes;
+using namespace Geometry::Grid;
 
 // ============================================================================
-// Helper: create a scalar grid filled with a sphere SDF.
+// Helper: create a DenseGrid filled with a sphere SDF.
 // ============================================================================
-static ScalarGrid MakeSphereGrid(std::size_t N, float radius, glm::vec3 center = glm::vec3(0))
+static DenseGrid MakeSphereGrid(std::size_t N, float radius, glm::vec3 center = glm::vec3(0))
 {
-    ScalarGrid grid;
-    grid.NX = grid.NY = grid.NZ = N;
+    GridDimensions dims;
+    dims.NX = dims.NY = dims.NZ = N;
     const float extent = radius * 2.0f;
-    grid.Origin = center - glm::vec3(extent);
-    grid.Spacing = glm::vec3(2.0f * extent / static_cast<float>(N));
-    grid.Values.resize((N + 1) * (N + 1) * (N + 1));
+    dims.Origin = center - glm::vec3(extent);
+    dims.Spacing = glm::vec3(2.0f * extent / static_cast<float>(N));
+
+    DenseGrid grid(dims);
+    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
 
     for (std::size_t z = 0; z <= N; ++z)
         for (std::size_t y = 0; y <= N; ++y)
             for (std::size_t x = 0; x <= N; ++x)
             {
-                const glm::vec3 pos = grid.VertexPosition(x, y, z);
-                grid.Set(x, y, z, glm::length(pos - center) - radius);
+                const glm::vec3 pos = grid.WorldPosition(x, y, z);
+                grid.Set(scalar, x, y, z, glm::length(pos - center) - radius);
             }
     return grid;
 }
@@ -36,7 +39,7 @@ static ScalarGrid MakeSphereGrid(std::size_t N, float radius, glm::vec3 center =
 
 TEST(MarchingCubes, InvalidGridReturnsNullopt)
 {
-    ScalarGrid grid;  // Zero dimensions.
+    DenseGrid grid;  // Zero dimensions.
     auto result = Extract(grid);
     EXPECT_FALSE(result.has_value());
 }
@@ -44,11 +47,13 @@ TEST(MarchingCubes, InvalidGridReturnsNullopt)
 TEST(MarchingCubes, EmptyIsosurfaceReturnsNullopt)
 {
     // All values positive — entirely "outside".
-    ScalarGrid grid;
-    grid.NX = grid.NY = grid.NZ = 2;
-    grid.Origin = glm::vec3(0);
-    grid.Spacing = glm::vec3(1);
-    grid.Values.assign((2 + 1) * (2 + 1) * (2 + 1), 10.0f);
+    GridDimensions dims;
+    dims.NX = dims.NY = dims.NZ = 2;
+    dims.Origin = glm::vec3(0);
+    dims.Spacing = glm::vec3(1);
+
+    DenseGrid grid(dims);
+    grid.AddProperty<float>("scalar", 10.0f);
 
     auto result = Extract(grid);
     EXPECT_FALSE(result.has_value());
@@ -143,33 +148,25 @@ TEST(MarchingCubes, ToMeshEmptyResultReturnsNullopt)
 }
 
 // ============================================================================
-// ScalarGrid accessors
+// DenseGrid dimension validation
 // ============================================================================
 
-TEST(MarchingCubes, ScalarGridIsValid)
+TEST(MarchingCubes, DenseGridDimensionsValid)
 {
-    ScalarGrid grid;
-    grid.NX = grid.NY = grid.NZ = 2;
-    grid.Origin = glm::vec3(0);
-    grid.Spacing = glm::vec3(1);
-    grid.Values.resize(3 * 3 * 3, 0.0f);
-    EXPECT_TRUE(grid.IsValid());
+    GridDimensions dims;
+    dims.NX = 2; dims.NY = 3; dims.NZ = 4;
+    DenseGrid grid(dims);
+    (void)grid.AddProperty<float>("scalar", 0.0f);
+    EXPECT_TRUE(dims.IsValid());
+    EXPECT_EQ(grid.VertexCount(), 3u * 4u * 5u);
 }
 
-TEST(MarchingCubes, ScalarGridIsInvalidWhenSizeMismatch)
+TEST(MarchingCubes, DenseGridLinearIndex)
 {
-    ScalarGrid grid;
-    grid.NX = grid.NY = grid.NZ = 2;
-    grid.Values.resize(10, 0.0f);  // Wrong size.
-    EXPECT_FALSE(grid.IsValid());
-}
-
-TEST(MarchingCubes, ScalarGridLinearIndex)
-{
-    ScalarGrid grid;
-    grid.NX = 3; grid.NY = 4; grid.NZ = 5;
+    GridDimensions dims;
+    dims.NX = 3; dims.NY = 4; dims.NZ = 5;
     // Index should be z*(NY+1)*(NX+1) + y*(NX+1) + x
-    EXPECT_EQ(grid.LinearIndex(2, 3, 4), 4u * 5u * 4u + 3u * 4u + 2u);
+    EXPECT_EQ(dims.LinearIndex(2, 3, 4), 4u * 5u * 4u + 3u * 4u + 2u);
 }
 
 // ============================================================================

@@ -57,59 +57,61 @@ static std::vector<glm::vec3> MakeSphereNormals(const std::vector<glm::vec3>& po
 }
 
 // =============================================================================
-// Helper: create a scalar grid from a sphere SDF
+// Helper: create a DenseGrid from a sphere SDF
 // =============================================================================
 
-static Geometry::MarchingCubes::ScalarGrid MakeSphereSDF(
+static Geometry::Grid::DenseGrid MakeSphereSDF(
     std::size_t nx, std::size_t ny, std::size_t nz,
     float radius = 1.0f,
     glm::vec3 center = {0.0f, 0.0f, 0.0f})
 {
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = nx;
-    grid.NY = ny;
-    grid.NZ = nz;
+    Geometry::Grid::GridDimensions dims;
+    dims.NX = nx;
+    dims.NY = ny;
+    dims.NZ = nz;
 
     float extent = radius * 2.0f;
-    grid.Origin = center - glm::vec3(extent);
-    grid.Spacing = glm::vec3(2.0f * extent / static_cast<float>(nx));
+    dims.Origin = center - glm::vec3(extent);
+    dims.Spacing = glm::vec3(2.0f * extent / static_cast<float>(nx));
 
-    grid.Values.resize((nx + 1) * (ny + 1) * (nz + 1));
+    Geometry::Grid::DenseGrid grid(dims);
+    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
 
     for (std::size_t z = 0; z <= nz; ++z)
         for (std::size_t y = 0; y <= ny; ++y)
             for (std::size_t x = 0; x <= nx; ++x)
             {
-                glm::vec3 pos = grid.VertexPosition(x, y, z);
+                glm::vec3 pos = grid.WorldPosition(x, y, z);
                 float dist = glm::length(pos - center) - radius;
-                grid.Set(x, y, z, dist);
+                grid.Set(scalar, x, y, z, dist);
             }
 
     return grid;
 }
 
 // =============================================================================
-// Helper: create a scalar grid from a plane SDF (z = 0)
+// Helper: create a DenseGrid from a plane SDF (z = 0)
 // =============================================================================
 
-static Geometry::MarchingCubes::ScalarGrid MakePlaneSDF(
+static Geometry::Grid::DenseGrid MakePlaneSDF(
     std::size_t nx, std::size_t ny, std::size_t nz)
 {
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = nx;
-    grid.NY = ny;
-    grid.NZ = nz;
-    grid.Origin = {-1.0f, -1.0f, -1.0f};
-    grid.Spacing = glm::vec3(2.0f / static_cast<float>(nx));
+    Geometry::Grid::GridDimensions dims;
+    dims.NX = nx;
+    dims.NY = ny;
+    dims.NZ = nz;
+    dims.Origin = {-1.0f, -1.0f, -1.0f};
+    dims.Spacing = glm::vec3(2.0f / static_cast<float>(nx));
 
-    grid.Values.resize((nx + 1) * (ny + 1) * (nz + 1));
+    Geometry::Grid::DenseGrid grid(dims);
+    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
 
     for (std::size_t z = 0; z <= nz; ++z)
         for (std::size_t y = 0; y <= ny; ++y)
             for (std::size_t x = 0; x <= nx; ++x)
             {
-                glm::vec3 pos = grid.VertexPosition(x, y, z);
-                grid.Set(x, y, z, pos.z);
+                glm::vec3 pos = grid.WorldPosition(x, y, z);
+                grid.Set(scalar, x, y, z, pos.z);
             }
 
     return grid;
@@ -123,13 +125,13 @@ static Geometry::MarchingCubes::ScalarGrid MakePlaneSDF(
 TEST(MarchingCubes, EmptyGridReturnsNullopt)
 {
     // Grid where all values are above the isovalue (all outside)
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = 2;
-    grid.NY = 2;
-    grid.NZ = 2;
-    grid.Origin = {0.0f, 0.0f, 0.0f};
-    grid.Spacing = {1.0f, 1.0f, 1.0f};
-    grid.Values.assign(3 * 3 * 3, 1.0f); // all positive = all outside
+    Geometry::Grid::GridDimensions dims;
+    dims.NX = 2; dims.NY = 2; dims.NZ = 2;
+    dims.Origin = {0.0f, 0.0f, 0.0f};
+    dims.Spacing = {1.0f, 1.0f, 1.0f};
+
+    Geometry::Grid::DenseGrid grid(dims);
+    grid.AddProperty<float>("scalar", 1.0f); // all positive = all outside
 
     auto result = Geometry::MarchingCubes::Extract(grid);
     EXPECT_FALSE(result.has_value());
@@ -138,13 +140,13 @@ TEST(MarchingCubes, EmptyGridReturnsNullopt)
 TEST(MarchingCubes, AllInsideReturnsNullopt)
 {
     // Grid where all values are below the isovalue (all inside)
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = 2;
-    grid.NY = 2;
-    grid.NZ = 2;
-    grid.Origin = {0.0f, 0.0f, 0.0f};
-    grid.Spacing = {1.0f, 1.0f, 1.0f};
-    grid.Values.assign(3 * 3 * 3, -1.0f); // all negative = all inside
+    Geometry::Grid::GridDimensions dims;
+    dims.NX = 2; dims.NY = 2; dims.NZ = 2;
+    dims.Origin = {0.0f, 0.0f, 0.0f};
+    dims.Spacing = {1.0f, 1.0f, 1.0f};
+
+    Geometry::Grid::DenseGrid grid(dims);
+    grid.AddProperty<float>("scalar", -1.0f); // all negative = all inside
 
     auto result = Geometry::MarchingCubes::Extract(grid);
     EXPECT_FALSE(result.has_value());
@@ -360,44 +362,42 @@ TEST(MarchingCubes, ToMesh_ClosedSphere_EulerCharacteristic)
 }
 
 // =============================================================================
-// Marching Cubes — ScalarGrid utilities
+// Marching Cubes — DenseGrid utilities
 // =============================================================================
 
-TEST(MarchingCubes, ScalarGrid_IsValid)
+TEST(MarchingCubes, DenseGridDimsValid)
 {
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = 2;
-    grid.NY = 3;
-    grid.NZ = 4;
-    grid.Values.resize(3 * 4 * 5); // (NX+1)*(NY+1)*(NZ+1) = 60
-    EXPECT_TRUE(grid.IsValid());
+    Geometry::Grid::GridDimensions dims;
+    dims.NX = 2; dims.NY = 3; dims.NZ = 4;
+    EXPECT_TRUE(dims.IsValid());
 
-    grid.Values.resize(10); // wrong size
-    EXPECT_FALSE(grid.IsValid());
+    Geometry::Grid::DenseGrid grid(dims);
+    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
+    EXPECT_EQ(grid.VertexCount(), 3u * 4u * 5u);
 }
 
-TEST(MarchingCubes, ScalarGrid_AtAndSet)
+TEST(MarchingCubes, DenseGridAtAndSet)
 {
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = 2;
-    grid.NY = 2;
-    grid.NZ = 2;
-    grid.Values.resize(27, 0.0f);
+    Geometry::Grid::GridDimensions dims;
+    dims.NX = 2; dims.NY = 2; dims.NZ = 2;
 
-    grid.Set(1, 1, 1, 42.0f);
-    EXPECT_FLOAT_EQ(grid.At(1, 1, 1), 42.0f);
+    Geometry::Grid::DenseGrid grid(dims);
+    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
+
+    grid.Set(scalar, 1, 1, 1, 42.0f);
+    EXPECT_FLOAT_EQ(grid.At(scalar, 1, 1, 1), 42.0f);
 }
 
-TEST(MarchingCubes, ScalarGrid_VertexPosition)
+TEST(MarchingCubes, DenseGridWorldPosition)
 {
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = 10;
-    grid.NY = 10;
-    grid.NZ = 10;
-    grid.Origin = {-1.0f, -2.0f, -3.0f};
-    grid.Spacing = {0.2f, 0.4f, 0.6f};
+    Geometry::Grid::GridDimensions dims;
+    dims.NX = 10; dims.NY = 10; dims.NZ = 10;
+    dims.Origin = {-1.0f, -2.0f, -3.0f};
+    dims.Spacing = {0.2f, 0.4f, 0.6f};
 
-    glm::vec3 p = grid.VertexPosition(5, 5, 5);
+    Geometry::Grid::DenseGrid grid(dims);
+
+    glm::vec3 p = grid.WorldPosition(5, 5, 5);
     EXPECT_NEAR(p.x, -1.0f + 5 * 0.2f, 1e-6f);
     EXPECT_NEAR(p.y, -2.0f + 5 * 0.4f, 1e-6f);
     EXPECT_NEAR(p.z, -3.0f + 5 * 0.6f, 1e-6f);

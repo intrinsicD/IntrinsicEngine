@@ -107,7 +107,7 @@ export namespace Geometry::Grid
     //
     // Every grid vertex has a slot in the PropertySet. Indices map directly
     // via the linearization formula. This is the general-purpose replacement
-    // for the old ScalarGrid: instead of a single float array, any number
+    // for a single-purpose scalar grid. Any number
     // of typed properties can be attached (scalar fields, gradients,
     // material IDs, etc.).
     //
