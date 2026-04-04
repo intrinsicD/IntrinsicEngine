@@ -8,6 +8,7 @@ module;
 #include <numbers>
 #include <span>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -892,5 +893,219 @@ namespace Geometry::MeshUtils
                     triangleFaceIds->push_back(static_cast<uint32_t>(f.Index));
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Edge Loop / Edge Ring
+    // -----------------------------------------------------------------------
+    //
+    // Terminology (matches Blender / standard mesh editing conventions):
+    //   Edge Loop  = continuous edge path through vertices. At each vertex the
+    //                walk picks the "straight" continuation edge (CW-rotate by
+    //                half the vertex valence in the halfedge fan).
+    //   Edge Ring  = parallel edges across a face strip. Walks through faces
+    //                via the opposite edge (Next^(valence/2) for even-valence
+    //                faces), then crosses to the adjacent face.
+    //
+    // Both walks support triangles and quads. For triangles the edge loop
+    // produces a zig-zag pattern (no unique straight continuation exists)
+    // while the edge ring still crosses via Next(Next(h)) to the "prev" edge.
+    // N-gon faces (valence > 4) terminate the walk.
+
+    // Helper: advance a halfedge by `steps` Next calls.
+    static HalfedgeHandle AdvanceNext(const Halfedge::Mesh& mesh,
+                                      HalfedgeHandle h, std::size_t steps)
+    {
+        for (std::size_t i = 0; i < steps && h.IsValid(); ++i)
+            h = mesh.NextHalfedge(h);
+        return h;
+    }
+
+    // --- Edge Loop: vertex-walking algorithm ---
+
+    // Walk one direction of an edge loop starting from vertex `v` (arriving
+    // via halfedge `incomingH` whose ToVertex is `v`).  Returns edge indices
+    // encountered (excluding the start edge).
+    static std::vector<uint32_t> WalkEdgeLoopThroughVertex(
+        const Halfedge::Mesh& mesh,
+        VertexHandle v,
+        HalfedgeHandle incomingH,
+        std::unordered_set<uint32_t>& visited,
+        uint32_t safetyLimit)
+    {
+        std::vector<uint32_t> result;
+        auto curVertex = v;
+        auto curIncoming = incomingH; // halfedge pointing TO curVertex
+        uint32_t iters = 0;
+
+        while (++iters <= safetyLimit)
+        {
+            if (!curVertex.IsValid() || mesh.IsDeleted(curVertex))
+                break;
+
+            // Count vertex valence (number of outgoing halfedges)
+            const auto valence = mesh.Valence(curVertex);
+            if (valence < 2)
+                break;
+
+            // The continuation edge is the one "opposite" in the vertex fan.
+            // CW-rotate the incoming halfedge by valence/2 positions to get
+            // the outgoing halfedge in the straight direction.
+            // incomingH points TO curVertex; OppositeHalfedge gives outgoing.
+            auto outH = mesh.OppositeHalfedge(curIncoming);
+            if (!outH.IsValid())
+                break;
+
+            // Rotate CW by valence/2 positions in the vertex fan
+            const auto rotations = valence / 2;
+            auto continuationH = outH;
+            for (std::size_t r = 0; r < rotations && continuationH.IsValid(); ++r)
+                continuationH = mesh.CWRotatedHalfedge(continuationH);
+
+            if (!continuationH.IsValid())
+                break;
+
+            auto edgeH = mesh.Edge(continuationH);
+            if (!edgeH.IsValid())
+                break;
+
+            if (visited.contains(edgeH.Index))
+                break;
+
+            visited.insert(edgeH.Index);
+            result.push_back(edgeH.Index);
+
+            // Advance to the next vertex: ToVertex of continuationH
+            auto nextVertex = mesh.ToVertex(continuationH);
+            curIncoming = continuationH;
+            curVertex = nextVertex;
+        }
+
+        return result;
+    }
+
+    std::vector<uint32_t> CollectEdgeLoop(
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge)
+    {
+        if (!mesh.IsValid(startEdge) || mesh.IsDeleted(startEdge))
+            return {};
+
+        const uint32_t safetyLimit = static_cast<uint32_t>(mesh.EdgeCount()) + 1;
+        const uint32_t startIdx = startEdge.Index;
+
+        auto h0 = mesh.Halfedge(startEdge, 0);
+        if (!h0.IsValid())
+            return {startIdx};
+
+        auto h1 = mesh.OppositeHalfedge(h0);
+
+        // Shared visited set prevents duplicates on closed loops
+        std::unordered_set<uint32_t> visited;
+        visited.insert(startIdx);
+
+        // Walk forward: from ToVertex(h0), incoming = h0
+        auto v0 = mesh.ToVertex(h0);
+        auto forward = WalkEdgeLoopThroughVertex(mesh, v0, h0, visited, safetyLimit);
+
+        // Walk backward: from ToVertex(h1) = FromVertex(h0), incoming = h1
+        auto v1 = mesh.ToVertex(h1);
+        auto backward = WalkEdgeLoopThroughVertex(mesh, v1, h1, visited, safetyLimit);
+
+        // Assemble: backward (reversed) + start + forward
+        std::vector<uint32_t> loop;
+        loop.reserve(backward.size() + 1 + forward.size());
+        for (auto it = backward.rbegin(); it != backward.rend(); ++it)
+            loop.push_back(*it);
+        loop.push_back(startIdx);
+        for (auto ei : forward)
+            loop.push_back(ei);
+
+        return loop;
+    }
+
+    // --- Edge Ring: face-crossing algorithm ---
+
+    // Walk one direction of an edge ring from a starting halfedge.
+    // In each face, finds the opposite edge via Next^(valence/2), then crosses
+    // to the adjacent face.
+    static std::vector<uint32_t> WalkEdgeRingDirection(
+        const Halfedge::Mesh& mesh,
+        HalfedgeHandle startH,
+        std::unordered_set<uint32_t>& visited,
+        uint32_t safetyLimit)
+    {
+        std::vector<uint32_t> result;
+        auto h = startH;
+        uint32_t iters = 0;
+
+        while (++iters <= safetyLimit)
+        {
+            auto face = mesh.Face(h);
+            if (!face.IsValid())
+                break; // boundary
+
+            const auto valence = mesh.Valence(face);
+            if (valence < 3 || valence > 4)
+                break; // unsupported polygon
+
+            // Opposite halfedge in face: Next^(valence/2)
+            auto opposite = AdvanceNext(mesh, h, valence / 2);
+            if (!opposite.IsValid())
+                break;
+
+            auto edgeH = mesh.Edge(opposite);
+            if (!edgeH.IsValid())
+                break;
+
+            if (visited.contains(edgeH.Index))
+                break;
+
+            visited.insert(edgeH.Index);
+            result.push_back(edgeH.Index);
+
+            // Cross to adjacent face
+            h = mesh.OppositeHalfedge(opposite);
+            if (!h.IsValid())
+                break;
+        }
+
+        return result;
+    }
+
+    std::vector<uint32_t> CollectEdgeRing(
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge)
+    {
+        if (!mesh.IsValid(startEdge) || mesh.IsDeleted(startEdge))
+            return {};
+
+        const uint32_t safetyLimit = static_cast<uint32_t>(mesh.EdgeCount()) + 1;
+        const uint32_t startIdx = startEdge.Index;
+
+        auto h0 = mesh.Halfedge(startEdge, 0);
+        if (!h0.IsValid())
+            return {startIdx};
+
+        auto h1 = mesh.OppositeHalfedge(h0);
+
+        // Shared visited set prevents duplicates on closed manifolds
+        std::unordered_set<uint32_t> visited;
+        visited.insert(startIdx);
+
+        // Walk forward (from h0's face side)
+        auto forward = WalkEdgeRingDirection(mesh, h0, visited, safetyLimit);
+
+        // Walk backward (from h1's face side)
+        auto backward = WalkEdgeRingDirection(mesh, h1, visited, safetyLimit);
+
+        // Assemble: backward (reversed) + start + forward
+        std::vector<uint32_t> ring;
+        ring.reserve(backward.size() + 1 + forward.size());
+        for (auto it = backward.rbegin(); it != backward.rend(); ++it)
+            ring.push_back(*it);
+        ring.push_back(startIdx);
+        for (auto ei : forward)
+            ring.push_back(ei);
+
+        return ring;
     }
 }

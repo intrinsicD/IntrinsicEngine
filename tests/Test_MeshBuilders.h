@@ -166,6 +166,59 @@ inline Geometry::Halfedge::Mesh MakeSingleQuad()
     return mesh;
 }
 
+// Triangle strip with N columns: a zig-zag strip of 2*N triangles.
+//   Row 0: y=0 vertices at x=0,1,...,N
+//   Row 1: y=1 vertices at x=0,1,...,N
+// Produces (N+1)*2 vertices, 2*N faces, with well-defined edge loops/rings.
+//
+//   v3---v4---v5---v6          (row 1, y=1)
+//   |  / |  / |  / |
+//   | /  | /  | /  |
+//   v0---v1---v2---v3_alias    (row 0, y=0)  [but v7=v3 alias not needed, these are separate vertices]
+//
+// Actually uses separate vertices:
+//   v0=(0,0) v1=(1,0) v2=(2,0) ... v_N=(N,0)
+//   v_{N+1}=(0,1) v_{N+2}=(1,1) ... v_{2N+1}=(N,1)
+//   Faces: for each column i in [0,N-1]:
+//     Lower: v_i, v_{i+1}, v_{N+1+i}
+//     Upper: v_{i+1}, v_{N+2+i}, v_{N+1+i}
+inline Geometry::Halfedge::Mesh MakeTriangleStrip(int columns = 3)
+{
+    Geometry::Halfedge::Mesh mesh;
+    // Bottom row
+    std::vector<Geometry::VertexHandle> bot, top;
+    for (int i = 0; i <= columns; ++i)
+        bot.push_back(mesh.AddVertex({static_cast<float>(i), 0.0f, 0.0f}));
+    // Top row
+    for (int i = 0; i <= columns; ++i)
+        top.push_back(mesh.AddVertex({static_cast<float>(i), 1.0f, 0.0f}));
+    // Triangulate
+    for (int i = 0; i < columns; ++i)
+    {
+        (void)mesh.AddTriangle(bot[i], bot[i + 1], top[i]);
+        (void)mesh.AddTriangle(bot[i + 1], top[i + 1], top[i]);
+    }
+    return mesh;
+}
+
+// Quad strip with N columns: N quads in a row.
+//   v0--v1--v2--v3     (bottom, y=0)
+//   |   |   |   |
+//   v4--v5--v6--v7     (top, y=1)
+// Produces (N+1)*2 vertices, N faces (quads).
+inline Geometry::Halfedge::Mesh MakeQuadStrip(int columns = 3)
+{
+    Geometry::Halfedge::Mesh mesh;
+    std::vector<Geometry::VertexHandle> bot, top;
+    for (int i = 0; i <= columns; ++i)
+        bot.push_back(mesh.AddVertex({static_cast<float>(i), 0.0f, 0.0f}));
+    for (int i = 0; i <= columns; ++i)
+        top.push_back(mesh.AddVertex({static_cast<float>(i), 1.0f, 0.0f}));
+    for (int i = 0; i < columns; ++i)
+        (void)mesh.AddQuad(bot[i], bot[i + 1], top[i + 1], top[i]);
+    return mesh;
+}
+
 // ---- Name aliases used in some test files ----
 
 // Same geometry as MakeSingleTriangle (used in Test_MeshQuality).

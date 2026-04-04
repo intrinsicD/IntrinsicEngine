@@ -272,7 +272,6 @@ Multi-entity selection (Ctrl+click toggle, Shift+click range) is complete. The h
 Right-click context menus are implemented in the 3D viewport (entity, empty-space, sub-element) with drag-threshold detection, undo support, and primitive spawning. Remaining:
 
 - [ ] Paste (requires clipboard/copy-buffer system — deferred).
-- [ ] Edge Ring/Loop selection (deferred until halfedge traversal helpers for manifold strip walking are verified or added).
 
 #### F6. Editor Polish
 
