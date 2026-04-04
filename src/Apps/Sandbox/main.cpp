@@ -1769,6 +1769,20 @@ private:
         {
             ShrinkSelection(reg, entity, selConfig.ElementMode);
         }
+
+        // Edge Loop / Edge Ring — only available in Edge mode with at least one edge selected
+        const bool edgeModeWithSelection =
+            hasMesh &&
+            selConfig.ElementMode == Runtime::Selection::ElementMode::Edge &&
+            !GetSelection().GetSubElementSelection().SelectedEdges.empty();
+        if (ImGui::MenuItem("Select Edge Loop", "L", false, edgeModeWithSelection))
+        {
+            SelectEdgeLoop(reg, entity);
+        }
+        if (ImGui::MenuItem("Select Edge Ring", nullptr, false, edgeModeWithSelection))
+        {
+            SelectEdgeRing(reg, entity);
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("Clear Sub-Element Selection"))
         {
@@ -2286,6 +2300,45 @@ private:
             }
             for (uint32_t e : toRemove)
                 subSel.SelectedEdges.erase(e);
+        }
+    }
+
+    // =========================================================================
+    // Edge Loop / Edge Ring selection
+    // =========================================================================
+    void SelectEdgeLoop(entt::registry& reg, entt::entity entity)
+    {
+        auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+        if (!meshData || !meshData->MeshRef) return;
+        const auto& mesh = *meshData->MeshRef;
+        auto& subSel = GetSelection().GetSubElementSelection();
+
+        // Collect loops from all currently selected edges
+        std::set<uint32_t> seedEdges(subSel.SelectedEdges);
+        for (uint32_t ei : seedEdges)
+        {
+            auto eh = Geometry::EdgeHandle(ei);
+            if (!mesh.IsValid(eh) || mesh.IsDeleted(eh)) continue;
+            auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+            subSel.SelectedEdges.insert(loop.begin(), loop.end());
+        }
+    }
+
+    void SelectEdgeRing(entt::registry& reg, entt::entity entity)
+    {
+        auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+        if (!meshData || !meshData->MeshRef) return;
+        const auto& mesh = *meshData->MeshRef;
+        auto& subSel = GetSelection().GetSubElementSelection();
+
+        // Collect rings from all currently selected edges
+        std::set<uint32_t> seedEdges(subSel.SelectedEdges);
+        for (uint32_t ei : seedEdges)
+        {
+            auto eh = Geometry::EdgeHandle(ei);
+            if (!mesh.IsValid(eh) || mesh.IsDeleted(eh)) continue;
+            auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, eh);
+            subSel.SelectedEdges.insert(ring.begin(), ring.end());
         }
     }
 

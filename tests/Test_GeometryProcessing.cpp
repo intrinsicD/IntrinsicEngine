@@ -2,6 +2,7 @@
 #include <cmath>
 #include <numbers>
 #include <numeric>
+#include <unordered_set>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -751,4 +752,184 @@ TEST(MeshUtils_OneRingCentroid, RegularTetrahedronSymmetry)
     EXPECT_NEAR(dist0, dist1, 1e-6);
     EXPECT_NEAR(dist1, dist2, 1e-6);
     EXPECT_NEAR(dist2, dist3, 1e-6);
+}
+
+// =============================================================================
+// Edge Loop / Edge Ring selection tests
+// =============================================================================
+
+// Helper: find the edge index connecting two vertices (or return UINT32_MAX).
+static uint32_t FindEdgeBetween(const Geometry::Halfedge::Mesh& mesh,
+                                Geometry::VertexHandle v0, Geometry::VertexHandle v1)
+{
+    for (auto he : mesh.HalfedgesAroundVertex(v0))
+    {
+        if (mesh.ToVertex(he).Index == v1.Index)
+            return mesh.Edge(he).Index;
+    }
+    return UINT32_MAX;
+}
+
+// Helper: check that a vector contains no duplicate values.
+static bool HasNoDuplicates(const std::vector<uint32_t>& v)
+{
+    std::unordered_set<uint32_t> seen(v.begin(), v.end());
+    return seen.size() == v.size();
+}
+
+// --- Edge Loop (vertex-walking) tests ---
+
+TEST(EdgeLoop, InvalidEdgeReturnsEmpty)
+{
+    auto mesh = MakeSingleTriangle();
+    auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, Geometry::EdgeHandle{999});
+    EXPECT_TRUE(loop.empty());
+}
+
+TEST(EdgeLoop, SingleTriangleProducesPath)
+{
+    auto mesh = MakeSingleTriangle();
+    // A single triangle has 3 vertices each with valence 2.
+    // The loop walk at a valence-2 vertex picks rotation by 1 (valence/2=1),
+    // which continues to the adjacent edge.
+    auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, Geometry::EdgeHandle{0});
+    ASSERT_GE(loop.size(), 1u);
+    ASSERT_LE(loop.size(), 3u);
+    EXPECT_TRUE(HasNoDuplicates(loop));
+}
+
+TEST(EdgeLoop, QuadStripVerticalEdgeSelectsColumn)
+{
+    // 3-quad strip: bot v0..v3, top v4..v7
+    // Vertical edges: v0-v4, v1-v5, v2-v6, v3-v7
+    // A loop from vertical edge v1-v5 should walk through vertices v1 and v5
+    // to select a continuous path of edges.
+    auto mesh = MakeQuadStrip(3);
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{1}, Geometry::VertexHandle{5});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, Geometry::EdgeHandle{edgeIdx});
+    EXPECT_GT(loop.size(), 1u) << "Loop should extend beyond the starting edge";
+    EXPECT_TRUE(HasNoDuplicates(loop));
+}
+
+TEST(EdgeLoop, QuadStripHorizontalEdgeSelectsRow)
+{
+    auto mesh = MakeQuadStrip(3);
+    // Pick a horizontal bottom edge: v0-v1
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{0}, Geometry::VertexHandle{1});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, Geometry::EdgeHandle{edgeIdx});
+    // Walking through vertices along the bottom row should select at least
+    // v0-v1 and one continuation edge.
+    EXPECT_GE(loop.size(), 2u);
+    EXPECT_TRUE(HasNoDuplicates(loop));
+}
+
+TEST(EdgeLoop, ClosedMeshNoDuplicatesOrOverflow)
+{
+    auto mesh = MakeIcosahedron();
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+        EXPECT_LE(loop.size(), mesh.EdgeCount());
+        EXPECT_TRUE(HasNoDuplicates(loop));
+    }
+}
+
+// --- Edge Ring (face-crossing) tests ---
+
+TEST(EdgeRing, InvalidEdgeReturnsEmpty)
+{
+    auto mesh = MakeSingleTriangle();
+    auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, Geometry::EdgeHandle{999});
+    EXPECT_TRUE(ring.empty());
+}
+
+TEST(EdgeRing, SingleTriangleBoundaryStops)
+{
+    auto mesh = MakeSingleTriangle();
+    // In a single triangle, one halfedge side faces the triangle, the other is
+    // boundary.  The ring walk enters the face, finds the opposite edge, but
+    // that edge's other side is boundary → stop after 1–2 edges.
+    auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, Geometry::EdgeHandle{0});
+    ASSERT_GE(ring.size(), 1u);
+    ASSERT_LE(ring.size(), 3u);
+    EXPECT_TRUE(HasNoDuplicates(ring));
+}
+
+TEST(EdgeRing, QuadStripVerticalEdgeSelectsAllVerticalEdges)
+{
+    // 3-quad strip: v0-v1-v2-v3 (bot), v4-v5-v6-v7 (top)
+    // Vertical edges: v0-v4, v1-v5, v2-v6, v3-v7
+    // Ring from v1-v5 should cross quads selecting opposite vertical edges.
+    auto mesh = MakeQuadStrip(3);
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{1}, Geometry::VertexHandle{5});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, Geometry::EdgeHandle{edgeIdx});
+
+    // On a 3-quad strip, the ring from an interior vertical edge should select
+    // all 4 vertical edges (the start + 3 via face-crossing).
+    EXPECT_EQ(ring.size(), 4u) << "Ring should select all vertical edges in the strip";
+    EXPECT_TRUE(HasNoDuplicates(ring));
+
+    // Verify all vertical edges are present
+    for (int col = 0; col <= 3; ++col)
+    {
+        uint32_t ve = FindEdgeBetween(mesh,
+            Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(col)},
+            Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(col + 4)});
+        ASSERT_NE(ve, UINT32_MAX);
+        bool found = false;
+        for (auto ei : ring)
+            if (ei == ve) found = true;
+        EXPECT_TRUE(found) << "Vertical edge at column " << col << " should be in ring";
+    }
+}
+
+TEST(EdgeRing, QuadStripHorizontalEdgeCrossesStripHeight)
+{
+    auto mesh = MakeQuadStrip(3);
+    // Pick horizontal bottom edge v0-v1
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{0}, Geometry::VertexHandle{1});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, Geometry::EdgeHandle{edgeIdx});
+    // A horizontal edge's opposite in a quad is the other horizontal edge (top).
+    // After crossing, we reach the boundary → ring has exactly 2 edges.
+    EXPECT_EQ(ring.size(), 2u) << "Horizontal ring crosses one quad to top edge";
+    EXPECT_TRUE(HasNoDuplicates(ring));
+}
+
+TEST(EdgeRing, TriangleStripProducesPath)
+{
+    auto mesh = MakeTriangleStrip(4);
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{1}, Geometry::VertexHandle{6});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, Geometry::EdgeHandle{edgeIdx});
+    EXPECT_GT(ring.size(), 1u) << "Ring should traverse at least one triangle";
+    EXPECT_TRUE(HasNoDuplicates(ring));
+}
+
+TEST(EdgeRing, ClosedMeshNoDuplicatesOrOverflow)
+{
+    auto mesh = MakeIcosahedron();
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, eh);
+        EXPECT_LE(ring.size(), mesh.EdgeCount());
+        EXPECT_TRUE(HasNoDuplicates(ring));
+    }
 }

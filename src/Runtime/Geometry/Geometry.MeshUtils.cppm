@@ -160,4 +160,29 @@ export namespace Geometry::MeshUtils
         std::vector<uint32_t>& indices,
         std::vector<glm::vec4>* aux = nullptr,
         std::vector<uint32_t>* triangleFaceIds = nullptr);
+
+    // --- Edge Loop / Edge Ring selection ---
+
+    /// Collect an edge loop starting from the given edge.
+    /// An edge loop is a continuous path of edges through vertices. At each
+    /// vertex the walk picks the "straight" continuation by CW-rotating by
+    /// half the vertex valence in the halfedge fan (Blender convention).
+    /// On regular quad meshes this produces clean column/row selections.
+    /// On triangle meshes with irregular valence the path zig-zags.
+    /// Stops at mesh boundaries, valence-1 vertices, or when the loop closes.
+    /// Returns the ordered edge indices (includes the starting edge).
+    /// No duplicates on closed manifolds.
+    [[nodiscard]] std::vector<uint32_t> CollectEdgeLoop(
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge);
+
+    /// Collect an edge ring starting from the given edge.
+    /// An edge ring selects parallel edges across a face strip. In each face
+    /// the "opposite" edge is found via Next^(valence/2), then the walk crosses
+    /// to the adjacent face. For quads this gives clean parallel selections;
+    /// for triangles it walks via Next(Next(h)) (the "prev" edge).
+    /// Stops at mesh boundaries, non-tri/quad faces, or when the ring closes.
+    /// Returns the ordered edge indices (includes the starting edge).
+    /// No duplicates on closed manifolds.
+    [[nodiscard]] std::vector<uint32_t> CollectEdgeRing(
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge);
 }
