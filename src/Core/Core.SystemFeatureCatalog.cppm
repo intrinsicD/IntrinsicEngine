@@ -75,6 +75,12 @@ export namespace Runtime::SystemFeatureCatalog
         "Use 90% GPU memory warning threshold instead of the 80% baseline",
         false);
 
+    inline constexpr Core::FeatureDescriptor ShaderHotReload = MakeFeatureDescriptor(
+        "ShaderHotReload",
+        Core::FeatureCategory::System,
+        "Watches shader source files and recompiles/reloads pipelines on change",
+        false);
+
     inline constexpr std::array<Core::FeatureDescriptor, 4> GpuMemoryWarnThresholdPresets{
         GpuMemoryWarnThreshold70,
         GpuMemoryWarnThreshold75,

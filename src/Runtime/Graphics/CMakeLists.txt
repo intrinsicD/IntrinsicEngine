@@ -64,6 +64,7 @@ target_sources(${target_name}
         Graphics.LifecycleUtils.cppm
         Graphics.IsolineExtractor.cppm
         Graphics.OverlayEntityFactory.cppm
+        Graphics.ShaderHotReload.cppm
 
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
@@ -126,6 +127,7 @@ target_sources(${target_name}
         Graphics.VectorFieldManager.cpp
         Graphics.IsolineExtractor.cpp
         Graphics.OverlayEntityFactory.cpp
+        Graphics.ShaderHotReload.cpp
         Pipelines/Graphics.Pipelines.cpp
         Graphics.IORegistry.cpp
         Systems/Graphics.Systems.GPUSceneSync.cpp

@@ -91,6 +91,16 @@ The engine uses **activity-aware idle throttling** to conserve CPU/GPU resources
 - **`FrameClock::Resample()`** re-anchors the clock after deliberate sleeps so the next `Advance()` does not count sleep duration as part of the following frame's time.
 - **Known limitation:** only GLFW input events currently signal activity. Scene mutations from async operations (file loads, GPU readbacks) do not yet wake the engine from idle. This is acceptable for interactive editor use and can be extended if needed.
 
+## Shader Hot-Reload
+
+`Graphics::ShaderHotReloadService` enables live shader iteration without engine restart. Gated by the `ShaderHotReload` feature toggle (default disabled).
+
+- **Flow:** `FileWatcher` detects GLSL source change → `glslc` recompiles to SPIR-V on the watcher thread → atomic flag set → `BookkeepHotReloads()` on the main thread debounces (200ms), drains GPU (`vkDeviceWaitIdle`), rebuilds all graphics pipelines via `PipelineLibrary::RebuildGraphicsPipelines()`.
+- **Graceful failure:** If `glslc` compilation fails, the previous pipeline stays active and an error is logged. If `glslc` is not on PATH, a warning is logged at startup and no watchers are registered.
+- **Scope:** Graphics pipelines only. Compute pipelines are not hot-reloaded.
+- **Thread model:** Compilation runs on the FileWatcher thread (safe — `glslc` is a child process). Pipeline rebuild runs on the main thread maintenance lane only.
+- **Source tracking:** `ShaderRegistry::RegisterWithSource()` stores the GLSL source path alongside each SPV path. `ForEachWithSource()` iterates entries that have source paths for watcher registration.
+
 ## Lambda Captures and InplaceFunction
 
 `RHI::VulkanDevice::SafeDestroy()` accepts an `InplaceFunction` (small-buffer-optimized callable) that requires `is_nothrow_move_constructible`. When writing deferred-destruction lambdas:

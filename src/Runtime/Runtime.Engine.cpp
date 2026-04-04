@@ -481,6 +481,7 @@ namespace Runtime
         registerDescriptor(Runtime::SystemFeatureCatalog::MeshViewLifecycle);
         registerDescriptor(Runtime::SystemFeatureCatalog::GPUSceneSync);
         registerDescriptor(Runtime::SystemFeatureCatalog::PropertySetDirtySync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::ShaderHotReload);
         for (const auto& preset : Runtime::SystemFeatureCatalog::GpuMemoryWarnThresholdPresets)
         {
             registerDescriptor(preset);
