@@ -7,6 +7,8 @@ import Core.Logging;
 import Core.SystemFeatureCatalog;
 import Core.Tasks;
 import Core.Telemetry;
+import Graphics.ShaderHotReload;
+import RHI.Image;
 
 namespace Runtime
 {
@@ -93,8 +95,20 @@ namespace Runtime
 
     void ResourceMaintenanceService::BookkeepHotReloads()
     {
-        // Hook for future shader/material hot-reload bookkeeping.
-        // FileWatcher infrastructure exists; shader-specific reload
-        // will be wired here when implemented (see ROADMAP.md Ongoing).
+        if (!m_Features.IsEnabled(Runtime::SystemFeatureCatalog::ShaderHotReload))
+            return;
+
+        auto* hotReload = m_Renderer.GetShaderHotReload();
+        if (!hotReload)
+        {
+            // Lazy initialization: create and start the service on first call
+            // when the feature is enabled. This avoids startup cost when disabled.
+            m_Renderer.InitShaderHotReload();
+            return;
+        }
+
+        hotReload->PollAndReload(
+            m_Graphics.GetSwapchain().GetImageFormat(),
+            RHI::VulkanImage::FindDepthFormat(m_Graphics.GetDevice()));
     }
 }

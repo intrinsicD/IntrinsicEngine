@@ -308,7 +308,7 @@ The two-layer architecture (I/O backend + format loaders) is complete with 8 imp
 
 ## Ongoing
 
-- **Shader hot-reload:** Tracked in `TODO.md` P1/E1. File-watcher integration for automatic recompilation on save.
+- **Shader hot-reload (**MVP complete**):** `Graphics::ShaderHotReloadService` watches GLSL source files via `Core::Filesystem::FileWatcher`, recompiles to SPIR-V via `glslc` on change, and rebuilds all graphics pipelines via `PipelineLibrary::RebuildGraphicsPipelines()`. Feature-gated by `FeatureRegistry` toggle `ShaderHotReload` (default disabled). Graceful fallback on compilation failure (keeps previous pipeline). Debounce coalescing (200ms) prevents redundant rebuilds on rapid saves. Compute pipeline hot-reload deferred.
 - **Port-based testing boundaries:** Type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. Implement opportunistically as new subsystems are added.
 
 ---

@@ -242,20 +242,7 @@ Independent parallel track with no ordering relationship to sections A or B. CUD
 
 Independent tracks that improve iteration speed and observability. Not rendering architecture gaps, but practical enablers for A-section and B-section work.
 
-#### E1. Shader Hot-Reload
-
-Begin alongside A1 for fast shader iteration during rendering mode and shadow development.
-
-- [ ] File watcher (inotify/kqueue) on the shader source directory.
-- [ ] On change: recompile affected SPIR-V, recreate `VkPipeline` via `PipelineLibrary`.
-- [ ] Graceful fallback: if compilation fails, keep the previous pipeline and log the error.
-- [ ] Wire into `FeatureRegistry` as a toggle (`ShaderHotReload`).
-- [ ] Scope: graphics pipelines only (compute hot-reload can follow later).
-- [ ] Update ROADMAP "Ongoing" section to cross-reference this item.
-
-#### E2. GPU Memory Budget Warning Configuration
-
-- [x] Make the 80% GPU memory warning threshold configurable via `FeatureRegistry` (preset toggles: 70/75/85/90%).
+(E1 Shader Hot-Reload and E2 GPU Memory Budget Warning are complete; see git history.)
 
 ### F. UI Architecture & Feature Wiring
 

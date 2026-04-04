@@ -12,6 +12,7 @@ module Runtime.RenderOrchestrator;
 import Core.Logging;
 import Core.Hash;
 import Core.Memory;
+import Core.Filesystem;
 import Core.FrameGraph;
 import Core.Assets;
 import Core.FeatureRegistry;
@@ -33,6 +34,7 @@ import Graphics.MaterialRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.Pipelines;
 import Graphics.RenderDriver;
+import Graphics.ShaderHotReload;
 import Graphics.RenderPipeline;
 import Graphics.ShaderRegistry;
 import Interface;
@@ -125,57 +127,67 @@ namespace Runtime
             struct ShaderRegistration
             {
                 Core::Hash::StringID Id;
-                std::string_view Path;
+                std::string_view SpvPath;   // Relative SPV path (e.g. "shaders/surface.vert.spv")
+                std::string_view GlslName;  // GLSL source filename (e.g. "surface.vert")
             };
 
             constexpr std::array kShaderRegistrations = {
-                ShaderRegistration{"Surface.Vert"_id, "shaders/surface.vert.spv"},
-                ShaderRegistration{"Surface.Frag"_id, "shaders/surface.frag.spv"},
-                ShaderRegistration{"Surface.GBuffer.Frag"_id, "shaders/surface_gbuffer.frag.spv"},
-                ShaderRegistration{"Deferred.Lighting.Frag"_id, "shaders/deferred_lighting.frag.spv"},
-                ShaderRegistration{"Picking.Vert"_id, "shaders/pick_id.vert.spv"},
-                ShaderRegistration{"Picking.Frag"_id, "shaders/pick_id.frag.spv"},
-                ShaderRegistration{"PickMesh.Vert"_id, "shaders/pick_mesh.vert.spv"},
-                ShaderRegistration{"PickMesh.Frag"_id, "shaders/pick_mesh.frag.spv"},
-                ShaderRegistration{"PickLine.Vert"_id, "shaders/pick_line.vert.spv"},
-                ShaderRegistration{"PickLine.Frag"_id, "shaders/pick_line.frag.spv"},
-                ShaderRegistration{"PickPoint.Vert"_id, "shaders/pick_point.vert.spv"},
-                ShaderRegistration{"PickPoint.Frag"_id, "shaders/pick_point.frag.spv"},
-                ShaderRegistration{"Debug.Vert"_id, "shaders/debug_view.vert.spv"},
-                ShaderRegistration{"Debug.Frag"_id, "shaders/debug_view.frag.spv"},
-                ShaderRegistration{"Debug.Comp"_id, "shaders/debug_view.comp.spv"},
-                ShaderRegistration{"Outline.Vert"_id, "shaders/debug_view.vert.spv"},
-                ShaderRegistration{"Outline.Frag"_id, "shaders/selection_outline.frag.spv"},
-                ShaderRegistration{"Line.Vert"_id, "shaders/line.vert.spv"},
-                ShaderRegistration{"Line.Frag"_id, "shaders/line.frag.spv"},
-                ShaderRegistration{"PointCloud.Vert"_id, "shaders/point.vert.spv"},
-                ShaderRegistration{"PointCloud.Frag"_id, "shaders/point.frag.spv"},
-                ShaderRegistration{"Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv"},
-                ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv"},
-                ShaderRegistration{"RetainedPoint.Vert"_id, "shaders/point_retained.vert.spv"},
-                ShaderRegistration{"RetainedPoint.Frag"_id, "shaders/point_retained.frag.spv"},
-                ShaderRegistration{"Point.FlatDisc.Vert"_id, "shaders/point_flatdisc.vert.spv"},
-                ShaderRegistration{"Point.FlatDisc.Frag"_id, "shaders/point_flatdisc.frag.spv"},
-                ShaderRegistration{"Point.Surfel.Vert"_id, "shaders/point_surfel.vert.spv"},
-                ShaderRegistration{"Point.Surfel.Frag"_id, "shaders/point_surfel.frag.spv"},
-                ShaderRegistration{"Point.Sphere.Vert"_id, "shaders/point_sphere.vert.spv"},
-                ShaderRegistration{"Point.Sphere.Frag"_id, "shaders/point_sphere.frag.spv"},
-                ShaderRegistration{"Post.Fullscreen.Vert"_id, "shaders/post_fullscreen.vert.spv"},
-                ShaderRegistration{"Post.ToneMap.Frag"_id, "shaders/post_tonemap.frag.spv"},
-                ShaderRegistration{"Post.FXAA.Frag"_id, "shaders/post_fxaa.frag.spv"},
-                ShaderRegistration{"Post.SMAA.Edge.Frag"_id, "shaders/post_smaa_edge.frag.spv"},
-                ShaderRegistration{"Post.SMAA.Blend.Frag"_id, "shaders/post_smaa_blend.frag.spv"},
-                ShaderRegistration{"Post.SMAA.Resolve.Frag"_id, "shaders/post_smaa_resolve.frag.spv"},
-                ShaderRegistration{"Post.BloomDown.Frag"_id, "shaders/post_bloom_downsample.frag.spv"},
-                ShaderRegistration{"Post.BloomUp.Frag"_id, "shaders/post_bloom_upsample.frag.spv"},
-                ShaderRegistration{"Post.Histogram.Comp"_id, "shaders/post_histogram.comp.spv"},
-                ShaderRegistration{"DebugSurface.Vert"_id, "shaders/debug_surface.vert.spv"},
-                ShaderRegistration{"DebugSurface.Frag"_id, "shaders/debug_surface.frag.spv"},
-                ShaderRegistration{"Shadow.Depth.Vert"_id, "shaders/shadow_depth.vert.spv"},
+                ShaderRegistration{"Surface.Vert"_id, "shaders/surface.vert.spv", "surface.vert"},
+                ShaderRegistration{"Surface.Frag"_id, "shaders/surface.frag.spv", "surface.frag"},
+                ShaderRegistration{"Surface.GBuffer.Frag"_id, "shaders/surface_gbuffer.frag.spv", "surface_gbuffer.frag"},
+                ShaderRegistration{"Deferred.Lighting.Frag"_id, "shaders/deferred_lighting.frag.spv", "deferred_lighting.frag"},
+                ShaderRegistration{"Picking.Vert"_id, "shaders/pick_id.vert.spv", "pick_id.vert"},
+                ShaderRegistration{"Picking.Frag"_id, "shaders/pick_id.frag.spv", "pick_id.frag"},
+                ShaderRegistration{"PickMesh.Vert"_id, "shaders/pick_mesh.vert.spv", "pick_mesh.vert"},
+                ShaderRegistration{"PickMesh.Frag"_id, "shaders/pick_mesh.frag.spv", "pick_mesh.frag"},
+                ShaderRegistration{"PickLine.Vert"_id, "shaders/pick_line.vert.spv", "pick_line.vert"},
+                ShaderRegistration{"PickLine.Frag"_id, "shaders/pick_line.frag.spv", "pick_line.frag"},
+                ShaderRegistration{"PickPoint.Vert"_id, "shaders/pick_point.vert.spv", "pick_point.vert"},
+                ShaderRegistration{"PickPoint.Frag"_id, "shaders/pick_point.frag.spv", "pick_point.frag"},
+                ShaderRegistration{"Debug.Vert"_id, "shaders/debug_view.vert.spv", "debug_view.vert"},
+                ShaderRegistration{"Debug.Frag"_id, "shaders/debug_view.frag.spv", "debug_view.frag"},
+                ShaderRegistration{"Debug.Comp"_id, "shaders/debug_view.comp.spv", "debug_view.comp"},
+                ShaderRegistration{"Outline.Vert"_id, "shaders/debug_view.vert.spv", "debug_view.vert"},
+                ShaderRegistration{"Outline.Frag"_id, "shaders/selection_outline.frag.spv", "selection_outline.frag"},
+                ShaderRegistration{"Line.Vert"_id, "shaders/line.vert.spv", "line.vert"},
+                ShaderRegistration{"Line.Frag"_id, "shaders/line.frag.spv", "line.frag"},
+                ShaderRegistration{"PointCloud.Vert"_id, "shaders/point.vert.spv", "point.vert"},
+                ShaderRegistration{"PointCloud.Frag"_id, "shaders/point.frag.spv", "point.frag"},
+                ShaderRegistration{"Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv", "instance_cull_multigeo.comp"},
+                ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv", "scene_update.comp"},
+                ShaderRegistration{"RetainedPoint.Vert"_id, "shaders/point_retained.vert.spv", "point_retained.vert"},
+                ShaderRegistration{"RetainedPoint.Frag"_id, "shaders/point_retained.frag.spv", "point_retained.frag"},
+                ShaderRegistration{"Point.FlatDisc.Vert"_id, "shaders/point_flatdisc.vert.spv", "point_flatdisc.vert"},
+                ShaderRegistration{"Point.FlatDisc.Frag"_id, "shaders/point_flatdisc.frag.spv", "point_flatdisc.frag"},
+                ShaderRegistration{"Point.Surfel.Vert"_id, "shaders/point_surfel.vert.spv", "point_surfel.vert"},
+                ShaderRegistration{"Point.Surfel.Frag"_id, "shaders/point_surfel.frag.spv", "point_surfel.frag"},
+                ShaderRegistration{"Point.Sphere.Vert"_id, "shaders/point_sphere.vert.spv", "point_sphere.vert"},
+                ShaderRegistration{"Point.Sphere.Frag"_id, "shaders/point_sphere.frag.spv", "point_sphere.frag"},
+                ShaderRegistration{"Post.Fullscreen.Vert"_id, "shaders/post_fullscreen.vert.spv", "post_fullscreen.vert"},
+                ShaderRegistration{"Post.ToneMap.Frag"_id, "shaders/post_tonemap.frag.spv", "post_tonemap.frag"},
+                ShaderRegistration{"Post.FXAA.Frag"_id, "shaders/post_fxaa.frag.spv", "post_fxaa.frag"},
+                ShaderRegistration{"Post.SMAA.Edge.Frag"_id, "shaders/post_smaa_edge.frag.spv", "post_smaa_edge.frag"},
+                ShaderRegistration{"Post.SMAA.Blend.Frag"_id, "shaders/post_smaa_blend.frag.spv", "post_smaa_blend.frag"},
+                ShaderRegistration{"Post.SMAA.Resolve.Frag"_id, "shaders/post_smaa_resolve.frag.spv", "post_smaa_resolve.frag"},
+                ShaderRegistration{"Post.BloomDown.Frag"_id, "shaders/post_bloom_downsample.frag.spv", "post_bloom_downsample.frag"},
+                ShaderRegistration{"Post.BloomUp.Frag"_id, "shaders/post_bloom_upsample.frag.spv", "post_bloom_upsample.frag"},
+                ShaderRegistration{"Post.Histogram.Comp"_id, "shaders/post_histogram.comp.spv", "post_histogram.comp"},
+                ShaderRegistration{"DebugSurface.Vert"_id, "shaders/debug_surface.vert.spv", "debug_surface.vert"},
+                ShaderRegistration{"DebugSurface.Frag"_id, "shaders/debug_surface.frag.spv", "debug_surface.frag"},
+                ShaderRegistration{"Shadow.Depth.Vert"_id, "shaders/shadow_depth.vert.spv", "shadow_depth.vert"},
             };
 
+            // Resolve the shader source directory for hot-reload source path tracking.
+            const std::string shaderSourceDir = Core::Filesystem::GetAssetPath("shaders");
+
             for (const auto& registration : kShaderRegistrations)
-                ShaderRegistry.Register(registration.Id, registration.Path.data());
+            {
+                const std::string glslSourcePath = shaderSourceDir + "/" + std::string(registration.GlslName);
+                ShaderRegistry.RegisterWithSource(
+                    registration.Id,
+                    std::string(registration.SpvPath),
+                    glslSourcePath);
+            }
 
             PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(
                 Device, Bindless, DescriptorLayoutRef);
@@ -216,6 +228,7 @@ namespace Runtime
         std::unique_ptr<Graphics::MaterialRegistry> MaterialRegistry;
         std::unique_ptr<Graphics::GPUScene> GpuScene;
         std::unique_ptr<Graphics::RenderDriver> RenderDriver;
+        std::unique_ptr<Graphics::ShaderHotReloadService> ShaderHotReload;
         std::shared_ptr<RHI::VulkanDevice> Device;
         RHI::VulkanSwapchain& Swapchain;
         RHI::BindlessDescriptorSystem& Bindless;
@@ -281,6 +294,33 @@ namespace Runtime
     Graphics::DebugDraw& RenderOrchestrator::GetDebugDraw() { return m_Impl->DebugDraw; }
     const Graphics::DebugDraw& RenderOrchestrator::GetDebugDraw() const { return m_Impl->DebugDraw; }
     uint32_t RenderOrchestrator::GetFrameContextCount() const { return m_Impl->FrameContextRing.GetFramesInFlight(); }
+
+    Graphics::ShaderHotReloadService* RenderOrchestrator::GetShaderHotReload()
+    {
+        return m_Impl->ShaderHotReload.get();
+    }
+
+    const Graphics::ShaderHotReloadService* RenderOrchestrator::GetShaderHotReload() const
+    {
+        return m_Impl->ShaderHotReload.get();
+    }
+
+    void RenderOrchestrator::InitShaderHotReload()
+    {
+        if (m_Impl->ShaderHotReload)
+            return;
+
+        if (!m_Impl->PipelineLibrary || !m_Impl->Device)
+            return;
+
+        m_Impl->ShaderHotReload = std::make_unique<Graphics::ShaderHotReloadService>(
+            m_Impl->Device,
+            *m_Impl->PipelineLibrary,
+            m_Impl->ShaderRegistry);
+
+        m_Impl->ShaderHotReload->Start();
+        Core::Log::Info("RenderOrchestrator: Shader hot-reload service started.");
+    }
 
     void RenderOrchestrator::OnResize()
     {

@@ -210,6 +210,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RuntimeSystemBundles.cpp
         Test_RuntimeFrameLoop.cpp
         Test_RuntimeEngineConfig.cpp
+        Test_ShaderHotReload.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )

@@ -6,6 +6,7 @@ export module Runtime.ResourceMaintenance;
 
 import Core.FeatureRegistry;
 import Graphics.Material;
+import Graphics.ShaderHotReload;
 import Runtime.GraphicsBackend;
 import Runtime.RenderOrchestrator;
 import Runtime.SceneManager;

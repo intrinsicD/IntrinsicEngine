@@ -39,6 +39,14 @@ export namespace Graphics
                            VkFormat depthFormat,
                            VkFormat sceneColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT);
 
+        // Rebuild all graphics pipelines from the current ShaderRegistry SPV paths.
+        // Caller must ensure no GPU work referencing old pipelines is in flight.
+        // Exits the process on critical pipeline build failure (same as BuildDefaults).
+        void RebuildGraphicsPipelines(const ShaderRegistry& shaderRegistry,
+                                      VkFormat swapchainFormat,
+                                      VkFormat depthFormat,
+                                      VkFormat sceneColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT);
+
         // Retrieve a pipeline by name.
         [[nodiscard]] std::optional<std::reference_wrapper<RHI::GraphicsPipeline>>
         TryGet(Core::Hash::StringID name);

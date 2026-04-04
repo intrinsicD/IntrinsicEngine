@@ -733,6 +733,23 @@ namespace Graphics
         }
     }
 
+    void PipelineLibrary::RebuildGraphicsPipelines(const ShaderRegistry& shaderRegistry,
+                                                    VkFormat swapchainFormat,
+                                                    VkFormat depthFormat,
+                                                    VkFormat sceneColorFormat)
+    {
+        // BuildDefaults() replaces pipeline entries in the map via unique_ptr
+        // assignment, which destroys old VkPipeline objects. Descriptor set
+        // layouts are guarded by null checks and persist across rebuilds.
+        // Compute pipelines are similarly guarded and will not be recreated
+        // if they already exist — this is intentional since compute hot-reload
+        // is out of scope (TODO E1).
+        //
+        // Caller MUST ensure GPU idle before calling this.
+        // Exits the process on critical shader/pipeline failures (same as init).
+        BuildDefaults(shaderRegistry, swapchainFormat, depthFormat, sceneColorFormat);
+    }
+
     std::optional<std::reference_wrapper<RHI::GraphicsPipeline>>
     PipelineLibrary::TryGet(Core::Hash::StringID name)
     {

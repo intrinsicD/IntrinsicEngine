@@ -25,6 +25,7 @@ import Graphics.Material;
 import Graphics.PipelineLibrary;
 import Graphics.RenderDriver;
 import Graphics.RenderPipeline;
+import Graphics.ShaderHotReload;
 import Graphics.ShaderRegistry;
 import Geometry.Handle;
 import Runtime.RenderExtraction;
@@ -88,6 +89,14 @@ export namespace Runtime
         [[nodiscard]] Graphics::DebugDraw& GetDebugDraw();
         [[nodiscard]] const Graphics::DebugDraw& GetDebugDraw() const;
         [[nodiscard]] uint32_t GetFrameContextCount() const;
+
+        // Shader hot-reload service (may be null if not initialized).
+        [[nodiscard]] Graphics::ShaderHotReloadService* GetShaderHotReload();
+        [[nodiscard]] const Graphics::ShaderHotReloadService* GetShaderHotReload() const;
+
+        // Create and start the shader hot-reload service.
+        // Call after construction, when ShaderRegistry is fully populated.
+        void InitShaderHotReload();
 
         // --- Per-frame maintenance ---
         void OnResize();
