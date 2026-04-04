@@ -120,6 +120,79 @@ TEST(CoreCommands, ComponentChangeCommandRestoresRegistryState)
     EXPECT_EQ(registry.get<TestComponent>(entity).value, 5);
 }
 
+TEST(CoreCommands, RecordPushesWithoutExecutingRedo)
+{
+    Core::CommandHistory history;
+    int value = 42;
+
+    EXPECT_TRUE(history.Record(Core::EditorCommand{
+        .name = "Already applied",
+        .redo = [&value]() { value = 99; },
+        .undo = [&value]() { value = 0; },
+    }));
+
+    // Record should NOT call redo — value stays at 42.
+    EXPECT_EQ(value, 42);
+    EXPECT_TRUE(history.CanUndo());
+    EXPECT_FALSE(history.CanRedo());
+
+    // Undo should work normally.
+    EXPECT_TRUE(history.Undo());
+    EXPECT_EQ(value, 0);
+    EXPECT_TRUE(history.CanRedo());
+
+    // Redo should re-apply the redo lambda.
+    EXPECT_TRUE(history.Redo());
+    EXPECT_EQ(value, 99);
+}
+
+TEST(CoreCommands, RecordClearsRedoStack)
+{
+    Core::CommandHistory history;
+    int value = 0;
+
+    EXPECT_TRUE(history.Execute(Core::EditorCommand{
+        .name = "Set one",
+        .redo = [&value]() { value = 1; },
+        .undo = [&value]() { value = 0; },
+    }));
+    EXPECT_TRUE(history.Undo());
+    EXPECT_TRUE(history.CanRedo());
+
+    // Recording a new command should clear the redo stack.
+    EXPECT_TRUE(history.Record(Core::EditorCommand{
+        .name = "Recorded",
+        .redo = [&value]() { value = 2; },
+        .undo = [&value]() { value = 0; },
+    }));
+
+    EXPECT_FALSE(history.CanRedo());
+    // Undo moved "Set one" to redo stack; Record cleared redo and added "Recorded".
+    EXPECT_EQ(history.UndoCount(), 1u);
+}
+
+TEST(CoreCommands, RecordRespectsCapacity)
+{
+    Core::CommandHistory history{1};
+    int value = 0;
+
+    EXPECT_TRUE(history.Record(Core::EditorCommand{
+        .name = "First",
+        .redo = [&value]() { value = 1; },
+        .undo = [&value]() { value = 0; },
+    }));
+    EXPECT_TRUE(history.Record(Core::EditorCommand{
+        .name = "Second",
+        .redo = [&value]() { value = 2; },
+        .undo = [&value]() { value = 1; },
+    }));
+
+    EXPECT_EQ(history.UndoCount(), 1u);
+    EXPECT_TRUE(history.Undo());
+    EXPECT_EQ(value, 1);
+    EXPECT_FALSE(history.CanUndo());
+}
+
 TEST(CoreCommands, ComponentChangeCommandFailsForDestroyedEntity)
 {
     entt::registry registry;
