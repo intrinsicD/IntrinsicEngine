@@ -253,7 +253,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             if (auto* pt = registry.try_get<ECS::Point::Component>(entity))
             {
                 pt->HasPerPointColors = !pcData.CachedColors.empty();
-                pt->HasPerPointRadii  = pcData.HasRadii();
+                pt->HasPerPointRadii  = !pcData.CachedRadii.empty();
             }
         }
     }
