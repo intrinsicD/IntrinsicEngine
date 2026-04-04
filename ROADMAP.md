@@ -134,7 +134,7 @@ Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Fe
 
 - ~~**Wire remaining geometry operators**~~ — `TODO.md` F1 **complete**. All geometry operators (including Boolean CSG) are now wired to the editor UI.
 - **Rendering controls** — `TODO.md` F2. (Light environment serialization, camera property editor, global render mode override, and lighting path selector are complete.)
-- **Undo/redo integration** (CommandHistory wired to gizmo, inspector, operators) — `TODO.md` F3. (CommandHistory, Edit menu shortcuts, transform gizmo commands, inspector property commands, and stack depth indicators are complete. Remaining: entity creation/deletion and geometry operator undo.)
+- **Undo/redo integration** (CommandHistory wired to gizmo, inspector, operators) — `TODO.md` F3. (CommandHistory, Edit menu shortcuts, transform gizmo commands, inspector property commands, stack depth indicators, and entity creation/deletion commands are complete. Remaining: geometry operator undo.)
 - **Hierarchy refinements** (drag-and-drop reparenting, multi-select, expand/collapse all) — `TODO.md` F4.
 - **Viewport context menus** — `TODO.md` F5.
 - **Editor polish** (log panel, keyboard shortcuts reference panel, multi-object editing, remaining tooltip coverage) — `TODO.md` F6.

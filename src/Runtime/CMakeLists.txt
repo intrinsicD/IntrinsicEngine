@@ -37,6 +37,7 @@ target_sources(${target_name}
         EditorUI/Runtime.EditorUI.cpp
         EditorUI/Runtime.EditorUI.Widgets.cpp
         EditorUI/Runtime.EditorUI.InspectorController.cpp
+        EditorUI/Runtime.EditorUI.EntityCommands.cpp
         EditorUI/Runtime.EditorUI.GeometryWorkflowController.cpp
         EditorUI/Runtime.EditorUI.SpatialDebugController.cpp
 )

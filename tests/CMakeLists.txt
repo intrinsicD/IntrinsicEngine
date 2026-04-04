@@ -91,6 +91,7 @@ intrinsic_test_object_lib(ECSTestObjs
         Test_RuntimeECS.cpp
         Test_FrameGraphSystems.cpp
         Test_CompileHotspotRefactors.cpp
+        Test_EntityCommands.cpp
     DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry
 )
 

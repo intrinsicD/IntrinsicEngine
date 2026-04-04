@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
@@ -9,6 +10,7 @@ module;
 
 export module Runtime.EditorUI;
 
+import Core.Commands;
 import Runtime.Engine;
 import Runtime.PointCloudKMeans;
 import Runtime.SceneSerializer;
@@ -477,6 +479,22 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawBooleanWidget(Runtime::Engine& engine,
                                          entt::entity entity,
                                          BooleanWidgetState& state);
+
+    // =========================================================================
+    // Entity Commands — undoable entity creation/deletion
+    // =========================================================================
+
+    // Create an undoable command that creates a new empty entity with default
+    // components (NameTag, Transform, Hierarchy). Redo creates; undo destroys.
+    [[nodiscard]] Core::EditorCommand MakeCreateEntityCommand(
+        Runtime::Engine& engine, const std::string& name);
+
+    // Create an undoable command that deletes the given entity, snapshotting
+    // all restorable component state. Redo destroys; undo recreates and
+    // restores the entity with its components. GPU state is marked dirty on
+    // restore so lifecycle systems re-upload as needed.
+    [[nodiscard]] Core::EditorCommand MakeDeleteEntityCommand(
+        Runtime::Engine& engine, entt::entity target);
 
     // =========================================================================
     // InspectorController — component property inspector panel

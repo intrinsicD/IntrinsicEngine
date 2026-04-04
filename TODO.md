@@ -289,7 +289,6 @@ The lighting environment, camera properties, and render mode are controlled prog
 - [x] Add Edit → Undo / Redo menu items with Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) keyboard shortcuts.
 - [x] Wrap `TransformGizmo` drag completion (mouse release) as a `TransformCommand` capturing before/after `Transform::Component` snapshots for all affected entities.
 - [x] Wrap Inspector numeric field edits (point size, line width, color changes) as property commands via `MakeComponentChangeCommand<T>()`.
-- [ ] Wrap entity creation/deletion from hierarchy context menu as commands.
 - [ ] Wrap geometry operator applications (simplify, remesh, smooth, subdivide, repair) as commands capturing mesh state before/after. Note: full mesh deep-copy snapshots are expensive for large meshes. Evaluate shallow CoW or diff-based approach if memory pressure is measured. Consider deferring to P2 if the snapshot cost is prohibitive.
 - [x] Display undo/redo stack depth in status bar or Edit menu (e.g. "Undo: Scale (3 remaining)").
 

@@ -1110,11 +1110,8 @@ private:
             }
             if (ImGui::MenuItem("Delete"))
             {
-                // Detach from hierarchy before destroying to keep sibling list consistent.
-                if (reg.all_of<ECS::Components::Hierarchy::Component>(entityID))
-                    ECS::Components::Hierarchy::Detach(reg, entityID);
-                reg.destroy(entityID);
-                GetSelection().ClearSelection(GetSceneManager().GetScene());
+                (void)GetCommandHistory().Execute(
+                    Runtime::EditorUI::MakeDeleteEntityCommand(*this, entityID));
                 ImGui::EndPopup();
                 if (opened && hasChildren)
                     ImGui::TreePop();
@@ -1176,7 +1173,8 @@ private:
         {
             if (ImGui::MenuItem("Create Empty Entity"))
             {
-                GetSceneManager().GetScene().CreateEntity("Empty Entity");
+                (void)GetCommandHistory().Execute(
+                    Runtime::EditorUI::MakeCreateEntityCommand(*this, "Empty Entity"));
             }
             if (ImGui::MenuItem("Create Demo Point Cloud"))
             {
@@ -1186,10 +1184,8 @@ private:
             if (ImGui::MenuItem("Remove Selected", nullptr, false,
                                 selected != entt::null && reg.valid(selected)))
             {
-                if (reg.all_of<ECS::Components::Hierarchy::Component>(selected))
-                    ECS::Components::Hierarchy::Detach(reg, selected);
-                reg.destroy(selected);
-                GetSelection().ClearSelection(GetSceneManager().GetScene());
+                (void)GetCommandHistory().Execute(
+                    Runtime::EditorUI::MakeDeleteEntityCommand(*this, selected));
             }
             ImGui::EndPopup();
         }
