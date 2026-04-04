@@ -14,11 +14,13 @@ module;
 
 module Geometry.SurfaceReconstruction;
 
+import Geometry.Grid;
 import Geometry.MarchingCubes;
 import Geometry.NormalEstimation;
 import Geometry.HalfedgeMesh;
 import Geometry.AABB;
 import Geometry.Octree;
+import Geometry.Properties;
 import Geometry.Primitives;
 import Geometry.Validation;
 
@@ -262,13 +264,15 @@ namespace Geometry::SurfaceReconstruction
         // -----------------------------------------------------------------
         // Step 5: Compute signed distance field on the grid
         // -----------------------------------------------------------------
-        MarchingCubes::ScalarGrid grid;
-        grid.NX = gridNX;
-        grid.NY = gridNY;
-        grid.NZ = gridNZ;
-        grid.Origin = bbMin;
-        grid.Spacing = spacing;
-        grid.Values.resize((gridNX + 1) * (gridNY + 1) * (gridNZ + 1));
+        Grid::GridDimensions dims;
+        dims.NX = gridNX;
+        dims.NY = gridNY;
+        dims.NZ = gridNZ;
+        dims.Origin = bbMin;
+        dims.Spacing = spacing;
+
+        Grid::DenseGrid grid(dims);
+        auto scalar = grid.AddProperty<float>("scalar", 0.0f);
 
         const bool useWeighted = (params.KNeighbors > 1);
         const std::size_t effectiveK = std::min(params.KNeighbors, usedPoints.size());
@@ -280,7 +284,7 @@ namespace Geometry::SurfaceReconstruction
             {
                 for (std::size_t x = 0; x <= gridNX; ++x)
                 {
-                    glm::vec3 gp = grid.VertexPosition(x, y, z);
+                    glm::vec3 gp = grid.WorldPosition(x, y, z);
 
                     float sd;
                     if (useWeighted)
@@ -295,7 +299,7 @@ namespace Geometry::SurfaceReconstruction
                             gp, octree, usedPoints, usedNormals);
                     }
 
-                    grid.Set(x, y, z, sd);
+                    grid.Set(scalar, x, y, z, sd);
                 }
             }
         }
@@ -307,7 +311,7 @@ namespace Geometry::SurfaceReconstruction
         mcParams.Isovalue = 0.0f;
         mcParams.ComputeNormals = true;
 
-        auto mcResult = MarchingCubes::Extract(grid, mcParams);
+        auto mcResult = MarchingCubes::Extract(grid, mcParams, "scalar");
         if (!mcResult.has_value())
             return std::nullopt;
 

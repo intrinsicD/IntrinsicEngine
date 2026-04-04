@@ -3,13 +3,16 @@ module;
 #include <array>
 #include <cstddef>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
 
 export module Geometry.MarchingCubes;
 
+import Geometry.Grid;
 import Geometry.HalfedgeMesh;
+import Geometry.Properties;
 
 export namespace Geometry::MarchingCubes
 {
@@ -39,11 +42,18 @@ export namespace Geometry::MarchingCubes
     // reused, producing a watertight mesh without duplicate vertices.
 
     // -------------------------------------------------------------------------
-    // ScalarGrid — regular 3D grid of scalar values
+    // ScalarGrid — DenseGrid wrapper for backward compatibility
     // -------------------------------------------------------------------------
+    //
+    // ScalarGrid wraps a DenseGrid with a single "scalar" float property.
+    // It preserves the original API (At, Set, VertexPosition, LinearIndex,
+    // IsValid) while being backed by the general-purpose Grid system.
 
-    struct ScalarGrid
+    class ScalarGrid
     {
+    public:
+        ScalarGrid() = default;
+
         // Grid dimensions: number of cells along each axis.
         // The grid has (NX+1) x (NY+1) x (NZ+1) vertices.
         std::size_t NX{0};
@@ -94,6 +104,9 @@ export namespace Geometry::MarchingCubes
             return NX > 0 && NY > 0 && NZ > 0
                 && Values.size() == (NX + 1) * (NY + 1) * (NZ + 1);
         }
+
+        // Convert to a DenseGrid with a "scalar" float property.
+        [[nodiscard]] Grid::DenseGrid ToDenseGrid() const;
     };
 
     // -------------------------------------------------------------------------
@@ -125,7 +138,7 @@ export namespace Geometry::MarchingCubes
     // Extraction
     // -------------------------------------------------------------------------
 
-    // Extract an isosurface from the scalar grid.
+    // Extract an isosurface from a ScalarGrid (legacy API).
     //
     // Returns nullopt if:
     //   - The grid is invalid (dimensions or value count mismatch)
@@ -133,6 +146,18 @@ export namespace Geometry::MarchingCubes
     [[nodiscard]] std::optional<MarchingCubesResult> Extract(
         const ScalarGrid& grid,
         const MarchingCubesParams& params = {});
+
+    // Extract an isosurface from a DenseGrid.
+    //
+    // The grid must have a float property with the given name (default: "scalar").
+    // Returns nullopt if:
+    //   - The grid dimensions are invalid
+    //   - The named property does not exist or is not float
+    //   - The isosurface is empty
+    [[nodiscard]] std::optional<MarchingCubesResult> Extract(
+        const Grid::DenseGrid& grid,
+        const MarchingCubesParams& params = {},
+        std::string_view scalarPropertyName = "scalar");
 
     // -------------------------------------------------------------------------
     // Conversion to HalfedgeMesh
