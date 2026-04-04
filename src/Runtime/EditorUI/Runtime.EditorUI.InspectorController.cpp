@@ -1022,7 +1022,7 @@ void InspectorController::DrawMultiSelection(entt::registry& reg,
     ImGui::Separator();
 
     // =================================================================
-    // 1. Transform — batch editing with mixed-value indicators
+    // 1. Transform — batch editing with drag-coalesced undo
     // =================================================================
     {
         // Count entities with Transform component.
@@ -1063,6 +1063,74 @@ void InspectorController::DrawMultiSelection(entt::registry& reg,
                 if (rotDeg != sharedRotDeg) rotUniform = false;
             }
 
+            // Helper: begin a drag session by capturing "before" snapshots.
+            auto beginDragIfNeeded = [&](const char* label)
+            {
+                if (m_MultiTransformDrag.Active) return;
+                m_MultiTransformDrag.Active = true;
+                m_MultiTransformDrag.Label = label;
+                m_MultiTransformDrag.Snapshots.clear();
+                for (const auto e : entities)
+                {
+                    auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
+                    if (t) m_MultiTransformDrag.Snapshots.push_back({e, *t});
+                }
+            };
+
+            // Helper: commit the drag session as a single undoable command.
+            auto commitDrag = [&]()
+            {
+                if (!m_MultiTransformDrag.Active) return;
+                m_MultiTransformDrag.Active = false;
+
+                // Build custom command with IsDirtyTag in both redo and undo
+                // (matches CommitGizmoCommand pattern).
+                std::vector<std::pair<entt::entity,
+                    std::pair<ECS::Components::Transform::Component,
+                              ECS::Components::Transform::Component>>> changes;
+
+                for (auto& [entity, before] : m_MultiTransformDrag.Snapshots)
+                {
+                    auto* t = reg.try_get<ECS::Components::Transform::Component>(entity);
+                    if (!t) continue;
+                    auto after = *t;
+                    // Skip entities that didn't actually change.
+                    if (before.Position == after.Position &&
+                        before.Rotation == after.Rotation &&
+                        before.Scale == after.Scale)
+                        continue;
+                    changes.push_back({entity, {std::move(before), std::move(after)}});
+                }
+
+                if (changes.empty()) return;
+
+                auto* regPtr = &reg;
+                auto label = std::move(m_MultiTransformDrag.Label);
+                Core::EditorCommand cmd{};
+                cmd.name = std::move(label);
+                cmd.redo = [regPtr, changes]()
+                {
+                    for (const auto& [entity, states] : changes)
+                    {
+                        if (!regPtr->valid(entity)) continue;
+                        regPtr->emplace_or_replace<ECS::Components::Transform::Component>(entity, states.second);
+                        regPtr->emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(entity);
+                    }
+                };
+                cmd.undo = [regPtr, changes = std::move(changes)]()
+                {
+                    for (const auto& [entity, states] : changes)
+                    {
+                        if (!regPtr->valid(entity)) continue;
+                        regPtr->emplace_or_replace<ECS::Components::Transform::Component>(entity, states.first);
+                        regPtr->emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(entity);
+                    }
+                };
+                (void)m_Engine->GetCommandHistory().Record(std::move(cmd));
+            };
+
+            bool anyEdited = false;
+
             // Position
             {
                 glm::vec3 editPos = posUniform ? sharedPos : glm::vec3(0.0f);
@@ -1074,31 +1142,17 @@ void InspectorController::DrawMultiSelection(entt::registry& reg,
                 }
                 if (Interface::GUI::DrawVec3Control(posUniform ? "Position" : "Position##Multi", editPos))
                 {
-                    // Snapshot before, apply delta or absolute, snapshot after.
-                    std::vector<std::pair<entt::entity, std::pair<
-                        ECS::Components::Transform::Component,
-                        ECS::Components::Transform::Component>>> changes;
-
+                    beginDragIfNeeded("Multi: Position");
+                    anyEdited = true;
                     for (const auto e : entities)
                     {
                         auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
                         if (!t) continue;
-
-                        auto before = *t;
                         if (posUniform)
                             t->Position = editPos;
                         else
-                            t->Position += editPos - glm::vec3(0.0f); // delta from zero
-                        auto after = *t;
-                        changes.push_back({e, {std::move(before), std::move(after)}});
+                            t->Position += editPos; // delta from zero
                         reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
-                    }
-
-                    if (!changes.empty())
-                    {
-                        auto cmd = Core::MakeBatchComponentChangeCommand<ECS::Components::Transform::Component>(
-                            "Multi: Position", &reg, std::move(changes));
-                        (void)m_Engine->GetCommandHistory().Record(std::move(cmd));
                     }
                 }
             }
@@ -1110,27 +1164,14 @@ void InspectorController::DrawMultiSelection(entt::registry& reg,
                     ImGui::TextDisabled("Rotation: (mixed)");
                 if (Interface::GUI::DrawVec3Control(rotUniform ? "Rotation" : "Rotation##Multi", editRot))
                 {
-                    std::vector<std::pair<entt::entity, std::pair<
-                        ECS::Components::Transform::Component,
-                        ECS::Components::Transform::Component>>> changes;
-
+                    beginDragIfNeeded("Multi: Rotation");
+                    anyEdited = true;
                     for (const auto e : entities)
                     {
                         auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
                         if (!t) continue;
-
-                        auto before = *t;
                         t->Rotation = glm::quat(glm::radians(editRot));
-                        auto after = *t;
-                        changes.push_back({e, {std::move(before), std::move(after)}});
                         reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
-                    }
-
-                    if (!changes.empty())
-                    {
-                        auto cmd = Core::MakeBatchComponentChangeCommand<ECS::Components::Transform::Component>(
-                            "Multi: Rotation", &reg, std::move(changes));
-                        (void)m_Engine->GetCommandHistory().Record(std::move(cmd));
                     }
                 }
             }
@@ -1142,30 +1183,21 @@ void InspectorController::DrawMultiSelection(entt::registry& reg,
                     ImGui::TextDisabled("Scale: (mixed)");
                 if (Interface::GUI::DrawVec3Control(scaleUniform ? "Scale" : "Scale##Multi", editScale, 1.0f))
                 {
-                    std::vector<std::pair<entt::entity, std::pair<
-                        ECS::Components::Transform::Component,
-                        ECS::Components::Transform::Component>>> changes;
-
+                    beginDragIfNeeded("Multi: Scale");
+                    anyEdited = true;
                     for (const auto e : entities)
                     {
                         auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
                         if (!t) continue;
-
-                        auto before = *t;
                         t->Scale = editScale;
-                        auto after = *t;
-                        changes.push_back({e, {std::move(before), std::move(after)}});
                         reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
-                    }
-
-                    if (!changes.empty())
-                    {
-                        auto cmd = Core::MakeBatchComponentChangeCommand<ECS::Components::Transform::Component>(
-                            "Multi: Scale", &reg, std::move(changes));
-                        (void)m_Engine->GetCommandHistory().Record(std::move(cmd));
                     }
                 }
             }
+
+            // Commit drag session when no widgets are actively editing this frame.
+            if (m_MultiTransformDrag.Active && !anyEdited)
+                commitDrag();
 
             ImGui::TextDisabled("(%zu / %zu entities have Transform)", transformCount, entities.size());
         }
@@ -1194,25 +1226,15 @@ void InspectorController::DrawMultiSelection(entt::registry& reg,
                 bool visible = (onCount > 0);
 
                 if (mixed)
-                {
                     ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
-                    if (ImGui::Checkbox("Surface Visible", &visible))
-                    {
-                        for (const auto e : entities)
-                            if (auto* sc = reg.try_get<ECS::Surface::Component>(e))
-                                sc->Visible = visible;
-                    }
-                    ImGui::PopItemFlag();
-                }
-                else
+                if (ImGui::Checkbox("Surface Visible", &visible))
                 {
-                    if (ImGui::Checkbox("Surface Visible", &visible))
-                    {
-                        for (const auto e : entities)
-                            if (auto* sc = reg.try_get<ECS::Surface::Component>(e))
-                                sc->Visible = visible;
-                    }
+                    for (const auto e : entities)
+                        if (auto* sc = reg.try_get<ECS::Surface::Component>(e))
+                            sc->Visible = visible;
                 }
+                if (mixed)
+                    ImGui::PopItemFlag();
             }
         }
 
