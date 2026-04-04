@@ -274,6 +274,15 @@ namespace Runtime::EditorUI
         entt::entity GeodesicEntity = entt::null;
         std::set<uint32_t> GeodesicSourceVertices;
         bool GeodesicDirty = false;
+
+        // Console panel
+        bool ConsoleShowInfo    = true;
+        bool ConsoleShowWarning = true;
+        bool ConsoleShowError   = true;
+        bool ConsoleShowDebug   = true;
+        bool ConsoleAutoScroll  = true;
+        ImGuiTextFilter ConsoleFilter;
+        uint64_t ConsoleLastSeq = 0;
     };
 
     static EditorPanelState s_PanelState;
@@ -831,12 +840,114 @@ namespace Runtime::EditorUI
         });
     }
 
+    static void RegisterConsolePanel()
+    {
+        Interface::GUI::RegisterPanel("Console", []()
+        {
+            auto& st = s_PanelState;
+
+            // Toolbar row: level filters + auto-scroll + clear
+            const auto FilterToggle = [](const char* label, bool& value, const ImVec4& activeColor)
+            {
+                if (value)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(activeColor.x * 0.3f, activeColor.y * 0.3f,
+                                                                   activeColor.z * 0.3f, 0.6f));
+                    ImGui::PushStyleColor(ImGuiCol_Text, activeColor);
+                }
+                else
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.2f, 0.4f));
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+                }
+                if (ImGui::SmallButton(label))
+                    value = !value;
+                ImGui::PopStyleColor(2);
+                ImGui::SameLine();
+            };
+
+            FilterToggle("Info",    st.ConsoleShowInfo,    ImVec4(0.4f, 0.9f, 0.4f, 1.0f));
+            FilterToggle("Warn",    st.ConsoleShowWarning, ImVec4(1.0f, 0.9f, 0.3f, 1.0f));
+            FilterToggle("Error",   st.ConsoleShowError,   ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+            FilterToggle("Debug",   st.ConsoleShowDebug,   ImVec4(0.3f, 0.8f, 1.0f, 1.0f));
+
+            ImGui::SameLine();
+            ImGui::Text("|");
+            ImGui::SameLine();
+            ImGui::Checkbox("Auto-scroll", &st.ConsoleAutoScroll);
+
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Clear"))
+                Core::Log::ClearEntries();
+
+            // Text search filter (ImGuiTextFilter handles case-insensitive
+            // matching and comma-separated include/exclude patterns)
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(150.0f);
+            st.ConsoleFilter.Draw("##ConsoleFilter");
+
+            ImGui::Separator();
+
+            // Take a snapshot of log entries — mutex is released immediately
+            // after copy, so rendering below does not block logging threads.
+            const auto snapshot = Core::Log::TakeSnapshot();
+
+            // Log content area
+            ImGui::BeginChild("ConsoleScrollArea", ImVec2(0, 0), ImGuiChildFlags_None,
+                              ImGuiWindowFlags_HorizontalScrollbar);
+
+            for (const auto& entry : snapshot.Entries)
+            {
+                // Level filter
+                switch (entry.Lvl)
+                {
+                case Core::Log::Level::Info:    if (!st.ConsoleShowInfo)    continue; break;
+                case Core::Log::Level::Warning: if (!st.ConsoleShowWarning) continue; break;
+                case Core::Log::Level::Error:   if (!st.ConsoleShowError)   continue; break;
+                case Core::Log::Level::Debug:   if (!st.ConsoleShowDebug)   continue; break;
+                }
+
+                // Text search filter
+                if (!st.ConsoleFilter.PassFilter(entry.Message.c_str(),
+                                                  entry.Message.c_str() + entry.Message.size()))
+                    continue;
+
+                // Level color + prefix
+                ImVec4 color;
+                const char* prefix;
+                switch (entry.Lvl)
+                {
+                case Core::Log::Level::Info:    color = ImVec4(0.4f, 0.9f, 0.4f, 1.0f); prefix = "[INFO]  "; break;
+                case Core::Log::Level::Warning: color = ImVec4(1.0f, 0.9f, 0.3f, 1.0f); prefix = "[WARN]  "; break;
+                case Core::Log::Level::Error:   color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f); prefix = "[ERR]   "; break;
+                case Core::Log::Level::Debug:   color = ImVec4(0.3f, 0.8f, 1.0f, 1.0f); prefix = "[DBG]   "; break;
+                default:                        color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); prefix = "        "; break;
+                }
+
+                ImGui::PushStyleColor(ImGuiCol_Text, color);
+                ImGui::TextUnformatted(prefix);
+                ImGui::PopStyleColor();
+                ImGui::SameLine();
+                ImGui::TextUnformatted(entry.Message.c_str(),
+                                       entry.Message.c_str() + entry.Message.size());
+            }
+
+            // Auto-scroll to bottom when new entries arrive
+            if (st.ConsoleAutoScroll && snapshot.Sequence != st.ConsoleLastSeq)
+                ImGui::SetScrollHereY(1.0f);
+            st.ConsoleLastSeq = snapshot.Sequence;
+
+            ImGui::EndChild();
+        }, true, 0, true);
+    }
+
     void RegisterDefaultPanels(Runtime::Engine& engine)
     {
         RegisterFeatureBrowserPanel(engine);
         RegisterFrameGraphInspectorPanel(engine);
         RegisterSelectionPanel(engine);
         RegisterBenchmarkPanel(engine);
+        RegisterConsolePanel();
         RegisterSceneFileMenu(engine);
         RegisterEditMenu(engine);
     }

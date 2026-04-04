@@ -1349,6 +1349,7 @@ namespace Interface::GUI
         ImGui::DockBuilderDockWindow("Stats", dockBottom);
         ImGui::DockBuilderDockWindow("Assets", dockBottom);
         ImGui::DockBuilderDockWindow("Performance", dockBottom);
+        ImGui::DockBuilderDockWindow("Console", dockBottom);
         ImGui::DockBuilderDockWindow("Features", dockBottom);
         ImGui::DockBuilderDockWindow("Frame Graph", dockBottom);
         ImGui::DockBuilderDockWindow("Selection", dockBottom);
