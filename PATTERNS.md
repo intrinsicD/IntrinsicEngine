@@ -439,7 +439,7 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 
 **Implementation:**
 - `Core::EditorCommand` stores `std::string` names plus move-only redo/undo callables via `std::move_only_function<void()>`.
-- `Core::CommandHistory` provides bounded undo/redo stacks with `Execute()`, `Undo()`, `Redo()`, `Clear()`, `CanUndo()`, and `CanRedo()`.
+- `Core::CommandHistory` provides bounded undo/redo stacks with `Execute()` (run and push), `Record()` (push without executing — for externally-applied actions like geometry operators), `Undo()`, `Redo()`, `Clear()`, `CanUndo()`, and `CanRedo()`. Non-copyable, non-movable.
 - `Core::CmdComponentChange<T>` captures ECS before/after snapshots for `entt::registry` updates.
 - `Core::MakeComponentChangeCommand<T>()` converts a registry snapshot pair into a replayable editor command.
 
@@ -490,7 +490,7 @@ bool DrawXxxWidget(Runtime::Engine& engine, entt::entity entity, XxxWidgetState&
     // 3. Draw parameter UI (sliders, combos, checkboxes) bound to state
     // 4. Show last-result diagnostics if state.HasResults
     // 5. "Run" button → call backend API → populate state diagnostics
-    //    For in-place: use ApplySurfaceMeshOperator()
+    //    For in-place: use ApplySurfaceMeshOperator(engine, entity, op, "Operator Name")
     //    For new entity: use SpawnMeshEntity() or scene.CreateEntity() + ECS setup
     // 6. Return true if entity was modified, false otherwise
 }

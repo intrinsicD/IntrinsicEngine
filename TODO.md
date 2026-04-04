@@ -261,9 +261,7 @@ Light environment serialization, camera property editor, global render mode over
 
 #### F3. Undo/Redo Integration
 
-CommandHistory, Edit menu shortcuts, transform gizmo commands, inspector property commands, entity creation/deletion/duplication/rename/reparent commands, and stack depth indicators are complete. Remaining:
-
-- [ ] Wrap geometry operator applications (simplify, remesh, smooth, subdivide, repair) as commands capturing mesh state before/after. Note: full mesh deep-copy snapshots are expensive for large meshes. Evaluate shallow CoW or diff-based approach if memory pressure is measured. Consider deferring to P2 if the snapshot cost is prohibitive.
+CommandHistory, Edit menu shortcuts, transform gizmo commands, inspector property commands, entity creation/deletion/duplication/rename/reparent commands, stack depth indicators, and geometry operator undo (simplify, remesh, smooth, subdivide, repair) are all complete. Mesh state is captured as `shared_ptr<Mesh>` snapshots before/after operator application; undo/redo restores the full mesh state including GPU re-upload. Memory note: each operator step stores two shared mesh snapshots (~5-15 MB per step for typical meshes). **Complete.**
 
 #### F4. Hierarchy Panel Improvements
 

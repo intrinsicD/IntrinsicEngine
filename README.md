@@ -79,7 +79,7 @@ python3 ./tools/compile_hotspots.py \
   - `LinearArena` — O(1) monotonic frame allocator with O(1) bulk deallocation.
   - `ScopeStack` — LIFO allocator with destructor support for complex per-frame objects.
   - `InplaceFunction` — Small-buffer-optimized callable (64B SBO, move-only, zero-heap).
-  - `CommandHistory` — bounded undo/redo stack built on `std::move_only_function` plus `CmdComponentChange<T>` ECS snapshots for inspector and gizmo edits.
+  - `CommandHistory` — bounded undo/redo stack built on `std::move_only_function` plus `CmdComponentChange<T>` ECS snapshots for inspector and gizmo edits. Geometry operators (simplify, remesh, smooth, subdivide, repair) capture full mesh state via `shared_ptr<Mesh>` snapshots for undo/redo with GPU re-upload.
 - **Hybrid Work-Stealing Task Scheduler:** Per-worker local deques execute local work in LIFO order, cross-worker stealing improves load balance, and an external inject queue handles non-worker producers. `Job` and `Yield()` provide cooperative coroutine multitasking.
 - **Lock-Free Telemetry:** Ring-buffered telemetry system for real-time CPU frame times, draw calls, triangle counts, per-pass GPU/CPU timing entries, and per-heap GPU memory budget tracking (via `VK_EXT_memory_budget` / VMA). The Performance panel shows live device-local usage bars with color-coded warnings at 80% threshold.
 - **Console/Log Panel:** Ring-buffer log sink (2048 entries) captures all `Core::Log` output. The Console panel provides scrollable, filterable, per-level (Info/Warn/Error/Debug) log viewing with `ImGuiTextFilter`-based search, auto-scroll, and clear. `TakeSnapshot()` decouples UI rendering from logging threads (no mutex held during ImGui drawing).

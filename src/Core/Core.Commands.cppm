@@ -80,11 +80,32 @@ export namespace Core
             }
         }
 
+        [[nodiscard]] bool PushCommand(EditorCommand cmd, bool executeRedo)
+        {
+            assert(cmd.IsValid() && "Core::EditorCommand must provide both redo and undo callables");
+            if (!cmd.IsValid()) return false;
+
+            if (executeRedo)
+                cmd.redo();
+
+            redoStack.clear();
+            if (m_Capacity > 0 && undoStack.size() == m_Capacity)
+                undoStack.pop_front();
+
+            undoStack.push_back(std::move(cmd));
+            return true;
+        }
+
     public:
         explicit CommandHistory(std::size_t capacity = 256)
             : m_Capacity(capacity == 0 ? 1 : capacity)
         {
         }
+
+        CommandHistory(const CommandHistory&) = delete;
+        CommandHistory& operator=(const CommandHistory&) = delete;
+        CommandHistory(CommandHistory&&) = delete;
+        CommandHistory& operator=(CommandHistory&&) = delete;
 
         [[nodiscard]] std::size_t Capacity() const noexcept { return m_Capacity; }
         [[nodiscard]] std::size_t UndoCount() const noexcept { return undoStack.size(); }
@@ -101,19 +122,15 @@ export namespace Core
 
         [[nodiscard]] bool Execute(EditorCommand cmd)
         {
-            assert(cmd.IsValid() && "Core::EditorCommand must provide both redo and undo callables");
-            if (!cmd.IsValid()) return false;
+            return PushCommand(std::move(cmd), true);
+        }
 
-            cmd.redo();
-
-            redoStack.clear();
-            if (m_Capacity > 0 && undoStack.size() == m_Capacity)
-            {
-                undoStack.pop_front();
-            }
-
-            undoStack.push_back(std::move(cmd));
-            return true;
+        /// Push a command whose redo action has already been performed.
+        /// Use when the action was applied externally (e.g. geometry operators)
+        /// and only undo/redo replay should go through the command.
+        [[nodiscard]] bool Record(EditorCommand cmd)
+        {
+            return PushCommand(std::move(cmd), false);
         }
 
         [[nodiscard]] bool Undo()
@@ -137,9 +154,7 @@ export namespace Core
 
             cmd.redo();
             if (m_Capacity > 0 && undoStack.size() == m_Capacity)
-            {
                 undoStack.pop_front();
-            }
             undoStack.push_back(std::move(cmd));
             return true;
         }
