@@ -42,74 +42,6 @@ export namespace Geometry::MarchingCubes
     // reused, producing a watertight mesh without duplicate vertices.
 
     // -------------------------------------------------------------------------
-    // ScalarGrid — DenseGrid wrapper for backward compatibility
-    // -------------------------------------------------------------------------
-    //
-    // ScalarGrid wraps a DenseGrid with a single "scalar" float property.
-    // It preserves the original API (At, Set, VertexPosition, LinearIndex,
-    // IsValid) while being backed by the general-purpose Grid system.
-
-    class ScalarGrid
-    {
-    public:
-        ScalarGrid() = default;
-
-        // Grid dimensions: number of cells along each axis.
-        // The grid has (NX+1) x (NY+1) x (NZ+1) vertices.
-        std::size_t NX{0};
-        std::size_t NY{0};
-        std::size_t NZ{0};
-
-        // Grid origin (minimum corner in world space).
-        glm::vec3 Origin{0.0f};
-
-        // Cell spacing along each axis.
-        glm::vec3 Spacing{1.0f};
-
-        // Scalar values at grid vertices, linearized as:
-        //   index = z * (NY+1) * (NX+1) + y * (NX+1) + x
-        // Total size: (NX+1) * (NY+1) * (NZ+1)
-        std::vector<float> Values;
-
-        // Access the scalar value at grid vertex (x, y, z).
-        [[nodiscard]] float At(std::size_t x, std::size_t y, std::size_t z) const
-        {
-            return Values[z * (NY + 1) * (NX + 1) + y * (NX + 1) + x];
-        }
-
-        // Set the scalar value at grid vertex (x, y, z).
-        void Set(std::size_t x, std::size_t y, std::size_t z, float value)
-        {
-            Values[z * (NY + 1) * (NX + 1) + y * (NX + 1) + x] = value;
-        }
-
-        // Compute the world-space position of grid vertex (x, y, z).
-        [[nodiscard]] glm::vec3 VertexPosition(std::size_t x, std::size_t y, std::size_t z) const
-        {
-            return Origin + Spacing * glm::vec3(
-                static_cast<float>(x),
-                static_cast<float>(y),
-                static_cast<float>(z));
-        }
-
-        // Linear index of grid vertex (x, y, z).
-        [[nodiscard]] std::size_t LinearIndex(std::size_t x, std::size_t y, std::size_t z) const
-        {
-            return z * (NY + 1) * (NX + 1) + y * (NX + 1) + x;
-        }
-
-        // Check whether the grid dimensions and value count are consistent.
-        [[nodiscard]] bool IsValid() const noexcept
-        {
-            return NX > 0 && NY > 0 && NZ > 0
-                && Values.size() == (NX + 1) * (NY + 1) * (NZ + 1);
-        }
-
-        // Convert to a DenseGrid with a "scalar" float property.
-        [[nodiscard]] Grid::DenseGrid ToDenseGrid() const;
-    };
-
-    // -------------------------------------------------------------------------
     // Parameters and result
     // -------------------------------------------------------------------------
 
@@ -137,15 +69,6 @@ export namespace Geometry::MarchingCubes
     // -------------------------------------------------------------------------
     // Extraction
     // -------------------------------------------------------------------------
-
-    // Extract an isosurface from a ScalarGrid (legacy API).
-    //
-    // Returns nullopt if:
-    //   - The grid is invalid (dimensions or value count mismatch)
-    //   - The isosurface is empty (no cells straddle the isovalue)
-    [[nodiscard]] std::optional<MarchingCubesResult> Extract(
-        const ScalarGrid& grid,
-        const MarchingCubesParams& params = {});
 
     // Extract an isosurface from a DenseGrid.
     //

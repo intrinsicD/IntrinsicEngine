@@ -305,32 +305,34 @@ TEST(DenseGrid, MarchingCubesInvalidGridReturnsNullopt)
 }
 
 // =============================================================================
-// DenseGrid — backward compatibility via ScalarGrid
+// DenseGrid — scalar property round-trip
 // =============================================================================
 
-TEST(DenseGrid, ScalarGridToDenseGridRoundTrip)
+TEST(DenseGrid, ScalarPropertyRoundTrip)
 {
-    Geometry::MarchingCubes::ScalarGrid sg;
-    sg.NX = sg.NY = sg.NZ = 4;
-    sg.Origin = glm::vec3(-1.0f);
-    sg.Spacing = glm::vec3(0.5f);
-    sg.Values.resize(5 * 5 * 5);
+    GridDimensions dims;
+    dims.NX = dims.NY = dims.NZ = 4;
+    dims.Origin = glm::vec3(-1.0f);
+    dims.Spacing = glm::vec3(0.5f);
 
-    for (std::size_t i = 0; i < sg.Values.size(); ++i)
-        sg.Values[i] = static_cast<float>(i) * 0.1f;
+    DenseGrid grid(dims);
+    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
+    EXPECT_EQ(grid.VertexCount(), 5u * 5u * 5u);
 
-    auto dg = sg.ToDenseGrid();
-    EXPECT_EQ(dg.VertexCount(), 5u * 5u * 5u);
+    // Fill with sequential values
+    for (std::size_t i = 0; i < grid.VertexCount(); ++i)
+        scalar[i] = static_cast<float>(i) * 0.1f;
 
-    auto scalar = dg.GetProperty<float>("scalar");
-    ASSERT_TRUE(scalar.IsValid());
+    // Verify round-trip through At/Set accessors
+    auto retrieved = grid.GetProperty<float>("scalar");
+    ASSERT_TRUE(retrieved.IsValid());
 
-    for (std::size_t z = 0; z <= sg.NZ; ++z)
-        for (std::size_t y = 0; y <= sg.NY; ++y)
-            for (std::size_t x = 0; x <= sg.NX; ++x)
+    for (std::size_t z = 0; z <= dims.NZ; ++z)
+        for (std::size_t y = 0; y <= dims.NY; ++y)
+            for (std::size_t x = 0; x <= dims.NX; ++x)
             {
-                float expected = sg.At(x, y, z);
-                float actual = dg.At(scalar, x, y, z);
+                float expected = static_cast<float>(dims.LinearIndex(x, y, z)) * 0.1f;
+                float actual = grid.At(retrieved, x, y, z);
                 EXPECT_NEAR(actual, expected, 1e-6f);
             }
 }
@@ -624,27 +626,27 @@ TEST(DenseGrid, SpanAccessForGPUUpload)
 }
 
 // =============================================================================
-// Existing MarchingCubes + SurfaceReconstruction tests still pass
-// (These verify backward compatibility of ScalarGrid)
+// DenseGrid — MarchingCubes extraction integration
 // =============================================================================
 
-TEST(DenseGrid_Compat, ScalarGridExtractStillWorks)
+TEST(DenseGrid, MarchingCubesExtractSphereSDF)
 {
-    // Same pattern as the original MarchingCubes tests
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = grid.NY = grid.NZ = 10;
+    GridDimensions dims;
+    dims.NX = dims.NY = dims.NZ = 10;
     const float radius = 1.0f;
     const float extent = radius * 2.0f;
-    grid.Origin = glm::vec3(-extent);
-    grid.Spacing = glm::vec3(2.0f * extent / 10.0f);
-    grid.Values.resize(11 * 11 * 11);
+    dims.Origin = glm::vec3(-extent);
+    dims.Spacing = glm::vec3(2.0f * extent / 10.0f);
+
+    DenseGrid grid(dims);
+    auto scalar = grid.AddProperty<float>("scalar", 0.0f);
 
     for (std::size_t z = 0; z <= 10; ++z)
         for (std::size_t y = 0; y <= 10; ++y)
             for (std::size_t x = 0; x <= 10; ++x)
             {
-                auto pos = grid.VertexPosition(x, y, z);
-                grid.Set(x, y, z, glm::length(pos) - radius);
+                auto pos = grid.WorldPosition(x, y, z);
+                grid.Set(scalar, x, y, z, glm::length(pos) - radius);
             }
 
     auto result = Geometry::MarchingCubes::Extract(grid);

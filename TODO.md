@@ -631,16 +631,6 @@ Fast mesh self-intersection detection using BVH-accelerated triangle-triangle ov
 - [ ] Publish `f:self_intersecting` boolean property and visualize via face highlight overlay.
 - [ ] Wire to Mesh Analysis panel (extends existing defect-marker UI).
 
-### C21. Grid Data Structure — Complete ScalarGrid Migration
-
-Remove the backward-compatibility `ScalarGrid` wrapper and migrate all remaining usage to `DenseGrid`/`SparseGrid` from the `Geometry.Grid` module.
-
-- [ ] Remove `ScalarGrid` class and `ToDenseGrid()` from `Geometry.MarchingCubes.cppm`.
-- [ ] Remove the `Extract(const ScalarGrid&, ...)` overload from MarchingCubes — only keep `Extract(const DenseGrid&, ...)`.
-- [ ] Update `Test_MarchingCubes.cpp` to use `DenseGrid` directly instead of `ScalarGrid`.
-- [ ] Update `Test_SurfaceReconstruction.cpp` helpers (`MakeSphereSDF`, `MakePlaneSDF`) to use `DenseGrid`.
-- [ ] Grep for any remaining `ScalarGrid` references and migrate them.
-- [ ] Update `DenseGrid_Compat` tests in `Test_Grid.cpp` — convert to pure `DenseGrid` tests once `ScalarGrid` is removed.
 
 ---
 
