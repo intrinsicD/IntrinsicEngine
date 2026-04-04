@@ -10,16 +10,20 @@
 module;
 
 #include <cstring>
+#include <span>
 #include <string>
 #include <utility>
+#include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <entt/entity/registry.hpp>
 
 module Runtime.EditorUI;
 
 import Runtime.Engine;
+import Runtime.SelectionModule;
 import Core.Commands;
 import Graphics.Components;
 import Graphics.Geometry;
@@ -103,16 +107,27 @@ void InspectorController::Draw()
 {
     ImGui::Begin("Inspector");
 
+    auto& scene = m_Engine->GetSceneManager().GetScene();
+    auto& reg = scene.GetRegistry();
+
+    // Detect multi-selection via SelectedTag.
+    const auto selectedEntities = m_Engine->GetSelection().GetSelectedEntities(scene);
+
+    if (selectedEntities.size() > 1)
+    {
+        DrawMultiSelection(reg, selectedEntities);
+        ImGui::End();
+        return;
+    }
+
     const entt::entity selected = *m_CachedSelected;
 
-    if (selected == entt::null || !m_Engine->GetSceneManager().GetScene().GetRegistry().valid(selected))
+    if (selected == entt::null || !reg.valid(selected))
     {
         ImGui::TextDisabled("Select an entity to inspect.");
         ImGui::End();
         return;
     }
-
-    auto& reg = m_Engine->GetSceneManager().GetScene().GetRegistry();
 
     // === Reset per-entity widget state on selection change ===
     if (selected != m_PreviousSelected)
@@ -977,6 +992,384 @@ void InspectorController::Draw()
     }
 
     ImGui::End();
+}
+
+// =========================================================================
+// DrawMultiSelection — multi-entity batch property inspector
+// =========================================================================
+
+void InspectorController::DrawMultiSelection(entt::registry& reg,
+                                             std::span<const entt::entity> entities)
+{
+    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f),
+                       "%zu entities selected", entities.size());
+    ImGui::Separator();
+
+    // Collect entity names for a collapsible list.
+    if (ImGui::CollapsingHeader("Selected Entities"))
+    {
+        for (const auto e : entities)
+        {
+            const auto* name = reg.try_get<ECS::Components::NameTag::Component>(e);
+            const auto id = static_cast<uint32_t>(static_cast<entt::id_type>(e));
+            if (name)
+                ImGui::BulletText("[%u] %s", id, name->Name.c_str());
+            else
+                ImGui::BulletText("[%u]", id);
+        }
+    }
+
+    ImGui::Separator();
+
+    // =================================================================
+    // 1. Transform — batch editing with mixed-value indicators
+    // =================================================================
+    {
+        // Count entities with Transform component.
+        std::size_t transformCount = 0;
+        for (const auto e : entities)
+            if (reg.all_of<ECS::Components::Transform::Component>(e))
+                ++transformCount;
+
+        if (transformCount > 0 && ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            // Determine if values are uniform across all selected entities.
+            glm::vec3 sharedPos{0.0f};
+            glm::vec3 sharedScale{1.0f};
+            glm::vec3 sharedRotDeg{0.0f};
+            bool posUniform = true;
+            bool rotUniform = true;
+            bool scaleUniform = true;
+            bool foundFirst = false;
+
+            for (const auto e : entities)
+            {
+                auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
+                if (!t) continue;
+
+                const glm::vec3 rotDeg = glm::degrees(glm::eulerAngles(t->Rotation));
+
+                if (!foundFirst)
+                {
+                    sharedPos = t->Position;
+                    sharedScale = t->Scale;
+                    sharedRotDeg = rotDeg;
+                    foundFirst = true;
+                    continue;
+                }
+
+                if (t->Position != sharedPos) posUniform = false;
+                if (t->Scale != sharedScale) scaleUniform = false;
+                if (rotDeg != sharedRotDeg) rotUniform = false;
+            }
+
+            // Position
+            {
+                glm::vec3 editPos = posUniform ? sharedPos : glm::vec3(0.0f);
+                if (!posUniform)
+                {
+                    ImGui::TextDisabled("Position: (mixed)");
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("Editing applies to all");
+                }
+                if (Interface::GUI::DrawVec3Control(posUniform ? "Position" : "Position##Multi", editPos))
+                {
+                    // Snapshot before, apply delta or absolute, snapshot after.
+                    std::vector<std::pair<entt::entity, std::pair<
+                        ECS::Components::Transform::Component,
+                        ECS::Components::Transform::Component>>> changes;
+
+                    for (const auto e : entities)
+                    {
+                        auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
+                        if (!t) continue;
+
+                        auto before = *t;
+                        if (posUniform)
+                            t->Position = editPos;
+                        else
+                            t->Position += editPos - glm::vec3(0.0f); // delta from zero
+                        auto after = *t;
+                        changes.push_back({e, {std::move(before), std::move(after)}});
+                        reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
+                    }
+
+                    if (!changes.empty())
+                    {
+                        auto cmd = Core::MakeBatchComponentChangeCommand<ECS::Components::Transform::Component>(
+                            "Multi: Position", &reg, std::move(changes));
+                        (void)m_Engine->GetCommandHistory().Record(std::move(cmd));
+                    }
+                }
+            }
+
+            // Rotation
+            {
+                glm::vec3 editRot = rotUniform ? sharedRotDeg : glm::vec3(0.0f);
+                if (!rotUniform)
+                    ImGui::TextDisabled("Rotation: (mixed)");
+                if (Interface::GUI::DrawVec3Control(rotUniform ? "Rotation" : "Rotation##Multi", editRot))
+                {
+                    std::vector<std::pair<entt::entity, std::pair<
+                        ECS::Components::Transform::Component,
+                        ECS::Components::Transform::Component>>> changes;
+
+                    for (const auto e : entities)
+                    {
+                        auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
+                        if (!t) continue;
+
+                        auto before = *t;
+                        t->Rotation = glm::quat(glm::radians(editRot));
+                        auto after = *t;
+                        changes.push_back({e, {std::move(before), std::move(after)}});
+                        reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
+                    }
+
+                    if (!changes.empty())
+                    {
+                        auto cmd = Core::MakeBatchComponentChangeCommand<ECS::Components::Transform::Component>(
+                            "Multi: Rotation", &reg, std::move(changes));
+                        (void)m_Engine->GetCommandHistory().Record(std::move(cmd));
+                    }
+                }
+            }
+
+            // Scale
+            {
+                glm::vec3 editScale = scaleUniform ? sharedScale : glm::vec3(1.0f);
+                if (!scaleUniform)
+                    ImGui::TextDisabled("Scale: (mixed)");
+                if (Interface::GUI::DrawVec3Control(scaleUniform ? "Scale" : "Scale##Multi", editScale, 1.0f))
+                {
+                    std::vector<std::pair<entt::entity, std::pair<
+                        ECS::Components::Transform::Component,
+                        ECS::Components::Transform::Component>>> changes;
+
+                    for (const auto e : entities)
+                    {
+                        auto* t = reg.try_get<ECS::Components::Transform::Component>(e);
+                        if (!t) continue;
+
+                        auto before = *t;
+                        t->Scale = editScale;
+                        auto after = *t;
+                        changes.push_back({e, {std::move(before), std::move(after)}});
+                        reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
+                    }
+
+                    if (!changes.empty())
+                    {
+                        auto cmd = Core::MakeBatchComponentChangeCommand<ECS::Components::Transform::Component>(
+                            "Multi: Scale", &reg, std::move(changes));
+                        (void)m_Engine->GetCommandHistory().Record(std::move(cmd));
+                    }
+                }
+            }
+
+            ImGui::TextDisabled("(%zu / %zu entities have Transform)", transformCount, entities.size());
+        }
+    }
+
+    // =================================================================
+    // 2. Visibility — tri-state checkboxes for Surface, Graph, PointCloud
+    // =================================================================
+    if (ImGui::CollapsingHeader("Visibility", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        // Surface visibility
+        {
+            int onCount = 0, totalCount = 0;
+            for (const auto e : entities)
+            {
+                if (auto* sc = reg.try_get<ECS::Surface::Component>(e))
+                {
+                    ++totalCount;
+                    if (sc->Visible) ++onCount;
+                }
+            }
+
+            if (totalCount > 0)
+            {
+                const bool mixed = (onCount > 0 && onCount < totalCount);
+                bool visible = (onCount > 0);
+
+                if (mixed)
+                {
+                    ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+                    if (ImGui::Checkbox("Surface Visible", &visible))
+                    {
+                        for (const auto e : entities)
+                            if (auto* sc = reg.try_get<ECS::Surface::Component>(e))
+                                sc->Visible = visible;
+                    }
+                    ImGui::PopItemFlag();
+                }
+                else
+                {
+                    if (ImGui::Checkbox("Surface Visible", &visible))
+                    {
+                        for (const auto e : entities)
+                            if (auto* sc = reg.try_get<ECS::Surface::Component>(e))
+                                sc->Visible = visible;
+                    }
+                }
+            }
+        }
+
+        // Graph visibility
+        {
+            int onCount = 0, totalCount = 0;
+            for (const auto e : entities)
+            {
+                if (auto* gd = reg.try_get<ECS::Graph::Data>(e))
+                {
+                    ++totalCount;
+                    if (gd->Visible) ++onCount;
+                }
+            }
+
+            if (totalCount > 0)
+            {
+                const bool mixed = (onCount > 0 && onCount < totalCount);
+                bool visible = (onCount > 0);
+
+                if (mixed)
+                    ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+                if (ImGui::Checkbox("Graph Visible", &visible))
+                {
+                    for (const auto e : entities)
+                        if (auto* gd = reg.try_get<ECS::Graph::Data>(e))
+                            gd->Visible = visible;
+                }
+                if (mixed)
+                    ImGui::PopItemFlag();
+            }
+        }
+
+        // Point Cloud visibility
+        {
+            int onCount = 0, totalCount = 0;
+            for (const auto e : entities)
+            {
+                if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(e))
+                {
+                    ++totalCount;
+                    if (pcd->Visible) ++onCount;
+                }
+            }
+
+            if (totalCount > 0)
+            {
+                const bool mixed = (onCount > 0 && onCount < totalCount);
+                bool visible = (onCount > 0);
+
+                if (mixed)
+                    ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+                if (ImGui::Checkbox("Point Cloud Visible", &visible))
+                {
+                    for (const auto e : entities)
+                        if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(e))
+                            pcd->Visible = visible;
+                }
+                if (mixed)
+                    ImGui::PopItemFlag();
+            }
+        }
+    }
+
+    // =================================================================
+    // 3. Wireframe / Vertex Display — batch toggle
+    // =================================================================
+    {
+        // Count entities with Surface components (mesh entities).
+        int meshCount = 0;
+        int wireframeCount = 0;
+        int vertexCount = 0;
+        for (const auto e : entities)
+        {
+            if (reg.all_of<ECS::Surface::Component>(e))
+            {
+                ++meshCount;
+                if (reg.all_of<ECS::Line::Component>(e)) ++wireframeCount;
+                if (reg.all_of<ECS::Point::Component>(e)) ++vertexCount;
+            }
+        }
+
+        if (meshCount > 0 && ImGui::CollapsingHeader("Display Modes"))
+        {
+            // Wireframe toggle
+            {
+                const bool mixed = (wireframeCount > 0 && wireframeCount < meshCount);
+                bool showWireframe = (wireframeCount > 0);
+
+                if (mixed)
+                    ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+                if (ImGui::Checkbox("Show Wireframe##Multi", &showWireframe))
+                {
+                    for (const auto e : entities)
+                    {
+                        if (!reg.all_of<ECS::Surface::Component>(e)) continue;
+                        if (showWireframe && !reg.all_of<ECS::Line::Component>(e))
+                            reg.emplace<ECS::Line::Component>(e);
+                        else if (!showWireframe && reg.all_of<ECS::Line::Component>(e))
+                            reg.remove<ECS::Line::Component>(e);
+                    }
+                }
+                if (mixed)
+                    ImGui::PopItemFlag();
+            }
+
+            // Vertex display toggle
+            {
+                const bool mixed = (vertexCount > 0 && vertexCount < meshCount);
+                bool showVertices = (vertexCount > 0);
+
+                if (mixed)
+                    ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+                if (ImGui::Checkbox("Show Vertices##Multi", &showVertices))
+                {
+                    for (const auto e : entities)
+                    {
+                        if (!reg.all_of<ECS::Surface::Component>(e)) continue;
+                        if (showVertices && !reg.all_of<ECS::Point::Component>(e))
+                            reg.emplace<ECS::Point::Component>(e);
+                        else if (!showVertices && reg.all_of<ECS::Point::Component>(e))
+                            reg.remove<ECS::Point::Component>(e);
+                    }
+                }
+                if (mixed)
+                    ImGui::PopItemFlag();
+            }
+
+            ImGui::TextDisabled("(%d mesh entities)", meshCount);
+        }
+    }
+
+    // =================================================================
+    // 4. Component Summary — read-only overview
+    // =================================================================
+    if (ImGui::CollapsingHeader("Component Summary"))
+    {
+        int surfaceCount = 0, meshCount = 0, graphCount = 0, pcdCount = 0;
+        int hierarchyCount = 0, colliderCount = 0;
+
+        for (const auto e : entities)
+        {
+            if (reg.all_of<ECS::Surface::Component>(e)) ++surfaceCount;
+            if (reg.all_of<ECS::Mesh::Data>(e)) ++meshCount;
+            if (reg.all_of<ECS::Graph::Data>(e)) ++graphCount;
+            if (reg.all_of<ECS::PointCloud::Data>(e)) ++pcdCount;
+            if (reg.all_of<ECS::Components::Hierarchy::Component>(e)) ++hierarchyCount;
+            if (reg.all_of<ECS::MeshCollider::Component>(e)) ++colliderCount;
+        }
+
+        if (surfaceCount > 0) ImGui::BulletText("Surface: %d", surfaceCount);
+        if (meshCount > 0)    ImGui::BulletText("Mesh Data: %d", meshCount);
+        if (graphCount > 0)   ImGui::BulletText("Graph: %d", graphCount);
+        if (pcdCount > 0)     ImGui::BulletText("Point Cloud: %d", pcdCount);
+        if (hierarchyCount > 0) ImGui::BulletText("Hierarchy: %d", hierarchyCount);
+        if (colliderCount > 0) ImGui::BulletText("Mesh Collider: %d", colliderCount);
+    }
 }
 
 } // namespace Runtime::EditorUI

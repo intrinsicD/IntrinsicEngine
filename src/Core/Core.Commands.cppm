@@ -5,8 +5,10 @@ module;
 #include <deque>
 #include <functional>
 #include <concepts>
+#include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <entt/entity/registry.hpp>
 
@@ -64,6 +66,49 @@ export namespace Core
             .redo = [reg, change]() { if (reg) (void)change.redo(*reg); },
             .undo = [reg, change]() { if (reg) (void)change.undo(*reg); },
         };
+    }
+
+    /// Create a single undoable command from multiple sub-commands.
+    /// Redo executes sub-commands in forward order; undo executes in reverse.
+    [[nodiscard]] inline EditorCommand MakeCompoundCommand(std::string name,
+                                                           std::vector<EditorCommand> subCommands)
+    {
+        auto shared = std::make_shared<std::vector<EditorCommand>>(std::move(subCommands));
+
+        return EditorCommand{
+            .name = std::move(name),
+            .redo = [shared]()
+            {
+                for (auto& cmd : *shared)
+                    if (cmd.redo) cmd.redo();
+            },
+            .undo = [shared]()
+            {
+                for (auto it = shared->rbegin(); it != shared->rend(); ++it)
+                    if (it->undo) it->undo();
+            },
+        };
+    }
+
+    /// Create a single undoable command that applies a component change to multiple entities.
+    template <typename T>
+        requires std::copy_constructible<T>
+    [[nodiscard]] EditorCommand MakeBatchComponentChangeCommand(
+        std::string name,
+        entt::registry* reg,
+        std::vector<std::pair<entt::entity, std::pair<T, T>>> entityChanges)
+    {
+        assert(reg && "MakeBatchComponentChangeCommand: registry pointer must not be null");
+
+        std::vector<EditorCommand> subCommands;
+        subCommands.reserve(entityChanges.size());
+        for (auto& [entity, states] : entityChanges)
+        {
+            subCommands.push_back(MakeComponentChangeCommand<T>(
+                name, reg, entity,
+                std::move(states.first), std::move(states.second)));
+        }
+        return MakeCompoundCommand(std::move(name), std::move(subCommands));
     }
 
     class CommandHistory

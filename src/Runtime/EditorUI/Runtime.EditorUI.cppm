@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
@@ -535,6 +536,8 @@ export namespace Runtime::EditorUI
         void Draw();
 
     private:
+        void DrawMultiSelection(entt::registry& reg,
+                                std::span<const entt::entity> entities);
         Runtime::Engine* m_Engine = nullptr;
         entt::entity* m_CachedSelected = nullptr;
         GeometryWorkflowController* m_GeometryWorkflow = nullptr;

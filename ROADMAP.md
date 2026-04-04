@@ -137,7 +137,7 @@ Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Fe
 - ~~**Undo/redo integration**~~ — `TODO.md` F3 **complete**. CommandHistory wired to gizmo, inspector, entity lifecycle, and geometry operators (simplify, remesh, smooth, subdivide, repair) with shared-ptr mesh snapshot undo.
 - ~~**Hierarchy refinements**~~ — `TODO.md` F4 **complete**. Drag-and-drop reparenting with undo, expand/collapse all, extended context menu, and multi-entity selection (Ctrl+click toggle, Shift+click range) are all implemented.
 - ~~**Viewport context menus**~~ — `TODO.md` F5 **core complete**. Entity context menu (Focus/Delete/Duplicate/Select Children/Visibility/Isolate), empty-space menu (Create Primitive/Reset Camera/Create Empty), and sub-element menu (Select Connected/Grow/Shrink Selection) are implemented with undo support. Paste and Edge Ring/Loop selection deferred.
-- **Editor polish** (multi-object editing, remaining tooltip coverage) — `TODO.md` F6. Console/Log panel is complete (ring-buffer log sink + ImGui panel with level filters, text search, auto-scroll). Keyboard Shortcuts reference panel and Help menu are complete.
+- **Editor polish** (remaining tooltip coverage) — `TODO.md` F6. Console/Log panel is complete (ring-buffer log sink + ImGui panel with level filters, text search, auto-scroll). Keyboard Shortcuts reference panel and Help menu are complete. Multi-object property editing is complete (Inspector shows shared/mixed properties for multi-selected entities with batch undo via `MakeCompoundCommand`).
 - **Render Target Viewer** panel enhancements — `TODO.md` F7.
 
 Each improvement is independent and can land incrementally.

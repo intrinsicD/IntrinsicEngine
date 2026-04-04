@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <entt/entity/registry.hpp>
 
@@ -204,4 +205,102 @@ TEST(CoreCommands, ComponentChangeCommandFailsForDestroyedEntity)
 
     EXPECT_FALSE(change.undo(registry));
     EXPECT_FALSE(change.redo(registry));
+}
+
+TEST(CoreCommands, CompoundCommandExecutesInOrder)
+{
+    Core::CommandHistory history;
+    std::vector<int> log;
+
+    std::vector<Core::EditorCommand> subs;
+    subs.push_back(Core::EditorCommand{
+        .name = "A",
+        .redo = [&log]() { log.push_back(1); },
+        .undo = [&log]() { log.push_back(-1); },
+    });
+    subs.push_back(Core::EditorCommand{
+        .name = "B",
+        .redo = [&log]() { log.push_back(2); },
+        .undo = [&log]() { log.push_back(-2); },
+    });
+    subs.push_back(Core::EditorCommand{
+        .name = "C",
+        .redo = [&log]() { log.push_back(3); },
+        .undo = [&log]() { log.push_back(-3); },
+    });
+
+    auto compound = Core::MakeCompoundCommand("ABC", std::move(subs));
+    EXPECT_TRUE(history.Execute(std::move(compound)));
+
+    // Redo executes forward: 1, 2, 3
+    ASSERT_EQ(log.size(), 3u);
+    EXPECT_EQ(log[0], 1);
+    EXPECT_EQ(log[1], 2);
+    EXPECT_EQ(log[2], 3);
+
+    log.clear();
+    EXPECT_TRUE(history.Undo());
+
+    // Undo executes reverse: -3, -2, -1
+    ASSERT_EQ(log.size(), 3u);
+    EXPECT_EQ(log[0], -3);
+    EXPECT_EQ(log[1], -2);
+    EXPECT_EQ(log[2], -1);
+
+    log.clear();
+    EXPECT_TRUE(history.Redo());
+
+    // Redo again: 1, 2, 3
+    ASSERT_EQ(log.size(), 3u);
+    EXPECT_EQ(log[0], 1);
+    EXPECT_EQ(log[1], 2);
+    EXPECT_EQ(log[2], 3);
+}
+
+TEST(CoreCommands, BatchComponentChangeRestoresAllEntities)
+{
+    entt::registry registry;
+    const auto e1 = registry.create();
+    const auto e2 = registry.create();
+    const auto e3 = registry.create();
+    registry.emplace<TestComponent>(e1, 10);
+    registry.emplace<TestComponent>(e2, 20);
+    registry.emplace<TestComponent>(e3, 30);
+
+    Core::CommandHistory history;
+
+    std::vector<std::pair<entt::entity, std::pair<TestComponent, TestComponent>>> changes;
+    changes.push_back({e1, {TestComponent{10}, TestComponent{100}}});
+    changes.push_back({e2, {TestComponent{20}, TestComponent{200}}});
+    changes.push_back({e3, {TestComponent{30}, TestComponent{300}}});
+
+    auto cmd = Core::MakeBatchComponentChangeCommand<TestComponent>(
+        "Batch change", &registry, std::move(changes));
+
+    EXPECT_TRUE(history.Execute(std::move(cmd)));
+    EXPECT_EQ(registry.get<TestComponent>(e1).value, 100);
+    EXPECT_EQ(registry.get<TestComponent>(e2).value, 200);
+    EXPECT_EQ(registry.get<TestComponent>(e3).value, 300);
+
+    EXPECT_TRUE(history.Undo());
+    EXPECT_EQ(registry.get<TestComponent>(e1).value, 10);
+    EXPECT_EQ(registry.get<TestComponent>(e2).value, 20);
+    EXPECT_EQ(registry.get<TestComponent>(e3).value, 30);
+
+    EXPECT_TRUE(history.Redo());
+    EXPECT_EQ(registry.get<TestComponent>(e1).value, 100);
+    EXPECT_EQ(registry.get<TestComponent>(e2).value, 200);
+    EXPECT_EQ(registry.get<TestComponent>(e3).value, 300);
+}
+
+TEST(CoreCommands, CompoundCommandEmpty)
+{
+    Core::CommandHistory history;
+    auto compound = Core::MakeCompoundCommand("Empty", {});
+
+    // An empty compound command should still be valid and executable.
+    EXPECT_TRUE(compound.IsValid());
+    EXPECT_TRUE(history.Execute(std::move(compound)));
+    EXPECT_TRUE(history.CanUndo());
+    EXPECT_TRUE(history.Undo());
 }
