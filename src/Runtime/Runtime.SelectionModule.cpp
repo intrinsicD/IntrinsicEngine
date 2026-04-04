@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <set>
+#include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
@@ -203,8 +204,18 @@ namespace Runtime
         const auto& reg = scene.GetRegistry();
         auto view = reg.view<ECS::Components::Selection::SelectedTag>();
         for (auto e : view)
-            return e; // NOTE: single-selection for now.
+            return e;
         return entt::null;
+    }
+
+    std::vector<entt::entity> SelectionModule::GetSelectedEntities(const ECS::Scene& scene) const
+    {
+        const auto& reg = scene.GetRegistry();
+        auto view = reg.view<ECS::Components::Selection::SelectedTag>();
+        std::vector<entt::entity> result;
+        for (auto e : view)
+            result.push_back(e);
+        return result;
     }
 
     void SelectionModule::SetSelectedEntity(ECS::Scene& scene, entt::entity e)
