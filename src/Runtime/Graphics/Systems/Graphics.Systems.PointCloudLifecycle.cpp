@@ -167,7 +167,7 @@ namespace Graphics::Systems::PointCloudLifecycle
                     pt.SizeMultiplier     = pcData.SizeMultiplier;
                     pt.Mode               = pcData.RenderMode;
                     pt.HasPerPointColors  = !pcData.CachedColors.empty();
-                    pt.HasPerPointRadii   = pcData.HasRadii();
+                    pt.HasPerPointRadii   = !pcData.CachedRadii.empty();
                     pt.HasPerPointNormals = pcData.HasRenderableNormals();
                     pt.SourceDomain       = ECS::Point::Domain::CloudPoint;
                 });

@@ -364,15 +364,23 @@ TEST(Phase6_CloudSync, PointCloudDataFields_MapToPoint)
     pcd.SizeMultiplier = 2.0f;
     pcd.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
 
+    // Simulate what PointCloudLifecycleSystem Phase 1 does: extract cached
+    // attribute vectors from the Cloud before Phase 3 populates render components.
+    {
+        const auto radiiSpan = cloud->Radii();
+        pcd.CachedRadii.assign(radiiSpan.begin(), radiiSpan.end());
+        pcd.CachedColors = {0xFFFFFFFFu}; // Placeholder — cloud has colors enabled.
+    }
+
     // Simulate what PointCloudLifecycleSystem Phase 3 does.
     Point::Component pt;
     pt.Color             = pcd.DefaultColor;
     pt.Size              = pcd.DefaultRadius;
     pt.SizeMultiplier    = pcd.SizeMultiplier;
     pt.Mode              = pcd.RenderMode;
-    pt.HasPerPointColors = pcd.HasColors();
-    pt.HasPerPointRadii  = pcd.HasRadii();
-    pt.HasPerPointNormals = pcd.HasNormals();
+    pt.HasPerPointColors = !pcd.CachedColors.empty();
+    pt.HasPerPointRadii  = !pcd.CachedRadii.empty();
+    pt.HasPerPointNormals = pcd.HasRenderableNormals();
 
     EXPECT_EQ(pt.Color, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
     EXPECT_FLOAT_EQ(pt.Size, 0.01f);
