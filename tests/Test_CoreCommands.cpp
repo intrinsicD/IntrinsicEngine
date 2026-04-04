@@ -132,5 +132,3 @@ TEST(CoreCommands, ComponentChangeCommandFailsForDestroyedEntity)
     EXPECT_FALSE(change.undo(registry));
     EXPECT_FALSE(change.redo(registry));
 }
-
-
