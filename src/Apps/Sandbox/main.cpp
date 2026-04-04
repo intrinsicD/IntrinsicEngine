@@ -293,6 +293,7 @@ private:
 
     // --- Editor / Selection ---
     entt::entity m_CachedSelectedEntity = entt::null;
+    entt::entity m_SelectionAnchor = entt::null;  // Anchor for Shift+click range selection in hierarchy.
     int m_SelectMouseButton = 0;
 
     // --- Hierarchy panel state ---
@@ -1100,6 +1101,94 @@ private:
         return false;
     }
 
+    // Collect entities in the same depth-first order they appear in the hierarchy panel.
+    // Used for Shift+click range selection.
+    void CollectVisibleHierarchyOrder(std::vector<entt::entity>& out)
+    {
+        auto& reg = GetSceneManager().GetScene().GetRegistry();
+        reg.view<entt::entity>().each([&](auto entityID)
+        {
+            if (reg.all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
+                return;
+            if (const auto* hierarchy = reg.try_get<ECS::Components::Hierarchy::Component>(entityID))
+            {
+                if (hierarchy->Parent != entt::null)
+                    return;
+            }
+            CollectEntitySubtree(reg, entityID, out);
+        });
+    }
+
+    static void CollectEntitySubtree(entt::registry& reg, entt::entity entityID,
+                                     std::vector<entt::entity>& out)
+    {
+        if (!reg.valid(entityID)) return;
+        if (reg.all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID)) return;
+
+        out.push_back(entityID);
+
+        if (const auto* hierarchy = reg.try_get<ECS::Components::Hierarchy::Component>(entityID))
+        {
+            entt::entity child = hierarchy->FirstChild;
+            uint32_t safety = 0;
+            while (child != entt::null && reg.valid(child) && safety < 1000)
+            {
+                CollectEntitySubtree(reg, child, out);
+                if (const auto* childH = reg.try_get<ECS::Components::Hierarchy::Component>(child))
+                    child = childH->NextSibling;
+                else
+                    break;
+                ++safety;
+            }
+        }
+    }
+
+    // Select all entities in the hierarchy between anchor and clicked entity (inclusive).
+    void SelectRangeInHierarchy(entt::entity clickedEntity)
+    {
+        std::vector<entt::entity> order;
+        CollectVisibleHierarchyOrder(order);
+
+        // Find anchor and clicked indices.
+        std::size_t anchorIdx = order.size();
+        std::size_t clickIdx = order.size();
+        for (std::size_t i = 0; i < order.size(); ++i)
+        {
+            if (order[i] == m_SelectionAnchor) anchorIdx = i;
+            if (order[i] == clickedEntity)     clickIdx = i;
+        }
+
+        // Fallback to single Replace selection if anchor not found.
+        if (anchorIdx >= order.size() || clickIdx >= order.size())
+        {
+            GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), clickedEntity);
+            m_SelectionAnchor = clickedEntity;
+            return;
+        }
+
+        auto& scene = GetSceneManager().GetScene();
+        auto& reg = scene.GetRegistry();
+        const std::size_t lo = std::min(anchorIdx, clickIdx);
+        const std::size_t hi = std::max(anchorIdx, clickIdx);
+
+        // Clear existing selection.
+        auto selectedView = reg.view<ECS::Components::Selection::SelectedTag>();
+        for (auto e : selectedView)
+            reg.remove<ECS::Components::Selection::SelectedTag>(e);
+
+        // Add range in bulk without firing per-entity events.
+        for (std::size_t i = lo; i <= hi; ++i)
+        {
+            if (reg.valid(order[i])
+                && reg.all_of<ECS::Components::Selection::SelectableTag>(order[i])
+                && !reg.all_of<ECS::Components::Selection::SelectedTag>(order[i]))
+                reg.emplace<ECS::Components::Selection::SelectedTag>(order[i]);
+        }
+
+        // Fire a single SelectionChanged event with the clicked entity as primary.
+        scene.GetDispatcher().enqueue<ECS::Events::SelectionChanged>({clickedEntity});
+    }
+
     // Recursively draw one entity and its hierarchy children.
     void DrawEntityNode(entt::entity entityID)
     {
@@ -1108,8 +1197,6 @@ private:
             return;
         if (reg.all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
             return;
-
-        const entt::entity selected = m_CachedSelectedEntity;
 
         // Entity display name
         std::string name = "Entity";
@@ -1125,7 +1212,7 @@ private:
             hasChildren = (hierarchy->FirstChild != entt::null);
 
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-        if (selected == entityID)
+        if (reg.all_of<ECS::Components::Selection::SelectedTag>(entityID))
             flags |= ImGuiTreeNodeFlags_Selected;
         if (!hasChildren)
             flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
@@ -1138,10 +1225,33 @@ private:
             reinterpret_cast<void*>(static_cast<entt::id_type>(entityID)),
             flags, "%s", displayName.c_str());
 
-        // --- Click to select ---
+        // --- Click to select (supports Ctrl+click toggle, Shift+click range) ---
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         {
-            GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), entityID);
+            const bool ctrl  = ImGui::GetIO().KeyCtrl;
+            const bool shift = ImGui::GetIO().KeyShift;
+
+            // Multi-select only applies in Entity selection mode.
+            // In sub-element modes, hierarchy clicks always do single Replace.
+            const bool entityMode = GetSelection().GetConfig().ElementMode
+                                    == Runtime::Selection::ElementMode::Entity;
+
+            if (entityMode && shift && m_SelectionAnchor != entt::null)
+            {
+                SelectRangeInHierarchy(entityID);
+                // Do not update anchor on shift-click (standard behavior).
+            }
+            else if (entityMode && ctrl)
+            {
+                auto& scene = GetSceneManager().GetScene();
+                Runtime::Selection::ApplySelection(scene, entityID, Runtime::Selection::PickMode::Toggle);
+                m_SelectionAnchor = entityID;
+            }
+            else
+            {
+                GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), entityID);
+                m_SelectionAnchor = entityID;
+            }
         }
 
         // --- Drag source for reparenting ---
@@ -1332,6 +1442,7 @@ private:
         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
         {
             GetSelection().ClearSelection(GetSceneManager().GetScene());
+            m_SelectionAnchor = entt::null;
         }
 
         // Right-click context menu on empty space

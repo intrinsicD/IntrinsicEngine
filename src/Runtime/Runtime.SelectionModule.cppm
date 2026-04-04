@@ -2,6 +2,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
@@ -74,6 +75,7 @@ export namespace Runtime
                     bool uiCapturesMouse);
 
         [[nodiscard]] entt::entity GetSelectedEntity(const ECS::Scene& scene) const;
+        [[nodiscard]] std::vector<entt::entity> GetSelectedEntities(const ECS::Scene& scene) const;
         [[nodiscard]] const Selection::Picked& GetPicked() const { return m_Picked; }
         void SetSelectedEntity(ECS::Scene& scene, entt::entity e);
         void ClearSelection(ECS::Scene& scene);
