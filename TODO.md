@@ -267,9 +267,7 @@ CommandHistory, Edit menu shortcuts, transform gizmo commands, inspector propert
 
 #### F4. Hierarchy Panel Improvements
 
-The hierarchy panel renders a flat entity list. The backend supports parent-child relationships via `Transform::Component` parent references.
-
-- [ ] Add multi-entity selection support in hierarchy (Ctrl+click, Shift+click range). Cross-cutting: propagates into Inspector (multi-object editing, F6), gizmo (already supports multi-select), and context menus. Track as a separate sub-task if scope grows.
+Multi-entity selection (Ctrl+click toggle, Shift+click range) is complete. The hierarchy panel supports parent-child tree rendering with drag-and-drop reparenting, expand/collapse all, and per-entity context menus. **Complete.**
 
 #### F5. Viewport Context Menus
 

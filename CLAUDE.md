@@ -196,6 +196,8 @@ Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `
 
 `Selection::ElementMode` (Entity/Vertex/Edge/Face) determines what a click selects. In Entity mode (default), whole entities receive `SelectedTag`. In sub-element modes, the clicked entity is implicitly selected and the picked sub-element index is added to `SubElementSelection`.
 
+- **Hierarchy multi-entity selection** (Entity mode only): Ctrl+click toggles individual entities (adds/removes from selection). Shift+click selects a contiguous range between the anchor entity (last plain/Ctrl-clicked) and the clicked entity in depth-first hierarchy order. Plain click replaces the selection with a single entity. `SelectionModule::GetSelectedEntities()` returns all entities with `SelectedTag`. The transform gizmo, selection outline, and picking systems all operate on `SelectedTag` and automatically support multi-entity selection. `m_CachedSelectedEntity` remains the "primary" (most recently interacted) entity for single-entity consumers (Inspector, camera focus). Range selection fires a single `SelectionChanged` event for efficiency.
+
 - **`SubElementSelection`**: Per-entity state with `std::set<uint32_t>` for `SelectedVertices`, `SelectedEdges`, and `SelectedFaces`. Owned by `SelectionModule`. Cleared when switching to a different entity or back to Entity mode.
 - **Shift-click**: Toggle mode — adds or removes individual sub-elements. Without shift, Replace mode clears all sub-element sets and selects only the clicked element.
 - **Visual highlights** via `DrawSubElementHighlights()` (called per frame from Sandbox `OnUpdate`):
