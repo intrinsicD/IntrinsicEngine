@@ -55,6 +55,7 @@ target_sources(${target_name}
         Geometry.CatmullClark.cppm
         Geometry.NormalEstimation.cppm
         Geometry.MeshRepair.cppm
+        Geometry.Grid.cppm
         Geometry.MarchingCubes.cppm
         Geometry.MeshBoundary.cppm
         Geometry.SurfaceReconstruction.cppm
