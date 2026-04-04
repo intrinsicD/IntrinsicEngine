@@ -279,7 +279,6 @@ Right-click context menus are implemented in the 3D viewport (entity, empty-spac
 Incremental improvements that modernize the editor feel. Each is independent.
 
 - [ ] **Status Bar — GPU Memory:** Add GPU memory usage display to the status bar (depends on E2).
-- [ ] **Help → Keyboard Shortcuts Panel:** Add a reference panel listing all keyboard shortcuts (supplement to the shortcut hints already shown in menus and toolbar).
 - [ ] **Multi-Object Property Editing:** When multiple entities are selected, Inspector shows shared properties with mixed-value indicators. Edits apply to all selected entities. Use `CommandHistory` for batch undo.
 - [ ] **Tooltip Coverage — Inspector Fields:** Extend tooltip coverage to all Inspector fields and remaining View Settings sliders.
 
