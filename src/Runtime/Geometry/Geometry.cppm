@@ -47,6 +47,7 @@ export import Geometry.Geodesic;
 export import Geometry.ShortestPath;
 export import Geometry.CatmullClark;
 export import Geometry.Grid;
+export import Geometry.ImplicitPlaneField;
 export import Geometry.MarchingCubes;
 export import Geometry.MeshRepair;
 export import Geometry.MeshBoundary;

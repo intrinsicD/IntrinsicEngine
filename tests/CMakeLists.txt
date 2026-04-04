@@ -134,6 +134,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_Grid.cpp
         Test_MarchingCubes.cpp
         Test_GJK.cpp
+        Test_ImplicitPlaneField.cpp
         Test_SDF.cpp
         Test_Containment.cpp
         Test_Support.cpp
