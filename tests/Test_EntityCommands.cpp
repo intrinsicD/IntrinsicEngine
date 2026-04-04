@@ -11,8 +11,8 @@ import ECS;
 
 namespace
 {
-    // Helper to compare entity handles without triggering entt_traits instantiation
-    // inside gtest's CmpHelper templates.
+    // gtest's EXPECT_EQ/NE macros trigger entt_traits<long long> instantiation
+    // when comparing entt::entity with entt::null.  This helper avoids that.
     [[nodiscard]] bool IsNull(entt::entity e) { return e == entt::null; }
 }
 

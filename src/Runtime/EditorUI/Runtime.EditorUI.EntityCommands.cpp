@@ -38,6 +38,29 @@ import Runtime.SelectionModule;
 
 namespace
 {
+    // Detach all direct children from the given entity, reparenting them
+    // to the scene root.  This prevents child entities from holding
+    // dangling Parent handles after the parent is destroyed.
+    void DetachAllChildren(entt::registry& reg, entt::entity parent)
+    {
+        auto* h = reg.try_get<ECS::Components::Hierarchy::Component>(parent);
+        if (!h) return;
+
+        entt::entity child = h->FirstChild;
+        uint32_t safety = 0;
+        while (child != entt::null && reg.valid(child) && safety < 10000)
+        {
+            // Cache next sibling before Detach modifies the linked list.
+            entt::entity next = entt::null;
+            if (auto* ch = reg.try_get<ECS::Components::Hierarchy::Component>(child))
+                next = ch->NextSibling;
+
+            ECS::Components::Hierarchy::Detach(reg, child);
+            child = next;
+            ++safety;
+        }
+    }
+
     struct EntitySnapshot
     {
         // --- Always present (from SceneBootstrap::EmplaceDefaults) ---
@@ -146,15 +169,21 @@ namespace
 
         // Restore data components with GPU state reset so lifecycle systems
         // pick them up for re-upload on the next frame.
+        //
+        // Mesh::Data only needs AttributesDirty because its GPU state lives
+        // on Surface::Component (not restored — see note below).
+        // PointCloud::Data and Graph::Data own their GPU handles directly,
+        // so those must be fully reset here for their lifecycle systems to
+        // re-upload correctly.
         if (snap.MeshData)
         {
             auto& md = reg.emplace_or_replace<ECS::Mesh::Data>(e, *snap.MeshData);
             md.AttributesDirty = true;
+            md.KMeansCentroidEntity = entt::null; // may be stale after destroy
         }
         if (snap.PointCloudData)
         {
             auto& pcd = reg.emplace_or_replace<ECS::PointCloud::Data>(e, *snap.PointCloudData);
-            // Reset GPU state — PointCloudLifecycleSystem re-uploads on GpuDirty
             pcd.GpuGeometry = {};
             pcd.GpuSlot = ECS::kInvalidGpuSlot;
             pcd.CachedColors.clear();
@@ -165,7 +194,6 @@ namespace
         if (snap.GraphData)
         {
             auto& gd = reg.emplace_or_replace<ECS::Graph::Data>(e, *snap.GraphData);
-            // Reset GPU state — GraphLifecycleSystem re-uploads on GpuDirty
             gd.GpuGeometry = {};
             gd.GpuEdgeGeometry = {};
             gd.GpuSlot = ECS::kInvalidGpuSlot;
@@ -176,6 +204,7 @@ namespace
             gd.GpuDirty = true;
             gd.GpuVertexCount = 0;
             gd.GpuEdgeCount = 0;
+            gd.KMeansCentroidEntity = entt::null; // may be stale after destroy
         }
 
         // Collider data is CPU-only — safe to restore directly.
@@ -212,12 +241,11 @@ namespace Runtime::EditorUI
                 auto& scene = engine.GetSceneManager().GetScene();
                 *handle = scene.CreateEntity(name);
 
-                // Make new entity selectable and give it a pick ID.
+                // Make selectable. PickID is auto-assigned by
+                // SelectionModule's ensurePickability loop on the
+                // next frame tick — no manual counter needed.
                 auto& reg = scene.GetRegistry();
                 reg.emplace_or_replace<ECS::Components::Selection::SelectableTag>(*handle);
-                static uint32_t s_NextPickId = 50000u;
-                reg.emplace_or_replace<ECS::Components::Selection::PickID>(*handle,
-                    ECS::Components::Selection::PickID{s_NextPickId++});
 
                 engine.GetSelection().SetSelectedEntity(scene, *handle);
             },
@@ -227,6 +255,7 @@ namespace Runtime::EditorUI
                 auto& reg = scene.GetRegistry();
                 if (*handle != entt::null && reg.valid(*handle))
                 {
+                    DetachAllChildren(reg, *handle);
                     if (reg.all_of<ECS::Components::Hierarchy::Component>(*handle))
                         ECS::Components::Hierarchy::Detach(reg, *handle);
                     reg.destroy(*handle);
@@ -261,6 +290,10 @@ namespace Runtime::EditorUI
                     // Re-capture in case state changed since command creation
                     // (only on subsequent redo after first undo).
                     *snapshot = CaptureEntity(r, *handle);
+
+                    // Detach children first so they don't hold dangling
+                    // Parent handles after this entity is destroyed.
+                    DetachAllChildren(r, *handle);
 
                     if (r.all_of<ECS::Components::Hierarchy::Component>(*handle))
                         ECS::Components::Hierarchy::Detach(r, *handle);
