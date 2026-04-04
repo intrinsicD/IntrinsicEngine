@@ -246,7 +246,7 @@ F1 (Operator Wiring) — no deps, parallel with everything
 F2 (Rendering Controls) — no deps
 F3 (Undo Integration) ──→ F5 (Context Menus, use undo for delete/duplicate)
 F4 (Hierarchy Tree) — no deps
-F5 (Context Menus) — depends on F3 for reversible actions
+F5 (Context Menus) — core complete; Paste deferred (needs clipboard system)
 F6 (Editor Polish) — no deps, incremental
 F7 (Render Target Viewer) — no hard deps; memory footprint sub-item soft-depends on E2
 ```
@@ -271,12 +271,10 @@ Multi-entity selection (Ctrl+click toggle, Shift+click range) is complete. The h
 
 #### F5. Viewport Context Menus
 
-No right-click context menu exists in the 3D viewport.
+Right-click context menus are implemented in the 3D viewport (entity, empty-space, sub-element) with drag-threshold detection, undo support, and primitive spawning. Remaining:
 
-- [ ] Right-click on entity: Focus Camera, Delete, Duplicate, Select Children, Toggle Visibility, Isolate (hide all others).
-- [ ] Right-click on empty space: Create Primitive (Cube/Sphere/Plane/Cylinder), Paste, Reset Camera.
-- [ ] Right-click on sub-element (vertex/edge/face mode): Select Connected, Grow Selection, Shrink Selection. Edge Ring/Loop selection deferred until halfedge traversal helpers for manifold strip walking are verified or added.
-- [ ] All destructive actions routed through `CommandHistory` (F3 dependency).
+- [ ] Paste (requires clipboard/copy-buffer system — deferred).
+- [ ] Edge Ring/Loop selection (deferred until halfedge traversal helpers for manifold strip walking are verified or added).
 
 #### F6. Editor Polish
 
