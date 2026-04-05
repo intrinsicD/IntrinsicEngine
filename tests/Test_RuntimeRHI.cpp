@@ -654,3 +654,83 @@ TEST(PresentPolicy, ToStringCoversAllPolicies)
     EXPECT_EQ(RHI::ToString(RHI::PresentPolicy::Uncapped), "Uncapped");
     EXPECT_EQ(RHI::ToString(RHI::PresentPolicy::EditorThrottled), "EditorThrottled");
 }
+
+// =============================================================================
+// VK_CHECK_* Error Semantics Policy (E3a)
+// =============================================================================
+
+namespace
+{
+    // Helper functions that exercise VK_CHECK_RETURN and VK_CHECK_BOOL with a
+    // known VkResult, allowing us to verify deterministic control flow without
+    // needing a live Vulkan device.
+
+    int ReturnHelperWithVkResult(VkResult injected)
+    {
+        VK_CHECK_RETURN(injected, -1);
+        return 42;
+    }
+
+    bool BoolHelperWithVkResult(VkResult injected)
+    {
+        VK_CHECK_BOOL(injected);
+        return true;
+    }
+
+    int WarnHelperWithVkResult(VkResult injected)
+    {
+        VK_CHECK_WARN(injected);
+        return 99;
+    }
+} // anonymous namespace
+
+TEST(VkCheckPolicy, CheckReturn_Success_ContinuesExecution)
+{
+    // VK_SUCCESS must not trigger an early return — function returns 42.
+    EXPECT_EQ(ReturnHelperWithVkResult(VK_SUCCESS), 42);
+}
+
+TEST(VkCheckPolicy, CheckReturn_Failure_ReturnsSentinel)
+{
+    // Any non-SUCCESS result must trigger early return with the sentinel value (-1).
+    EXPECT_EQ(ReturnHelperWithVkResult(VK_ERROR_DEVICE_LOST), -1);
+    EXPECT_EQ(ReturnHelperWithVkResult(VK_ERROR_OUT_OF_HOST_MEMORY), -1);
+    EXPECT_EQ(ReturnHelperWithVkResult(VK_ERROR_INITIALIZATION_FAILED), -1);
+}
+
+TEST(VkCheckPolicy, CheckBool_Success_ReturnsTrue)
+{
+    EXPECT_TRUE(BoolHelperWithVkResult(VK_SUCCESS));
+}
+
+TEST(VkCheckPolicy, CheckBool_Failure_ReturnsFalse)
+{
+    EXPECT_FALSE(BoolHelperWithVkResult(VK_ERROR_DEVICE_LOST));
+    EXPECT_FALSE(BoolHelperWithVkResult(VK_ERROR_OUT_OF_DEVICE_MEMORY));
+}
+
+TEST(VkCheckPolicy, CheckWarn_Success_ContinuesExecution)
+{
+    EXPECT_EQ(WarnHelperWithVkResult(VK_SUCCESS), 99);
+}
+
+TEST(VkCheckPolicy, CheckWarn_Failure_ContinuesExecution)
+{
+    // VK_CHECK_WARN must log but continue — function still returns 99.
+    EXPECT_EQ(WarnHelperWithVkResult(VK_ERROR_DEVICE_LOST), 99);
+    EXPECT_EQ(WarnHelperWithVkResult(VK_NOT_READY), 99);
+}
+
+TEST(VkCheckPolicy, CheckFatal_Success_DoesNotAbort)
+{
+    // VK_CHECK_FATAL with VK_SUCCESS must not abort.
+    VK_CHECK_FATAL(VK_SUCCESS);
+    SUCCEED();
+}
+
+TEST(VkCheckPolicyDeathTest, CheckFatal_Failure_Aborts)
+{
+    // VK_CHECK_FATAL with a non-SUCCESS result must abort the process.
+    // GTest death tests fork a subprocess, so this does not terminate the suite.
+    EXPECT_DEATH(VK_CHECK_FATAL(VK_ERROR_DEVICE_LOST), "");
+}

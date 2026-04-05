@@ -179,7 +179,7 @@ namespace RHI
     {
         if (!m_GraphicsTimelineSemaphore) return 0;
         uint64_t completed = 0;
-        VK_CHECK(vkGetSemaphoreCounterValue(m_Device, m_GraphicsTimelineSemaphore, &completed));
+        VK_CHECK_WARN(vkGetSemaphoreCounterValue(m_Device, m_GraphicsTimelineSemaphore, &completed));
         return completed;
     }
 

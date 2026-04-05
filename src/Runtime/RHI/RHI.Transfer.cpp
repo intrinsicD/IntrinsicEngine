@@ -36,7 +36,7 @@ namespace RHI
         semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         semInfo.pNext = &timelineInfo;
 
-        VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semInfo, nullptr, &m_TimelineSemaphore));
+        VK_CHECK_FATAL(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semInfo, nullptr, &m_TimelineSemaphore));
 
         // Default staging belt size: large enough for typical level-load bursts.
         // If this turns out too small, we can grow or add a slow-path.
@@ -80,13 +80,13 @@ namespace RHI
         allocInfo.commandPool = ctx.Pool;
 
         VkCommandBuffer cmd;
-        VK_CHECK(vkAllocateCommandBuffers(m_Device.GetLogicalDevice(), &allocInfo, &cmd));
+        VK_CHECK_FATAL(vkAllocateCommandBuffers(m_Device.GetLogicalDevice(), &allocInfo, &cmd));
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+        VK_CHECK_FATAL(vkBeginCommandBuffer(cmd, &beginInfo));
 
         return cmd;
     }
@@ -100,7 +100,7 @@ namespace RHI
                                           std::vector<std::unique_ptr<VulkanBuffer>>&& stagingBuffers)
     {
         // 1. End Recording
-        VK_CHECK(vkEndCommandBuffer(cmd));
+        VK_CHECK_FATAL(vkEndCommandBuffer(cmd));
 
         // 2. Prepare Synchronization
         uint64_t signalValue = m_NextTicket.fetch_add(1);
@@ -122,7 +122,7 @@ namespace RHI
             std::scoped_lock deviceLock(m_Device.GetQueueMutex());
             std::lock_guard internalLock(m_Mutex);
 
-            VK_CHECK(vkQueueSubmit(m_TransferQueue, 1, &submitInfo, VK_NULL_HANDLE));
+            VK_CHECK_FATAL(vkQueueSubmit(m_TransferQueue, 1, &submitInfo, VK_NULL_HANDLE));
             m_InFlightBatches.push_back({TransferToken{signalValue}, std::move(stagingBuffers)});
 
             if (m_StagingBelt)
@@ -143,7 +143,7 @@ namespace RHI
         if (!token.IsValid()) return true;
 
         uint64_t gpuValue = 0;
-        VK_CHECK(vkGetSemaphoreCounterValue(m_Device.GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
+        VK_CHECK_WARN(vkGetSemaphoreCounterValue(m_Device.GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
 
         return gpuValue >= token.Value;
     }
@@ -151,7 +151,7 @@ namespace RHI
     void TransferManager::GarbageCollect()
     {
         uint64_t gpuValue = 0;
-        VK_CHECK(vkGetSemaphoreCounterValue(m_Device.GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
+        VK_CHECK_WARN(vkGetSemaphoreCounterValue(m_Device.GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
 
         std::lock_guard lock(m_Mutex);
 
@@ -188,7 +188,7 @@ namespace RHI
                 ? queueIndices.TransferFamily.value()
                 : queueIndices.GraphicsFamily.value();
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-            VK_CHECK(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
+            VK_CHECK_FATAL(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
 
             m_Device.RegisterThreadLocalPool(ctx.Pool);
         }

@@ -445,3 +445,16 @@ When creating graphics pipelines with multiple descriptor set layouts:
   layout(set = 0, binding = 0) uniform CameraBuffer { ... } camera;
   layout(std430, set = 1, binding = 0) readonly buffer LineBuffer { ... } lines;
   ```
+
+## Vulkan Error Checking Macros
+
+`RHI.Vulkan.hpp` defines four callsite-aware error checking macros. Every Vulkan call that returns `VkResult` must use one of these — there is no generic `VK_CHECK`.
+
+| Macro | On Failure | Use For |
+|-------|-----------|---------|
+| `VK_CHECK_FATAL(x)` | Abort (debug + release) | Object creation, queue submit, command buffer begin/end/reset, fence reset/wait |
+| `VK_CHECK_RETURN(x, retval)` | Log + `return retval` | Operations with explicit recovery paths |
+| `VK_CHECK_BOOL(x)` | Log + `return false` | Sugar for `VK_CHECK_RETURN(x, false)` |
+| `VK_CHECK_WARN(x)` | Log at warn level, continue | Timeline semaphore queries where zero-init output is a safe conservative default |
+
+**Classification rule:** If a failed Vulkan call would leave the frame in an unrecoverable state (invalid command buffer, failed submission, missing sync primitive), use `VK_CHECK_FATAL`. If the caller has a defined recovery path, use `VK_CHECK_RETURN` or `VK_CHECK_BOOL`. If zero-initialized output is a safe fallback (e.g. "nothing completed yet"), use `VK_CHECK_WARN`.
