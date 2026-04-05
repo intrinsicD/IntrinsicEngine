@@ -28,6 +28,12 @@
             }                                                                        \
         } while(0)
 #else
-// In release, still check but don't print detailed info
-#define VK_CHECK(x) x
+// In release, still check but don't abort — log and continue.
+#define VK_CHECK(x)                                                                  \
+        do {                                                                         \
+            VkResult result_ = x;                                                    \
+            if (result_ != VK_SUCCESS) {                                             \
+                Core::Log::Error("Vulkan Error: {} (result {})", #x, (int)result_);  \
+            }                                                                        \
+        } while(0)
 #endif

@@ -20,7 +20,11 @@ namespace RHI
     TransferManager::TransferManager(VulkanDevice& device)
         : m_Device(device)
     {
-        uint32_t queueFamilyIndex = m_Device.GetQueueIndices().TransferFamily.value();
+        const auto& indices = m_Device.GetQueueIndices();
+        // Fallback to graphics queue family if dedicated transfer queue is unavailable.
+        uint32_t queueFamilyIndex = indices.TransferFamily.has_value()
+            ? indices.TransferFamily.value()
+            : indices.GraphicsFamily.value();
         vkGetDeviceQueue(m_Device.GetLogicalDevice(), queueFamilyIndex, 0, &m_TransferQueue);
 
         VkSemaphoreTypeCreateInfo timelineInfo{};
@@ -179,7 +183,10 @@ namespace RHI
         {
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-            poolInfo.queueFamilyIndex = m_Device.GetQueueIndices().TransferFamily.value();
+            const auto& queueIndices = m_Device.GetQueueIndices();
+            poolInfo.queueFamilyIndex = queueIndices.TransferFamily.has_value()
+                ? queueIndices.TransferFamily.value()
+                : queueIndices.GraphicsFamily.value();
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
             VK_CHECK(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
 

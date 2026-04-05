@@ -79,8 +79,8 @@ namespace RHI
         std::vector<VkImage> m_Images;
         std::vector<VkImageView> m_ImageViews;
 
-        VkFormat m_ImageFormat;
-        VkExtent2D m_Extent;
+        VkFormat m_ImageFormat = VK_FORMAT_UNDEFINED;
+        VkExtent2D m_Extent{0, 0};
 
         PresentPolicy m_PresentPolicy = PresentPolicy::VSync;
         VkPresentModeKHR m_ActivePresentMode = VK_PRESENT_MODE_FIFO_KHR;

@@ -205,14 +205,20 @@ namespace RHI
 
     VkMemoryRequirements VulkanImage::GetMemoryRequirements() const
     {
-        VkMemoryRequirements memReqs;
-        vkGetImageMemoryRequirements(m_Device.GetLogicalDevice(), m_Image, &memReqs);
+        VkMemoryRequirements memReqs{};
+        if (m_Image != VK_NULL_HANDLE)
+            vkGetImageMemoryRequirements(m_Device.GetLogicalDevice(), m_Image, &memReqs);
         return memReqs;
     }
 
     void VulkanImage::BindMemory(VkDeviceMemory memory, VkDeviceSize offset)
     {
-        vkBindImageMemory(m_Device.GetLogicalDevice(), m_Image, memory, offset);
+        if (vkBindImageMemory(m_Device.GetLogicalDevice(), m_Image, memory, offset) != VK_SUCCESS)
+        {
+            Core::Log::Error("VulkanImage::BindMemory: vkBindImageMemory failed");
+            m_IsValid = false;
+            return;
+        }
 
         // Create view AFTER memory is bound
         VkImageViewCreateInfo viewInfo{};

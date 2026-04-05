@@ -1,4 +1,5 @@
 module;
+#include <cassert>
 #include <chrono>
 #include <memory>
 #include <algorithm>
@@ -29,6 +30,7 @@ namespace RHI
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        assert(m_Device->GetQueueIndices().GraphicsFamily.has_value() && "GraphicsFamily required for renderer");
         poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value();
 
         VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));

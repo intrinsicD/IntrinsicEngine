@@ -1,12 +1,13 @@
 module;
-#include <vector>
-#include <string>
-#include <set>
-#include <mutex>
-#include <string_view>
-#include <memory>
 #include <algorithm>
 #include <array>
+#include <cassert>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "RHI.Vulkan.hpp"
 
@@ -117,7 +118,13 @@ namespace RHI
     VulkanDevice::~VulkanDevice()
     {
         // 1) Stop the GPU first.
-        if (m_Device) vkDeviceWaitIdle(m_Device);
+        if (m_Device)
+        {
+            const VkResult waitResult = vkDeviceWaitIdle(m_Device);
+            if (waitResult != VK_SUCCESS)
+                Core::Log::Error("VulkanDevice::~VulkanDevice: vkDeviceWaitIdle failed (VkResult={}).",
+                                 static_cast<int>(waitResult));
+        }
 
         // 2) Execute all deferred deletions while the device + VMA allocator are still valid.
         FlushAllDeletionQueues();
@@ -267,7 +274,8 @@ namespace RHI
         if (needsFlush)
         {
             Core::Log::Warn("VulkanDevice: Timeline deletion queue exceeded high-water mark, forcing GPU sync");
-            vkDeviceWaitIdle(m_Device);
+            if (vkDeviceWaitIdle(m_Device) != VK_SUCCESS)
+                Core::Log::Error("VulkanDevice::SafeDestroyAfter: vkDeviceWaitIdle failed during backpressure flush");
             CollectGarbage();
         }
     }
@@ -472,6 +480,7 @@ namespace RHI
                 m_CachedHeapFlags[i] = memProps.memoryHeaps[i].flags;
         }
 
+        assert(m_Indices.GraphicsFamily.has_value() && "GraphicsFamily must be set after device selection");
         vkGetDeviceQueue(m_Device, m_Indices.GraphicsFamily.value(), 0, &m_GraphicsQueue);
         if (m_Indices.PresentFamily.has_value())
         {
@@ -507,6 +516,7 @@ namespace RHI
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        assert(m_Indices.GraphicsFamily.has_value() && "GraphicsFamily must be set before creating command pool");
         poolInfo.queueFamilyIndex = m_Indices.GraphicsFamily.value();
 
         if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)

@@ -1167,7 +1167,13 @@ namespace Graphics
         m_Impl->m_LastBuiltGraphExtent = extent;
         RenderBlackboard blackboard;
         auto stableBlackboard = m_Impl->m_FrameScope->New<RenderBlackboard>(blackboard);
-        RenderBlackboard* activeBlackboard = stableBlackboard ? *stableBlackboard : &blackboard;
+        if (!stableBlackboard)
+        {
+            Core::Log::Error("RenderDriver::BuildGraph: ScopeStack allocation for RenderBlackboard failed — "
+                             "render-graph closures would hold dangling references. Skipping frame.");
+            return;
+        }
+        RenderBlackboard* activeBlackboard = *stableBlackboard;
 
         RenderPassContext ctx{
             m_Impl->m_RenderGraph,
@@ -1214,7 +1220,13 @@ namespace Graphics
         ctx.EditorOverlay = input.EditorOverlay;
 
         auto stable = m_Impl->m_FrameScope->New<RenderPassContext>(ctx);
-        RenderPassContext* stableCtx = stable ? *stable : &ctx;
+        if (!stable)
+        {
+            Core::Log::Error("RenderDriver::BuildGraph: ScopeStack allocation for RenderPassContext failed — "
+                             "render-graph closures would hold dangling references. Skipping frame.");
+            return;
+        }
+        RenderPassContext* stableCtx = *stable;
 
         if (m_Impl->m_ActivePipeline)
             stableCtx->Recipe = m_Impl->m_ActivePipeline->BuildFrameRecipe(*stableCtx);

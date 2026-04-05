@@ -1,6 +1,7 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include "RHI.DestructionUtils.hpp"
+#include <cassert>
 #include <vector>
 #include <algorithm>
 #include <limits>
@@ -124,6 +125,8 @@ namespace RHI {
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
         QueueFamilyIndices indices = m_Device->GetQueueIndices();
+        assert(indices.GraphicsFamily.has_value() && "GraphicsFamily must be set for swapchain creation");
+        assert(indices.PresentFamily.has_value() && "PresentFamily must be set for swapchain creation");
         uint32_t queueFamilyIndices[] = {indices.GraphicsFamily.value(), indices.PresentFamily.value()};
 
         if (indices.GraphicsFamily != indices.PresentFamily) {

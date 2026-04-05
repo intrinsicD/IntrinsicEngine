@@ -156,7 +156,7 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
     ImGui::Checkbox("KD Draw Internal", &KDTreeSettings.DrawInternal);
     ImGui::Checkbox("KD Occupied Only", &KDTreeSettings.OccupiedOnly);
     ImGui::Checkbox("KD Draw Split Planes", &KDTreeSettings.DrawSplitPlanes);
-    ImGui::SliderInt("KD Max Depth", reinterpret_cast<int*>(&KDTreeSettings.MaxDepth), 0, 32);
+    { int tmp = static_cast<int>(KDTreeSettings.MaxDepth); ImGui::SliderInt("KD Max Depth", &tmp, 0, 32); KDTreeSettings.MaxDepth = static_cast<uint32_t>(tmp); }
     ImGui::SliderFloat("KD Alpha", &KDTreeSettings.Alpha, 0.05f, 1.0f, "%.2f");
 
     ColorEdit3("KD Leaf Color", KDTreeSettings.LeafColor);
@@ -172,8 +172,8 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
     ImGui::Checkbox("BVH Overlay (no depth test)", &BVHSettings.Overlay);
     ImGui::Checkbox("BVH Leaf Only", &BVHSettings.LeafOnly);
     ImGui::Checkbox("BVH Draw Internal", &BVHSettings.DrawInternal);
-    ImGui::SliderInt("BVH Max Depth", reinterpret_cast<int*>(&BVHSettings.MaxDepth), 0, 32);
-    ImGui::SliderInt("BVH Leaf Triangles", reinterpret_cast<int*>(&BVHSettings.LeafTriangleCount), 1, 64);
+    { int tmp = static_cast<int>(BVHSettings.MaxDepth); ImGui::SliderInt("BVH Max Depth", &tmp, 0, 32); BVHSettings.MaxDepth = static_cast<uint32_t>(tmp); }
+    { int tmp = static_cast<int>(BVHSettings.LeafTriangleCount); ImGui::SliderInt("BVH Leaf Triangles", &tmp, 1, 64); BVHSettings.LeafTriangleCount = static_cast<uint32_t>(tmp); }
     ImGui::SliderFloat("BVH Alpha", &BVHSettings.Alpha, 0.05f, 1.0f, "%.2f");
 
     ColorEdit3("BVH Leaf Color", BVHSettings.LeafColor);
