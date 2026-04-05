@@ -31,6 +31,7 @@ target_sources(${target_name}
         Core.Commands.cppm
         Core.IOBackend.cppm
         Core.Benchmark.cppm
+        Core.Process.cppm
         Core.SystemFeatureCatalog.cppm
         PRIVATE
         Core.Memory.cpp
@@ -46,6 +47,7 @@ target_sources(${target_name}
         Core.FeatureRegistry.cpp
         Core.IOBackend.cpp
         Core.Benchmark.cpp
+        Core.Process.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

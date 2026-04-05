@@ -91,14 +91,26 @@ The engine uses **activity-aware idle throttling** to conserve CPU/GPU resources
 - **`FrameClock::Resample()`** re-anchors the clock after deliberate sleeps so the next `Advance()` does not count sleep duration as part of the following frame's time.
 - **Known limitation:** only GLFW input events currently signal activity. Scene mutations from async operations (file loads, GPU readbacks) do not yet wake the engine from idle. This is acceptable for interactive editor use and can be extended if needed.
 
+## Structured Process Execution
+
+`Core::Process::Run()` provides safe, structured process spawning via `posix_spawnp`. **Never use `std::system()` anywhere in the codebase** — it passes strings through the shell, enabling command injection.
+
+- **API:** `ProcessConfig` (executable, args vector, optional working directory, timeout, capture flag) → `ProcessResult` (exit code, stdout, stderr, timed-out flag, spawn-failed flag).
+- **Safety:** Arguments are passed as argv (no shell interpolation). Paths with spaces, quotes, dollar signs, and other special characters are handled correctly.
+- **Timeout:** Configurable per-invocation. On timeout, the child receives SIGTERM, then SIGKILL after 100ms. Default for shader compilation: 30 seconds.
+- **Output capture:** stdout and stderr are captured into separate strings via pipe + `poll()`. Non-blocking reads prevent deadlock on large output.
+- **Convenience:** `IsExecutableAvailable(name)` checks PATH availability by spawning `name --version`.
+
 ## Shader Hot-Reload
 
 `Graphics::ShaderHotReloadService` enables live shader iteration without engine restart. Gated by the `ShaderHotReload` feature toggle (default disabled).
 
-- **Flow:** `FileWatcher` detects GLSL source change → `glslc` recompiles to SPIR-V on the watcher thread → atomic flag set → `BookkeepHotReloads()` on the main thread debounces (200ms), drains GPU (`vkDeviceWaitIdle`), rebuilds all graphics pipelines via `PipelineLibrary::RebuildGraphicsPipelines()`.
-- **Graceful failure:** If `glslc` compilation fails, the previous pipeline stays active and an error is logged. If `glslc` is not on PATH, a warning is logged at startup and no watchers are registered.
+- **Flow:** `FileWatcher` detects GLSL source change → `Core::Process::Run("glslc", ...)` recompiles to SPIR-V on the watcher thread → atomic flag set → `BookkeepHotReloads()` on the main thread debounces (200ms), drains GPU (`vkDeviceWaitIdle`), rebuilds all graphics pipelines via `PipelineLibrary::RebuildGraphicsPipelines()`.
+- **Graceful failure:** If `glslc` compilation fails, the previous pipeline stays active and compiler diagnostics (stdout/stderr) are surfaced via `Core::Log`. If `glslc` is not on PATH, a warning is logged at startup and no watchers are registered. If `glslc` times out (30s), the compilation is killed and logged.
+- **Include-file dependency tracking:** On startup, registered GLSL source files are scanned for `#include` directives. A reverse dependency map (include file → dependent shaders) is built, and include files are watched. When an include file changes, all dependent shaders are recompiled.
+- **Burst coalescing:** A 200ms debounce window coalesces rapid sequential compilations. A 500ms max rebuild frequency cap prevents excessive GPU drains under rapid file-save bursts.
 - **Scope:** Graphics pipelines only. Compute pipelines are not hot-reloaded.
-- **Thread model:** Compilation runs on the FileWatcher thread (safe — `glslc` is a child process). Pipeline rebuild runs on the main thread maintenance lane only.
+- **Thread model:** Compilation runs on the FileWatcher thread (safe — `posix_spawnp` child process, no shared state). Pipeline rebuild runs on the main thread maintenance lane only.
 - **Source tracking:** `ShaderRegistry::RegisterWithSource()` stores the GLSL source path alongside each SPV path. `ForEachWithSource()` iterates entries that have source paths for watcher registration.
 
 ## Lambda Captures and InplaceFunction
