@@ -8,7 +8,6 @@ module;
 #include <numbers>
 #include <span>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -907,10 +906,22 @@ namespace Geometry::MeshUtils
     //                via the opposite edge (Next^(valence/2) for even-valence
     //                faces), then crosses to the adjacent face.
     //
-    // Both walks support triangles and quads. For triangles the edge loop
-    // produces a zig-zag pattern (no unique straight continuation exists)
-    // while the edge ring still crosses via Next(Next(h)) to the "prev" edge.
-    // N-gon faces (valence > 4) terminate the walk.
+    // Both walks support triangles and quads in Permissive mode. For triangles
+    // the edge loop produces a zig-zag pattern (no unique straight continuation
+    // exists) while the edge ring crosses via Next^1(h) (valence/2 = 1 for
+    // triangles), also producing a zig-zag. N-gon faces (valence > 4) terminate
+    // the walk.
+    //
+    // Odd-valence tie-breaking (Permissive mode):
+    //   When a vertex has odd valence, floor(valence/2) and ceil(valence/2) CW
+    //   rotations yield two candidate continuation edges. The algorithm picks
+    //   the candidate whose outgoing direction best continues the incoming
+    //   direction (largest dot product with negated incoming direction, i.e.
+    //   straightest path). This is deterministic and geometry-aware.
+    //
+    // StrictQuad mode:
+    //   Edge loops stop at vertices with valence != 4.
+    //   Edge rings stop at faces with valence != 4.
 
     // Helper: advance a halfedge by `steps` Next calls.
     static HalfedgeHandle AdvanceNext(const Halfedge::Mesh& mesh,
@@ -919,6 +930,63 @@ namespace Geometry::MeshUtils
         for (std::size_t i = 0; i < steps && h.IsValid(); ++i)
             h = mesh.NextHalfedge(h);
         return h;
+    }
+
+    // Helper: CW-rotate an outgoing halfedge by `rotations` positions.
+    static HalfedgeHandle RotateCW(const Halfedge::Mesh& mesh,
+                                   HalfedgeHandle outH, std::size_t rotations)
+    {
+        auto h = outH;
+        for (std::size_t r = 0; r < rotations && h.IsValid(); ++r)
+            h = mesh.CWRotatedHalfedge(h);
+        return h;
+    }
+
+    // Pick the straightest continuation halfedge at a vertex with odd valence.
+    // `outH` is the outgoing halfedge opposite to the incoming one.
+    // `incomingDir` is the normalized direction of the incoming edge (towards
+    // the current vertex). The "straight" continuation is the one whose outgoing
+    // direction has the largest dot product with -incomingDir (most collinear).
+    static HalfedgeHandle PickStraightestContinuation(
+        const Halfedge::Mesh& mesh,
+        HalfedgeHandle outH,
+        const glm::vec3& incomingDir,
+        std::size_t valence)
+    {
+        const std::size_t rotLow  = valence / 2;       // floor
+        const std::size_t rotHigh = rotLow + 1;        // ceil
+
+        auto candidateLow  = RotateCW(mesh, outH, rotLow);
+        auto candidateHigh = RotateCW(mesh, outH, rotHigh);
+
+        if (!candidateLow.IsValid())  return candidateHigh;
+        if (!candidateHigh.IsValid()) return candidateLow;
+
+        // Both candidates are outgoing halfedges from curVertex (= FromVertex(outH)).
+        auto vtxLow  = mesh.ToVertex(candidateLow);
+        auto vtxHigh = mesh.ToVertex(candidateHigh);
+
+        if (!vtxLow.IsValid())  return candidateHigh;
+        if (!vtxHigh.IsValid()) return candidateLow;
+
+        const glm::vec3 curPos  = mesh.Position(mesh.FromVertex(outH));
+        const glm::vec3 dirLow  = mesh.Position(vtxLow)  - curPos;
+        const glm::vec3 dirHigh = mesh.Position(vtxHigh) - curPos;
+
+        // Guard against degenerate (zero-length) outgoing edges
+        const float lenSqLow  = glm::dot(dirLow, dirLow);
+        const float lenSqHigh = glm::dot(dirHigh, dirHigh);
+        if (lenSqLow < 1e-24f && lenSqHigh < 1e-24f) return candidateLow;
+        if (lenSqLow < 1e-24f)  return candidateHigh;
+        if (lenSqHigh < 1e-24f) return candidateLow;
+
+        // Straightest = most aligned with -incomingDir (the "through" direction)
+        const glm::vec3 throughDir = -incomingDir;
+        const float dotLow  = glm::dot(dirLow / std::sqrt(lenSqLow),   throughDir);
+        const float dotHigh = glm::dot(dirHigh / std::sqrt(lenSqHigh), throughDir);
+
+        // Tie-break: prefer the lower rotation count for absolute determinism
+        return (dotHigh > dotLow) ? candidateHigh : candidateLow;
     }
 
     // --- Edge Loop: vertex-walking algorithm ---
@@ -930,8 +998,9 @@ namespace Geometry::MeshUtils
         const Halfedge::Mesh& mesh,
         VertexHandle v,
         HalfedgeHandle incomingH,
-        std::unordered_set<uint32_t>& visited,
-        uint32_t safetyLimit)
+        std::vector<bool>& visited,
+        uint32_t safetyLimit,
+        EdgeTraversalStrategy strategy)
     {
         std::vector<uint32_t> result;
         auto curVertex = v;
@@ -943,24 +1012,45 @@ namespace Geometry::MeshUtils
             if (!curVertex.IsValid() || mesh.IsDeleted(curVertex))
                 break;
 
-            // Count vertex valence (number of outgoing halfedges)
             const auto valence = mesh.Valence(curVertex);
             if (valence < 2)
                 break;
 
-            // The continuation edge is the one "opposite" in the vertex fan.
-            // CW-rotate the incoming halfedge by valence/2 positions to get
-            // the outgoing halfedge in the straight direction.
+            // StrictQuad mode: only continue through regular quad vertices
+            if (strategy == EdgeTraversalStrategy::StrictQuad && valence != 4)
+                break;
+
             // incomingH points TO curVertex; OppositeHalfedge gives outgoing.
             auto outH = mesh.OppositeHalfedge(curIncoming);
             if (!outH.IsValid())
                 break;
 
-            // Rotate CW by valence/2 positions in the vertex fan
-            const auto rotations = valence / 2;
-            auto continuationH = outH;
-            for (std::size_t r = 0; r < rotations && continuationH.IsValid(); ++r)
-                continuationH = mesh.CWRotatedHalfedge(continuationH);
+            HalfedgeHandle continuationH;
+
+            if (valence % 2 == 0)
+            {
+                // Even valence: unambiguous continuation at valence/2 CW rotations
+                continuationH = RotateCW(mesh, outH, valence / 2);
+            }
+            else
+            {
+                // Odd valence: geometric tie-break between floor and ceil candidates
+                const glm::vec3 fromPos = mesh.Position(mesh.FromVertex(curIncoming));
+                const glm::vec3 toPos   = mesh.Position(curVertex);
+                glm::vec3 inDir = toPos - fromPos;
+                const float len = glm::length(inDir);
+                if (len < 1e-12f)
+                {
+                    // Degenerate edge — fall back to floor rotation
+                    continuationH = RotateCW(mesh, outH, valence / 2);
+                }
+                else
+                {
+                    inDir /= len;
+                    continuationH = PickStraightestContinuation(
+                        mesh, outH, inDir, valence);
+                }
+            }
 
             if (!continuationH.IsValid())
                 break;
@@ -969,10 +1059,10 @@ namespace Geometry::MeshUtils
             if (!edgeH.IsValid())
                 break;
 
-            if (visited.contains(edgeH.Index))
+            if (visited[edgeH.Index])
                 break;
 
-            visited.insert(edgeH.Index);
+            visited[edgeH.Index] = true;
             result.push_back(edgeH.Index);
 
             // Advance to the next vertex: ToVertex of continuationH
@@ -985,7 +1075,8 @@ namespace Geometry::MeshUtils
     }
 
     std::vector<uint32_t> CollectEdgeLoop(
-        const Halfedge::Mesh& mesh, EdgeHandle startEdge)
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge,
+        EdgeTraversalStrategy strategy)
     {
         if (!mesh.IsValid(startEdge) || mesh.IsDeleted(startEdge))
             return {};
@@ -999,17 +1090,17 @@ namespace Geometry::MeshUtils
 
         auto h1 = mesh.OppositeHalfedge(h0);
 
-        // Shared visited set prevents duplicates on closed loops
-        std::unordered_set<uint32_t> visited;
-        visited.insert(startIdx);
+        // Bitset visited set: O(1) lookup, dense edge indices, cache-friendly
+        std::vector<bool> visited(mesh.EdgesSize(), false);
+        visited[startIdx] = true;
 
         // Walk forward: from ToVertex(h0), incoming = h0
         auto v0 = mesh.ToVertex(h0);
-        auto forward = WalkEdgeLoopThroughVertex(mesh, v0, h0, visited, safetyLimit);
+        auto forward = WalkEdgeLoopThroughVertex(mesh, v0, h0, visited, safetyLimit, strategy);
 
         // Walk backward: from ToVertex(h1) = FromVertex(h0), incoming = h1
         auto v1 = mesh.ToVertex(h1);
-        auto backward = WalkEdgeLoopThroughVertex(mesh, v1, h1, visited, safetyLimit);
+        auto backward = WalkEdgeLoopThroughVertex(mesh, v1, h1, visited, safetyLimit, strategy);
 
         // Assemble: backward (reversed) + start + forward
         std::vector<uint32_t> loop;
@@ -1031,8 +1122,9 @@ namespace Geometry::MeshUtils
     static std::vector<uint32_t> WalkEdgeRingDirection(
         const Halfedge::Mesh& mesh,
         HalfedgeHandle startH,
-        std::unordered_set<uint32_t>& visited,
-        uint32_t safetyLimit)
+        std::vector<bool>& visited,
+        uint32_t safetyLimit,
+        EdgeTraversalStrategy strategy)
     {
         std::vector<uint32_t> result;
         auto h = startH;
@@ -1048,6 +1140,10 @@ namespace Geometry::MeshUtils
             if (valence < 3 || valence > 4)
                 break; // unsupported polygon
 
+            // StrictQuad mode: only traverse quad faces
+            if (strategy == EdgeTraversalStrategy::StrictQuad && valence != 4)
+                break;
+
             // Opposite halfedge in face: Next^(valence/2)
             auto opposite = AdvanceNext(mesh, h, valence / 2);
             if (!opposite.IsValid())
@@ -1057,10 +1153,10 @@ namespace Geometry::MeshUtils
             if (!edgeH.IsValid())
                 break;
 
-            if (visited.contains(edgeH.Index))
+            if (visited[edgeH.Index])
                 break;
 
-            visited.insert(edgeH.Index);
+            visited[edgeH.Index] = true;
             result.push_back(edgeH.Index);
 
             // Cross to adjacent face
@@ -1073,7 +1169,8 @@ namespace Geometry::MeshUtils
     }
 
     std::vector<uint32_t> CollectEdgeRing(
-        const Halfedge::Mesh& mesh, EdgeHandle startEdge)
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge,
+        EdgeTraversalStrategy strategy)
     {
         if (!mesh.IsValid(startEdge) || mesh.IsDeleted(startEdge))
             return {};
@@ -1087,15 +1184,15 @@ namespace Geometry::MeshUtils
 
         auto h1 = mesh.OppositeHalfedge(h0);
 
-        // Shared visited set prevents duplicates on closed manifolds
-        std::unordered_set<uint32_t> visited;
-        visited.insert(startIdx);
+        // Bitset visited set: O(1) lookup, dense edge indices, cache-friendly
+        std::vector<bool> visited(mesh.EdgesSize(), false);
+        visited[startIdx] = true;
 
         // Walk forward (from h0's face side)
-        auto forward = WalkEdgeRingDirection(mesh, h0, visited, safetyLimit);
+        auto forward = WalkEdgeRingDirection(mesh, h0, visited, safetyLimit, strategy);
 
         // Walk backward (from h1's face side)
-        auto backward = WalkEdgeRingDirection(mesh, h1, visited, safetyLimit);
+        auto backward = WalkEdgeRingDirection(mesh, h1, visited, safetyLimit, strategy);
 
         // Assemble: backward (reversed) + start + forward
         std::vector<uint32_t> ring;

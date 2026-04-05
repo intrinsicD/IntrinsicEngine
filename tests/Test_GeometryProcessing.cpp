@@ -933,3 +933,309 @@ TEST(EdgeRing, ClosedMeshNoDuplicatesOrOverflow)
         EXPECT_TRUE(HasNoDuplicates(ring));
     }
 }
+
+// =============================================================================
+// Edge Loop / Edge Ring — extended tests for E3e hardening
+// =============================================================================
+
+// Helper: build a mixed tri/quad fan around a central vertex.
+// Creates a central vertex (v0) surrounded by `numSectors` sectors.
+// Even-indexed sectors are quads, odd-indexed are triangles, producing
+// an extraordinary vertex with mixed face types.
+static Geometry::Halfedge::Mesh MakeMixedFanAroundVertex(int numSectors)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto center = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const float pi2 = 2.0f * 3.14159265f;
+    // Create ring vertices
+    std::vector<Geometry::VertexHandle> ring;
+    for (int i = 0; i < numSectors; ++i)
+    {
+        float angle = pi2 * static_cast<float>(i) / static_cast<float>(numSectors);
+        ring.push_back(mesh.AddVertex({std::cos(angle), std::sin(angle), 0.0f}));
+    }
+    // Create faces: even sectors = quads (need an extra midpoint vertex), odd = tris
+    for (int i = 0; i < numSectors; ++i)
+    {
+        int next = (i + 1) % numSectors;
+        if (i % 2 == 0)
+        {
+            // Quad: center, ring[i], midpoint, ring[next] — but midpoint must exist
+            float midAngle = pi2 * (static_cast<float>(i) + 0.5f) / static_cast<float>(numSectors);
+            auto mid = mesh.AddVertex({1.5f * std::cos(midAngle), 1.5f * std::sin(midAngle), 0.0f});
+            (void)mesh.AddQuad(center, ring[i], mid, ring[next]);
+        }
+        else
+        {
+            (void)mesh.AddTriangle(center, ring[i], ring[next]);
+        }
+    }
+    return mesh;
+}
+
+// --- EdgeTraversalStrategy tests ---
+
+TEST(EdgeLoop, StrictQuadStopsAtNonQuadVertex)
+{
+    // On a triangle mesh (icosahedron), all vertices have valence 5.
+    // StrictQuad mode should only return the start edge.
+    auto mesh = MakeIcosahedron();
+    auto eh = Geometry::EdgeHandle{0};
+    auto loop = Geometry::MeshUtils::CollectEdgeLoop(
+        mesh, eh, Geometry::MeshUtils::EdgeTraversalStrategy::StrictQuad);
+    EXPECT_EQ(loop.size(), 1u) << "StrictQuad should stop at non-valence-4 vertices";
+    EXPECT_EQ(loop[0], 0u);
+}
+
+TEST(EdgeLoop, StrictQuadTraversesQuadStripInterior)
+{
+    // On a quad strip, boundary vertices have valence 2-3 (not 4).
+    // StrictQuad stops at non-valence-4 vertices, so it produces shorter
+    // loops than Permissive on boundary meshes. For an interior vertical
+    // edge (v2-v8 in a 5-col strip), the endpoints are boundary vertices
+    // (valence 3), so StrictQuad returns only the start edge.
+    // This test verifies StrictQuad correctly restricts to valence-4 only.
+    auto mesh = MakeQuadStrip(5);
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{2}, Geometry::VertexHandle{8});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto loopStrict = Geometry::MeshUtils::CollectEdgeLoop(
+        mesh, Geometry::EdgeHandle{edgeIdx},
+        Geometry::MeshUtils::EdgeTraversalStrategy::StrictQuad);
+
+    // Boundary vertices have valence 3, not 4, so StrictQuad stops immediately
+    EXPECT_EQ(loopStrict.size(), 1u)
+        << "StrictQuad should stop at valence-3 boundary vertices";
+
+    auto loopPermissive = Geometry::MeshUtils::CollectEdgeLoop(
+        mesh, Geometry::EdgeHandle{edgeIdx},
+        Geometry::MeshUtils::EdgeTraversalStrategy::Permissive);
+    EXPECT_GT(loopPermissive.size(), loopStrict.size())
+        << "Permissive should traverse further than StrictQuad on boundary mesh";
+}
+
+TEST(EdgeRing, StrictQuadStopsAtTriangleFace)
+{
+    // On a pure triangle mesh, StrictQuad ring should only return start edge.
+    auto mesh = MakeIcosahedron();
+    auto eh = Geometry::EdgeHandle{0};
+    auto ring = Geometry::MeshUtils::CollectEdgeRing(
+        mesh, eh, Geometry::MeshUtils::EdgeTraversalStrategy::StrictQuad);
+    EXPECT_EQ(ring.size(), 1u) << "StrictQuad ring should stop at triangle faces";
+}
+
+TEST(EdgeRing, StrictQuadTraversesQuadStrip)
+{
+    auto mesh = MakeQuadStrip(4);
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{2}, Geometry::VertexHandle{7});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto ringPermissive = Geometry::MeshUtils::CollectEdgeRing(
+        mesh, Geometry::EdgeHandle{edgeIdx},
+        Geometry::MeshUtils::EdgeTraversalStrategy::Permissive);
+    auto ringStrict = Geometry::MeshUtils::CollectEdgeRing(
+        mesh, Geometry::EdgeHandle{edgeIdx},
+        Geometry::MeshUtils::EdgeTraversalStrategy::StrictQuad);
+
+    EXPECT_EQ(ringPermissive, ringStrict);
+}
+
+// --- Odd-valence / extraordinary vertex tests ---
+
+TEST(EdgeLoop, OddValenceVertexProducesDeterministicResult)
+{
+    // Icosahedron vertices all have valence 5 (odd).
+    // Run CollectEdgeLoop 10 times from the same edge and verify identical results.
+    auto mesh = MakeIcosahedron();
+    auto eh = Geometry::EdgeHandle{5};
+
+    auto reference = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+    ASSERT_FALSE(reference.empty());
+
+    for (int trial = 0; trial < 10; ++trial)
+    {
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+        EXPECT_EQ(loop, reference) << "Trial " << trial << " diverged from reference";
+    }
+}
+
+TEST(EdgeLoop, MixedTriQuadFanNoDuplicatesOrOverflow)
+{
+    // Mixed fan: extraordinary vertex surrounded by alternating tri/quad faces.
+    auto mesh = MakeMixedFanAroundVertex(6);
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+        EXPECT_LE(loop.size(), mesh.EdgeCount());
+        EXPECT_TRUE(HasNoDuplicates(loop));
+    }
+}
+
+TEST(EdgeRing, MixedTriQuadFanNoDuplicatesOrOverflow)
+{
+    auto mesh = MakeMixedFanAroundVertex(6);
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, eh);
+        EXPECT_LE(ring.size(), mesh.EdgeCount());
+        EXPECT_TRUE(HasNoDuplicates(ring));
+    }
+}
+
+// --- Boundary-rich mesh tests ---
+
+TEST(EdgeLoop, BoundaryMeshStopsAtBoundary)
+{
+    // A single quad has all boundary edges and valence-2 vertices.
+    // Edge loop should be short (boundary vertices have valence 2).
+    auto mesh = MakeSingleQuad();
+    auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, Geometry::EdgeHandle{0});
+    ASSERT_GE(loop.size(), 1u);
+    ASSERT_LE(loop.size(), mesh.EdgeCount());
+    EXPECT_TRUE(HasNoDuplicates(loop));
+}
+
+TEST(EdgeRing, BoundaryMeshStopsAtBoundary)
+{
+    // Single quad: the ring enters the face, finds opposite edge, but other
+    // side is boundary → stops after at most 2 edges.
+    auto mesh = MakeSingleQuad();
+    auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, Geometry::EdgeHandle{0});
+    ASSERT_GE(ring.size(), 1u);
+    ASSERT_LE(ring.size(), 2u);
+    EXPECT_TRUE(HasNoDuplicates(ring));
+}
+
+TEST(EdgeLoop, TwoTriangleDiamondBoundary)
+{
+    // Diamond: 4 vertices, 2 faces. Boundary-heavy with one shared interior edge.
+    auto mesh = MakeTwoTriangleDiamond();
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+        EXPECT_GE(loop.size(), 1u);
+        EXPECT_LE(loop.size(), mesh.EdgeCount());
+        EXPECT_TRUE(HasNoDuplicates(loop));
+    }
+}
+
+// --- Valence-3 extraordinary vertex (subdivided triangle) ---
+
+TEST(EdgeLoop, SubdividedTriangleValence6Interior)
+{
+    // The subdivided triangle has an interior vertex (v3, the midpoint)
+    // with valence 6 (even). The loop should traverse cleanly through it.
+    auto mesh = MakeSubdividedTriangle();
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+        EXPECT_GE(loop.size(), 1u);
+        EXPECT_LE(loop.size(), mesh.EdgeCount());
+        EXPECT_TRUE(HasNoDuplicates(loop));
+    }
+}
+
+// --- Deterministic ordering guarantees ---
+
+TEST(EdgeLoop, OrderingIsConsistentAcrossRuns)
+{
+    // Build a non-trivial mesh and verify that edge loop ordering is identical
+    // across 20 invocations (catches any non-determinism from hash sets, etc.).
+    auto mesh = MakeQuadStrip(5);
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{1}, Geometry::VertexHandle{7});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto reference = Geometry::MeshUtils::CollectEdgeLoop(
+        mesh, Geometry::EdgeHandle{edgeIdx});
+    for (int trial = 0; trial < 20; ++trial)
+    {
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(
+            mesh, Geometry::EdgeHandle{edgeIdx});
+        EXPECT_EQ(loop, reference) << "Ordering diverged on trial " << trial;
+    }
+}
+
+TEST(EdgeRing, OrderingIsConsistentAcrossRuns)
+{
+    auto mesh = MakeQuadStrip(5);
+    uint32_t edgeIdx = FindEdgeBetween(mesh,
+        Geometry::VertexHandle{2}, Geometry::VertexHandle{8});
+    ASSERT_NE(edgeIdx, UINT32_MAX);
+
+    auto reference = Geometry::MeshUtils::CollectEdgeRing(
+        mesh, Geometry::EdgeHandle{edgeIdx});
+    for (int trial = 0; trial < 20; ++trial)
+    {
+        auto ring = Geometry::MeshUtils::CollectEdgeRing(
+            mesh, Geometry::EdgeHandle{edgeIdx});
+        EXPECT_EQ(ring, reference) << "Ordering diverged on trial " << trial;
+    }
+}
+
+// --- Start edge is always included in result ---
+
+TEST(EdgeLoop, AlwaysContainsStartEdge)
+{
+    auto mesh = MakeQuadStrip(3);
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+        ASSERT_FALSE(loop.empty());
+        bool found = false;
+        for (auto ei : loop)
+            if (ei == eh.Index) found = true;
+        EXPECT_TRUE(found) << "Start edge " << eh.Index << " missing from loop";
+    }
+}
+
+TEST(EdgeRing, AlwaysContainsStartEdge)
+{
+    auto mesh = MakeQuadStrip(3);
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto ring = Geometry::MeshUtils::CollectEdgeRing(mesh, eh);
+        ASSERT_FALSE(ring.empty());
+        bool found = false;
+        for (auto ei : ring)
+            if (ei == eh.Index) found = true;
+        EXPECT_TRUE(found) << "Start edge " << eh.Index << " missing from ring";
+    }
+}
+
+// --- Degenerate edge (zero-length / coincident vertices) ---
+
+TEST(EdgeLoop, DegenerateZeroLengthEdgeDoesNotCrash)
+{
+    // Build a triangle with two coincident vertices (zero-length edge).
+    // The loop should not crash or produce NaN; it should gracefully
+    // fall back to floor-rotation for the degenerate incoming direction.
+    Geometry::Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({0.0f, 0.0f, 0.0f}); // coincident with v0
+    auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(v0, v1, v2);
+
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        auto eh = Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(eh)) continue;
+        auto loop = Geometry::MeshUtils::CollectEdgeLoop(mesh, eh);
+        EXPECT_GE(loop.size(), 1u);
+        EXPECT_TRUE(HasNoDuplicates(loop));
+    }
+}
