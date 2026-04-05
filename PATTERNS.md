@@ -430,6 +430,7 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 | 13 | **BDA Shared-Buffer** | Surface/Line/Point passes, `ReuseVertexBuffersFrom()` | Shared vertex data with multiple topology views |
 | 14 | **Commit Hygiene for Render Contracts** | `Graphics.Pipelines.cpp`, `Test_RuntimeGraphics.cpp` | Separating cross-cutting renderer contract changes from feature work |
 | 15 | **Command Pattern (Undo/Redo)** | `Core.Commands.cppm`, `Test_CoreCommands.cpp` | Reversible editor operations |
+| 18 | **Selective PImpl** | `Runtime.RenderOrchestrator.cppm`, `Graphics.RenderDriver.cppm`, `Runtime.GraphicsBackend.cppm` | Module-boundary stability for orchestration classes |
 
 ---
 
@@ -578,6 +579,70 @@ reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
 ---
 
+## 18. Selective PImpl for Module-Boundary Stability
+
+**What:** Move heavyweight implementation state behind a stable, thin exported shell using the PImpl idiom (`struct Impl; std::unique_ptr<Impl> m_Impl;`) for orchestration/manager classes at composition-root/runtime seams. This reduces incremental rebuild scope when implementation details change — touching a `.cpp` file rebuilds only that TU instead of cascading through all importers.
+
+**When to apply:**
+- **Do use** for orchestration/manager classes with high implementation churn and wide dependency fan-out (many downstream importers): `RenderOrchestrator`, `RenderDriver`, `GraphicsBackend`, `AssetPipeline`, `PipelineLibrary`.
+- **Do NOT use** for tiny POD-like types, hot per-entity data (ECS components), immediate-mode containers (`DebugDraw`), or thin re-export modules with no concrete layout to hide.
+
+**Interface contract:**
+
+```cpp
+// In .cppm (module interface):
+export class MySubsystem {
+public:
+    explicit MySubsystem(/* borrowed deps */);
+    ~MySubsystem();
+    MySubsystem(const MySubsystem&) = delete;
+    MySubsystem& operator=(const MySubsystem&) = delete;
+
+    // Narrow accessor API — only what downstream importers need
+    SomeType& GetSomething();
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> m_Impl;
+};
+```
+
+```cpp
+// In .cpp (module implementation):
+struct MySubsystem::Impl {
+    // All heavyweight members live here
+    std::unique_ptr<SubA> SubSystemA;
+    std::unique_ptr<SubB> SubSystemB;
+    std::vector<CachedData> Cache;
+    // ...
+};
+
+MySubsystem::MySubsystem(/* deps */)
+    : m_Impl(std::make_unique<Impl>(/* ... */)) {}
+
+MySubsystem::~MySubsystem() = default;  // Must be in .cpp where Impl is complete
+```
+
+**Invariants:**
+- `m_Impl` is allocated exactly once at construction time via `std::make_unique<Impl>()`. No per-frame heap allocations through the Impl pointer.
+- Destructor must be defined in the `.cpp` file where `Impl` is a complete type (otherwise `unique_ptr<Impl>` cannot compile the deleter).
+- Keep constructors explicit about borrowed vs owned dependencies — PImpl hides layout, not ownership semantics.
+- Preserve no-exception / `std::expected` error propagation style.
+
+**Measured impact** (see `tools/build_time_baseline_2026-04-05.md`):
+- Touching `RenderOrchestrator.cpp`: **16s** (1 object + 2 links)
+- Touching `RenderOrchestrator.cppm`: **3m23s** (34 downstream rebuilds)
+- During normal development, most changes are `.cpp`-only, making 16s the typical incremental cost.
+
+**Canonical examples:**
+- `Runtime.RenderOrchestrator.cppm` / `.cpp` — Hides `PipelineLibrary`, `MaterialRegistry`, `GPUScene`, `RenderDriver` ownership.
+- `Runtime.GraphicsBackend.cppm` / `.cpp` — Hides Vulkan context, device, swapchain, descriptor system ownership.
+- `Graphics.RenderDriver.cppm` / `.cpp` — Hides `GlobalResources`, `PresentationSystem`, `InteractionSystem`, render graph internals.
+- `Runtime.AssetPipeline.cppm` / `.cpp` — Hides mutexes, pending-load queues, completion machinery.
+- `Graphics.PipelineLibrary.cppm` / `.cpp` — Hides pipeline map, descriptor-set layouts, compute pipeline storage.
+
+---
+
 ### Rejected Patterns (with rationale)
 
 #### ~~15. Enumerate/Zip Iteration Utilities~~ — DROPPED
@@ -619,6 +684,7 @@ The existing `Utils::LockFreeQueue<T>` (`Utils.LockFreeQueue.cppm`) is **already
 | 15 | Command Pattern (Undo/Redo) | Implemented | — | Reversible editor operations |
 | 16 | Geometry Operator UI Wiring | Implemented | — | Connecting geometry algorithms to editor UI |
 | 17 | Standalone Entity Creation | Implemented | — | Spawning mesh/graph/point cloud entities from results |
+| 18 | Selective PImpl | Implemented | — | Module-boundary stability for orchestration classes |
 | ~~15~~ | ~~Enumerate/Zip Utilities~~ | Dropped | — | C++23 `std::views::enumerate`/`zip` covers this natively |
 | ~~16~~ | ~~ComponentGui Dispatch~~ | Dropped | — | Only 6 component checks; not justified at current scale |
 | ~~17~~ | ~~Policy-Based Composition~~ | Dropped | — | `std::variant` dispatch (Pattern doc) already covers the need |
