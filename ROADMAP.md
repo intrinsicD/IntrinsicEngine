@@ -175,7 +175,7 @@ Currently only a single forward PBR pass (metallic-roughness) exists via `Surfac
 
 ### Shadow Mapping
 
-CSM foundation is tracked in `TODO.md` P1/A2 (Phase 1 shadow atlas + depth rasterization is complete; Phase 2 PCF sampling is next). Remaining items after CSM lands:
+CSM for the directional light is complete: shadow atlas, depth-only rendering, PCF sampling, cascade computation, and focused CPU-side tests. Remaining items beyond CSM:
 
 - Point light shadow maps (cubemap or dual-paraboloid) if point lights are added.
 - Variance shadow maps (VSM) as an alternative to PCF.

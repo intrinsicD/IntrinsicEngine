@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <cmath>
+#include <limits>
 #include <span>
 #include <type_traits>
 #include <utility>
@@ -695,6 +697,361 @@ TEST(RenderExtraction, ComputeCascadeSplitDistances_HandlesDegenerateAndOutOfRan
     EXPECT_FLOAT_EQ(splits[1], 1.0f);
     EXPECT_FLOAT_EQ(splits[2], 1.0f);
     EXPECT_FLOAT_EQ(splits[3], 1.0f);
+}
+
+// =========================================================================
+// A2 — CSM: Focused tests that shadow pass produces non-trivial depth
+// for a known scene.  CPU-side validation of ComputeCascadeViewProjections:
+// project known world-space geometry through cascade light-VP matrices and
+// verify the resulting NDC depth is in the valid (0,1) range and varies
+// across vertices (i.e. the shadow map would contain non-trivial depth).
+// =========================================================================
+
+namespace
+{
+    // Helper: project a world-space point through a cascade VP matrix and
+    // return the resulting NDC depth (Vulkan convention: z in [0,1]).
+    float ProjectShadowDepth(const glm::mat4& cascadeVP, const glm::vec3& worldPos)
+    {
+        glm::vec4 clip = cascadeVP * glm::vec4(worldPos, 1.0f);
+        return clip.z / clip.w;
+    }
+
+    // Configurable test camera for CSM tests.
+    struct ShadowTestCamera
+    {
+        glm::mat4 View;
+        glm::mat4 Proj;
+        float Near = 0.1f;
+        float Far  = 100.0f;
+
+        static ShadowTestCamera Create(const glm::vec3& eye, const glm::vec3& center,
+                                       const glm::vec3& up,
+                                       float fovDeg = 60.0f, float aspect = 16.0f / 9.0f,
+                                       float near = 0.1f, float far = 100.0f)
+        {
+            ShadowTestCamera cam;
+            cam.Near = near;
+            cam.Far  = far;
+            cam.View = glm::lookAt(eye, center, up);
+            cam.Proj = glm::perspective(glm::radians(fovDeg), aspect, near, far);
+            cam.Proj[1][1] *= -1.0f; // Vulkan Y-flip
+            return cam;
+        }
+
+        static ShadowTestCamera LookingAtOrigin(float fovDeg = 60.0f, float aspect = 16.0f / 9.0f,
+                                                 float near = 0.1f, float far = 100.0f)
+        {
+            return Create(glm::vec3(0.0f, 2.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+                          glm::vec3(0.0f, 1.0f, 0.0f), fovDeg, aspect, near, far);
+        }
+    };
+
+    // Verify every element of a cascade VP matrix is finite (no NaN/inf).
+    void ExpectFiniteMatrix(const glm::mat4& m, uint32_t cascadeIndex)
+    {
+        for (int col = 0; col < 4; ++col)
+            for (int row = 0; row < 4; ++row)
+                EXPECT_TRUE(std::isfinite(m[col][row]))
+                    << "Cascade " << cascadeIndex
+                    << " has non-finite value at [" << col << "][" << row << "]";
+    }
+}
+
+TEST(RenderExtraction, CascadeVPs_ProduceNonTrivialDepthForKnownScene)
+{
+    // A camera looking at a unit cube at the origin, lit by a directional
+    // light from the upper-right.
+    const auto cam = ShadowTestCamera::LookingAtOrigin();
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f));
+
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, Graphics::ShadowParams::MaxCascades, 0.85f);
+
+    const auto cascadeVPs = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits,
+        Graphics::ShadowParams::MaxCascades, 2048u,
+        cam.Near, cam.Far);
+
+    // Unit cube vertices at origin — the standard test scene.
+    constexpr glm::vec3 cubeVerts[] = {
+        {-0.5f, -0.5f, -0.5f}, { 0.5f, -0.5f, -0.5f},
+        {-0.5f,  0.5f, -0.5f}, { 0.5f,  0.5f, -0.5f},
+        {-0.5f, -0.5f,  0.5f}, { 0.5f, -0.5f,  0.5f},
+        {-0.5f,  0.5f,  0.5f}, { 0.5f,  0.5f,  0.5f},
+    };
+
+    // The cube is close to the camera (within the first few cascades).
+    // At least one cascade must produce non-trivial, in-range depth values.
+    bool anyNonTrivialCascade = false;
+
+    for (uint32_t c = 0; c < Graphics::ShadowParams::MaxCascades; ++c)
+    {
+        const glm::mat4& vp = cascadeVPs[c];
+
+        // Cascade VP must not be identity (degenerate).
+        EXPECT_NE(vp, glm::mat4(1.0f)) << "Cascade " << c << " is identity (degenerate)";
+        ExpectFiniteMatrix(vp, c);
+
+        float minDepth = std::numeric_limits<float>::max();
+        float maxDepth = std::numeric_limits<float>::lowest();
+        int inRangeCount = 0;
+
+        for (const auto& v : cubeVerts)
+        {
+            const float d = ProjectShadowDepth(vp, v);
+            minDepth = std::min(minDepth, d);
+            maxDepth = std::max(maxDepth, d);
+            if (d > 0.0f && d < 1.0f)
+                ++inRangeCount;
+        }
+
+        // "Non-trivial" means: at least 2 vertices in range AND depth
+        // varies by more than 1% of the [0,1] range.  A nearly-flat
+        // depth (e.g. all at 0.500x) would indicate a degenerate ortho.
+        if (inRangeCount >= 2 && (maxDepth - minDepth) > 0.01f)
+            anyNonTrivialCascade = true;
+    }
+
+    EXPECT_TRUE(anyNonTrivialCascade)
+        << "No cascade produced non-trivial depth for a unit cube at origin";
+}
+
+TEST(RenderExtraction, CascadeVPs_AllCascadesAreDistinct)
+{
+    const auto cam = ShadowTestCamera::LookingAtOrigin();
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(0.5f, 1.0f, 0.3f));
+
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, Graphics::ShadowParams::MaxCascades, 0.85f);
+
+    const auto cascadeVPs = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits,
+        Graphics::ShadowParams::MaxCascades, 2048u,
+        cam.Near, cam.Far);
+
+    // Each cascade covers a different frustum slice, so their VP matrices
+    // must differ (different orthographic extents or offsets).
+    for (uint32_t i = 0; i < Graphics::ShadowParams::MaxCascades; ++i)
+    {
+        for (uint32_t j = i + 1; j < Graphics::ShadowParams::MaxCascades; ++j)
+        {
+            EXPECT_NE(cascadeVPs[i], cascadeVPs[j])
+                << "Cascades " << i << " and " << j << " have identical VP matrices";
+        }
+    }
+}
+
+TEST(RenderExtraction, CascadeVPs_LightAlignedWithUpVector)
+{
+    // When light direction is nearly aligned with the world up vector,
+    // the lookAt fallback to (0,0,1) up must still produce valid matrices.
+    const auto cam = ShadowTestCamera::LookingAtOrigin();
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(0.001f, 1.0f, 0.001f));
+
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, 2u, 0.5f);
+
+    const auto cascadeVPs = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits, 2u, 2048u,
+        cam.Near, cam.Far);
+
+    for (uint32_t c = 0; c < 2u; ++c)
+    {
+        EXPECT_NE(cascadeVPs[c], glm::mat4(1.0f))
+            << "Cascade " << c << " is degenerate with up-aligned light";
+        ExpectFiniteMatrix(cascadeVPs[c], c);
+    }
+}
+
+TEST(RenderExtraction, CascadeVPs_SingleCascade)
+{
+    const auto cam = ShadowTestCamera::LookingAtOrigin();
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f));
+
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, 1u, 0.85f);
+
+    const auto cascadeVPs = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits, 1u, 2048u,
+        cam.Near, cam.Far);
+
+    // Only cascade 0 should be populated; the rest remain identity.
+    EXPECT_NE(cascadeVPs[0], glm::mat4(1.0f));
+    ExpectFiniteMatrix(cascadeVPs[0], 0);
+    for (uint32_t c = 1; c < Graphics::ShadowParams::MaxCascades; ++c)
+        EXPECT_EQ(cascadeVPs[c], glm::mat4(1.0f))
+            << "Cascade " << c << " should be identity when only 1 cascade is active";
+
+    // Project a point visible from the camera and verify meaningful depth.
+    const float d = ProjectShadowDepth(cascadeVPs[0], glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_TRUE(std::isfinite(d)) << "Depth for origin is not finite";
+}
+
+TEST(RenderExtraction, CascadeVPs_ExtremeNearFarRatio)
+{
+    // Near/far ratio of 10^5 — exercises the logarithmic split path
+    // which can produce very skewed cascade partitions.
+    const auto cam = ShadowTestCamera::LookingAtOrigin(60.0f, 16.0f / 9.0f, 0.001f, 10000.0f);
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(1.0f, 0.5f, 0.7f));
+
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, Graphics::ShadowParams::MaxCascades, 0.85f);
+
+    // Splits must still be monotonic and normalized.
+    for (uint32_t i = 0; i < Graphics::ShadowParams::MaxCascades; ++i)
+    {
+        EXPECT_GE(splits[i], 0.0f);
+        EXPECT_LE(splits[i], 1.0f);
+        if (i > 0)
+            EXPECT_GE(splits[i], splits[i - 1]);
+    }
+
+    const auto cascadeVPs = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits,
+        Graphics::ShadowParams::MaxCascades, 2048u,
+        cam.Near, cam.Far);
+
+    for (uint32_t c = 0; c < Graphics::ShadowParams::MaxCascades; ++c)
+    {
+        EXPECT_NE(cascadeVPs[c], glm::mat4(1.0f))
+            << "Cascade " << c << " is identity under extreme near/far ratio";
+        ExpectFiniteMatrix(cascadeVPs[c], c);
+    }
+}
+
+TEST(RenderExtraction, CascadeVPs_RotatedCamera)
+{
+    // Camera looking sideways (+X) instead of the typical -Z to exercise
+    // frustum corner unprojection with a non-trivial view matrix.
+    const auto cam = ShadowTestCamera::Create(
+        glm::vec3(-5.0f, 1.0f, 0.0f),  // eye: left of origin
+        glm::vec3(10.0f, 0.0f, 0.0f),  // center: looking right
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        70.0f, 2.0f, 0.1f, 50.0f);
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(0.2f, 1.0f, -0.3f));
+
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, Graphics::ShadowParams::MaxCascades, 0.85f);
+
+    const auto cascadeVPs = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits,
+        Graphics::ShadowParams::MaxCascades, 2048u,
+        cam.Near, cam.Far);
+
+    // All cascades must be non-degenerate and finite.
+    for (uint32_t c = 0; c < Graphics::ShadowParams::MaxCascades; ++c)
+    {
+        EXPECT_NE(cascadeVPs[c], glm::mat4(1.0f))
+            << "Cascade " << c << " is identity with rotated camera";
+        ExpectFiniteMatrix(cascadeVPs[c], c);
+    }
+
+    // A point along the camera's view direction should produce valid depth.
+    const float d = ProjectShadowDepth(cascadeVPs[0], glm::vec3(0.0f, 0.5f, 0.0f));
+    EXPECT_TRUE(std::isfinite(d));
+}
+
+TEST(RenderExtraction, CascadeVPs_ZeroResolutionDisablesTexelSnapping)
+{
+    // When cascadeResolution is 0, the texel-snapping code path is skipped.
+    // The resulting matrices must still be valid and non-degenerate.
+    const auto cam = ShadowTestCamera::LookingAtOrigin();
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f));
+
+    const auto splits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, 2u, 0.85f);
+
+    const auto noSnap = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits, 2u, 0u, cam.Near, cam.Far);
+
+    const auto withSnap = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, splits, 2u, 2048u, cam.Near, cam.Far);
+
+    for (uint32_t c = 0; c < 2u; ++c)
+    {
+        EXPECT_NE(noSnap[c], glm::mat4(1.0f))
+            << "Cascade " << c << " is identity with resolution=0";
+        ExpectFiniteMatrix(noSnap[c], c);
+        ExpectFiniteMatrix(withSnap[c], c);
+    }
+}
+
+TEST(RenderExtraction, CascadeVPs_EndToEnd_ProducesValidGpuPayload)
+{
+    // Full CPU-side shadow pipeline: splits -> VP matrices -> packed GPU data.
+    // This mirrors the runtime path: ComputeCascadeSplitDistances ->
+    // ComputeCascadeViewProjections -> PackShadowCascadeData.
+    const auto cam = ShadowTestCamera::LookingAtOrigin(45.0f, 1.0f, 0.5f, 200.0f);
+    const glm::vec3 lightDir = glm::normalize(glm::vec3(-0.3f, 0.8f, 0.5f));
+
+    Graphics::ShadowParams params{};
+    params.Enabled = true;
+    params.CascadeCount = 3u;
+    params.SplitLambda = 0.75f;
+    params.DepthBias = 0.002f;
+    params.NormalBias = 0.003f;
+    params.PcfFilterRadius = 2.5f;
+
+    // Step 1: Compute split distances.
+    params.CascadeSplits = Graphics::ComputeCascadeSplitDistances(
+        cam.Near, cam.Far, params.CascadeCount, params.SplitLambda);
+
+    for (uint32_t i = 0; i < params.CascadeCount; ++i)
+    {
+        EXPECT_GE(params.CascadeSplits[i], 0.0f);
+        EXPECT_LE(params.CascadeSplits[i], 1.0f);
+        if (i > 0)
+            EXPECT_GE(params.CascadeSplits[i], params.CascadeSplits[i - 1])
+                << "Split " << i << " is not monotonically increasing";
+    }
+
+    // Step 2: Compute cascade VP matrices.
+    const auto cascadeVPs = Graphics::ComputeCascadeViewProjections(
+        cam.View, cam.Proj, lightDir, params.CascadeSplits,
+        params.CascadeCount, 2048u, cam.Near, cam.Far);
+
+    // Step 3: Pack into GPU-ready struct.
+    const Graphics::ShadowCascadeData packed = Graphics::PackShadowCascadeData(
+        params, cascadeVPs);
+
+    EXPECT_EQ(packed.CascadeCount, 3u);
+    EXPECT_FLOAT_EQ(packed.DepthBias, 0.002f);
+    EXPECT_FLOAT_EQ(packed.NormalBias, 0.003f);
+    EXPECT_FLOAT_EQ(packed.PcfFilterRadius, 2.5f);
+
+    // Packed matrices must match computed matrices for active cascades.
+    for (uint32_t c = 0; c < params.CascadeCount; ++c)
+        EXPECT_EQ(packed.LightViewProjection[c], cascadeVPs[c])
+            << "Packed cascade " << c << " matrix differs from computed";
+
+    // Unused cascade slot (index 3) should be identity.
+    EXPECT_EQ(packed.LightViewProjection[3], glm::mat4(1.0f));
+
+    // Project scene geometry through each active cascade and verify at least
+    // one cascade produces meaningful depth values.
+    const glm::vec3 scenePoints[] = {
+        {0.0f, 0.0f, 0.0f},     // origin
+        {0.0f, 1.0f, 0.0f},     // above origin
+        {2.0f, 0.0f, -3.0f},    // offset in view
+        {-1.0f, 0.5f, -10.0f},  // farther away
+    };
+
+    bool anyProducesDepth = false;
+    for (uint32_t c = 0; c < packed.CascadeCount; ++c)
+    {
+        int validCount = 0;
+        for (const auto& p : scenePoints)
+        {
+            const float d = ProjectShadowDepth(packed.LightViewProjection[c], p);
+            if (std::isfinite(d) && d > 0.0f && d < 1.0f)
+                ++validCount;
+        }
+        if (validCount >= 2)
+            anyProducesDepth = true;
+    }
+    EXPECT_TRUE(anyProducesDepth)
+        << "No cascade in the packed data produces valid depth for known scene points";
 }
 
 TEST(RenderExtraction, PackShadowCascadeData_SanitizesAndPacksForGpuConsumption)

@@ -8,7 +8,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## 0. Scope & Success Criteria
 
-**Current focus:** harden the frame pipeline, close the remaining rendering architecture gaps (depth prepass, shadow mapping, GPU-driven submission), advance the GPU compute backend, and wire all implemented backend features to the editor UI — without painting the engine into a corner for hybrid, transparency, or material-system work.
+**Current focus:** harden the frame pipeline, close the remaining rendering architecture gaps (GPU-driven submission), advance the GPU compute backend, and wire all implemented backend features to the editor UI — without painting the engine into a corner for hybrid, transparency, or material-system work.
 
 **Success criteria:**
 
@@ -42,26 +42,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 ## 2. Next (P1) — Near-Term Priorities
 
 P1 items are active development targets with concrete deliverables and test requirements.
-
-### A. Rendering Architecture Gaps
-
-These close critical gaps in the rendering pipeline that block or de-risk later feature work.
-
-**Dependency graph:**
-
-```
-A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
-```
-
-#### A2. Cascaded Shadow Maps (CSM)
-
-Shadow mapping is the single largest visual fidelity gap. CSM for the directional light is the minimal viable target.
-
-Split into two sub-phases to keep commits reviewable:
-
-Phase 1 (shadow atlas + depth-only rendering) and Phase 2 (PCF sampling + integration) are complete. Remaining:
-
-- [ ] Add focused test: shadow pass produces non-trivial depth for a known scene.
 
 ### B. Frame Pipeline Hardening (O2 ADR Continuation)
 
