@@ -458,3 +458,18 @@ When creating graphics pipelines with multiple descriptor set layouts:
 | `VK_CHECK_WARN(x)` | Log at warn level, continue | Timeline semaphore queries where zero-init output is a safe conservative default |
 
 **Classification rule:** If a failed Vulkan call would leave the frame in an unrecoverable state (invalid command buffer, failed submission, missing sync primitive), use `VK_CHECK_FATAL`. If the caller has a defined recovery path, use `VK_CHECK_RETURN` or `VK_CHECK_BOOL`. If zero-initialized output is a safe fallback (e.g. "nothing completed yet"), use `VK_CHECK_WARN`.
+
+## Queue-Family Safety Contract
+
+`QueueFamilyIndices` has validated safe accessors that replace raw `.value()` calls on the `std::optional<uint32_t>` fields:
+
+| Accessor | Precondition | Notes |
+|----------|-------------|-------|
+| `Graphics()` | Always valid after `ValidateQueueFamilyContract()` | Required for all devices |
+| `Present()` | Valid only when a surface is present | **Do not call in headless mode** without checking `PresentFamily.has_value()` first |
+| `Transfer()` | Always valid after validation | Resolves to dedicated transfer or graphics fallback |
+| `HasDistinctTransfer()` | Safe to call anytime | Returns `true` only when transfer is a separate queue family |
+
+`ValidateQueueFamilyContract()` runs in `CreateLogicalDevice()` after `FindQueueFamilies()`. It enforces: graphics required, present required when surface active, transfer resolves via 3-level fallback (dedicated → any transfer-capable → graphics). Failure sets `m_IsValid = false` with diagnostics.
+
+**Never use raw `.value()` on queue-family optionals outside the accessor definitions.** Use the safe accessors or check `.has_value()` first.

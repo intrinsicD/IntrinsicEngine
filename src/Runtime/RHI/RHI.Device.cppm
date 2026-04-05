@@ -1,5 +1,6 @@
 module;
 #include <array>
+#include <cassert>
 #include <vector>
 #include <optional>
 #include <mutex>
@@ -46,6 +47,37 @@ namespace RHI
         [[nodiscard]] bool IsComplete() const
         {
             return GraphicsFamily.has_value() && PresentFamily.has_value() && TransferFamily.has_value();
+        }
+
+        // Safe accessors — call only after ValidateQueueFamilyContract() succeeds.
+        // GraphicsFamily is always required; after validation, .value() is guaranteed safe.
+        [[nodiscard]] uint32_t Graphics() const
+        {
+            assert(GraphicsFamily.has_value() && "Graphics() called before queue-family validation");
+            return GraphicsFamily.value();
+        }
+
+        // PresentFamily is required when a surface is present (not in headless mode).
+        // Only call when a surface exists; headless devices must check has_value() first.
+        [[nodiscard]] uint32_t Present() const
+        {
+            assert(PresentFamily.has_value() && "Present() called without a valid present family");
+            return PresentFamily.value();
+        }
+
+        // TransferFamily always resolves (dedicated or fallback to graphics).
+        // After validation, .value() is guaranteed safe.
+        [[nodiscard]] uint32_t Transfer() const
+        {
+            assert(TransferFamily.has_value() && "Transfer() called before queue-family validation");
+            return TransferFamily.value();
+        }
+
+        // Check whether the transfer queue is a distinct family from graphics.
+        [[nodiscard]] bool HasDistinctTransfer() const
+        {
+            return TransferFamily.has_value() && GraphicsFamily.has_value()
+                && TransferFamily.value() != GraphicsFamily.value();
         }
     };
 
@@ -192,6 +224,11 @@ namespace RHI
         void PickPhysicalDevice(VkInstance instance);
         void CreateLogicalDevice(VulkanContext & context);
         void CreateCommandPool();
+
+        // Validates queue-family invariants after FindQueueFamilies().
+        // Returns true if all required families are present.
+        // Sets m_IsValid = false and logs diagnostics on failure.
+        bool ValidateQueueFamilyContract();
 
         bool IsDeviceSuitable(VkPhysicalDevice device);
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);

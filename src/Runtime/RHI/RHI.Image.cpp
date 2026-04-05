@@ -35,19 +35,10 @@ namespace RHI
         if (sharingMode == VK_SHARING_MODE_CONCURRENT)
         {
             auto indices = m_Device.GetQueueIndices();
-            if (indices.GraphicsFamily.has_value())
+            queueIndices.push_back(indices.Graphics());
+            if (indices.HasDistinctTransfer())
             {
-                queueIndices.push_back(indices.GraphicsFamily.value());
-            }
-            // Avoid duplicate if transfer == graphics
-            if (indices.TransferFamily.has_value())
-            {
-                const bool isDistinct = !indices.GraphicsFamily.has_value() ||
-                    (indices.TransferFamily.value() != indices.GraphicsFamily.value());
-                if (isDistinct)
-                {
-                    queueIndices.push_back(indices.TransferFamily.value());
-                }
+                queueIndices.push_back(indices.Transfer());
             }
             imageInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueIndices.size());
             imageInfo.pQueueFamilyIndices = queueIndices.data();

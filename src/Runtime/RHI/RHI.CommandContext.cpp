@@ -56,8 +56,7 @@ namespace RHI
             {
                 VkCommandPoolCreateInfo poolInfo{};
                 poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-                assert(device.GetQueueIndices().GraphicsFamily.has_value() && "GraphicsFamily required for command pool");
-                poolInfo.queueFamilyIndex = device.GetQueueIndices().GraphicsFamily.value();
+                poolInfo.queueFamilyIndex = device.GetQueueIndices().Graphics();
                 poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
                 VK_CHECK_FATAL(vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &s_Thread.Pool));
