@@ -271,10 +271,7 @@ Right-click context menus are implemented in the 3D viewport (entity, empty-spac
 
 #### F6. Editor Polish
 
-Incremental improvements that modernize the editor feel. Each is independent.
-
-- [ ] **Status Bar — GPU Memory:** Add GPU memory usage display to the status bar (depends on E2).
-- [ ] **Tooltip Coverage — Inspector Fields:** Extend tooltip coverage to all Inspector fields and remaining View Settings sliders.
+**Complete.** GPU memory usage display in the status bar (device-local VRAM summary with color-coded thresholds) and comprehensive tooltip coverage for all Inspector fields and remaining View Settings sliders (AA parameters, histogram, color grading, selection outline). See git history for details.
 
 #### F7. Render Target Viewer Panel Enhancements
 

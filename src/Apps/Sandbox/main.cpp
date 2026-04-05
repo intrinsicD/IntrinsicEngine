@@ -65,6 +65,7 @@ import RHI.Device;
 import RHI.Transfer;
 import RHI.Texture;
 import Interface;
+import Core.Telemetry;
 
 
 using namespace Core;
@@ -665,6 +666,41 @@ private:
                     const Core::CommandHistory& history = GetCommandHistory();
                     ImGui::Text("Undo: %zu  Redo: %zu", history.UndoCount(), history.RedoCount());
                 }
+                VerticalSeparator();
+
+                // GPU memory usage (device-local summary)
+                {
+                    const auto& mem = Core::Telemetry::TelemetrySystem::Get().GetGpuMemorySnapshot();
+                    uint64_t totalUsed = 0;
+                    uint64_t totalBudget = 0;
+                    for (uint32_t i = 0; i < mem.HeapCount; ++i)
+                    {
+                        if (mem.Heaps[i].Flags & Core::Telemetry::kHeapFlagDeviceLocal)
+                        {
+                            totalUsed += mem.Heaps[i].UsageBytes;
+                            totalBudget += mem.Heaps[i].BudgetBytes;
+                        }
+                    }
+
+                    if (totalBudget > 0)
+                    {
+                        const float usedMB = static_cast<float>(totalUsed) / (1024.0f * 1024.0f);
+                        const float budgetMB = static_cast<float>(totalBudget) / (1024.0f * 1024.0f);
+                        const float pct = static_cast<float>(static_cast<double>(totalUsed) / static_cast<double>(totalBudget)) * 100.0f;
+
+                        // Color-code: green < 70%, yellow < 85%, red >= 85%.
+                        ImVec4 color;
+                        if (pct < 70.0f)      color = ImVec4(0.20f, 0.75f, 0.30f, 1.0f);
+                        else if (pct < 85.0f) color = ImVec4(0.90f, 0.75f, 0.15f, 1.0f);
+                        else                  color = ImVec4(0.95f, 0.25f, 0.20f, 1.0f);
+
+                        ImGui::TextColored(color, "VRAM: %.0f/%.0f MB", usedMB, budgetMB);
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("VRAM: N/A");
+                    }
+                }
             }
             ImGui::End();
             ImGui::PopStyleVar();
@@ -918,27 +954,37 @@ private:
                 int aaIdx = static_cast<int>(postSettings->AntiAliasingMode);
                 if (ImGui::Combo("Anti-Aliasing", &aaIdx, aaModeNames, 3))
                     postSettings->AntiAliasingMode = static_cast<Graphics::Passes::AAMode>(aaIdx);
+                Interface::GUI::ItemTooltip("Anti-aliasing method.\nNone: no AA.\nFXAA: fast approximate AA.\nSMAA: enhanced morphological AA (default, higher quality).");
             }
             if (postSettings->AntiAliasingMode == Graphics::Passes::AAMode::FXAA)
             {
                 ImGui::SliderFloat("FXAA Contrast", &postSettings->FXAAContrastThreshold, 0.01f, 0.1f, "%.4f");
+                Interface::GUI::ItemTooltip("Minimum contrast to trigger edge detection. Lower = more edges detected.");
                 ImGui::SliderFloat("FXAA Relative", &postSettings->FXAARelativeThreshold, 0.01f, 0.2f, "%.4f");
+                Interface::GUI::ItemTooltip("Relative threshold against the local maximum luma. Lower = more aggressive.");
                 ImGui::SliderFloat("FXAA Subpixel", &postSettings->FXAASubpixelBlending, 0.0f, 1.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Subpixel blending amount. Higher = smoother but potentially blurrier.");
             }
             if (postSettings->AntiAliasingMode == Graphics::Passes::AAMode::SMAA)
             {
                 ImGui::SliderFloat("SMAA Edge Threshold", &postSettings->SMAAEdgeThreshold, 0.01f, 0.5f, "%.3f");
+                Interface::GUI::ItemTooltip("Luma threshold for edge detection. Lower = more edges, higher quality but slower.");
                 ImGui::SliderInt("SMAA Search Steps", &postSettings->SMAAMaxSearchSteps, 4, 32);
+                Interface::GUI::ItemTooltip("Maximum search distance for edge endpoints. Higher = better long-edge AA.");
                 ImGui::SliderInt("SMAA Diag Steps", &postSettings->SMAAMaxSearchStepsDiag, 0, 16);
+                Interface::GUI::ItemTooltip("Maximum diagonal search steps. 0 disables diagonal edge detection.");
             }
 
             // Luminance Histogram
             ImGui::Spacing();
             ImGui::Checkbox("Exposure Histogram", &postSettings->HistogramEnabled);
+            Interface::GUI::ItemTooltip("Display a luminance histogram of the rendered scene.");
             if (postSettings->HistogramEnabled)
             {
                 ImGui::SliderFloat("Min EV", &postSettings->HistogramMinEV, -20.0f, 0.0f, "%.1f");
+                Interface::GUI::ItemTooltip("Minimum exposure value for histogram range.");
                 ImGui::SliderFloat("Max EV", &postSettings->HistogramMaxEV, 0.0f, 20.0f, "%.1f");
+                Interface::GUI::ItemTooltip("Maximum exposure value for histogram range.");
 
                 const auto* histo = GetRenderOrchestrator().GetRenderDriver().GetHistogramReadback();
                 if (histo && histo->Valid)
@@ -969,22 +1015,30 @@ private:
             // Color Grading
             ImGui::Spacing();
             ImGui::Checkbox("Color Grading", &postSettings->ColorGradingEnabled);
+            Interface::GUI::ItemTooltip("Enable lift/gamma/gain color correction in linear space.");
             if (postSettings->ColorGradingEnabled)
             {
                 ImGui::SliderFloat("Saturation", &postSettings->Saturation, 0.0f, 2.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Color saturation. 0 = grayscale, 1 = normal, 2 = oversaturated.");
                 ImGui::SliderFloat("Contrast##CG", &postSettings->Contrast, 0.5f, 2.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Contrast around mid-gray (0.18). Higher = more punch.");
                 ImGui::SliderFloat("Temperature", &postSettings->ColorTempOffset, -1.0f, 1.0f, "%.2f");
+                Interface::GUI::ItemTooltip("White balance shift. Negative = cooler (blue), positive = warmer (orange).");
                 ImGui::SliderFloat("Tint", &postSettings->TintOffset, -1.0f, 1.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Green-magenta tint correction. Negative = green, positive = magenta.");
 
                 ImGui::Spacing();
                 ImGui::TextDisabled("Lift (Shadows)");
                 ImGui::SliderFloat3("Lift", &postSettings->Lift.x, -0.5f, 0.5f, "%.3f");
+                Interface::GUI::ItemTooltip("Per-channel shadow offset (R, G, B). Shifts dark tones.");
 
                 ImGui::TextDisabled("Gamma (Midtones)");
                 ImGui::SliderFloat3("Gamma", &postSettings->Gamma.x, 0.2f, 3.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Per-channel midtone power curve (R, G, B). 1.0 = neutral.");
 
                 ImGui::TextDisabled("Gain (Highlights)");
                 ImGui::SliderFloat3("Gain", &postSettings->Gain.x, 0.0f, 3.0f, "%.2f");
+                Interface::GUI::ItemTooltip("Per-channel highlight multiplier (R, G, B). 1.0 = neutral.");
 
                 if (ImGui::Button("Reset Color Grading"))
                 {
@@ -1014,6 +1068,7 @@ private:
             int currentMode = static_cast<int>(outlineSettings->Mode);
             if (ImGui::Combo("Outline Mode", &currentMode, modeNames, 3))
                 outlineSettings->Mode = static_cast<Graphics::Passes::OutlineMode>(currentMode);
+            Interface::GUI::ItemTooltip("Selection outline rendering style.\nSolid: constant opacity.\nPulse: alpha oscillates over time.\nGlow: radial falloff around silhouette.");
         }
 
         float selColor[4] = {
@@ -1026,6 +1081,7 @@ private:
         {
             outlineSettings->SelectionColor = glm::vec4(selColor[0], selColor[1], selColor[2], selColor[3]);
         }
+        Interface::GUI::ItemTooltip("Color and opacity of the selection outline.");
 
         float hoverColor[4] = {
             outlineSettings->HoverColor.r,
@@ -1037,20 +1093,28 @@ private:
         {
             outlineSettings->HoverColor = glm::vec4(hoverColor[0], hoverColor[1], hoverColor[2], hoverColor[3]);
         }
+        Interface::GUI::ItemTooltip("Color and opacity of the hover highlight outline.");
 
         ImGui::SliderFloat("Outline Width", &outlineSettings->OutlineWidth, 1.0f, 10.0f, "%.1f px");
+        Interface::GUI::ItemTooltip("Pixel width of the selection/hover outline.");
         ImGui::SliderFloat("Selection Fill", &outlineSettings->SelectionFillAlpha, 0.0f, 0.5f, "%.2f");
+        Interface::GUI::ItemTooltip("Interior fill opacity for selected entities. 0 = outline only.");
         ImGui::SliderFloat("Hover Fill", &outlineSettings->HoverFillAlpha, 0.0f, 0.5f, "%.2f");
+        Interface::GUI::ItemTooltip("Interior fill opacity for hovered entities. 0 = outline only.");
 
         if (outlineSettings->Mode == Graphics::Passes::OutlineMode::Pulse)
         {
             ImGui::SliderFloat("Pulse Speed", &outlineSettings->PulseSpeed, 0.5f, 10.0f, "%.1f");
+            Interface::GUI::ItemTooltip("Oscillation speed of the pulsing outline (cycles per second).");
             ImGui::SliderFloat("Pulse Min Alpha", &outlineSettings->PulseMin, 0.0f, 1.0f, "%.2f");
+            Interface::GUI::ItemTooltip("Minimum alpha during pulse cycle.");
             ImGui::SliderFloat("Pulse Max Alpha", &outlineSettings->PulseMax, 0.0f, 1.0f, "%.2f");
+            Interface::GUI::ItemTooltip("Maximum alpha during pulse cycle.");
         }
         else if (outlineSettings->Mode == Graphics::Passes::OutlineMode::Glow)
         {
             ImGui::SliderFloat("Glow Falloff", &outlineSettings->GlowFalloff, 0.5f, 8.0f, "%.1f");
+            Interface::GUI::ItemTooltip("Exponential falloff rate for glow distance from silhouette edge.");
         }
 
         if (ImGui::Button("Reset Outline Defaults"))
