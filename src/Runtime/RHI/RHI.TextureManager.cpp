@@ -128,9 +128,7 @@ namespace RHI
         auto gpu = std::make_unique<TextureGpuData>();
 
         auto indices = m_Device.GetQueueIndices();
-        bool distinctQueues = false;
-        if (indices.GraphicsFamily.has_value() && indices.TransferFamily.has_value())
-            distinctQueues = (indices.GraphicsFamily.value() != indices.TransferFamily.value());
+        bool distinctQueues = indices.HasDistinctTransfer();
 
         VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
 

@@ -21,11 +21,8 @@ namespace RHI
         : m_Device(device)
     {
         const auto& indices = m_Device.GetQueueIndices();
-        // Fallback to graphics queue family if dedicated transfer queue is unavailable.
-        uint32_t queueFamilyIndex = indices.TransferFamily.has_value()
-            ? indices.TransferFamily.value()
-            : indices.GraphicsFamily.value();
-        vkGetDeviceQueue(m_Device.GetLogicalDevice(), queueFamilyIndex, 0, &m_TransferQueue);
+        // Transfer() always resolves (dedicated or graphics fallback) after validation.
+        vkGetDeviceQueue(m_Device.GetLogicalDevice(), indices.Transfer(), 0, &m_TransferQueue);
 
         VkSemaphoreTypeCreateInfo timelineInfo{};
         timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
@@ -184,9 +181,7 @@ namespace RHI
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
             const auto& queueIndices = m_Device.GetQueueIndices();
-            poolInfo.queueFamilyIndex = queueIndices.TransferFamily.has_value()
-                ? queueIndices.TransferFamily.value()
-                : queueIndices.GraphicsFamily.value();
+            poolInfo.queueFamilyIndex = queueIndices.Transfer();
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
             VK_CHECK_FATAL(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
 

@@ -342,18 +342,51 @@ namespace RHI
         }
     }
 
+    bool VulkanDevice::ValidateQueueFamilyContract()
+    {
+        if (!m_Indices.GraphicsFamily.has_value())
+        {
+            Core::Log::Error("RHI: Graphics queue family is required but not available.");
+            m_IsValid = false;
+            return false;
+        }
+
+        if (m_Surface != VK_NULL_HANDLE && !m_Indices.PresentFamily.has_value())
+        {
+            Core::Log::Error("RHI: Present queue family is required (surface is active) but not available.");
+            m_IsValid = false;
+            return false;
+        }
+
+        if (!m_Indices.TransferFamily.has_value())
+        {
+            // FindQueueFamilies() should always resolve transfer to at least graphics.
+            // If we somehow get here, fall back explicitly.
+            Core::Log::Warn("RHI: No transfer queue family found; falling back to graphics family.");
+            m_Indices.TransferFamily = m_Indices.GraphicsFamily;
+        }
+
+        if (m_Indices.HasDistinctTransfer())
+            Core::Log::Info("RHI: Using dedicated transfer queue (family {}).", m_Indices.Transfer());
+        else
+            Core::Log::Info("RHI: Transfer shares graphics queue family ({}).", m_Indices.Graphics());
+
+        return true;
+    }
+
     void VulkanDevice::CreateLogicalDevice(VulkanContext& context)
     {
         m_Indices = FindQueueFamilies(m_PhysicalDevice);
 
+        if (!ValidateQueueFamilyContract())
+            return;
+
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies;
-        if (m_Indices.GraphicsFamily.has_value())
-            uniqueQueueFamilies.insert(m_Indices.GraphicsFamily.value());
+        uniqueQueueFamilies.insert(m_Indices.Graphics());
         if (m_Indices.PresentFamily.has_value())
-            uniqueQueueFamilies.insert(m_Indices.PresentFamily.value());
-        if (m_Indices.TransferFamily.has_value())
-            uniqueQueueFamilies.insert(m_Indices.TransferFamily.value());
+            uniqueQueueFamilies.insert(m_Indices.Present());
+        uniqueQueueFamilies.insert(m_Indices.Transfer());
 
         float queuePriority = 1.0f;
         for (uint32_t queueFamily : uniqueQueueFamilies)
@@ -480,16 +513,13 @@ namespace RHI
                 m_CachedHeapFlags[i] = memProps.memoryHeaps[i].flags;
         }
 
-        assert(m_Indices.GraphicsFamily.has_value() && "GraphicsFamily must be set after device selection");
-        vkGetDeviceQueue(m_Device, m_Indices.GraphicsFamily.value(), 0, &m_GraphicsQueue);
+        // Queue families validated by ValidateQueueFamilyContract() — safe accessors are valid.
+        vkGetDeviceQueue(m_Device, m_Indices.Graphics(), 0, &m_GraphicsQueue);
         if (m_Indices.PresentFamily.has_value())
         {
-            vkGetDeviceQueue(m_Device, m_Indices.PresentFamily.value(), 0, &m_PresentQueue);
+            vkGetDeviceQueue(m_Device, m_Indices.Present(), 0, &m_PresentQueue);
         }
-        if (m_Indices.TransferFamily.has_value())
-        {
-            vkGetDeviceQueue(m_Device, m_Indices.TransferFamily.value(), 0, &m_TransferQueue);
-        }
+        vkGetDeviceQueue(m_Device, m_Indices.Transfer(), 0, &m_TransferQueue);
     }
 
     Core::Telemetry::GpuMemorySnapshot VulkanDevice::QueryMemoryBudgets() const
@@ -516,8 +546,8 @@ namespace RHI
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        assert(m_Indices.GraphicsFamily.has_value() && "GraphicsFamily must be set before creating command pool");
-        poolInfo.queueFamilyIndex = m_Indices.GraphicsFamily.value();
+        // Graphics family validated by ValidateQueueFamilyContract().
+        poolInfo.queueFamilyIndex = m_Indices.Graphics();
 
         if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
         {

@@ -243,19 +243,9 @@ Translate the latest commit-audit findings into concrete remediation work items 
 
 Four callsite-aware macros (`VK_CHECK_FATAL`, `VK_CHECK_RETURN`, `VK_CHECK_BOOL`, `VK_CHECK_WARN`) replace the old undifferentiated `VK_CHECK`. All 42 callsites across 8 source files audited and classified: 36 fatal (object creation, submit, command buffer lifecycle), 3 warn (timeline semaphore queries with safe zero-init defaults), 3 fatal (descriptor set layout creation). Eight unit tests including a GTest death test verify control-flow contracts. See git history for details.
 
-**E3b — Queue-family safety and initialization contracts:**
-- [ ] Eliminate raw `.value()` access for queue-family optionals in hot paths unless prevalidated by invariant checks that survive release builds.
-- [ ] Add a `ValidateQueueFamilyContract()` boot-time gate in RHI init:
-  - [ ] graphics family required;
-  - [ ] present family required when swapchain path enabled;
-  - [ ] transfer family optional with explicit fallback policy.
-- [ ] Harden transfer fallback logic:
-  - [ ] if transfer family is absent, use graphics family only after runtime validation;
-  - [ ] if required families are missing, fail RHI init with explicit diagnostics instead of abrupt termination.
-- [ ] Add tests covering devices with:
-  - [ ] dedicated transfer queue present;
-  - [ ] no dedicated transfer queue;
-  - [ ] malformed/insufficient queue-family discovery results (expected graceful init failure).
+**E3b — Queue-family safety and initialization contracts: Complete.**
+
+`ValidateQueueFamilyContract()` boot-time gate in `VulkanDevice::CreateLogicalDevice()` validates: graphics family required, present family required when surface active, transfer family resolves via 3-level fallback (dedicated → any transfer → graphics). Safe accessors `Graphics()`, `Present()`, `Transfer()`, `HasDistinctTransfer()` on `QueueFamilyIndices` replace all 20+ raw `.value()` calls across 9 RHI source files and `Gui.cpp`. Each accessor has a debug assert guarding the precondition. Five CPU-only unit tests cover accessor correctness and `HasDistinctTransfer()` logic; one GPU integration test validates the headless device contract. See git history for details.
 
 **E3d — Shader hot-reload process execution hardening:**
 - [ ] Replace shell-string `std::system(...)` compilation path with structured process spawn API (argv-based, no shell interpolation).

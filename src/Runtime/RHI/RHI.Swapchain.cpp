@@ -125,11 +125,10 @@ namespace RHI {
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
         QueueFamilyIndices indices = m_Device->GetQueueIndices();
-        assert(indices.GraphicsFamily.has_value() && "GraphicsFamily must be set for swapchain creation");
-        assert(indices.PresentFamily.has_value() && "PresentFamily must be set for swapchain creation");
-        uint32_t queueFamilyIndices[] = {indices.GraphicsFamily.value(), indices.PresentFamily.value()};
+        // Graphics and Present families validated at device creation by ValidateQueueFamilyContract().
+        uint32_t queueFamilyIndices[] = {indices.Graphics(), indices.Present()};
 
-        if (indices.GraphicsFamily != indices.PresentFamily) {
+        if (indices.Graphics() != indices.Present()) {
             createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
             createInfo.queueFamilyIndexCount = 2;
             createInfo.pQueueFamilyIndices = queueFamilyIndices;

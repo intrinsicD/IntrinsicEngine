@@ -734,3 +734,101 @@ TEST(VkCheckPolicyDeathTest, CheckFatal_Failure_Aborts)
     // GTest death tests fork a subprocess, so this does not terminate the suite.
     EXPECT_DEATH(VK_CHECK_FATAL(VK_ERROR_DEVICE_LOST), "");
 }
+
+// =============================================================================
+// Queue-Family Safety Contract Tests (E3b)
+// =============================================================================
+
+TEST(QueueFamilyIndices, SafeAccessors_AllFamiliesPresent)
+{
+    RHI::QueueFamilyIndices indices;
+    indices.GraphicsFamily = 0u;
+    indices.PresentFamily = 1u;
+    indices.TransferFamily = 2u;
+
+    EXPECT_EQ(indices.Graphics(), 0u);
+    EXPECT_EQ(indices.Present(), 1u);
+    EXPECT_EQ(indices.Transfer(), 2u);
+    EXPECT_TRUE(indices.IsComplete());
+    EXPECT_TRUE(indices.HasDistinctTransfer());
+}
+
+TEST(QueueFamilyIndices, HasDistinctTransfer_SameAsGraphics)
+{
+    RHI::QueueFamilyIndices indices;
+    indices.GraphicsFamily = 0u;
+    indices.TransferFamily = 0u;
+
+    EXPECT_FALSE(indices.HasDistinctTransfer());
+}
+
+TEST(QueueFamilyIndices, HasDistinctTransfer_DifferentFromGraphics)
+{
+    RHI::QueueFamilyIndices indices;
+    indices.GraphicsFamily = 0u;
+    indices.TransferFamily = 2u;
+
+    EXPECT_TRUE(indices.HasDistinctTransfer());
+}
+
+TEST(QueueFamilyIndices, HasDistinctTransfer_NoTransfer)
+{
+    RHI::QueueFamilyIndices indices;
+    indices.GraphicsFamily = 0u;
+    // TransferFamily not set
+
+    EXPECT_FALSE(indices.HasDistinctTransfer());
+}
+
+TEST(QueueFamilyIndices, IsComplete_MissingPresent)
+{
+    RHI::QueueFamilyIndices indices;
+    indices.GraphicsFamily = 0u;
+    indices.TransferFamily = 0u;
+
+    EXPECT_FALSE(indices.IsComplete());
+}
+
+// Integration test: headless device passes the queue-family contract.
+// Requires a Vulkan-capable GPU; skips gracefully in headless CI environments.
+TEST(QueueFamilyContract, HeadlessDevice_GraphicsAndTransferResolved)
+{
+    RHI::ContextConfig config{
+        .AppName = "QueueFamilyContractTest",
+        .EnableValidation = false,
+        .Headless = true,
+    };
+
+    auto context = std::make_unique<RHI::VulkanContext>(config);
+    if (!context->GetInstance())
+    {
+        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+    }
+
+    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
+    if (!device->IsValid())
+    {
+        GTEST_SKIP() << "No suitable GPU found";
+    }
+
+    auto indices = device->GetQueueIndices();
+
+    // Graphics is always required.
+    EXPECT_TRUE(indices.GraphicsFamily.has_value());
+
+    // Transfer always resolves (dedicated or graphics fallback).
+    EXPECT_TRUE(indices.TransferFamily.has_value());
+
+    // Safe accessors must not throw after validation.
+    EXPECT_EQ(indices.Graphics(), indices.GraphicsFamily.value());
+    EXPECT_EQ(indices.Transfer(), indices.TransferFamily.value());
+
+    // Present is not required in headless mode.
+    // (It may or may not be set depending on the driver.)
+
+    // Graphics queue must be non-null.
+    EXPECT_NE(device->GetGraphicsQueue(), VK_NULL_HANDLE);
+
+    // Transfer queue must be non-null (resolved by ValidateQueueFamilyContract).
+    EXPECT_NE(device->GetTransferQueue(), VK_NULL_HANDLE);
+}
