@@ -400,6 +400,52 @@ TEST_F(TransferTest, UploadBufferBatchHelper)
 }
 
 // ---------------------------------------------------------------------------
+// TransferManager error-path resource hygiene (E3c)
+// ---------------------------------------------------------------------------
+
+TEST_F(TransferTest, UploadBuffer_NullDst_ReturnsInvalidToken)
+{
+    // UploadBuffer with VK_NULL_HANDLE dst must return an invalid token
+    // without leaking a command buffer (early return before Begin()).
+    std::vector<std::byte> payload(256);
+    auto token = m_TransferMgr->UploadBuffer(VK_NULL_HANDLE, payload);
+    EXPECT_FALSE(token.IsValid());
+}
+
+TEST_F(TransferTest, UploadBuffer_EmptySrc_ReturnsInvalidToken)
+{
+    // Empty source should early-return without allocating a command buffer.
+    auto dst = std::make_unique<RHI::VulkanBuffer>(
+        *m_Device, 256,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    std::span<const std::byte> empty;
+    auto token = m_TransferMgr->UploadBuffer(dst->GetHandle(), empty);
+    EXPECT_FALSE(token.IsValid());
+}
+
+TEST_F(TransferTest, FreeCommandBuffer_ReleasesWithoutSubmit)
+{
+    // BeginUploadBatch + FreeCommandBuffer must not leak the command buffer.
+    // Repeat many times to ensure no pool exhaustion.
+    for (int i = 0; i < 100; ++i)
+    {
+        VkCommandBuffer cmd = m_TransferMgr->BeginUploadBatch();
+        ASSERT_NE(cmd, VK_NULL_HANDLE);
+        m_TransferMgr->FreeCommandBuffer(cmd);
+    }
+    SUCCEED();
+}
+
+TEST_F(TransferTest, FreeCommandBuffer_NullIsNoOp)
+{
+    // FreeCommandBuffer(VK_NULL_HANDLE) must not crash.
+    m_TransferMgr->FreeCommandBuffer(VK_NULL_HANDLE);
+    SUCCEED();
+}
+
+// ---------------------------------------------------------------------------
 // Push Constant Runtime Validation (TODO §1.10)
 // ---------------------------------------------------------------------------
 

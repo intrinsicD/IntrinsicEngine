@@ -68,6 +68,10 @@ export namespace RHI {
 
         // --- Batched uploads -------------------------------------------------
         // Use this when you have many small uploads and want a single Begin/Submit.
+        //
+        // Ownership contract: the caller owns the command buffer returned by
+        // BeginUploadBatch() and MUST call EndUploadBatch() on success, or
+        // FreeCommandBuffer() on failure, to avoid leaking command buffers.
         struct UploadBatchConfig
         {
             size_t CopyAlignment = 0; // 0 => use device optimalBufferCopyOffsetAlignment (clamped to >= 16)
@@ -77,7 +81,8 @@ export namespace RHI {
         [[nodiscard]] VkCommandBuffer BeginUploadBatch(const UploadBatchConfig& cfg);
 
         // Enqueue a buffer upload into an already-recording transfer command buffer.
-        // Returns false if staging allocation failed.
+        // Returns false if staging allocation failed. The command buffer remains valid
+        // and recording — the caller may continue enqueuing other uploads or abort.
         [[nodiscard]] bool EnqueueUploadBuffer(VkCommandBuffer cmd,
                                                VkBuffer dst,
                                                std::span<const std::byte> src,
@@ -86,6 +91,11 @@ export namespace RHI {
 
         // Ends+submits the batch. Equivalent to Submit(cmd).
         [[nodiscard]] TransferToken EndUploadBatch(VkCommandBuffer cmd);
+
+        // Free a command buffer without submitting (error-path cleanup).
+        // Use this to release a command buffer from BeginUploadBatch() when
+        // the batch must be abandoned due to errors.
+        void FreeCommandBuffer(VkCommandBuffer cmd);
 
     private:
         struct ThreadTransferContext {
