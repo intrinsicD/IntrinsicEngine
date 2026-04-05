@@ -1779,10 +1779,19 @@ private:
         {
             SelectEdgeLoop(reg, entity);
         }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("Extend selection along edge loops through vertices.\n"
+                              "Best results on quad meshes (clean rows/columns).\n"
+                              "On mixed tri/quad topology, uses angle-based\n"
+                              "continuation for deterministic results.");
         if (ImGui::MenuItem("Select Edge Ring", nullptr, false, edgeModeWithSelection))
         {
             SelectEdgeRing(reg, entity);
         }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("Extend selection across parallel edges in face strips.\n"
+                              "Best results on quad meshes. Stops at boundaries\n"
+                              "and non-tri/quad faces.");
         ImGui::Separator();
         if (ImGui::MenuItem("Clear Sub-Element Selection"))
         {

@@ -163,26 +163,47 @@ export namespace Geometry::MeshUtils
 
     // --- Edge Loop / Edge Ring selection ---
 
+    /// Strategy for edge loop/ring traversal behavior on mixed-topology meshes.
+    enum class EdgeTraversalStrategy : uint8_t
+    {
+        /// Permissive (default): walks through any vertex valence / face type
+        /// (triangles and quads). At odd-valence vertices, uses geometric
+        /// angle-based tie-breaking to pick the straightest continuation edge.
+        /// Produces zig-zag paths on triangle meshes.
+        Permissive = 0,
+
+        /// StrictQuad: stops at non-valence-4 vertices (loop) or non-quad
+        /// faces (ring). Produces clean selections only on pure-quad regions.
+        StrictQuad = 1,
+    };
+
     /// Collect an edge loop starting from the given edge.
     /// An edge loop is a continuous path of edges through vertices. At each
     /// vertex the walk picks the "straight" continuation by CW-rotating by
     /// half the vertex valence in the halfedge fan (Blender convention).
-    /// On regular quad meshes this produces clean column/row selections.
-    /// On triangle meshes with irregular valence the path zig-zags.
-    /// Stops at mesh boundaries, valence-1 vertices, or when the loop closes.
+    /// For even-valence vertices the continuation is unambiguous (valence/2).
+    /// For odd-valence vertices, the two candidates (floor and ceil of
+    /// valence/2 rotations) are evaluated geometrically: the candidate whose
+    /// outgoing direction best continues the incoming direction (smallest
+    /// angle deviation from straight-through) wins. This ensures deterministic,
+    /// geometry-aware results on irregular topology.
+    /// In StrictQuad mode, the walk stops at any vertex with valence != 4.
     /// Returns the ordered edge indices (includes the starting edge).
     /// No duplicates on closed manifolds.
     [[nodiscard]] std::vector<uint32_t> CollectEdgeLoop(
-        const Halfedge::Mesh& mesh, EdgeHandle startEdge);
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge,
+        EdgeTraversalStrategy strategy = EdgeTraversalStrategy::Permissive);
 
     /// Collect an edge ring starting from the given edge.
     /// An edge ring selects parallel edges across a face strip. In each face
     /// the "opposite" edge is found via Next^(valence/2), then the walk crosses
     /// to the adjacent face. For quads this gives clean parallel selections;
-    /// for triangles it walks via Next(Next(h)) (the "prev" edge).
-    /// Stops at mesh boundaries, non-tri/quad faces, or when the ring closes.
+    /// for triangles it walks via Next^1(h) (valence/2 = 1, zig-zag pattern).
+    /// In StrictQuad mode, the walk stops at any non-quad face (valence != 4).
+    /// Stops at mesh boundaries, unsupported face types, or when the ring closes.
     /// Returns the ordered edge indices (includes the starting edge).
     /// No duplicates on closed manifolds.
     [[nodiscard]] std::vector<uint32_t> CollectEdgeRing(
-        const Halfedge::Mesh& mesh, EdgeHandle startEdge);
+        const Halfedge::Mesh& mesh, EdgeHandle startEdge,
+        EdgeTraversalStrategy strategy = EdgeTraversalStrategy::Permissive);
 }

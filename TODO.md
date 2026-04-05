@@ -265,15 +265,6 @@ Translate the latest commit-audit findings into concrete remediation work items 
   - [ ] no dedicated transfer queue;
   - [ ] malformed/insufficient queue-family discovery results (expected graceful init failure).
 
-**E3c — TransferManager error-path resource hygiene:**
-- [x] Fix `UploadBuffer` early-return leak path so command buffers are reclaimed when staging allocation fails.
-- [x] Add `FreeCommandBuffer()` public API for error-path cleanup of batch command buffers (begin/end/free safety even on error branches).
-- [x] Audit transfer upload methods for similar partial-failure leaks:
-  - [x] command pools — `UploadBuffer` now frees cmd on staging failure; batch API documents caller-owns-cmd contract.
-  - [x] semaphores/fences — no leak: timeline semaphore is shared, not per-cmd.
-  - [x] staging allocations — no leak: staging belt ring is reclaimed by `GarbageCollect()`.
-- [x] Add tests: `FreeCommandBuffer_ReleasesWithoutSubmit` (100 iterations), `FreeCommandBuffer_NullIsNoOp`, `UploadBuffer_NullDst_ReturnsInvalidToken`, `UploadBuffer_EmptySrc_ReturnsInvalidToken` (GPU-required tests, verified compilation).
-
 **E3d — Shader hot-reload process execution hardening:**
 - [ ] Replace shell-string `std::system(...)` compilation path with structured process spawn API (argv-based, no shell interpolation).
 - [ ] Capture compiler stdout/stderr streams and surface them in Editor Console + logs with source file association.
@@ -285,15 +276,6 @@ Translate the latest commit-audit findings into concrete remediation work items 
   - [ ] compile failure keeps previous pipelines alive;
   - [ ] compile success triggers exactly one rebuild after debounce window;
   - [ ] path edge cases (spaces, quotes, non-ASCII filenames) compile safely.
-
-**E3e — Edge loop/ring deterministic selection semantics:**
-- [ ] Formalize edge-loop continuation for odd/irregular valence vertices with explicit tie-break rules.
-- [ ] Add selectable strategy modes for loop/ring traversal (at minimum: strict quad-only and permissive mixed-topology behavior).
-- [ ] Extend tests beyond strip fixtures:
-  - [ ] mixed tri/quad fans around extraordinary vertices;
-  - [ ] boundary-rich meshes and non-manifold rejection behavior;
-  - [ ] deterministic ordering guarantees across repeated runs.
-- [ ] Expose current strategy and limitations in editor UX (tooltip/help text) to reduce user confusion on non-quad topology.
 
 ### F. UI Architecture & Feature Wiring
 
