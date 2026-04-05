@@ -3,6 +3,7 @@ module;
 // 1. Force ImGui to expose Dynamic Rendering fields
 #define IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
 
+#include <cassert>
 #include "RHI.Vulkan.hpp"
 
 #include <glm/glm.hpp>
@@ -764,6 +765,7 @@ namespace Interface::GUI
         init_info.Instance = instance;
         init_info.PhysicalDevice = device.GetPhysicalDevice();
         init_info.Device = device.GetLogicalDevice();
+        assert(device.GetQueueIndices().GraphicsFamily.has_value() && "GraphicsFamily required for ImGui init");
         init_info.QueueFamily = device.GetQueueIndices().GraphicsFamily.value();
         init_info.Queue = graphicsQueue;
         init_info.DescriptorPool = s_DescriptorPool;

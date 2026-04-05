@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include <cassert>
 #include <vector>
 
 module RHI.CommandContext;
@@ -55,6 +56,7 @@ namespace RHI
             {
                 VkCommandPoolCreateInfo poolInfo{};
                 poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+                assert(device.GetQueueIndices().GraphicsFamily.has_value() && "GraphicsFamily required for command pool");
                 poolInfo.queueFamilyIndex = device.GetQueueIndices().GraphicsFamily.value();
                 poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
