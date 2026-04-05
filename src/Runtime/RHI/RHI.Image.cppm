@@ -53,7 +53,7 @@ export namespace RHI
         VkImage m_Image = VK_NULL_HANDLE;
         VkImageView m_ImageView = VK_NULL_HANDLE;
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
-        VkFormat m_Format;
+        VkFormat m_Format = VK_FORMAT_UNDEFINED;
         uint32_t m_MipLevels = 1;
         uint32_t m_Width = 0;
         uint32_t m_Height = 0;

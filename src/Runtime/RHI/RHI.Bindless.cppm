@@ -39,10 +39,10 @@ export namespace RHI
     private:
         struct PendingUpdate
         {
-            uint32_t Index;
-            VkImageView View;
-            VkSampler Sampler;
-            VkImageLayout Layout;
+            uint32_t Index = 0;
+            VkImageView View = VK_NULL_HANDLE;
+            VkSampler Sampler = VK_NULL_HANDLE;
+            VkImageLayout Layout = VK_IMAGE_LAYOUT_UNDEFINED;
         };
 
         VulkanDevice& m_Device;

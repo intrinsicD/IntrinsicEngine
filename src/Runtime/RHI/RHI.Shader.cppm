@@ -22,7 +22,7 @@ export namespace RHI {
     private:
         VulkanDevice& m_Device;
         VkShaderModule m_Module = VK_NULL_HANDLE;
-        ShaderStage m_Stage;
+        ShaderStage m_Stage = ShaderStage::Vertex;
 
         std::vector<char> ReadFile(const std::string& filename);
     };
