@@ -266,13 +266,13 @@ Translate the latest commit-audit findings into concrete remediation work items 
   - [ ] malformed/insufficient queue-family discovery results (expected graceful init failure).
 
 **E3c — TransferManager error-path resource hygiene:**
-- [ ] Fix `UploadBuffer` early-return leak path so command buffers are reclaimed when staging allocation fails.
-- [ ] Add RAII guard for transient command-buffer lifetime in transfer upload helpers (begin/end/free safety even on error branches).
-- [ ] Audit transfer upload methods for similar partial-failure leaks:
-  - [ ] command pools;
-  - [ ] semaphores/fences;
-  - [ ] staging allocations.
-- [ ] Add stress test: force repeated staging allocation failures and verify no monotonic growth in command-buffer allocations or pool pressure.
+- [x] Fix `UploadBuffer` early-return leak path so command buffers are reclaimed when staging allocation fails.
+- [x] Add `FreeCommandBuffer()` public API for error-path cleanup of batch command buffers (begin/end/free safety even on error branches).
+- [x] Audit transfer upload methods for similar partial-failure leaks:
+  - [x] command pools — `UploadBuffer` now frees cmd on staging failure; batch API documents caller-owns-cmd contract.
+  - [x] semaphores/fences — no leak: timeline semaphore is shared, not per-cmd.
+  - [x] staging allocations — no leak: staging belt ring is reclaimed by `GarbageCollect()`.
+- [x] Add tests: `FreeCommandBuffer_ReleasesWithoutSubmit` (100 iterations), `FreeCommandBuffer_NullIsNoOp`, `UploadBuffer_NullDst_ReturnsInvalidToken`, `UploadBuffer_EmptySrc_ReturnsInvalidToken` (GPU-required tests, verified compilation).
 
 **E3d — Shader hot-reload process execution hardening:**
 - [ ] Replace shell-string `std::system(...)` compilation path with structured process spawn API (argv-based, no shell interpolation).

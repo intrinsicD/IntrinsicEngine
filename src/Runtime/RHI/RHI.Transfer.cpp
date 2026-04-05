@@ -225,6 +225,7 @@ namespace RHI
         if (alloc.Buffer == VK_NULL_HANDLE || alloc.MappedPtr == nullptr)
         {
             Core::Log::Error("TransferManager::UploadBuffer(): staging allocation failed (size={}, align={}).", src.size_bytes(), copyAlign);
+            FreeCommandBuffer(cmd);
             return {};
         }
 
@@ -286,5 +287,19 @@ namespace RHI
     TransferToken TransferManager::EndUploadBatch(VkCommandBuffer cmd)
     {
         return Submit(cmd);
+    }
+
+    void TransferManager::FreeCommandBuffer(VkCommandBuffer cmd)
+    {
+        if (cmd == VK_NULL_HANDLE) return;
+
+        // vkFreeCommandBuffers is valid for command buffers in any state (initial,
+        // recording, executable) per Vulkan spec. No need to call vkEndCommandBuffer
+        // first — that would be wasteful and could trigger validation errors if the
+        // recording state is invalid.
+        // NOTE: must be called from the same thread that called Begin()/BeginUploadBatch(),
+        // because command pools are per-thread (thread_local in GetThreadContext()).
+        auto& ctx = GetThreadContext();
+        vkFreeCommandBuffers(m_Device.GetLogicalDevice(), ctx.Pool, 1, &cmd);
     }
 }
