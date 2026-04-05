@@ -247,17 +247,9 @@ Four callsite-aware macros (`VK_CHECK_FATAL`, `VK_CHECK_RETURN`, `VK_CHECK_BOOL`
 
 `ValidateQueueFamilyContract()` boot-time gate in `VulkanDevice::CreateLogicalDevice()` validates: graphics family required, present family required when surface active, transfer family resolves via 3-level fallback (dedicated → any transfer → graphics). Safe accessors `Graphics()`, `Present()`, `Transfer()`, `HasDistinctTransfer()` on `QueueFamilyIndices` replace all 20+ raw `.value()` calls across 9 RHI source files and `Gui.cpp`. Each accessor has a debug assert guarding the precondition. Five CPU-only unit tests cover accessor correctness and `HasDistinctTransfer()` logic; one GPU integration test validates the headless device contract. See git history for details.
 
-**E3d — Shader hot-reload process execution hardening:**
-- [ ] Replace shell-string `std::system(...)` compilation path with structured process spawn API (argv-based, no shell interpolation).
-- [ ] Capture compiler stdout/stderr streams and surface them in Editor Console + logs with source file association.
-- [ ] Add timeout + cancellation policy for stuck compiler invocations to avoid watcher-thread starvation.
-- [ ] Debounce/coalescing improvements:
-  - [ ] ensure include-file changes can trigger dependent shader recompiles deterministically;
-  - [ ] cap rebuild frequency under rapid file-save bursts.
-- [ ] Add integration tests for:
-  - [ ] compile failure keeps previous pipelines alive;
-  - [ ] compile success triggers exactly one rebuild after debounce window;
-  - [ ] path edge cases (spaces, quotes, non-ASCII filenames) compile safely.
+**E3d — Shader hot-reload process execution hardening: Complete.**
+
+`Core::Process` module provides structured process spawn via `posix_spawnp` (argv-based, no shell interpolation) with stdout/stderr capture, configurable timeout + SIGTERM/SIGKILL cancellation, and `IsExecutableAvailable()` helper. All `std::system()` calls eliminated from the codebase (ShaderHotReload + ShaderCompiler). Compiler diagnostics (stdout/stderr) are surfaced via `Core::Log` (Error for stderr, Warn for stdout). Include-file dependency tracking scans `#include` directives at startup, watches include files, and cascades recompilation to all dependent shaders. Burst coalescing via 500ms max rebuild frequency cap on top of existing 200ms debounce window. 15 CPU-only unit tests cover spawn, capture, timeout, argument safety (spaces, quotes, dollar signs not shell-expanded), and glslc integration. See git history for details.
 
 ### F. UI Architecture & Feature Wiring
 

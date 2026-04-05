@@ -83,6 +83,7 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_Profiling.cpp
         Test_CoreError.cpp
         Test_LogRingBuffer.cpp
+        Test_Process.cpp
     DEPS IntrinsicCore EnTT::EnTT
 )
 
