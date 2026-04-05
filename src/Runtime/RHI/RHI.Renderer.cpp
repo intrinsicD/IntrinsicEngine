@@ -33,7 +33,7 @@ namespace RHI
         assert(m_Device->GetQueueIndices().GraphicsFamily.has_value() && "GraphicsFamily required for renderer");
         poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value();
 
-        VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));
+        VK_CHECK_FATAL(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));
 
         m_CommandBuffers.resize(m_FramesInFlight);
 
@@ -43,7 +43,7 @@ namespace RHI
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
 
-        VK_CHECK(vkAllocateCommandBuffers(m_Device->GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()));
+        VK_CHECK_FATAL(vkAllocateCommandBuffers(m_Device->GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()));
 
         // Optional GPU timestamping; safe to keep null if unsupported.
         m_GpuProfiler = std::make_unique<GpuProfiler>(m_Device);
@@ -93,9 +93,9 @@ namespace RHI
 
         for (size_t i = 0; i < m_FramesInFlight; i++)
         {
-            VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]));
-            VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]));
-            VK_CHECK(vkCreateFence(m_Device->GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFences[i]));
+            VK_CHECK_FATAL(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]));
+            VK_CHECK_FATAL(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]));
+            VK_CHECK_FATAL(vkCreateFence(m_Device->GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFences[i]));
         }
     }
 
@@ -195,13 +195,13 @@ namespace RHI
         // deferred work scheduled during command-buffer recording.
         m_Device->IncrementGlobalFrame();
 
-        VK_CHECK(vkResetFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]));
+        VK_CHECK_FATAL(vkResetFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]));
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
-        VK_CHECK(vkResetCommandBuffer(cmd, 0));
+        VK_CHECK_FATAL(vkResetCommandBuffer(cmd, 0));
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+        VK_CHECK_FATAL(vkBeginCommandBuffer(cmd, &beginInfo));
 
         if (m_GpuProfiler)
         {
@@ -299,7 +299,7 @@ namespace RHI
             m_GpuProfiler->WriteFrameEnd(cmd);
         }
 
-        VK_CHECK(vkEndCommandBuffer(cmd));
+        VK_CHECK_FATAL(vkEndCommandBuffer(cmd));
 
         // Attach a timeline signal to this submit.
         const uint64_t signalValue = m_Device->SignalGraphicsTimeline();
@@ -333,7 +333,7 @@ namespace RHI
         submitInfo.signalSemaphoreCount = 2;
         submitInfo.pSignalSemaphores = submitSignalSemaphores;
 
-        VK_CHECK(m_Device->SubmitToGraphicsQueue(submitInfo, m_InFlightFences[m_CurrentFrame]));
+        VK_CHECK_FATAL(m_Device->SubmitToGraphicsQueue(submitInfo, m_InFlightFences[m_CurrentFrame]));
 
         // --- Non-blocking resolve of an older frame (avoid stalls) ---
         // Cache the result for the orchestrator to consume per-FrameContext (B4.9).

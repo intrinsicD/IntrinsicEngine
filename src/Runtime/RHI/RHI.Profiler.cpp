@@ -70,7 +70,7 @@ namespace RHI
         info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
         info.queryType = VK_QUERY_TYPE_TIMESTAMP;
         info.queryCount = newMax;
-        VK_CHECK(vkCreateQueryPool(m_Device->GetLogicalDevice(), &info, nullptr, &m_QueryPool));
+        VK_CHECK_FATAL(vkCreateQueryPool(m_Device->GetLogicalDevice(), &info, nullptr, &m_QueryPool));
 
         m_MaxQueries = newMax;
     }

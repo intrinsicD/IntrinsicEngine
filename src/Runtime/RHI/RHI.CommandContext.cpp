@@ -60,7 +60,7 @@ namespace RHI
                 poolInfo.queueFamilyIndex = device.GetQueueIndices().GraphicsFamily.value();
                 poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-                VK_CHECK(vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &s_Thread.Pool));
+                VK_CHECK_FATAL(vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &s_Thread.Pool));
                 s_Thread.OwnerDevicePtr = &device;
                 s_Thread.FramesInFlight = device.GetFramesInFlight();
                 if (s_Thread.FramesInFlight == 0 || s_Thread.FramesInFlight > ThreadData::kMaxFramesInFlight)
@@ -80,7 +80,7 @@ namespace RHI
             allocInfo.commandBufferCount = 1;
 
             VkCommandBuffer cmd = VK_NULL_HANDLE;
-            VK_CHECK(vkAllocateCommandBuffers(device.GetLogicalDevice(), &allocInfo, &cmd));
+            VK_CHECK_FATAL(vkAllocateCommandBuffers(device.GetLogicalDevice(), &allocInfo, &cmd));
             return cmd;
         }
     }
@@ -113,7 +113,7 @@ namespace RHI
 
         // Reset is allowed because pool has RESET_COMMAND_BUFFER_BIT.
         // Safety relies on the renderer waiting on the in-flight fence for this slot.
-        VK_CHECK(vkResetCommandBuffer(cmd, 0));
+        VK_CHECK_FATAL(vkResetCommandBuffer(cmd, 0));
 
         const bool isRasterSecondary = inherit.IsRaster();
 
@@ -147,14 +147,14 @@ namespace RHI
             beginInfo.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
         }
 
-        VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+        VK_CHECK_FATAL(vkBeginCommandBuffer(cmd, &beginInfo));
         return cmd;
     }
 
     void CommandContext::End(VkCommandBuffer cmd)
     {
         if (cmd == VK_NULL_HANDLE) return;
-        VK_CHECK(vkEndCommandBuffer(cmd));
+        VK_CHECK_FATAL(vkEndCommandBuffer(cmd));
     }
 
     void CommandContext::Reset(VulkanDevice& device)
@@ -168,6 +168,6 @@ namespace RHI
         s_Thread.LastEpochPerFrame[0] = ~0ull;
         s_Thread.LastEpochPerFrame[1] = ~0ull;
         s_Thread.LastEpochPerFrame[2] = ~0ull;
-        VK_CHECK(vkResetCommandPool(device.GetLogicalDevice(), s_Thread.Pool, 0));
+        VK_CHECK_FATAL(vkResetCommandPool(device.GetLogicalDevice(), s_Thread.Pool, 0));
     }
 }

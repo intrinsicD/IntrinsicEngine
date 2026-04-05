@@ -80,7 +80,7 @@ namespace RHI
         layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
         layoutInfo.pNext = &bindingFlags;
 
-        VK_CHECK(vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout));
+        VK_CHECK_FATAL(vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout));
     }
 
     void BindlessDescriptorSystem::CreatePoolAndSet()
@@ -96,7 +96,7 @@ namespace RHI
         poolInfo.pPoolSizes = &poolSize;
         poolInfo.maxSets = 1;
 
-        VK_CHECK(vkCreateDescriptorPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_Pool));
+        VK_CHECK_FATAL(vkCreateDescriptorPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_Pool));
 
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -104,7 +104,7 @@ namespace RHI
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &m_Layout;
 
-        VK_CHECK(vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &m_GlobalSet));
+        VK_CHECK_FATAL(vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &m_GlobalSet));
     }
 
     void BindlessDescriptorSystem::SetTexture(uint32_t index, VkImageView view, VkSampler sampler, VkImageLayout layout)

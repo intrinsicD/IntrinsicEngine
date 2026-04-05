@@ -159,7 +159,7 @@ namespace Graphics
                 layoutInfo.bindingCount = 2;
                 layoutInfo.pBindings = bindings;
 
-                VK_CHECK(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr,
+                VK_CHECK_FATAL(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr,
                                                     &m_Impl->Stage1InstanceSetLayout));
 
                 // NOTE: Do NOT SafeDestroy() this layout. SafeDestroy schedules deletion a frame later,
@@ -620,7 +620,7 @@ namespace Graphics
                 layoutInfo.bindingCount = 3;
                 layoutInfo.pBindings = bindings;
 
-                VK_CHECK(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Impl->SceneUpdateSetLayout));
+                VK_CHECK_FATAL(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Impl->SceneUpdateSetLayout));
             }
 
             if (!m_Impl->SceneUpdatePipeline)
@@ -703,7 +703,7 @@ namespace Graphics
                 layoutInfo.bindingCount = 7;
                 layoutInfo.pBindings = bindings;
 
-                VK_CHECK(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Impl->CullSetLayout));
+                VK_CHECK_FATAL(vkCreateDescriptorSetLayout(m_Impl->Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Impl->CullSetLayout));
             }
 
             if (!m_Impl->CullPipeline)

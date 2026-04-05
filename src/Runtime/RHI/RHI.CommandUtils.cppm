@@ -42,7 +42,7 @@ export namespace RHI::CommandUtils
             assert(device.GetQueueIndices().GraphicsFamily.has_value() && "GraphicsFamily required for command utils");
             poolInfo.queueFamilyIndex = device.GetQueueIndices().GraphicsFamily.value();
 
-            VK_CHECK(vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.CommandPool));
+            VK_CHECK_FATAL(vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.CommandPool));
 
             ctx.OwnerDevicePtr = &device;
             device.RegisterThreadLocalPool(ctx.CommandPool);
@@ -55,18 +55,18 @@ export namespace RHI::CommandUtils
         allocInfo.commandBufferCount = 1;
 
         VkCommandBuffer commandBuffer;
-        VK_CHECK(vkAllocateCommandBuffers(device.GetLogicalDevice(), &allocInfo, &commandBuffer));
+        VK_CHECK_FATAL(vkAllocateCommandBuffers(device.GetLogicalDevice(), &allocInfo, &commandBuffer));
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+        VK_CHECK_FATAL(vkBeginCommandBuffer(commandBuffer, &beginInfo));
         return commandBuffer;
     }
 
     void EndSingleTimeCommands(VulkanDevice& device, VkCommandBuffer commandBuffer) {
-        VK_CHECK(vkEndCommandBuffer(commandBuffer));
+        VK_CHECK_FATAL(vkEndCommandBuffer(commandBuffer));
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -77,14 +77,14 @@ export namespace RHI::CommandUtils
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         VkFence fence;
-        VK_CHECK(vkCreateFence(device.GetLogicalDevice(), &fenceInfo, nullptr, &fence));
+        VK_CHECK_FATAL(vkCreateFence(device.GetLogicalDevice(), &fenceInfo, nullptr, &fence));
 
         // Submit
-        VK_CHECK(device.SubmitToGraphicsQueue(submitInfo, fence));
+        VK_CHECK_FATAL(device.SubmitToGraphicsQueue(submitInfo, fence));
 
         // Wait (Blocking!) - We keep this for compatibility with old code,
         // but new code should avoid calling this if possible.
-        VK_CHECK(vkWaitForFences(device.GetLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX));
+        VK_CHECK_FATAL(vkWaitForFences(device.GetLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX));
         vkDestroyFence(device.GetLogicalDevice(), fence, nullptr);
 
         ThreadRenderContext& ctx = GetThreadContext();

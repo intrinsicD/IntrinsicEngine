@@ -239,17 +239,9 @@ Independent tracks that improve iteration speed and observability. Not rendering
 
 Translate the latest commit-audit findings into concrete remediation work items with explicit test gates. This section is intentionally detailed so each risk can be closed with evidence instead of ad-hoc fixes.
 
-**E3a — Vulkan error semantics policy (release vs debug parity):**
-- [ ] Replace global "log-and-continue" release behavior with callsite-aware policies:
-  - [ ] `VK_CHECK_FATAL(...)` for operations that invalidate frame safety on failure (object creation, queue submit, command buffer begin/end, swapchain image acquire/present transitions).
-  - [ ] `VK_CHECK_RETURN(...)` / `VK_CHECK_BOOL(...)` for operations with explicit recovery paths.
-  - [ ] Keep debug-time fail-fast diagnostics (`file:line`, expression text, result code), but ensure release paths still enforce deterministic control flow.
-- [ ] Audit all `VK_CHECK(...)` callsites under `src/Runtime/RHI` and `src/Runtime/Graphics`:
-  - [ ] classify each callsite as fatal/recoverable/telemetry-only;
-  - [ ] update code accordingly with explicit return/propagation behavior.
-- [ ] Add focused tests for failure propagation (mock/fault-injected Vulkan function table where possible):
-  - [ ] failed pipeline creation does not continue into submission with invalid handles;
-  - [ ] failed command buffer begin/end aborts affected submission path deterministically.
+**E3a — Vulkan error semantics policy (release vs debug parity): Complete.**
+
+Four callsite-aware macros (`VK_CHECK_FATAL`, `VK_CHECK_RETURN`, `VK_CHECK_BOOL`, `VK_CHECK_WARN`) replace the old undifferentiated `VK_CHECK`. All 42 callsites across 8 source files audited and classified: 36 fatal (object creation, submit, command buffer lifecycle), 3 warn (timeline semaphore queries with safe zero-init defaults), 3 fatal (descriptor set layout creation). Eight unit tests including a GTest death test verify control-flow contracts. See git history for details.
 
 **E3b — Queue-family safety and initialization contracts:**
 - [ ] Eliminate raw `.value()` access for queue-family optionals in hot paths unless prevalidated by invariant checks that survive release builds.
