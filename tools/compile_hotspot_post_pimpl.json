@@ -1,0 +1,186 @@
+{
+  "build_dir": "build",
+  "top": 20,
+  "rows": [
+    {
+      "duration_ms": 48132,
+      "output": "src/Runtime/CMakeFiles/IntrinsicRuntime.dir/EditorUI/Runtime.EditorUI.cppm.o",
+      "source": "src/Runtime/EditorUI/Runtime.EditorUI.cppm",
+      "source_lines": 775,
+      "includes": 8,
+      "imports": 28,
+      "exports": 2
+    },
+    {
+      "duration_ms": 48132,
+      "output": "src/Runtime/CMakeFiles/IntrinsicRuntime.dir/Runtime.EditorUI.pcm",
+      "source": "src/Runtime/EditorUI/Runtime.EditorUI.cpp",
+      "source_lines": 1239,
+      "includes": 11,
+      "imports": 15,
+      "exports": 0
+    },
+    {
+      "duration_ms": 37438,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Passes/Graphics.Passes.Surface.cppm.o",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.Surface.cppm",
+      "source_lines": 358,
+      "includes": 8,
+      "imports": 11,
+      "exports": 2
+    },
+    {
+      "duration_ms": 37438,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.Passes.Surface.pcm",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.Surface.cpp",
+      "source_lines": 1692,
+      "includes": 13,
+      "imports": 21,
+      "exports": 0
+    },
+    {
+      "duration_ms": 34847,
+      "output": "src/Runtime/CMakeFiles/IntrinsicRuntime.dir/Runtime.Engine.cppm.o",
+      "source": "src/Runtime/Runtime.Engine.cppm",
+      "source_lines": 215,
+      "includes": 7,
+      "imports": 25,
+      "exports": 2
+    },
+    {
+      "duration_ms": 34847,
+      "output": "src/Runtime/CMakeFiles/IntrinsicRuntime.dir/Runtime.Engine.pcm",
+      "source": "src/Runtime/Runtime.Engine.cpp",
+      "source_lines": 735,
+      "includes": 8,
+      "imports": 25,
+      "exports": 0
+    },
+    {
+      "duration_ms": 34365,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Passes/Graphics.Passes.HtexPatchPreview.cppm.o",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.HtexPatchPreview.cppm",
+      "source_lines": 145,
+      "includes": 8,
+      "imports": 12,
+      "exports": 2
+    },
+    {
+      "duration_ms": 34365,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.Passes.HtexPatchPreview.pcm",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.HtexPatchPreview.cpp",
+      "source_lines": 702,
+      "includes": 16,
+      "imports": 19,
+      "exports": 0
+    },
+    {
+      "duration_ms": 30722,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.LifecycleUtils.cppm.o",
+      "source": "src/Runtime/Graphics/Graphics.LifecycleUtils.cppm",
+      "source_lines": 175,
+      "includes": 2,
+      "imports": 6,
+      "exports": 2
+    },
+    {
+      "duration_ms": 30722,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.LifecycleUtils.pcm",
+      "source": "src/Runtime/Graphics/Graphics.LifecycleUtils.cppm",
+      "source_lines": 175,
+      "includes": 2,
+      "imports": 6,
+      "exports": 2
+    },
+    {
+      "duration_ms": 27262,
+      "output": "src/Runtime/CMakeFiles/IntrinsicRuntime.dir/Runtime.PointCloudKMeans.cppm.o",
+      "source": "src/Runtime/Runtime.PointCloudKMeans.cppm",
+      "source_lines": 104,
+      "includes": 2,
+      "imports": 4,
+      "exports": 2
+    },
+    {
+      "duration_ms": 27262,
+      "output": "src/Runtime/CMakeFiles/IntrinsicRuntime.dir/Runtime.PointCloudKMeans.pcm",
+      "source": "src/Runtime/Runtime.PointCloudKMeans.cpp",
+      "source_lines": 1397,
+      "includes": 23,
+      "imports": 13,
+      "exports": 0
+    },
+    {
+      "duration_ms": 26698,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.RenderDriver.cppm.o",
+      "source": "src/Runtime/Graphics/Graphics.RenderDriver.cppm",
+      "source_lines": 143,
+      "includes": 7,
+      "imports": 24,
+      "exports": 2
+    },
+    {
+      "duration_ms": 26698,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.RenderDriver.pcm",
+      "source": "src/Runtime/Graphics/Graphics.RenderDriver.cpp",
+      "source_lines": 1486,
+      "includes": 14,
+      "imports": 26,
+      "exports": 0
+    },
+    {
+      "duration_ms": 26671,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Passes/Graphics.Passes.SelectionOutline.cppm.o",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.SelectionOutline.cppm",
+      "source_lines": 86,
+      "includes": 7,
+      "imports": 10,
+      "exports": 2
+    },
+    {
+      "duration_ms": 26671,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.Passes.SelectionOutline.pcm",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.SelectionOutline.cpp",
+      "source_lines": 433,
+      "includes": 14,
+      "imports": 18,
+      "exports": 0
+    },
+    {
+      "duration_ms": 26151,
+      "output": "src/Apps/Sandbox/CMakeFiles/Sandbox.dir/main.cpp.o",
+      "source": "src/Apps/Sandbox/main.cpp",
+      "source_lines": 2645,
+      "includes": 21,
+      "imports": 38,
+      "exports": 0
+    },
+    {
+      "duration_ms": 24776,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Passes/Graphics.Passes.Picking.cppm.o",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.Picking.cppm",
+      "source_lines": 70,
+      "includes": 5,
+      "imports": 8,
+      "exports": 2
+    },
+    {
+      "duration_ms": 24776,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.Passes.Picking.pcm",
+      "source": "src/Runtime/Graphics/Passes/Graphics.Passes.Picking.cpp",
+      "source_lines": 345,
+      "includes": 12,
+      "imports": 14,
+      "exports": 0
+    },
+    {
+      "duration_ms": 24744,
+      "output": "src/Runtime/Graphics/CMakeFiles/IntrinsicGraphics.dir/Graphics.RenderPipeline.cppm.o",
+      "source": "src/Runtime/Graphics/Graphics.RenderPipeline.cppm",
+      "source_lines": 836,
+      "includes": 10,
+      "imports": 23,
+      "exports": 2
+    }
+  ]
+}
