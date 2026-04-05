@@ -235,6 +235,66 @@ Independent tracks that improve iteration speed and observability. Not rendering
 
 (E1 Shader Hot-Reload and E2 GPU Memory Budget Warning are complete; see git history.)
 
+#### E3. Post-Review Correctness Hardening (2026-04-04 → 2026-04-05 commit audit)
+
+Translate the latest commit-audit findings into concrete remediation work items with explicit test gates. This section is intentionally detailed so each risk can be closed with evidence instead of ad-hoc fixes.
+
+**E3a — Vulkan error semantics policy (release vs debug parity):**
+- [ ] Replace global "log-and-continue" release behavior with callsite-aware policies:
+  - [ ] `VK_CHECK_FATAL(...)` for operations that invalidate frame safety on failure (object creation, queue submit, command buffer begin/end, swapchain image acquire/present transitions).
+  - [ ] `VK_CHECK_RETURN(...)` / `VK_CHECK_BOOL(...)` for operations with explicit recovery paths.
+  - [ ] Keep debug-time fail-fast diagnostics (`file:line`, expression text, result code), but ensure release paths still enforce deterministic control flow.
+- [ ] Audit all `VK_CHECK(...)` callsites under `src/Runtime/RHI` and `src/Runtime/Graphics`:
+  - [ ] classify each callsite as fatal/recoverable/telemetry-only;
+  - [ ] update code accordingly with explicit return/propagation behavior.
+- [ ] Add focused tests for failure propagation (mock/fault-injected Vulkan function table where possible):
+  - [ ] failed pipeline creation does not continue into submission with invalid handles;
+  - [ ] failed command buffer begin/end aborts affected submission path deterministically.
+
+**E3b — Queue-family safety and initialization contracts:**
+- [ ] Eliminate raw `.value()` access for queue-family optionals in hot paths unless prevalidated by invariant checks that survive release builds.
+- [ ] Add a `ValidateQueueFamilyContract()` boot-time gate in RHI init:
+  - [ ] graphics family required;
+  - [ ] present family required when swapchain path enabled;
+  - [ ] transfer family optional with explicit fallback policy.
+- [ ] Harden transfer fallback logic:
+  - [ ] if transfer family is absent, use graphics family only after runtime validation;
+  - [ ] if required families are missing, fail RHI init with explicit diagnostics instead of abrupt termination.
+- [ ] Add tests covering devices with:
+  - [ ] dedicated transfer queue present;
+  - [ ] no dedicated transfer queue;
+  - [ ] malformed/insufficient queue-family discovery results (expected graceful init failure).
+
+**E3c — TransferManager error-path resource hygiene:**
+- [ ] Fix `UploadBuffer` early-return leak path so command buffers are reclaimed when staging allocation fails.
+- [ ] Add RAII guard for transient command-buffer lifetime in transfer upload helpers (begin/end/free safety even on error branches).
+- [ ] Audit transfer upload methods for similar partial-failure leaks:
+  - [ ] command pools;
+  - [ ] semaphores/fences;
+  - [ ] staging allocations.
+- [ ] Add stress test: force repeated staging allocation failures and verify no monotonic growth in command-buffer allocations or pool pressure.
+
+**E3d — Shader hot-reload process execution hardening:**
+- [ ] Replace shell-string `std::system(...)` compilation path with structured process spawn API (argv-based, no shell interpolation).
+- [ ] Capture compiler stdout/stderr streams and surface them in Editor Console + logs with source file association.
+- [ ] Add timeout + cancellation policy for stuck compiler invocations to avoid watcher-thread starvation.
+- [ ] Debounce/coalescing improvements:
+  - [ ] ensure include-file changes can trigger dependent shader recompiles deterministically;
+  - [ ] cap rebuild frequency under rapid file-save bursts.
+- [ ] Add integration tests for:
+  - [ ] compile failure keeps previous pipelines alive;
+  - [ ] compile success triggers exactly one rebuild after debounce window;
+  - [ ] path edge cases (spaces, quotes, non-ASCII filenames) compile safely.
+
+**E3e — Edge loop/ring deterministic selection semantics:**
+- [ ] Formalize edge-loop continuation for odd/irregular valence vertices with explicit tie-break rules.
+- [ ] Add selectable strategy modes for loop/ring traversal (at minimum: strict quad-only and permissive mixed-topology behavior).
+- [ ] Extend tests beyond strip fixtures:
+  - [ ] mixed tri/quad fans around extraordinary vertices;
+  - [ ] boundary-rich meshes and non-manifold rejection behavior;
+  - [ ] deterministic ordering guarantees across repeated runs.
+- [ ] Expose current strategy and limitations in editor UX (tooltip/help text) to reduce user confusion on non-quad topology.
+
 ### F. UI Architecture & Feature Wiring
 
 Wire implemented backend features to the editor UI and improve editor UX. Independent of rendering architecture work (A/B sections). High ROI: most items are pure UI additions over existing, tested backends.
@@ -480,5 +540,4 @@ Fast mesh self-intersection detection using BVH-accelerated triangle-triangle ov
 - [ ] GPU path (after C14 lands): use GPU LBVH with `rightmost` dedup for large meshes.
 - [ ] Publish `f:self_intersecting` boolean property and visualize via face highlight overlay.
 - [ ] Wire to Mesh Analysis panel (extends existing defect-marker UI).
-
 
