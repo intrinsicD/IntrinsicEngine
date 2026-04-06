@@ -364,6 +364,41 @@ For CUDA-enabled builds, substitute `dev-cuda` for `dev` in the commands above.
 | `IntrinsicECSTests` | Core + ECS | FrameGraph system integration |
 | `IntrinsicTests` | Full Runtime | Graphics, I/O, integration |
 
+### Adding new tests
+
+**File placement — one topic per file, in the correct OBJECT library:**
+
+| Your test needs… | Put it in… | OBJECT library (CMakeLists.txt) |
+|---|---|---|
+| Only `import Core;` (no ECS, no GPU) | `tests/Test_<Topic>.cpp` | `CoreTestObjs` |
+| `import ECS;` or FrameGraph systems | `tests/Test_<Topic>.cpp` | `ECSTestObjs` |
+| `import Geometry;` (mesh/graph/spatial, no GPU) | `tests/Test_<Topic>.cpp` | `GeometryTestObjs` |
+| `import Runtime;`, `import Graphics;`, or Vulkan/ECS rendering | `tests/Test_<Topic>.cpp` | `RuntimeTestObjs` |
+
+After creating a new `.cpp`, add it to the matching `intrinsic_test_object_lib()` block in `tests/CMakeLists.txt`.
+
+**File organization rules:**
+
+- **One dedicated file per algorithm/subsystem.** Do not add tests to "mega" files like `Test_RuntimeGeometry.cpp` or `Test_MeshOperations.cpp`. Instead, create or extend the dedicated file (e.g., `Test_Smoothing.cpp` for smoothing, `Test_Octree.cpp` for octree).
+- **Never duplicate tests across files.** If a topic already has a dedicated file, all tests for that topic go there — not in a broader integration file alongside it.
+- **Shared mesh builders** live in `tests/Test_MeshBuilders.h` (inline functions, included after `import Geometry;`). Add new reusable mesh/graph factories there rather than duplicating them across test files.
+- **Local helpers** (only needed in one file) go in an anonymous namespace — not `static` functions.
+- **Cross-TU tests** (e.g., `Test_FrameGraphTypeTokenHelper.cpp` testing TypeToken stability across translation units) must stay in separate files.
+
+**Naming conventions:**
+
+- File: `Test_<SubsystemOrAlgorithm>.cpp` (e.g., `Test_Geodesic.cpp`, `Test_RenderPassContracts.cpp`).
+- Test suite: Match the subsystem (`TEST(Geodesic, SourceVertexHasZeroDistance)`). Use `_` to separate sub-categories (`TEST(Curvature_Gaussian, GaussBonnetOnClosedMesh)`).
+- Keep test names descriptive: `<What>_<ExpectedBehavior>` (e.g., `EmptyMeshReturnsNullopt`, `SphereHasConstantMeanCurvature`).
+
+**Test style:**
+
+- Use `EXPECT_*` for non-fatal checks, `ASSERT_*` only when continuing is meaningless (e.g., null pointer, empty container that will be indexed).
+- No `EXPECT_NO_THROW` — the project builds with `-fno-exceptions`. Check results directly.
+- Suppress `[[nodiscard]]` warnings on fire-and-forget calls with `(void)expr;`.
+- Compile-time contract tests (`static_assert` + `SUCCEED()`) are acceptable for type traits but do not count as behavioral coverage.
+- Prefer exact assertions (`EXPECT_EQ`) over loose bounds (`EXPECT_GE`) when the expected value is deterministic.
+
 ### Key principles
 
 - **Build after every file edit.** C++23 modules require explicit imports — transitive visibility rules differ from header-based builds. Build the touched target after every module interface or implementation change **before moving to the next file**. This catches missing imports immediately instead of accumulating errors across multiple files.
