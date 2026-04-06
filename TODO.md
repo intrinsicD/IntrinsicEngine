@@ -186,14 +186,17 @@ Split into two sub-phases:
 - [ ] Frame-pacing modes deferred to a later item: editor-throttled, background-throttled, and uncapped modes are out of scope for now. Track remaining modes when the submission stage is stable.
 - [ ] Add integration test: resource retirement correctly reclaims GPU resources after timeline completion.
 
-#### B6. Maintenance Lane Completion
+#### B6. Maintenance Lane Completion — Complete
 
-Verify that the centralized maintenance lane (from commit `25d5bd2`) covers all remaining concerns. If gaps exist, close them:
+Audit confirmed the centralized maintenance lane (from commit `25d5bd2`) covers all B6 concerns:
 
-- [ ] Garbage collection of retired GPU resources.
-- [ ] Profiler rollup and telemetry capture.
-- [ ] Hot-reload bookkeeping (shader, texture, material).
-- [ ] Add integration test: maintenance lane correctly retires resources after N frames.
+- GPU garbage collection: timeline-based `CollectGarbage()`, transfer GC, texture/material deletions.
+- GPU readback processing: `ProcessCompletedReadbacks()` handles pick readbacks after GPU completion.
+- Profiler rollup: GPU profiler data in render lane's `BeginFrame()`; CPU telemetry (simulation stats, framegraph timings, task scheduler stats, memory budgets) in maintenance lane's `CaptureFrameTelemetry()`.
+- Hot-reload bookkeeping: `BookkeepHotReloads()` covers shader hot-reload (the only implemented hot-reload type).
+- Integration tests: `Test_MaintenanceLane.cpp` — 2 CPU-only coordinator contract tests (multi-frame call sequence verification, telemetry isolation) + 4 GPU integration tests (deferred deletion lifecycle, timeline ordering, real buffer retirement, multi-frame retirement cycle). GPU tests skip gracefully when no Vulkan ICD is available.
+
+See git history for details.
 
 ### D. GPU Compute Backend — Phase 2
 
