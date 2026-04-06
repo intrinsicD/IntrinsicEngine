@@ -427,10 +427,8 @@ Coherent Point Drift (Myronenko & Song 2010) for deformable point cloud alignmen
 
 Extend the existing DEC module with adaptive edge weighting variants from Engine24's `GraphLaplacianOperator`.
 
-- [ ] **Heat kernel weights:** `w_ij = exp(-||p_i - p_j||² / 4t)` with automatic time parameter selection (e.g. mean edge length squared). Provides distance-adaptive smoothing for irregular graph/mesh connectivity.
-- [ ] **GMM-weighted Laplacian:** Mahalanobis-distance edge weights from per-vertex covariance matrices. Enables anisotropy-aware spectral analysis. Requires per-vertex covariance computation from local neighborhoods.
-- [ ] Integrate both variants into `LaplacianCache` as alternative `BuildOperators()` modes selectable via enum.
-- [ ] Validate via `AnalyzeLaplacian()` — both variants must satisfy symmetry and row-sum invariants.
+- [x] **Heat kernel weights:** `w_ij = exp(-||p_i - p_j||² / 4t)` with automatic time parameter selection (mean squared edge length). Implemented via `EdgeWeightMode::HeatKernel` enum and `EdgeWeightConfig` struct. Integrated into `BuildHodgeStar1`, `BuildLaplacian`, `BuildOperators`, and `BuildLaplacianCache` as weighted overloads. Validated via `AnalyzeLaplacian()` — passes all structural invariants (symmetry, zero row sums, non-positive off-diagonal, positive diagonal, diagonal dominance). Always-positive weights provide robustness on meshes with obtuse triangles where cotan weights go negative. 16 focused tests.
+- [ ] **GMM-weighted Laplacian:** Mahalanobis-distance edge weights from per-vertex covariance matrices. Enables anisotropy-aware spectral analysis. Requires per-vertex covariance computation from local neighborhoods. Deferred — depends on GMM infrastructure from C11.
 
 ### C18. SPIR-V Shader Reflection for Automatic Pipeline Layout
 

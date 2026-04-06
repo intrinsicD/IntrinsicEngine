@@ -14,6 +14,39 @@ import Geometry.HalfedgeMesh;
 export namespace Geometry::DEC
 {
     // -------------------------------------------------------------------------
+    // EdgeWeightMode — selects the edge weighting scheme for Laplacian assembly
+    // -------------------------------------------------------------------------
+    //
+    // Cotan weights are the standard DEC choice for triangle meshes.
+    // Heat kernel and distance-based weights provide alternatives for
+    // irregular graphs, distance-adaptive spectral analysis, and robustness
+    // on meshes with obtuse triangles (where cotan weights can be negative).
+
+    enum class EdgeWeightMode : std::uint8_t
+    {
+        // (cot α_ij + cot β_ij) / 2 — standard DEC cotan weights.
+        // Requires a triangle mesh. Can be negative at obtuse angles.
+        Cotan = 0,
+
+        // exp(-||p_i - p_j||² / 4t) — heat kernel weights.
+        // Always positive. Distance-adaptive smoothing for irregular
+        // connectivity. The time parameter t controls the scale:
+        //   t → 0: weights concentrate on short edges (→ combinatorial)
+        //   t → ∞: weights approach 1 (uniform weighting)
+        // When TimeParam == 0, t is set automatically to mean edge length².
+        HeatKernel = 1,
+    };
+
+    // Configuration for non-default edge weighting schemes.
+    struct EdgeWeightConfig
+    {
+        EdgeWeightMode Mode{EdgeWeightMode::Cotan};
+
+        // Time parameter for HeatKernel mode.
+        // If <= 0 (default), automatically set to mean squared edge length.
+        double TimeParam{0.0};
+    };
+    // -------------------------------------------------------------------------
     // SparseMatrix — Compressed Sparse Row (CSR) representation
     // -------------------------------------------------------------------------
     // Lightweight CSR matrix for DEC operator storage. DEC operators have
@@ -158,6 +191,15 @@ export namespace Geometry::DEC
     // triangles. Boundary edges use only the one available angle.
     [[nodiscard]] DiagonalMatrix BuildHodgeStar1(const Halfedge::Mesh& mesh);
 
+    // Weighted variant: select edge weighting scheme via EdgeWeightConfig.
+    // When mode != Cotan, the returned matrix is a per-edge weight matrix
+    // (not the geometric DEC Hodge star), stored in the Hodge1 slot of
+    // DECOperators for uniform Laplacian assembly. Downstream consumers
+    // that rely on DEC-specific Hodge star semantics (e.g., discrete
+    // Hodge decomposition) should use Cotan mode only.
+    [[nodiscard]] DiagonalMatrix BuildHodgeStar1(const Halfedge::Mesh& mesh,
+                                                  const EdgeWeightConfig& config);
+
     // Build the Hodge star ⋆2: diagonal matrix of 1/(triangle area).
     [[nodiscard]] DiagonalMatrix BuildHodgeStar2(const Halfedge::Mesh& mesh);
 
@@ -170,8 +212,21 @@ export namespace Geometry::DEC
     // and numerical robustness.
     [[nodiscard]] SparseMatrix BuildLaplacian(const Halfedge::Mesh& mesh);
 
+    // Weighted variant: assembles the graph Laplacian with the specified
+    // edge weighting. For HeatKernel mode, the Laplacian is always a valid
+    // graph Laplacian (symmetric, zero row sums, non-positive off-diagonal,
+    // positive diagonal) since heat kernel weights are strictly positive.
+    [[nodiscard]] SparseMatrix BuildLaplacian(const Halfedge::Mesh& mesh,
+                                               const EdgeWeightConfig& config);
+
     // Build all DEC operators at once.
     [[nodiscard]] DECOperators BuildOperators(const Halfedge::Mesh& mesh);
+
+    // Weighted variant: builds all DEC operators with the specified edge
+    // weighting for ⋆1 and Laplacian. D0, D1, ⋆0, ⋆2 are topology/area-
+    // dependent and remain unchanged regardless of weight mode.
+    [[nodiscard]] DECOperators BuildOperators(const Halfedge::Mesh& mesh,
+                                               const EdgeWeightConfig& config);
 
     // -------------------------------------------------------------------------
     // Conjugate Gradient Solver (Jacobi-preconditioned)
@@ -241,6 +296,11 @@ export namespace Geometry::DEC
     /// Build a LaplacianCache from a mesh: assembles all DEC operators plus
     /// derived inverse-mass and symmetric-normalized Laplacian forms.
     [[nodiscard]] LaplacianCache BuildLaplacianCache(const Halfedge::Mesh& mesh);
+
+    /// Weighted variant: uses the specified edge weighting for Laplacian
+    /// and Hodge star assembly.
+    [[nodiscard]] LaplacianCache BuildLaplacianCache(const Halfedge::Mesh& mesh,
+                                                      const EdgeWeightConfig& config);
 
     // -------------------------------------------------------------------------
     // Laplacian Diagnostics — structural validation for debugging

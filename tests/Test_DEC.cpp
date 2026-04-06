@@ -927,3 +927,332 @@ TEST(DEC_Diagnostics, EmptyMatrixDoesNotCrash)
     // Empty matrix should fail all checks (nothing to validate)
     EXPECT_FALSE(diag.AllPassed());
 }
+
+// =============================================================================
+// Heat Kernel Weights — EdgeWeightMode::HeatKernel
+// =============================================================================
+
+TEST(DEC_HeatKernel, HodgeStar1AllPositive)
+{
+    // Heat kernel weights are always positive (exp(...) > 0).
+    auto mesh = MakeTetrahedron();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto h1 = Geometry::DEC::BuildHodgeStar1(mesh, config);
+
+    EXPECT_EQ(h1.Size, mesh.EdgesSize());
+    for (std::size_t i = 0; i < h1.Size; ++i)
+    {
+        EXPECT_GT(h1.Diagonal[i], 0.0) << "Edge " << i;
+        EXPECT_LE(h1.Diagonal[i], 1.0) << "Edge " << i << " (exp <= 1 for non-zero dist)";
+    }
+}
+
+TEST(DEC_HeatKernel, RegularTetrahedronEqualWeights)
+{
+    // Regular tetrahedron: all edges have the same length => equal heat kernel weights.
+    auto mesh = MakeTetrahedron();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto h1 = Geometry::DEC::BuildHodgeStar1(mesh, config);
+
+    for (std::size_t i = 1; i < h1.Size; ++i)
+    {
+        EXPECT_NEAR(h1.Diagonal[i], h1.Diagonal[0], 1e-12) << "Edge " << i;
+    }
+}
+
+TEST(DEC_HeatKernel, AutoTimeParamMeanEdgeLengthSq)
+{
+    // With TimeParam=0 (default), time is set to mean squared edge length.
+    // For a regular tetrahedron: all edges have the same length L,
+    // so t = L^2, and weight = exp(-L^2 / (4*L^2)) = exp(-0.25).
+    auto mesh = MakeTetrahedron();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto h1 = Geometry::DEC::BuildHodgeStar1(mesh, config);
+
+    double expected = std::exp(-0.25);
+    for (std::size_t i = 0; i < h1.Size; ++i)
+    {
+        EXPECT_NEAR(h1.Diagonal[i], expected, 1e-10) << "Edge " << i;
+    }
+}
+
+TEST(DEC_HeatKernel, ExplicitTimeParam)
+{
+    // With explicit t, weight = exp(-d^2 / (4*t)).
+    auto mesh = MakeSingleTriangle();  // equilateral, side=1
+    double t = 2.0;
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel, t};
+    auto h1 = Geometry::DEC::BuildHodgeStar1(mesh, config);
+
+    // Edge length ≈ 1 for equilateral triangle with side 1 (float positions)
+    double expected = std::exp(-1.0 / (4.0 * t));  // exp(-0.125)
+    for (std::size_t i = 0; i < h1.Size; ++i)
+    {
+        EXPECT_NEAR(h1.Diagonal[i], expected, 1e-6) << "Edge " << i;
+    }
+}
+
+TEST(DEC_HeatKernel, LargeTimeLimitUniform)
+{
+    // As t → ∞, heat kernel weights → 1 (uniform).
+    auto mesh = MakeTwoTriangleSquare();
+    double largeT = 1e10;
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel, largeT};
+    auto h1 = Geometry::DEC::BuildHodgeStar1(mesh, config);
+
+    for (std::size_t i = 0; i < h1.Size; ++i)
+    {
+        EXPECT_NEAR(h1.Diagonal[i], 1.0, 1e-6) << "Edge " << i;
+    }
+}
+
+TEST(DEC_HeatKernel, SmallTimeDiscriminatesEdgeLengths)
+{
+    // For mixed edge lengths, smaller t makes shorter edges have higher weight.
+    auto mesh = MakeTwoTriangleSquare();  // has edges of length 1 and sqrt(2)
+    double smallT = 0.1;
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel, smallT};
+    auto h1 = Geometry::DEC::BuildHodgeStar1(mesh, config);
+
+    // Find min/max weights
+    double minW = 1.0, maxW = 0.0;
+    for (std::size_t i = 0; i < h1.Size; ++i)
+    {
+        minW = std::min(minW, h1.Diagonal[i]);
+        maxW = std::max(maxW, h1.Diagonal[i]);
+    }
+    // Short edges (length 1) should have higher weight than diagonal (length sqrt(2))
+    EXPECT_GT(maxW, minW);
+}
+
+TEST(DEC_HeatKernel, LaplacianPassesDiagnostics)
+{
+    // Heat kernel Laplacian should pass ALL structural diagnostics:
+    // symmetric, zero row sums, non-positive off-diag, positive diag, diag dominant.
+    auto mesh = MakeTetrahedron();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto L = Geometry::DEC::BuildLaplacian(mesh, config);
+    auto diag = Geometry::DEC::AnalyzeLaplacian(L);
+
+    EXPECT_TRUE(diag.AllPassed()) << "Heat kernel Laplacian should be a valid graph Laplacian";
+    EXPECT_TRUE(diag.IsSymmetric);
+    EXPECT_TRUE(diag.HasZeroRowSums);
+    EXPECT_TRUE(diag.HasNonPositiveOffDiag);
+    EXPECT_TRUE(diag.HasPositiveDiagonal);
+    EXPECT_TRUE(diag.IsDiagonallyDominant);
+}
+
+TEST(DEC_HeatKernel, LaplacianSubdividedTrianglePassesDiagnostics)
+{
+    auto mesh = MakeSubdividedTriangle();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto L = Geometry::DEC::BuildLaplacian(mesh, config);
+    auto diag = Geometry::DEC::AnalyzeLaplacian(L);
+
+    EXPECT_TRUE(diag.AllPassed());
+}
+
+TEST(DEC_HeatKernel, LaplacianConstantInKernel)
+{
+    // L * 1 = 0 for heat kernel Laplacian.
+    auto mesh = MakeSubdividedTriangle();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto L = Geometry::DEC::BuildLaplacian(mesh, config);
+
+    std::vector<double> ones(L.Cols, 1.0);
+    std::vector<double> result(L.Rows, 999.0);
+    L.Multiply(ones, result);
+
+    for (std::size_t i = 0; i < L.Rows; ++i)
+    {
+        EXPECT_NEAR(result[i], 0.0, 1e-10) << "Vertex " << i;
+    }
+}
+
+TEST(DEC_HeatKernel, LaplacianMatchesHodge1Weights)
+{
+    // Verify that BuildLaplacian(config) is consistent with BuildHodgeStar1(config):
+    // L[i,j] = -w_e for edge (i,j), L[i,i] = Σ_j w_{ij}
+    auto mesh = MakeTwoTriangleSquare();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel, 0.5};
+    auto L = Geometry::DEC::BuildLaplacian(mesh, config);
+    auto h1 = Geometry::DEC::BuildHodgeStar1(mesh, config);
+
+    // For each edge, the off-diagonal entries in L should equal -h1[edge]
+    for (std::size_t e = 0; e < mesh.EdgesSize(); ++e)
+    {
+        Geometry::EdgeHandle eh{static_cast<Geometry::PropertyIndex>(e)};
+        if (mesh.IsDeleted(eh))
+            continue;
+
+        Geometry::HalfedgeHandle hh{static_cast<Geometry::PropertyIndex>(2u * e)};
+        std::size_t vi = mesh.FromVertex(hh).Index;
+        std::size_t vj = mesh.ToVertex(hh).Index;
+        double w = h1.Diagonal[e];
+
+        // Find L[vi, vj]
+        bool found = false;
+        for (std::size_t k = L.RowOffsets[vi]; k < L.RowOffsets[vi + 1]; ++k)
+        {
+            if (L.ColIndices[k] == vj)
+            {
+                EXPECT_NEAR(L.Values[k], -w, 1e-12) << "L[" << vi << "," << vj << "]";
+                found = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(found) << "L[" << vi << "," << vj << "] not found";
+    }
+}
+
+TEST(DEC_HeatKernel, BuildOperatorsValid)
+{
+    auto mesh = MakeTetrahedron();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto ops = Geometry::DEC::BuildOperators(mesh, config);
+
+    EXPECT_TRUE(ops.IsValid());
+    // D0, D1 should match standard (topology-only)
+    auto stdOps = Geometry::DEC::BuildOperators(mesh);
+    EXPECT_EQ(ops.D0.Rows, stdOps.D0.Rows);
+    EXPECT_EQ(ops.D0.Cols, stdOps.D0.Cols);
+    EXPECT_EQ(ops.D0.NonZeros(), stdOps.D0.NonZeros());
+    // Hodge0, Hodge2 should match (area-based, weight-independent)
+    EXPECT_EQ(ops.Hodge0.Size, stdOps.Hodge0.Size);
+    for (std::size_t i = 0; i < ops.Hodge0.Size; ++i)
+    {
+        EXPECT_NEAR(ops.Hodge0.Diagonal[i], stdOps.Hodge0.Diagonal[i], 1e-14);
+    }
+}
+
+TEST(DEC_HeatKernel, LaplacianCacheValid)
+{
+    auto mesh = MakeTetrahedron();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh, config);
+
+    EXPECT_TRUE(cache.IsValid());
+    EXPECT_FALSE(cache.MassInverse.IsEmpty());
+    EXPECT_FALSE(cache.MassSqrtInverse.IsEmpty());
+    EXPECT_FALSE(cache.SymmetricNormalizedLaplacian.IsEmpty());
+}
+
+TEST(DEC_HeatKernel, SymNormalizedLaplacianSymmetric)
+{
+    auto mesh = MakeSubdividedTriangle();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh, config);
+
+    const auto& Lsym = cache.SymmetricNormalizedLaplacian;
+
+    for (std::size_t i = 0; i < Lsym.Rows; ++i)
+    {
+        for (std::size_t k = Lsym.RowOffsets[i]; k < Lsym.RowOffsets[i + 1]; ++k)
+        {
+            std::size_t j = Lsym.ColIndices[k];
+            double lij = Lsym.Values[k];
+
+            double lji = 0.0;
+            for (std::size_t m = Lsym.RowOffsets[j]; m < Lsym.RowOffsets[j + 1]; ++m)
+            {
+                if (Lsym.ColIndices[m] == i)
+                {
+                    lji = Lsym.Values[m];
+                    break;
+                }
+            }
+
+            EXPECT_NEAR(lij, lji, 1e-10)
+                << "L_sym[" << i << "," << j << "] != L_sym[" << j << "," << i << "]";
+        }
+    }
+}
+
+TEST(DEC_HeatKernel, ObtuseTriangleAlwaysPositive)
+{
+    // Key motivation: cotan weights can go negative at obtuse angles,
+    // but heat kernel weights are always strictly positive.
+    // MakeRightTriangle has a 90-degree angle. Make one more obtuse.
+    Geometry::Halfedge::Mesh mesh;
+    // Obtuse triangle: angle at v2 > 90 degrees
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({3.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({0.1f, 0.3f, 0.0f});  // very close to v0-v1 line → obtuse at v2
+    (void)mesh.AddTriangle(v0, v1, v2);
+
+    // Cotan weights: at least one should be negative for the obtuse triangle
+    auto h1Cotan = Geometry::DEC::BuildHodgeStar1(mesh);
+    bool hasNegativeCotan = false;
+    for (std::size_t i = 0; i < h1Cotan.Size; ++i)
+    {
+        if (h1Cotan.Diagonal[i] < 0.0)
+            hasNegativeCotan = true;
+    }
+    EXPECT_TRUE(hasNegativeCotan) << "Obtuse triangle should have at least one negative cotan weight";
+
+    // Heat kernel weights: all must be positive
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto h1Heat = Geometry::DEC::BuildHodgeStar1(mesh, config);
+    for (std::size_t i = 0; i < h1Heat.Size; ++i)
+    {
+        EXPECT_GT(h1Heat.Diagonal[i], 0.0) << "Heat kernel weight must be positive, edge " << i;
+    }
+
+    // Heat kernel Laplacian should still pass all diagnostics
+    auto L = Geometry::DEC::BuildLaplacian(mesh, config);
+    auto diag = Geometry::DEC::AnalyzeLaplacian(L);
+    EXPECT_TRUE(diag.AllPassed()) << "Heat kernel Laplacian on obtuse mesh should be valid";
+}
+
+TEST(DEC_HeatKernel, CotanModePassthrough)
+{
+    // EdgeWeightConfig with Cotan mode should produce identical results to default.
+    auto mesh = MakeTetrahedron();
+    Geometry::DEC::EdgeWeightConfig cotanConfig{Geometry::DEC::EdgeWeightMode::Cotan};
+
+    auto h1Default = Geometry::DEC::BuildHodgeStar1(mesh);
+    auto h1Config = Geometry::DEC::BuildHodgeStar1(mesh, cotanConfig);
+
+    EXPECT_EQ(h1Default.Size, h1Config.Size);
+    for (std::size_t i = 0; i < h1Default.Size; ++i)
+    {
+        EXPECT_DOUBLE_EQ(h1Default.Diagonal[i], h1Config.Diagonal[i]) << "Edge " << i;
+    }
+
+    auto LDefault = Geometry::DEC::BuildLaplacian(mesh);
+    auto LConfig = Geometry::DEC::BuildLaplacian(mesh, cotanConfig);
+
+    EXPECT_EQ(LDefault.Rows, LConfig.Rows);
+    EXPECT_EQ(LDefault.NonZeros(), LConfig.NonZeros());
+    for (std::size_t i = 0; i < LDefault.Values.size(); ++i)
+    {
+        EXPECT_DOUBLE_EQ(LDefault.Values[i], LConfig.Values[i]) << "Value index " << i;
+    }
+}
+
+TEST(DEC_HeatKernel, SolveCGShiftedWithHeatKernel)
+{
+    // Solve (M + t*L_hk)*x = b where L_hk is the heat kernel Laplacian.
+    // This validates that the heat kernel Laplacian works with the existing
+    // CG solver infrastructure (e.g., for heat method distance computation).
+    auto mesh = MakeSubdividedTriangle();
+    Geometry::DEC::EdgeWeightConfig config{Geometry::DEC::EdgeWeightMode::HeatKernel};
+    auto cache = Geometry::DEC::BuildLaplacianCache(mesh, config);
+
+    const auto& M = cache.Operators.Hodge0;
+    const auto& L = cache.Operators.Laplacian;
+    const std::size_t nV = M.Size;
+
+    // RHS: mass-weighted delta at vertex 0
+    std::vector<double> b(nV, 0.0);
+    b[0] = M.Diagonal[0];
+
+    std::vector<double> x(nV, 0.0);
+    Geometry::DEC::CGParams cgParams{1000, 1e-8};
+    auto result = Geometry::DEC::SolveCGShifted(M, 1.0, L, 1.0, b, x, cgParams);
+
+    EXPECT_TRUE(result.Converged) << "CG should converge for (M + L_hk)";
+    EXPECT_LT(result.ResidualNorm, 1e-6);
+    // Solution should be positive at vertex 0 (heat source)
+    EXPECT_GT(x[0], 0.0);
+}

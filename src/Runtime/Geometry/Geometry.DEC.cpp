@@ -281,6 +281,67 @@ namespace Geometry::DEC
     }
 
     // -------------------------------------------------------------------------
+    // BuildHodgeStar1 — weighted variant
+    // -------------------------------------------------------------------------
+
+    DiagonalMatrix BuildHodgeStar1(const Halfedge::Mesh& mesh,
+                                    const EdgeWeightConfig& config)
+    {
+        if (config.Mode == EdgeWeightMode::Cotan)
+        {
+            return BuildHodgeStar1(mesh);
+        }
+
+        const std::size_t nE = mesh.EdgesSize();
+
+        DiagonalMatrix hodge1;
+        hodge1.Size = nE;
+        hodge1.Diagonal.assign(nE, 0.0);
+
+        // Compute automatic time parameter if needed.
+        double timeParam = config.TimeParam;
+        if (config.Mode == EdgeWeightMode::HeatKernel && timeParam <= 0.0)
+        {
+            // Default: t = mean squared edge length
+            double sumLenSq = 0.0;
+            std::size_t edgeCount = 0;
+            for (std::size_t ei = 0; ei < nE; ++ei)
+            {
+                EdgeHandle eh{static_cast<PropertyIndex>(ei)};
+                if (mesh.IsDeleted(eh))
+                    continue;
+
+                HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
+                auto p0 = glm::dvec3(mesh.Position(mesh.FromVertex(h0)));
+                auto p1 = glm::dvec3(mesh.Position(mesh.ToVertex(h0)));
+                auto d = p1 - p0;
+                sumLenSq += glm::dot(d, d);
+                ++edgeCount;
+            }
+            timeParam = (edgeCount > 0) ? (sumLenSq / static_cast<double>(edgeCount)) : 1.0;
+        }
+
+        // Assemble weights per edge
+        for (std::size_t ei = 0; ei < nE; ++ei)
+        {
+            EdgeHandle eh{static_cast<PropertyIndex>(ei)};
+            if (mesh.IsDeleted(eh))
+                continue;
+
+            HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
+            auto p0 = glm::dvec3(mesh.Position(mesh.FromVertex(h0)));
+            auto p1 = glm::dvec3(mesh.Position(mesh.ToVertex(h0)));
+            auto d = p1 - p0;
+            double distSq = glm::dot(d, d);
+
+            // w_ij = exp(-||p_i - p_j||² / (4t))
+            hodge1.Diagonal[ei] = std::exp(-distSq / (4.0 * timeParam));
+        }
+
+        return hodge1;
+    }
+
+    // -------------------------------------------------------------------------
     // BuildHodgeStar2
     // -------------------------------------------------------------------------
     // ⋆2 diagonal: 1 / (area of face).
@@ -314,42 +375,24 @@ namespace Geometry::DEC
     }
 
     // -------------------------------------------------------------------------
-    // BuildLaplacian
+    // AssembleLaplacianFromWeights — shared CSR assembly logic
     // -------------------------------------------------------------------------
-    // Weak cotan Laplacian: L = d0ᵀ ⋆1 d0  (#V × #V).
-    //
-    // Assembled directly for efficiency. For each edge e = (i, j):
-    //   w_e = (cot α_e + cot β_e) / 2  (the Hodge star 1 weight)
-    //   L[i,j] += -w_e
-    //   L[j,i] += -w_e
-    //   L[i,i] += w_e
-    //   L[j,j] += w_e
-    //
-    // The result is symmetric negative-semidefinite.
-    // Convention: L * 1 = 0 (constant functions are in the kernel).
+    // Builds L from a pre-computed diagonal edge weight matrix:
+    //   L[i,j] = -w_e for edge (i,j), L[i,i] = Σ_j w_{ij}
+    // The result is symmetric, with zero row sums and non-positive off-diagonal.
 
-    SparseMatrix BuildLaplacian(const Halfedge::Mesh& mesh)
+    static SparseMatrix AssembleLaplacianFromWeights(
+        const Halfedge::Mesh& mesh, const DiagonalMatrix& weights)
     {
         const std::size_t nV = mesh.VerticesSize();
 
-        // Phase 1: Build the Hodge star 1 weights
-        DiagonalMatrix hodge1 = BuildHodgeStar1(mesh);
-
-        // Phase 2: Accumulate entries in COO format, then convert to CSR.
-        // For each non-deleted vertex, we need the diagonal entry + one entry
-        // per adjacent edge (i.e., the 1-ring neighbors).
-
-        // First pass: count nonzeros per row = 1 (diagonal) + valence
         std::vector<std::size_t> rowNnz(nV, 0);
 
         for (std::size_t vi = 0; vi < nV; ++vi)
         {
             VertexHandle vh{static_cast<PropertyIndex>(vi)};
             if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
-            {
                 continue;
-            }
-            // 1 for diagonal + count neighbors
             rowNnz[vi] = 1;  // diagonal
             for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
             {
@@ -358,33 +401,24 @@ namespace Geometry::DEC
             }
         }
 
-        // Build row offsets
         SparseMatrix L;
         L.Rows = nV;
         L.Cols = nV;
         L.RowOffsets.resize(nV + 1);
         L.RowOffsets[0] = 0;
         for (std::size_t i = 0; i < nV; ++i)
-        {
             L.RowOffsets[i + 1] = L.RowOffsets[i] + rowNnz[i];
-        }
 
         std::size_t totalNnz = L.RowOffsets[nV];
         L.ColIndices.resize(totalNnz, 0);
         L.Values.resize(totalNnz, 0.0);
 
-        // Phase 3: Fill in entries for each vertex row
-        // We need to iterate the 1-ring for each vertex and collect (neighbor, weight).
-        // Then sort by column index and write.
         for (std::size_t vi = 0; vi < nV; ++vi)
         {
             VertexHandle vh{static_cast<PropertyIndex>(vi)};
             if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
-            {
                 continue;
-            }
 
-            // Collect (neighbor_index, -weight) pairs
             struct Entry
             {
                 std::size_t Col;
@@ -398,22 +432,18 @@ namespace Geometry::DEC
             for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
             {
                 EdgeHandle e = mesh.Edge(h);
-                double w = hodge1.Diagonal[e.Index];
+                double w = weights.Diagonal[e.Index];
 
-                // The other vertex of this edge
                 VertexHandle vOther = mesh.ToVertex(h);
                 entries.push_back({vOther.Index, -w});
                 diagSum += w;
             }
 
-            // Add diagonal
             entries.push_back({vi, diagSum});
 
-            // Sort by column
             std::sort(entries.begin(), entries.end(),
                       [](const Entry& a, const Entry& b) { return a.Col < b.Col; });
 
-            // Write to CSR
             std::size_t base = L.RowOffsets[vi];
             for (std::size_t k = 0; k < entries.size(); ++k)
             {
@@ -423,6 +453,34 @@ namespace Geometry::DEC
         }
 
         return L;
+    }
+
+    // -------------------------------------------------------------------------
+    // BuildLaplacian
+    // -------------------------------------------------------------------------
+    // Weak cotan Laplacian: L = d0ᵀ ⋆1 d0  (#V × #V).
+    // Convention: L * 1 = 0 (constant functions are in the kernel).
+
+    SparseMatrix BuildLaplacian(const Halfedge::Mesh& mesh)
+    {
+        DiagonalMatrix hodge1 = BuildHodgeStar1(mesh);
+        return AssembleLaplacianFromWeights(mesh, hodge1);
+    }
+
+    // -------------------------------------------------------------------------
+    // BuildLaplacian — weighted variant
+    // -------------------------------------------------------------------------
+
+    SparseMatrix BuildLaplacian(const Halfedge::Mesh& mesh,
+                                 const EdgeWeightConfig& config)
+    {
+        if (config.Mode == EdgeWeightMode::Cotan)
+        {
+            return BuildLaplacian(mesh);
+        }
+
+        DiagonalMatrix weights = BuildHodgeStar1(mesh, config);
+        return AssembleLaplacianFromWeights(mesh, weights);
     }
 
     // -------------------------------------------------------------------------
@@ -439,6 +497,31 @@ namespace Geometry::DEC
         ops.Hodge1 = BuildHodgeStar1(mesh);
         ops.Hodge2 = BuildHodgeStar2(mesh);
         ops.Laplacian = BuildLaplacian(mesh);
+
+        return ops;
+    }
+
+    DECOperators BuildOperators(const Halfedge::Mesh& mesh,
+                                 const EdgeWeightConfig& config)
+    {
+        if (config.Mode == EdgeWeightMode::Cotan)
+        {
+            return BuildOperators(mesh);
+        }
+
+        DECOperators ops;
+
+        // Topology-only operators are weight-independent
+        ops.D0 = BuildExteriorDerivative0(mesh);
+        ops.D1 = BuildExteriorDerivative1(mesh);
+
+        // Area-based Hodge stars are metric-dependent but not edge-weight-dependent
+        ops.Hodge0 = BuildHodgeStar0(mesh);
+        ops.Hodge2 = BuildHodgeStar2(mesh);
+
+        // Weight-dependent operators
+        ops.Hodge1 = BuildHodgeStar1(mesh, config);
+        ops.Laplacian = BuildLaplacian(mesh, config);
 
         return ops;
     }
@@ -692,14 +775,14 @@ namespace Geometry::DEC
     // BuildLaplacianCache
     // -------------------------------------------------------------------------
 
-    LaplacianCache BuildLaplacianCache(const Halfedge::Mesh& mesh)
+    // -------------------------------------------------------------------------
+    // PopulateLaplacianCache — shared logic for derived matrix forms
+    // -------------------------------------------------------------------------
+    // Given a LaplacianCache with Operators already set, computes the
+    // derived forms: MassInverse, MassSqrtInverse, SymmetricNormalizedLaplacian.
+
+    static void PopulateLaplacianCacheDerived(LaplacianCache& cache)
     {
-        LaplacianCache cache;
-        cache.Operators = BuildOperators(mesh);
-
-        if (!cache.Operators.IsValid())
-            return cache;
-
         const auto& hodge0 = cache.Operators.Hodge0;
         const std::size_t nV = hodge0.Size;
 
@@ -743,7 +826,31 @@ namespace Geometry::DEC
                 Lsym.Values[k] = L.Values[k] * di * dj;
             }
         }
+    }
 
+    LaplacianCache BuildLaplacianCache(const Halfedge::Mesh& mesh)
+    {
+        LaplacianCache cache;
+        cache.Operators = BuildOperators(mesh);
+        if (!cache.Operators.IsValid())
+            return cache;
+        PopulateLaplacianCacheDerived(cache);
+        return cache;
+    }
+
+    LaplacianCache BuildLaplacianCache(const Halfedge::Mesh& mesh,
+                                        const EdgeWeightConfig& config)
+    {
+        if (config.Mode == EdgeWeightMode::Cotan)
+        {
+            return BuildLaplacianCache(mesh);
+        }
+
+        LaplacianCache cache;
+        cache.Operators = BuildOperators(mesh, config);
+        if (!cache.Operators.IsValid())
+            return cache;
+        PopulateLaplacianCacheDerived(cache);
         return cache;
     }
 
