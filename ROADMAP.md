@@ -96,7 +96,7 @@ The HDR post-processing foundation is in place. Scene passes render to an `R16G1
 
 **Render graph debug dump:** `DumpRenderGraphToString()` produces a human-readable snapshot of pass execution order (with per-pass attachment metadata) and resource lifetimes (with read/write pass ranges).
 
-**Render target inspection:** Enhanced Render Target Viewer panel with human-readable resource names, per-attachment format/load/store tooltips, and a resource lifetime table (dimensions, format, imported vs. transient, alive-range). Click any resource to select it for debug visualization.
+**Render target inspection:** Enhanced Render Target Viewer panel with human-readable resource names, per-attachment format/load/store tooltips, a resource lifetime table (dimensions, format, imported vs. transient, alive-range, per-resource memory estimates), a visual lifetime timeline bar (per-pass columns, write-range overlay), and a zoomable texture preview (zoom-to-cursor scroll, click-drag pan, pixel coordinate tooltips). Click any resource to select it for debug visualization or texture preview.
 
 **Anti-aliasing:** Selectable via `AAMode` enum — None, FXAA, or SMAA (Jimenez et al. 2012). SMAA is a 3-pass morphological AA: luma-based edge detection → blend weight calculation (with procedurally generated area and search lookup textures) → neighborhood blending. Default is SMAA. Configurable edge threshold and search step counts via View Settings panel.
 
@@ -138,7 +138,7 @@ Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Fe
 - ~~**Hierarchy refinements**~~ — `TODO.md` F4 **complete**. Drag-and-drop reparenting with undo, expand/collapse all, extended context menu, and multi-entity selection (Ctrl+click toggle, Shift+click range) are all implemented.
 - ~~**Viewport context menus**~~ — `TODO.md` F5 **core complete**. Entity context menu (Focus/Delete/Duplicate/Select Children/Visibility/Isolate), empty-space menu (Create Primitive/Reset Camera/Create Empty), and sub-element menu (Select Connected/Grow/Shrink Selection) are implemented with undo support. Paste and Edge Ring/Loop selection deferred.
 - ~~**Editor polish**~~ — `TODO.md` F6 **complete**. GPU memory display in status bar (color-coded VRAM usage), comprehensive tooltip coverage on all Inspector fields and View Settings sliders (AA, histogram, color grading, selection outline). Console/Log panel, Keyboard Shortcuts panel, Help menu, and multi-object property editing were already complete.
-- **Render Target Viewer** panel enhancements — `TODO.md` F7.
+- ~~**Render Target Viewer**~~ panel enhancements — `TODO.md` F7 **complete**. Per-resource memory estimates, visual lifetime timeline bar (per-pass column headers, write-range overlay), and zoomable texture preview (zoom-to-cursor, pan, pixel coordinate tooltips) are all implemented.
 
 Each improvement is independent and can land incrementally.
 
