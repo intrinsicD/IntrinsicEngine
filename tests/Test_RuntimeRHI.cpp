@@ -832,3 +832,190 @@ TEST(QueueFamilyContract, HeadlessDevice_GraphicsAndTransferResolved)
     // Transfer queue must be non-null (resolved by ValidateQueueFamilyContract).
     EXPECT_NE(device->GetTransferQueue(), VK_NULL_HANDLE);
 }
+
+// =============================================================================
+// Queue Domain Abstraction Tests (B2)
+// =============================================================================
+
+TEST(QueueDomain, DomainName_ReturnsHumanReadableStrings)
+{
+    EXPECT_STREQ(RHI::QueueDomainName(RHI::QueueDomain::Graphics), "Graphics");
+    EXPECT_STREQ(RHI::QueueDomainName(RHI::QueueDomain::Compute),  "Compute");
+    EXPECT_STREQ(RHI::QueueDomainName(RHI::QueueDomain::Transfer), "Transfer");
+}
+
+TEST(QueueDomain, EnumValues_AreDistinct)
+{
+    EXPECT_NE(static_cast<uint8_t>(RHI::QueueDomain::Graphics),
+              static_cast<uint8_t>(RHI::QueueDomain::Compute));
+    EXPECT_NE(static_cast<uint8_t>(RHI::QueueDomain::Graphics),
+              static_cast<uint8_t>(RHI::QueueDomain::Transfer));
+    EXPECT_NE(static_cast<uint8_t>(RHI::QueueDomain::Compute),
+              static_cast<uint8_t>(RHI::QueueDomain::Transfer));
+}
+
+TEST(QueueDomain, EnumSize_IsCompact)
+{
+    static_assert(sizeof(RHI::QueueDomain) == 1);
+    SUCCEED();
+}
+
+// GPU integration test: QueueSubmitter resolves queues and family indices.
+TEST(QueueSubmitter, HeadlessDevice_ResolvesQueuesAndFamilies)
+{
+    RHI::ContextConfig config{
+        .AppName = "QueueSubmitterTest",
+        .EnableValidation = false,
+        .Headless = true,
+    };
+
+    auto context = std::make_unique<RHI::VulkanContext>(config);
+    if (!context->GetInstance())
+    {
+        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+    }
+
+    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
+    if (!device->IsValid())
+    {
+        GTEST_SKIP() << "No suitable GPU found";
+    }
+
+    RHI::QueueSubmitter submitter(*device);
+
+    // Graphics domain always has a queue.
+    EXPECT_NE(submitter.GetQueue(RHI::QueueDomain::Graphics), VK_NULL_HANDLE);
+
+    // Compute maps to graphics (same queue) in the initial implementation.
+    EXPECT_EQ(submitter.GetQueue(RHI::QueueDomain::Compute),
+              submitter.GetQueue(RHI::QueueDomain::Graphics));
+
+    // Transfer always resolves (dedicated or graphics fallback).
+    EXPECT_NE(submitter.GetQueue(RHI::QueueDomain::Transfer), VK_NULL_HANDLE);
+
+    // Queue family indices must be valid.
+    const auto indices = device->GetQueueIndices();
+    EXPECT_EQ(submitter.GetQueueFamilyIndex(RHI::QueueDomain::Graphics), indices.Graphics());
+    EXPECT_EQ(submitter.GetQueueFamilyIndex(RHI::QueueDomain::Compute), indices.Graphics());
+    EXPECT_EQ(submitter.GetQueueFamilyIndex(RHI::QueueDomain::Transfer), indices.Transfer());
+}
+
+TEST(QueueSubmitter, RequiresOwnershipTransfer_SameDomain_ReturnsFalse)
+{
+    RHI::ContextConfig config{
+        .AppName = "QueueSubmitterOwnershipTest",
+        .EnableValidation = false,
+        .Headless = true,
+    };
+
+    auto context = std::make_unique<RHI::VulkanContext>(config);
+    if (!context->GetInstance())
+    {
+        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+    }
+
+    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
+    if (!device->IsValid())
+    {
+        GTEST_SKIP() << "No suitable GPU found";
+    }
+
+    RHI::QueueSubmitter submitter(*device);
+
+    // Same domain never requires ownership transfer.
+    EXPECT_FALSE(submitter.RequiresOwnershipTransfer(RHI::QueueDomain::Graphics, RHI::QueueDomain::Graphics));
+    EXPECT_FALSE(submitter.RequiresOwnershipTransfer(RHI::QueueDomain::Transfer, RHI::QueueDomain::Transfer));
+    EXPECT_FALSE(submitter.RequiresOwnershipTransfer(RHI::QueueDomain::Compute, RHI::QueueDomain::Compute));
+
+    // Compute→Graphics never requires transfer (same family in initial impl).
+    EXPECT_FALSE(submitter.RequiresOwnershipTransfer(RHI::QueueDomain::Graphics, RHI::QueueDomain::Compute));
+    EXPECT_FALSE(submitter.RequiresOwnershipTransfer(RHI::QueueDomain::Compute, RHI::QueueDomain::Graphics));
+}
+
+TEST(QueueSubmitter, RequiresOwnershipTransfer_GraphicsToTransfer_MatchesDedicatedStatus)
+{
+    RHI::ContextConfig config{
+        .AppName = "QueueSubmitterOwnershipTest2",
+        .EnableValidation = false,
+        .Headless = true,
+    };
+
+    auto context = std::make_unique<RHI::VulkanContext>(config);
+    if (!context->GetInstance())
+    {
+        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+    }
+
+    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
+    if (!device->IsValid())
+    {
+        GTEST_SKIP() << "No suitable GPU found";
+    }
+
+    RHI::QueueSubmitter submitter(*device);
+
+    // Ownership transfer between Graphics↔Transfer is needed iff the transfer
+    // queue is a dedicated (distinct) family.
+    const bool hasDedicated = submitter.HasDedicatedQueue(RHI::QueueDomain::Transfer);
+    EXPECT_EQ(submitter.RequiresOwnershipTransfer(RHI::QueueDomain::Graphics, RHI::QueueDomain::Transfer),
+              hasDedicated);
+    EXPECT_EQ(submitter.RequiresOwnershipTransfer(RHI::QueueDomain::Transfer, RHI::QueueDomain::Graphics),
+              hasDedicated);
+}
+
+TEST(QueueSubmitter, HasDedicatedQueue_GraphicsAlwaysTrue_ComputeAlwaysFalse)
+{
+    RHI::ContextConfig config{
+        .AppName = "QueueSubmitterDedicatedTest",
+        .EnableValidation = false,
+        .Headless = true,
+    };
+
+    auto context = std::make_unique<RHI::VulkanContext>(config);
+    if (!context->GetInstance())
+    {
+        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+    }
+
+    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
+    if (!device->IsValid())
+    {
+        GTEST_SKIP() << "No suitable GPU found";
+    }
+
+    RHI::QueueSubmitter submitter(*device);
+
+    // Graphics always has its own queue.
+    EXPECT_TRUE(submitter.HasDedicatedQueue(RHI::QueueDomain::Graphics));
+
+    // Compute is not yet dedicated (shares graphics).
+    EXPECT_FALSE(submitter.HasDedicatedQueue(RHI::QueueDomain::Compute));
+
+    // Transfer: depends on hardware.
+    EXPECT_EQ(submitter.HasDedicatedQueue(RHI::QueueDomain::Transfer),
+              device->GetQueueIndices().HasDistinctTransfer());
+}
+
+TEST(QueueSubmitter, GetDevice_ReturnsOriginalDevice)
+{
+    RHI::ContextConfig config{
+        .AppName = "QueueSubmitterDeviceTest",
+        .EnableValidation = false,
+        .Headless = true,
+    };
+
+    auto context = std::make_unique<RHI::VulkanContext>(config);
+    if (!context->GetInstance())
+    {
+        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+    }
+
+    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
+    if (!device->IsValid())
+    {
+        GTEST_SKIP() << "No suitable GPU found";
+    }
+
+    RHI::QueueSubmitter submitter(*device);
+    EXPECT_EQ(&submitter.GetDevice(), device.get());
+}

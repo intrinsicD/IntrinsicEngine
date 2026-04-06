@@ -25,6 +25,7 @@ target_sources(${target_name}
         RHI.Types.cppm
         RHI.Shader.cppm
         RHI.Pipeline.cppm
+        RHI.QueueDomain.cppm
         RHI.Descriptors.cppm
         RHI.Image.cppm
         RHI.Texture.cppm
@@ -50,6 +51,7 @@ target_sources(${target_name}
         RHI.Buffer.cpp
         RHI.Shader.cpp
         RHI.Pipeline.cpp
+        RHI.QueueDomain.cpp
         RHI.Descriptors.cpp
         RHI.Image.cpp
         RHI.Texture.cpp

@@ -9,6 +9,7 @@ export import RHI.Context;
 export import RHI.CudaError;
 export import RHI.Descriptors;
 export import RHI.Device;
+export import RHI.QueueDomain;
 export import RHI.Image;
 export import RHI.Pipeline;
 export import RHI.Profiler;
