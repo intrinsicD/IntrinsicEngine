@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <unordered_set>
 #include <utility>
@@ -704,5 +705,43 @@ TEST(HalfedgeMesh_PropertyAccess, ParameterizationMutableOverloadPublishesUvAndP
 
     EXPECT_TRUE(result->IsPinnedProperty[VertexHandle{static_cast<PropertyIndex>(result->PinVertex0)}]);
     EXPECT_TRUE(result->IsPinnedProperty[VertexHandle{static_cast<PropertyIndex>(result->PinVertex1)}]);
+}
+
+// =============================================================================
+// Layout canary: detect ABI/sizeof mismatches across module boundaries.
+//
+// A Clang 18 C++23 module bug caused MeshProperties to be allocated with the
+// wrong size (168 bytes instead of the correct ~376+), leading to a
+// heap-buffer-overflow during PropertyRegistry construction.  These static
+// asserts catch that class of bug at compile time rather than at runtime.
+// =============================================================================
+
+TEST(PropertyLayout_Canary, PropertyRegistrySizeIncludesUnorderedMap)
+{
+    // PropertyRegistry contains: vector + unordered_map + size_t.
+    // The unordered_map alone is >= 40 bytes on any 64-bit libstdc++/libc++.
+    // If the compiler sees a truncated layout, sizeof will be far too small.
+    static_assert(sizeof(Geometry::PropertyRegistry) >= 64,
+                  "PropertyRegistry is suspiciously small — possible module ABI mismatch");
+
+    SUCCEED();
+}
+
+TEST(PropertyLayout_Canary, MeshPropertiesContainsFourPropertySets)
+{
+    // MeshProperties = 4 PropertySet + 3 size_t.
+    // Minimum: 4 * sizeof(PropertySet) + 3 * 8.
+    static_assert(sizeof(Geometry::Halfedge::MeshProperties) >=
+                      4 * sizeof(Geometry::PropertySet) + 3 * sizeof(std::size_t),
+                  "MeshProperties layout is smaller than the sum of its members");
+    SUCCEED();
+}
+
+TEST(PropertyLayout_Canary, OptionalMeshDefaultIsDisengaged)
+{
+    // Verify that std::optional<Mesh>{} does NOT construct a Mesh.
+    // This catches a potential compiler bug where brace-init engages the optional.
+    std::optional<Geometry::Halfedge::Mesh> opt{};
+    EXPECT_FALSE(opt.has_value());
 }
 
