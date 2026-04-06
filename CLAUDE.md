@@ -485,3 +485,22 @@ When creating graphics pipelines with multiple descriptor set layouts:
 `ValidateQueueFamilyContract()` runs in `CreateLogicalDevice()` after `FindQueueFamilies()`. It enforces: graphics required, present required when surface active, transfer resolves via 3-level fallback (dedicated → any transfer-capable → graphics). Failure sets `m_IsValid = false` with diagnostics.
 
 **Never use raw `.value()` on queue-family optionals outside the accessor definitions.** Use the safe accessors or check `.has_value()` first.
+
+## Queue Domain Abstraction
+
+`RHI::QueueDomain` (in `RHI.QueueDomain` module) provides a conceptual queue domain model for GPU work submission. `RHI::QueueSubmitter` is a non-owning wrapper around `VulkanDevice` that routes submissions by domain.
+
+| Domain | Maps to | Queue Family | Notes |
+|--------|---------|-------------|-------|
+| `Graphics` | `VulkanDevice::GetGraphicsQueue()` | Graphics family | Always available |
+| `Compute` | `VulkanDevice::GetGraphicsQueue()` | Graphics family | Shares graphics queue until async compute is added |
+| `Transfer` | `VulkanDevice::GetTransferQueue()` | Transfer or graphics fallback | May be dedicated; check `HasDedicatedQueue()` |
+
+**Presentation is NOT a QueueDomain.** `vkQueuePresentKHR` uses a fundamentally different Vulkan entry point and synchronization model (binary semaphores only). It remains on `VulkanDevice::Present()`.
+
+**Key APIs:**
+- `QueueSubmitter::Submit(domain, submitInfo, fence)` — routes to the correct VkQueue with proper mutex locking.
+- `QueueSubmitter::RequiresOwnershipTransfer(from, to)` — returns `true` when domains use different queue families (requires VkBufferMemoryBarrier with explicit family indices).
+- `QueueSubmitter::HasDedicatedQueue(domain)` — returns `true` when the domain has its own queue family.
+
+**Lock ordering:** Device queue mutex (`VulkanDevice::GetQueueMutex()`) is always the outermost lock. Subsystem-internal mutexes (e.g. `TransferManager::m_Mutex`) must be acquired after, never before.
