@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <memory>
+#include <type_traits>
 
 // This test avoids touching ImGui directly (requires Vulkan context).
 // It validates linkability of the EditorUI module and exercises the
@@ -29,6 +30,24 @@ TEST(EditorUI, GetSceneDirtyTracker_IsLinkable)
 {
     auto* fn = &Runtime::EditorUI::GetSceneDirtyTracker;
     ASSERT_NE(fn, nullptr);
+}
+
+TEST(EditorUI, ControllersAreNonCopyableAndNonMovable)
+{
+    static_assert(!std::is_copy_constructible_v<Runtime::EditorUI::InspectorController>);
+    static_assert(!std::is_copy_assignable_v<Runtime::EditorUI::InspectorController>);
+    static_assert(!std::is_move_constructible_v<Runtime::EditorUI::InspectorController>);
+    static_assert(!std::is_move_assignable_v<Runtime::EditorUI::InspectorController>);
+
+    static_assert(!std::is_copy_constructible_v<Runtime::EditorUI::GeometryWorkflowController>);
+    static_assert(!std::is_copy_assignable_v<Runtime::EditorUI::GeometryWorkflowController>);
+    static_assert(!std::is_move_constructible_v<Runtime::EditorUI::GeometryWorkflowController>);
+    static_assert(!std::is_move_assignable_v<Runtime::EditorUI::GeometryWorkflowController>);
+
+    static_assert(!std::is_copy_constructible_v<Runtime::EditorUI::SpatialDebugController>);
+    static_assert(!std::is_copy_assignable_v<Runtime::EditorUI::SpatialDebugController>);
+    static_assert(!std::is_move_constructible_v<Runtime::EditorUI::SpatialDebugController>);
+    static_assert(!std::is_move_assignable_v<Runtime::EditorUI::SpatialDebugController>);
 }
 
 // =========================================================================
