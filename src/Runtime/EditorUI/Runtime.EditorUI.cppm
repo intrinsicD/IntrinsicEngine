@@ -600,6 +600,8 @@ export namespace Runtime::EditorUI
         InspectorController() = default;
         InspectorController(const InspectorController&) = delete;
         InspectorController& operator=(const InspectorController&) = delete;
+        InspectorController(InspectorController&&) = delete;
+        InspectorController& operator=(InspectorController&&) = delete;
 
         void Init(Runtime::Engine& engine,
                   entt::entity& cachedSelected,
@@ -664,6 +666,8 @@ export namespace Runtime::EditorUI
         GeometryWorkflowController() = default;
         GeometryWorkflowController(const GeometryWorkflowController&) = delete;
         GeometryWorkflowController& operator=(const GeometryWorkflowController&) = delete;
+        GeometryWorkflowController(GeometryWorkflowController&&) = delete;
+        GeometryWorkflowController& operator=(GeometryWorkflowController&&) = delete;
 
         void Init(Runtime::Engine& engine, entt::entity& cachedSelected);
         void RegisterPanelsAndMenu();
