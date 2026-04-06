@@ -156,6 +156,9 @@ void InspectorController::Draw()
         m_VectorHeatUi = {};
         m_ParameterizationUi = {};
         m_BooleanUi = {};
+        m_BilateralFilterUi = {};
+        m_OutlierEstimationUi = {};
+        m_KDEUi = {};
     }
 
     // === Entity ID (always shown at top) ===
@@ -749,10 +752,26 @@ void InspectorController::Draw()
                     case GeometryProcessingAlgorithm::BooleanCSG:
                         static_cast<void>(DrawBooleanWidget(*m_Engine, selected, m_BooleanUi));
                         break;
+                    case GeometryProcessingAlgorithm::Registration:
+                        static_cast<void>(DrawRegistrationWidget(*m_Engine, selected, m_RegistrationUi));
+                        break;
+                    case GeometryProcessingAlgorithm::BilateralFilter:
+                        static_cast<void>(DrawBilateralFilterWidget(*m_Engine, selected, m_BilateralFilterUi));
+                        break;
+                    case GeometryProcessingAlgorithm::OutlierEstimation:
+                        static_cast<void>(DrawOutlierEstimationWidget(*m_Engine, selected, m_OutlierEstimationUi));
+                        break;
+                    case GeometryProcessingAlgorithm::KernelDensity:
+                        static_cast<void>(DrawKDEWidget(*m_Engine, selected, m_KDEUi));
+                        break;
                     }
 
                     if (m_GeometryWorkflow && entry.Algorithm != GeometryProcessingAlgorithm::KMeans
                         && entry.Algorithm != GeometryProcessingAlgorithm::NormalEstimation
+                        && entry.Algorithm != GeometryProcessingAlgorithm::Registration
+                        && entry.Algorithm != GeometryProcessingAlgorithm::BilateralFilter
+                        && entry.Algorithm != GeometryProcessingAlgorithm::OutlierEstimation
+                        && entry.Algorithm != GeometryProcessingAlgorithm::KernelDensity
                         && entry.Algorithm != GeometryProcessingAlgorithm::ShortestPath
                         && entry.Algorithm != GeometryProcessingAlgorithm::ConvexHull
                         && entry.Algorithm != GeometryProcessingAlgorithm::SurfaceReconstruction

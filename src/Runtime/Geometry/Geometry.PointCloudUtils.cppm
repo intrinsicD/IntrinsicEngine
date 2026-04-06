@@ -180,4 +180,123 @@ export namespace Geometry::PointCloud
         const Cloud& cloud,
         const SubsampleParams& params = {});
 
+    // -------------------------------------------------------------------------
+    // Bilateral Filter (Edge-Preserving Smoothing)
+    // -------------------------------------------------------------------------
+    //
+    // Edge-preserving point cloud smoothing using spatial and normal-space
+    // Gaussian weighting. Preserves sharp features that uniform Laplacian
+    // smoothing destroys.
+    //
+    // For each point p_i with normal n_i, the filtered position is:
+    //
+    //   p_i' = p_i + n_i * [ sum_j w_s(||p_j - p_i||) * w_n(1 - n_i·n_j)
+    //                         * <p_j - p_i, n_i> ]
+    //          / [ sum_j w_s(||p_j - p_i||) * w_n(1 - n_i·n_j) ]
+    //
+    // where w_s and w_n are Gaussian kernels with spatial and normal bandwidths.
+    // Positions move only along the normal direction, preserving tangential
+    // geometry.
+    //
+    // References:
+    //   - Fleishman, Drori, Cohen-Or, "Bilateral Mesh Denoising" (SIGGRAPH 2003)
+    //   - Zheng, Fu, Au, Tai, "Bilateral Normal Filtering for Mesh Denoising"
+    //     (IEEE TVCG 2011)
+
+    struct BilateralFilterParams
+    {
+        std::size_t KNeighbors{15};        // Neighbors for local averaging.
+        float       SpatialSigma{0.0f};    // Spatial Gaussian σ. 0 = auto (2× avg spacing).
+        float       NormalSigma{0.25f};    // Normal-space Gaussian σ. Controls feature sensitivity.
+        uint32_t    Iterations{1};         // Number of filter passes.
+    };
+
+    struct BilateralFilterResult
+    {
+        std::size_t PointsFiltered{0};
+        std::size_t DegenerateNormals{0};  // Points with zero-length normals (skipped).
+        float       AverageDisplacement{0.0f};
+        float       MaxDisplacement{0.0f};
+    };
+
+    // Modifies cloud positions in-place. Requires normals.
+    // Returns nullopt if cloud has < 2 points or normals are not enabled.
+    [[nodiscard]] std::optional<BilateralFilterResult> BilateralFilter(
+        Cloud& cloud,
+        const BilateralFilterParams& params = {});
+
+    // -------------------------------------------------------------------------
+    // Outlier Probability Estimation
+    // -------------------------------------------------------------------------
+    //
+    // Per-point outlier score based on local density deviation. Points whose
+    // mean distance to k nearest neighbors deviates significantly from the
+    // neighborhood average are flagged as statistical outliers.
+    //
+    // Score_i = mean_kNN_dist(i) / mean_j_in_kNN(mean_kNN_dist(j))
+    //
+    // A score >> 1.0 indicates the point is in a sparse region relative to its
+    // neighbors (likely an outlier). A score near 1.0 indicates consistent
+    // local density.
+    //
+    // Reference:
+    //   - Breunig, Kriegel, Ng, Sander, "LOF: Identifying Density-Based Local
+    //     Outliers" (SIGMOD 2000)
+
+    struct OutlierEstimationParams
+    {
+        std::size_t KNeighbors{20};        // Neighbors for density estimation.
+        float       ScoreThreshold{2.0f};  // Points above this score are flagged.
+    };
+
+    struct OutlierEstimationResult
+    {
+        std::vector<float> Scores;         // Per-point outlier score (≥ 0).
+        std::size_t        OutlierCount{0}; // Points with score > threshold.
+        float              MeanScore{0.0f};
+        float              MaxScore{0.0f};
+    };
+
+    // Publishes "p:outlier_score" property on the cloud.
+    // Returns nullopt if cloud has < 2 points.
+    [[nodiscard]] std::optional<OutlierEstimationResult> EstimateOutlierProbability(
+        Cloud& cloud,
+        const OutlierEstimationParams& params = {});
+
+    // -------------------------------------------------------------------------
+    // Kernel Density Estimation (KDE)
+    // -------------------------------------------------------------------------
+    //
+    // Per-point density estimation using Gaussian KDE with adaptive bandwidth.
+    //
+    //   ρ(p_i) = (1/k) * sum_{j in kNN(i)} K_h(||p_i - p_j||)
+    //
+    // where K_h is a Gaussian kernel with bandwidth h. Bandwidth selection
+    // follows Silverman's rule of thumb: h = (4σ⁵/3n)^(1/5) ≈ 1.06·σ·n^(-1/5)
+    // where σ is the standard deviation of nearest-neighbor distances.
+    //
+    // Reference:
+    //   - Silverman, "Density Estimation for Statistics and Data Analysis" (1986)
+
+    struct KDEParams
+    {
+        std::size_t KNeighbors{15};        // Neighbors for density estimation.
+        float       Bandwidth{0.0f};       // Gaussian bandwidth h. 0 = auto (Silverman's rule).
+    };
+
+    struct KDEResult
+    {
+        std::vector<float> Densities;      // Per-point density estimate.
+        float              MeanDensity{0.0f};
+        float              MinDensity{0.0f};
+        float              MaxDensity{0.0f};
+        float              UsedBandwidth{0.0f}; // Actual bandwidth used.
+    };
+
+    // Publishes "p:density" property on the cloud.
+    // Returns nullopt if cloud has < 2 points.
+    [[nodiscard]] std::optional<KDEResult> EstimateKernelDensity(
+        Cloud& cloud,
+        const KDEParams& params = {});
+
 } // namespace Geometry::PointCloud

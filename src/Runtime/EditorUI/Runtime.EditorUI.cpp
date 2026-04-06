@@ -69,6 +69,10 @@ namespace Runtime::EditorUI
             case GeometryProcessingAlgorithm::ConvexHull:
             case GeometryProcessingAlgorithm::SurfaceReconstruction:
             case GeometryProcessingAlgorithm::BooleanCSG:
+            case GeometryProcessingAlgorithm::Registration:
+            case GeometryProcessingAlgorithm::BilateralFilter:
+            case GeometryProcessingAlgorithm::OutlierEstimation:
+            case GeometryProcessingAlgorithm::KernelDensity:
             default:
                 return false;
             }
@@ -109,6 +113,10 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::VectorHeat: return "Vector Heat Method";
         case GeometryProcessingAlgorithm::Parameterization: return "Parameterization";
         case GeometryProcessingAlgorithm::BooleanCSG: return "Boolean CSG";
+        case GeometryProcessingAlgorithm::Registration: return "ICP Registration";
+        case GeometryProcessingAlgorithm::BilateralFilter: return "Bilateral Filter";
+        case GeometryProcessingAlgorithm::OutlierEstimation: return "Outlier Estimation";
+        case GeometryProcessingAlgorithm::KernelDensity: return "Kernel Density";
         default: return "Unknown";
         }
     }
@@ -185,6 +193,11 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::BooleanCSG:
             return GeometryProcessingDomain::MeshVertices
                 | GeometryProcessingDomain::MeshFaces;
+        case GeometryProcessingAlgorithm::Registration:
+        case GeometryProcessingAlgorithm::BilateralFilter:
+        case GeometryProcessingAlgorithm::OutlierEstimation:
+        case GeometryProcessingAlgorithm::KernelDensity:
+            return GeometryProcessingDomain::PointCloudPoints;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -201,9 +214,13 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
-        static constexpr std::array<GeometryProcessingAlgorithm, 13> kAlgorithmOrder = {
+        static constexpr std::array<GeometryProcessingAlgorithm, 17> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
             GeometryProcessingAlgorithm::NormalEstimation,
+            GeometryProcessingAlgorithm::Registration,
+            GeometryProcessingAlgorithm::BilateralFilter,
+            GeometryProcessingAlgorithm::OutlierEstimation,
+            GeometryProcessingAlgorithm::KernelDensity,
             GeometryProcessingAlgorithm::ShortestPath,
             GeometryProcessingAlgorithm::VectorHeat,
             GeometryProcessingAlgorithm::Parameterization,

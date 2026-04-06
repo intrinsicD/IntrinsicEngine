@@ -314,33 +314,52 @@ TEST(EditorUIProcessing, MixedGeometryEntityEnumeratesAllKMeansDomainsInStableOr
     EXPECT_EQ(domains[2], Runtime::PointCloudKMeans::Domain::PointCloudPoints);
 
     const auto entries = Runtime::EditorUI::ResolveGeometryProcessingEntries(reg, entity);
-    ASSERT_EQ(entries.size(), 13u);
+    ASSERT_EQ(entries.size(), 17u);
     EXPECT_EQ(entries[0].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::KMeans);
     EXPECT_EQ(entries[1].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::NormalEstimation);
-    EXPECT_EQ(entries[2].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::ShortestPath);
-    EXPECT_EQ(entries[3].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::VectorHeat);
-    EXPECT_EQ(entries[4].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Parameterization);
-    EXPECT_EQ(entries[5].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::ConvexHull);
-    EXPECT_EQ(entries[6].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::SurfaceReconstruction);
-    EXPECT_EQ(entries[7].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::BooleanCSG);
-    EXPECT_EQ(entries[8].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Remeshing);
-    EXPECT_EQ(entries[9].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Simplification);
-    EXPECT_EQ(entries[10].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Smoothing);
-    EXPECT_EQ(entries[11].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Subdivision);
-    EXPECT_EQ(entries[12].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Repair);
+    EXPECT_EQ(entries[2].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Registration);
+    EXPECT_EQ(entries[3].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::BilateralFilter);
+    EXPECT_EQ(entries[4].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::OutlierEstimation);
+    EXPECT_EQ(entries[5].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::KernelDensity);
+    EXPECT_EQ(entries[6].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::ShortestPath);
+    EXPECT_EQ(entries[7].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::VectorHeat);
+    EXPECT_EQ(entries[8].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Parameterization);
+    EXPECT_EQ(entries[9].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::ConvexHull);
+    EXPECT_EQ(entries[10].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::SurfaceReconstruction);
+    EXPECT_EQ(entries[11].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::BooleanCSG);
+    EXPECT_EQ(entries[12].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Remeshing);
+    EXPECT_EQ(entries[13].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Simplification);
+    EXPECT_EQ(entries[14].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Smoothing);
+    EXPECT_EQ(entries[15].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Subdivision);
+    EXPECT_EQ(entries[16].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Repair);
+    // entries[0] = KMeans
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    // entries[1] = NormalEstimation
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[1].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[2].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[2].Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[3].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[4].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[4].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[5].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    // entries[2] = Registration
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[2].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    // entries[3..5] = BilateralFilter, OutlierEstimation, KernelDensity
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[3].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[4].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[5].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[6].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    // entries[6] = ShortestPath
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[6].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[6].Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
+    // entries[7] = VectorHeat
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[7].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[7].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[8].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshHalfedges));
+    // entries[8] = Parameterization
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[8].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[8].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
+    // entries[9] = ConvexHull
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[9].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[9].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    // entries[10] = SurfaceReconstruction
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[10].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    // entries[11] = BooleanCSG
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[11].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[11].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
+    // entries[12] = Remeshing — has mesh halfedges
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[12].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshHalfedges));
 }
