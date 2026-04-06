@@ -9,7 +9,6 @@
 import Core;
 import RHI;
 import Runtime.FrameLoop;
-import Runtime.RenderExtraction;
 import Runtime.ResourceMaintenance;
 
 namespace
@@ -106,13 +105,18 @@ TEST(MaintenanceLane, CoordinatorRunsAllStepsInOrderOverNFrames)
         coordinator.Run(telemetry);
 
         // Verify all 8 steps ran in the canonical order.
+        ASSERT_EQ(host.Calls.size(), kExpectedCallSequence.size())
+            << "Maintenance lane step count diverged on frame " << frame;
         EXPECT_EQ(host.Calls, kExpectedCallSequence)
             << "Maintenance lane call sequence diverged on frame " << frame;
 
-        // Verify telemetry was propagated for this frame.
+        // Verify all 6 telemetry fields round-trip correctly.
         EXPECT_EQ(host.LastTelemetry.FixedStepSubsteps, static_cast<uint32_t>(frame + 1));
         EXPECT_EQ(host.LastTelemetry.AccumulatorClamped, (frame % 2 == 0));
         EXPECT_EQ(host.LastTelemetry.SimulationCpuTimeNs, static_cast<uint64_t>(frame * 100'000));
+        EXPECT_EQ(host.LastTelemetry.FrameGraphCompileNs, static_cast<uint64_t>(frame * 50'000));
+        EXPECT_EQ(host.LastTelemetry.FrameGraphExecuteNs, static_cast<uint64_t>(frame * 200'000));
+        EXPECT_EQ(host.LastTelemetry.FrameGraphCriticalPathNs, static_cast<uint64_t>(frame * 150'000));
     }
 
     // Verify all N frames were captured.
@@ -234,9 +238,9 @@ TEST_F(MaintenanceLaneGpuTest, SafeDestroyDefersUntilTimelineCompletion)
         << "All deferred deletions should fire after flush";
 }
 
-// Verify SafeDestroyAfter respects per-deletion timeline values: deletions
-// with earlier timeline values are collected before later ones.
-TEST_F(MaintenanceLaneGpuTest, SafeDestroyAfterRespectsTimelineOrdering)
+// Verify SafeDestroyAfter enqueues deletions correctly and that the flush
+// path executes them in insertion order when draining unconditionally.
+TEST_F(MaintenanceLaneGpuTest, SafeDestroyAfterFlushExecutesInInsertionOrder)
 {
     std::vector<int> executionOrder;
 
