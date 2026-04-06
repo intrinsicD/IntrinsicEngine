@@ -180,13 +180,16 @@ void InspectorController::Draw()
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
         {
             const bool posChanged = Interface::GUI::DrawVec3Control("Position", transform->Position);
+            Interface::GUI::ItemTooltip("World-space position (X, Y, Z).");
 
             glm::vec3 rotationDegrees = glm::degrees(glm::eulerAngles(transform->Rotation));
             const bool rotChanged = Interface::GUI::DrawVec3Control("Rotation", rotationDegrees);
+            Interface::GUI::ItemTooltip("Euler rotation in degrees (pitch, yaw, roll).");
             if (rotChanged)
                 transform->Rotation = glm::quat(glm::radians(rotationDegrees));
 
             const bool scaleChanged = Interface::GUI::DrawVec3Control("Scale", transform->Scale, 1.0f);
+            Interface::GUI::ItemTooltip("Scale factor per axis. Default is (1, 1, 1).");
 
             if (posChanged || rotChanged || scaleChanged)
                 reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(selected);
@@ -222,6 +225,7 @@ void InspectorController::Draw()
             }
 
             ImGui::Checkbox("Visible##Surface", &sc->Visible);
+            Interface::GUI::ItemTooltip("Toggle surface rendering for this entity.");
 
             // Wireframe / vertex toggles — only when geometry is valid.
             if (geo)
@@ -238,11 +242,18 @@ void InspectorController::Draw()
                         else
                             reg.remove<ECS::Line::Component>(selected);
                     }
+                    Interface::GUI::ItemTooltip("Overlay wireframe edges on the mesh surface.");
 
                     if (!sc->CachedVertexColors.empty())
+                    {
                         ImGui::Checkbox("Per-Vertex Colors", &sc->ShowPerVertexColors);
+                        Interface::GUI::ItemTooltip("Use per-vertex color attributes for shading.");
+                    }
                     if (!sc->CachedFaceColors.empty())
+                    {
                         ImGui::Checkbox("Per-Face Colors", &sc->ShowPerFaceColors);
+                        Interface::GUI::ItemTooltip("Use per-face color attributes for shading.");
+                    }
                 }
 
                 bool showVertices = reg.all_of<ECS::Point::Component>(selected);
@@ -253,6 +264,7 @@ void InspectorController::Draw()
                     else
                         reg.remove<ECS::Point::Component>(selected);
                 }
+                Interface::GUI::ItemTooltip("Render vertex positions as point primitives.");
 
                 // Inline wireframe settings when Line::Component is present.
                 if (auto* line = reg.try_get<ECS::Line::Component>(selected))
@@ -263,14 +275,20 @@ void InspectorController::Draw()
                         {
                             return ColorEdit4("Wire Color", component.Color);
                         });
+                    Interface::GUI::ItemTooltip("Base color for wireframe edges.");
                     ApplyComponentCommand<ECS::Line::Component>(*m_Engine, reg, selected, "Inspector: Wire Width",
                         [](auto& component)
                         {
                             return ImGui::SliderFloat("Wire Width", &component.Width, 0.5f, 32.0f, "%.1f");
                         });
+                    Interface::GUI::ItemTooltip("Wireframe line width in pixels (0.5 - 32).");
                     ImGui::Checkbox("Overlay##Wire", &line->Overlay);
+                    Interface::GUI::ItemTooltip("Render wireframe on top of surfaces (no depth test).");
                     if (line->HasPerEdgeColors)
+                    {
                         ImGui::Checkbox("Per-Edge Colors", &line->ShowPerEdgeColors);
+                        Interface::GUI::ItemTooltip("Use per-edge color attributes instead of the base wire color.");
+                    }
                 }
 
                 // Inline vertex settings when Point::Component is present.
@@ -278,23 +296,27 @@ void InspectorController::Draw()
                 {
                     ImGui::SeparatorText("Vertex Settings");
                     PointRenderModeCombo("Render Mode##Point", pt->Mode);
+                    Interface::GUI::ItemTooltip("Point rendering style: FlatDisc (billboard) or Surfel (oriented).");
                     ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Vertex Size",
                         [](auto& component)
                         {
                             return ImGui::SliderFloat("Vertex Size", &component.Size, 0.0001f, 1.0f, "%.5f",
                                                       ImGuiSliderFlags_Logarithmic);
                         });
+                    Interface::GUI::ItemTooltip("Base world-space radius of rendered vertex points.");
                     ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Vertex Size Multiplier",
                         [](auto& component)
                         {
                             return ImGui::SliderFloat("Size Multiplier##Point", &component.SizeMultiplier, 0.1f, 10.0f, "%.2f",
                                                       ImGuiSliderFlags_Logarithmic);
                         });
+                    Interface::GUI::ItemTooltip("Multiplier applied on top of the base vertex size.");
                     ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Vertex Color",
                         [](auto& component)
                         {
                             return ColorEdit4("Vertex Color", component.Color);
                         });
+                    Interface::GUI::ItemTooltip("Default color for rendered vertex points.");
                 }
             }
         }
@@ -473,33 +495,45 @@ void InspectorController::Draw()
             ImGui::Text("Has Node Radii: %s", gd->HasNodeRadii() ? "Yes" : "No");
             ImGui::Text("Has Edge Colors: %s", gd->HasEdgeColors() ? "Yes" : "No");
             ImGui::Checkbox("Static Geometry", &gd->StaticGeometry);
+            Interface::GUI::ItemTooltip("When enabled, uploads graph to device-local (GPU) memory for better rendering performance. Disable for frequently changing graphs.");
 
             ImGui::Checkbox("Visible##Graph", &gd->Visible);
+            Interface::GUI::ItemTooltip("Toggle graph rendering for this entity.");
 
             ImGui::SeparatorText("Node Settings");
             if (PointRenderModeCombo("Node Render Mode", gd->NodeRenderMode))
                 gd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Point rendering style for graph nodes: FlatDisc or Surfel.");
             if (ImGui::SliderFloat("Node Size", &gd->DefaultNodeRadius, 0.0001f, 1.0f, "%.5f",
                                ImGuiSliderFlags_Logarithmic))
                 gd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Base world-space radius of graph nodes.");
             if (ImGui::SliderFloat("Node Size Multiplier", &gd->NodeSizeMultiplier, 0.1f, 10.0f, "%.2f",
                                ImGuiSliderFlags_Logarithmic))
                 gd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Multiplier applied on top of the base node size.");
             if (ColorEdit4("Node Color", gd->DefaultNodeColor))
                 gd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Default color for graph nodes without per-node colors.");
 
             ImGui::SeparatorText("Edge Settings");
             if (ColorEdit4("Edge Color", gd->DefaultEdgeColor))
                 gd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Default color for graph edges.");
             if (ImGui::SliderFloat("Edge Width", &gd->EdgeWidth, 0.5f, 32.0f, "%.1f"))
                 gd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Edge line width in pixels (0.5 - 32).");
             if (ImGui::Checkbox("Edge Overlay", &gd->EdgesOverlay))
                 gd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Render edges on top of surfaces (no depth test).");
 
             if (gd->HasEdgeColors())
             {
                 if (auto* line = reg.try_get<ECS::Line::Component>(selected))
+                {
                     ImGui::Checkbox("Per-Edge Colors##Graph", &line->ShowPerEdgeColors);
+                    Interface::GUI::ItemTooltip("Use per-edge color attributes from graph data.");
+                }
             }
 
             if (gd->GraphRef)
@@ -551,19 +585,24 @@ void InspectorController::Draw()
 
             ImGui::SeparatorText("Rendering");
             ImGui::Checkbox("Visible##PCD", &pcd->Visible);
+            Interface::GUI::ItemTooltip("Toggle point cloud rendering for this entity.");
 
             if (PointRenderModeCombo("Render Mode##PCD", pcd->RenderMode))
                 pcd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Point rendering style: FlatDisc (billboard) or Surfel (oriented by normals).");
 
             if (ImGui::SliderFloat("Default Radius##PCD", &pcd->DefaultRadius, 0.0001f, 1.0f, "%.5f",
                                ImGuiSliderFlags_Logarithmic))
                 pcd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Base world-space radius for each point. Per-point radii override this when available.");
             if (ImGui::SliderFloat("Size Multiplier##PCD", &pcd->SizeMultiplier, 0.1f, 10.0f, "%.2f",
                                ImGuiSliderFlags_Logarithmic))
                 pcd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Multiplier applied on top of the base point radius.");
 
             if (ColorEdit4("Default Color##PCD", pcd->DefaultColor))
                 pcd->GpuDirty = true;
+            Interface::GUI::ItemTooltip("Default color when no per-point color attribute is active.");
 
             if (pcd->CloudRef)
             {
@@ -599,16 +638,22 @@ void InspectorController::Draw()
                     {
                         return ColorEdit4("Line Color", component.Color);
                     });
+                Interface::GUI::ItemTooltip("Base color for line edges.");
                 ApplyComponentCommand<ECS::Line::Component>(*m_Engine, reg, selected, "Inspector: Line Width",
                     [](auto& component)
                     {
                         return ImGui::SliderFloat("Line Width", &component.Width, 0.5f, 32.0f, "%.1f");
                     });
+                Interface::GUI::ItemTooltip("Line width in pixels (0.5 - 32).");
                 ImGui::Checkbox("Overlay##Line", &line->Overlay);
+                Interface::GUI::ItemTooltip("Render lines on top of surfaces (no depth test).");
                 ImGui::Text("Edge Count: %u", line->EdgeCount);
 
                 if (line->HasPerEdgeColors)
+                {
                     ImGui::Checkbox("Per-Edge Colors##Standalone", &line->ShowPerEdgeColors);
+                    Interface::GUI::ItemTooltip("Use per-edge color attributes instead of the base line color.");
+                }
             }
         }
 
@@ -617,23 +662,27 @@ void InspectorController::Draw()
             if (ImGui::CollapsingHeader("Point Rendering"))
             {
                 PointRenderModeCombo("Render Mode##StandalonePoint", pt->Mode);
+                Interface::GUI::ItemTooltip("Point rendering style: FlatDisc (billboard) or Surfel (oriented).");
                 ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Point Size",
                     [](auto& component)
                     {
                         return ImGui::SliderFloat("Point Size", &component.Size, 0.0001f, 1.0f, "%.5f",
                                                   ImGuiSliderFlags_Logarithmic);
                     });
+                Interface::GUI::ItemTooltip("Base world-space radius of rendered points.");
                 ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Point Size Multiplier",
                     [](auto& component)
                     {
                         return ImGui::SliderFloat("Size Multiplier##StandalonePoint", &component.SizeMultiplier, 0.1f, 10.0f, "%.2f",
                                                   ImGuiSliderFlags_Logarithmic);
                     });
+                Interface::GUI::ItemTooltip("Multiplier applied on top of the base point size.");
                 ApplyComponentCommand<ECS::Point::Component>(*m_Engine, reg, selected, "Inspector: Point Color",
                     [](auto& component)
                     {
                         return ColorEdit4("Point Color", component.Color);
                     });
+                Interface::GUI::ItemTooltip("Default color for rendered points.");
             }
         }
     }
@@ -802,11 +851,20 @@ void InspectorController::Draw()
                     {
                         // Inline visibility toggle for overlay children.
                         if (auto* sc = reg.try_get<ECS::Surface::Component>(child))
+                        {
                             ImGui::Checkbox("Visible##Overlay", &sc->Visible);
+                            Interface::GUI::ItemTooltip("Toggle rendering of this overlay child entity.");
+                        }
                         else if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(child))
+                        {
                             ImGui::Checkbox("Visible##Overlay", &pcd->Visible);
+                            Interface::GUI::ItemTooltip("Toggle rendering of this overlay child entity.");
+                        }
                         else if (auto* gd = reg.try_get<ECS::Graph::Data>(child))
+                        {
                             ImGui::Checkbox("Visible##Overlay", &gd->Visible);
+                            Interface::GUI::ItemTooltip("Toggle rendering of this overlay child entity.");
+                        }
 
                         if (ImGui::SmallButton("Select"))
                             *m_CachedSelected = child;
@@ -919,7 +977,9 @@ void InspectorController::Draw()
         if (ImGui::CollapsingHeader("Axis Rotator"))
         {
             ImGui::DragFloat("Speed (deg/s)", &rotator->Speed, 1.0f, -360.0f, 360.0f, "%.1f");
+            Interface::GUI::ItemTooltip("Continuous rotation speed in degrees per second. Negative values reverse direction.");
             ImGui::DragFloat3("Axis", &rotator->axis.x, 0.01f, -1.0f, 1.0f, "%.3f");
+            Interface::GUI::ItemTooltip("Rotation axis vector (will be normalized). Default is Y-up (0, 1, 0).");
         }
     }
 

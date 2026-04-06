@@ -128,7 +128,7 @@ Undo/redo integration now lives in `Core::CommandHistory`; editor panels should 
 
 ### UI Improvements
 
-The editor UI foundation is in place: programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View → Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
+The editor UI foundation is in place: programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View → Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool, GPU VRAM usage), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
 
 Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Feature Wiring):
 
@@ -137,7 +137,7 @@ Concrete remaining items are tracked in `TODO.md` → P1/F (UI Architecture & Fe
 - ~~**Undo/redo integration**~~ — `TODO.md` F3 **complete**. CommandHistory wired to gizmo, inspector, entity lifecycle, and geometry operators (simplify, remesh, smooth, subdivide, repair) with shared-ptr mesh snapshot undo.
 - ~~**Hierarchy refinements**~~ — `TODO.md` F4 **complete**. Drag-and-drop reparenting with undo, expand/collapse all, extended context menu, and multi-entity selection (Ctrl+click toggle, Shift+click range) are all implemented.
 - ~~**Viewport context menus**~~ — `TODO.md` F5 **core complete**. Entity context menu (Focus/Delete/Duplicate/Select Children/Visibility/Isolate), empty-space menu (Create Primitive/Reset Camera/Create Empty), and sub-element menu (Select Connected/Grow/Shrink Selection) are implemented with undo support. Paste and Edge Ring/Loop selection deferred.
-- **Editor polish** (remaining tooltip coverage) — `TODO.md` F6. Console/Log panel is complete (ring-buffer log sink + ImGui panel with level filters, text search, auto-scroll). Keyboard Shortcuts reference panel and Help menu are complete. Multi-object property editing is complete (Inspector shows shared/mixed properties for multi-selected entities with batch undo via `MakeCompoundCommand`).
+- ~~**Editor polish**~~ — `TODO.md` F6 **complete**. GPU memory display in status bar (color-coded VRAM usage), comprehensive tooltip coverage on all Inspector fields and View Settings sliders (AA, histogram, color grading, selection outline). Console/Log panel, Keyboard Shortcuts panel, Help menu, and multi-object property editing were already complete.
 - **Render Target Viewer** panel enhancements — `TODO.md` F7.
 
 Each improvement is independent and can land incrementally.
