@@ -369,12 +369,13 @@ bool SpatialDebugController::EnsureSelectedColliderConvexHull(entt::entity selec
 {
     const bool cacheValid =
         (m_SelectedHullEntity == selected) &&
-        !m_SelectedColliderHullMesh.IsEmpty();
+        m_SelectedColliderHullMesh.has_value() &&
+        !m_SelectedColliderHullMesh->IsEmpty();
 
     if (cacheValid)
         return true;
 
-    m_SelectedColliderHullMesh = Geometry::Halfedge::Mesh{};
+    m_SelectedColliderHullMesh.reset();
     m_SelectedHullEntity = entt::null;
 
     if (collision.Positions.size() < 4)
@@ -388,7 +389,7 @@ bool SpatialDebugController::EnsureSelectedColliderConvexHull(entt::entity selec
     if (!hull || hull->Mesh.IsEmpty())
         return false;
 
-    m_SelectedColliderHullMesh = std::move(hull->Mesh);
+    m_SelectedColliderHullMesh.emplace(std::move(hull->Mesh));
     m_SelectedHullEntity = selected;
     return true;
 }
@@ -765,7 +766,9 @@ bool SpatialDebugController::EnsureRetainedConvexHullOverlay(Runtime::Engine& en
     settings.Enabled = true;
     const bool ok = UpdateRetainedLineOverlay(engine, m_ConvexHullOverlay, [&](Graphics::DebugDraw& dd)
     {
-        Graphics::DrawConvexHull(dd, m_SelectedColliderHullMesh, settings, worldMatrix);
+        if (!m_SelectedColliderHullMesh.has_value())
+            return;
+        Graphics::DrawConvexHull(dd, *m_SelectedColliderHullMesh, settings, worldMatrix);
     });
 
     if (!ok)
