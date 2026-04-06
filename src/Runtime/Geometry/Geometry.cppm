@@ -65,3 +65,4 @@ export import Geometry.PointCloudUtils;
 export import Geometry.Boolean;
 export import Geometry.Queries;
 export import Geometry.VectorHeatMethod;
+export import Geometry.Registration;

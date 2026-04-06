@@ -69,6 +69,7 @@ namespace Runtime::EditorUI
             case GeometryProcessingAlgorithm::ConvexHull:
             case GeometryProcessingAlgorithm::SurfaceReconstruction:
             case GeometryProcessingAlgorithm::BooleanCSG:
+            case GeometryProcessingAlgorithm::Registration:
             default:
                 return false;
             }
@@ -109,6 +110,7 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::VectorHeat: return "Vector Heat Method";
         case GeometryProcessingAlgorithm::Parameterization: return "Parameterization";
         case GeometryProcessingAlgorithm::BooleanCSG: return "Boolean CSG";
+        case GeometryProcessingAlgorithm::Registration: return "ICP Registration";
         default: return "Unknown";
         }
     }
@@ -185,6 +187,8 @@ namespace Runtime::EditorUI
         case GeometryProcessingAlgorithm::BooleanCSG:
             return GeometryProcessingDomain::MeshVertices
                 | GeometryProcessingDomain::MeshFaces;
+        case GeometryProcessingAlgorithm::Registration:
+            return GeometryProcessingDomain::PointCloudPoints;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -201,9 +205,10 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
-        static constexpr std::array<GeometryProcessingAlgorithm, 13> kAlgorithmOrder = {
+        static constexpr std::array<GeometryProcessingAlgorithm, 14> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
             GeometryProcessingAlgorithm::NormalEstimation,
+            GeometryProcessingAlgorithm::Registration,
             GeometryProcessingAlgorithm::ShortestPath,
             GeometryProcessingAlgorithm::VectorHeat,
             GeometryProcessingAlgorithm::Parameterization,

@@ -252,7 +252,7 @@ Core operators are complete (16 mesh operators + DEC + graph builders/layouts + 
 - **Mesh and point cloud denoising:** Edge-aware/spectral denoising operators for scanned and reconstructed data.
 - **Mesh parameterization:** Robust UV/atlas generation and distortion-controlled parameterization methods.
 - **Spectral mesh processing:** Laplacian/eigendecomposition-driven filters, embeddings, and editing operators.
-- **Shape and point cloud registration (ICP variants):** Point-to-point, point-to-plane, and robust weighted ICP pipelines.
+- ~~**Shape and point cloud registration (ICP variants):**~~ Point-to-point and point-to-plane ICP implemented in `Geometry.Registration` module with KDTree correspondence, SVD/linearized solvers, outlier rejection, and editor UI wiring. Remaining: robust weighted ICP variants.
 - **Additional state-of-the-art geometry processing methods:** Continue integrating current research-grade operators as first-class runtime tools.
 
 **Top next (dependency-ordered):** Ordered from foundational geometry robustness and correspondence to advanced deformation/reconstruction so later operators can reuse earlier data products and solvers. Heat-method geodesic distance and vector heat geodesics (parallel transport + logarithmic map) are implemented.

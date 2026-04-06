@@ -35,6 +35,7 @@ import Geometry.ShortestPath;
 import Geometry.MeshQuality;
 import Geometry.Subdivision;
 import Geometry.PointCloudUtils;
+import Geometry.Registration;
 import Geometry.GraphUtils;
 import Geometry.HalfedgeMesh;
 import Geometry.KDTree;
@@ -98,6 +99,7 @@ export namespace Runtime::EditorUI
         VectorHeat,
         Parameterization,
         BooleanCSG,
+        Registration,
     };
 
     struct GeometryProcessingCapabilities
@@ -404,6 +406,22 @@ export namespace Runtime::EditorUI
         std::size_t OutputFaceCount = 0;
     };
 
+    struct RegistrationWidgetState
+    {
+        int Variant = static_cast<int>(Geometry::Registration::ICPVariant::PointToPlane);
+        int MaxIterations = 50;
+        double ConvergenceThreshold = 1e-6;
+        double MaxCorrespondenceDistance = 1e6;
+        double InlierRatio = 0.9;
+        entt::entity TargetEntity = entt::null;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        bool LastConverged = false;
+        std::size_t LastIterationsPerformed = 0;
+        double LastFinalRMSE = 0.0;
+        std::size_t LastInlierCount = 0;
+    };
+
     struct MeshAnalysisWidgetState
     {
         bool HasResults = false;
@@ -480,6 +498,9 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawBooleanWidget(Runtime::Engine& engine,
                                          entt::entity entity,
                                          BooleanWidgetState& state);
+    [[nodiscard]] bool DrawRegistrationWidget(Runtime::Engine& engine,
+                                              entt::entity entity,
+                                              RegistrationWidgetState& state);
 
     // =========================================================================
     // Entity Commands — undoable entity creation/deletion
@@ -577,6 +598,7 @@ export namespace Runtime::EditorUI
         VectorHeatWidgetState m_VectorHeatUi{};
         ParameterizationWidgetState m_ParameterizationUi{};
         BooleanWidgetState m_BooleanUi{};
+        RegistrationWidgetState m_RegistrationUi{};
     };
 
     // =========================================================================

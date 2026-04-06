@@ -73,6 +73,7 @@ target_sources(${target_name}
         Geometry.Queries.cppm
         Geometry.ShortestPath.cppm
         Geometry.VectorHeatMethod.cppm
+        Geometry.Registration.cppm
         PRIVATE
         Geometry.MeshUtils.cpp
         Geometry.Raycast.cpp
@@ -113,6 +114,7 @@ target_sources(${target_name}
         Geometry.Boolean.cpp
         Geometry.ShortestPath.cpp
         Geometry.VectorHeatMethod.cpp
+        Geometry.Registration.cpp
         Geometry.SDF.cpp
 
         #Partitioned modules: how do we tell cmake about these? Do we need to list them all here, or can we just list the main module and have it import the others?

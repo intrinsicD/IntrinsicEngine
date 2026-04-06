@@ -58,6 +58,7 @@ import Geometry.SurfaceReconstruction;
 import Geometry.VectorHeatMethod;
 import Geometry.Parameterization;
 import Geometry.Boolean;
+import Geometry.Registration;
 
 import Core.Commands;
 import Core.Logging;
@@ -3332,6 +3333,207 @@ bool DrawBooleanWidget(Runtime::Engine& engine,
         ImGui::EndDisabled();
 
     return false;
+}
+
+// =========================================================================
+// ICP Registration Widget
+// =========================================================================
+
+bool DrawRegistrationWidget(Runtime::Engine& engine,
+                            entt::entity entity,
+                            RegistrationWidgetState& state)
+{
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+
+    auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity);
+    if (!pcd || !pcd->CloudRef || pcd->CloudRef->IsEmpty())
+    {
+        ImGui::TextDisabled("ICP Registration requires a source point cloud.");
+        return false;
+    }
+
+    ImGui::TextDisabled("Iterative Closest Point (ICP) alignment.\n"
+                        "Aligns this point cloud (source) to a target entity.");
+    ImGui::Spacing();
+
+    // --- Target entity selection ---
+    ImGui::SeparatorText("Target");
+
+    // List all point cloud entities except the source
+    if (ImGui::BeginCombo("Target Entity", state.TargetEntity != entt::null
+            ? std::to_string(static_cast<uint32_t>(static_cast<entt::id_type>(state.TargetEntity))).c_str()
+            : "<none>"))
+    {
+        for (auto [candidate, candidateData] : reg.view<ECS::PointCloud::Data>().each())
+        {
+            if (candidate == entity)
+                continue;
+            if (!candidateData.CloudRef || candidateData.CloudRef->IsEmpty())
+                continue;
+
+            char buf[128]{};
+            if (auto* nameTag = reg.try_get<ECS::Components::NameTag::Component>(candidate))
+            {
+                std::snprintf(buf, sizeof(buf), "%s (id %u, %zu pts)",
+                              nameTag->Name.c_str(),
+                              static_cast<uint32_t>(static_cast<entt::id_type>(candidate)),
+                              candidateData.CloudRef->VertexCount());
+            }
+            else
+            {
+                std::snprintf(buf, sizeof(buf), "Entity %u (%zu pts)",
+                              static_cast<uint32_t>(static_cast<entt::id_type>(candidate)),
+                              candidateData.CloudRef->VertexCount());
+            }
+
+            if (ImGui::Selectable(buf, state.TargetEntity == candidate))
+                state.TargetEntity = candidate;
+        }
+        ImGui::EndCombo();
+    }
+
+    // --- ICP parameters ---
+    ImGui::SeparatorText("Parameters");
+
+    const char* variantLabels[] = {"Point-to-Point", "Point-to-Plane"};
+    ImGui::Combo("Variant", &state.Variant, variantLabels, 2);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Point-to-Plane converges faster on smooth surfaces\n"
+                          "but requires target normals (auto-estimated if absent).");
+
+    int maxIter = state.MaxIterations;
+    ImGui::SliderInt("Max Iterations", &maxIter, 1, 200);
+    state.MaxIterations = maxIter;
+
+    float inlier = static_cast<float>(state.InlierRatio);
+    ImGui::SliderFloat("Inlier Ratio", &inlier, 0.5f, 1.0f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Fraction of closest pairs to keep per iteration.\n"
+                          "Lower values reject more outliers.");
+    state.InlierRatio = inlier;
+
+    float maxDist = static_cast<float>(std::min(state.MaxCorrespondenceDistance, 1e4));
+    ImGui::SliderFloat("Max Correspondence Dist", &maxDist, 0.01f, 100.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Maximum distance for a correspondence pair.\n"
+                          "Pairs farther than this threshold are rejected.");
+    state.MaxCorrespondenceDistance = maxDist;
+
+    // --- Validate and apply ---
+    const bool hasTarget = state.TargetEntity != entt::null && reg.valid(state.TargetEntity);
+    const auto* targetPcd = hasTarget ? reg.try_get<ECS::PointCloud::Data>(state.TargetEntity) : nullptr;
+    const bool targetValid = targetPcd && targetPcd->CloudRef && !targetPcd->CloudRef->IsEmpty();
+
+    if (!targetValid)
+        ImGui::BeginDisabled();
+
+    const bool pressed = ImGui::Button("Align");
+
+    if (!targetValid)
+    {
+        ImGui::EndDisabled();
+        ImGui::TextDisabled("Select a valid target point cloud entity.");
+    }
+
+    // --- Result display ---
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "ICP alignment failed.");
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Iterations: %zu", state.LastIterationsPerformed);
+        ImGui::Text("Final RMSE: %.6f", state.LastFinalRMSE);
+        ImGui::Text("Inlier correspondences: %zu", state.LastInlierCount);
+        if (state.LastConverged)
+            ImGui::TextColored({0.4f, 0.8f, 0.4f, 1.0f}, "Converged");
+        else
+            ImGui::TextColored({0.8f, 0.8f, 0.2f, 1.0f}, "Did not converge (hit max iterations)");
+    }
+
+    if (!pressed || !targetValid)
+        return false;
+
+    // --- Execute ICP ---
+    auto sourcePositions = pcd->CloudRef->Positions();
+    auto targetPositions = targetPcd->CloudRef->Positions();
+
+    // Auto-estimate target normals for point-to-plane if not available
+    std::vector<glm::vec3> estimatedNormals;
+    std::span<const glm::vec3> targetNormals;
+
+    if (state.Variant == static_cast<int>(Geometry::Registration::ICPVariant::PointToPlane))
+    {
+        if (targetPcd->CloudRef->HasNormals())
+        {
+            targetNormals = targetPcd->CloudRef->Normals();
+        }
+        else
+        {
+            auto normalResult = Geometry::NormalEstimation::EstimateNormals(targetPositions);
+            if (normalResult)
+            {
+                estimatedNormals = std::move(normalResult->Normals);
+                targetNormals = estimatedNormals;
+            }
+        }
+    }
+
+    Geometry::Registration::RegistrationParams params;
+    params.Variant = static_cast<Geometry::Registration::ICPVariant>(state.Variant);
+    params.MaxIterations = static_cast<std::size_t>(state.MaxIterations);
+    params.ConvergenceThreshold = state.ConvergenceThreshold;
+    params.MaxCorrespondenceDistance = state.MaxCorrespondenceDistance;
+    params.InlierRatio = state.InlierRatio;
+
+    auto result = Geometry::Registration::AlignICP(sourcePositions, targetPositions,
+                                                    targetNormals, params);
+
+    if (!result)
+    {
+        state.LastRunFailed = true;
+        state.HasResults = false;
+        return false;
+    }
+
+    state.LastRunFailed = false;
+    state.HasResults = true;
+    state.LastIterationsPerformed = result->IterationsPerformed;
+    state.LastFinalRMSE = result->FinalRMSE;
+    state.LastInlierCount = result->FinalInlierCount;
+    state.LastConverged = result->Converged;
+
+    // Apply the recovered transform to the source point cloud positions
+    auto positions = pcd->CloudRef->Positions();
+    for (std::size_t i = 0; i < positions.size(); ++i)
+    {
+        const glm::dvec4 p(positions[i].x, positions[i].y, positions[i].z, 1.0);
+        const glm::dvec4 tp = result->Transform * p;
+        positions[i] = glm::vec3(static_cast<float>(tp.x),
+                                  static_cast<float>(tp.y),
+                                  static_cast<float>(tp.z));
+    }
+
+    // If normals exist, rotate them too
+    if (pcd->CloudRef->HasNormals())
+    {
+        const glm::dmat3 R(result->Transform);
+        auto normals = pcd->CloudRef->Normals();
+        for (std::size_t i = 0; i < normals.size(); ++i)
+        {
+            const glm::dvec3 n(normals[i].x, normals[i].y, normals[i].z);
+            const glm::dvec3 rn = R * n;
+            const double len = glm::length(rn);
+            normals[i] = (len > 1e-12) ? glm::vec3(rn / len) : normals[i];
+        }
+    }
+
+    pcd->GpuDirty = true;
+
+    Core::Log::Info("ICP Registration: {} iterations, RMSE={:.6f}, inliers={}, converged={}",
+                    result->IterationsPerformed, result->FinalRMSE,
+                    result->FinalInlierCount, result->Converged);
+
+    return true;
 }
 
 } // namespace Runtime::EditorUI

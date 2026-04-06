@@ -749,10 +749,14 @@ void InspectorController::Draw()
                     case GeometryProcessingAlgorithm::BooleanCSG:
                         static_cast<void>(DrawBooleanWidget(*m_Engine, selected, m_BooleanUi));
                         break;
+                    case GeometryProcessingAlgorithm::Registration:
+                        static_cast<void>(DrawRegistrationWidget(*m_Engine, selected, m_RegistrationUi));
+                        break;
                     }
 
                     if (m_GeometryWorkflow && entry.Algorithm != GeometryProcessingAlgorithm::KMeans
                         && entry.Algorithm != GeometryProcessingAlgorithm::NormalEstimation
+                        && entry.Algorithm != GeometryProcessingAlgorithm::Registration
                         && entry.Algorithm != GeometryProcessingAlgorithm::ShortestPath
                         && entry.Algorithm != GeometryProcessingAlgorithm::ConvexHull
                         && entry.Algorithm != GeometryProcessingAlgorithm::SurfaceReconstruction
