@@ -1641,3 +1641,186 @@ TEST(Simplification_QEM, PreserveBoundaryPreventsCollapsesOnOpenPatch)
     EXPECT_EQ(boundaryVertexCountAfter, boundaryVertexCountBefore);
 }
 
+// =============================================================================
+// Mesh Repair tests (merged from Test_GeometryProcessing2.cpp)
+// =============================================================================
+
+TEST(MeshRepair_BoundaryDetection, ClosedMeshHasNoBoundary)
+{
+    auto mesh = MakeTetrahedron();
+    auto result = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->Loops.empty());
+}
+
+TEST(MeshRepair_BoundaryDetection, OpenMeshHasBoundary)
+{
+    auto mesh = MakeSingleTriangle();
+    auto result = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Loops.size(), 1u);
+    EXPECT_EQ(result->Loops[0].Vertices.size(), 3u);
+}
+
+TEST(MeshRepair_BoundaryDetection, TwoTriangleSquareHasBoundary)
+{
+    auto mesh = MakeTwoTriangleSquare();
+    auto result = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(result.has_value());
+    // The two-triangle square has one boundary loop with 4 vertices
+    EXPECT_EQ(result->Loops.size(), 1u);
+    EXPECT_EQ(result->Loops[0].Vertices.size(), 4u);
+}
+
+TEST(MeshRepair_HoleFilling, FillsTriangularHole)
+{
+    // Create a tetrahedron, delete one face to create a hole, then fill it
+    auto mesh = MakeTetrahedron();
+
+    // Verify it starts closed
+    auto beforeResult = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(beforeResult.has_value());
+    EXPECT_TRUE(beforeResult->Loops.empty());
+
+    // Delete one face to create a hole
+    Geometry::FaceHandle f0{0};
+    mesh.DeleteFace(f0);
+    mesh.GarbageCollection();
+
+    // Verify the hole exists
+    auto afterResult = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(afterResult.has_value());
+    EXPECT_EQ(afterResult->Loops.size(), 1u);
+
+    // Fill the hole
+    auto result = Geometry::MeshRepair::FillHoles(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->HolesDetected, 1u);
+    EXPECT_EQ(result->HolesFilled, 1u);
+    EXPECT_GE(result->TrianglesAdded, 1u);
+
+    // Verify no more holes
+    auto finalResult = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(finalResult.has_value());
+    EXPECT_TRUE(finalResult->Loops.empty());
+}
+
+TEST(MeshRepair_HoleFilling, EmptyMeshReturnsNullopt)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto result = Geometry::MeshRepair::FillHoles(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(MeshRepair_HoleFilling, ClosedMeshReportsZeroHoles)
+{
+    auto mesh = MakeTetrahedron();
+    auto result = Geometry::MeshRepair::FillHoles(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->HolesDetected, 0u);
+    EXPECT_EQ(result->HolesFilled, 0u);
+}
+
+TEST(MeshRepair_DegenerateFaces, DetectsZeroAreaTriangle)
+{
+    Geometry::Halfedge::Mesh mesh;
+    // Create a degenerate triangle (all vertices collinear)
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({2.0f, 0.0f, 0.0f});
+    (void)mesh.AddTriangle(v0, v1, v2);
+
+    auto result = Geometry::MeshRepair::RemoveDegenerateFaces(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->DegenerateFacesFound, 1u);
+    EXPECT_EQ(result->FacesRemoved, 1u);
+}
+
+TEST(MeshRepair_DegenerateFaces, PreservesValidTriangles)
+{
+    auto mesh = MakeTetrahedron();
+    std::size_t facesBefore = mesh.FaceCount();
+
+    auto result = Geometry::MeshRepair::RemoveDegenerateFaces(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->DegenerateFacesFound, 0u);
+    EXPECT_EQ(mesh.FaceCount(), facesBefore);
+}
+
+TEST(MeshRepair_DegenerateFaces, EmptyMeshReturnsNullopt)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto result = Geometry::MeshRepair::RemoveDegenerateFaces(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(MeshRepair_Orientation, ClosedMeshIsConsistent)
+{
+    auto mesh = MakeTetrahedron();
+    auto result = Geometry::MeshRepair::MakeConsistentOrientation(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->WasConsistent);
+    EXPECT_EQ(result->FacesFlipped, 0u);
+    EXPECT_EQ(result->ComponentCount, 1u);
+}
+
+TEST(MeshRepair_Orientation, EmptyMeshReturnsNullopt)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto result = Geometry::MeshRepair::MakeConsistentOrientation(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(MeshRepair_Orientation, IcosahedronSingleComponent)
+{
+    auto mesh = MakeIcosahedron();
+    auto result = Geometry::MeshRepair::MakeConsistentOrientation(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->ComponentCount, 1u);
+}
+
+TEST(MeshRepair_Combined, RepairValidMesh)
+{
+    // A valid closed mesh should pass through repair without modification
+    auto mesh = MakeTetrahedron();
+
+    auto result = Geometry::MeshRepair::Repair(mesh);
+    ASSERT_TRUE(result.has_value());
+
+    // No degenerates
+    EXPECT_EQ(result->DegenerateResult.DegenerateFacesFound, 0u);
+
+    // Orientation is consistent
+    EXPECT_TRUE(result->OrientResult.WasConsistent);
+
+    // No holes to fill
+    EXPECT_EQ(result->HoleResult.HolesDetected, 0u);
+}
+
+TEST(MeshRepair_Combined, RepairWithDegenerates)
+{
+    // Create mesh with a degenerate triangle among valid ones
+    Geometry::Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({0.5f, 1.0f, 0.0f});
+    (void)mesh.AddVertex({2.0f, 0.0f, 0.0f}); // extra vertex, not part of any face
+
+    (void)mesh.AddTriangle(v0, v1, v2); // valid triangle
+
+    // The repair should detect no degenerates in the valid triangles
+    Geometry::MeshRepair::RepairParams params;
+    params.FillHoles = false; // skip hole filling for this test
+
+    auto result = Geometry::MeshRepair::Repair(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->DegenerateResult.DegenerateFacesFound, 0u);
+}
+
+TEST(MeshRepair_Combined, EmptyMeshReturnsNullopt)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto result = Geometry::MeshRepair::Repair(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+

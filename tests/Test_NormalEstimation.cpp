@@ -168,3 +168,124 @@ TEST(NormalEstimation, AcceptsBorrowedSpanInput)
     EXPECT_EQ(result->Normals.size(), points.size());
 }
 
+// =============================================================================
+// Tests merged from Test_GeometryProcessing2.cpp
+// =============================================================================
+
+namespace
+{
+    // Generate unit sphere point cloud via Fibonacci sampling.
+    std::vector<glm::vec3> MakeSpherePointCloud(std::size_t n)
+    {
+        std::vector<glm::vec3> points;
+        points.reserve(n);
+
+        const float goldenAngle = static_cast<float>(3.14159265358979323846) * (3.0f - std::sqrt(5.0f));
+
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            float y = 1.0f - (2.0f * static_cast<float>(i) / static_cast<float>(n - 1));
+            float radius = std::sqrt(1.0f - y * y);
+            float theta = goldenAngle * static_cast<float>(i);
+            float x = std::cos(theta) * radius;
+            float z = std::sin(theta) * radius;
+            points.push_back({x, y, z});
+        }
+
+        return points;
+    }
+
+    // Generate planar point cloud on the XY plane.
+    std::vector<glm::vec3> MakePlanarPointCloud(std::size_t nx, std::size_t ny)
+    {
+        std::vector<glm::vec3> points;
+        points.reserve(nx * ny);
+
+        for (std::size_t i = 0; i < nx; ++i)
+        {
+            for (std::size_t j = 0; j < ny; ++j)
+            {
+                float x = static_cast<float>(i) / static_cast<float>(nx - 1);
+                float y = static_cast<float>(j) / static_cast<float>(ny - 1);
+                points.push_back({x, y, 0.0f});
+            }
+        }
+
+        return points;
+    }
+}
+
+TEST(NormalEstimation, PlanarNormalsAreConsistent)
+{
+    auto points = MakePlanarPointCloud(10, 10);
+
+    // Use larger k for the regular grid to get robust PCA at boundaries
+    Geometry::NormalEstimation::EstimationParams params;
+    params.KNeighbors = 20;
+
+    auto result = Geometry::NormalEstimation::EstimateNormals(points, params);
+    ASSERT_TRUE(result.has_value());
+
+    // Count how many normals are nearly vertical (z-aligned)
+    std::size_t verticalCount = 0;
+    for (std::size_t i = 0; i < points.size(); ++i)
+    {
+        float zComponent = std::abs(result->Normals[i].z);
+        if (zComponent > 0.8f)
+            ++verticalCount;
+    }
+
+    // At least 90% should be well-aligned (boundary points may be less precise)
+    EXPECT_GT(verticalCount, points.size() * 9 / 10)
+        << "Most normals should be nearly vertical: " << verticalCount << "/" << points.size();
+
+    // After MST orientation, the majority should point in the same direction
+    std::size_t positiveZ = 0;
+    for (std::size_t i = 0; i < points.size(); ++i)
+    {
+        if (result->Normals[i].z > 0.0f)
+            ++positiveZ;
+    }
+
+    // Either most are +Z or most are -Z
+    std::size_t consistentCount = std::max(positiveZ, points.size() - positiveZ);
+    EXPECT_GT(consistentCount, points.size() * 9 / 10)
+        << "Most normals should have consistent orientation";
+}
+
+TEST(NormalEstimation, DifferentKValues)
+{
+    auto points = MakeSpherePointCloud(100);
+
+    Geometry::NormalEstimation::EstimationParams params;
+
+    // Small k
+    params.KNeighbors = 5;
+    auto resultSmall = Geometry::NormalEstimation::EstimateNormals(points, params);
+    ASSERT_TRUE(resultSmall.has_value());
+
+    // Large k
+    params.KNeighbors = 30;
+    auto resultLarge = Geometry::NormalEstimation::EstimateNormals(points, params);
+    ASSERT_TRUE(resultLarge.has_value());
+
+    // Both should produce valid normals
+    EXPECT_EQ(resultSmall->Normals.size(), points.size());
+    EXPECT_EQ(resultLarge->Normals.size(), points.size());
+}
+
+TEST(NormalEstimation, MinimumThreePoints)
+{
+    std::vector<glm::vec3> points = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+    auto result = Geometry::NormalEstimation::EstimateNormals(points);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Normals.size(), 3u);
+
+    // All three normals should point in Z direction
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        float zComponent = std::abs(result->Normals[i].z);
+        EXPECT_GT(zComponent, 0.9f);
+    }
+}
+
