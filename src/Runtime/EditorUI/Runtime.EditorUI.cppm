@@ -100,6 +100,9 @@ export namespace Runtime::EditorUI
         Parameterization,
         BooleanCSG,
         Registration,
+        BilateralFilter,
+        OutlierEstimation,
+        KernelDensity,
     };
 
     struct GeometryProcessingCapabilities
@@ -422,6 +425,43 @@ export namespace Runtime::EditorUI
         std::size_t LastInlierCount = 0;
     };
 
+    struct BilateralFilterWidgetState
+    {
+        int KNeighbors = 15;
+        float SpatialSigma = 0.0f;
+        float NormalSigma = 0.25f;
+        int Iterations = 1;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        std::size_t PointsFiltered = 0;
+        std::size_t DegenerateNormals = 0;
+        float AverageDisplacement = 0.0f;
+        float MaxDisplacement = 0.0f;
+    };
+
+    struct OutlierEstimationWidgetState
+    {
+        int KNeighbors = 20;
+        float ScoreThreshold = 2.0f;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        std::size_t OutlierCount = 0;
+        float MeanScore = 0.0f;
+        float MaxScore = 0.0f;
+    };
+
+    struct KDEWidgetState
+    {
+        int KNeighbors = 15;
+        float Bandwidth = 0.0f;
+        bool HasResults = false;
+        bool LastRunFailed = false;
+        float MeanDensity = 0.0f;
+        float MinDensity = 0.0f;
+        float MaxDensity = 0.0f;
+        float UsedBandwidth = 0.0f;
+    };
+
     struct MeshAnalysisWidgetState
     {
         bool HasResults = false;
@@ -501,6 +541,15 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawRegistrationWidget(Runtime::Engine& engine,
                                               entt::entity entity,
                                               RegistrationWidgetState& state);
+    [[nodiscard]] bool DrawBilateralFilterWidget(Runtime::Engine& engine,
+                                                  entt::entity entity,
+                                                  BilateralFilterWidgetState& state);
+    [[nodiscard]] bool DrawOutlierEstimationWidget(Runtime::Engine& engine,
+                                                    entt::entity entity,
+                                                    OutlierEstimationWidgetState& state);
+    [[nodiscard]] bool DrawKDEWidget(Runtime::Engine& engine,
+                                     entt::entity entity,
+                                     KDEWidgetState& state);
 
     // =========================================================================
     // Entity Commands — undoable entity creation/deletion
@@ -599,6 +648,9 @@ export namespace Runtime::EditorUI
         ParameterizationWidgetState m_ParameterizationUi{};
         BooleanWidgetState m_BooleanUi{};
         RegistrationWidgetState m_RegistrationUi{};
+        BilateralFilterWidgetState m_BilateralFilterUi{};
+        OutlierEstimationWidgetState m_OutlierEstimationUi{};
+        KDEWidgetState m_KDEUi{};
     };
 
     // =========================================================================

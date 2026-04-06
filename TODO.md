@@ -405,14 +405,9 @@ Port the Morton-code Linear BVH construction algorithm (Karras 2012, implemented
 - [ ] Integrate as an alternative to CPU `Geometry.BVH` for entities exceeding a triangle-count threshold.
 - [ ] Benchmark: GPU LBVH build + query vs CPU BVH at 100K+ triangles.
 
-### C15. Point Cloud Robustness Operators
+### C15. Point Cloud Robustness Operators — Complete
 
-Edge-preserving filtering and statistical quality analysis for noisy/incomplete point cloud data (patterns from basics_lab).
-
-- [ ] **Bilateral filter:** Edge-preserving point cloud smoothing using spatial + normal-space Gaussian weighting. Preserves sharp features that uniform Laplacian smoothing destroys. Implement in `Geometry.PointCloudUtils` following the operator pattern.
-- [ ] **Outlier probability estimation:** Per-point outlier score from local density deviation. Flag statistical outliers using Mahalanobis distance from neighborhood covariance. Publish as `p:outlier_score` property.
-- [ ] **Kernel density estimation:** Per-point density via Gaussian KDE with adaptive bandwidth (Silverman's rule). Publish as `p:density` property for downstream weighting (reconstruction, registration).
-- [ ] Wire all three to editor UI as point cloud geometry operators (F1-style panel).
+Bilateral filter (Fleishman et al. 2003), outlier probability estimation (LOF-inspired, Breunig et al. 2000), and kernel density estimation (Gaussian KDE with Silverman's rule) implemented in `Geometry.PointCloudUtils`. All three operators follow the standard Params/Result/optional pattern, publish per-point properties (`p:outlier_score`, `p:density`), and are wired to the editor UI as point cloud geometry operators. 24 focused tests cover degenerate inputs, noise reduction, outlier detection, density discrimination, property publication, and convergence. See git history for details.
 
 ### C16. Non-Rigid Point Cloud Registration (CPD)
 

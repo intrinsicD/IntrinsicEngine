@@ -3536,4 +3536,222 @@ bool DrawRegistrationWidget(Runtime::Engine& engine,
     return true;
 }
 
+// =========================================================================
+// Bilateral Filter Widget
+// =========================================================================
+
+bool DrawBilateralFilterWidget(Runtime::Engine& engine,
+                               entt::entity entity,
+                               BilateralFilterWidgetState& state)
+{
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+
+    auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity);
+    if (!pcd || !pcd->CloudRef || pcd->CloudRef->IsEmpty())
+    {
+        ImGui::TextDisabled("Bilateral Filter requires a point cloud with positions.");
+        return false;
+    }
+
+    if (!pcd->CloudRef->HasNormals())
+    {
+        ImGui::TextColored({0.8f, 0.6f, 0.2f, 1.0f},
+                           "Normals required. Run Normal Estimation first.");
+        return false;
+    }
+
+    ImGui::TextDisabled("Edge-preserving smoothing using spatial and normal-space\n"
+                        "Gaussian weighting (Fleishman et al. 2003).");
+
+    ImGui::SliderInt("K Neighbors##bilateral", &state.KNeighbors, 3, 50);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Number of nearest neighbors for local averaging.");
+
+    ImGui::SliderFloat("Spatial Sigma##bilateral", &state.SpatialSigma, 0.0f, 1.0f, "%.4f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Spatial Gaussian bandwidth. 0 = auto (2x avg spacing).");
+
+    ImGui::SliderFloat("Normal Sigma##bilateral", &state.NormalSigma, 0.01f, 2.0f, "%.3f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Normal-space Gaussian bandwidth. Lower = more edge-preserving.");
+
+    ImGui::SliderInt("Iterations##bilateral", &state.Iterations, 1, 20);
+
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last filter run failed.");
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Points filtered: %zu", state.PointsFiltered);
+        ImGui::Text("Degenerate normals: %zu", state.DegenerateNormals);
+        ImGui::Text("Avg displacement: %.6f", state.AverageDisplacement);
+        ImGui::Text("Max displacement: %.6f", state.MaxDisplacement);
+    }
+
+    if (!ImGui::Button("Apply Bilateral Filter"))
+        return false;
+
+    Geometry::PointCloud::BilateralFilterParams params;
+    params.KNeighbors = static_cast<std::size_t>(std::max(3, state.KNeighbors));
+    params.SpatialSigma = state.SpatialSigma;
+    params.NormalSigma = state.NormalSigma;
+    params.Iterations = static_cast<uint32_t>(std::max(1, state.Iterations));
+
+    auto result = Geometry::PointCloud::BilateralFilter(*pcd->CloudRef, params);
+    if (!result)
+    {
+        state.LastRunFailed = true;
+        state.HasResults = false;
+        return false;
+    }
+
+    state.LastRunFailed = false;
+    state.HasResults = true;
+    state.PointsFiltered = result->PointsFiltered;
+    state.DegenerateNormals = result->DegenerateNormals;
+    state.AverageDisplacement = result->AverageDisplacement;
+    state.MaxDisplacement = result->MaxDisplacement;
+
+    pcd->GpuDirty = true;
+
+    Core::Log::Info("BilateralFilter: {} points filtered, avg disp={:.6f}, max disp={:.6f}",
+                    result->PointsFiltered, result->AverageDisplacement, result->MaxDisplacement);
+
+    return true;
+}
+
+// =========================================================================
+// Outlier Estimation Widget
+// =========================================================================
+
+bool DrawOutlierEstimationWidget(Runtime::Engine& engine,
+                                  entt::entity entity,
+                                  OutlierEstimationWidgetState& state)
+{
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+
+    auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity);
+    if (!pcd || !pcd->CloudRef || pcd->CloudRef->IsEmpty())
+    {
+        ImGui::TextDisabled("Outlier Estimation requires a point cloud.");
+        return false;
+    }
+
+    ImGui::TextDisabled("Per-point outlier score based on local density deviation\n"
+                        "(LOF-inspired, Breunig et al. 2000).");
+
+    ImGui::SliderInt("K Neighbors##outlier", &state.KNeighbors, 3, 100);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Number of nearest neighbors for density estimation.");
+
+    ImGui::SliderFloat("Score Threshold##outlier", &state.ScoreThreshold, 1.0f, 10.0f, "%.2f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Points with score above this value are flagged as outliers.");
+
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last estimation failed.");
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Outliers found: %zu", state.OutlierCount);
+        ImGui::Text("Mean score: %.3f", state.MeanScore);
+        ImGui::Text("Max score: %.3f", state.MaxScore);
+        ImGui::TextDisabled("Published as 'p:outlier_score' property.");
+    }
+
+    if (!ImGui::Button("Estimate Outlier Probability"))
+        return false;
+
+    Geometry::PointCloud::OutlierEstimationParams params;
+    params.KNeighbors = static_cast<std::size_t>(std::max(3, state.KNeighbors));
+    params.ScoreThreshold = state.ScoreThreshold;
+
+    auto result = Geometry::PointCloud::EstimateOutlierProbability(*pcd->CloudRef, params);
+    if (!result)
+    {
+        state.LastRunFailed = true;
+        state.HasResults = false;
+        return false;
+    }
+
+    state.LastRunFailed = false;
+    state.HasResults = true;
+    state.OutlierCount = result->OutlierCount;
+    state.MeanScore = result->MeanScore;
+    state.MaxScore = result->MaxScore;
+
+    Core::Log::Info("OutlierEstimation: {} outliers (threshold={:.2f}), mean={:.3f}, max={:.3f}",
+                    result->OutlierCount, state.ScoreThreshold, result->MeanScore, result->MaxScore);
+
+    return true;
+}
+
+// =========================================================================
+// Kernel Density Estimation Widget
+// =========================================================================
+
+bool DrawKDEWidget(Runtime::Engine& engine,
+                   entt::entity entity,
+                   KDEWidgetState& state)
+{
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
+
+    auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity);
+    if (!pcd || !pcd->CloudRef || pcd->CloudRef->IsEmpty())
+    {
+        ImGui::TextDisabled("Kernel Density Estimation requires a point cloud.");
+        return false;
+    }
+
+    ImGui::TextDisabled("Per-point density estimation using Gaussian KDE\n"
+                        "with adaptive bandwidth (Silverman 1986).");
+
+    ImGui::SliderInt("K Neighbors##kde", &state.KNeighbors, 3, 100);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Number of nearest neighbors for density estimation.");
+
+    ImGui::SliderFloat("Bandwidth##kde", &state.Bandwidth, 0.0f, 1.0f, "%.4f");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Gaussian bandwidth h. 0 = auto (Silverman's rule).");
+
+    if (state.LastRunFailed)
+        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Last estimation failed.");
+    if (state.HasResults)
+    {
+        ImGui::SeparatorText("Last Result");
+        ImGui::Text("Mean density: %.6f", state.MeanDensity);
+        ImGui::Text("Min density: %.6f", state.MinDensity);
+        ImGui::Text("Max density: %.6f", state.MaxDensity);
+        ImGui::Text("Used bandwidth: %.6f", state.UsedBandwidth);
+        ImGui::TextDisabled("Published as 'p:density' property.");
+    }
+
+    if (!ImGui::Button("Estimate Kernel Density"))
+        return false;
+
+    Geometry::PointCloud::KDEParams params;
+    params.KNeighbors = static_cast<std::size_t>(std::max(3, state.KNeighbors));
+    params.Bandwidth = state.Bandwidth;
+
+    auto result = Geometry::PointCloud::EstimateKernelDensity(*pcd->CloudRef, params);
+    if (!result)
+    {
+        state.LastRunFailed = true;
+        state.HasResults = false;
+        return false;
+    }
+
+    state.LastRunFailed = false;
+    state.HasResults = true;
+    state.MeanDensity = result->MeanDensity;
+    state.MinDensity = result->MinDensity;
+    state.MaxDensity = result->MaxDensity;
+    state.UsedBandwidth = result->UsedBandwidth;
+
+    Core::Log::Info("KDE: mean={:.6f}, min={:.6f}, max={:.6f}, bandwidth={:.6f}",
+                    result->MeanDensity, result->MinDensity, result->MaxDensity, result->UsedBandwidth);
+
+    return true;
+}
+
 } // namespace Runtime::EditorUI

@@ -249,7 +249,7 @@ Infrastructure required to move heavyweight geometry operators from CPU to GPU.
 Core operators are complete (16 mesh operators + DEC + graph builders/layouts + collision/spatial queries). Remaining:
 - **Exact Boolean CSG:** Robust triangle clipping + stitched remeshing for partial-overlap union/intersection/difference. The baseline (disjoint/full-containment) is done.
 - **Ultra-fast GPU K-means clustering:** CUDA-accelerated k-means for point clouds and feature-space segmentation workflows.
-- **Mesh and point cloud denoising:** Edge-aware/spectral denoising operators for scanned and reconstructed data.
+- ~~**Mesh and point cloud denoising:**~~ Bilateral filter (edge-preserving smoothing), outlier probability estimation (LOF-inspired), and Gaussian KDE density estimation implemented in `Geometry.PointCloudUtils`. All three wired to editor UI. Remaining: mesh-specific denoising, spectral denoising.
 - **Mesh parameterization:** Robust UV/atlas generation and distortion-controlled parameterization methods.
 - **Spectral mesh processing:** Laplacian/eigendecomposition-driven filters, embeddings, and editing operators.
 - ~~**Shape and point cloud registration (ICP variants):**~~ Point-to-point and point-to-plane ICP implemented in `Geometry.Registration` module with KDTree correspondence, SVD/linearized solvers, outlier rejection, and editor UI wiring. Remaining: robust weighted ICP variants.
