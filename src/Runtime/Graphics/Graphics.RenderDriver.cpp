@@ -1,5 +1,6 @@
 module;
 
+#include <cmath>
 #include <cstring>
 #include <vector>
 #include <algorithm>
@@ -327,6 +328,14 @@ namespace Graphics
         std::unique_ptr<RenderPipeline> m_PendingPipeline;
         std::vector<RetiredPipeline> m_RetiredPipelines;
 
+        // Texture preview state for F7.2 zoomable render target inspection
+        VkSampler m_PreviewSampler = VK_NULL_HANDLE;
+        Core::Hash::StringID m_PreviewResourceId{};
+        VkImageView m_PreviewRegisteredView = VK_NULL_HANDLE;
+        void* m_PreviewTextureId = nullptr;
+        float m_PreviewZoom = 1.0f;
+        ImVec2 m_PreviewPanOffset{0.0f, 0.0f};
+
         Impl(const RenderDriverConfig& config,
              std::shared_ptr<RHI::VulkanDevice> device,
              RHI::VulkanSwapchain& swapchain,
@@ -386,6 +395,20 @@ namespace Graphics
                                         materialRegistry))
 
     {
+        // Create a nearest-point sampler for the texture preview panel.
+        {
+            VkSamplerCreateInfo si{};
+            si.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            si.magFilter = VK_FILTER_NEAREST;
+            si.minFilter = VK_FILTER_NEAREST;
+            si.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+            si.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            si.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            si.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            si.maxAnisotropy = 1.0f;
+            VK_CHECK_FATAL(vkCreateSampler(m_Impl->m_Device->GetLogicalDevice(), &si, nullptr, &m_Impl->m_PreviewSampler));
+        }
+
         // Wire GPU profiler into RenderGraph for per-pass timestamp scoping.
         if (auto* profiler = renderer.GetGpuProfiler())
             m_Impl->m_RenderGraph.SetGpuProfiler(profiler);
@@ -961,6 +984,181 @@ namespace Graphics
                                               }
                                           }
 
+                                          // --- Zoomable Texture Preview (F7.2) ---
+                                          if (ImGui::CollapsingHeader("Texture Preview"))
+                                          {
+                                              // Find the currently selected debug image
+                                              const RenderGraphDebugImage* previewImg = nullptr;
+                                              for (const auto& img : m_Impl->m_LastDebugImages)
+                                              {
+                                                  if (img.Name == debugView.SelectedResource &&
+                                                      (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0 &&
+                                                      img.View != VK_NULL_HANDLE)
+                                                  {
+                                                      previewImg = &img;
+                                                      break;
+                                                  }
+                                              }
+
+                                              if (previewImg)
+                                              {
+                                                  // Always re-register texture each frame — transient resource views
+                                                  // may be recreated on swapchain resize, and Vulkan handles can be
+                                                  // recycled. Comparing VkImageView pointers is not sufficient.
+                                                  const bool resourceChanged = (m_Impl->m_PreviewResourceId != previewImg->Name);
+                                                  if (m_Impl->m_PreviewTextureId)
+                                                      Interface::GUI::RemoveTexture(m_Impl->m_PreviewTextureId);
+                                                  m_Impl->m_PreviewTextureId = Interface::GUI::AddTexture(
+                                                      m_Impl->m_PreviewSampler,
+                                                      previewImg->View,
+                                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                                  m_Impl->m_PreviewRegisteredView = previewImg->View;
+                                                  if (resourceChanged)
+                                                  {
+                                                      m_Impl->m_PreviewResourceId = previewImg->Name;
+                                                      m_Impl->m_PreviewZoom = 1.0f;
+                                                      m_Impl->m_PreviewPanOffset = ImVec2(0.0f, 0.0f);
+                                                  }
+
+                                                  if (m_Impl->m_PreviewTextureId)
+                                                  {
+                                                      const char* rn = resolveName(previewImg->Name);
+                                                      ImGui::Text("Resource: %s  (%ux%u  %s)",
+                                                                  rn ? rn : "Unknown",
+                                                                  previewImg->Extent.width,
+                                                                  previewImg->Extent.height,
+                                                                  formatName(previewImg->Format));
+
+                                                      // Zoom controls
+                                                      ImGui::SliderFloat("Zoom", &m_Impl->m_PreviewZoom, 0.1f, 16.0f, "%.1fx");
+                                                      ImGui::SameLine();
+                                                      if (ImGui::Button("1:1"))
+                                                      {
+                                                          m_Impl->m_PreviewZoom = 1.0f;
+                                                          m_Impl->m_PreviewPanOffset = ImVec2(0.0f, 0.0f);
+                                                      }
+                                                      // Compute display area
+                                                      const float availW = ImGui::GetContentRegionAvail().x;
+                                                      const float previewH = 300.0f;
+
+                                                      ImGui::SameLine();
+                                                      if (ImGui::Button("Fit"))
+                                                      {
+                                                          const float fw = static_cast<float>(previewImg->Extent.width);
+                                                          const float fh = static_cast<float>(previewImg->Extent.height);
+                                                          if (fw > 0.0f && fh > 0.0f)
+                                                              m_Impl->m_PreviewZoom = std::min(availW / fw, previewH / fh);
+                                                          m_Impl->m_PreviewPanOffset = ImVec2(0.0f, 0.0f);
+                                                      }
+                                                      const ImVec2 canvasSize(availW, previewH);
+
+                                                      // Image dimensions scaled by zoom
+                                                      const float imgW = static_cast<float>(previewImg->Extent.width) * m_Impl->m_PreviewZoom;
+                                                      const float imgH = static_cast<float>(previewImg->Extent.height) * m_Impl->m_PreviewZoom;
+
+                                                      // Draw the image with a child region for input isolation
+                                                      ImGui::BeginChild("##preview_canvas", canvasSize, ImGuiChildFlags_Borders,
+                                                                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+                                                      // Process input before computing UVs so pan/zoom changes
+                                                      // take effect in the same frame (no one-frame flicker).
+                                                      if (ImGui::IsWindowHovered())
+                                                      {
+                                                          // Zoom with mouse wheel toward cursor
+                                                          float wheel = ImGui::GetIO().MouseWheel;
+                                                          if (wheel != 0.0f)
+                                                          {
+                                                              ImVec2 mousePos = ImGui::GetIO().MousePos;
+                                                              ImVec2 canvasPos = ImGui::GetWindowPos();
+                                                              float mx = mousePos.x - canvasPos.x;
+                                                              float my = mousePos.y - canvasPos.y;
+
+                                                              float oldZoom = m_Impl->m_PreviewZoom;
+                                                              float zoomFactor = (wheel > 0) ? 1.15f : (1.0f / 1.15f);
+                                                              m_Impl->m_PreviewZoom = std::clamp(m_Impl->m_PreviewZoom * zoomFactor, 0.1f, 16.0f);
+                                                              float ratio = m_Impl->m_PreviewZoom / oldZoom;
+
+                                                              m_Impl->m_PreviewPanOffset.x = mx - ratio * (mx - m_Impl->m_PreviewPanOffset.x);
+                                                              m_Impl->m_PreviewPanOffset.y = my - ratio * (my - m_Impl->m_PreviewPanOffset.y);
+                                                          }
+
+                                                          // Pan with middle mouse button only (left-drag conflicts with ImGui widgets)
+                                                          if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+                                                          {
+                                                              ImVec2 delta = ImGui::GetIO().MouseDelta;
+                                                              m_Impl->m_PreviewPanOffset.x += delta.x;
+                                                              m_Impl->m_PreviewPanOffset.y += delta.y;
+                                                          }
+                                                      }
+
+                                                      // Clamp pan after all input so zoom-to-cursor doesn't flicker
+                                                      m_Impl->m_PreviewPanOffset.x = std::clamp(m_Impl->m_PreviewPanOffset.x, -(imgW - 16.0f), canvasSize.x - 16.0f);
+                                                      m_Impl->m_PreviewPanOffset.y = std::clamp(m_Impl->m_PreviewPanOffset.y, -(imgH - 16.0f), canvasSize.y - 16.0f);
+
+                                                      // UV mapping: compute visible region in normalized texture coordinates
+                                                      float uv0x = -m_Impl->m_PreviewPanOffset.x / imgW;
+                                                      float uv0y = -m_Impl->m_PreviewPanOffset.y / imgH;
+                                                      float uv1x = uv0x + canvasSize.x / imgW;
+                                                      float uv1y = uv0y + canvasSize.y / imgH;
+
+                                                      ImGui::Image(m_Impl->m_PreviewTextureId, canvasSize,
+                                                                   ImVec2(uv0x, uv0y), ImVec2(uv1x, uv1y));
+
+                                                      // Pixel info tooltip on hover (not during drag)
+                                                      if (ImGui::IsWindowHovered() && !ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+                                                      {
+                                                          ImVec2 mousePos = ImGui::GetIO().MousePos;
+                                                          ImVec2 canvasPos = ImGui::GetWindowPos();
+                                                          float mx = mousePos.x - canvasPos.x;
+                                                          float my = mousePos.y - canvasPos.y;
+                                                          float u = uv0x + mx / canvasSize.x * (uv1x - uv0x);
+                                                          float v = uv0y + my / canvasSize.y * (uv1y - uv0y);
+                                                          int px = static_cast<int>(std::floor(u * previewImg->Extent.width));
+                                                          int py = static_cast<int>(std::floor(v * previewImg->Extent.height));
+                                                          if (px >= 0 && px < static_cast<int>(previewImg->Extent.width) &&
+                                                              py >= 0 && py < static_cast<int>(previewImg->Extent.height))
+                                                          {
+                                                              ImGui::BeginTooltip();
+                                                              ImGui::Text("Pixel: (%d, %d)", px, py);
+                                                              ImGui::Text("UV: (%.3f, %.3f)", u, v);
+                                                              ImGui::EndTooltip();
+                                                          }
+                                                      }
+
+                                                      ImGui::EndChild();
+
+                                                      ImGui::TextDisabled("Scroll to zoom, middle-click drag to pan.");
+                                                  }
+                                                  else
+                                                  {
+                                                      ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f),
+                                                          "Failed to register texture for preview.");
+                                                  }
+                                              }
+                                              else
+                                              {
+                                                  // No valid preview target — clear stale registration
+                                                  if (m_Impl->m_PreviewTextureId)
+                                                  {
+                                                      Interface::GUI::RemoveTexture(m_Impl->m_PreviewTextureId);
+                                                      m_Impl->m_PreviewTextureId = nullptr;
+                                                      m_Impl->m_PreviewRegisteredView = VK_NULL_HANDLE;
+                                                  }
+                                                  ImGui::TextDisabled("Select a sampleable resource above to preview it here.");
+                                                  ImGui::TextDisabled("Use the 'Viewport debug source' combo or click a resource in the table.");
+                                              }
+                                          }
+                                          else
+                                          {
+                                              // Header collapsed — release texture registration to save resources
+                                              if (m_Impl->m_PreviewTextureId)
+                                              {
+                                                  Interface::GUI::RemoveTexture(m_Impl->m_PreviewTextureId);
+                                                  m_Impl->m_PreviewTextureId = nullptr;
+                                                  m_Impl->m_PreviewRegisteredView = VK_NULL_HANDLE;
+                                              }
+                                          }
+
                                           ImGui::Separator();
                                           ImGui::DragFloat("Depth Near", &debugView.DepthNear, 0.01f, 1e-4f, 10.0f,
                                                            "%.4f", ImGuiSliderFlags_AlwaysClamp);
@@ -978,6 +1176,12 @@ namespace Graphics
     RenderDriver::~RenderDriver()
     {
         if (m_Impl->m_Device) vkDeviceWaitIdle(m_Impl->m_Device->GetLogicalDevice());
+
+        // Release texture preview resources
+        if (m_Impl->m_PreviewTextureId)
+            Interface::GUI::RemoveTexture(m_Impl->m_PreviewTextureId);
+        if (m_Impl->m_PreviewSampler)
+            vkDestroySampler(m_Impl->m_Device->GetLogicalDevice(), m_Impl->m_PreviewSampler, nullptr);
 
         if (m_Impl->m_ActivePipeline) m_Impl->m_ActivePipeline->Shutdown();
         if (m_Impl->m_PendingPipeline) m_Impl->m_PendingPipeline->Shutdown();

@@ -275,11 +275,7 @@ Right-click context menus are implemented in the 3D viewport (entity, empty-spac
 
 #### F7. Render Target Viewer Panel Enhancements
 
-The Render Target Viewer panel is already implemented with frame state, recipe flags, pipeline feature state, selection outline / post-process internals, debug view toggles, and resource lists. These are incremental improvements:
-
-- [ ] Add a visual resource lifetime timeline bar per resource (first producer pass → last consumer pass) alongside the existing resource table.
-- [ ] Add zoomable texture preview on resource click (currently only viewport debug source selection is supported).
-- [ ] When E2 (GPU Memory Budget) lands, show per-resource estimated memory footprint in the resource table.
+The Render Target Viewer panel is already implemented with frame state, recipe flags, pipeline feature state, selection outline / post-process internals, debug view toggles, resource lists, per-resource memory estimates, a visual resource lifetime timeline bar (green/blue bars with write-range overlay and per-pass column headers), and a zoomable texture preview with zoom-to-cursor, pan, and pixel coordinate tooltips. **Complete.**
 
 ## 3. Later (P2) — Planned Downstream Work
 
