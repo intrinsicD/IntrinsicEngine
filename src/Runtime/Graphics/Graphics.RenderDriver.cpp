@@ -1,5 +1,6 @@
 module;
 
+#include <cmath>
 #include <cstring>
 #include <vector>
 #include <algorithm>
@@ -1055,34 +1056,18 @@ namespace Graphics
                                                       const float imgW = static_cast<float>(previewImg->Extent.width) * m_Impl->m_PreviewZoom;
                                                       const float imgH = static_cast<float>(previewImg->Extent.height) * m_Impl->m_PreviewZoom;
 
-                                                      // For "Fit" mode: auto-compute zoom to fit canvas
-                                                      // (Fit button resets zoom to 1.0, but we show the actual fit in the canvas via UV)
-
-                                                      // Clamp pan so image stays partially visible
-                                                      m_Impl->m_PreviewPanOffset.x = std::clamp(m_Impl->m_PreviewPanOffset.x, -(imgW - 16.0f), canvasSize.x - 16.0f);
-                                                      m_Impl->m_PreviewPanOffset.y = std::clamp(m_Impl->m_PreviewPanOffset.y, -(imgH - 16.0f), canvasSize.y - 16.0f);
-
-                                                      // UV mapping: compute visible region in normalized texture coordinates
-                                                      float uv0x = -m_Impl->m_PreviewPanOffset.x / imgW;
-                                                      float uv0y = -m_Impl->m_PreviewPanOffset.y / imgH;
-                                                      float uv1x = uv0x + canvasSize.x / imgW;
-                                                      float uv1y = uv0y + canvasSize.y / imgH;
-
                                                       // Draw the image with a child region for input isolation
                                                       ImGui::BeginChild("##preview_canvas", canvasSize, ImGuiChildFlags_Borders,
                                                                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-                                                      ImGui::Image(m_Impl->m_PreviewTextureId, canvasSize,
-                                                                   ImVec2(uv0x, uv0y), ImVec2(uv1x, uv1y));
-
-                                                      // Mouse interaction within the canvas
+                                                      // Process input before computing UVs so pan/zoom changes
+                                                      // take effect in the same frame (no one-frame flicker).
                                                       if (ImGui::IsWindowHovered())
                                                       {
-                                                          // Zoom with mouse wheel
+                                                          // Zoom with mouse wheel toward cursor
                                                           float wheel = ImGui::GetIO().MouseWheel;
                                                           if (wheel != 0.0f)
                                                           {
-                                                              // Zoom toward mouse cursor position
                                                               ImVec2 mousePos = ImGui::GetIO().MousePos;
                                                               ImVec2 canvasPos = ImGui::GetWindowPos();
                                                               float mx = mousePos.x - canvasPos.x;
@@ -1093,14 +1078,12 @@ namespace Graphics
                                                               m_Impl->m_PreviewZoom = std::clamp(m_Impl->m_PreviewZoom * zoomFactor, 0.1f, 16.0f);
                                                               float ratio = m_Impl->m_PreviewZoom / oldZoom;
 
-                                                              // Adjust pan to zoom toward cursor
                                                               m_Impl->m_PreviewPanOffset.x = mx - ratio * (mx - m_Impl->m_PreviewPanOffset.x);
                                                               m_Impl->m_PreviewPanOffset.y = my - ratio * (my - m_Impl->m_PreviewPanOffset.y);
                                                           }
 
-                                                          // Pan with middle mouse button or left-drag
-                                                          if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle) ||
-                                                              ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+                                                          // Pan with middle mouse button only (left-drag conflicts with ImGui widgets)
+                                                          if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
                                                           {
                                                               ImVec2 delta = ImGui::GetIO().MouseDelta;
                                                               m_Impl->m_PreviewPanOffset.x += delta.x;
@@ -1108,9 +1091,21 @@ namespace Graphics
                                                           }
                                                       }
 
-                                                      // Pixel info tooltip on hover
-                                                      if (ImGui::IsWindowHovered() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left) &&
-                                                          !ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
+                                                      // Clamp pan after all input so zoom-to-cursor doesn't flicker
+                                                      m_Impl->m_PreviewPanOffset.x = std::clamp(m_Impl->m_PreviewPanOffset.x, -(imgW - 16.0f), canvasSize.x - 16.0f);
+                                                      m_Impl->m_PreviewPanOffset.y = std::clamp(m_Impl->m_PreviewPanOffset.y, -(imgH - 16.0f), canvasSize.y - 16.0f);
+
+                                                      // UV mapping: compute visible region in normalized texture coordinates
+                                                      float uv0x = -m_Impl->m_PreviewPanOffset.x / imgW;
+                                                      float uv0y = -m_Impl->m_PreviewPanOffset.y / imgH;
+                                                      float uv1x = uv0x + canvasSize.x / imgW;
+                                                      float uv1y = uv0y + canvasSize.y / imgH;
+
+                                                      ImGui::Image(m_Impl->m_PreviewTextureId, canvasSize,
+                                                                   ImVec2(uv0x, uv0y), ImVec2(uv1x, uv1y));
+
+                                                      // Pixel info tooltip on hover (not during drag)
+                                                      if (ImGui::IsWindowHovered() && !ImGui::IsMouseDragging(ImGuiMouseButton_Middle))
                                                       {
                                                           ImVec2 mousePos = ImGui::GetIO().MousePos;
                                                           ImVec2 canvasPos = ImGui::GetWindowPos();
@@ -1118,8 +1113,8 @@ namespace Graphics
                                                           float my = mousePos.y - canvasPos.y;
                                                           float u = uv0x + mx / canvasSize.x * (uv1x - uv0x);
                                                           float v = uv0y + my / canvasSize.y * (uv1y - uv0y);
-                                                          int px = static_cast<int>(u * previewImg->Extent.width);
-                                                          int py = static_cast<int>(v * previewImg->Extent.height);
+                                                          int px = static_cast<int>(std::floor(u * previewImg->Extent.width));
+                                                          int py = static_cast<int>(std::floor(v * previewImg->Extent.height));
                                                           if (px >= 0 && px < static_cast<int>(previewImg->Extent.width) &&
                                                               py >= 0 && py < static_cast<int>(previewImg->Extent.height))
                                                           {
@@ -1132,7 +1127,7 @@ namespace Graphics
 
                                                       ImGui::EndChild();
 
-                                                      ImGui::TextDisabled("Scroll to zoom, drag to pan. Middle-click or left-drag pans.");
+                                                      ImGui::TextDisabled("Scroll to zoom, middle-click drag to pan.");
                                                   }
                                                   else
                                                   {
