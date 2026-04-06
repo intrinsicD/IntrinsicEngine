@@ -13,13 +13,6 @@ using namespace Core::Tasks;
 
 namespace
 {
-    [[maybe_unused]] Job WaitForCounterAndIncrement(CounterEvent* event, std::atomic<int>* resumedCount) noexcept
-    {
-        co_await WaitFor(*event);
-        resumedCount->fetch_add(1, std::memory_order_relaxed);
-        co_return;
-    }
-
     Job WaitForCounterTrackStartAndIncrement(CounterEvent* event,
                                              std::atomic<int>* startedCount,
                                              std::atomic<int>* resumedCount) noexcept

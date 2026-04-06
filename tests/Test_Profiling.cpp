@@ -77,7 +77,7 @@ TEST(Profiling_ScopedTimer, CategoryAccumulation)
     {
         if (categories[i].NameHash == kHash)
         {
-            EXPECT_GE(categories[i].CallCount, 3u);
+            EXPECT_EQ(categories[i].CallCount, 3u);
             EXPECT_GT(categories[i].TotalTimeNs, 0u);
             EXPECT_GT(categories[i].MinTimeNs, 0u);
             EXPECT_GT(categories[i].MaxTimeNs, 0u);

@@ -223,7 +223,7 @@ TEST(DenseGrid, Reset)
     dims.NX = 2; dims.NY = 2; dims.NZ = 2;
 
     DenseGrid grid(dims);
-    grid.AddProperty<float>("temp");
+    (void)grid.AddProperty<float>("temp");
 
     GridDimensions newDims;
     newDims.NX = 5; newDims.NY = 5; newDims.NZ = 5;
@@ -397,14 +397,14 @@ TEST(SparseGrid, SameBlockForNearbyVertices)
     SparseGrid grid(dims);
 
     // Vertices (0,0,0) and (7,7,7) are in the same 8^3 block.
-    grid.TouchVertex(0, 0, 0);
+    (void)grid.TouchVertex(0, 0, 0);
     EXPECT_EQ(grid.AllocatedBlockCount(), 1u);
 
-    grid.TouchVertex(7, 7, 7);
+    (void)grid.TouchVertex(7, 7, 7);
     EXPECT_EQ(grid.AllocatedBlockCount(), 1u);  // Same block!
 
     // Vertex (8,0,0) is in a different block.
-    grid.TouchVertex(8, 0, 0);
+    (void)grid.TouchVertex(8, 0, 0);
     EXPECT_EQ(grid.AllocatedBlockCount(), 2u);
 }
 
@@ -416,7 +416,7 @@ TEST(SparseGrid, IsAllocated)
     SparseGrid grid(dims);
     EXPECT_FALSE(grid.IsAllocated(5, 5, 5));
 
-    grid.TouchVertex(5, 5, 5);
+    (void)grid.TouchVertex(5, 5, 5);
     EXPECT_TRUE(grid.IsAllocated(5, 5, 5));
     // All vertices in the same block should also be "allocated"
     EXPECT_TRUE(grid.IsAllocated(0, 0, 0));

@@ -109,10 +109,10 @@ TEST(CoreHash, StringID_Ordering)
     StringID a("AAA");
     StringID b("ZZZ");
 
-    // Ordering is based on hash value, not alphabetical
-    // Just verify that ordering exists and is consistent
-    auto cmp = a <=> b;
-    EXPECT_TRUE((cmp < 0) || (cmp > 0) || (cmp == 0));
+    // Ordering is based on hash value, not alphabetical.
+    // Verify that distinct strings produce a non-equal ordering.
+    EXPECT_NE(a, b);
+    EXPECT_TRUE((a <=> b) != 0);
 
     // Same values should be equal
     StringID a2("AAA");

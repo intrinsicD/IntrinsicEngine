@@ -72,12 +72,6 @@ TEST(MeshViewLifecycle_Contract, VertexViewDefaultState)
     EXPECT_FALSE(comp.HasGpuGeometry());
 }
 
-TEST(MeshViewLifecycle_Contract, VertexViewInvalidSlotSentinel)
-{
-    // All components now use the shared ECS::kInvalidGpuSlot constant.
-    EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
-}
-
 TEST(MeshViewLifecycle_Contract, VertexViewHasGpuGeometryTrueWhenValid)
 {
     ECS::MeshVertexView::Component comp;

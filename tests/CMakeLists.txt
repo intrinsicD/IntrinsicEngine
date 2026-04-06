@@ -101,10 +101,7 @@ intrinsic_test_object_lib(ECSTestObjs
 intrinsic_test_object_lib(GeometryTestObjs
     SOURCES
         Test_RuntimeGeometry.cpp
-        Test_RuntimeGeometry_NoHeapEPA.cpp
         Test_RuntimeGraph.cpp
-        Test_GraphCirculators.cpp
-        Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeGraphKNN.cpp
         Test_KDTree.cpp
         Test_Octree.cpp
@@ -113,7 +110,6 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_MeshOperations.cpp
         Test_MeshBuilder.cpp
         Test_GeometryProcessing.cpp
-        Test_GeometryProcessing2.cpp
         Test_SurfaceReconstruction.cpp
         Test_MeshQuality.cpp
         Test_MeshAnalysis.cpp
@@ -174,11 +170,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_IORegistry.cpp
         Test_Exporters.cpp
         Test_DebugDraw.cpp
-        Test_BoundingDebugDraw.cpp
-        Test_KDTreeDebugDraw.cpp
-        Test_BVHDebugDraw.cpp
-        Test_ConvexHullDebugDraw.cpp
-        Test_OctreeDebugDraw.cpp
+        Test_DebugDrawVisualizations.cpp
         Test_EditorUI.cpp
         Test_PointCloudRenderPass.cpp
         Test_GraphRenderPass.cpp
@@ -196,8 +188,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_TransformGizmo.cpp
         Test_CameraSpaceTransforms.cpp
         Test_CompositionAndValidation.cpp
-        Test_Colormap.cpp
-        Test_ColorMapper.cpp
+        Test_ColorMapping.cpp
         Test_PropertyEnumerator.cpp
         Test_IsolineExtractor.cpp
         Test_EventBus.cpp

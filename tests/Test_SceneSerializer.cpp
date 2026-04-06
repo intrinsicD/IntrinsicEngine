@@ -59,32 +59,7 @@ private:
     std::unordered_map<std::string, std::vector<std::byte>> m_Files;
 };
 
-// ---------------------------------------------------------------------------
-// Dirty Tracker tests (no GPU required)
-// ---------------------------------------------------------------------------
-
-TEST(SceneDirtyTracker, InitiallyClean)
-{
-    Runtime::SceneDirtyTracker tracker;
-    EXPECT_FALSE(tracker.IsDirty());
-    EXPECT_TRUE(tracker.GetCurrentPath().empty());
-}
-
-TEST(SceneDirtyTracker, MarkAndClear)
-{
-    Runtime::SceneDirtyTracker tracker;
-    tracker.MarkDirty();
-    EXPECT_TRUE(tracker.IsDirty());
-    tracker.ClearDirty();
-    EXPECT_FALSE(tracker.IsDirty());
-}
-
-TEST(SceneDirtyTracker, PathTracking)
-{
-    Runtime::SceneDirtyTracker tracker;
-    tracker.SetCurrentPath("test_scene.json");
-    EXPECT_EQ(tracker.GetCurrentPath(), "test_scene.json");
-}
+// SceneDirtyTracker tests live in Test_EditorUI.cpp (9 comprehensive tests).
 
 // ---------------------------------------------------------------------------
 // Scene schema tests — verify JSON structure produced by SaveScene
