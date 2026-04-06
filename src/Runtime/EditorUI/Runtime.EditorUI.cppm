@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -728,6 +729,12 @@ export namespace Runtime::EditorUI
     class SpatialDebugController
     {
     public:
+        SpatialDebugController() = default;
+        SpatialDebugController(const SpatialDebugController&) = delete;
+        SpatialDebugController& operator=(const SpatialDebugController&) = delete;
+        SpatialDebugController(SpatialDebugController&&) = delete;
+        SpatialDebugController& operator=(SpatialDebugController&&) = delete;
+
         // Toggle flags (bound to UI checkboxes).
         bool DrawOctree = false;
         bool DrawBounds = false;
@@ -793,7 +800,7 @@ export namespace Runtime::EditorUI
         entt::entity m_ConvexHullOverlaySourceEntity = entt::null;
         Graphics::ConvexHullDebugDrawSettings m_CachedConvexHullSettings{};
         glm::mat4 m_CachedConvexHullWorld{1.0f};
-        Geometry::Halfedge::Mesh m_SelectedColliderHullMesh{};
+        std::optional<Geometry::Halfedge::Mesh> m_SelectedColliderHullMesh{};
         entt::entity m_SelectedHullEntity = entt::null;
 
         // Contact manifold overlay (transient, released every frame).
