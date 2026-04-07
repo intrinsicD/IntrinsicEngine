@@ -13,6 +13,7 @@ module;
 export module Graphics.IORegistry;
 
 import Graphics.Geometry;
+import Graphics.Model;
 import Graphics.AssetErrors;
 import Core.IOBackend;
 
@@ -38,7 +39,9 @@ export namespace Graphics
     // --- Import Result (extensible variant) ---
     struct MeshImportData
     {
-        std::vector<GeometryCpuData> Meshes;
+        std::vector<GeometryCpuData> Meshes{};
+        std::vector<ImportedTextureImage> EmbeddedImages{};
+        std::vector<ImportedMaterialTextureRefs> EmbeddedMaterials{};
     };
     // Phase 1: struct SceneImportData { ... };
 

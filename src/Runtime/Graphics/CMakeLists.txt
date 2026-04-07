@@ -169,6 +169,13 @@ target_include_directories(${target_name} PUBLIC .)
 
 target_include_directories(${target_name} SYSTEM PUBLIC
         ${tinygltf_SOURCE_DIR}
+        ${draco_SOURCE_DIR}/src
+        ${CMAKE_BINARY_DIR}
+)
+
+target_compile_definitions(${target_name}
+        PUBLIC
+        TINYGLTF_ENABLE_DRACO
 )
 
 target_link_libraries(${target_name}
@@ -178,5 +185,6 @@ target_link_libraries(${target_name}
         IntrinsicRHI
         IntrinsicECS
         IntrinsicInterface
+        Draco::draco
         imguizmo_lib
 )

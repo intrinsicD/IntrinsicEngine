@@ -157,6 +157,26 @@ FetchContent_Declare(
 )
 intrinsic_make_available(json)
 
+# --- Draco (Required for glTF KHR_draco_mesh_compression) ---
+set(DRACO_INSTALL OFF CACHE BOOL "Disable Draco install targets" FORCE)
+set(DRACO_TESTS OFF CACHE BOOL "Disable Draco tests" FORCE)
+FetchContent_Declare(
+        draco
+        GIT_REPOSITORY https://github.com/google/draco.git
+        GIT_TAG 1.5.7
+)
+intrinsic_make_available(draco)
+
+if(TARGET draco)
+    add_library(Draco::draco ALIAS draco)
+elseif(TARGET draco_static)
+    add_library(Draco::draco ALIAS draco_static)
+elseif(TARGET draco_shared)
+    add_library(Draco::draco ALIAS draco_shared)
+else()
+    message(FATAL_ERROR "Draco dependency did not define a recognized library target")
+endif()
+
 # --- TinyGLTF ---
 FetchContent_Declare(
         tinygltf

@@ -326,3 +326,127 @@ TEST(ColorMapper, ConstantFieldAutoRange)
     EXPECT_FLOAT_EQ(config.RangeMin, 4.5f);
     EXPECT_FLOAT_EQ(config.RangeMax, 5.5f);
 }
+
+// =============================================================================
+// ColorMapper — double property support (geometry processing results)
+// =============================================================================
+
+TEST(ColorMapper, DoubleScalarAutoRange)
+{
+    // Geometry processing algorithms (geodesic, shortest path, curvature) store
+    // results as double. The color mapper must handle them transparently.
+    Geometry::PropertySet ps;
+    auto prop = ps.Add<double>("v:geodesic_distance", 0.0);
+    auto& vec = prop.Vector();
+    vec.resize(4);
+    vec[0] = 0.0;
+    vec[1] = 1.0;
+    vec[2] = 2.0;
+    vec[3] = 3.0;
+
+    ColorSource config;
+    config.PropertyName = "v:geodesic_distance";
+    config.AutoRange = true;
+    config.Map = Colormap::Type::Viridis;
+
+    auto result = ColorMapper::MapProperty(ps, config);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Colors.size(), 4u);
+    EXPECT_FLOAT_EQ(config.RangeMin, 0.0f);
+    EXPECT_FLOAT_EQ(config.RangeMax, 3.0f);
+}
+
+TEST(ColorMapper, DoubleScalarMapsToDistinctColors)
+{
+    Geometry::PropertySet ps;
+    auto prop = ps.Add<double>("v:shortest_path_distance", 0.0);
+    auto& vec = prop.Vector();
+    vec.resize(3);
+    vec[0] = 0.0;
+    vec[1] = 0.5;
+    vec[2] = 1.0;
+
+    ColorSource config;
+    config.PropertyName = "v:shortest_path_distance";
+    config.AutoRange = false;
+    config.RangeMin = 0.0f;
+    config.RangeMax = 1.0f;
+    config.Map = Colormap::Type::Viridis;
+
+    auto result = ColorMapper::MapProperty(ps, config);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Colors.size(), 3u);
+
+    // All three values should map to different colors.
+    EXPECT_NE(result->Colors[0], result->Colors[1]);
+    EXPECT_NE(result->Colors[1], result->Colors[2]);
+}
+
+TEST(ColorMapper, DoubleInfinityIgnoredInAutoRange)
+{
+    // Dijkstra initialises unreachable vertices to +infinity.
+    // AutoRange must skip infinities and clamp to the finite range.
+    Geometry::PropertySet ps;
+    auto prop = ps.Add<double>("v:shortest_path_distance",
+                               std::numeric_limits<double>::infinity());
+    auto& vec = prop.Vector();
+    vec.resize(4);
+    vec[0] = 0.0;
+    vec[1] = 1.0;
+    vec[2] = std::numeric_limits<double>::infinity(); // unreachable vertex
+    vec[3] = 2.0;
+
+    ColorSource config;
+    config.PropertyName = "v:shortest_path_distance";
+    config.AutoRange = true;
+    config.Map = Colormap::Type::Viridis;
+
+    auto result = ColorMapper::MapProperty(ps, config);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Colors.size(), 4u);
+    // AutoRange should use [0, 2], not [0, inf].
+    EXPECT_FLOAT_EQ(config.RangeMin, 0.0f);
+    EXPECT_FLOAT_EQ(config.RangeMax, 2.0f);
+}
+
+// =============================================================================
+// PropertyEnumerator — double property discovery
+// =============================================================================
+
+TEST(PropertyEnumerator, DoublePropertyAppearsAsScalar)
+{
+    Geometry::PropertySet ps;
+    ps.Add<double>("v:geodesic_distance", 0.0);
+    ps.Add<double>("v:mean_curvature", 0.0);
+    ps.Add<float>("v:some_float", 0.0f);
+    ps.Add<glm::vec3>("v:normal", glm::vec3(0.0f));
+
+    const Geometry::ConstPropertySet cps{ps};
+    const auto infos = Graphics::EnumerateColorableProperties(cps);
+
+    // All three colorable properties must be discovered.
+    EXPECT_EQ(infos.size(), 3u);
+
+    auto findProp = [&](const std::string& name) {
+        for (const auto& info : infos)
+            if (info.Name == name) return true;
+        return false;
+    };
+    EXPECT_TRUE(findProp("v:geodesic_distance"));
+    EXPECT_TRUE(findProp("v:mean_curvature"));
+    EXPECT_TRUE(findProp("v:some_float"));
+}
+
+TEST(PropertyEnumerator, DoublePropertyAppearsInScalarEnumeration)
+{
+    Geometry::PropertySet ps;
+    ps.Add<double>("v:transported_angle", 0.0);
+    ps.Add<float>("v:curvature_f", 0.0f);
+
+    const Geometry::ConstPropertySet cps{ps};
+    const auto scalars = Graphics::EnumerateScalarProperties(cps);
+
+    EXPECT_EQ(scalars.size(), 2u);
+    for (const auto& info : scalars)
+        EXPECT_EQ(info.Type, Graphics::PropertyDataType::Scalar);
+}

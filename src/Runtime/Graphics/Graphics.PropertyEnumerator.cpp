@@ -58,6 +58,8 @@ static std::vector<PropertyInfo> EnumerateColorablePropertiesImpl(const Property
 
         if (ps.template Get<float>(name).IsValid())
             result.push_back({name, PropertyDataType::Scalar});
+        else if (ps.template Get<double>(name).IsValid())
+            result.push_back({name, PropertyDataType::Scalar});
         else if (ps.template Get<glm::vec3>(name).IsValid())
             result.push_back({name, PropertyDataType::Vec3});
         else if (ps.template Get<glm::vec4>(name).IsValid())
@@ -79,6 +81,8 @@ static std::vector<PropertyInfo> EnumerateScalarPropertiesImpl(const PropertySet
             continue;
 
         if (ps.template Get<float>(name).IsValid())
+            result.push_back({name, PropertyDataType::Scalar});
+        else if (ps.template Get<double>(name).IsValid())
             result.push_back({name, PropertyDataType::Scalar});
     }
 

@@ -1,7 +1,10 @@
 module;
+#include <cstddef>
 #include <vector>
 #include <memory>
 #include <string>
+
+#include <glm/glm.hpp>
 
 export module Graphics.Model;
 
@@ -13,6 +16,30 @@ import RHI.Device;
 export namespace Graphics
 {
 
+    struct ImportedTextureImage
+    {
+        std::string Name{};
+        int Width = 0;
+        int Height = 0;
+        int Components = 0;
+        int Bits = 0;
+        int PixelType = 0;
+        bool AsIs = false;
+        std::vector<std::byte> Pixels;
+    };
+
+    struct ImportedMaterialTextureRefs
+    {
+        std::string Name{};
+        glm::vec4 BaseColorFactor{1.0f};
+        float MetallicFactor = 1.0f;
+        float RoughnessFactor = 1.0f;
+        int BaseColorImage = -1;
+        int NormalImage = -1;
+        int MetallicRoughnessImage = -1;
+        int OcclusionImage = -1;
+    };
+
     struct MeshSegment
     {
         Geometry::GeometryHandle Handle;
@@ -23,7 +50,12 @@ export namespace Graphics
     struct Model
     {
         Model(GeometryPool& storage, std::shared_ptr<RHI::VulkanDevice> device)
-            : m_Storage(storage), m_Device(std::move(device)) {}
+            : m_Storage(storage)
+            , m_Device(std::move(device))
+            , Meshes{}
+            , EmbeddedImages{}
+            , EmbeddedMaterials{}
+        {}
 
         // RAII: Release handles on destruction using deferred deletion
         ~Model() {
@@ -39,6 +71,8 @@ export namespace Graphics
 
         // The individual parts of the model (primitives)
         std::vector<std::shared_ptr<MeshSegment>> Meshes;
+        std::vector<ImportedTextureImage> EmbeddedImages;
+        std::vector<ImportedMaterialTextureRefs> EmbeddedMaterials;
 
         [[nodiscard]] bool IsValid() const { return !Meshes.empty(); }
         [[nodiscard]] size_t Size() const { return Meshes.size(); }

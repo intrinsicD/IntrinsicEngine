@@ -19,6 +19,7 @@ module Graphics.Importers.GLTF;
 import Graphics.IORegistry;
 import Graphics.Geometry;
 import Graphics.AssetErrors;
+import Graphics.Model;
 import Core.IOBackend;
 import Core.Logging;
 import Geometry.MeshUtils;
@@ -38,6 +39,14 @@ namespace Graphics
                         const tinygltf::Accessor& accessor,
                         size_t count)
         {
+            // bufferView == -1 means the accessor has no dense buffer (glTF spec: zero-initialized,
+            // or the data lives in a Draco blob that we don't yet decode). Fill with defaults.
+            if (accessor.bufferView < 0)
+            {
+                outBuffer.assign(count, DstT{});
+                return;
+            }
+
             const auto& view = model.bufferViews[accessor.bufferView];
             const auto& buffer = model.buffers[view.buffer];
             const uint8_t* srcData = &buffer.data[view.byteOffset + accessor.byteOffset];
@@ -54,14 +63,103 @@ namespace Graphics
                 }
             }
 
-            DstT* dstPtr = outBuffer.data();
             for (size_t i = 0; i < count; ++i)
             {
-                const SrcT* elem = reinterpret_cast<const SrcT*>(srcData + i * srcStride);
+                SrcT elem{};
+                std::memcpy(&elem, srcData + i * srcStride, sizeof(SrcT));
                 if constexpr (std::is_same_v<DstT, SrcT>)
-                    dstPtr[i] = *elem;
+                    outBuffer[i] = elem;
                 else
-                    dstPtr[i] = static_cast<DstT>(*elem);
+                    outBuffer[i] = static_cast<DstT>(elem);
+            }
+        }
+
+        [[nodiscard]] float DecodeAccessorComponentAsFloat(const tinygltf::Accessor& accessor,
+                                                          const uint8_t* src)
+        {
+            switch (accessor.componentType)
+            {
+            case TINYGLTF_COMPONENT_TYPE_FLOAT:
+            {
+                float value = 0.0f;
+                std::memcpy(&value, src, sizeof(float));
+                return value;
+            }
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+            {
+                uint16_t value = 0;
+                std::memcpy(&value, src, sizeof(uint16_t));
+                return accessor.normalized ? static_cast<float>(value) / 65535.0f
+                                            : static_cast<float>(value);
+            }
+            case TINYGLTF_COMPONENT_TYPE_SHORT:
+            {
+                int16_t value = 0;
+                std::memcpy(&value, src, sizeof(int16_t));
+                if (!accessor.normalized) return static_cast<float>(value);
+                constexpr float kDenom = 32767.0f;
+                return glm::clamp(static_cast<float>(value) / kDenom, -1.0f, 1.0f);
+            }
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+            {
+                uint8_t value = 0;
+                std::memcpy(&value, src, sizeof(uint8_t));
+                return accessor.normalized ? static_cast<float>(value) / 255.0f
+                                           : static_cast<float>(value);
+            }
+            case TINYGLTF_COMPONENT_TYPE_BYTE:
+            {
+                int8_t value = 0;
+                std::memcpy(&value, src, sizeof(int8_t));
+                if (!accessor.normalized) return static_cast<float>(value);
+                constexpr float kDenom = 127.0f;
+                return glm::clamp(static_cast<float>(value) / kDenom, -1.0f, 1.0f);
+            }
+            case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+            {
+                uint32_t value = 0;
+                std::memcpy(&value, src, sizeof(uint32_t));
+                return accessor.normalized ? static_cast<float>(value) / 4294967295.0f
+                                           : static_cast<float>(value);
+            }
+            case TINYGLTF_COMPONENT_TYPE_INT:
+            {
+                int32_t value = 0;
+                std::memcpy(&value, src, sizeof(int32_t));
+                if (!accessor.normalized) return static_cast<float>(value);
+                constexpr float kDenom = 2147483647.0f;
+                return glm::clamp(static_cast<float>(value) / kDenom, -1.0f, 1.0f);
+            }
+            default:
+                return 0.0f;
+            }
+        }
+
+        void LoadVec2Buffer(std::vector<glm::vec2>& outBuffer,
+                            const tinygltf::Model& model,
+                            const tinygltf::Accessor& accessor,
+                            size_t count)
+        {
+            if (accessor.bufferView < 0)
+            {
+                outBuffer.assign(count, glm::vec2(0.0f));
+                return;
+            }
+
+            const auto& view = model.bufferViews[accessor.bufferView];
+            const auto& buffer = model.buffers[view.buffer];
+            const uint8_t* srcData = &buffer.data[view.byteOffset + accessor.byteOffset];
+            const size_t srcStride = view.byteStride == 0
+                ? static_cast<size_t>(tinygltf::GetComponentSizeInBytes(accessor.componentType)) * 2u
+                : view.byteStride;
+
+            outBuffer.resize(count);
+            for (size_t i = 0; i < count; ++i)
+            {
+                const uint8_t* elem = srcData + i * srcStride;
+                outBuffer[i] = glm::vec2(
+                    DecodeAccessorComponentAsFloat(accessor, elem + 0 * tinygltf::GetComponentSizeInBytes(accessor.componentType)),
+                    DecodeAccessorComponentAsFloat(accessor, elem + 1 * tinygltf::GetComponentSizeInBytes(accessor.componentType)));
             }
         }
 
@@ -201,6 +299,19 @@ namespace Graphics
             return std::unexpected(AssetError::DecodeFailed);
         }
 
+        // Reject only required extensions that we truly cannot satisfy in-engine.
+        for (const auto& ext : model.extensionsRequired)
+        {
+            if (ext == "KHR_draco_mesh_compression")
+            {
+                Core::Log::Info("GLTF: '{}' uses Draco mesh compression; decoding natively.",
+                                ctx.SourcePath);
+                continue;
+            }
+            Core::Log::Warn("GLTF: '{}' uses required extension '{}' — partial or no support.",
+                            ctx.SourcePath, ext);
+        }
+
         std::vector<GeometryCpuData> meshes;
 
         for (const auto& gltfMesh : model.meshes)
@@ -249,16 +360,11 @@ namespace Graphics
                 if (uvIt != primitive.attributes.end())
                 {
                     const auto& uvAccessor = model.accessors[uvIt->second];
-                    const auto& uvView = model.bufferViews[uvAccessor.bufferView];
-                    const auto& uvBuffer = model.buffers[uvView.buffer];
-                    const uint8_t* uvData = &uvBuffer.data[uvView.byteOffset + uvAccessor.byteOffset];
-                    const size_t uvStride = uvView.byteStride == 0 ? sizeof(glm::vec2) : uvView.byteStride;
+                    std::vector<glm::vec2> uvs;
+                    LoadVec2Buffer(uvs, model, uvAccessor, vertexCount);
 
-                    for (size_t i = 0; i < vertexCount; ++i)
-                    {
-                        const glm::vec2* uv = reinterpret_cast<const glm::vec2*>(uvData + i * uvStride);
-                        meshData.Aux[i] = glm::vec4(uv->x, uv->y, 0.0f, 0.0f);
-                    }
+                    for (size_t i = 0; i < uvs.size(); ++i)
+                        meshData.Aux[i] = glm::vec4(uvs[i], 0.0f, 0.0f);
                 }
 
                 if (primitive.indices >= 0)
@@ -299,6 +405,58 @@ namespace Graphics
 
         MeshImportData result;
         result.Meshes = std::move(meshes);
+
+        result.EmbeddedImages.reserve(model.images.size());
+        for (const auto& image : model.images)
+        {
+            if (image.width <= 0 || image.height <= 0 || image.image.empty())
+                continue;
+
+            ImportedTextureImage out{};
+            out.Name = image.name;
+            out.Width = image.width;
+            out.Height = image.height;
+            out.Components = image.component;
+            out.Bits = image.bits;
+            out.PixelType = image.pixel_type;
+            out.AsIs = image.as_is;
+            out.Pixels.resize(image.image.size());
+            std::memcpy(out.Pixels.data(), image.image.data(), image.image.size());
+            result.EmbeddedImages.push_back(std::move(out));
+        }
+
+        auto resolveTextureImage = [&model](int textureIndex) -> int
+        {
+            if (textureIndex < 0 || textureIndex >= static_cast<int>(model.textures.size()))
+                return -1;
+            const int source = model.textures[textureIndex].source;
+            if (source < 0 || source >= static_cast<int>(model.images.size()))
+                return -1;
+            return source;
+        };
+
+        result.EmbeddedMaterials.reserve(model.materials.size());
+        for (const auto& material : model.materials)
+        {
+            ImportedMaterialTextureRefs out{};
+            out.Name = material.name;
+            if (material.pbrMetallicRoughness.baseColorFactor.size() == 4)
+            {
+                out.BaseColorFactor = glm::vec4(
+                    static_cast<float>(material.pbrMetallicRoughness.baseColorFactor[0]),
+                    static_cast<float>(material.pbrMetallicRoughness.baseColorFactor[1]),
+                    static_cast<float>(material.pbrMetallicRoughness.baseColorFactor[2]),
+                    static_cast<float>(material.pbrMetallicRoughness.baseColorFactor[3]));
+            }
+            out.MetallicFactor = static_cast<float>(material.pbrMetallicRoughness.metallicFactor);
+            out.RoughnessFactor = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor);
+            out.BaseColorImage = resolveTextureImage(material.pbrMetallicRoughness.baseColorTexture.index);
+            out.MetallicRoughnessImage = resolveTextureImage(material.pbrMetallicRoughness.metallicRoughnessTexture.index);
+            out.NormalImage = resolveTextureImage(material.normalTexture.index);
+            out.OcclusionImage = resolveTextureImage(material.occlusionTexture.index);
+            result.EmbeddedMaterials.push_back(std::move(out));
+        }
+
         return ImportResult{std::move(result)};
     }
 }

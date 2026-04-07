@@ -80,17 +80,19 @@ TEST(PropertyEnumerator, VectorEnumeration_IncludesNormals)
     EXPECT_EQ(colorProps[0].Name, "direction");
 }
 
-TEST(PropertyEnumerator, EnumerateScalarOnlyReturnsFloat)
+TEST(PropertyEnumerator, EnumerateScalarReturnsFloatAndDouble)
 {
+    // Scalar enumeration covers both float and double — vec3/vec4 are excluded.
     Geometry::PropertySet ps;
     (void)ps.Add<float>("curvature", 0.0f);
+    (void)ps.Add<double>("geodesic", 0.0);
     (void)ps.Add<glm::vec3>("v:color", glm::vec3(0.0f));
     (void)ps.Add<glm::vec4>("rgba", glm::vec4(0.0f));
 
     auto props = EnumerateScalarProperties(ps);
-    ASSERT_EQ(props.size(), 1u);
-    EXPECT_EQ(props[0].Name, "curvature");
-    EXPECT_EQ(props[0].Type, PropertyDataType::Scalar);
+    ASSERT_EQ(props.size(), 2u);
+    for (const auto& p : props)
+        EXPECT_EQ(p.Type, PropertyDataType::Scalar);
 }
 
 TEST(PropertyEnumerator, EnumerateVectorOnlyReturnsVec3)

@@ -135,7 +135,8 @@ export namespace Graphics::Passes
                                                     std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
                                                      std::vector<glm::vec4>& outPixels,
                                                      uint32_t& outWidth,
-                                                     uint32_t& outHeight);
+                                                     uint32_t& outHeight,
+                                                     uint32_t maxImageDimension2D);
 
         [[nodiscard]] static uint64_t ComputePreviewAtlasSignature(
             const Geometry::Halfedge::Mesh& mesh,

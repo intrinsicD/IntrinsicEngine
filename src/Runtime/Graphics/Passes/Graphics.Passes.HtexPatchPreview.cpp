@@ -61,6 +61,13 @@ namespace Graphics::Passes
 
     namespace
     {
+        [[nodiscard]] uint32_t GetMaxPreviewAtlasDimension2D(const RHI::VulkanDevice& device) noexcept
+        {
+            VkPhysicalDeviceProperties props{};
+            vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &props);
+            return props.limits.maxImageDimension2D;
+        }
+
         [[nodiscard]] constexpr uint64_t HashCombine64(uint64_t seed, uint64_t value) noexcept
         {
             value *= 0x9e3779b97f4a7c15ull;
@@ -311,7 +318,8 @@ namespace Graphics::Passes
                                                                std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
                                                                std::vector<glm::vec4>& outPixels,
                                                                uint32_t& outWidth,
-                                                               uint32_t& outHeight)
+                                                               uint32_t& outHeight,
+                                                               uint32_t maxImageDimension2D)
     {
         PROFILE_SCOPE("HtexPatchPreview::BuildPreviewAtlas");
 
@@ -324,14 +332,31 @@ namespace Graphics::Passes
         }
 
         constexpr uint32_t kTileSize = 16u;
-        constexpr uint32_t kMaxColumns = 32u;
-        const uint32_t columns = std::max(1u,
-                                          std::min(kMaxColumns,
-                                                   static_cast<uint32_t>(std::ceil(std::sqrt(static_cast<float>(patches.size()))))));
-        const uint32_t rows = static_cast<uint32_t>((patches.size() + columns - 1u) / columns);
+        if (maxImageDimension2D < kTileSize)
+            return false;
 
-        outWidth = columns * kTileSize;
-        outHeight = rows * kTileSize;
+        const uint32_t maxColumns = std::max(1u, maxImageDimension2D / kTileSize);
+        const uint64_t patchCount = static_cast<uint64_t>(patches.size());
+        const uint64_t minColumnsForHeight = (patchCount + static_cast<uint64_t>(maxColumns) - 1u) /
+                                             static_cast<uint64_t>(maxColumns);
+        if (minColumnsForHeight > static_cast<uint64_t>(maxColumns))
+            return false;
+
+        const uint64_t desiredColumns64 = static_cast<uint64_t>(std::ceil(std::sqrt(static_cast<double>(patchCount))));
+        const uint32_t columns = static_cast<uint32_t>(std::clamp(desiredColumns64,
+                                                                  minColumnsForHeight,
+                                                                  static_cast<uint64_t>(maxColumns)));
+        const uint64_t rows64 = (patchCount + static_cast<uint64_t>(columns) - 1u) / static_cast<uint64_t>(columns);
+        const uint64_t width64 = static_cast<uint64_t>(columns) * static_cast<uint64_t>(kTileSize);
+        const uint64_t height64 = rows64 * static_cast<uint64_t>(kTileSize);
+        if (width64 > static_cast<uint64_t>(maxImageDimension2D) ||
+            height64 > static_cast<uint64_t>(maxImageDimension2D))
+        {
+            return false;
+        }
+
+        outWidth = static_cast<uint32_t>(width64);
+        outHeight = static_cast<uint32_t>(height64);
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
         const bool hasPerTexelKMeans = kmeansData.HasCentroidField();
@@ -413,12 +438,26 @@ namespace Graphics::Passes
 
         const entt::entity entity = static_cast<entt::entity>(preview->SourceEntityId);
         const Geometry::Halfedge::Mesh& mesh = *preview->Mesh;
+        const uint32_t maxImageDimension2D = GetMaxPreviewAtlasDimension2D(*m_Device);
 
         if (m_PendingBake && m_PendingBake->Ready.load(std::memory_order_acquire))
         {
             m_CachedAtlas = std::move(m_PendingBake->Atlas);
             m_PendingBake.reset();
             m_DebugState.AtlasRebuiltThisFrame = true;
+
+            if (!m_CachedAtlas.Valid || !m_CachedAtlas.Built)
+            {
+                Core::Log::Warn("HtexPatchPreview: rejecting oversized atlas {}x{} for {} patches (device max 2D extent {}).",
+                                m_CachedAtlas.Width,
+                                m_CachedAtlas.Height,
+                                m_CachedPatchBuild.Patches.size(),
+                                maxImageDimension2D);
+                m_CachedAtlas = {};
+                m_CachedPreviewSignature = 0;
+                m_DebugState.PreviewImageReady = false;
+                return;
+            }
         }
 
         const PreviewKMeansData kmeansData{
@@ -496,7 +535,7 @@ namespace Graphics::Passes
                     pending->Patches = m_CachedPatchBuild.Patches;
                     m_PendingBake = pending;
 
-                    auto bakeJob = [pending, centroidSeed = preview->KMeansCentroids]() mutable
+                    auto bakeJob = [pending, centroidSeed = preview->KMeansCentroids, maxImageDimension2D]() mutable
                     {
                         PROFILE_SCOPE("HtexPatchPreview::BakeJob");
 
@@ -521,7 +560,8 @@ namespace Graphics::Passes
                                                         patchesCopy,
                                                         atlas.Pixels,
                                                         atlas.Width,
-                                                        atlas.Height);
+                                                        atlas.Height,
+                                                        maxImageDimension2D);
                         atlas.Valid = atlas.Built;
                         pending->Atlas = std::move(atlas);
                         pending->Ready.store(true, std::memory_order_release);

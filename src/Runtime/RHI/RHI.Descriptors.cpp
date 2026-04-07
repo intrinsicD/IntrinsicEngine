@@ -18,6 +18,10 @@ namespace RHI {
         uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
         // Binding 1: shadow atlas comparison sampler (PCF shadow mapping).
+        // Uses VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT so the shadow atlas
+        // view can be updated between frames while a previous frame's command
+        // buffer (which references this same descriptor set) is still pending on
+        // the GPU. Without this flag vkUpdateDescriptorSets fires VUID-03047.
         VkDescriptorSetLayoutBinding shadowSamplerBinding{};
         shadowSamplerBinding.binding = 1;
         shadowSamplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -26,10 +30,23 @@ namespace RHI {
 
         const VkDescriptorSetLayoutBinding bindings[] = { uboBinding, shadowSamplerBinding };
 
+        // Per-binding flags: binding 0 is plain; binding 1 is update-after-bind.
+        const VkDescriptorBindingFlags bindingFlags[] = {
+            0,
+            VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+        };
+        VkDescriptorSetLayoutBindingFlagsCreateInfo flagsInfo{};
+        flagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+        flagsInfo.bindingCount = static_cast<uint32_t>(std::size(bindingFlags));
+        flagsInfo.pBindingFlags = bindingFlags;
+
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        // Required whenever any binding carries UPDATE_AFTER_BIND_BIT.
+        layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
         layoutInfo.bindingCount = static_cast<uint32_t>(std::size(bindings));
         layoutInfo.pBindings = bindings;
+        layoutInfo.pNext = &flagsInfo;
 
         if (vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor set layout!");
@@ -91,7 +108,11 @@ namespace RHI {
 
         VkDescriptorPoolCreateInfo poolInfo{  };
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.flags = 0; // We reset whole pools; no per-set free.
+        // VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT is required to allocate
+        // descriptor sets whose layout carries VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT
+        // (e.g. the global set with the shadow atlas binding 1).
+        // It is harmless for sets that do not use update-after-bind bindings.
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
         poolInfo.maxSets = 2048;
         poolInfo.poolSizeCount = static_cast<uint32_t>(std::size(sizes));
         poolInfo.pPoolSizes = sizes;

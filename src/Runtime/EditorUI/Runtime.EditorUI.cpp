@@ -491,6 +491,7 @@ namespace Runtime::EditorUI
                                 s_PanelState.GeodesicEntity = selected;
                                 s_PanelState.GeodesicSourceVertices = sub.SelectedVertices;
                                 md->AttributesDirty = true;
+                                md->Visualization.VertexColors.PropertyName = "v:geodesic_distance";
                                 reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
                                 Core::Log::Info("Geodesic distance computed: heat={} iters, poisson={} iters",
                                                 result->HeatSolveIterations, result->PoissonSolveIterations);
@@ -507,8 +508,7 @@ namespace Runtime::EditorUI
 
                     if (s_PanelState.GeodesicEntity != entt::null)
                     {
-                        ImGui::TextDisabled("Result stored as 'v:geodesic_distance' property.");
-                        ImGui::TextDisabled("Use Vertex Color Source to visualize.");
+                        ImGui::TextDisabled("Result in 'v:geodesic_distance' — color source auto-applied.");
                     }
                 }
             }

@@ -422,6 +422,8 @@ These are the most frequent errors observed in recent agent-authored commits, ra
 
 5. **Hardcoded counts in tests and registration arrays.** When extending an enum or adding entries to a registration list (e.g., `GeometryProcessingAlgorithm`, `kAlgorithmOrder`), grep for all test assertions and array sizes that depend on the count. Hardcoded values like `ASSERT_EQ(entries.size(), 8u)` or fixed-size `std::array<..., 8>` silently break when new entries are added. Prefer `static_assert` on enum/array size where possible, and always search tests for the old count.
 
+6. **Stale module BMIs after class layout changes.** When changing an exported class layout in a `.cppm` interface (adding/removing/retyping members), CMake's `clang-scan-deps` module dependency scanner can fail to propagate the change to all downstream consumers. This causes silent ABI mismatches: one TU allocates the old size while another TU's constructor writes the new (larger) layout, producing heap-buffer-overflow under ASan. **After any class layout change in a `.cppm`, rebuild the owning library target with `--clean-first`** to force BMI regeneration, then rebuild all downstream targets. When in doubt, delete the build directory's module cache.
+
 ## Architecture & Markdown Sync Contract
 
 When architecture state changes, keep the architecture markdown documents synchronized in the same change:

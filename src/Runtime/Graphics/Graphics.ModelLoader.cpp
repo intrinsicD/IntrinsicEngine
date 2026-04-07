@@ -219,6 +219,9 @@ namespace Graphics
             outModel->Meshes.push_back(std::move(seg));
         }
 
+        outModel->EmbeddedImages = std::move(meshImport->EmbeddedImages);
+        outModel->EmbeddedMaterials = std::move(meshImport->EmbeddedMaterials);
+
         return ModelLoadResult{.ModelData = std::move(outModel), .Token = lastToken};
     }
 
