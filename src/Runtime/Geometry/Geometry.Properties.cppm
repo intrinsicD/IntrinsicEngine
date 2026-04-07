@@ -737,6 +737,15 @@ export namespace Geometry
     /// Sentinel index used to mark an invalid handle.
     constexpr PropertyIndex kInvalidIndex = std::numeric_limits<PropertyIndex>::max();
 
+    /// Describes a contiguous sub-range of elements within a geometry container.
+    /// Used by submesh views to restrict the visible window into the underlying
+    /// storage without copying data. A Size of 0 means "use full extent".
+    struct ElementRange
+    {
+        std::size_t Offset{0};
+        std::size_t Size{0};
+    };
+
     /// Lightweight index handle tagged by a type.
     template <typename Tag>
     struct Handle

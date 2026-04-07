@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <memory>
 #include <glm/glm.hpp>
 
@@ -34,6 +35,27 @@ namespace Geometry::PointCloud
     }
 
     Cloud::~Cloud() = default;
+
+    Cloud Cloud::CreateView(const Cloud& source,
+                            ElementRange vertexRange)
+    {
+        assert(source.m_Properties && "Cannot create a view from a non-owning cloud");
+
+        auto clamp = [](ElementRange r, std::size_t total) -> ElementRange {
+            if (r.Offset >= total) return {0, 0};
+            if (r.Size == 0 || r.Offset + r.Size > total)
+                r.Size = total - r.Offset;
+            return r;
+        };
+        vertexRange = clamp(vertexRange, source.m_Properties->Vertices.Size());
+
+        Cloud view(source.m_Properties->Vertices,
+                   source.m_Properties->DeletedVertices);
+        view.m_Properties    = source.m_Properties;
+        view.m_IsSubmeshView = true;
+        view.m_VertexRange   = vertexRange;
+        return view;
+    }
 
     Cloud& Cloud::operator=(const Cloud& other) noexcept
     {
@@ -170,10 +192,24 @@ namespace Geometry::PointCloud
     {
         // Empty cloud is valid.
         if (IsEmpty()) return true;
-        // Optional properties must exactly cover all points when present.
-        if (HasNormals() && m_PNormal.Span().size() != VerticesSize()) return false;
-        if (HasColors() && m_PColor.Span().size() != VerticesSize()) return false;
-        if (HasRadii() && m_PRadius.Span().size() != VerticesSize()) return false;
+
+        // For views, span accessors are sub-range restricted; validate that
+        // the underlying storage has at least enough elements for the view.
+        // For non-views, optional properties must exactly cover all points.
+        if (m_IsSubmeshView)
+        {
+            const auto fullSize = m_Vertices.Size();
+            if (m_VertexRange.Offset + m_VertexRange.Size > fullSize) return false;
+            if (HasNormals() && m_PNormal.Span().size() < m_VertexRange.Offset + m_VertexRange.Size) return false;
+            if (HasColors()  && m_PColor.Span().size()  < m_VertexRange.Offset + m_VertexRange.Size) return false;
+            if (HasRadii()   && m_PRadius.Span().size() < m_VertexRange.Offset + m_VertexRange.Size) return false;
+        }
+        else
+        {
+            if (HasNormals() && m_PNormal.Span().size() != VerticesSize()) return false;
+            if (HasColors()  && m_PColor.Span().size()  != VerticesSize()) return false;
+            if (HasRadii()   && m_PRadius.Span().size() != VerticesSize()) return false;
+        }
         return true;
     }
 

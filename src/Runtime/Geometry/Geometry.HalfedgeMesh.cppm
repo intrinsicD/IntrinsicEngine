@@ -51,16 +51,57 @@ export namespace Geometry::Halfedge
         void Reserve(std::size_t nVertices, std::size_t nEdges, std::size_t nFaces);
         void GarbageCollection();
 
-        // Sizes
-        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_Vertices.Size(); }
-        [[nodiscard]] std::size_t HalfedgesSize() const noexcept { return m_Halfedges.Size(); }
-        [[nodiscard]] std::size_t EdgesSize() const noexcept { return m_Edges.Size(); }
-        [[nodiscard]] std::size_t FacesSize() const noexcept { return m_Faces.Size(); }
+        // -----------------------------------------------------------------
+        // Submesh view support
+        // -----------------------------------------------------------------
+        // A submesh view is a lightweight, non-owning window into another
+        // mesh's property storage. It shares the underlying data via
+        // reference-counted shared_ptr — no data is copied.
+        //
+        // **Span accessors** (Positions(), etc.) return subspans restricted
+        // to the view range. These are the primary interface for GPU upload
+        // of geometry subsets.
+        //
+        // **Handle-based access** (Position(VertexHandle), connectivity
+        // queries, circulators) uses absolute indices into the underlying
+        // storage and is NOT offset-adjusted. This is intentional: handles
+        // from the source mesh remain valid in the view.
+        //
+        // **Mutating operations** (AddVertex, AddFace, DeleteVertex,
+        // GarbageCollection, Clear) operate on the shared storage and will
+        // affect the source mesh and all other views. Use with care.
+        // -----------------------------------------------------------------
 
-        [[nodiscard]] std::size_t VertexCount() const noexcept { return VerticesSize() - m_DeletedVertices; }
-        [[nodiscard]] std::size_t HalfedgeCount() const noexcept { return HalfedgesSize() - 2u * m_DeletedEdges; }
-        [[nodiscard]] std::size_t EdgeCount() const noexcept { return EdgesSize() - m_DeletedEdges; }
-        [[nodiscard]] std::size_t FaceCount() const noexcept { return FacesSize() - m_DeletedFaces; }
+        /// Returns true if this mesh is a lightweight view into another mesh's data.
+        [[nodiscard]] bool IsSubmeshView() const noexcept { return m_IsSubmeshView; }
+
+        /// Creates a non-owning submesh view that shares the underlying property
+        /// storage but restricts the visible element range. The source mesh must
+        /// outlive (or be co-owned via shared_ptr with) the returned view.
+        /// Ranges are clamped to the source's extent at creation time.
+        [[nodiscard]] static Mesh CreateView(const Mesh& source,
+                                             ElementRange vertexRange,
+                                             ElementRange edgeRange,
+                                             ElementRange faceRange);
+
+        /// Accessors for the view ranges. When IsSubmeshView() is false these
+        /// return zero-initialised ranges (Offset=0, Size=0).
+        [[nodiscard]] ElementRange VertexRange() const noexcept { return m_VertexRange; }
+        [[nodiscard]] ElementRange EdgeRange()   const noexcept { return m_EdgeRange; }
+        [[nodiscard]] ElementRange FaceRange()   const noexcept { return m_FaceRange; }
+
+        // Sizes
+        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_IsSubmeshView ? m_VertexRange.Size : m_Vertices.Size(); }
+        [[nodiscard]] std::size_t HalfedgesSize() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size * 2u : m_Halfedges.Size(); }
+        [[nodiscard]] std::size_t EdgesSize() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size : m_Edges.Size(); }
+        [[nodiscard]] std::size_t FacesSize() const noexcept { return m_IsSubmeshView ? m_FaceRange.Size : m_Faces.Size(); }
+
+        // For views, Count() == Size() since deleted-element tracking is
+        // global to the source mesh and cannot be projected onto a sub-range.
+        [[nodiscard]] std::size_t VertexCount() const noexcept { return m_IsSubmeshView ? m_VertexRange.Size : VerticesSize() - m_DeletedVertices; }
+        [[nodiscard]] std::size_t HalfedgeCount() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size * 2u : HalfedgesSize() - 2u * m_DeletedEdges; }
+        [[nodiscard]] std::size_t EdgeCount() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size : EdgesSize() - m_DeletedEdges; }
+        [[nodiscard]] std::size_t FaceCount() const noexcept { return m_IsSubmeshView ? m_FaceRange.Size : FacesSize() - m_DeletedFaces; }
 
         [[nodiscard]] bool IsEmpty() const noexcept { return VertexCount() == 0; }
 
@@ -124,8 +165,18 @@ export namespace Geometry::Halfedge
         // Geometry payload (PMP-style): store vertex positions as a built-in property.
         [[nodiscard]] const glm::vec3& Position(VertexHandle v) const { return m_VPoint[v]; }
         [[nodiscard]] glm::vec3& Position(VertexHandle v) { return m_VPoint[v]; }
-        [[nodiscard]] std::span<const glm::vec3> Positions() const { return m_VPoint.Span(); }
-        [[nodiscard]] std::span<glm::vec3> Positions() { return m_VPoint.Span(); }
+        [[nodiscard]] std::span<const glm::vec3> Positions() const
+        {
+            auto full = m_VPoint.Span();
+            if (m_IsSubmeshView) return full.subspan(m_VertexRange.Offset, m_VertexRange.Size);
+            return full;
+        }
+        [[nodiscard]] std::span<glm::vec3> Positions()
+        {
+            auto full = m_VPoint.Span();
+            if (m_IsSubmeshView) return full.subspan(m_VertexRange.Offset, m_VertexRange.Size);
+            return full;
+        }
 
         // Basic editing utilities (subset)
         [[nodiscard]] std::optional<HalfedgeHandle> FindHalfedge(VertexHandle start, VertexHandle end) const;
@@ -295,6 +346,12 @@ export namespace Geometry::Halfedge
 
         // Cached transfer rules.
         std::vector<VertexAttributeTransfer> m_VertexAttrTransfer;
+
+        // Submesh view state.
+        bool m_IsSubmeshView{false};
+        ElementRange m_VertexRange{};
+        ElementRange m_EdgeRange{};
+        ElementRange m_FaceRange{};
 
         // Helpers used by Split/Collapse.
         void RemoveLoopHelper(HalfedgeHandle h);

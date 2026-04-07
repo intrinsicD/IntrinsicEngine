@@ -32,6 +32,22 @@ export namespace Geometry::Graph
         [[nodiscard]] VertexHandle AddVertex();
         VertexHandle AddVertex(glm::vec3 position);
 
+        // -----------------------------------------------------------------
+        // Submesh view support
+        // -----------------------------------------------------------------
+        // See Halfedge::Mesh for the full view contract. Span accessors are
+        // range-restricted; handle-based access uses absolute indices.
+        // -----------------------------------------------------------------
+
+        [[nodiscard]] bool IsSubmeshView() const noexcept { return m_IsSubmeshView; }
+
+        [[nodiscard]] static Graph CreateView(const Graph& source,
+                                              ElementRange vertexRange,
+                                              ElementRange edgeRange);
+
+        [[nodiscard]] ElementRange VertexRange() const noexcept { return m_VertexRange; }
+        [[nodiscard]] ElementRange EdgeRange()   const noexcept { return m_EdgeRange; }
+
         void Clear();
         void FreeMemory();
         void Reserve(std::size_t nVertices, std::size_t nEdges);
@@ -44,12 +60,12 @@ export namespace Geometry::Graph
         void GarbageCollection();
         [[nodiscard]] bool HasGarbage() const noexcept { return m_DeletedEdges > 0 || m_DeletedVertices > 0; }
 
-        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_Vertices.Size(); }
-        [[nodiscard]] std::size_t HalfedgesSize() const noexcept { return m_Halfedges.Size(); }
-        [[nodiscard]] std::size_t EdgesSize() const noexcept { return m_Edges.Size(); }
+        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_IsSubmeshView ? m_VertexRange.Size : m_Vertices.Size(); }
+        [[nodiscard]] std::size_t HalfedgesSize() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size * 2u : m_Halfedges.Size(); }
+        [[nodiscard]] std::size_t EdgesSize() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size : m_Edges.Size(); }
 
-        [[nodiscard]] std::size_t VertexCount() const noexcept { return VerticesSize() - m_DeletedVertices; }
-        [[nodiscard]] std::size_t EdgeCount() const noexcept { return EdgesSize() - m_DeletedEdges; }
+        [[nodiscard]] std::size_t VertexCount() const noexcept { return m_IsSubmeshView ? m_VertexRange.Size : VerticesSize() - m_DeletedVertices; }
+        [[nodiscard]] std::size_t EdgeCount() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size : EdgesSize() - m_DeletedEdges; }
 
         [[nodiscard]] bool IsDeleted(VertexHandle v) const { return m_VDeleted[v]; }
         [[nodiscard]] bool IsDeleted(EdgeHandle e) const { return m_EDeleted[e]; }
@@ -174,5 +190,10 @@ export namespace Geometry::Graph
 
         std::size_t &m_DeletedVertices;
         std::size_t &m_DeletedEdges;
+
+        // Submesh view state.
+        bool m_IsSubmeshView{false};
+        ElementRange m_VertexRange{};
+        ElementRange m_EdgeRange{};
     };
 }

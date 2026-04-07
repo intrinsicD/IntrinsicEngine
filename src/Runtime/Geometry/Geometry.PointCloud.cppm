@@ -28,13 +28,24 @@ export namespace Geometry::PointCloud
         Cloud &operator=(const Cloud &other) noexcept;
         Cloud &operator=(Cloud &&other) noexcept;
 
+        // ---- Submesh view support ----
+        // See Halfedge::Mesh for the full view contract. Span accessors are
+        // range-restricted; handle-based access uses absolute indices.
+
+        [[nodiscard]] bool IsSubmeshView() const noexcept { return m_IsSubmeshView; }
+
+        [[nodiscard]] static Cloud CreateView(const Cloud& source,
+                                              ElementRange vertexRange);
+
+        [[nodiscard]] ElementRange VertexRange() const noexcept { return m_VertexRange; }
+
         // ---- Capacity / sizing ----
         // Canonical names match Mesh (VerticesSize/IsEmpty) and Graph conventions.
 
-        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_Vertices.Size(); }
-        [[nodiscard]] bool        IsEmpty()    const noexcept { return m_Vertices.Size() == 0; }
+        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_IsSubmeshView ? m_VertexRange.Size : m_Vertices.Size(); }
+        [[nodiscard]] bool        IsEmpty()    const noexcept { return VerticesSize() == 0; }
 
-        [[nodiscard]] std::size_t VertexCount() const noexcept { return VerticesSize() - m_DeletedVertices; }
+        [[nodiscard]] std::size_t VertexCount() const noexcept { return m_IsSubmeshView ? m_VertexRange.Size : VerticesSize() - m_DeletedVertices; }
 
         [[nodiscard]] bool IsDeleted(VertexHandle v) const { return m_VDeleted[v]; }
 
@@ -84,18 +95,19 @@ export namespace Geometry::PointCloud
         [[nodiscard]] float& Radius(VertexHandle p)       { return m_PRadius[p]; }
 
         // ---- Span accessors (for bulk GPU upload / SIMD loops) ----
+        // When this is a submesh view, spans are restricted to the view range.
 
-        [[nodiscard]] std::span<const glm::vec3> Positions() const { return m_PPoint.Span(); }
-        [[nodiscard]] std::span<glm::vec3>       Positions()       { return m_PPoint.Span(); }
+        [[nodiscard]] std::span<const glm::vec3> Positions() const { return ViewSubspan(m_PPoint.Span()); }
+        [[nodiscard]] std::span<glm::vec3>       Positions()       { return ViewSubspan(m_PPoint.Span()); }
 
-        [[nodiscard]] std::span<const glm::vec3> Normals() const { return m_PNormal.Span(); }
-        [[nodiscard]] std::span<glm::vec3>       Normals()       { return m_PNormal.Span(); }
+        [[nodiscard]] std::span<const glm::vec3> Normals() const { return ViewSubspan(m_PNormal.Span()); }
+        [[nodiscard]] std::span<glm::vec3>       Normals()       { return ViewSubspan(m_PNormal.Span()); }
 
-        [[nodiscard]] std::span<const glm::vec4> Colors() const { return m_PColor.Span(); }
-        [[nodiscard]] std::span<glm::vec4>       Colors()       { return m_PColor.Span(); }
+        [[nodiscard]] std::span<const glm::vec4> Colors() const { return ViewSubspan(m_PColor.Span()); }
+        [[nodiscard]] std::span<glm::vec4>       Colors()       { return ViewSubspan(m_PColor.Span()); }
 
-        [[nodiscard]] std::span<const float> Radii() const { return m_PRadius.Span(); }
-        [[nodiscard]] std::span<float>       Radii()       { return m_PRadius.Span(); }
+        [[nodiscard]] std::span<const float> Radii() const { return ViewSubspan(m_PRadius.Span()); }
+        [[nodiscard]] std::span<float>       Radii()       { return ViewSubspan(m_PRadius.Span()); }
 
         // ---- Handle from index ----
 
@@ -127,6 +139,13 @@ export namespace Geometry::PointCloud
     private:
         void EnsureProperties();
 
+        template <class T>
+        [[nodiscard]] std::span<T> ViewSubspan(std::span<T> full) const
+        {
+            if (m_IsSubmeshView) return full.subspan(m_VertexRange.Offset, m_VertexRange.Size);
+            return full;
+        }
+
         std::shared_ptr<CloudProperties> m_Properties;
         Vertices &m_Vertices;
 
@@ -138,6 +157,10 @@ export namespace Geometry::PointCloud
         VertexProperty<glm::vec3> m_PNormal;  // "p:normal"   (optional)
         VertexProperty<glm::vec4> m_PColor;   // "p:color"    (optional)
         VertexProperty<float>     m_PRadius;  // "p:radius"   (optional)
+
+        // Submesh view state.
+        bool m_IsSubmeshView{false};
+        ElementRange m_VertexRange{};
     };
 
 }

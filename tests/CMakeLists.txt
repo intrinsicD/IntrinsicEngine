@@ -147,6 +147,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_NormalEstimation.cpp
         Test_Registration.cpp
         Test_PointCloudRobustness.cpp
+        Test_SubmeshView.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )
 

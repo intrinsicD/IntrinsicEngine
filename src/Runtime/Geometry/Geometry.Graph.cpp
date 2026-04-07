@@ -44,6 +44,33 @@ namespace Geometry::Graph
 
     Graph::~Graph() = default;
 
+    Graph Graph::CreateView(const Graph& source,
+                            ElementRange vertexRange,
+                            ElementRange edgeRange)
+    {
+        assert(source.m_Properties && "Cannot create a view from a non-owning graph");
+
+        auto clamp = [](ElementRange r, std::size_t total) -> ElementRange {
+            if (r.Offset >= total) return {0, 0};
+            if (r.Size == 0 || r.Offset + r.Size > total)
+                r.Size = total - r.Offset;
+            return r;
+        };
+        vertexRange = clamp(vertexRange, source.m_Properties->Vertices.Size());
+        edgeRange   = clamp(edgeRange,   source.m_Properties->Edges.Size());
+
+        Graph view(source.m_Properties->Vertices,
+                   source.m_Properties->Halfedges,
+                   source.m_Properties->Edges,
+                   source.m_Properties->m_DeletedVertices,
+                   source.m_Properties->m_DeletedEdges);
+        view.m_Properties    = source.m_Properties;
+        view.m_IsSubmeshView = true;
+        view.m_VertexRange   = vertexRange;
+        view.m_EdgeRange     = edgeRange;
+        return view;
+    }
+
     Graph &Graph::operator=(const Graph &other)
     {
         if (this != &other)
