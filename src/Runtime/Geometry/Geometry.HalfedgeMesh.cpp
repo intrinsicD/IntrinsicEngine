@@ -202,6 +202,41 @@ namespace Geometry::Halfedge
 
     Mesh::~Mesh() = default;
 
+    Mesh Mesh::CreateView(const Mesh& source,
+                          ElementRange vertexRange,
+                          ElementRange edgeRange,
+                          ElementRange faceRange)
+    {
+        assert(source.m_Properties && "Cannot create a view from a non-owning mesh");
+
+        // Clamp ranges to source extents.
+        auto clamp = [](ElementRange r, std::size_t total) -> ElementRange {
+            if (r.Offset >= total) return {0, 0};
+            if (r.Size == 0 || r.Offset + r.Size > total)
+                r.Size = total - r.Offset;
+            return r;
+        };
+        vertexRange = clamp(vertexRange, source.m_Properties->Vertices.Size());
+        edgeRange   = clamp(edgeRange,   source.m_Properties->Edges.Size());
+        faceRange   = clamp(faceRange,   source.m_Properties->Faces.Size());
+
+        // Share the underlying property storage — no data is copied.
+        // Use the non-owning constructor, then take shared ownership.
+        Mesh view(source.m_Properties->Vertices,
+                  source.m_Properties->Halfedges,
+                  source.m_Properties->Edges,
+                  source.m_Properties->Faces,
+                  source.m_Properties->DeletedVertices,
+                  source.m_Properties->DeletedEdges,
+                  source.m_Properties->DeletedFaces);
+        view.m_Properties    = source.m_Properties;
+        view.m_IsSubmeshView = true;
+        view.m_VertexRange   = vertexRange;
+        view.m_EdgeRange     = edgeRange;
+        view.m_FaceRange     = faceRange;
+        return view;
+    }
+
     Mesh& Mesh::operator=(const Mesh& other) noexcept
     {
         if (this != &other)
