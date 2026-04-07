@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <vector>
 
 export module ECS:Components.Selection;
 
@@ -19,6 +20,21 @@ export namespace ECS::Components::Selection
     struct PickID
     {
         uint32_t Value = 0;
+    };
+
+    struct CachedSelectedVertexIndices
+    {
+        std::vector<uint32_t> Indices;
+    };
+
+    struct CachedSelectedEdgeIndices
+    {
+        std::vector<uint32_t> Indices;
+    };
+
+    struct CachedSelectedFaceIndices
+    {
+        std::vector<uint32_t> Indices;
     };
 }
 

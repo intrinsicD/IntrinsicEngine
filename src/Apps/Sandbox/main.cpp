@@ -106,6 +106,7 @@ public:
         auto &sceneManager = GetSceneManager();
         auto &scene = sceneManager.GetScene();
         auto &registry = scene.GetRegistry();
+
         m_CameraEntity = scene.CreateEntity("Main Camera");
         m_Camera = registry.emplace<Graphics::CameraComponent>(m_CameraEntity);
         registry.emplace<Graphics::OrbitControlComponent>(m_CameraEntity);

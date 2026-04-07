@@ -15,7 +15,6 @@ import RHI.Device;
 
 export namespace Graphics
 {
-
     struct ImportedTextureImage
     {
         std::string Name{};
@@ -49,21 +48,26 @@ export namespace Graphics
 
     struct Model
     {
-        Model(GeometryPool& storage, std::shared_ptr<RHI::VulkanDevice> device)
-            : m_Storage(storage)
-            , m_Device(std::move(device))
-            , Meshes{}
-            , EmbeddedImages{}
-            , EmbeddedMaterials{}
-        {}
-
         // RAII: Release handles on destruction using deferred deletion
-        ~Model() {
+        Model(GeometryPool& storage, std::shared_ptr<RHI::VulkanDevice> device)
+            : Meshes{}
+              , EmbeddedImages{}
+              , EmbeddedMaterials{}
+              , m_Storage(storage)
+              , m_Device(std::move(device))
+        {
+        }
+
+
+        ~Model()
+        {
             // Get the current global frame number for deferred deletion
             uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : 0;
 
-            for(auto& mesh : Meshes) {
-                if(mesh->Handle.IsValid()) {
+            for (auto& mesh : Meshes)
+            {
+                if (mesh->Handle.IsValid())
+                {
                     m_Storage.Remove(mesh->Handle, currentFrame);
                 }
             }
