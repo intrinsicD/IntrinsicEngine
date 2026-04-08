@@ -10,6 +10,7 @@ import Graphics.Model;
 import Graphics.Geometry;
 import Graphics.IORegistry;
 import Core.IOBackend;
+import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;
 
@@ -29,6 +30,7 @@ export namespace Graphics
         static std::expected<ModelLoadResult, AssetError> LoadAsync(
             std::shared_ptr<RHI::VulkanDevice> device,
             RHI::TransferManager& transferManager,
+            RHI::BufferManager& bufferManager,
             GeometryPool& geometryStorage,
             const std::string& filepath,
             const IORegistry& registry,

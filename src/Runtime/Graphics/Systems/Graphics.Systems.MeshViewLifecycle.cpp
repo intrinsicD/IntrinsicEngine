@@ -87,6 +87,7 @@ namespace Graphics::Systems::MeshViewLifecycle
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
+                  RHI::BufferManager& bufferManager,
                   std::shared_ptr<RHI::VulkanDevice> device,
                   RHI::TransferManager& transferManager,
                   entt::dispatcher& dispatcher)
@@ -177,7 +178,7 @@ namespace Graphics::Systems::MeshViewLifecycle
             req.UploadMode = GeometryUploadMode::Direct;
 
             auto [gpuData, token] = GeometryGpuData::CreateAsync(
-                device, transferManager, req, &geometryStorage);
+                device, transferManager, bufferManager, req, &geometryStorage);
 
             if (!gpuData || !gpuData->GetIndexBuffer())
             {
@@ -186,7 +187,7 @@ namespace Graphics::Systems::MeshViewLifecycle
                 continue;
             }
 
-            ev.Geometry = geometryStorage.Add(std::move(gpuData));
+            ev.Geometry = geometryStorage.Add(std::move(*gpuData));
             ev.EdgeCount = edgeCount;
             ev.Dirty = false;
 
@@ -253,7 +254,7 @@ namespace Graphics::Systems::MeshViewLifecycle
             req.UploadMode = GeometryUploadMode::Direct;
 
             auto [gpuData, token] = GeometryGpuData::CreateAsync(
-                device, transferManager, req, &geometryStorage);
+                device, transferManager, bufferManager, req, &geometryStorage);
 
             if (!gpuData || !gpuData->GetVertexBuffer())
             {
@@ -262,7 +263,7 @@ namespace Graphics::Systems::MeshViewLifecycle
                 continue;
             }
 
-            pv.Geometry = geometryStorage.Add(std::move(gpuData));
+            pv.Geometry = geometryStorage.Add(std::move(*gpuData));
             pv.VertexCount = vertexCount;
             pv.Dirty = false;
 
@@ -300,6 +301,7 @@ namespace Graphics::Systems::MeshViewLifecycle
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
+                        RHI::BufferManager& bufferManager,
                         std::shared_ptr<RHI::VulkanDevice> device,
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
@@ -314,9 +316,9 @@ namespace Graphics::Systems::MeshViewLifecycle
                 builder.Write<ECS::Point::Component>();
                 builder.WaitFor("MeshRendererLifecycle"_id);
             },
-            [&registry, &gpuScene, &geometryStorage, device, &transferManager, &dispatcher]()
+            [&registry, &gpuScene, &geometryStorage, &bufferManager, device, &transferManager, &dispatcher]()
             {
-                OnUpdate(registry, gpuScene, geometryStorage, device, transferManager, dispatcher);
+                OnUpdate(registry, gpuScene, geometryStorage, bufferManager, device, transferManager, dispatcher);
             });
     }
 }

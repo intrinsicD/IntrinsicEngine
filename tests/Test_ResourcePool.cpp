@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <thread>
 #include <vector>
@@ -48,7 +47,7 @@ TEST(ResourcePool, AddAndGet)
 {
     ImmediatePool pool;
 
-    auto h = pool.Add(std::make_unique<DummyResource>(42));
+    auto h = pool.Add(DummyResource{42});
     ASSERT_TRUE(h.IsValid());
 
     auto result = pool.Get(h);
@@ -324,7 +323,7 @@ TEST(ResourcePool, PointerStableAcrossAdds)
     for (int i = 1; i < 100; ++i)
         pool.Create(i);
 
-    // The original pointer should still be valid (unique_ptr heap allocation).
+    // The original pointer should still be valid because the slot owns a stable value.
     DummyResource* ptr0After = pool.GetIfValid(h0);
     EXPECT_EQ(ptr0, ptr0After);
     EXPECT_EQ(ptr0After->Value, 0);

@@ -10,6 +10,7 @@ export module Runtime.AssetIngestService;
 
 import Core.Assets;
 import Core.IOBackend;
+import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;
 import Graphics.Geometry;
@@ -37,6 +38,7 @@ export namespace Runtime
     public:
         AssetIngestService(std::shared_ptr<RHI::VulkanDevice> device,
                            RHI::TransferManager& transferManager,
+                           RHI::BufferManager& bufferManager,
                            Graphics::GeometryPool& geometryStorage,
                            Graphics::MaterialRegistry& materialRegistry,
                            AssetPipeline& assetPipeline,
@@ -82,6 +84,7 @@ export namespace Runtime
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         RHI::TransferManager& m_TransferManager;
+        RHI::BufferManager& m_BufferManager;
         Graphics::GeometryPool& m_GeometryStorage;
         Graphics::MaterialRegistry& m_MaterialRegistry;
         AssetPipeline& m_AssetPipeline;

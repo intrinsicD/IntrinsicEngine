@@ -588,6 +588,7 @@ namespace Runtime
                 .AssetManager = m_Assets,
                 .MaterialRegistry = m_Renderer.GetMaterialRegistry(),
                 .GeometryStorage = m_Renderer.GetGeometryStorage(),
+                .BufferManager = m_Graphics.GetBufferManager(),
                 .Device = m_Graphics.GetDeviceShared(),
                 .TransferManager = m_Graphics.GetTransferManager(),
                 .Dispatcher = m_Scene.GetScene().GetDispatcher(),

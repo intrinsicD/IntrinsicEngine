@@ -43,6 +43,7 @@ namespace Graphics::Systems::PointCloudLifecycle
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
+                  RHI::BufferManager& bufferManager,
                   std::shared_ptr<RHI::VulkanDevice> device,
                   RHI::TransferManager& transferManager,
                   entt::dispatcher& dispatcher)
@@ -114,7 +115,7 @@ namespace Graphics::Systems::PointCloudLifecycle
                 upload.UploadMode = GeometryUploadMode::Staged;
 
                 auto [newGpuData, token] = GeometryGpuData::CreateAsync(
-                    device, transferManager, upload, &geometryStorage);
+                    device, transferManager, bufferManager, upload, &geometryStorage);
 
                 if (!newGpuData || !newGpuData->GetVertexBuffer())
                 {
@@ -128,7 +129,7 @@ namespace Graphics::Systems::PointCloudLifecycle
                 else
                 {
 
-                pcData.GpuGeometry = geometryStorage.Add(std::move(newGpuData));
+                pcData.GpuGeometry = geometryStorage.Add(std::move(*newGpuData));
                 pcData.CachedColors = std::move(pointColors);
                 pcData.CachedRadii = std::move(pointRadii);
                 pcData.GpuPointCount = static_cast<uint32_t>(positions.size());
@@ -178,6 +179,7 @@ namespace Graphics::Systems::PointCloudLifecycle
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
+                        RHI::BufferManager& bufferManager,
                         std::shared_ptr<RHI::VulkanDevice> device,
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
@@ -190,9 +192,9 @@ namespace Graphics::Systems::PointCloudLifecycle
                 builder.WaitFor("TransformUpdate"_id);
                 builder.WaitFor("PropertySetDirtySync"_id);
             },
-            [&registry, &gpuScene, &geometryStorage, device, &transferManager, &dispatcher]()
+            [&registry, &gpuScene, &geometryStorage, &bufferManager, device, &transferManager, &dispatcher]()
             {
-                OnUpdate(registry, gpuScene, geometryStorage, device, transferManager, dispatcher);
+                OnUpdate(registry, gpuScene, geometryStorage, bufferManager, device, transferManager, dispatcher);
             });
     }
 }

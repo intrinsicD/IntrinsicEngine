@@ -48,15 +48,16 @@ namespace Graphics
         return {center.x, center.y, center.z, std::max(radius, 1e-3f)};
     }
 
-    std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
+    std::pair<std::optional<GeometryGpuData>, RHI::TransferToken>
     GeometryGpuData::CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
                                  RHI::TransferManager& transferManager,
+                                 RHI::BufferManager& bufferManager,
                                  const GeometryUploadRequest& data,
                                  const GeometryPool* existingPool)
     {
-        auto result = std::make_unique<GeometryGpuData>();
-        result->m_IndexCount = static_cast<uint32_t>(data.Indices.size());
-        result->m_Layout.Topology = data.Topology;
+        GeometryGpuData result{};
+        result.m_IndexCount = static_cast<uint32_t>(data.Indices.size());
+        result.m_Layout.Topology = data.Topology;
 
         const bool wantsReuse = data.ReuseVertexBuffersFrom.IsValid();
 
@@ -69,7 +70,7 @@ namespace Graphics
                     Core::Log::Error(
                         "GeometryGpuData::CreateAsync: Non-finite position at vertex {}. Upload rejected.",
                         i);
-                    return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
+                    return { std::nullopt, RHI::TransferToken{} };
                 }
             }
         }
@@ -83,14 +84,14 @@ namespace Graphics
             if (!existingPool)
             {
                 Core::Log::Error("GeometryGpuData::CreateAsync: ReuseVertexBuffersFrom requested but no GeometryPool provided.");
-                return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
+                return { std::nullopt, RHI::TransferToken{} };
             }
 
             const GeometryGpuData* source = existingPool->GetIfValid(data.ReuseVertexBuffersFrom);
-            if (!source || !source->m_VertexBuffer)
+            if (!source || !source->m_VertexBuffer.IsValid())
             {
                 Core::Log::Error("GeometryGpuData::CreateAsync: ReuseVertexBuffersFrom handle invalid or source has no vertex buffer.");
-                return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
+                return { std::nullopt, RHI::TransferToken{} };
             }
 
             // Validate that the source has a meaningful layout.
@@ -98,7 +99,7 @@ namespace Graphics
             if (sourceTotal == 0)
             {
                 Core::Log::Error("GeometryGpuData::CreateAsync: ReuseVertexBuffersFrom refers to geometry with empty vertex layout.");
-                return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
+                return { std::nullopt, RHI::TransferToken{} };
             }
 
             // If the caller supplied spans anyway, they must match the reused layout sizes.
@@ -108,33 +109,35 @@ namespace Graphics
                 Core::Log::Error(
                     "GeometryGpuData::CreateAsync: ReuseVertexBuffersFrom mismatch: Positions span bytes ({}) != source layout bytes ({}).",
                     data.Positions.size_bytes(), source->m_Layout.PositionsSize);
-                return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
+                return { std::nullopt, RHI::TransferToken{} };
             }
             if (!data.Normals.empty() && data.Normals.size_bytes() != source->m_Layout.NormalsSize)
             {
                 Core::Log::Error(
                     "GeometryGpuData::CreateAsync: ReuseVertexBuffersFrom mismatch: Normals span bytes ({}) != source layout bytes ({}).",
                     data.Normals.size_bytes(), source->m_Layout.NormalsSize);
-                return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
+                return { std::nullopt, RHI::TransferToken{} };
             }
             if (!data.Aux.empty() && data.Aux.size_bytes() != source->m_Layout.AuxSize)
             {
                 Core::Log::Error(
                     "GeometryGpuData::CreateAsync: ReuseVertexBuffersFrom mismatch: Aux span bytes ({}) != source layout bytes ({}).",
                     data.Aux.size_bytes(), source->m_Layout.AuxSize);
-                return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
+                return { std::nullopt, RHI::TransferToken{} };
             }
 
             // Shared ownership: views alias the same vertex buffer.
-            result->m_VertexBuffer = source->m_VertexBuffer;
+            result.m_VertexBuffer = source->m_VertexBuffer.Share();
+            if (!result.m_VertexBuffer.IsValid())
+                return { std::nullopt, RHI::TransferToken{} };
 
             // Copy layout for vertex streams exactly. Topology remains view-specific.
-            const PrimitiveTopology topo = result->m_Layout.Topology;
-            result->m_Layout = source->m_Layout;
-            result->m_Layout.Topology = topo;
+            const PrimitiveTopology topo = result.m_Layout.Topology;
+            result.m_Layout = source->m_Layout;
+            result.m_Layout.Topology = topo;
 
             // Inherit bounding sphere from source (same vertex data).
-            result->m_LocalBoundingSphere = source->m_LocalBoundingSphere;
+            result.m_LocalBoundingSphere = source->m_LocalBoundingSphere;
 
             totalVertexSize = sourceTotal;
         }
@@ -145,17 +148,17 @@ namespace Graphics
             const VkDeviceSize normSize = data.Normals.size_bytes();
             const VkDeviceSize auxSize = data.Aux.size_bytes();
 
-            result->m_Layout.PositionsOffset = 0;
-            result->m_Layout.PositionsSize = posSize;
-            result->m_Layout.NormalsOffset = AlignSize(result->m_Layout.PositionsOffset + result->m_Layout.PositionsSize, 16);
-            result->m_Layout.NormalsSize = normSize;
-            result->m_Layout.AuxOffset = AlignSize(result->m_Layout.NormalsOffset + result->m_Layout.NormalsSize, 16);
-            result->m_Layout.AuxSize = auxSize;
+            result.m_Layout.PositionsOffset = 0;
+            result.m_Layout.PositionsSize = posSize;
+            result.m_Layout.NormalsOffset = AlignSize(result.m_Layout.PositionsOffset + result.m_Layout.PositionsSize, 16);
+            result.m_Layout.NormalsSize = normSize;
+            result.m_Layout.AuxOffset = AlignSize(result.m_Layout.NormalsOffset + result.m_Layout.NormalsSize, 16);
+            result.m_Layout.AuxSize = auxSize;
 
-            totalVertexSize = result->m_Layout.AuxOffset + result->m_Layout.AuxSize;
+            totalVertexSize = result.m_Layout.AuxOffset + result.m_Layout.AuxSize;
 
             // Compute bounding sphere from CPU positions before they go to GPU.
-            result->m_LocalBoundingSphere = ComputeBoundingSphereFromPositions(data.Positions);
+            result.m_LocalBoundingSphere = ComputeBoundingSphereFromPositions(data.Positions);
         }
 
         const VkDeviceSize idxSize = data.Indices.size_bytes();
@@ -167,27 +170,33 @@ namespace Graphics
         {
             if (!wantsReuse && totalVertexSize > 0)
             {
-                result->m_VertexBuffer = std::make_shared<RHI::VulkanBuffer>(
-                    *device, totalVertexSize,
+                result.m_VertexBuffer = bufferManager.CreateLease(
+                    static_cast<size_t>(totalVertexSize),
                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                     VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-                if (!data.Positions.empty()) result->m_VertexBuffer->Write(data.Positions.data(), data.Positions.size_bytes(), result->m_Layout.PositionsOffset);
-                if (!data.Normals.empty()) result->m_VertexBuffer->Write(data.Normals.data(), data.Normals.size_bytes(), result->m_Layout.NormalsOffset);
-                if (!data.Aux.empty()) result->m_VertexBuffer->Write(data.Aux.data(), data.Aux.size_bytes(), result->m_Layout.AuxOffset);
+                if (!result.m_VertexBuffer.IsValid())
+                    return { std::nullopt, RHI::TransferToken{} };
+
+                if (!data.Positions.empty()) result.m_VertexBuffer.Get()->Write(data.Positions.data(), data.Positions.size_bytes(), result.m_Layout.PositionsOffset);
+                if (!data.Normals.empty()) result.m_VertexBuffer.Get()->Write(data.Normals.data(), data.Normals.size_bytes(), result.m_Layout.NormalsOffset);
+                if (!data.Aux.empty()) result.m_VertexBuffer.Get()->Write(data.Aux.data(), data.Aux.size_bytes(), result.m_Layout.AuxOffset);
             }
 
-            if (result->m_IndexCount > 0)
+            if (result.m_IndexCount > 0)
             {
-                result->m_IndexBuffer = std::make_shared<RHI::VulkanBuffer>(
-                    *device, idxSize,
+                result.m_IndexBuffer = bufferManager.CreateLease(
+                    static_cast<size_t>(idxSize),
                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                     VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-                result->m_IndexBuffer->Write(data.Indices.data(), idxSize, 0);
+                if (!result.m_IndexBuffer.IsValid())
+                    return { std::nullopt, RHI::TransferToken{} };
+
+                result.m_IndexBuffer.Get()->Write(data.Indices.data(), idxSize, 0);
             }
 
-            return { std::move(result), RHI::TransferToken{} };
+            return std::pair{std::optional<GeometryGpuData>{std::move(result)}, RHI::TransferToken{}};
         }
 
         // ---------------------------------------------------------------------
@@ -215,9 +224,9 @@ namespace Graphics
             {
                 uint8_t* ptr = static_cast<uint8_t*>(alloc.MappedPtr);
 
-                if (!data.Positions.empty()) memcpy(ptr + result->m_Layout.PositionsOffset, data.Positions.data(), data.Positions.size_bytes());
-                if (!data.Normals.empty()) memcpy(ptr + result->m_Layout.NormalsOffset, data.Normals.data(), data.Normals.size_bytes());
-                if (!data.Aux.empty()) memcpy(ptr + result->m_Layout.AuxOffset, data.Aux.data(), data.Aux.size_bytes());
+                    if (!data.Positions.empty()) memcpy(ptr + result.m_Layout.PositionsOffset, data.Positions.data(), data.Positions.size_bytes());
+                    if (!data.Normals.empty()) memcpy(ptr + result.m_Layout.NormalsOffset, data.Normals.data(), data.Normals.size_bytes());
+                    if (!data.Aux.empty()) memcpy(ptr + result.m_Layout.AuxOffset, data.Aux.data(), data.Aux.size_bytes());
 
                 stagingHandle = alloc.Buffer;
                 stagingOffset = static_cast<VkDeviceSize>(alloc.Offset);
@@ -228,9 +237,9 @@ namespace Graphics
                 auto staging = std::make_unique<RHI::VulkanBuffer>(*device, totalVertexSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
                 uint8_t* ptr = static_cast<uint8_t*>(staging->Map());
 
-                if (!data.Positions.empty()) memcpy(ptr + result->m_Layout.PositionsOffset, data.Positions.data(), data.Positions.size_bytes());
-                if (!data.Normals.empty()) memcpy(ptr + result->m_Layout.NormalsOffset, data.Normals.data(), data.Normals.size_bytes());
-                if (!data.Aux.empty()) memcpy(ptr + result->m_Layout.AuxOffset, data.Aux.data(), data.Aux.size_bytes());
+                if (!data.Positions.empty()) memcpy(ptr + result.m_Layout.PositionsOffset, data.Positions.data(), data.Positions.size_bytes());
+                if (!data.Normals.empty()) memcpy(ptr + result.m_Layout.NormalsOffset, data.Normals.data(), data.Normals.size_bytes());
+                if (!data.Aux.empty()) memcpy(ptr + result.m_Layout.AuxOffset, data.Aux.data(), data.Aux.size_bytes());
                 staging->Unmap();
 
                 stagingHandle = staging->GetHandle();
@@ -239,21 +248,24 @@ namespace Graphics
                 stagingBuffers.push_back(std::move(staging));
             }
 
-            result->m_VertexBuffer = std::make_shared<RHI::VulkanBuffer>(
-                *device, totalVertexSize,
+            result.m_VertexBuffer = bufferManager.CreateLease(
+                static_cast<size_t>(totalVertexSize),
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
+
+            if (!result.m_VertexBuffer.IsValid())
+                return { std::nullopt, RHI::TransferToken{} };
 
             VkBufferCopy copyRegion{};
             copyRegion.srcOffset = stagingOffset;
             copyRegion.dstOffset = 0;
             copyRegion.size = totalVertexSize;
-            vkCmdCopyBuffer(cmd, stagingHandle, result->m_VertexBuffer->GetHandle(), 1, &copyRegion);
+            vkCmdCopyBuffer(cmd, stagingHandle, result.m_VertexBuffer.Get()->GetHandle(), 1, &copyRegion);
             hasCopies = true;
         }
 
         // Index Buffer Upload (always unique to this view)
-        if (result->m_IndexCount > 0)
+        if (result.m_IndexCount > 0)
         {
             auto alloc = transferManager.AllocateStaging(static_cast<size_t>(idxSize), copyAlign);
 
@@ -277,27 +289,30 @@ namespace Graphics
                 stagingBuffers.push_back(std::move(iStaging));
             }
 
-            result->m_IndexBuffer = std::make_shared<RHI::VulkanBuffer>(
-                *device, idxSize,
+            result.m_IndexBuffer = bufferManager.CreateLease(
+                static_cast<size_t>(idxSize),
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
+
+            if (!result.m_IndexBuffer.IsValid())
+                return { std::nullopt, RHI::TransferToken{} };
 
             VkBufferCopy copyRegion{};
             copyRegion.srcOffset = stagingOffset;
             copyRegion.dstOffset = 0;
             copyRegion.size = idxSize;
-            vkCmdCopyBuffer(cmd, stagingHandle, result->m_IndexBuffer->GetHandle(), 1, &copyRegion);
+            vkCmdCopyBuffer(cmd, stagingHandle, result.m_IndexBuffer.Get()->GetHandle(), 1, &copyRegion);
             hasCopies = true;
         }
 
         // If we recorded no copies, return an invalid token (no work submitted).
         if (!hasCopies)
-            return { std::move(result), RHI::TransferToken{} };
+            return std::pair{std::optional<GeometryGpuData>{std::move(result)}, RHI::TransferToken{}};
 
         RHI::TransferToken token = stagingBuffers.empty()
             ? transferManager.Submit(cmd)
             : transferManager.Submit(cmd, std::move(stagingBuffers));
 
-        return { std::move(result), token };
+        return std::pair{std::optional<GeometryGpuData>{std::move(result)}, token};
     }
 }

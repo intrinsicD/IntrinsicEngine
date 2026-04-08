@@ -5,8 +5,9 @@ module;
 #include <vector>
 #include <deque>
 #include <expected>
-#include <memory>
 #include <concepts>
+#include <optional>
+#include <utility>
 
 export module Core.ResourcePool;
 import Core.Error; // For ErrorCode, etc.
@@ -14,8 +15,9 @@ import Core.Error; // For ErrorCode, etc.
 export namespace Core
 {
     // Concept to ensure the Handle type fits the engine's requirements
-    template<typename H>
-    concept GenerationalHandle = requires(H h) {
+    template <typename H>
+    concept GenerationalHandle = requires(H h)
+    {
         { h.Index } -> std::convertible_to<uint32_t>;
         { h.Generation } -> std::convertible_to<uint32_t>;
     };
@@ -36,8 +38,8 @@ export namespace Core
         ResourcePool& operator=(ResourcePool&&) noexcept = default;
 
 
-        // Accepts unique_ptr to enforce ownership transfer
-        Handle Add(std::unique_ptr<T> resource)
+        // Stores values by copy/move; callers retain no ownership after insertion.
+        Handle Add(T resource)
         {
             std::unique_lock lock(m_Mutex);
 
@@ -54,9 +56,9 @@ export namespace Core
             }
 
             Slot& slot = m_Slots[index];
-            // POINTER STABILITY: We move the unique_ptr. The resource heap address remains constant
-            // even if m_Slots vector reallocates.
-            slot.Data = std::move(resource);
+            // Value storage lives inside the slot; deque-backed slots keep element addresses stable
+            // while the slot remains active.
+            slot.Data.emplace(std::move(resource));
             ++slot.Generation;
             slot.IsActive = true;
 
@@ -64,9 +66,10 @@ export namespace Core
         }
 
         // Convenience overload for creating in-place
-        template<typename... Args>
-        Handle Create(Args&&... args) {
-            return Add(std::make_unique<T>(std::forward<Args>(args)...));
+        template <typename... Args>
+        Handle Create(Args&&... args)
+        {
+            return Add(T(std::forward<Args>(args)...));
         }
 
         void Remove(Handle handle, uint64_t globalFrameNumber)
@@ -127,10 +130,10 @@ export namespace Core
 
             const Slot& slot = m_Slots[handle.Index];
 
-            if (!slot.IsActive || slot.Generation != handle.Generation)
+            if (!slot.IsActive || slot.Generation != handle.Generation || !slot.Data.has_value())
                 return std::unexpected(Core::ErrorCode::ResourceNotFound);
 
-            return slot.Data.get();
+            return const_cast<T*>(&slot.Data.value());
         }
 
         // Hot-path access with lightweight validation.
@@ -141,9 +144,9 @@ export namespace Core
             if (handle.Index < m_Slots.size())
             {
                 const Slot& slot = m_Slots[handle.Index];
-                if (slot.IsActive && slot.Generation == handle.Generation)
+                if (slot.IsActive && slot.Generation == handle.Generation && slot.Data.has_value())
                 {
-                    return slot.Data.get();
+                    return const_cast<T*>(&slot.Data.value());
                 }
             }
             return nullptr;
@@ -157,7 +160,8 @@ export namespace Core
             m_FreeIndices.clear();
         }
 
-        [[nodiscard]] size_t Capacity() const {
+        [[nodiscard]] size_t Capacity() const
+        {
             std::shared_lock lock(m_Mutex);
             return m_Slots.size();
         }
@@ -165,7 +169,7 @@ export namespace Core
     private:
         struct Slot
         {
-            std::unique_ptr<T> Data; // Unique Ptr ensures pointer stability
+            std::optional<T> Data; // Borrowed pointers remain valid while the slot stays active.
             uint32_t Generation = 0;
             bool IsActive = false;
         };
@@ -177,7 +181,7 @@ export namespace Core
             uint64_t KillFrameNumber;
         };
 
-        std::vector<Slot> m_Slots;
+        std::deque<Slot> m_Slots;
         std::deque<uint32_t> m_FreeIndices;
         std::vector<PendingKill> m_PendingKillList;
 

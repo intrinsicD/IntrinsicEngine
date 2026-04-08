@@ -103,9 +103,9 @@ public:
         auto& gfx = GetGraphicsBackend();
 
         // Camera
-        auto &sceneManager = GetSceneManager();
-        auto &scene = sceneManager.GetScene();
-        auto &registry = scene.GetRegistry();
+        auto& sceneManager = GetSceneManager();
+        auto& scene = sceneManager.GetScene();
+        auto& registry = scene.GetRegistry();
 
         m_CameraEntity = scene.CreateEntity("Main Camera");
         m_Camera = registry.emplace<Graphics::CameraComponent>(m_CameraEntity);
@@ -301,7 +301,7 @@ private:
 
     // --- Editor / Selection ---
     entt::entity m_CachedSelectedEntity = entt::null;
-    entt::entity m_SelectionAnchor = entt::null;  // Anchor for Shift+click range selection in hierarchy.
+    entt::entity m_SelectionAnchor = entt::null; // Anchor for Shift+click range selection in hierarchy.
     int m_SelectMouseButton = 0;
 
     // --- Hierarchy panel state ---
@@ -385,14 +385,19 @@ private:
             Log::Warn("Texture load failed: {} ({})", path.string(), Graphics::AssetErrorToString(result.error()));
             return {};
         };
-        m_DuckTexture = GetAssetPipeline().GetAssetManager().Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
-                                                             textureLoader);
+        m_DuckTexture = GetAssetPipeline().GetAssetManager().Load<RHI::Texture>(
+            Filesystem::GetAssetPath("textures/DuckCM.png"),
+            textureLoader);
 
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
         {
             auto result = Graphics::ModelLoader::LoadAsync(
-                GetGraphicsBackend().GetDeviceShared(), gfx.GetTransferManager(), GetRenderOrchestrator().GetGeometryStorage(), path,
+                GetGraphicsBackend().GetDeviceShared(),
+                gfx.GetTransferManager(),
+                gfx.GetBufferManager(),
+                GetRenderOrchestrator().GetGeometryStorage(),
+                path,
                 GetIORegistry(), GetIOBackend());
 
             if (result)
@@ -489,7 +494,8 @@ private:
     {
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); }, true, 0, false);
         Interface::GUI::RegisterPanel("Inspector", [this]() { m_Inspector.Draw(); }, true, 0, false);
-        Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetPipeline().GetAssetManager().AssetsUiPanel(); }, true, 0, false);
+        Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetPipeline().GetAssetManager().AssetsUiPanel(); },
+                                      true, 0, false);
 
         // Geometry workflow panels and menu bar (delegated to controller).
         m_GeometryWorkflow.RegisterPanelsAndMenu();
@@ -517,7 +523,8 @@ private:
             ImGui::Text("Select Mouse Button: %d", m_SelectMouseButton);
 
             const entt::entity selected = m_CachedSelectedEntity;
-            const bool selectedValid = (selected != entt::null) && GetSceneManager().GetScene().GetRegistry().valid(selected);
+            const bool selectedValid = (selected != entt::null) && GetSceneManager().GetScene().GetRegistry().
+                valid(selected);
 
             ImGui::Text("Selected: %u (%s)",
                         static_cast<uint32_t>(static_cast<entt::id_type>(selected)),
@@ -558,7 +565,9 @@ private:
                 const auto& picked = GetSelection().GetPicked();
                 constexpr uint32_t Invalid = Runtime::Selection::Picked::Entity::InvalidIndex;
                 ImGui::Text("Picked IDs: V=%s E=%s F=%s",
-                            picked.entity.vertex_idx != Invalid ? std::to_string(picked.entity.vertex_idx).c_str() : "-",
+                            picked.entity.vertex_idx != Invalid
+                                ? std::to_string(picked.entity.vertex_idx).c_str()
+                                : "-",
                             picked.entity.edge_idx != Invalid ? std::to_string(picked.entity.edge_idx).c_str() : "-",
                             picked.entity.face_idx != Invalid ? std::to_string(picked.entity.face_idx).c_str() : "-");
                 ImGui::Text("Picked Local: (%.3f, %.3f, %.3f)",
@@ -623,7 +632,7 @@ private:
                 {
                     const entt::entity sel = m_CachedSelectedEntity;
                     const bool hasSel = (sel != entt::null) &&
-                                        GetSceneManager().GetScene().GetRegistry().valid(sel);
+                        GetSceneManager().GetScene().GetRegistry().valid(sel);
 
                     if (hasSel)
                     {
@@ -687,13 +696,14 @@ private:
                     {
                         const float usedMB = static_cast<float>(totalUsed) / (1024.0f * 1024.0f);
                         const float budgetMB = static_cast<float>(totalBudget) / (1024.0f * 1024.0f);
-                        const float pct = static_cast<float>(static_cast<double>(totalUsed) / static_cast<double>(totalBudget)) * 100.0f;
+                        const float pct = static_cast<float>(static_cast<double>(totalUsed) / static_cast<double>(
+                            totalBudget)) * 100.0f;
 
                         // Color-code: green < 70%, yellow < 85%, red >= 85%.
                         ImVec4 color;
-                        if (pct < 70.0f)      color = ImVec4(0.20f, 0.75f, 0.30f, 1.0f);
+                        if (pct < 70.0f) color = ImVec4(0.20f, 0.75f, 0.30f, 1.0f);
                         else if (pct < 85.0f) color = ImVec4(0.90f, 0.75f, 0.15f, 1.0f);
-                        else                  color = ImVec4(0.95f, 0.25f, 0.20f, 1.0f);
+                        else color = ImVec4(0.95f, 0.25f, 0.20f, 1.0f);
 
                         ImGui::TextColored(color, "VRAM: %.0f/%.0f MB", usedMB, budgetMB);
                     }
@@ -852,7 +862,8 @@ private:
                 renderDriver.SetGlobalRenderModeOverride(
                     static_cast<Graphics::GlobalRenderModeOverride>(renderMode));
             }
-            Interface::GUI::ItemTooltip("Viewport-wide rendering override. None keeps per-entity Surface/Line/Point visibility. Flat currently maps to the shaded surface path.");
+            Interface::GUI::ItemTooltip(
+                "Viewport-wide rendering override. None keeps per-entity Surface/Line/Point visibility. Flat currently maps to the shaded surface path.");
         }
 
         // --- Lighting ---
@@ -871,7 +882,8 @@ private:
                     const bool deferredEnabled = (lightingPath == 1);
                     features.SetEnabled("DeferredLighting"_id, deferredEnabled);
                 }
-                Interface::GUI::ItemTooltip("Select the active frame lighting path. Forward renders directly to HDR; Deferred uses G-buffer + composition.");
+                Interface::GUI::ItemTooltip(
+                    "Select the active frame lighting path. Forward renders directly to HDR; Deferred uses G-buffer + composition.");
             }
 
             // Directional light direction — spherical angles for intuitive control.
@@ -898,14 +910,14 @@ private:
             ImGui::SliderFloat("Intensity##Light", &lighting.LightIntensity, 0.0f, 5.0f, "%.2f");
             Interface::GUI::ItemTooltip("Brightness multiplier for the directional light (0 = off, 5 = very bright).");
 
-            float lightCol[3] = { lighting.LightColor.r, lighting.LightColor.g, lighting.LightColor.b };
+            float lightCol[3] = {lighting.LightColor.r, lighting.LightColor.g, lighting.LightColor.b};
             if (ImGui::ColorEdit3("Color##Light", lightCol))
                 lighting.LightColor = glm::vec3(lightCol[0], lightCol[1], lightCol[2]);
             Interface::GUI::ItemTooltip("RGB color of the directional light.");
 
             ImGui::SeparatorText("Ambient");
 
-            float ambCol[3] = { lighting.AmbientColor.r, lighting.AmbientColor.g, lighting.AmbientColor.b };
+            float ambCol[3] = {lighting.AmbientColor.r, lighting.AmbientColor.g, lighting.AmbientColor.b};
             if (ImGui::ColorEdit3("Color##Ambient", ambCol))
                 lighting.AmbientColor = glm::vec3(ambCol[0], ambCol[1], ambCol[2]);
             Interface::GUI::ItemTooltip("RGB color of the ambient (fill) light that illuminates all surfaces equally.");
@@ -929,10 +941,12 @@ private:
             int toneOp = static_cast<int>(postSettings->ToneOperator);
             if (ImGui::Combo("Tone Mapping", &toneOp, toneMapOps, 3))
                 postSettings->ToneOperator = static_cast<Graphics::Passes::ToneMapOperator>(toneOp);
-            Interface::GUI::ItemTooltip("Tone mapping operator that maps HDR scene colors to displayable LDR range.\nACES: filmic, industry standard.\nReinhard: simple, soft rolloff.\nUncharted 2: Hable filmic curve.");
+            Interface::GUI::ItemTooltip(
+                "Tone mapping operator that maps HDR scene colors to displayable LDR range.\nACES: filmic, industry standard.\nReinhard: simple, soft rolloff.\nUncharted 2: Hable filmic curve.");
 
             ImGui::SliderFloat("Exposure", &postSettings->Exposure, 0.1f, 10.0f, "%.2f");
-            Interface::GUI::ItemTooltip("Global exposure multiplier applied before tone mapping. Higher = brighter scene.");
+            Interface::GUI::ItemTooltip(
+                "Global exposure multiplier applied before tone mapping. Higher = brighter scene.");
 
             // Bloom
             ImGui::Spacing();
@@ -941,7 +955,8 @@ private:
             if (postSettings->BloomEnabled)
             {
                 ImGui::SliderFloat("Bloom Threshold", &postSettings->BloomThreshold, 0.0f, 5.0f, "%.2f");
-                Interface::GUI::ItemTooltip("Minimum HDR brightness for a pixel to contribute to bloom. Lower = more glow.");
+                Interface::GUI::ItemTooltip(
+                    "Minimum HDR brightness for a pixel to contribute to bloom. Lower = more glow.");
                 ImGui::SliderFloat("Bloom Intensity", &postSettings->BloomIntensity, 0.0f, 1.0f, "%.3f");
                 Interface::GUI::ItemTooltip("Strength of the bloom effect blended into the final image.");
                 ImGui::SliderFloat("Bloom Radius", &postSettings->BloomFilterRadius, 0.5f, 3.0f, "%.2f");
@@ -955,23 +970,27 @@ private:
                 int aaIdx = static_cast<int>(postSettings->AntiAliasingMode);
                 if (ImGui::Combo("Anti-Aliasing", &aaIdx, aaModeNames, 3))
                     postSettings->AntiAliasingMode = static_cast<Graphics::Passes::AAMode>(aaIdx);
-                Interface::GUI::ItemTooltip("Anti-aliasing method.\nNone: no AA.\nFXAA: fast approximate AA.\nSMAA: enhanced morphological AA (default, higher quality).");
+                Interface::GUI::ItemTooltip(
+                    "Anti-aliasing method.\nNone: no AA.\nFXAA: fast approximate AA.\nSMAA: enhanced morphological AA (default, higher quality).");
             }
             if (postSettings->AntiAliasingMode == Graphics::Passes::AAMode::FXAA)
             {
                 ImGui::SliderFloat("FXAA Contrast", &postSettings->FXAAContrastThreshold, 0.01f, 0.1f, "%.4f");
                 Interface::GUI::ItemTooltip("Minimum contrast to trigger edge detection. Lower = more edges detected.");
                 ImGui::SliderFloat("FXAA Relative", &postSettings->FXAARelativeThreshold, 0.01f, 0.2f, "%.4f");
-                Interface::GUI::ItemTooltip("Relative threshold against the local maximum luma. Lower = more aggressive.");
+                Interface::GUI::ItemTooltip(
+                    "Relative threshold against the local maximum luma. Lower = more aggressive.");
                 ImGui::SliderFloat("FXAA Subpixel", &postSettings->FXAASubpixelBlending, 0.0f, 1.0f, "%.2f");
                 Interface::GUI::ItemTooltip("Subpixel blending amount. Higher = smoother but potentially blurrier.");
             }
             if (postSettings->AntiAliasingMode == Graphics::Passes::AAMode::SMAA)
             {
                 ImGui::SliderFloat("SMAA Edge Threshold", &postSettings->SMAAEdgeThreshold, 0.01f, 0.5f, "%.3f");
-                Interface::GUI::ItemTooltip("Luma threshold for edge detection. Lower = more edges, higher quality but slower.");
+                Interface::GUI::ItemTooltip(
+                    "Luma threshold for edge detection. Lower = more edges, higher quality but slower.");
                 ImGui::SliderInt("SMAA Search Steps", &postSettings->SMAAMaxSearchSteps, 4, 32);
-                Interface::GUI::ItemTooltip("Maximum search distance for edge endpoints. Higher = better long-edge AA.");
+                Interface::GUI::ItemTooltip(
+                    "Maximum search distance for edge endpoints. Higher = better long-edge AA.");
                 ImGui::SliderInt("SMAA Diag Steps", &postSettings->SMAAMaxSearchStepsDiag, 0, 16);
                 Interface::GUI::ItemTooltip("Maximum diagonal search steps. 0 disables diagonal edge detection.");
             }
@@ -1024,7 +1043,8 @@ private:
                 ImGui::SliderFloat("Contrast##CG", &postSettings->Contrast, 0.5f, 2.0f, "%.2f");
                 Interface::GUI::ItemTooltip("Contrast around mid-gray (0.18). Higher = more punch.");
                 ImGui::SliderFloat("Temperature", &postSettings->ColorTempOffset, -1.0f, 1.0f, "%.2f");
-                Interface::GUI::ItemTooltip("White balance shift. Negative = cooler (blue), positive = warmer (orange).");
+                Interface::GUI::ItemTooltip(
+                    "White balance shift. Negative = cooler (blue), positive = warmer (orange).");
                 ImGui::SliderFloat("Tint", &postSettings->TintOffset, -1.0f, 1.0f, "%.2f");
                 Interface::GUI::ItemTooltip("Green-magenta tint correction. Negative = green, positive = magenta.");
 
@@ -1047,9 +1067,9 @@ private:
                     postSettings->Contrast = 1.0f;
                     postSettings->ColorTempOffset = 0.0f;
                     postSettings->TintOffset = 0.0f;
-                    postSettings->Lift  = glm::vec3(0.0f);
+                    postSettings->Lift = glm::vec3(0.0f);
                     postSettings->Gamma = glm::vec3(1.0f);
-                    postSettings->Gain  = glm::vec3(1.0f);
+                    postSettings->Gain = glm::vec3(1.0f);
                 }
             }
         }
@@ -1069,7 +1089,8 @@ private:
             int currentMode = static_cast<int>(outlineSettings->Mode);
             if (ImGui::Combo("Outline Mode", &currentMode, modeNames, 3))
                 outlineSettings->Mode = static_cast<Graphics::Passes::OutlineMode>(currentMode);
-            Interface::GUI::ItemTooltip("Selection outline rendering style.\nSolid: constant opacity.\nPulse: alpha oscillates over time.\nGlow: radial falloff around silhouette.");
+            Interface::GUI::ItemTooltip(
+                "Selection outline rendering style.\nSolid: constant opacity.\nPulse: alpha oscillates over time.\nGlow: radial falloff around silhouette.");
         }
 
         float selColor[4] = {
@@ -1134,15 +1155,15 @@ private:
     // Returns a short text icon prefix based on the entity's primary component type.
     static const char* EntityTypeIcon(const entt::registry& reg, entt::entity e)
     {
-        if (reg.all_of<ECS::DataAuthority::MeshTag>(e))         return "[M] ";  // Mesh
-        if (reg.all_of<ECS::DataAuthority::GraphTag>(e))        return "[G] ";  // Graph
-        if (reg.all_of<ECS::DataAuthority::PointCloudTag>(e))   return "[P] ";  // Point Cloud
+        if (reg.all_of<ECS::DataAuthority::MeshTag>(e)) return "[M] "; // Mesh
+        if (reg.all_of<ECS::DataAuthority::GraphTag>(e)) return "[G] "; // Graph
+        if (reg.all_of<ECS::DataAuthority::PointCloudTag>(e)) return "[P] "; // Point Cloud
         if (reg.all_of<ECS::Components::Hierarchy::Component>(e))
         {
             const auto& h = reg.get<ECS::Components::Hierarchy::Component>(e);
-            if (h.FirstChild != entt::null)                     return "[+] ";  // Group/parent
+            if (h.FirstChild != entt::null) return "[+] "; // Group/parent
         }
-        return "[o] ";  // Empty/other
+        return "[o] "; // Empty/other
     }
 
     // Toggle the Visible flag on all render components of an entity.
@@ -1232,7 +1253,7 @@ private:
         for (std::size_t i = 0; i < order.size(); ++i)
         {
             if (order[i] == m_SelectionAnchor) anchorIdx = i;
-            if (order[i] == clickedEntity)     clickIdx = i;
+            if (order[i] == clickedEntity) clickIdx = i;
         }
 
         // Fallback to single Replace selection if anchor not found.
@@ -1305,13 +1326,13 @@ private:
         // --- Click to select (supports Ctrl+click toggle, Shift+click range) ---
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         {
-            const bool ctrl  = ImGui::GetIO().KeyCtrl;
+            const bool ctrl = ImGui::GetIO().KeyCtrl;
             const bool shift = ImGui::GetIO().KeyShift;
 
             // Multi-select only applies in Entity selection mode.
             // In sub-element modes, hierarchy clicks always do single Replace.
             const bool entityMode = GetSelection().GetConfig().ElementMode
-                                    == Runtime::Selection::ElementMode::Entity;
+                == Runtime::Selection::ElementMode::Entity;
 
             if (entityMode && shift && m_SelectionAnchor != entt::null)
             {
@@ -1523,7 +1544,8 @@ private:
         }
 
         // Right-click context menu on empty space
-        if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_NoOpenOverExistingPopup | ImGuiPopupFlags_MouseButtonRight))
+        if (ImGui::BeginPopupContextWindow(
+            nullptr, ImGuiPopupFlags_NoOpenOverExistingPopup | ImGuiPopupFlags_MouseButtonRight))
         {
             if (ImGui::MenuItem("Create Empty Entity"))
             {
@@ -1635,7 +1657,8 @@ private:
     void FocusCameraOnEntity(entt::entity entity)
     {
         auto* cam = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::CameraComponent>(m_CameraEntity);
-        auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity);
+        auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(
+            m_CameraEntity);
         if (!cam || !orbit) return;
 
         glm::vec3 center;
@@ -1663,7 +1686,8 @@ private:
         const bool cPressed = !uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::C);
         if (fPressed || cPressed)
         {
-            auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity);
+            auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(
+                m_CameraEntity);
             if (!orbit) return;
 
             glm::vec3 center;
@@ -1776,7 +1800,7 @@ private:
 
         {
             const bool anyVisible = std::any_of(selectedEntities.begin(), selectedEntities.end(),
-                [&reg](entt::entity e) { return IsEntityVisible(reg, e); });
+                                                [&reg](entt::entity e) { return IsEntityVisible(reg, e); });
             if (ImGui::MenuItem(anyVisible ? "Hide" : "Show", "H", false, hasPrimary))
             {
                 for (auto e : selectedEntities)
@@ -1819,7 +1843,7 @@ private:
     {
         const entt::entity entity = m_CachedSelectedEntity;
         const bool hasMesh = (entity != entt::null) && reg.valid(entity) &&
-                             reg.all_of<ECS::Mesh::Data>(entity);
+            reg.all_of<ECS::Mesh::Data>(entity);
         const auto& selConfig = GetSelection().GetConfig();
 
         if (ImGui::MenuItem("Select Connected", nullptr, false, hasMesh))
@@ -1846,17 +1870,17 @@ private:
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("Extend selection along edge loops through vertices.\n"
-                              "Best results on quad meshes (clean rows/columns).\n"
-                              "On mixed tri/quad topology, uses angle-based\n"
-                              "continuation for deterministic results.");
+                "Best results on quad meshes (clean rows/columns).\n"
+                "On mixed tri/quad topology, uses angle-based\n"
+                "continuation for deterministic results.");
         if (ImGui::MenuItem("Select Edge Ring", nullptr, false, edgeModeWithSelection))
         {
             SelectEdgeRing(reg, entity);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("Extend selection across parallel edges in face strips.\n"
-                              "Best results on quad meshes. Stops at boundaries\n"
-                              "and non-tri/quad faces.");
+                "Best results on quad meshes. Stops at boundaries\n"
+                "and non-tri/quad faces.");
         ImGui::Separator();
         if (ImGui::MenuItem("Clear Sub-Element Selection"))
         {
@@ -1873,11 +1897,15 @@ private:
             if (ImGui::MenuItem("Sphere"))
                 SpawnPrimitiveMesh("Sphere", Geometry::Sphere{glm::vec3(0.0f), 0.5f});
             if (ImGui::MenuItem("Cylinder"))
-                SpawnPrimitiveMesh("Cylinder", Geometry::Cylinder{glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f, 0.5f, 0.0f), 0.5f});
+                SpawnPrimitiveMesh("Cylinder", Geometry::Cylinder{
+                                       glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f, 0.5f, 0.0f), 0.5f
+                                   });
             if (ImGui::MenuItem("Plane"))
             {
                 // Thin box (non-degenerate) approximating a plane
-                SpawnPrimitiveMesh("Plane", Geometry::AABB{glm::vec3(-1.0f, -0.001f, -1.0f), glm::vec3(1.0f, 0.001f, 1.0f)});
+                SpawnPrimitiveMesh("Plane", Geometry::AABB{
+                                       glm::vec3(-1.0f, -0.001f, -1.0f), glm::vec3(1.0f, 0.001f, 1.0f)
+                                   });
             }
             if (ImGui::MenuItem("Icosahedron"))
                 SpawnPrimitiveMeshFromHalfedge("Icosahedron", Geometry::Halfedge::MakeMeshIcosahedron());
@@ -1954,11 +1982,11 @@ private:
 
                 auto& geomStorage = GetRenderOrchestrator().GetGeometryStorage();
                 auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-                    g.GetDeviceShared(), g.GetTransferManager(), upload, &geomStorage);
+                    g.GetDeviceShared(), g.GetTransferManager(), g.GetBufferManager(), upload, &geomStorage);
                 (void)token;
 
                 if (gpuData && gpuData->GetVertexBuffer() && gpuData->GetIndexBuffer())
-                    surface.Geometry = geomStorage.Add(std::move(gpuData));
+                    surface.Geometry = geomStorage.Add(std::move(*gpuData));
             }
 
             auto collisionData = std::make_shared<Graphics::GeometryCollisionData>();
@@ -2220,7 +2248,7 @@ private:
     }
 
     void GrowSelection(entt::registry& reg, entt::entity entity,
-                        Runtime::Selection::ElementMode mode)
+                       Runtime::Selection::ElementMode mode)
     {
         auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
         if (!meshData || !meshData->MeshRef) return;
@@ -2289,7 +2317,7 @@ private:
     }
 
     void ShrinkSelection(entt::registry& reg, entt::entity entity,
-                          Runtime::Selection::ElementMode mode)
+                         Runtime::Selection::ElementMode mode)
     {
         auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
         if (!meshData || !meshData->MeshRef) return;
@@ -2303,7 +2331,11 @@ private:
             for (uint32_t vi : subSel.SelectedVertices)
             {
                 auto vh = Geometry::VertexHandle(vi);
-                if (!mesh.IsValid(vh)) { toRemove.insert(vi); continue; }
+                if (!mesh.IsValid(vh))
+                {
+                    toRemove.insert(vi);
+                    continue;
+                }
                 for (auto he : mesh.HalfedgesAroundVertex(vh))
                 {
                     auto target = mesh.ToVertex(he);
@@ -2324,11 +2356,19 @@ private:
             for (uint32_t fi : subSel.SelectedFaces)
             {
                 auto fh = Geometry::FaceHandle(fi);
-                if (!mesh.IsValid(fh)) { toRemove.insert(fi); continue; }
+                if (!mesh.IsValid(fh))
+                {
+                    toRemove.insert(fi);
+                    continue;
+                }
                 for (auto he : mesh.HalfedgesAroundFace(fh))
                 {
                     auto opp = mesh.OppositeHalfedge(he);
-                    if (!opp.IsValid()) { toRemove.insert(fi); break; }
+                    if (!opp.IsValid())
+                    {
+                        toRemove.insert(fi);
+                        break;
+                    }
                     auto adjFace = mesh.Face(opp);
                     if (!adjFace.IsValid() ||
                         subSel.SelectedFaces.find(adjFace.Index) == subSel.SelectedFaces.end())
@@ -2347,9 +2387,17 @@ private:
             for (uint32_t ei : subSel.SelectedEdges)
             {
                 auto eh = Geometry::EdgeHandle(ei);
-                if (!mesh.IsValid(eh)) { toRemove.insert(ei); continue; }
+                if (!mesh.IsValid(eh))
+                {
+                    toRemove.insert(ei);
+                    continue;
+                }
                 auto he0 = mesh.Halfedge(eh, 0);
-                if (!he0.IsValid()) { toRemove.insert(ei); continue; }
+                if (!he0.IsValid())
+                {
+                    toRemove.insert(ei);
+                    continue;
+                }
                 auto he1 = mesh.OppositeHalfedge(he0);
                 bool boundary = false;
                 for (auto endpointHe : {he0, he1})
@@ -2551,9 +2599,9 @@ int main(int argc, char* argv[])
     // Editor-oriented defaults: VSync handles primary pacing; the activity
     // tracker drops to 15 fps after 2 seconds of idle to conserve CPU/GPU.
     config.FramePacing = {
-        .ActiveFps = 0.0,             // 0 = VSync-limited (no additional sleep cap)
-        .IdleFps = 15.0,              // Idle rate when no user interaction
-        .IdleTimeoutSeconds = 2.0,    // Seconds before entering idle pacing
+        .ActiveFps = 0.0, // 0 = VSync-limited (no additional sleep cap)
+        .IdleFps = 15.0, // Idle rate when no user interaction
+        .IdleTimeoutSeconds = 2.0, // Seconds before entering idle pacing
         .Enabled = true,
     };
 

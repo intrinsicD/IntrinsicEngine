@@ -343,6 +343,7 @@ namespace Runtime
             m_GraphicsBackend->GetBindlessSystem(),
             m_GraphicsBackend->GetDescriptorPool(),
             m_GraphicsBackend->GetDescriptorLayout(),
+            m_GraphicsBackend->GetBufferManager(),
             m_GraphicsBackend->GetTextureManager(),
             m_AssetPipeline->GetAssetManager(),
             &m_FeatureRegistry,
@@ -373,6 +374,7 @@ namespace Runtime
         m_AssetIngestService = std::make_unique<AssetIngestService>(
             m_GraphicsBackend->GetDeviceShared(),
             m_GraphicsBackend->GetTransferManager(),
+            m_GraphicsBackend->GetBufferManager(),
             m_RenderOrchestrator->GetGeometryStorage(),
             m_RenderOrchestrator->GetMaterialRegistry(),
             *m_AssetPipeline,

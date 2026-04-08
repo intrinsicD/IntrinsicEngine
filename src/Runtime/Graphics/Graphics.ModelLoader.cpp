@@ -35,6 +35,7 @@ import Graphics.IORegistry;
 import Core.IOBackend;
 import Core.Filesystem;
 import Core.Logging;
+import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;
 import Graphics.Geometry;
@@ -102,16 +103,16 @@ namespace Graphics
     {
         auto flatAxis = Geometry::MeshUtils::GenerateUVs(mesh.Positions, mesh.Aux);
 
-        if (flatAxis == -1)
+        if (flatAxis < 0)
         {
             Core::Log::Warn("Failed to generate UVs: Mesh has no vertices.");
         }
+#if defined(INTRINSIC_MODELLOADER_VERBOSE)
         else
         {
-#if defined(INTRINSIC_MODELLOADER_VERBOSE)
             Core::Log::Info("Generated Planar UVs for {} vertices (Axis: {})", mesh.Positions.size(), flatAxis);
-#endif
         }
+#endif
     }
 
     // --- Bulk Data Loading Helper ---
@@ -170,6 +171,7 @@ namespace Graphics
     std::expected<ModelLoadResult, AssetError> ModelLoader::LoadAsync(
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
+        RHI::BufferManager& bufferManager,
         GeometryPool& geometryStorage,
         const std::string& filepath,
         const IORegistry& registry,
@@ -208,10 +210,13 @@ namespace Graphics
             upload.Topology = cpu.Topology;
             upload.UploadMode = GeometryUploadMode::Staged;
 
-            auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, upload, &geometryStorage);
+            auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, bufferManager, upload, &geometryStorage);
             lastToken = token;
 
-            auto geomHandle = geometryStorage.Add(std::move(gpuData));
+            if (!gpuData)
+                continue;
+
+            auto geomHandle = geometryStorage.Add(std::move(*gpuData));
 
             auto seg = std::make_shared<MeshSegment>();
             seg->Handle = geomHandle;

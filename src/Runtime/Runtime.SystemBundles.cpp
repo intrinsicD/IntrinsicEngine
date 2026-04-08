@@ -21,14 +21,14 @@ namespace
 
     struct CoreSystemRegistrationSpec
     {
-        Core::FeatureDescriptor Feature;
-        CoreBundleRegisterFn Register;
+        Core::FeatureDescriptor Feature{};
+        CoreBundleRegisterFn Register{};
     };
 
     struct GpuSystemRegistrationSpec
     {
-        Core::FeatureDescriptor Feature;
-        GpuBundleRegisterFn Register;
+        Core::FeatureDescriptor Feature{};
+        GpuBundleRegisterFn Register{};
     };
 
     template <typename RegistrationSpec, typename Context>
@@ -60,6 +60,7 @@ namespace
                          context.Core.Registry,
                          context.GpuScene,
                          context.GeometryStorage,
+                         context.BufferManager,
                          context.Device,
                          context.TransferManager,
                          context.Dispatcher);

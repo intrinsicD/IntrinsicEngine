@@ -73,6 +73,7 @@ namespace Runtime
 {
     AssetIngestService::AssetIngestService(std::shared_ptr<RHI::VulkanDevice> device,
                                            RHI::TransferManager& transferManager,
+                                           RHI::BufferManager& bufferManager,
                                            Graphics::GeometryPool& geometryStorage,
                                            Graphics::MaterialRegistry& materialRegistry,
                                            AssetPipeline& assetPipeline,
@@ -82,6 +83,7 @@ namespace Runtime
                                            uint32_t defaultTextureId)
         : m_Device(std::move(device))
         , m_TransferManager(transferManager)
+        , m_BufferManager(bufferManager)
         , m_GeometryStorage(geometryStorage)
         , m_MaterialRegistry(materialRegistry)
         , m_AssetPipeline(assetPipeline)
@@ -154,6 +156,7 @@ namespace Runtime
                 auto loadResult = Graphics::ModelLoader::LoadAsync(
                     m_Device,
                     m_TransferManager,
+                    m_BufferManager,
                     m_GeometryStorage,
                     canonicalPath,
                     m_IORegistry,
@@ -237,6 +240,7 @@ namespace Runtime
         auto loadResult = Graphics::ModelLoader::LoadAsync(
             m_Device,
             m_TransferManager,
+            m_BufferManager,
             m_GeometryStorage,
             importPath->CanonicalPath,
             m_IORegistry,

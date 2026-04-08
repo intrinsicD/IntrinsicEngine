@@ -295,7 +295,7 @@ bool SpatialDebugController::UpdateRetainedLineOverlay(Runtime::Engine& engine, 
     upload.UploadMode = Graphics::GeometryUploadMode::Direct;
 
     auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-        engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
+        engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), engine.GetGraphicsBackend().GetBufferManager(), upload,
         &engine.GetRenderOrchestrator().GetGeometryStorage());
     (void)token;
     if (!gpuData)
@@ -305,7 +305,7 @@ bool SpatialDebugController::UpdateRetainedLineOverlay(Runtime::Engine& engine, 
     }
 
     const Geometry::GeometryHandle oldGeometry = slot.Geometry;
-    const Geometry::GeometryHandle newGeometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
+    const Geometry::GeometryHandle newGeometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(*gpuData));
 
     auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     if (slot.Entity == entt::null || !reg.valid(slot.Entity))
@@ -541,7 +541,7 @@ bool SpatialDebugController::EnsureRetainedOctreeOverlay(Runtime::Engine& engine
     upload.UploadMode = Graphics::GeometryUploadMode::Direct;
 
     auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-        engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
+        engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), engine.GetGraphicsBackend().GetBufferManager(), upload,
         &engine.GetRenderOrchestrator().GetGeometryStorage());
     (void)token;
     if (!gpuData)
@@ -551,7 +551,7 @@ bool SpatialDebugController::EnsureRetainedOctreeOverlay(Runtime::Engine& engine
     }
 
     const Geometry::GeometryHandle oldGeometry = m_OctreeOverlayGeometry;
-    const Geometry::GeometryHandle newGeometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
+    const Geometry::GeometryHandle newGeometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(*gpuData));
 
     auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     if (m_OctreeOverlayEntity == entt::null || !reg.valid(m_OctreeOverlayEntity))

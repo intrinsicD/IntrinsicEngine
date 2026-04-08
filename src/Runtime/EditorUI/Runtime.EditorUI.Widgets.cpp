@@ -312,11 +312,11 @@ namespace
         uploadReq.UploadMode = Graphics::GeometryUploadMode::Staged;
 
         auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-            engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), uploadReq,
+            engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), engine.GetGraphicsBackend().GetBufferManager(), uploadReq,
             &engine.GetRenderOrchestrator().GetGeometryStorage());
 
         auto oldHandle = sc->Geometry;
-        sc->Geometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
+        sc->Geometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(*gpuData));
 
         if (oldHandle.IsValid())
             engine.GetRenderOrchestrator().GetGeometryStorage().Remove(oldHandle, engine.GetGraphicsBackend().GetDevice().GetGlobalFrameNumber());
@@ -2534,11 +2534,12 @@ namespace
         auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
             engine.GetGraphicsBackend().GetDeviceShared(),
             engine.GetGraphicsBackend().GetTransferManager(),
+            engine.GetGraphicsBackend().GetBufferManager(),
             uploadReq,
             &engine.GetRenderOrchestrator().GetGeometryStorage());
 
         auto& surface = reg.emplace<ECS::Surface::Component>(entity);
-        surface.Geometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
+        surface.Geometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(*gpuData));
 
         auto& meshData = reg.emplace<ECS::Mesh::Data>(entity);
         meshData.MeshRef = collisionRef->SourceMesh;

@@ -23,6 +23,7 @@ import Graphics.Geometry;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.PointCloudUtils;
+import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;
 
@@ -38,6 +39,7 @@ export namespace Graphics::OverlayEntityFactory
         std::shared_ptr<Geometry::Halfedge::Mesh> mesh,
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
+        RHI::BufferManager& bufferManager,
         Graphics::GeometryPool& geometryStorage,
         const std::string& name);
 

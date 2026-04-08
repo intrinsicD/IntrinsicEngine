@@ -110,7 +110,7 @@ namespace RHI
             // Keep slot reserved for now; alternatively we could FreeBindlessSlot here.
         }
 
-        TextureHandle handle = m_Pool.Add(std::move(gpuData));
+        TextureHandle handle = m_Pool.Add(std::move(*gpuData));
 
         if (handle.IsValid())
         {
@@ -125,14 +125,14 @@ namespace RHI
     TextureHandle TextureManager::CreatePending(uint32_t width, uint32_t height, VkFormat format)
     {
         // Allocate a pool entry with a bindless slot, but keep it bound to default.
-        auto gpu = std::make_unique<TextureGpuData>();
+        TextureGpuData gpu;
 
         auto indices = m_Device.GetQueueIndices();
         bool distinctQueues = indices.HasDistinctTransfer();
 
         VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
 
-        gpu->Image = std::make_unique<VulkanImage>(
+        gpu.Image = std::make_unique<VulkanImage>(
             m_Device,
             width,
             height,
@@ -143,15 +143,15 @@ namespace RHI
             sharingMode);
 
         // Use the shared sampler helper for consistency with Texture.
-        CreateDefaultSampler(m_Device, gpu->Image->GetMipLevels(), gpu->Sampler);
+        CreateDefaultSampler(m_Device, gpu.Image->GetMipLevels(), gpu.Sampler);
 
         // Allocate stable slot.
-        gpu->BindlessSlot = AllocateBindlessSlot();
+        gpu.BindlessSlot = AllocateBindlessSlot();
 
-        if (gpu->BindlessSlot >= m_Bindless.GetCapacity())
+        if (gpu.BindlessSlot >= m_Bindless.GetCapacity())
         {
             Core::Log::Error("Bindless texture capacity exceeded (slot {} >= {}). Texture will not be visible.",
-                             gpu->BindlessSlot, m_Bindless.GetCapacity());
+                             gpu.BindlessSlot, m_Bindless.GetCapacity());
         }
 
         // Insert into pool.

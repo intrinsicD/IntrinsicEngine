@@ -19,6 +19,7 @@ import Geometry.Graph;
 import Geometry.Handle;
 import Geometry.HalfedgeMesh;
 import Geometry.PointCloudUtils;
+import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;
 
@@ -32,6 +33,7 @@ namespace
     [[nodiscard]] bool UploadMeshOverlayGeometry(
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
+        RHI::BufferManager& bufferManager,
         Graphics::GeometryPool& geometryStorage,
         ECS::Surface::Component& surface,
         const Geometry::Halfedge::Mesh& mesh)
@@ -56,13 +58,13 @@ namespace
         upload.UploadMode = Graphics::GeometryUploadMode::Staged;
 
         auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-            std::move(device), transferManager, upload, &geometryStorage);
+            std::move(device), transferManager, bufferManager, upload, &geometryStorage);
         (void)token;
 
         if (!gpuData || !gpuData->GetVertexBuffer() || !gpuData->GetIndexBuffer())
             return false;
 
-        surface.Geometry = geometryStorage.Add(std::move(gpuData));
+        surface.Geometry = geometryStorage.Add(std::move(*gpuData));
         return surface.Geometry.IsValid();
     }
 }
@@ -75,6 +77,7 @@ namespace Graphics::OverlayEntityFactory
         std::shared_ptr<Geometry::Halfedge::Mesh> mesh,
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
+        RHI::BufferManager& bufferManager,
         Graphics::GeometryPool& geometryStorage,
         const std::string& name)
     {
@@ -102,7 +105,7 @@ namespace Graphics::OverlayEntityFactory
         auto& surface = registry.emplace<ECS::Surface::Component>(child);
         if (md.MeshRef)
         {
-            if (!UploadMeshOverlayGeometry(std::move(device), transferManager, geometryStorage, surface, *md.MeshRef))
+            if (!UploadMeshOverlayGeometry(std::move(device), transferManager, bufferManager, geometryStorage, surface, *md.MeshRef))
             {
                 Core::Log::Warn("CreateMeshOverlay: mesh overlay '{}' has no renderable triangle geometry; Surface::Geometry remains invalid.",
                                 name);

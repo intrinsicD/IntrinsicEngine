@@ -3,6 +3,7 @@ module;
 #include <vector>
 #include <span>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
@@ -38,10 +39,10 @@ export namespace Graphics
 
     struct GeometryUploadRequest
     {
-        std::span<const glm::vec3> Positions;
-        std::span<const glm::vec3> Normals;
-        std::span<const glm::vec4> Aux; // UVs packed in xy, Color/Data in zw
-        std::span<const uint32_t> Indices;
+        std::span<const glm::vec3> Positions{};
+        std::span<const glm::vec3> Normals{};
+        std::span<const glm::vec4> Aux{}; // UVs packed in xy, Color/Data in zw
+        std::span<const uint32_t> Indices{};
 
         PrimitiveTopology Topology = PrimitiveTopology::Triangles;
         GeometryUploadMode UploadMode = GeometryUploadMode::Staged;
@@ -53,10 +54,10 @@ export namespace Graphics
 
     struct GeometryCpuData
     {
-        std::vector<glm::vec3> Positions;
-        std::vector<glm::vec3> Normals;
-        std::vector<glm::vec4> Aux;
-        std::vector<uint32_t> Indices;
+        std::vector<glm::vec3> Positions{};
+        std::vector<glm::vec3> Normals{};
+        std::vector<glm::vec4> Aux{};
+        std::vector<uint32_t> Indices{};
         PrimitiveTopology Topology = PrimitiveTopology::Triangles;
 
         [[nodiscard]] GeometryUploadRequest ToUploadRequest(GeometryUploadMode mode = GeometryUploadMode::Staged) const
@@ -67,22 +68,22 @@ export namespace Graphics
 
     struct GeometryCollisionData
     {
-        Geometry::AABB LocalAABB;
-        Geometry::Octree LocalOctree; // Static octree of triangle primitive bounds
+        Geometry::AABB LocalAABB{};
+        Geometry::Octree LocalOctree{}; // Static octree of triangle primitive bounds
 
         // Local-space nearest-vertex lookup for picker refinement.
         // Element i in LocalVertexLookupPoints maps to authoritative vertex index
         // LocalVertexLookupIndices[i]. When SourceMesh is available these are
         // Halfedge::VertexHandle::Index values; otherwise they fall back to raw
         // Positions[] indices.
-        Geometry::KDTree LocalVertexKdTree;
-        std::vector<glm::vec3> LocalVertexLookupPoints;
-        std::vector<uint32_t> LocalVertexLookupIndices;
+        Geometry::KDTree LocalVertexKdTree{};
+        std::vector<glm::vec3> LocalVertexLookupPoints{};
+        std::vector<uint32_t> LocalVertexLookupIndices{};
 
         // Optional: Keep CPU-side collision geometry and an authoritative editable mesh.
-        std::vector<glm::vec3> Positions;
-        std::vector<glm::vec4> Aux;
-        std::vector<uint32_t> Indices;
+        std::vector<glm::vec3> Positions{};
+        std::vector<glm::vec4> Aux{};
+        std::vector<uint32_t> Indices{};
         std::shared_ptr<Geometry::Halfedge::Mesh> SourceMesh{};
     };
 
@@ -113,14 +114,20 @@ export namespace Graphics
 
         ~GeometryGpuData() = default;
 
-        [[nodiscard]] static std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
+        GeometryGpuData(const GeometryGpuData&) = delete;
+        GeometryGpuData& operator=(const GeometryGpuData&) = delete;
+        GeometryGpuData(GeometryGpuData&&) noexcept = default;
+        GeometryGpuData& operator=(GeometryGpuData&&) noexcept = default;
+
+        [[nodiscard]] static std::pair<std::optional<GeometryGpuData>, RHI::TransferToken>
         CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
                     RHI::TransferManager& transferManager,
+                    RHI::BufferManager& bufferManager,
                     const GeometryUploadRequest& data,
                     const GeometryPool* existingPool = nullptr);
 
-        [[nodiscard]] RHI::VulkanBuffer* GetVertexBuffer() const { return m_VertexBuffer.get(); }
-        [[nodiscard]] RHI::VulkanBuffer* GetIndexBuffer() const { return m_IndexBuffer.get(); }
+        [[nodiscard]] RHI::VulkanBuffer* GetVertexBuffer() const { return m_VertexBuffer.Get(); }
+        [[nodiscard]] RHI::VulkanBuffer* GetIndexBuffer() const { return m_IndexBuffer.Get(); }
         [[nodiscard]] uint32_t GetIndexCount() const { return m_IndexCount; }
         [[nodiscard]] const GeometryBufferLayout& GetLayout() const { return m_Layout; }
         [[nodiscard]] PrimitiveTopology GetTopology() const { return m_Layout.Topology; }
@@ -131,9 +138,9 @@ export namespace Graphics
         [[nodiscard]] glm::vec4 GetLocalBoundingSphere() const { return m_LocalBoundingSphere; }
 
     private:
-        // Shared ownership enables multiple GeometryGpuData instances (views) to reference the same heavy buffers.
-        std::shared_ptr<RHI::VulkanBuffer> m_VertexBuffer;
-        std::shared_ptr<RHI::VulkanBuffer> m_IndexBuffer;
+        // Buffer leases keep retained GPU memory alive across reused geometry views.
+        RHI::BufferLease m_VertexBuffer{};
+        RHI::BufferLease m_IndexBuffer{};
 
         GeometryBufferLayout m_Layout{};
         uint32_t m_IndexCount = 0;

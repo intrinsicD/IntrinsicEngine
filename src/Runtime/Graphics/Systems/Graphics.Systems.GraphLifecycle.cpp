@@ -46,6 +46,7 @@ namespace Graphics::Systems::GraphLifecycle
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
+                  RHI::BufferManager& bufferManager,
                   std::shared_ptr<RHI::VulkanDevice> device,
                   RHI::TransferManager& transferManager,
                   entt::dispatcher& dispatcher)
@@ -201,7 +202,7 @@ namespace Graphics::Systems::GraphLifecycle
                 vertexUpload.UploadMode = uploadMode;
 
                 auto [newGpuData, token] = GeometryGpuData::CreateAsync(
-                    device, transferManager, vertexUpload, &geometryStorage);
+                    device, transferManager, bufferManager, vertexUpload, &geometryStorage);
 
                 if (!newGpuData || !newGpuData->GetVertexBuffer())
                 {
@@ -216,7 +217,7 @@ namespace Graphics::Systems::GraphLifecycle
                 else
                 {
 
-                graphData.GpuGeometry = geometryStorage.Add(std::move(newGpuData));
+                graphData.GpuGeometry = geometryStorage.Add(std::move(*newGpuData));
 
                 // --- Create edge index buffer via ReuseVertexBuffersFrom ---
                 // Shares the vertex buffer (positions) with the node geometry.
@@ -247,11 +248,11 @@ namespace Graphics::Systems::GraphLifecycle
                     edgeReq.UploadMode = uploadMode;
 
                     auto [edgeGpuData, edgeToken] = GeometryGpuData::CreateAsync(
-                        device, transferManager, edgeReq, &geometryStorage);
+                        device, transferManager, bufferManager, edgeReq, &geometryStorage);
 
                     if (edgeGpuData && edgeGpuData->GetIndexBuffer())
                     {
-                        graphData.GpuEdgeGeometry = geometryStorage.Add(std::move(edgeGpuData));
+                        graphData.GpuEdgeGeometry = geometryStorage.Add(std::move(*edgeGpuData));
                         graphData.GpuEdgeCount = static_cast<uint32_t>(edgePairs.size());
                     }
                     else
@@ -326,6 +327,7 @@ namespace Graphics::Systems::GraphLifecycle
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
+                        RHI::BufferManager& bufferManager,
                         std::shared_ptr<RHI::VulkanDevice> device,
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
@@ -339,9 +341,9 @@ namespace Graphics::Systems::GraphLifecycle
                 builder.WaitFor("TransformUpdate"_id);
                 builder.WaitFor("PropertySetDirtySync"_id);
             },
-            [&registry, &gpuScene, &geometryStorage, device, &transferManager, &dispatcher]()
+            [&registry, &gpuScene, &geometryStorage, &bufferManager, device, &transferManager, &dispatcher]()
             {
-                OnUpdate(registry, gpuScene, geometryStorage, device, transferManager, dispatcher);
+                OnUpdate(registry, gpuScene, geometryStorage, bufferManager, device, transferManager, dispatcher);
             });
     }
 }

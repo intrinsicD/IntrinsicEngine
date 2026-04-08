@@ -1,12 +1,14 @@
 module;
 #include <cstring> // memcpy
 #include <memory>
+#include <mutex>
 #include <utility> // std::exchange
 #include "RHI.Vulkan.hpp"
 #include "RHI.DestructionUtils.hpp"
 
 module RHI.Buffer;
 
+import Core.ResourcePool;
 import RHI.Device;
 import Core.Logging;
 
@@ -143,6 +145,152 @@ namespace RHI
         info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
         info.buffer = m_Buffer;
         return vkGetBufferDeviceAddress(m_Device.GetLogicalDevice(), &info);
+    }
+
+    BufferManager::Lease::Lease(BufferManager* manager, BufferHandle handle, bool adopt)
+        : m_Manager(manager)
+        , m_Handle(handle)
+    {
+        if (m_Manager && m_Handle.IsValid() && !adopt)
+        {
+            m_Manager->Retain(m_Handle);
+        }
+    }
+
+    BufferManager::Lease::Lease(Lease&& other) noexcept
+        : m_Manager(std::exchange(other.m_Manager, nullptr))
+        , m_Handle(std::exchange(other.m_Handle, BufferHandle{}))
+    {
+    }
+
+    BufferManager::Lease& BufferManager::Lease::operator=(Lease&& other) noexcept
+    {
+        if (this != &other)
+        {
+            Reset();
+            m_Manager = std::exchange(other.m_Manager, nullptr);
+            m_Handle = std::exchange(other.m_Handle, BufferHandle{});
+        }
+        return *this;
+    }
+
+    BufferManager::Lease::~Lease()
+    {
+        Reset();
+    }
+
+    VulkanBuffer* BufferManager::Lease::Get() const
+    {
+        return (m_Manager && m_Handle.IsValid()) ? m_Manager->GetIfValid(m_Handle) : nullptr;
+    }
+
+    BufferManager::Lease BufferManager::Lease::Share() const
+    {
+        return (m_Manager && m_Handle.IsValid()) ? m_Manager->AcquireLease(m_Handle) : Lease{};
+    }
+
+    void BufferManager::Lease::Reset()
+    {
+        if (m_Manager && m_Handle.IsValid())
+        {
+            m_Manager->Release(m_Handle);
+        }
+
+        m_Handle = {};
+        m_Manager = nullptr;
+    }
+
+    BufferManager::BufferManager(VulkanDevice& device)
+        : m_Device(device)
+    {
+    }
+
+    BufferManager::~BufferManager()
+    {
+        Clear();
+    }
+
+    BufferHandle BufferManager::Create(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+    {
+        auto buffer = std::make_unique<VulkanBuffer>(m_Device, size, usage, memoryUsage);
+        if (!buffer || !buffer->IsValid())
+            return {};
+
+        std::lock_guard lock(m_Mutex);
+        BufferRecord record{};
+        record.Buffer = std::move(buffer);
+        record.RefCount = 1u;
+        return m_Pool.Add(std::move(record));
+    }
+
+    BufferManager::Lease BufferManager::CreateLease(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+    {
+        const BufferHandle handle = Create(size, usage, memoryUsage);
+        return handle.IsValid() ? Lease(this, handle, true) : Lease{};
+    }
+
+    BufferManager::Lease BufferManager::AcquireLease(BufferHandle handle)
+    {
+        Retain(handle);
+        return handle.IsValid() ? Lease(this, handle, true) : Lease{};
+    }
+
+    VulkanBuffer* BufferManager::Get(BufferHandle handle) const
+    {
+        return GetIfValid(handle);
+    }
+
+    VulkanBuffer* BufferManager::GetIfValid(BufferHandle handle) const
+    {
+        std::lock_guard lock(m_Mutex);
+        if (auto* record = m_Pool.GetIfValid(handle))
+        {
+            return record->Buffer.get();
+        }
+        return nullptr;
+    }
+
+    void BufferManager::Retain(BufferHandle handle)
+    {
+        if (!handle.IsValid())
+            return;
+
+        std::lock_guard lock(m_Mutex);
+        if (auto* record = m_Pool.GetIfValid(handle))
+        {
+            ++record->RefCount;
+        }
+    }
+
+    void BufferManager::Release(BufferHandle handle)
+    {
+        if (!handle.IsValid())
+            return;
+
+        std::lock_guard lock(m_Mutex);
+        auto* record = m_Pool.GetIfValid(handle);
+        if (!record || !record->Buffer)
+            return;
+
+        if (record->RefCount > 1u)
+        {
+            --record->RefCount;
+            return;
+        }
+
+        m_Pool.Remove(handle, m_Device.GetGlobalFrameNumber());
+    }
+
+    void BufferManager::ProcessDeletions()
+    {
+        std::lock_guard lock(m_Mutex);
+        m_Pool.ProcessDeletions(m_Device.GetGlobalFrameNumber());
+    }
+
+    void BufferManager::Clear()
+    {
+        std::lock_guard lock(m_Mutex);
+        m_Pool.Clear();
     }
 
     void VulkanBuffer::Invalidate(size_t offset, size_t size)

@@ -12,6 +12,7 @@ import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.Memory;
 import RHI.Bindless;
+import RHI.Buffer;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Renderer;
@@ -47,6 +48,7 @@ export namespace Runtime
                            RHI::BindlessDescriptorSystem& bindless,
                            RHI::DescriptorAllocator& descriptorPool,
                            RHI::DescriptorLayout& descriptorLayout,
+                           RHI::BufferManager& bufferManager,
                            RHI::TextureManager& textureManager,
                            Core::Assets::AssetManager& assetManager,
                            Core::FeatureRegistry* featureRegistry = nullptr,

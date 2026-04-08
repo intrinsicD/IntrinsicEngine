@@ -1,10 +1,14 @@
 module;
 #include <cstring>
 #include <limits>
+#include <mutex>
+#include <memory>
 #include "RHI.Vulkan.hpp"
 
 export module RHI.Buffer;
 
+import Core.Handle;
+import Core.ResourcePool;
 import RHI.Device;
 import Core.Logging; // For Core::Log::Error in inline Write/Read methods
 
@@ -26,6 +30,7 @@ export namespace RHI {
         VulkanBuffer& operator=(VulkanBuffer&& other) noexcept;
 
         [[nodiscard]] VkBuffer GetHandle() const { return m_Buffer; }
+        [[nodiscard]] bool IsValid() const { return m_Buffer != VK_NULL_HANDLE; }
 
         // Returns the persistent pointer for host-visible buffers.
         // Thread-safe: can be called concurrently. Pointer is valid until destruction.
@@ -97,4 +102,71 @@ export namespace RHI {
         size_t m_SizeBytes = 0;
         bool m_IsHostVisible = false;
     };
+
+    struct BufferTag {};
+    using BufferHandle = Core::StrongHandle<BufferTag>;
+
+    class BufferManager
+    {
+    public:
+        class Lease
+        {
+        public:
+            Lease() = default;
+            ~Lease();
+
+            Lease(const Lease&) = delete;
+            Lease& operator=(const Lease&) = delete;
+            Lease(Lease&& other) noexcept;
+            Lease& operator=(Lease&& other) noexcept;
+
+            [[nodiscard]] bool IsValid() const { return m_Manager && m_Handle.IsValid(); }
+            [[nodiscard]] BufferHandle GetHandle() const { return m_Handle; }
+            [[nodiscard]] VulkanBuffer* Get() const;
+            [[nodiscard]] Lease Share() const;
+
+            void Reset();
+
+        private:
+            friend class BufferManager;
+
+            Lease(BufferManager* manager, BufferHandle handle, bool adopt);
+
+            BufferManager* m_Manager = nullptr;
+            BufferHandle m_Handle{};
+        };
+
+        explicit BufferManager(VulkanDevice& device);
+        ~BufferManager();
+
+        BufferManager(const BufferManager&) = delete;
+        BufferManager& operator=(const BufferManager&) = delete;
+        BufferManager(BufferManager&&) = delete;
+        BufferManager& operator=(BufferManager&&) = delete;
+
+        [[nodiscard]] BufferHandle Create(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+        [[nodiscard]] Lease CreateLease(size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+        [[nodiscard]] Lease AcquireLease(BufferHandle handle);
+
+        [[nodiscard]] VulkanBuffer* Get(BufferHandle handle) const;
+        [[nodiscard]] VulkanBuffer* GetIfValid(BufferHandle handle) const;
+
+        void Retain(BufferHandle handle);
+        void Release(BufferHandle handle);
+        void ProcessDeletions();
+        void Clear();
+
+    private:
+        struct BufferRecord
+        {
+            std::unique_ptr<VulkanBuffer> Buffer{};
+            uint32_t RefCount = 1;
+        };
+
+        VulkanDevice& m_Device;
+        Core::ResourcePool<BufferRecord, BufferHandle, 3> m_Pool;
+        mutable std::mutex m_Mutex;
+    };
+
+    using BufferLease = BufferManager::Lease;
 }

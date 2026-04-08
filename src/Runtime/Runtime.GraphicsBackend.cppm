@@ -17,6 +17,7 @@ import RHI.Descriptors;
 import RHI.Device;
 import RHI.Renderer;
 import RHI.Swapchain;
+import RHI.Buffer;
 import RHI.Texture;
 import RHI.TextureManager;
 import RHI.Transfer;
@@ -58,6 +59,7 @@ export namespace Runtime
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const;
         [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const;
         [[nodiscard]] RHI::BindlessDescriptorSystem& GetBindlessSystem() const;
+        [[nodiscard]] RHI::BufferManager& GetBufferManager() const;
         [[nodiscard]] RHI::TextureManager& GetTextureManager() const;
         [[nodiscard]] uint32_t GetDefaultTextureIndex() const;
 #ifdef INTRINSIC_HAS_CUDA
@@ -73,12 +75,14 @@ export namespace Runtime
         void CollectGpuDeferredDestructions();
         void GarbageCollectTransfers();
         void ProcessTextureDeletions();
+        void ProcessBufferDeletions();
 
         // --- Shutdown helpers ---
         void WaitIdle();
         void FlushDeletionQueues();
 
         // Clear texture pool (call during teardown after all textures are released).
+        void ClearBufferManager();
         void ClearTextureManager();
 
     private:

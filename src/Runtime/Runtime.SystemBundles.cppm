@@ -15,6 +15,7 @@ import Core.FrameGraph;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import Graphics.MaterialRegistry;
+import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;
 
@@ -34,7 +35,8 @@ export namespace Runtime
         Core::Assets::AssetManager& AssetManager;
         Graphics::MaterialRegistry& MaterialRegistry;
         Graphics::GeometryPool& GeometryStorage;
-        std::shared_ptr<RHI::VulkanDevice> Device;
+        RHI::BufferManager& BufferManager;
+        std::shared_ptr<RHI::VulkanDevice> Device{};
         RHI::TransferManager& TransferManager;
         entt::dispatcher& Dispatcher;
         uint32_t DefaultTextureId = 0;

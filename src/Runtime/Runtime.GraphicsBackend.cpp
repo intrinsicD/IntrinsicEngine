@@ -17,6 +17,7 @@ import RHI.Descriptors;
 import RHI.Device;
 import RHI.Renderer;
 import RHI.Swapchain;
+import RHI.Buffer;
 import RHI.Texture;
 import RHI.TextureFwd;
 import RHI.TextureManager;
@@ -35,6 +36,7 @@ namespace Runtime
         std::unique_ptr<RHI::DescriptorLayout> DescriptorLayout;
         std::unique_ptr<RHI::DescriptorAllocator> DescriptorPool;
         std::unique_ptr<RHI::BindlessDescriptorSystem> BindlessSystem;
+        std::unique_ptr<RHI::BufferManager> BufferManager;
         std::unique_ptr<RHI::TextureManager> TextureManager;
         std::shared_ptr<RHI::Texture> DefaultTexture;
         uint32_t DefaultTextureIndex = 0;
@@ -173,7 +175,8 @@ namespace Runtime
         }
 #endif
 
-        // 4. Bindless + TextureManager
+        // 4. Buffer + Bindless + TextureManager
+        m_Impl->BufferManager = std::make_unique<RHI::BufferManager>(*m_Impl->Device);
         m_Impl->BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Impl->Device);
         m_Impl->TextureManager = std::make_unique<RHI::TextureManager>(*m_Impl->Device, *m_Impl->BindlessSystem);
 
@@ -210,6 +213,12 @@ namespace Runtime
         m_Impl->DefaultTexture.reset();
 
         // Texture pool: process any final deletions and clear.
+        if (m_Impl->BufferManager)
+        {
+            m_Impl->BufferManager->ProcessDeletions();
+            m_Impl->BufferManager->Clear();
+        }
+
         if (m_Impl->TextureManager)
         {
             m_Impl->TextureManager->ProcessDeletions();
@@ -229,6 +238,7 @@ namespace Runtime
         m_Impl->TransferManager.reset();
 
         // Texture system (after descriptors and transfer are gone).
+        m_Impl->BufferManager.reset();
         m_Impl->TextureManager.reset();
 
         // Flush deferred VkObject destruction.
@@ -298,6 +308,11 @@ namespace Runtime
         return *m_Impl->BindlessSystem;
     }
 
+    RHI::BufferManager& GraphicsBackend::GetBufferManager() const
+    {
+        return *m_Impl->BufferManager;
+    }
+
     RHI::TextureManager& GraphicsBackend::GetTextureManager() const
     {
         return *m_Impl->TextureManager;
@@ -357,6 +372,14 @@ namespace Runtime
         }
     }
 
+    void GraphicsBackend::ProcessBufferDeletions()
+    {
+        if (m_Impl->BufferManager)
+        {
+            m_Impl->BufferManager->ProcessDeletions();
+        }
+    }
+
     void GraphicsBackend::WaitIdle()
     {
         if (m_Impl->Device)
@@ -379,6 +402,15 @@ namespace Runtime
         {
             m_Impl->TextureManager->ProcessDeletions();
             m_Impl->TextureManager->Clear();
+        }
+    }
+
+    void GraphicsBackend::ClearBufferManager()
+    {
+        if (m_Impl->BufferManager)
+        {
+            m_Impl->BufferManager->ProcessDeletions();
+            m_Impl->BufferManager->Clear();
         }
     }
 }

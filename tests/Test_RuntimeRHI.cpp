@@ -8,6 +8,7 @@
 #include <vector>
 #include <atomic>
 #include <cstdint>
+#include <span>
 
 #include "RHI.Vulkan.hpp"
 // VMA types/enums are already pulled in transitively via RHI.Vulkan.hpp → RHI.VmaConfig.hpp.

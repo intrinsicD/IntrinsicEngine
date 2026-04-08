@@ -9,6 +9,7 @@ export module Graphics.Systems.PointCloudLifecycle;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import Core.FrameGraph;
+import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;
 
@@ -39,6 +40,7 @@ export namespace Graphics::Systems::PointCloudLifecycle
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
+                  RHI::BufferManager& bufferManager,
                   std::shared_ptr<RHI::VulkanDevice> device,
                   RHI::TransferManager& transferManager,
                   entt::dispatcher& dispatcher);
@@ -50,6 +52,7 @@ export namespace Graphics::Systems::PointCloudLifecycle
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
+                        RHI::BufferManager& bufferManager,
                         std::shared_ptr<RHI::VulkanDevice> device,
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher);

@@ -18,6 +18,7 @@ import Core.Assets;
 import Core.FeatureRegistry;
 import Core.Telemetry;
 import RHI.Bindless;
+import RHI.Buffer;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Image;
@@ -58,7 +59,7 @@ namespace Runtime
             VkSemaphoreWaitInfo waitInfo{};
             waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
             waitInfo.semaphoreCount = 1;
-            const VkSemaphore timelineSemaphore = device->GetGraphicsTimelineSemaphore();
+            VkSemaphore timelineSemaphore = device->GetGraphicsTimelineSemaphore();
             waitInfo.pSemaphores = &timelineSemaphore;
             const uint64_t waitValue = frame.LastSubmittedTimelineValue;
             waitInfo.pValues = &waitValue;
@@ -89,6 +90,7 @@ namespace Runtime
              RHI::BindlessDescriptorSystem& bindless,
              RHI::DescriptorAllocator& descriptorPool,
              RHI::DescriptorLayout& descriptorLayout,
+             RHI::BufferManager& bufferManager,
              RHI::TextureManager& textureManager,
              Core::Assets::AssetManager& inAssetManager,
              Core::FeatureRegistry* inFeatureRegistry,
@@ -100,6 +102,7 @@ namespace Runtime
             , Device(std::move(inDevice))
             , Swapchain(inSwapchain)
             , Bindless(bindless)
+            , BufferManager(bufferManager)
             , DescriptorLayoutRef(descriptorLayout)
             , AssetManagerRef(inAssetManager)
             , FeatureRegistryRef(inFeatureRegistry)
@@ -230,6 +233,7 @@ namespace Runtime
         std::unique_ptr<Graphics::RenderDriver> RenderDriver;
         std::unique_ptr<Graphics::ShaderHotReloadService> ShaderHotReload;
         std::shared_ptr<RHI::VulkanDevice> Device;
+        RHI::BufferManager& BufferManager;
         RHI::VulkanSwapchain& Swapchain;
         RHI::BindlessDescriptorSystem& Bindless;
         RHI::DescriptorLayout& DescriptorLayoutRef;
@@ -245,6 +249,7 @@ namespace Runtime
         RHI::BindlessDescriptorSystem& bindless,
         RHI::DescriptorAllocator& descriptorPool,
         RHI::DescriptorLayout& descriptorLayout,
+        RHI::BufferManager& bufferManager,
         RHI::TextureManager& textureManager,
         Core::Assets::AssetManager& assetManager,
         Core::FeatureRegistry* featureRegistry,
@@ -258,6 +263,7 @@ namespace Runtime
                                         bindless,
                                         descriptorPool,
                                         descriptorLayout,
+                                                                    bufferManager,
                                         textureManager,
                                         assetManager,
                                         featureRegistry,
@@ -640,14 +646,14 @@ namespace Runtime
         req.Topology = topology;
         req.UploadMode = uploadMode;
 
-        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(m_Impl->Device, transferManager, req, &m_Impl->GeometryStorage);
+        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(m_Impl->Device, transferManager, m_Impl->BufferManager, req, &m_Impl->GeometryStorage);
         if (!gpuData)
         {
             Core::Log::Error("RenderOrchestrator::CreateGeometryView: GPU data creation failed.");
             return { {}, {} };
         }
 
-        const auto h = m_Impl->GeometryStorage.Add(std::move(gpuData));
+        const auto h = m_Impl->GeometryStorage.Add(std::move(gpuData.value()));
         return { h, token };
     }
 }
