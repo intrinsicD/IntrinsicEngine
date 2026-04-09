@@ -15,6 +15,7 @@ target_sources(${target_name}
         Components/ECS.Components.Selection.cppm
         Components/ECS.Components.DEC.cppm
         Components/ECS.Components.Events.cppm
+        Components/ECS.Components.GeometrySources.cppm
         Components/ECS.Components.cppm
         Systems/ECS.Systems.AxisRotator.cppm
         Systems/ECS.Systems.Transform.cppm
