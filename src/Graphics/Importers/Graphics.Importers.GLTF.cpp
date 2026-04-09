@@ -18,7 +18,7 @@ module;
 module Graphics.Importers.GLTF;
 import Graphics.IORegistry;
 import Graphics.Geometry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Graphics.Model;
 import Core.IOBackend;
 import Core.Logging;

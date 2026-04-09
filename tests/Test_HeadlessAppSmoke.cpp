@@ -10,7 +10,7 @@
 #include "RHI.Vulkan.hpp"
 
 import Runtime.SceneManager;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.GraphicsBackend;
 import Runtime.Selection;
 import Runtime.SelectionModule;

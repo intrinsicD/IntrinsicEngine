@@ -6,14 +6,14 @@ module;
 
 export module Runtime.FrameLoop;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.InplaceFunction;
 import Core.Window;
 import Runtime.RenderExtraction;
 import Runtime.AssetIngestService;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.GraphicsBackend;
 import Runtime.RenderOrchestrator;
 import Runtime.ResourceMaintenance;

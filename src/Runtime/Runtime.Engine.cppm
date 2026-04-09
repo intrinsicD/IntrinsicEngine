@@ -13,7 +13,7 @@ export module Runtime.Engine;
 
 import Core.Window;
 import Core.FrameGraph;
-import Core.Assets;
+import Asset.Manager;
 import Core.Memory;
 import Core.FeatureRegistry;
 import Core.IOBackend;
@@ -33,7 +33,7 @@ import ECS;
 import Runtime.SelectionModule;
 import Runtime.FrameLoop;
 import Runtime.GraphicsBackend;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.AssetIngestService;
 import Runtime.SceneManager;
 import Runtime.RenderExtraction;

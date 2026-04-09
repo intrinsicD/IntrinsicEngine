@@ -12,7 +12,7 @@ module;
 module Graphics.Exporters.PLY;
 import Graphics.IORegistry;
 import Graphics.Geometry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 
 #include "Graphics.ExportUtils.hpp"
 

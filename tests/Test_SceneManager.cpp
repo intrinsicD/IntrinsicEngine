@@ -7,6 +7,7 @@
 #include "RHI.Vulkan.hpp"
 
 import Runtime.SceneManager;
+import Asset.Manager;
 import ECS;
 import Core;
 import RHI;

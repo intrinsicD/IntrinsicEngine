@@ -7,7 +7,7 @@ module;
 
 export module Runtime.RenderOrchestrator;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.Memory;

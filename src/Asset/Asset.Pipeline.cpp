@@ -4,11 +4,11 @@ module;
 #include <memory>
 #include <vector>
 
-module Runtime.AssetPipeline;
+module Asset.Pipeline;
 
 import Core.Logging;
 import Core.Tasks;
-import Core.Assets;
+import Asset.Manager;
 import RHI.Transfer;
 
 namespace Runtime
@@ -133,3 +133,4 @@ namespace Runtime
         m_Impl->LoadedMaterials.clear();
     }
 }
+

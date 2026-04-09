@@ -7,7 +7,7 @@ module;
 export module Graphics.Importers.PCD;
 
 import Graphics.IORegistry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 
 export namespace Graphics
 {

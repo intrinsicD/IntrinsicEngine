@@ -12,7 +12,7 @@ import Graphics.Material;
 import Graphics.Geometry;
 
 import Core.Hash;
-import Core.Assets;
+import Asset.Manager;
 import Core.FrameGraph;
 import Core.Logging;
 

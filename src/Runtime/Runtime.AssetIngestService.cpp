@@ -17,7 +17,7 @@ module Runtime.AssetIngestService;
 import Core.Logging;
 import Core.Tasks;
 import Core.IOBackend;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Graphics.Geometry;
 import Graphics.IORegistry;
 import Graphics.Material;
@@ -25,7 +25,7 @@ import Graphics.MaterialRegistry;
 import Graphics.Model;
 import Graphics.ModelLoader;
 import ECS;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.SceneManager;
 
 namespace

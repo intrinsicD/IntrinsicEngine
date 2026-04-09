@@ -10,7 +10,7 @@ module;
 module Runtime.SceneManager;
 
 import Core.Logging;
-import Core.Assets;
+import Asset.Manager;
 
 import Graphics.Components;
 import Graphics.Geometry;

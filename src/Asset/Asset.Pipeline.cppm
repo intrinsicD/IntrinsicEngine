@@ -3,9 +3,9 @@ module;
 #include <utility>
 #include <vector>
 
-export module Runtime.AssetPipeline;
+export module Asset.Pipeline;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.Tasks;
 import RHI.Transfer;
 
@@ -83,3 +83,4 @@ export namespace Runtime
         std::unique_ptr<Impl> m_Impl;
     };
 }
+

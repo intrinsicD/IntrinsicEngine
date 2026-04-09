@@ -5,7 +5,7 @@ module;
 
 module Graphics.Material;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.Logging;
 import RHI.Texture;
 import RHI.TextureManager;

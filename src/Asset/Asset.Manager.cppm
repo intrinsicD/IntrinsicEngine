@@ -12,7 +12,7 @@ module;
 #include <atomic>
 #include <cassert>
 
-export module Core.Assets;
+export module Asset.Manager;
 
 import Core.Error;
 import Core.Logging;
@@ -724,3 +724,4 @@ export namespace Core::Assets
             (*fn)();
     }
 }
+

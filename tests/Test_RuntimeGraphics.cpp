@@ -10,6 +10,7 @@
 #include "RHI.Vulkan.hpp"
 
 import Graphics;
+import Asset.Manager;
 import RHI;
 import Core;
 import ECS;

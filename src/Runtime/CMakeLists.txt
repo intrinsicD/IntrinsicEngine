@@ -6,7 +6,6 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
         Runtime.GraphicsBackend.cppm
-        Runtime.AssetPipeline.cppm
         Runtime.AssetIngestService.cppm
         Runtime.SceneManager.cppm
         Runtime.RenderExtraction.cppm
@@ -21,7 +20,6 @@ target_sources(${target_name}
         PRIVATE
         Runtime.Engine.cpp
         Runtime.GraphicsBackend.cpp
-        Runtime.AssetPipeline.cpp
         Runtime.AssetIngestService.cpp
         Runtime.SceneManager.cpp
         Runtime.RenderExtraction.cpp
@@ -44,6 +42,7 @@ target_include_directories(${target_name} SYSTEM PUBLIC
 target_link_libraries(${target_name}
         PUBLIC
         IntrinsicCore
+        IntrinsicAsset
         IntrinsicGraphics
         IntrinsicGeometry
         IntrinsicInterface

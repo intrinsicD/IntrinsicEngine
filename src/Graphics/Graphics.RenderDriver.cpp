@@ -36,7 +36,7 @@ import Graphics.Pipelines;
 
 import Core.Hash;
 import Core.Memory;
-import Core.Assets;
+import Asset.Manager;
 import Core.Logging;
 import Core.Telemetry;
 import RHI.Bindless;

@@ -8,7 +8,7 @@ module;
 #include <map>
 #include <entt/entity/registry.hpp>
 
-module Core.Assets;
+module Asset.Manager;
 import Core.Logging;
 
 namespace Core::Assets
@@ -410,3 +410,4 @@ namespace Core::Assets
         }
     }
 }
+

@@ -11,6 +11,7 @@
 
 import ECS;
 import Graphics;
+import Asset.Manager;
 import Core;
 import Runtime.RenderOrchestrator;
 

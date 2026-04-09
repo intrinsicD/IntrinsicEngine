@@ -10,7 +10,7 @@ import Graphics.GPUScene;
 import ECS;
 import Graphics.Components;
 import Core.Hash;
-import Core.Assets;
+import Asset.Manager;
 import Core.FrameGraph;
 import Graphics.MaterialRegistry;
 import Graphics.Material;

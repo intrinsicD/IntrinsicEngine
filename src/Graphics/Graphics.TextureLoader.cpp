@@ -8,7 +8,7 @@ module;
 #include "RHI.Vulkan.hpp"
 
 module Graphics.TextureLoader;
-import Graphics.AssetErrors;
+import Asset.Errors;
 
 import RHI.Device;
 import RHI.Texture;

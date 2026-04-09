@@ -14,7 +14,7 @@ module;
 #include "Graphics.FileFormatUtils.hpp"
 
 module Graphics.IORegistry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Graphics.Geometry;
 import Graphics.Importers.OBJ;
 import Graphics.Importers.PLY;

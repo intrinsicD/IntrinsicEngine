@@ -17,7 +17,7 @@ import Graphics.Components.Core;
 import Graphics.Geometry;
 import Graphics.Material;
 import Geometry.Handle;
-import Core.Assets;
+import Asset.Manager;
 
 export namespace ECS::Surface
 {

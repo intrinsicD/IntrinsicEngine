@@ -11,7 +11,7 @@ export import Graphics.RenderPipeline;
 export import Graphics.TextureLoader;
 export import Graphics.RenderGraph;
 export import Graphics.Components;
-export import Graphics.AssetErrors;
+export import Asset.Errors;
 export import Graphics.IORegistry;
 export import Graphics.ShaderRegistry;
 export import Graphics.PipelineLibrary;

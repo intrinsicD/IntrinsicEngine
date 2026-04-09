@@ -8,7 +8,6 @@ export import Core.Tasks;
 export import Core.Window;
 export import Core.Filesystem;
 export import Core.Input;
-export import Core.Assets;
 export import Core.Profiling;
 export import Core.Telemetry;
 export import Core.ResourcePool;

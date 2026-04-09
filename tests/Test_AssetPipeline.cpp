@@ -7,7 +7,8 @@
 #include <entt/entity/fwd.hpp>
 #include "RHI.Vulkan.hpp"
 
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
+import Asset.Manager;
 import RHI;
 import Core;
 

@@ -7,6 +7,7 @@
 #include <vector>
 
 import Core;
+import Asset.Manager;
 import Graphics;
 import RHI;
 

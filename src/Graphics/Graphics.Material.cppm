@@ -9,7 +9,7 @@ module;
 
 export module Graphics.Material;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.Handle;
 import Core.ResourcePool;
 import RHI.Texture;

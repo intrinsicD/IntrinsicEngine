@@ -6,6 +6,7 @@
 #include "RHI.Vulkan.hpp"
 
 import Runtime.RenderOrchestrator;
+import Asset.Manager;
 import RHI;
 import Graphics;
 import Core;

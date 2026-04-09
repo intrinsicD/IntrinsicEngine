@@ -8,7 +8,7 @@ module;
 export module Graphics.Exporters.OBJ;
 
 import Graphics.IORegistry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Graphics.Geometry;
 
 export namespace Graphics

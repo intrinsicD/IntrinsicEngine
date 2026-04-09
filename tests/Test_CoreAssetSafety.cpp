@@ -8,6 +8,7 @@
 #include <string>
 
 import Core;
+import Asset.Manager;
 
 using namespace Core;
 using namespace Core::Assets;

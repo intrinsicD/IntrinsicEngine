@@ -14,7 +14,7 @@ import Core.Hash;
 import Core.Memory;
 import Core.Filesystem;
 import Core.FrameGraph;
-import Core.Assets;
+import Asset.Manager;
 import Core.FeatureRegistry;
 import Core.Telemetry;
 import RHI.Bindless;

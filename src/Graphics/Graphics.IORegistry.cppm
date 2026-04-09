@@ -14,7 +14,7 @@ export module Graphics.IORegistry;
 
 import Graphics.Geometry;
 import Graphics.Model;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Core.IOBackend;
 
 export namespace Graphics

@@ -4,7 +4,7 @@ module;
 
 export module Graphics.Systems.GPUSceneSync;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.FrameGraph;
 import Graphics.GPUScene;
 import Graphics.MaterialRegistry;

@@ -7,7 +7,7 @@ module;
 export module Graphics.Importers.GLTF;
 
 import Graphics.IORegistry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 
 export namespace Graphics
 {

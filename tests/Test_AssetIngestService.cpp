@@ -2,7 +2,7 @@
 #include <type_traits>
 
 import Runtime.AssetIngestService;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.SceneManager;
 import Graphics;
 import Core.IOBackend;
@@ -33,6 +33,7 @@ TEST(AssetIngestService, RequiresExplicitSubsystemDependencies)
     static_assert(std::is_constructible_v<Runtime::AssetIngestService,
                                           std::shared_ptr<RHI::VulkanDevice>,
                                           RHI::TransferManager&,
+                                          RHI::BufferManager&,
                                           Graphics::GeometryPool&,
                                           Graphics::MaterialRegistry&,
                                           Runtime::AssetPipeline&,

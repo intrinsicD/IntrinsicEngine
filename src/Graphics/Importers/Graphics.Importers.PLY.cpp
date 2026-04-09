@@ -21,7 +21,7 @@ module;
 module Graphics.Importers.PLY;
 import Graphics.IORegistry;
 import Graphics.Geometry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Core.Logging;
 import Geometry.MeshUtils;
 

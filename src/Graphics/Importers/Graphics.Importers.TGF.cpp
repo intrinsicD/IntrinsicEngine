@@ -12,7 +12,7 @@ module;
 module Graphics.Importers.TGF;
 import Graphics.IORegistry;
 import Graphics.Geometry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 
 namespace Graphics
 {

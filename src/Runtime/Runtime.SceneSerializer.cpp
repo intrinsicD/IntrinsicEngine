@@ -19,7 +19,7 @@ module Runtime.SceneSerializer;
 import Core.Logging;
 import Core.Error;
 import Core.IOBackend;
-import Core.Assets;
+import Asset.Manager;
 import Core.Tasks;
 
 import Graphics.Geometry;
@@ -31,7 +31,7 @@ import ECS;
 
 import Runtime.Engine;
 import Runtime.SceneManager;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.RenderOrchestrator;
 import Runtime.GraphicsBackend;
 

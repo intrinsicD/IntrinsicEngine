@@ -5,7 +5,7 @@ module;
 
 export module Graphics.ModelLoader;
 
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Graphics.Model;
 import Graphics.Geometry;
 import Graphics.IORegistry;

@@ -5,7 +5,7 @@ module;
 
 export module Runtime.SceneManager;
 
-import Core.Assets;
+import Asset.Manager;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import RHI.Device;

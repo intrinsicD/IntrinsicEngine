@@ -29,7 +29,6 @@ target_sources(${target_name}
         Components/Graphics.Components.Point.cppm
         Graphics.ModelLoader.cppm
         Graphics.TextureLoader.cppm
-        Graphics.AssetErrors.cppm
         Graphics.ShaderRegistry.cppm
         Graphics.PipelineLibrary.cppm
         Graphics.RenderPipeline.cppm
@@ -181,6 +180,7 @@ target_compile_definitions(${target_name}
 target_link_libraries(${target_name}
         PUBLIC
         IntrinsicCore
+        IntrinsicAsset
         IntrinsicGeometry
         IntrinsicRHI
         IntrinsicECS

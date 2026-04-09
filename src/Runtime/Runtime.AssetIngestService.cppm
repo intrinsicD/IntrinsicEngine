@@ -8,7 +8,7 @@ module;
 
 export module Runtime.AssetIngestService;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.IOBackend;
 import RHI.Buffer;
 import RHI.Device;
@@ -17,7 +17,7 @@ import Graphics.Geometry;
 import Graphics.IORegistry;
 import Graphics.MaterialRegistry;
 import Graphics.Model;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.SceneManager;
 
 export namespace Runtime

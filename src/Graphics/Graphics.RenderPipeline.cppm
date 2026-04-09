@@ -31,7 +31,7 @@ import Graphics.DebugDraw;
 import Graphics.Passes.SelectionOutlineSettings;
 import Graphics.Passes.PostProcessSettings;
 import Core.Hash;
-import Core.Assets;
+import Asset.Manager;
 import RHI.Bindless;
 import RHI.Buffer;
 import RHI.Descriptors;

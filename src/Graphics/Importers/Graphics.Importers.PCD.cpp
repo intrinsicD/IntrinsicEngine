@@ -21,7 +21,7 @@ module Graphics.Importers.PCD;
 
 import Graphics.IORegistry;
 import Graphics.Geometry;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Geometry.MeshUtils;
 
 #include "Graphics.Importers.PostProcess.hpp"

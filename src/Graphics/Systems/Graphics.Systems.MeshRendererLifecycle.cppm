@@ -4,7 +4,7 @@ module;
 
 export module Graphics.Systems.MeshRendererLifecycle;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.FrameGraph;
 import Graphics.Geometry;
 import Graphics.GPUScene;

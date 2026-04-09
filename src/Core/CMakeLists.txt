@@ -20,7 +20,6 @@ target_sources(${target_name}
         Core.Hash.cppm
         Core.Handle.cppm
         Core.Input.cppm
-        Core.Assets.cppm
         Core.ResourcePool.cppm
         Core.Profiling.cppm
         Core.Telemetry.cppm
@@ -40,7 +39,6 @@ target_sources(${target_name}
         Core.Window.cpp
         Core.Filesystem.cpp
         Core.Input.cpp
-        Core.Assets.cpp
         Core.Telemetry.cpp
         Core.FrameGraph.cpp
         Core.DAGScheduler.cpp

@@ -32,7 +32,7 @@ import Graphics.GlobalResources; // New: Global State
 import Graphics.Passes.SelectionOutlineSettings;
 import Graphics.Passes.PostProcessSettings;
 import Core.Memory;
-import Core.Assets;
+import Asset.Manager;
 import ECS;
 
 export namespace Graphics

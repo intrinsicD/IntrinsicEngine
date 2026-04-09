@@ -9,7 +9,7 @@ module;
 
 export module Runtime.SystemBundles;
 
-import Core.Assets;
+import Asset.Manager;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Graphics.Geometry;

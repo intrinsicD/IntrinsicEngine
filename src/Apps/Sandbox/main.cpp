@@ -28,7 +28,7 @@
 
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
-import Runtime.AssetPipeline;
+import Asset.Pipeline;
 import Runtime.RenderOrchestrator;
 import Runtime.SelectionModule;
 import Runtime.Selection;
@@ -37,14 +37,14 @@ import Runtime.EditorUI;
 import Core.Logging;
 import Core.Commands;
 import Core.Filesystem;
-import Core.Assets;
+import Asset.Manager;
 import Core.FrameGraph;
 import Core.FeatureRegistry;
 import Core.Hash;
 import Core.Input;
 import Graphics.Camera;
 import Graphics.Components;
-import Graphics.AssetErrors;
+import Asset.Errors;
 import Graphics.FeatureCatalog;
 import Graphics.Material;
 import Graphics.Model;

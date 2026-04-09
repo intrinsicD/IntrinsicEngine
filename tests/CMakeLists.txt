@@ -74,7 +74,6 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_FrameGraphTypeTokenHelper.cpp
         Test_ArchitectureSLO.cpp
         Test_DAGScheduler.cpp
-        Test_CoreAssetSafety.cpp
         Test_FeatureRegistry.cpp
         Test_SystemFeatureCatalog.cpp
         Test_InplaceFunction.cpp
@@ -155,6 +154,7 @@ intrinsic_test_object_lib(GeometryTestObjs
 intrinsic_test_object_lib(RuntimeTestObjs
     SOURCES
         Test_CoreAssets.cpp
+        Test_CoreAssetSafety.cpp
         Test_RuntimeGraphics.cpp
         Test_RuntimeRHI.cpp
         Test_RuntimeSelection.cpp
@@ -210,7 +210,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_MaintenanceLane.cpp
         Test_ShaderHotReload.cpp
 
-    DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
+    DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI nlohmann_json::nlohmann_json
 )
 
 # Shared support for all test executables (sanitizer defaults, shared test hooks).
@@ -227,7 +227,7 @@ intrinsic_test_object_lib(TestSupportObjs
 # --- Full suite (all tests) ---
 intrinsic_test_executable(IntrinsicTests
     OBJECTS  CoreTestObjs ECSTestObjs GeometryTestObjs RuntimeTestObjs
-    LINK_LIBS IntrinsicRuntime
+    LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
 )
 
 # --- Core-only (no Runtime, no ECS, no GPU) ---
