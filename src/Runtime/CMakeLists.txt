@@ -18,7 +18,6 @@ target_sources(${target_name}
         Runtime.SystemBundles.cppm
         Runtime.SceneSerializer.cppm
         Runtime.PointCloudKMeans.cppm
-        EditorUI/Runtime.EditorUI.cppm
         PRIVATE
         Runtime.Engine.cpp
         Runtime.GraphicsBackend.cpp
@@ -34,12 +33,6 @@ target_sources(${target_name}
         Runtime.SystemBundles.cpp
         Runtime.SceneSerializer.cpp
         Runtime.PointCloudKMeans.cpp
-        EditorUI/Runtime.EditorUI.cpp
-        EditorUI/Runtime.EditorUI.Widgets.cpp
-        EditorUI/Runtime.EditorUI.InspectorController.cpp
-        EditorUI/Runtime.EditorUI.EntityCommands.cpp
-        EditorUI/Runtime.EditorUI.GeometryWorkflowController.cpp
-        EditorUI/Runtime.EditorUI.SpatialDebugController.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
@@ -75,9 +68,3 @@ if(INTRINSIC_ENABLE_CUDA)
     target_sources(${target_name} PRIVATE $<TARGET_OBJECTS:IntrinsicRuntimePointCloudKMeansCuda>)
     target_link_libraries(${target_name} PRIVATE CUDA::cudart)
 endif()
-
-add_subdirectory(Geometry)
-add_subdirectory(ECS)
-add_subdirectory(Graphics)
-add_subdirectory(Interface)
-add_subdirectory(RHI)

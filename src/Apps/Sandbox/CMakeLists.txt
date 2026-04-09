@@ -12,6 +12,7 @@ target_link_libraries(${target_name}
         PRIVATE
         IntrinsicConfig
         IntrinsicRuntime
+        IntrinsicEditorUI
 )
 
 include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)

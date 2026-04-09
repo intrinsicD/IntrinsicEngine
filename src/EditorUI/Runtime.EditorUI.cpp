@@ -24,13 +24,13 @@ import Core.Logging;
 import Core.IOBackend;
 import Core.Commands;
 
-import Graphics.Components;
-
 import Runtime.PointCloudKMeans;
 import Runtime.Selection;
 import Runtime.SelectionModule;
-import Graphics.SubElementHighlightSettings;
 import Runtime.SceneSerializer;
+
+import Graphics.SubElementHighlightSettings;
+import Graphics.Components;
 
 import Geometry.Geodesic;
 

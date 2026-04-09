@@ -164,6 +164,13 @@ endif()
 # ------------------------------------------------------------------------------
 add_subdirectory(src/Core)
 add_subdirectory(src/Runtime)
+add_subdirectory(src/Geometry)
+add_subdirectory(src/ECS)
+add_subdirectory(src/Graphics)
+add_subdirectory(src/Interface)
+add_subdirectory(src/RHI)
+add_subdirectory(src/EditorUI)
+
 if(INTRINSIC_BUILD_SANDBOX)
     add_subdirectory(src/Apps/Sandbox)
 endif()
