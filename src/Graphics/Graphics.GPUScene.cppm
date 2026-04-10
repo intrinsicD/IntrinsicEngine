@@ -54,7 +54,7 @@ export namespace Graphics
     struct GpuInstanceData
     {
         glm::mat4 Model{1.0f};
-        uint32_t TextureID = 0;
+        uint32_t MaterialSlot = 0; // Index into the Material SSBO (set=3, binding=0).
         uint32_t EntityID = 0;
         uint32_t GeometryID = 0; // Stable per-geometry identifier used for GPU-driven batching/culling.
         uint32_t Pad1 = 0;

@@ -11,6 +11,7 @@ layout(location = 2) flat in uint fragTexID;
 layout(location = 3) in vec4 fragVertexColor;
 layout(location = 4) in vec3 fragObjectPos;
 layout(location = 5) in vec3 fragWorldPos;
+layout(location = 6) flat in uint fragMaterialSlot;
 
 layout(location = 0) out vec4 outColor;
 
@@ -57,6 +58,23 @@ layout(set = 0, binding = 1) uniform sampler2DShadow shadowAtlas;
 
 // Set 1: Bindless textures
 layout(set = 1, binding = 0) uniform sampler2D globalTextures[];
+
+struct MaterialData {
+    vec4  BaseColorFactor;
+    float MetallicFactor;
+    float RoughnessFactor;
+    uint  AlbedoID;
+    uint  NormalID;
+    uint  MetallicRoughnessID;
+    uint  Flags;
+    uint  _pad0;
+    uint  _pad1;
+};
+
+// Material SSBO (set=3, binding=0).
+layout(std430, set = 3, binding = 0) readonly buffer MaterialBuffer {
+    MaterialData Materials[];
+} materials;
 
 #include "surface_color_resolve.glsl"
 #include "shadow_sampling.glsl"

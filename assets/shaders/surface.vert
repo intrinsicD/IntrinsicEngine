@@ -25,10 +25,22 @@ layout(buffer_reference, scalar) readonly buffer VertexAttrBuf { uint color[]; }
 
 struct InstanceData {
     mat4 Model;
-    uint TextureID;
+    uint MaterialSlot;
     uint EntityID;
     uint GeometryID;
     uint Pad1;
+};
+
+struct MaterialData {
+    vec4  BaseColorFactor;
+    float MetallicFactor;
+    float RoughnessFactor;
+    uint  AlbedoID;
+    uint  NormalID;
+    uint  MetallicRoughnessID;
+    uint  Flags;
+    uint  _pad0;
+    uint  _pad1;
 };
 
 // Stage 1: CPU uploads a full instance array + identity visible remap.
@@ -39,6 +51,11 @@ layout(std430, set = 2, binding = 0) readonly buffer AllInstances {
 layout(std430, set = 2, binding = 1) readonly buffer Visibility {
     uint VisibleRemap[];
 } visibility;
+
+// Material SSBO: per-material PBR data indexed by InstanceData.MaterialSlot.
+layout(std430, set = 3, binding = 0) readonly buffer MaterialBuffer {
+    MaterialData Materials[];
+} materials;
 
 layout(push_constant) uniform PushConsts {
     mat4     Model;
@@ -59,6 +76,7 @@ layout(location = 2) flat out uint fragTexID;
 layout(location = 3) out vec4 fragVertexColor;
 layout(location = 4) out vec3 fragObjectPos;
 layout(location = 5) out vec3 fragWorldPos;
+layout(location = 6) flat out uint fragMaterialSlot;
 
 void main() {
     PosBuf  pBuf = PosBuf(push.PtrPositions);
@@ -116,5 +134,7 @@ void main() {
     fragWorldPos = worldPos.xyz;
 
     fragTexCoord = inUV;
-    fragTexID = inst.TextureID;
+    fragMaterialSlot = inst.MaterialSlot;
+    MaterialData mat = materials.Materials[inst.MaterialSlot];
+    fragTexID = mat.AlbedoID;
 }

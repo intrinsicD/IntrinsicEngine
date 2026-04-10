@@ -26,6 +26,8 @@ namespace Graphics::Systems::GPUSceneSync
                   const MaterialRegistry& materialRegistry,
                   uint32_t defaultTextureId)
     {
+        (void)defaultTextureId; // Material slot index is used instead of raw texture ID.
+
         // Fast path: only entities that either changed transform OR need material refresh.
         // Queries Surface::Component (migrated from MeshRenderer::Component in Phase 2).
         auto view = registry.view<
@@ -83,12 +85,13 @@ namespace Graphics::Systems::GPUSceneSync
 
             if (wantsMaterialRefresh)
             {
-                inst.TextureID = (matData) ? matData->AlbedoID : defaultTextureId;
+                inst.MaterialSlot = sc.CachedMaterialHandle.IsValid()
+                    ? sc.CachedMaterialHandle.Index : 0u;
             }
             else
             {
-                // Preserve existing TextureID.
-                inst.TextureID = 0xFFFFFFFFu;
+                // Preserve existing MaterialSlot.
+                inst.MaterialSlot = 0xFFFFFFFFu;
             }
 
             // Keep the picking ID stable.
@@ -146,7 +149,7 @@ namespace Graphics::Systems::GPUSceneSync
             GpuInstanceData inst{};
             inst.Model = world.Matrix;
             inst.GeometryID = GPUSceneConstants::kPreserveGeometryId;
-            inst.TextureID = 0xFFFFFFFFu; // Preserve existing.
+            inst.MaterialSlot = 0xFFFFFFFFu; // Preserve existing.
 
             if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
                 inst.EntityID = pick->Value;
@@ -174,7 +177,7 @@ namespace Graphics::Systems::GPUSceneSync
             GpuInstanceData inst{};
             inst.Model = world.Matrix;
             inst.GeometryID = GPUSceneConstants::kPreserveGeometryId;
-            inst.TextureID = 0xFFFFFFFFu; // Preserve existing.
+            inst.MaterialSlot = 0xFFFFFFFFu; // Preserve existing.
 
             if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
                 inst.EntityID = pick->Value;

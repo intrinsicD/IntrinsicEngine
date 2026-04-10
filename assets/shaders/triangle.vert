@@ -19,7 +19,7 @@ layout(buffer_reference, scalar) readonly buffer AuxBuf  { vec4 v[]; };
 
 struct InstanceData {
     mat4 Model;
-    uint TextureID;
+    uint MaterialSlot;
     uint EntityID;
     uint GeometryID;
     uint Pad1;
@@ -73,5 +73,5 @@ void main() {
 
     fragNormal = mat3(inst.Model) * inNorm;
     fragTexCoord = inUV;
-    fragTexID = inst.TextureID;
+    fragTexID = inst.MaterialSlot;
 }

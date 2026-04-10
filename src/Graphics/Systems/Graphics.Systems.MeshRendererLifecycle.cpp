@@ -78,14 +78,9 @@ namespace Graphics::Systems::MeshRendererLifecycle
                 mr.CachedMaterialHandle = matHandle;
 
                 uint32_t matRev = 0u;
-                uint32_t texId = defaultTextureId;
                 if (matHandle.IsValid())
-                {
                     matRev = materialRegistry.GetRevision(matHandle);
-                    if (const MaterialData* data = materialRegistry.GetData(matHandle))
-                        texId = data->AlbedoID;
-                }
-                inst.TextureID = texId;
+                inst.MaterialSlot = matHandle.IsValid() ? matHandle.Index : 0u;
 
                 mr.CachedMaterialHandleForInstance = matHandle;
                 mr.CachedMaterialRevisionForInstance = matRev;

@@ -137,14 +137,14 @@ export namespace Graphics::Passes
         struct RenderPacket
         {
             Geometry::GeometryHandle GeoHandle{};
-            uint32_t TextureID = 0;
+            uint32_t MaterialSlot = 0;
             glm::mat4 Transform{1.0f};
             bool IsSelected = false;
 
             bool operator<(const RenderPacket& other) const
             {
                 if (GeoHandle != other.GeoHandle) return GeoHandle < other.GeoHandle;
-                if (TextureID != other.TextureID) return TextureID < other.TextureID;
+                if (MaterialSlot != other.MaterialSlot) return MaterialSlot < other.MaterialSlot;
                 return IsSelected < other.IsSelected;
             }
         };
