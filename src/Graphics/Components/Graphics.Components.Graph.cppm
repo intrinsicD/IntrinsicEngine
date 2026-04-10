@@ -2,13 +2,20 @@
 // Graph::Data — ECS component for graph visualization (PropertySet-backed).
 // -------------------------------------------------------------------------
 //
-// Holds a shared_ptr to an authoritative Geometry::Graph::Graph instance.
-// Node positions, colors, radii, and edge topology are sourced directly from
-// the Graph's PropertySets — no std::vector copies.
+// The authoritative CPU geometry data for a graph entity lives in the
+// ECS::Components::GeometrySources::Nodes / Edges components.  Loaders
+// and algorithms write data there; lifecycle systems read from those
+// components exclusively.
+//
+// GraphRef is an *optional computation tool* — kept for algorithms that
+// need direct graph-traversal APIs (connectivity queries, topology edits).
+// It is NOT the data authority and must never be used as the primary data
+// source in rendering systems.
 //
 // Rendering: retained-mode via BDA shared-buffer architecture.
-//   - Nodes rendered via PointPass (BDA position pull).
+//   - Nodes rendered via PointPass (BDA position pull from GeometrySources).
 //   - Edges rendered via LinePass (BDA position pull + edge buffer).
+// -------------------------------------------------------------------------
 
 module;
 #include <string>
@@ -30,7 +37,11 @@ export namespace ECS::Graph
 {
     struct Data
     {
-        // ---- Authoritative Data Source ----
+        // ---- Authoritative data: GeometrySources::Nodes / Edges (ECS components) ----
+
+        // ---- Optional computation tool (NOT the data authority) ----
+        // GraphRef is kept for algorithms that need direct halfedge/traversal APIs.
+        // Lifecycle systems never read from GraphRef; they read from GeometrySources.
         std::shared_ptr<Geometry::Graph::Graph> GraphRef;
 
         // ---- Rendering Parameters (not data — data lives in PropertySets) ----
@@ -78,15 +89,21 @@ export namespace ECS::Graph
         entt::entity KMeansCentroidEntity = entt::null;
         uint64_t KMeansResultRevision = 0;
 
-        // ---- Queries (delegate to GraphRef) ----
+        // ---- Queries ----
+        // NOTE: These delegate to GpuVertexCount / GpuEdgeCount which are set
+        // after the first GPU upload from GeometrySources.  Before the first
+        // upload they return 0.  For live counts use GeometrySources::NodeCount()
+        // / EdgeCount() with the GeometrySources::Nodes / Edges ECS components.
         [[nodiscard]] std::size_t NodeCount() const noexcept
         {
-            return GraphRef ? GraphRef->VertexCount() : 0;
+            return GpuVertexCount;
         }
         [[nodiscard]] std::size_t EdgeCount() const noexcept
         {
-            return GraphRef ? GraphRef->EdgeCount() : 0;
+            return GpuEdgeCount;
         }
+        // Property presence is now resolved via GeometrySources::Nodes/Edges
+        // PropertySets.  These helpers remain for legacy call-sites.
         [[nodiscard]] bool HasNodeColors() const noexcept
         {
             return GraphRef && GraphRef->VertexProperties().Exists("v:color");

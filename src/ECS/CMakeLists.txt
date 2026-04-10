@@ -16,6 +16,7 @@ target_sources(${target_name}
         Components/ECS.Components.DEC.cppm
         Components/ECS.Components.Events.cppm
         Components/ECS.Components.GeometrySources.cppm
+        Components/ECS.Components.GeometrySourcesPopulate.cppm
         Components/ECS.Components.cppm
         Systems/ECS.Systems.AxisRotator.cppm
         Systems/ECS.Systems.Transform.cppm
@@ -26,6 +27,7 @@ target_sources(${target_name}
         FILE_SET ecs_impl TYPE CXX_MODULES FILES
         ECS.SceneBootstrap.cpp
         Components/ECS.HierarchyStructure.cpp
+        Components/ECS.Components.GeometrySourcesPopulate.cpp
         Components/ECS.Components.Hierarchy.cpp
         Systems/ECS.Systems.AxisRotator.cpp
         Systems/ECS.Systems.Transform.cpp

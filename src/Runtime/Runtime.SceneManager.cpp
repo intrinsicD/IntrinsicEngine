@@ -22,6 +22,7 @@ import Graphics.VisualizationConfig;
 import ECS;
 
 import Geometry.Handle;
+import Geometry.HalfedgeMesh;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;
 #endif
@@ -246,6 +247,18 @@ namespace Runtime
                             auto& meshData = m_Scene.GetRegistry().emplace_or_replace<ECS::Mesh::Data>(targetEntity);
                             meshData.MeshRef = col.CollisionRef->SourceMesh;
                             meshData.AttributesDirty = true;
+
+                            // Transfer mesh data into the authoritative GeometrySources
+                            // components.  MeshRef is kept as a computation tool for
+                            // algorithms that need the halfedge structure; it is NOT
+                            // the data authority.
+                            ECS::Components::GeometrySources::PopulateFromMesh(
+                                m_Scene.GetRegistry(), targetEntity, *col.CollisionRef->SourceMesh);
+
+                            // Mark attributes dirty so PropertySetDirtySync picks them
+                            // up on the first frame.
+                            m_Scene.GetRegistry().emplace_or_replace<ECS::DirtyTag::VertexAttributes>(targetEntity);
+                            m_Scene.GetRegistry().emplace_or_replace<ECS::DirtyTag::FaceAttributes>(targetEntity);
                         }
 
                         auto& primitiveBvh = m_Scene.GetRegistry().emplace_or_replace<ECS::PrimitiveBVH::Data>(targetEntity);

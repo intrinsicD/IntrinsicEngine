@@ -27,12 +27,12 @@ static GeometryCpuData MakeTriangle()
 {
     GeometryCpuData data;
     data.Topology = PrimitiveTopology::Triangles;
-    data.Positions = {
+    data.Positions() = {
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(1.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     };
-    data.Normals = {
+    data.Normals() = {
         glm::vec3(0.0f, 0.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 1.0f)
@@ -46,13 +46,13 @@ static GeometryCpuData MakeQuad()
 {
     GeometryCpuData data;
     data.Topology = PrimitiveTopology::Triangles;
-    data.Positions = {
+    data.Positions() = {
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(1.0f, 0.0f, 0.0f),
         glm::vec3(1.0f, 1.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     };
-    data.Normals = {
+    data.Normals() = {
         glm::vec3(0.0f, 0.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 1.0f),
@@ -67,7 +67,7 @@ static GeometryCpuData MakePointCloud()
 {
     GeometryCpuData data;
     data.Topology = PrimitiveTopology::Points;
-    data.Positions = {
+    data.Positions() = {
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(1.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f),
@@ -140,15 +140,15 @@ TEST(PLYExporter, ExportBinaryRoundTrip)
 
     auto& meshData = std::get<MeshImportData>(*imported);
     ASSERT_EQ(meshData.Meshes.size(), 1u);
-    EXPECT_EQ(meshData.Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshData.Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshData.Meshes[0].Indices.size(), 3u);
 
     // Compare positions (should be exact for binary float round-trip)
     for (std::size_t i = 0; i < 3; ++i)
     {
-        EXPECT_FLOAT_EQ(meshData.Meshes[0].Positions[i].x, original.Positions[i].x);
-        EXPECT_FLOAT_EQ(meshData.Meshes[0].Positions[i].y, original.Positions[i].y);
-        EXPECT_FLOAT_EQ(meshData.Meshes[0].Positions[i].z, original.Positions[i].z);
+        EXPECT_FLOAT_EQ(meshData.Meshes[0].Positions()[i].x, original.Positions()[i].x);
+        EXPECT_FLOAT_EQ(meshData.Meshes[0].Positions()[i].y, original.Positions()[i].y);
+        EXPECT_FLOAT_EQ(meshData.Meshes[0].Positions()[i].z, original.Positions()[i].z);
     }
 }
 
@@ -175,15 +175,15 @@ TEST(PLYExporter, ExportAsciiRoundTrip)
 
     auto& meshData = std::get<MeshImportData>(*imported);
     ASSERT_EQ(meshData.Meshes.size(), 1u);
-    EXPECT_EQ(meshData.Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshData.Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshData.Meshes[0].Indices.size(), 3u);
 
     // ASCII round-trip may have epsilon differences
     for (std::size_t i = 0; i < 3; ++i)
     {
-        EXPECT_NEAR(meshData.Meshes[0].Positions[i].x, original.Positions[i].x, 1e-4f);
-        EXPECT_NEAR(meshData.Meshes[0].Positions[i].y, original.Positions[i].y, 1e-4f);
-        EXPECT_NEAR(meshData.Meshes[0].Positions[i].z, original.Positions[i].z, 1e-4f);
+        EXPECT_NEAR(meshData.Meshes[0].Positions()[i].x, original.Positions()[i].x, 1e-4f);
+        EXPECT_NEAR(meshData.Meshes[0].Positions()[i].y, original.Positions()[i].y, 1e-4f);
+        EXPECT_NEAR(meshData.Meshes[0].Positions()[i].z, original.Positions()[i].z, 1e-4f);
     }
 }
 
@@ -227,13 +227,13 @@ TEST(PLYExporter, ExportWithNormalsPreserved)
 
     auto& meshData = std::get<MeshImportData>(*imported);
     ASSERT_EQ(meshData.Meshes.size(), 1u);
-    EXPECT_EQ(meshData.Meshes[0].Normals.size(), 3u);
+    EXPECT_EQ(meshData.Meshes[0].Normals().size(), 3u);
 
     for (std::size_t i = 0; i < 3; ++i)
     {
-        EXPECT_FLOAT_EQ(meshData.Meshes[0].Normals[i].x, original.Normals[i].x);
-        EXPECT_FLOAT_EQ(meshData.Meshes[0].Normals[i].y, original.Normals[i].y);
-        EXPECT_FLOAT_EQ(meshData.Meshes[0].Normals[i].z, original.Normals[i].z);
+        EXPECT_FLOAT_EQ(meshData.Meshes[0].Normals()[i].x, original.Normals()[i].x);
+        EXPECT_FLOAT_EQ(meshData.Meshes[0].Normals()[i].y, original.Normals()[i].y);
+        EXPECT_FLOAT_EQ(meshData.Meshes[0].Normals()[i].z, original.Normals()[i].z);
     }
 }
 
@@ -325,7 +325,7 @@ TEST(IORegistryExport, ExportViaRegistryConvenienceMethod)
 
     auto& meshData = std::get<MeshImportData>(*importResult);
     ASSERT_EQ(meshData.Meshes.size(), 1u);
-    EXPECT_EQ(meshData.Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshData.Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshData.Meshes[0].Indices.size(), 3u);
 
     // Clean up

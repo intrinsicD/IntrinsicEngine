@@ -48,6 +48,9 @@ namespace Graphics
         std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVertices;
 
         outData.Topology = PrimitiveTopology::Triangles;
+        auto& positions = outData.Positions();
+        auto& normals   = outData.Normals();
+        auto& attrs     = outData.Attrs();
         std::string_view line;
         size_t lineCursor = 0;
         bool hasNormals = false;
@@ -140,15 +143,15 @@ namespace Graphics
                         continue;
 
                     auto [it, inserted] = uniqueVertices.try_emplace(
-                        key, static_cast<uint32_t>(outData.Positions.size()));
+                        key, static_cast<uint32_t>(positions.size()));
                     if (inserted)
                     {
-                        outData.Positions.push_back(tempPos[key.p]);
-                        outData.Normals.push_back((key.n >= 0 && static_cast<size_t>(key.n) < tempNorm.size())
+                        positions.push_back(tempPos[key.p]);
+                        normals.push_back((key.n >= 0 && static_cast<size_t>(key.n) < tempNorm.size())
                                                       ? tempNorm[key.n]
                                                       : glm::vec3(0, 1, 0));
                         glm::vec2 uv = (key.t >= 0 && static_cast<size_t>(key.t) < tempUV.size()) ? tempUV[key.t] : glm::vec2(0, 0);
-                        outData.Aux.emplace_back(uv.x, uv.y, 0, 0);
+                        attrs.emplace_back(uv.x, uv.y, 0, 0);
                     }
                     faceIndices.push_back(it->second);
                 }

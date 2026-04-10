@@ -86,9 +86,12 @@ namespace Graphics
 
         GeometryCpuData outData;
         outData.Topology = PrimitiveTopology::Triangles;
-        outData.Positions.resize(*nVertices);
-        outData.Normals.resize(*nVertices, glm::vec3(0, 1, 0));
-        outData.Aux.resize(*nVertices, glm::vec4(0, 0, 0, 0));
+        auto& positions = outData.Positions();
+        auto& normals   = outData.Normals();
+        auto& attrs     = outData.Attrs();
+        positions.resize(*nVertices);
+        normals.resize(*nVertices, glm::vec3(0, 1, 0));
+        attrs.resize(*nVertices, glm::vec4(0, 0, 0, 0));
 
         bool hasNormals = (variant == OFFVariant::NOFF || variant == OFFVariant::CNOFF);
         bool hasColors = (variant == OFFVariant::COFF || variant == OFFVariant::CNOFF);
@@ -109,7 +112,7 @@ namespace Graphics
             if (!x || !y || !z)
                 return std::unexpected(AssetError::InvalidData);
 
-            outData.Positions[i] = glm::vec3(*x, *y, *z);
+            positions[i] = glm::vec3(*x, *y, *z);
 
             std::size_t tokenIdx = 3;
 
@@ -119,7 +122,7 @@ namespace Graphics
                 const auto ny = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx + 1]);
                 const auto nz = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx + 2]);
                 if (nx && ny && nz)
-                    outData.Normals[i] = glm::vec3(*nx, *ny, *nz);
+                    normals[i] = glm::vec3(*nx, *ny, *nz);
                 tokenIdx += 3;
             }
 
@@ -134,7 +137,7 @@ namespace Graphics
                     float gf = Detail::NormalizeColorChannelToUnitRange(*g);
                     float bf = Detail::NormalizeColorChannelToUnitRange(*b);
 
-                    outData.Aux[i] = glm::vec4(rf, gf, bf, 1.0f);
+                    attrs[i] = glm::vec4(rf, gf, bf, 1.0f);
                 }
                 tokenIdx += 3;
 

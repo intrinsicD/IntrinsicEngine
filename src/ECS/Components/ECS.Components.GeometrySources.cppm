@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 
@@ -11,6 +12,48 @@ import Geometry.Properties;
 
 export namespace ECS::Components::GeometrySources
 {
+    // -----------------------------------------------------------------------
+    // Canonical property-name constants for GeometrySources PropertySets.
+    //
+    // All lifecycle systems and attribute-sync systems must read from these
+    // well-known keys, regardless of the originating geometry type.
+    //
+    // Domain: Vertices (mesh vertex OR point-cloud point)
+    //   "v:position"  – glm::vec3  mandatory canonical position
+    //   "v:normal"    – glm::vec3  optional surface / point-cloud normal
+    //
+    // Domain: Nodes (graph node)
+    //   "v:position"  – glm::vec3  same canonical key as above (node pos)
+    //   "v:normal"    – glm::vec3  optional, defaults to world-up on graphs
+    //
+    // Domain: Edges (mesh or graph)
+    //   "e:v0"        – uint32_t   index of first  endpoint vertex / node
+    //   "e:v1"        – uint32_t   index of second endpoint vertex / node
+    //
+    // Domain: Halfedges (mesh only)
+    //   "h:to_vertex" – uint32_t   index of the halfedge's target vertex
+    //   "h:next"      – uint32_t   index of the next halfedge around its face
+    //   "h:face"      – uint32_t   index of the adjacent face (UINT32_MAX = boundary)
+    //
+    // Domain: Faces (mesh only)
+    //   "f:halfedge"  – uint32_t   index of the face's first halfedge
+    // -----------------------------------------------------------------------
+    namespace PropertyNames
+    {
+        constexpr std::string_view kPosition        = "v:position";
+        constexpr std::string_view kNormal          = "v:normal";
+
+        constexpr std::string_view kEdgeV0          = "e:v0";
+        constexpr std::string_view kEdgeV1          = "e:v1";
+
+        constexpr std::string_view kHalfedgeToVertex = "h:to_vertex";
+        constexpr std::string_view kHalfedgeNext     = "h:next";
+        constexpr std::string_view kHalfedgeFace     = "h:face";
+
+        constexpr std::string_view kFaceHalfedge    = "f:halfedge";
+    }
+
+
     struct Vertices
     {
         Geometry::PropertySet Properties{};

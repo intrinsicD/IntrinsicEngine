@@ -81,7 +81,8 @@ namespace Graphics
 
             GeometryCpuData outData;
             outData.Topology = PrimitiveTopology::Triangles;
-            outData.Positions.reserve(triCount * 3);
+            auto& positions = outData.Positions();
+            positions.reserve(triCount * 3);
             outData.Indices.reserve(triCount * 3);
 
             std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVerts;
@@ -112,11 +113,9 @@ namespace Graphics
 
                     VertexKey key{pos};
                     auto [it, inserted] = uniqueVerts.try_emplace(
-                        key, static_cast<uint32_t>(outData.Positions.size()));
+                        key, static_cast<uint32_t>(positions.size()));
                     if (inserted)
-                    {
-                        outData.Positions.push_back(pos);
-                    }
+                        positions.push_back(pos);
                     outData.Indices.push_back(it->second);
                 }
 
@@ -125,7 +124,8 @@ namespace Graphics
 
             // Normals: if the file provided meaningful face normals, keep them by accumulating
             // them onto the deduplicated vertices. Otherwise recompute from geometry.
-            outData.Normals.resize(outData.Positions.size(), glm::vec3(0, 0, 0));
+            auto& normals = outData.Normals();
+            normals.resize(positions.size(), glm::vec3(0, 0, 0));
 
             if (!allNormalsZero)
             {
@@ -146,16 +146,16 @@ namespace Graphics
 
                     // Add to the three indices corresponding to this triangle.
                     const std::size_t base = static_cast<std::size_t>(t) * 3;
-                    outData.Normals[outData.Indices[base + 0]] += n;
-                    outData.Normals[outData.Indices[base + 1]] += n;
-                    outData.Normals[outData.Indices[base + 2]] += n;
+                    normals[outData.Indices[base + 0]] += n;
+                    normals[outData.Indices[base + 1]] += n;
+                    normals[outData.Indices[base + 2]] += n;
 
                     nPtr += 50;
                 }
 
                 // Normalize; if everything collapsed to zero (degenerate mesh), fall back.
                 bool anyNonZero = false;
-                for (auto& n : outData.Normals)
+                for (auto& n : normals)
                 {
                     const float len2 = glm::length2(n);
                     if (len2 > 1e-12f)
@@ -170,11 +170,11 @@ namespace Graphics
                 }
 
                 if (!anyNonZero)
-                    Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
+                    Geometry::MeshUtils::CalculateNormals(positions, outData.Indices, normals);
             }
             else
             {
-                Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
+                Geometry::MeshUtils::CalculateNormals(positions, outData.Indices, normals);
             }
 
             // Generate UVs via shared post-process path
@@ -199,6 +199,7 @@ namespace Graphics
 
             GeometryCpuData outData;
             outData.Topology = PrimitiveTopology::Triangles;
+            auto& positions = outData.Positions();
 
             std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVerts;
             std::vector<std::string_view> tokens;
@@ -225,16 +226,16 @@ namespace Graphics
                 const glm::vec3 pos(*x, *y, *z);
                 VertexKey key{pos};
                 auto [it, inserted] = uniqueVerts.try_emplace(
-                    key, static_cast<uint32_t>(outData.Positions.size()));
+                    key, static_cast<uint32_t>(positions.size()));
                 if (inserted)
-                    outData.Positions.push_back(pos);
+                    positions.push_back(pos);
                 outData.Indices.push_back(it->second);
             }
 
-            if (outData.Positions.empty())
+            if (positions.empty())
                 return std::unexpected(AssetError::InvalidData);
 
-            outData.Normals.resize(outData.Positions.size(), glm::vec3(0, 0, 0));
+            outData.Normals().resize(positions.size(), glm::vec3(0, 0, 0));
 
             if (!Importers::ApplyGeometryImportPostProcess(
                     outData,

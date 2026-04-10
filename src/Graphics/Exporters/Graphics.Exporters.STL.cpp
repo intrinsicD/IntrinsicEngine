@@ -43,7 +43,8 @@ namespace Graphics
         if (data.Indices.empty() || data.Indices.size() % 3 != 0)
             return std::unexpected(AssetError::InvalidData);
 
-        if (data.Positions.empty())
+        const auto positions = data.Positions();
+        if (positions.empty())
             return std::unexpected(AssetError::InvalidData);
 
         uint32_t triCount = static_cast<uint32_t>(data.Indices.size() / 3);
@@ -66,9 +67,9 @@ namespace Graphics
                 uint32_t i1 = data.Indices[t * 3 + 1];
                 uint32_t i2 = data.Indices[t * 3 + 2];
 
-                glm::vec3 v0 = data.Positions[i0];
-                glm::vec3 v1 = data.Positions[i1];
-                glm::vec3 v2 = data.Positions[i2];
+                glm::vec3 v0 = positions[i0];
+                glm::vec3 v1 = positions[i1];
+                glm::vec3 v2 = positions[i2];
 
                 // Compute face normal
                 glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
@@ -116,9 +117,9 @@ namespace Graphics
                 uint32_t i1 = data.Indices[t * 3 + 1];
                 uint32_t i2 = data.Indices[t * 3 + 2];
 
-                glm::vec3 v0 = data.Positions[i0];
-                glm::vec3 v1 = data.Positions[i1];
-                glm::vec3 v2 = data.Positions[i2];
+                glm::vec3 v0 = positions[i0];
+                glm::vec3 v1 = positions[i1];
+                glm::vec3 v2 = positions[i2];
 
                 glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
                 if (!std::isfinite(normal.x))

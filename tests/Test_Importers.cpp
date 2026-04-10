@@ -73,7 +73,7 @@ TEST(Importer_OBJ, LoadsTriangle)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_GE(meshes[0].Positions.size(), 3u);
+    EXPECT_GE(meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshes[0].Indices.size(), 3u);
 }
 
@@ -109,7 +109,7 @@ TEST(Importer_OBJ, EmptyInputReturnsError)
         const auto& meshes = AsMesh(*result).Meshes;
         // Either no meshes or meshes with no geometry.
         for (const auto& m : meshes)
-            EXPECT_TRUE(m.Positions.empty());
+            EXPECT_TRUE(m.Positions().empty());
     }
 }
 
@@ -141,7 +141,7 @@ TEST(Importer_OBJ, VertexNormals)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_FALSE(meshes[0].Normals.empty());
+    EXPECT_FALSE(meshes[0].Normals().empty());
 }
 
 // =============================================================================
@@ -165,7 +165,7 @@ TEST(Importer_OFF, LoadsTriangle)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshes[0].Indices.size(), 3u);
 }
 
@@ -208,7 +208,7 @@ TEST(Importer_XYZ, LoadsPoints)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshes[0].Positions().size(), 3u);
 }
 
 TEST(Importer_XYZ, EmptyInputProducesNoGeometry)
@@ -221,7 +221,7 @@ TEST(Importer_XYZ, EmptyInputProducesNoGeometry)
     {
         const auto& meshes = AsMesh(*result).Meshes;
         for (const auto& m : meshes)
-            EXPECT_TRUE(m.Positions.empty());
+            EXPECT_TRUE(m.Positions().empty());
     }
 }
 
@@ -293,7 +293,7 @@ TEST(Importer_STL, LoadsASCIITriangle)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_GE(meshes[0].Positions.size(), 3u);
+    EXPECT_GE(meshes[0].Positions().size(), 3u);
 }
 
 TEST(Importer_STL, ExtensionsRegistered)
@@ -336,7 +336,7 @@ TEST(Importer_PLY, LoadsASCIITriangle)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshes[0].Indices.size(), 3u);
     EXPECT_EQ(meshes[0].Topology, PrimitiveTopology::Triangles);
 }
@@ -363,7 +363,7 @@ TEST(Importer_PLY, LoadsASCIIPointCloud)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 4u);
+    EXPECT_EQ(meshes[0].Positions().size(), 4u);
     EXPECT_EQ(meshes[0].Topology, PrimitiveTopology::Points);
     EXPECT_TRUE(meshes[0].Indices.empty());
 }
@@ -395,9 +395,9 @@ TEST(Importer_PLY, LoadsASCIIWithNormalsAndColors)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 3u);
-    EXPECT_FALSE(meshes[0].Normals.empty());
-    EXPECT_FALSE(meshes[0].Aux.empty());
+    EXPECT_EQ(meshes[0].Positions().size(), 3u);
+    EXPECT_FALSE(meshes[0].Normals().empty());
+    EXPECT_FALSE(meshes[0].Attrs().empty());
 }
 
 TEST(Importer_PLY, LoadsASCIIQuadTriangulated)
@@ -472,7 +472,7 @@ TEST(Importer_PLY, LoadsBinaryLittleEndianTriangle)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshes[0].Indices.size(), 3u);
     EXPECT_EQ(meshes[0].Topology, PrimitiveTopology::Triangles);
 }
@@ -547,7 +547,7 @@ TEST(Importer_PCD, LoadsASCIIPoints)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshes[0].Topology, PrimitiveTopology::Points);
 }
 
@@ -572,8 +572,8 @@ TEST(Importer_PCD, LoadsASCIIWithSeparateRGBChannels)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 2u);
-    EXPECT_FALSE(meshes[0].Aux.empty());
+    EXPECT_EQ(meshes[0].Positions().size(), 2u);
+    EXPECT_FALSE(meshes[0].Attrs().empty());
 }
 
 TEST(Importer_PCD, LoadsBinaryPoints)
@@ -604,7 +604,7 @@ TEST(Importer_PCD, LoadsBinaryPoints)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 2u);
+    EXPECT_EQ(meshes[0].Positions().size(), 2u);
 }
 
 TEST(Importer_PCD, MissingFieldsReturnsError)
@@ -755,7 +755,7 @@ TEST(Importer_GLTF, LoadsGLBTriangle)
 
     const auto& meshes = AsMesh(*result).Meshes;
     ASSERT_EQ(meshes.size(), 1u);
-    EXPECT_EQ(meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshes[0].Indices.size(), 3u);
     EXPECT_EQ(meshes[0].Topology, PrimitiveTopology::Triangles);
 }

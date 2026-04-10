@@ -19,17 +19,21 @@ namespace Graphics::Importers
         GenerateUVsFn&& generateUVs,
         const GeometryImportPostProcessPolicy& policy = {})
     {
-        if (policy.RequirePositions && mesh.Positions.empty())
+        if (policy.RequirePositions && mesh.Positions().empty())
             return false;
 
         if (policy.RequireIndicesForTriangles && mesh.Topology == PrimitiveTopology::Triangles && mesh.Indices.empty())
             return false;
 
         if (policy.GenerateNormalsForTrianglesIfMissing && !hasNormals && mesh.Topology == PrimitiveTopology::Triangles)
-            computeNormals(mesh.Positions, mesh.Indices, mesh.Normals);
+            computeNormals(mesh.Positions(), mesh.Indices, mesh.Normals());
 
         if (policy.GenerateUVsIfMissing && !hasUVs)
-            generateUVs(mesh.Positions, mesh.Aux);
+        {
+            auto& attrs = mesh.Attrs();
+            attrs.resize(mesh.Positions().size(), glm::vec4(0.0f));
+            generateUVs(mesh.Positions(), attrs);
+        }
 
         return true;
     }

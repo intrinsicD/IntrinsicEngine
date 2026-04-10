@@ -2,16 +2,24 @@
 // Mesh::Data — ECS component for PropertySet-backed mesh visualization.
 // -------------------------------------------------------------------------
 //
-// Holds a shared_ptr to an authoritative Geometry::Halfedge::Mesh instance.
-// Retaining the mesh on the entity enables:
-//   - Enumeration of vertex/edge/face PropertySet properties for the UI.
-//   - Mapping arbitrary properties to per-element colors via ColorMapper.
-//   - Isoline extraction from vertex-domain scalar fields.
-//   - Vector field visualization from vertex-domain vec3 properties.
+// The authoritative CPU geometry data for a mesh entity lives in the
+// ECS::Components::GeometrySources::Vertices / Edges / Halfedges / Faces
+// components.  Loaders and algorithms write data there first, and all
+// lifecycle / attribute-sync systems read from those components.
 //
-// Created by importers (or geometry operators) when PropertySet data is
-// available. Entities without Mesh::Data fall back to programmatic color
-// setting on Surface::Component::CachedFaceColors.
+// MeshRef is an *optional computation tool* — kept for algorithms that
+// need direct access to the halfedge structure (raycasting, geometry
+// operators, topology editing).  It is NOT the data authority and must
+// never be used as the primary data source in rendering systems.
+//
+// Entities without MeshRef still render correctly; they simply cannot
+// participate in halfedge-topology-dependent operations until MeshRef
+// is constructed (e.g. from GeometrySources topology properties).
+//
+// Visualization pipeline:
+//   GeometrySources::Vertices::Properties["v:color"] → ColorMapper
+//     → Surface::Component::CachedVertexColors → SurfacePass shader.
+// -------------------------------------------------------------------------
 
 module;
 #include <cstdint>

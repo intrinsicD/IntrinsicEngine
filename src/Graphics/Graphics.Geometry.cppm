@@ -18,6 +18,7 @@ import Geometry.Handle;
 import Geometry.HalfedgeMesh;
 import Geometry.KDTree;
 import Geometry.Octree;
+import Geometry.Properties;
 import Core.ResourcePool;
 
 export namespace Graphics
@@ -52,17 +53,74 @@ export namespace Graphics
         Geometry::GeometryHandle ReuseVertexBuffersFrom{};
     };
 
+    // -------------------------------------------------------------------------
+    // GeometryCpuData — I/O boundary type (loader output / exporter input).
+    //
+    // PropertySet-backed per-vertex data.  All per-vertex attributes live in
+    // VertexProperties under canonical keys:
+    //
+    //   "v:position"  (glm::vec3) — mandatory vertex positions
+    //   "v:normal"    (glm::vec3) — surface / point normals
+    //   "v:attr"      (glm::vec4) — opaque attribute slot:
+    //                               mesh importers store UV in .xy
+    //                               point-cloud importers store RGBA color
+    //
+    // Loaders write to Positions()/Normals()/Attrs() mutable accessors.
+    // Exporters and upload code read from the const span accessors.
+    // Arbitrary additional per-vertex data can be stored in VertexProperties
+    // directly under user-defined keys.
+    //
+    //   Import:  bytes → GeometryCpuData → Halfedge::Mesh → PopulateFromMesh
+    //               → ECS::Components::GeometrySources   ← runtime authority
+    //   Export:  GeometrySources → GeometryCpuData → IAssetExporter → bytes
+    //
+    // DO NOT use this struct as a runtime data store.
+    // -------------------------------------------------------------------------
     struct GeometryCpuData
     {
-        std::vector<glm::vec3> Positions{};
-        std::vector<glm::vec3> Normals{};
-        std::vector<glm::vec4> Aux{};
+        // All per-vertex attributes — use the accessors below for common slots.
+        Geometry::PropertySet VertexProperties{};
+
+        // Index buffer and primitive type (no PropertySet concept for these).
         std::vector<uint32_t> Indices{};
         PrimitiveTopology Topology = PrimitiveTopology::Triangles;
 
+        // ---- Mutable accessors (for importers / generators) -----------------
+        // Returns a reference to the internal vector, creating the property on
+        // first access.  Use these when building data during import.
+
+        [[nodiscard]] std::vector<glm::vec3>& Positions()
+        { return VertexProperties.GetOrAdd<glm::vec3>("v:position", {}).Vector(); }
+
+        [[nodiscard]] std::vector<glm::vec3>& Normals()
+        { return VertexProperties.GetOrAdd<glm::vec3>("v:normal", {}).Vector(); }
+
+        [[nodiscard]] std::vector<glm::vec4>& Attrs()
+        { return VertexProperties.GetOrAdd<glm::vec4>("v:attr", {}).Vector(); }
+
+        // ---- Const span accessors (for exporters / GPU upload) --------------
+        // Returns an empty span when the property is absent.
+
+        [[nodiscard]] std::span<const glm::vec3> Positions() const noexcept
+        {
+            auto p = VertexProperties.Get<glm::vec3>("v:position");
+            return p ? p.Span() : std::span<const glm::vec3>{};
+        }
+        [[nodiscard]] std::span<const glm::vec3> Normals() const noexcept
+        {
+            auto p = VertexProperties.Get<glm::vec3>("v:normal");
+            return p ? p.Span() : std::span<const glm::vec3>{};
+        }
+        [[nodiscard]] std::span<const glm::vec4> Attrs() const noexcept
+        {
+            auto p = VertexProperties.Get<glm::vec4>("v:attr");
+            return p ? p.Span() : std::span<const glm::vec4>{};
+        }
+
+        // ---- GPU upload helper ----------------------------------------------
         [[nodiscard]] GeometryUploadRequest ToUploadRequest(GeometryUploadMode mode = GeometryUploadMode::Staged) const
         {
-            return {Positions, Normals, Aux, Indices, Topology, mode, {}};
+            return {Positions(), Normals(), Attrs(), Indices, Topology, mode, {}};
         }
     };
 

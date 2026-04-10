@@ -82,196 +82,174 @@ namespace Graphics::Systems::GraphLifecycle
             // -----------------------------------------------------------------
             if (graphData.GpuDirty)
             {
-                if (!graphData.GraphRef || graphData.GraphRef->VertexCount() == 0)
+                // Sync GeometrySources from GraphRef when it is available.
+                // GraphRef is an optional computation tool — after this call,
+                // GeometrySources::Nodes / Edges are the authoritative CPU data.
+                if (graphData.GraphRef && graphData.GraphRef->EdgeCount() > 0)
                 {
-                    // Graph is empty or null — release any existing GPU geometry.
+                    ECS::Components::GeometrySources::PopulateFromGraph(
+                        registry, entity, *graphData.GraphRef);
+                }
+
+                // Read from authoritative GeometrySources.
+                auto* geoNodes = registry.try_get<ECS::Components::GeometrySources::Nodes>(entity);
+                auto* geoEdges = registry.try_get<ECS::Components::GeometrySources::Edges>(entity);
+
+                if (!geoNodes)
+                {
+                    // No data source — release any existing GPU geometry.
                     releaseGraphGpu(graphData);
                     // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
                 else
                 {
+                    auto posProp = geoNodes->Properties.Get<glm::vec3>("v:position");
 
-                auto& graph = *graphData.GraphRef;
-                const bool vectorFieldMode = graphData.VectorFieldMode;
-
-                // Run garbage collection if the graph has deleted elements to ensure
-                // contiguous storage. This simplifies the compaction step.
-                if (graph.HasGarbage())
-                    graph.GarbageCollection();
-
-                // --- Extract compacted positions and normals ---
-                // After GC, there are no deleted vertices — direct iteration is safe.
-                const std::size_t vSize = graph.VerticesSize();
-                std::vector<glm::vec3> positions;
-                std::vector<glm::vec3> normals;
-                positions.reserve(vSize);
-                normals.reserve(vSize);
-
-                // Build remap table: original vertex index → compacted index.
-                // After GC, this is typically identity, but we handle the general case.
-                std::vector<uint32_t> remap(vSize, UINT32_MAX);
-                uint32_t compactIdx = 0;
-
-                for (std::size_t i = 0; i < vSize; ++i)
-                {
-                    const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-                    if (graph.IsDeleted(v))
-                        continue;
-
-                    positions.push_back(graph.VertexPosition(v));
-                    // Graph nodes have no meaningful surface normal — use world-up default.
-                    normals.emplace_back(0.0f, 1.0f, 0.0f);
-                    remap[i] = compactIdx++;
-                }
-
-                // --- Extract per-node colors and radii via shared helpers ---
-                std::vector<uint32_t> nodeColors = GraphPropertyHelpers::ExtractNodeColors(
-                    graph, graphData.Visualization.VertexColors);
-                std::vector<float> nodeRadii = GraphPropertyHelpers::ExtractNodeRadii(graph);
-
-                if (positions.empty())
-                {
-                    releaseGraphGpu(graphData);
-                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
-                }
-                else
-                {
-
-                // --- Extract edge pairs (remapped to compacted indices) ---
-                const std::size_t eSize = graph.EdgesSize();
-                std::vector<ECS::EdgePair> edgePairs;
-                edgePairs.reserve(eSize);
-
-                for (std::size_t i = 0; i < eSize; ++i)
-                {
-                    const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
-                    if (graph.IsDeleted(e))
-                        continue;
-
-                    const auto [v0, v1] = graph.EdgeVertices(e);
-                    const uint32_t ci0 = remap[v0.Index];
-                    const uint32_t ci1 = remap[v1.Index];
-
-                    if (ci0 == UINT32_MAX || ci1 == UINT32_MAX)
-                        continue; // Edge references a deleted vertex — skip.
-
-                    // Skip zero-length edges (coincident endpoints) — these would
-                    // produce degenerate line quads. Nodes are still rendered as
-                    // points via Point::Component.
-                    if (!vectorFieldMode)
+                    if (!posProp || posProp.Vector().empty())
                     {
-                        if (ci0 == ci1)
-                            continue;
-                        {
-                            const glm::vec3& p0 = positions[ci0];
-                            const glm::vec3& p1 = positions[ci1];
-                            const glm::vec3 d = p1 - p0;
-                            if (glm::dot(d, d) < 1e-12f)
-                                continue;
-                        }
-                    }
-
-                    edgePairs.push_back({ci0, ci1});
-                }
-
-                // --- Extract per-edge colors via shared helper ---
-                std::vector<uint32_t> edgeColors = GraphPropertyHelpers::ExtractEdgeColors(
-                    graph, graphData.Visualization.EdgeColors);
-
-                // Release previous geometry before allocating new.
-                if (graphData.GpuGeometry.IsValid())
-                {
-                    geometryStorage.Remove(graphData.GpuGeometry, device->GetGlobalFrameNumber());
-                    graphData.GpuGeometry = {};
-                }
-
-                // --- Upload to GPU ---
-                // Upload mode is selected by the StaticGeometry flag on the component:
-                //   StaticGeometry = true  → Staged (device-local, GPU_ONLY) — optimal
-                //     for graphs that don't change every frame (file-loaded, computed once).
-                //   StaticGeometry = false → Direct (host-visible, CPU_TO_GPU) — suitable
-                //     for dynamic graphs undergoing frequent re-layout.
-                const auto uploadMode = graphData.StaticGeometry
-                    ? GeometryUploadMode::Staged
-                    : GeometryUploadMode::Direct;
-
-                GeometryUploadRequest vertexUpload{};
-                vertexUpload.Positions = positions;
-                vertexUpload.Normals = normals;
-                vertexUpload.Topology = PrimitiveTopology::Points;
-                vertexUpload.UploadMode = uploadMode;
-
-                auto [newGpuData, token] = GeometryGpuData::CreateAsync(
-                    device, transferManager, bufferManager, vertexUpload, &geometryStorage);
-
-                if (!newGpuData || !newGpuData->GetVertexBuffer())
-                {
-                    HandleUploadFailure(dispatcher, entity, "GraphLifecycle");
-                    graphData.CachedEdgePairs.clear();
-                    graphData.CachedEdgeColors.clear();
-                    graphData.CachedNodeColors.clear();
-                    graphData.CachedNodeRadii.clear();
-                    graphData.GpuVertexCount = 0;
-                    graphData.GpuDirty = false;
-                }
-                else
-                {
-
-                graphData.GpuGeometry = geometryStorage.Add(std::move(*newGpuData));
-
-                // --- Create edge index buffer via ReuseVertexBuffersFrom ---
-                // Shares the vertex buffer (positions) with the node geometry.
-                // LinePass reads edge pairs from this geometry's index buffer
-                // via BDA — no LinePass-internal edge buffer management needed.
-                if (graphData.GpuEdgeGeometry.IsValid())
-                {
-                    geometryStorage.Remove(graphData.GpuEdgeGeometry, device->GetGlobalFrameNumber());
-                    graphData.GpuEdgeGeometry = {};
-                    graphData.GpuEdgeCount = 0;
-                }
-
-                if (!edgePairs.empty())
-                {
-                    // Flatten EdgePair array to contiguous uint32_t indices.
-                    std::vector<uint32_t> edgeIndices;
-                    edgeIndices.reserve(edgePairs.size() * 2);
-                    for (const auto& [i0, i1] : edgePairs)
-                    {
-                        edgeIndices.push_back(i0);
-                        edgeIndices.push_back(i1);
-                    }
-
-                    GeometryUploadRequest edgeReq{};
-                    edgeReq.ReuseVertexBuffersFrom = graphData.GpuGeometry;
-                    edgeReq.Indices = edgeIndices;
-                    edgeReq.Topology = PrimitiveTopology::Lines;
-                    edgeReq.UploadMode = uploadMode;
-
-                    auto [edgeGpuData, edgeToken] = GeometryGpuData::CreateAsync(
-                        device, transferManager, bufferManager, edgeReq, &geometryStorage);
-
-                    if (edgeGpuData && edgeGpuData->GetIndexBuffer())
-                    {
-                        graphData.GpuEdgeGeometry = geometryStorage.Add(std::move(*edgeGpuData));
-                        graphData.GpuEdgeCount = static_cast<uint32_t>(edgePairs.size());
+                        releaseGraphGpu(graphData);
                     }
                     else
                     {
-                        Core::Log::Warn("GraphLifecycle: Failed to create edge index buffer for entity {}",
-                                        static_cast<uint32_t>(entity));
-                    }
-                }
+                        const auto& posVec = posProp.Vector();
+                        const std::size_t vSize = posVec.size();
+                        const bool vectorFieldMode = graphData.VectorFieldMode;
 
-                graphData.CachedEdgePairs = std::move(edgePairs);
-                graphData.CachedEdgeColors = std::move(edgeColors);
-                graphData.CachedNodeColors = std::move(nodeColors);
-                graphData.CachedNodeRadii = std::move(nodeRadii);
-                graphData.GpuVertexCount = compactIdx;
-                graphData.GpuDirty = false;
+                        std::vector<glm::vec3> positions(posVec.begin(), posVec.end());
+                        std::vector<glm::vec3> normals(vSize, glm::vec3(0.0f, 1.0f, 0.0f));
 
-                } // else (upload succeeded)
-                } // else (positions not empty)
-                } // else (graph not empty)
+                        // --- Extract per-node colors and radii from GeometrySources ---
+                        std::vector<uint32_t> nodeColors =
+                            GraphPropertyHelpers::ExtractNodeColorsFromPropertySet(
+                                geoNodes->Properties, graphData.Visualization.VertexColors);
+                        std::vector<float> nodeRadii =
+                            GraphPropertyHelpers::ExtractNodeRadiiFromPropertySet(
+                                geoNodes->Properties);
+
+                        // --- Extract edge pairs from GeometrySources::Edges ---
+                        std::vector<ECS::EdgePair> edgePairs;
+                        std::vector<uint32_t> edgeColors;
+
+                        if (geoEdges)
+                        {
+                            auto v0Prop = geoEdges->Properties.Get<uint32_t>("e:v0");
+                            auto v1Prop = geoEdges->Properties.Get<uint32_t>("e:v1");
+
+                            if (v0Prop && v1Prop)
+                            {
+                                const auto& v0Vec = v0Prop.Vector();
+                                const auto& v1Vec = v1Prop.Vector();
+                                const std::size_t eCount = std::min(v0Vec.size(), v1Vec.size());
+                                edgePairs.reserve(eCount);
+
+                                for (std::size_t i = 0; i < eCount; ++i)
+                                {
+                                    const uint32_t ci0 = v0Vec[i];
+                                    const uint32_t ci1 = v1Vec[i];
+
+                                    if (!vectorFieldMode)
+                                    {
+                                        if (ci0 == ci1)
+                                            continue;
+                                        if (ci0 >= vSize || ci1 >= vSize)
+                                            continue;
+                                        const glm::vec3 d = positions[ci1] - positions[ci0];
+                                        if (glm::dot(d, d) < 1e-12f)
+                                            continue;
+                                    }
+                                    edgePairs.push_back({ci0, ci1});
+                                }
+                            }
+
+                            edgeColors = GraphPropertyHelpers::ExtractEdgeColorsFromPropertySet(
+                                geoEdges->Properties, graphData.Visualization.EdgeColors);
+                        }
+
+                        // Release previous geometry before allocating new.
+                        if (graphData.GpuGeometry.IsValid())
+                        {
+                            geometryStorage.Remove(graphData.GpuGeometry, device->GetGlobalFrameNumber());
+                            graphData.GpuGeometry = {};
+                        }
+
+                        // --- Upload to GPU ---
+                        const auto uploadMode = graphData.StaticGeometry
+                            ? GeometryUploadMode::Staged
+                            : GeometryUploadMode::Direct;
+
+                        GeometryUploadRequest vertexUpload{};
+                        vertexUpload.Positions = positions;
+                        vertexUpload.Normals = normals;
+                        vertexUpload.Topology = PrimitiveTopology::Points;
+                        vertexUpload.UploadMode = uploadMode;
+
+                        auto [newGpuData, token] = GeometryGpuData::CreateAsync(
+                            device, transferManager, bufferManager, vertexUpload, &geometryStorage);
+
+                        if (!newGpuData || !newGpuData->GetVertexBuffer())
+                        {
+                            HandleUploadFailure(dispatcher, entity, "GraphLifecycle");
+                            graphData.CachedEdgePairs.clear();
+                            graphData.CachedEdgeColors.clear();
+                            graphData.CachedNodeColors.clear();
+                            graphData.CachedNodeRadii.clear();
+                            graphData.GpuVertexCount = 0;
+                            graphData.GpuDirty = false;
+                        }
+                        else
+                        {
+
+                        graphData.GpuGeometry = geometryStorage.Add(std::move(*newGpuData));
+
+                        // --- Create edge index buffer via ReuseVertexBuffersFrom ---
+                        if (graphData.GpuEdgeGeometry.IsValid())
+                        {
+                            geometryStorage.Remove(graphData.GpuEdgeGeometry, device->GetGlobalFrameNumber());
+                            graphData.GpuEdgeGeometry = {};
+                            graphData.GpuEdgeCount = 0;
+                        }
+
+                        if (!edgePairs.empty())
+                        {
+                            std::vector<uint32_t> edgeIndices;
+                            edgeIndices.reserve(edgePairs.size() * 2);
+                            for (const auto& [i0, i1] : edgePairs)
+                            {
+                                edgeIndices.push_back(i0);
+                                edgeIndices.push_back(i1);
+                            }
+
+                            GeometryUploadRequest edgeReq{};
+                            edgeReq.ReuseVertexBuffersFrom = graphData.GpuGeometry;
+                            edgeReq.Indices = edgeIndices;
+                            edgeReq.Topology = PrimitiveTopology::Lines;
+                            edgeReq.UploadMode = uploadMode;
+
+                            auto [edgeGpuData, edgeToken] = GeometryGpuData::CreateAsync(
+                                device, transferManager, bufferManager, edgeReq, &geometryStorage);
+
+                            if (edgeGpuData && edgeGpuData->GetIndexBuffer())
+                            {
+                                graphData.GpuEdgeGeometry = geometryStorage.Add(std::move(*edgeGpuData));
+                                graphData.GpuEdgeCount = static_cast<uint32_t>(edgePairs.size());
+                            }
+                            else
+                            {
+                                Core::Log::Warn("GraphLifecycle: Failed to create edge index buffer for entity {}",
+                                                static_cast<uint32_t>(entity));
+                            }
+                        }
+
+                        graphData.CachedEdgePairs = std::move(edgePairs);
+                        graphData.CachedEdgeColors = std::move(edgeColors);
+                        graphData.CachedNodeColors = std::move(nodeColors);
+                        graphData.CachedNodeRadii = std::move(nodeRadii);
+                        graphData.GpuVertexCount = static_cast<uint32_t>(vSize);
+                        graphData.GpuDirty = false;
+
+                        } // else (upload succeeded)
+                    } // else (positions not empty)
+                } // else (geoNodes present)
             } // if (GpuDirty)
 
             // -----------------------------------------------------------------

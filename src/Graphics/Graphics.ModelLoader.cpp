@@ -92,7 +92,7 @@ namespace Graphics
     {
         if (mesh.Topology != PrimitiveTopology::Triangles) return;
 
-        Geometry::MeshUtils::CalculateNormals(mesh.Positions, mesh.Indices, mesh.Normals);
+        Geometry::MeshUtils::CalculateNormals(mesh.Positions(), mesh.Indices, mesh.Normals());
 #if defined(INTRINSIC_MODELLOADER_VERBOSE)
         Core::Log::Info("Recalculated normals for vertices.");
 #endif
@@ -101,7 +101,9 @@ namespace Graphics
 
     inline void GenerateUVs(GeometryCpuData& mesh)
     {
-        auto flatAxis = Geometry::MeshUtils::GenerateUVs(mesh.Positions, mesh.Aux);
+        auto& attrs = mesh.Attrs();
+        attrs.resize(mesh.Positions().size(), glm::vec4(0.0f));
+        auto flatAxis = Geometry::MeshUtils::GenerateUVs(mesh.Positions(), attrs);
 
         if (flatAxis < 0)
         {
@@ -110,7 +112,7 @@ namespace Graphics
 #if defined(INTRINSIC_MODELLOADER_VERBOSE)
         else
         {
-            Core::Log::Info("Generated Planar UVs for {} vertices (Axis: {})", mesh.Positions.size(), flatAxis);
+            Core::Log::Info("Generated Planar UVs for {} vertices (Axis: {})", mesh.Positions().size(), flatAxis);
         }
 #endif
     }
@@ -197,18 +199,12 @@ namespace Graphics
         for (auto cpu : meshImport->Meshes)
         {
             // Hygiene: if the asset has no normals/uvs, generate deterministic defaults.
-            if (cpu.Normals.empty())
+            if (cpu.Normals().empty())
                 RecalculateNormals(cpu);
-            if (cpu.Aux.empty())
+            if (cpu.Attrs().empty())
                 GenerateUVs(cpu);
 
-            GeometryUploadRequest upload{};
-            upload.Positions = cpu.Positions;
-            upload.Indices = cpu.Indices;
-            upload.Normals = cpu.Normals;
-            upload.Aux = cpu.Aux;
-            upload.Topology = cpu.Topology;
-            upload.UploadMode = GeometryUploadMode::Staged;
+            auto upload = cpu.ToUploadRequest(GeometryUploadMode::Staged);
 
             auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, bufferManager, upload, &geometryStorage);
             lastToken = token;
@@ -234,24 +230,29 @@ namespace Graphics
     [[nodiscard]] std::shared_ptr<GeometryCollisionData> BuildCollisionData(const GeometryCpuData& cpu)
     {
         auto collision = std::make_shared<GeometryCollisionData>();
-        collision->Positions = cpu.Positions;
-        collision->Aux = cpu.Aux;
+        {
+            auto pos = cpu.Positions();
+            collision->Positions.assign(pos.begin(), pos.end());
+        }
+        {
+            auto attr = cpu.Attrs();
+            collision->Aux.assign(attr.begin(), attr.end());
+        }
         collision->Indices = cpu.Indices;
 
-        if (cpu.Topology == PrimitiveTopology::Triangles && !cpu.Positions.empty() && !cpu.Indices.empty())
+        if (cpu.Topology == PrimitiveTopology::Triangles && !cpu.Positions().empty() && !cpu.Indices.empty())
         {
             Geometry::MeshUtils::TriangleSoupBuildParams buildParams;
             buildParams.WeldVertices = true;
             buildParams.WeldEpsilon = 1e-6f;
 
-            if (auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions, cpu.Indices, cpu.Aux, buildParams))
+            if (auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions(), cpu.Indices, cpu.Attrs(), buildParams))
             {
                 collision->SourceMesh = std::make_shared<Geometry::Halfedge::Mesh>(std::move(*mesh));
             }
         }
 
-        if (!collision->Positions.empty())
-        {
+        if (!collision->Positions.empty())        {
             collision->LocalAABB = Geometry::Union(Geometry::ToAABB(collision->Positions));
         }
 

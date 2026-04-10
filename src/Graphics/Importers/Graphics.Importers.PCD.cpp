@@ -384,7 +384,7 @@ namespace Graphics
 
         [[nodiscard]] bool FinalizePointCloud(GeometryCpuData& outData)
         {
-            if (outData.Positions.empty())
+            if (outData.Positions().empty())
                 return false;
 
             Importers::GeometryImportPostProcessPolicy policy;
@@ -424,11 +424,14 @@ namespace Graphics
 
         GeometryCpuData outData;
         outData.Topology = PrimitiveTopology::Points;
+        auto& positions = outData.Positions();
+        auto& normals   = outData.Normals();
+        auto& attrs     = outData.Attrs();
         if (header->Points > 0)
         {
-            outData.Positions.reserve(header->Points);
-            outData.Normals.reserve(header->Points);
-            outData.Aux.reserve(header->Points);
+            positions.reserve(header->Points);
+            normals.reserve(header->Points);
+            attrs.reserve(header->Points);
         }
 
         if (header->DataEncoding == "ascii")
@@ -453,11 +456,11 @@ namespace Graphics
                 if (!x || !y || !z)
                     continue;
 
-                outData.Positions.emplace_back(*x, *y, *z);
-                outData.Normals.emplace_back(0.0f, 1.0f, 0.0f);
-                outData.Aux.emplace_back(ParseAsciiColor(tokens, header->Fields).value_or(glm::vec4(1.0f)));
+                positions.emplace_back(*x, *y, *z);
+                normals.emplace_back(0.0f, 1.0f, 0.0f);
+                attrs.emplace_back(ParseAsciiColor(tokens, header->Fields).value_or(glm::vec4(1.0f)));
 
-                if (header->Points > 0 && outData.Positions.size() >= header->Points)
+                if (header->Points > 0 && positions.size() >= header->Points)
                     break;
             }
         }
@@ -488,9 +491,9 @@ namespace Graphics
                 if (!x || !y || !z)
                     continue;
 
-                outData.Positions.emplace_back(*x, *y, *z);
-                outData.Normals.emplace_back(0.0f, 1.0f, 0.0f);
-                outData.Aux.emplace_back(ParseBinaryColor(pointBytes, header->Fields).value_or(glm::vec4(1.0f)));
+                positions.emplace_back(*x, *y, *z);
+                normals.emplace_back(0.0f, 1.0f, 0.0f);
+                attrs.emplace_back(ParseBinaryColor(pointBytes, header->Fields).value_or(glm::vec4(1.0f)));
             }
         }
         else

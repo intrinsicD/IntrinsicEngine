@@ -130,8 +130,8 @@ TEST(BDA_BufferLayout, DefaultValues)
 TEST(BDA_CpuData, ToUploadRequestConverts)
 {
     Graphics::GeometryCpuData cpu;
-    cpu.Positions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
-    cpu.Normals = {{0, 0, 1}, {0, 0, 1}, {0, 0, 1}};
+    cpu.Positions() = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+    cpu.Normals() = {{0, 0, 1}, {0, 0, 1}, {0, 0, 1}};
     cpu.Indices = {0, 1, 2};
     cpu.Topology = Graphics::PrimitiveTopology::Lines;
 

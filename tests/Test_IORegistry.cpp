@@ -169,9 +169,9 @@ public:
         // Return a mesh with a single vertex for each byte in the input
         GeometryCpuData mesh;
         mesh.Topology = PrimitiveTopology::Points;
-        mesh.Positions.resize(data.size());
-        mesh.Normals.resize(data.size());
-        mesh.Aux.resize(data.size());
+        mesh.Positions().resize(data.size());
+        mesh.Normals().resize(data.size());
+        mesh.Attrs().resize(data.size());
 
         MeshImportData result;
         result.Meshes.push_back(std::move(mesh));
@@ -347,7 +347,7 @@ TEST(OBJLoader, ParseCubeFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Triangles);
 }
@@ -384,7 +384,7 @@ TEST(PLYLoader, ParseAsciiFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Triangles);
 }
@@ -419,7 +419,7 @@ TEST(PLYLoader, ParsePointCloudFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 4u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 4u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
 }
 
@@ -445,7 +445,7 @@ TEST(XYZLoader, ParseFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
 }
 
@@ -474,14 +474,14 @@ TEST(XYZLoader, SupportsPointCloudAliasesAndPTSLayout)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    ASSERT_EQ(meshImport->Meshes[0].Positions.size(), 2u);
+    ASSERT_EQ(meshImport->Meshes[0].Positions().size(), 2u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].x, 1.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].y, 1.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].z, 1.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].x, 64.0f / 255.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].y, 128.0f / 255.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].z, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[0].x, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[0].y, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[0].z, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[1].x, 64.0f / 255.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[1].y, 128.0f / 255.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[1].z, 1.0f, 1e-6f);
 }
 
 TEST(XYZLoader, SkipsLHScanLineMarkers)
@@ -510,11 +510,11 @@ TEST(XYZLoader, SkipsLHScanLineMarkers)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    ASSERT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    ASSERT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
-    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions[0].x, 1.0f);
-    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions[1].y, 5.0f);
-    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions[2].z, 9.0f);
+    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions()[0].x, 1.0f);
+    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions()[1].y, 5.0f);
+    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions()[2].z, 9.0f);
 }
 
 TEST(XYZLoader, ParsesSemicolonDelimitedRows)
@@ -540,7 +540,7 @@ TEST(XYZLoader, ParsesSemicolonDelimitedRows)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    ASSERT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    ASSERT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
 }
 
@@ -575,11 +575,11 @@ TEST(PCDLoader, ParseAsciiFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 2u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 2u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].x, 1.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].y, 0.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].y, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[0].x, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[0].y, 0.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[1].y, 1.0f, 1e-6f);
 }
 
 TEST(PCDLoader, ParseBinaryFromBytes)
@@ -634,12 +634,12 @@ TEST(PCDLoader, ParseBinaryFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 2u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 2u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].x, 1.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].y, 0.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].y, 1.0f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].z, 128.0f / 255.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[0].x, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[0].y, 0.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[1].y, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Attrs()[1].z, 128.0f / 255.0f, 1e-6f);
 }
 
 // =============================================================================
@@ -693,7 +693,7 @@ TEST(STLLoader, ParseBinaryFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Triangles);
 }
@@ -726,7 +726,7 @@ TEST(STLLoader, ParseAsciiFromBytes)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
 }
 
@@ -775,7 +775,7 @@ TEST(STLLoader, VertexDeduplication)
 
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 4u); // 4 unique, not 6
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 4u); // 4 unique, not 6
     EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 6u);   // 2 triangles * 3
 }
 
@@ -830,7 +830,7 @@ TEST(STLLoader, AutoDetectsBinaryWithSolidHeader)
 
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
 }
 
 // =============================================================================
@@ -862,7 +862,7 @@ TEST(OFFLoader, ParseBasicTriangle)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Triangles);
 }
@@ -920,7 +920,7 @@ TEST(OFFLoader, ParseCOFF)
 
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions().size(), 3u);
 }
 
 TEST(OFFLoader, EmptyReturnsInvalidData)
@@ -1001,7 +1001,7 @@ namespace
     {
         Geometry::MeshUtils::TriangleSoupBuildParams params;
         params.WeldVertices = false;
-        auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions, cpu.Indices, params);
+        auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions(), cpu.Indices, params);
         EXPECT_TRUE(mesh.has_value());
         return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
     }
@@ -1011,7 +1011,7 @@ namespace
         Geometry::MeshUtils::TriangleSoupBuildParams params;
         params.WeldVertices = true;
         params.WeldEpsilon = 1e-6f;
-        auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions, cpu.Indices, params);
+        auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions(), cpu.Indices, params);
         EXPECT_TRUE(mesh.has_value());
         return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
     }
@@ -1209,7 +1209,7 @@ TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
     ExtractTriangleSoup(mesh, positions, indices);
 
     Graphics::GeometryCpuData rebuiltCpu;
-    rebuiltCpu.Positions = positions;
+    rebuiltCpu.Positions() = positions;
     rebuiltCpu.Indices = indices;
     auto rebuilt = BuildWorkflowHalfedgeMesh(rebuiltCpu);
 
@@ -1335,7 +1335,7 @@ TEST(IORegistryImport, DuckAggressiveSimplificationSurvivesWorkflowExtraction)
         << "Workflow extraction dropped faces after aggressive duck simplification";
 
     Graphics::GeometryCpuData rebuiltCpu;
-    rebuiltCpu.Positions = positions;
+    rebuiltCpu.Positions() = positions;
     rebuiltCpu.Indices = indices;
     auto rebuilt = BuildWorkflowHalfedgeMesh(rebuiltCpu);
 

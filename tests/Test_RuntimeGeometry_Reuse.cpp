@@ -29,6 +29,7 @@ namespace
             m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
             m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
             m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
+            m_BufferManager = std::make_unique<RHI::BufferManager>(*m_Device);
 
             // GeometryPool is a Core::ResourcePool; it doesn't require explicit initialization.
         }
@@ -41,6 +42,7 @@ namespace
             if (m_TransferManager)
                 m_TransferManager->GarbageCollect();
             m_TransferManager.reset();
+            m_BufferManager.reset();
 
             // Ensure GeometryGpuData instances are destroyed before VulkanDevice teardown.
             m_Pool.Clear();
@@ -59,6 +61,7 @@ namespace
         std::unique_ptr<RHI::VulkanContext> m_Context;
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         std::unique_ptr<RHI::TransferManager> m_TransferManager;
+        std::unique_ptr<RHI::BufferManager> m_BufferManager;
     };
 }
 
@@ -78,8 +81,8 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     req1.Topology = Graphics::PrimitiveTopology::Triangles;
     req1.UploadMode = Graphics::GeometryUploadMode::Staged;
 
-    auto [gpu1, t1] = Graphics::GeometryGpuData::CreateAsync(m_Device, *m_TransferManager, req1, &m_Pool);
-    ASSERT_NE(gpu1, nullptr);
+    auto [gpu1, t1] = Graphics::GeometryGpuData::CreateAsync(m_Device, *m_TransferManager, *m_BufferManager, req1, &m_Pool);
+    ASSERT_TRUE(gpu1.has_value());
     ASSERT_NE(gpu1->GetVertexBuffer(), nullptr);
     ASSERT_NE(gpu1->GetIndexBuffer(), nullptr);
 
@@ -96,7 +99,7 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     VkBuffer vb1 = gpu1->GetVertexBuffer()->GetHandle();
     VkBuffer ib1 = gpu1->GetIndexBuffer()->GetHandle();
 
-    const auto h1 = m_Pool.Add(std::move(gpu1));
+    const auto h1 = m_Pool.Add(std::move(*gpu1));
     ASSERT_TRUE(h1.IsValid());
 
     // Derived view: reuse vertices, different topology + indices.
@@ -108,8 +111,8 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     req2.Topology = Graphics::PrimitiveTopology::Lines;
     req2.UploadMode = Graphics::GeometryUploadMode::Staged;
 
-    auto [gpu2, t2] = Graphics::GeometryGpuData::CreateAsync(m_Device, *m_TransferManager, req2, &m_Pool);
-    ASSERT_NE(gpu2, nullptr);
+    auto [gpu2, t2] = Graphics::GeometryGpuData::CreateAsync(m_Device, *m_TransferManager, *m_BufferManager, req2, &m_Pool);
+    ASSERT_TRUE(gpu2.has_value());
     ASSERT_NE(gpu2->GetVertexBuffer(), nullptr);
     ASSERT_NE(gpu2->GetIndexBuffer(), nullptr);
 
@@ -155,7 +158,7 @@ TEST_F(GeometryReuseTest, RejectsUploadWhenPositionsContainNonFiniteValues)
     req.Topology = Graphics::PrimitiveTopology::Triangles;
     req.UploadMode = Graphics::GeometryUploadMode::Staged;
 
-    auto [gpu, token] = Graphics::GeometryGpuData::CreateAsync(m_Device, *m_TransferManager, req, &m_Pool);
-    EXPECT_EQ(gpu, nullptr);
+    auto [gpu, token] = Graphics::GeometryGpuData::CreateAsync(m_Device, *m_TransferManager, *m_BufferManager, req, &m_Pool);
+    EXPECT_FALSE(gpu.has_value());
     (void)token;
 }

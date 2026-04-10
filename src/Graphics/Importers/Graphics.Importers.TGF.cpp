@@ -34,6 +34,9 @@ namespace Graphics
 
         GeometryCpuData outData;
         outData.Topology = PrimitiveTopology::Lines;
+        auto& positions = outData.Positions();
+        auto& normals   = outData.Normals();
+        auto& attrs     = outData.Attrs();
         std::string_view line;
         size_t lineCursor = 0;
         bool parsingEdges = false;
@@ -73,11 +76,11 @@ namespace Graphics
                         p = glm::vec3(*x, *y, *z);
                 }
 
-                auto idx = static_cast<uint32_t>(outData.Positions.size());
+                auto idx = static_cast<uint32_t>(positions.size());
                 idMap[*id] = idx;
-                outData.Positions.push_back(p);
-                outData.Normals.emplace_back(0, 1, 0);
-                outData.Aux.emplace_back(1);
+                positions.push_back(p);
+                normals.emplace_back(0, 1, 0);
+                attrs.emplace_back(1);
             }
             else
             {
@@ -97,7 +100,7 @@ namespace Graphics
             }
         }
 
-        if (outData.Positions.empty())
+        if (positions.empty())
             return std::unexpected(AssetError::InvalidData);
 
         MeshImportData result;

@@ -36,12 +36,15 @@ namespace Graphics
     {
         // OBJ is always ASCII
         std::vector<std::byte> out;
-        out.reserve(data.Positions.size() * 40); // rough estimate
+        const auto positions = data.Positions();
+        const auto normals   = data.Normals();
+        const auto attrs     = data.Attrs();
+        out.reserve(positions.size() * 40); // rough estimate
 
         AppendString(out, "# Exported by IntrinsicEngine\n");
 
         // Write vertices
-        for (const auto& p : data.Positions)
+        for (const auto& p : positions)
         {
             AppendFormatted(out, "v %.6f %.6f %.6f\n",
                             static_cast<double>(p.x),
@@ -50,10 +53,10 @@ namespace Graphics
         }
 
         // Write normals
-        bool hasNormals = !data.Normals.empty() && data.Normals.size() == data.Positions.size();
+        bool hasNormals = !normals.empty() && normals.size() == positions.size();
         if (hasNormals)
         {
-            for (const auto& n : data.Normals)
+            for (const auto& n : normals)
             {
                 AppendFormatted(out, "vn %.6f %.6f %.6f\n",
                                 static_cast<double>(n.x),
@@ -62,11 +65,11 @@ namespace Graphics
             }
         }
 
-        // Write UVs from Aux (xy components)
-        bool hasUVs = !data.Aux.empty() && data.Aux.size() == data.Positions.size();
+        // Write UVs from Attrs (xy components)
+        bool hasUVs = !attrs.empty() && attrs.size() == positions.size();
         if (hasUVs)
         {
-            for (const auto& a : data.Aux)
+            for (const auto& a : attrs)
             {
                 AppendFormatted(out, "vt %.6f %.6f\n",
                                 static_cast<double>(a.x),

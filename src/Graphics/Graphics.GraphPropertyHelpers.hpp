@@ -3,16 +3,24 @@
 // =============================================================================
 // GraphPropertyHelpers — shared graph property extraction utilities.
 //
-// Consolidates duplicated property extraction logic between
-// GraphLifecycle (full upload) and PropertySetDirtySync (incremental sync).
-// This header is intended for inclusion in graph-related system .cpp files only.
+// Two flavours:
+//
+//   Graph-backed  (ExtractNodeColors / ExtractEdgeColors / ExtractNodeRadii)
+//     Take a const Graph& for skip-deleted filtering.  Used when the calling
+//     code still holds a Graph object (e.g. legacy GraphRef path, algorithms).
+//
+//   PropertySet-backed  (ExtractNodeColorsFromPropertySet / …)
+//     Take a const PropertySet& directly.  Used when reading from authoritative
+//     GeometrySources components, which are already compacted (no deleted gaps).
 // =============================================================================
 
 namespace Graphics::GraphPropertyHelpers
 {
+    // -------------------------------------------------------------------------
+    // Graph-backed helpers (require a Graph for is-deleted check)
+    // -------------------------------------------------------------------------
+
     // Extract per-element colors via ColorMapper with default property fallback.
-    // Sets config.PropertyName to defaultPropName if empty and the property exists.
-    // Returns the extracted color vector (empty if no property found).
     template <typename HandleT, class PropertySetT>
     [[nodiscard]] inline std::vector<uint32_t> ExtractColors(
         const PropertySetT& properties,
@@ -33,7 +41,6 @@ namespace Graphics::GraphPropertyHelpers
         return {};
     }
 
-    // Extract per-node colors (convenience wrapper).
     [[nodiscard]] inline std::vector<uint32_t> ExtractNodeColors(
         const Geometry::Graph::Graph& graph,
         Graphics::ColorSource& config)
@@ -42,7 +49,6 @@ namespace Graphics::GraphPropertyHelpers
             graph.VertexProperties(), config, graph, "v:color");
     }
 
-    // Extract per-edge colors (convenience wrapper).
     [[nodiscard]] inline std::vector<uint32_t> ExtractEdgeColors(
         const Geometry::Graph::Graph& graph,
         Graphics::ColorSource& config)
@@ -51,7 +57,6 @@ namespace Graphics::GraphPropertyHelpers
             graph.EdgeProperties(), config, graph, "e:color");
     }
 
-    // Extract per-node radii from "v:radius" property, skipping deleted vertices.
     [[nodiscard]] inline std::vector<float> ExtractNodeRadii(
         const Geometry::Graph::Graph& graph)
     {
@@ -77,5 +82,48 @@ namespace Graphics::GraphPropertyHelpers
         }
 
         return radii;
+    }
+
+    // -------------------------------------------------------------------------
+    // PropertySet-backed helpers (compacted GeometrySources — no deleted gaps)
+    // -------------------------------------------------------------------------
+
+    [[nodiscard]] inline std::vector<uint32_t> ExtractNodeColorsFromPropertySet(
+        const Geometry::PropertySet& properties,
+        Graphics::ColorSource& config)
+    {
+        if (config.PropertyName.empty() && properties.Exists("v:color"))
+            config.PropertyName = "v:color";
+
+        if (auto mapped = ColorMapper::MapProperty(properties, config))
+            return std::move(mapped->Colors);
+
+        return {};
+    }
+
+    [[nodiscard]] inline std::vector<uint32_t> ExtractEdgeColorsFromPropertySet(
+        const Geometry::PropertySet& properties,
+        Graphics::ColorSource& config)
+    {
+        if (config.PropertyName.empty() && properties.Exists("e:color"))
+            config.PropertyName = "e:color";
+
+        if (auto mapped = ColorMapper::MapProperty(properties, config))
+            return std::move(mapped->Colors);
+
+        return {};
+    }
+
+    [[nodiscard]] inline std::vector<float> ExtractNodeRadiiFromPropertySet(
+        const Geometry::PropertySet& properties)
+    {
+        if (!properties.Exists("v:radius"))
+            return {};
+
+        auto radiusProp = properties.Get<float>("v:radius");
+        if (!radiusProp)
+            return {};
+
+        return std::vector<float>(radiusProp.Vector().begin(), radiusProp.Vector().end());
     }
 }

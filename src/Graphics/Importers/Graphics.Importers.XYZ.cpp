@@ -93,6 +93,9 @@ namespace Graphics
 
         GeometryCpuData outData;
         outData.Topology = PrimitiveTopology::Points;
+        auto& positions = outData.Positions();
+        auto& normals   = outData.Normals();
+        auto& attrs     = outData.Attrs();
         std::string_view line;
         size_t lineCursor = 0;
         std::size_t expectedPointCount = 0;
@@ -119,14 +122,14 @@ namespace Graphics
             if (IsScanLineMarker(tokens))
                 continue;
 
-            if (!firstPayloadLineSeen && outData.Positions.empty() && tokens.size() == 1)
+            if (!firstPayloadLineSeen && positions.empty() && tokens.size() == 1)
             {
                 if (const auto count = Importers::TextParse::ParseNumber<std::size_t>(tokens[0]); count && *count > 0)
                 {
                     expectedPointCount = *count;
-                    outData.Positions.reserve(expectedPointCount);
-                    outData.Normals.reserve(expectedPointCount);
-                    outData.Aux.reserve(expectedPointCount);
+                    positions.reserve(expectedPointCount);
+                    normals.reserve(expectedPointCount);
+                    attrs.reserve(expectedPointCount);
                     continue;
                 }
             }
@@ -141,15 +144,15 @@ namespace Graphics
             if (!px || !py || !pz)
                 continue;
 
-            outData.Positions.emplace_back(*px, *py, *pz);
-            outData.Normals.emplace_back(0.0f, 1.0f, 0.0f);
-            outData.Aux.emplace_back(ParsePointColor(tokens).value_or(glm::vec4(1.0f)));
+            positions.emplace_back(*px, *py, *pz);
+            normals.emplace_back(0.0f, 1.0f, 0.0f);
+            attrs.emplace_back(ParsePointColor(tokens).value_or(glm::vec4(1.0f)));
 
-            if (expectedPointCount > 0 && outData.Positions.size() >= expectedPointCount)
+            if (expectedPointCount > 0 && positions.size() >= expectedPointCount)
                 break;
         }
 
-        if (outData.Positions.empty())
+        if (positions.empty())
             return std::unexpected(AssetError::InvalidData);
 
         Importers::GeometryImportPostProcessPolicy policy;

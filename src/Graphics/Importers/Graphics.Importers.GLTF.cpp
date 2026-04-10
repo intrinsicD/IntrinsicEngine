@@ -342,20 +342,20 @@ namespace Graphics
                 const auto& posAccessor = model.accessors[posIt->second];
                 const size_t vertexCount = posAccessor.count;
 
-                LoadBuffer<glm::vec3, glm::vec3>(meshData.Positions, model, posAccessor, vertexCount);
+                LoadBuffer<glm::vec3, glm::vec3>(meshData.Positions(), model, posAccessor, vertexCount);
 
                 auto normIt = primitive.attributes.find("NORMAL");
                 if (normIt != primitive.attributes.end())
                 {
-                    LoadBuffer<glm::vec3, glm::vec3>(meshData.Normals, model, model.accessors[normIt->second], vertexCount);
+                    LoadBuffer<glm::vec3, glm::vec3>(meshData.Normals(), model, model.accessors[normIt->second], vertexCount);
                     hasNormals = true;
                 }
                 else
                 {
-                    meshData.Normals.resize(vertexCount, glm::vec3(0, 1, 0));
+                    meshData.Normals().resize(vertexCount, glm::vec3(0, 1, 0));
                 }
 
-                meshData.Aux.resize(vertexCount, glm::vec4(0.0f));
+                meshData.Attrs().resize(vertexCount, glm::vec4(0.0f));
                 auto uvIt = primitive.attributes.find("TEXCOORD_0");
                 if (uvIt != primitive.attributes.end())
                 {
@@ -363,8 +363,9 @@ namespace Graphics
                     std::vector<glm::vec2> uvs;
                     LoadVec2Buffer(uvs, model, uvAccessor, vertexCount);
 
+                    auto& attrs = meshData.Attrs();
                     for (size_t i = 0; i < uvs.size(); ++i)
-                        meshData.Aux[i] = glm::vec4(uvs[i], 0.0f, 0.0f);
+                        attrs[i] = glm::vec4(uvs[i], 0.0f, 0.0f);
                 }
 
                 if (primitive.indices >= 0)

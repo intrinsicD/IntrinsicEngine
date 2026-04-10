@@ -39,7 +39,9 @@ namespace Graphics
     {
         std::vector<std::byte> out;
 
-        bool hasNormals = !data.Normals.empty() && data.Normals.size() == data.Positions.size();
+        const auto positions = data.Positions();
+        const auto normals   = data.Normals();
+        bool hasNormals = !normals.empty() && normals.size() == positions.size();
         bool hasFaces = data.Topology == PrimitiveTopology::Triangles
                         && !data.Indices.empty()
                         && data.Indices.size() % 3 == 0;
@@ -54,7 +56,7 @@ namespace Graphics
             header += "format ascii 1.0\n";
         header += "comment Exported by IntrinsicEngine\n";
 
-        header += "element vertex " + std::to_string(data.Positions.size()) + "\n";
+        header += "element vertex " + std::to_string(positions.size()) + "\n";
         header += "property float x\n";
         header += "property float y\n";
         header += "property float z\n";
@@ -76,23 +78,23 @@ namespace Graphics
         // Estimate output size
         std::size_t vertSize = hasNormals ? 24 : 12; // per vertex
         std::size_t faceSize = hasFaces ? (1 + 12) : 0; // per face
-        out.reserve(header.size() + data.Positions.size() * vertSize + faceCount * faceSize);
+        out.reserve(header.size() + positions.size() * vertSize + faceCount * faceSize);
 
         AppendString(out, header);
 
         if (options.Binary)
         {
             // Binary vertex data
-            for (std::size_t i = 0; i < data.Positions.size(); ++i)
+            for (std::size_t i = 0; i < positions.size(); ++i)
             {
-                AppendValue(out, data.Positions[i].x);
-                AppendValue(out, data.Positions[i].y);
-                AppendValue(out, data.Positions[i].z);
+                AppendValue(out, positions[i].x);
+                AppendValue(out, positions[i].y);
+                AppendValue(out, positions[i].z);
                 if (hasNormals)
                 {
-                    AppendValue(out, data.Normals[i].x);
-                    AppendValue(out, data.Normals[i].y);
-                    AppendValue(out, data.Normals[i].z);
+                    AppendValue(out, normals[i].x);
+                    AppendValue(out, normals[i].y);
+                    AppendValue(out, normals[i].z);
                 }
             }
 
@@ -111,24 +113,24 @@ namespace Graphics
         else
         {
             // ASCII vertex data
-            for (std::size_t i = 0; i < data.Positions.size(); ++i)
+            for (std::size_t i = 0; i < positions.size(); ++i)
             {
                 if (hasNormals)
                 {
                     AppendFormatted(out, "%.6f %.6f %.6f %.6f %.6f %.6f\n",
-                                    static_cast<double>(data.Positions[i].x),
-                                    static_cast<double>(data.Positions[i].y),
-                                    static_cast<double>(data.Positions[i].z),
-                                    static_cast<double>(data.Normals[i].x),
-                                    static_cast<double>(data.Normals[i].y),
-                                    static_cast<double>(data.Normals[i].z));
+                                    static_cast<double>(positions[i].x),
+                                    static_cast<double>(positions[i].y),
+                                    static_cast<double>(positions[i].z),
+                                    static_cast<double>(normals[i].x),
+                                    static_cast<double>(normals[i].y),
+                                    static_cast<double>(normals[i].z));
                 }
                 else
                 {
                     AppendFormatted(out, "%.6f %.6f %.6f\n",
-                                    static_cast<double>(data.Positions[i].x),
-                                    static_cast<double>(data.Positions[i].y),
-                                    static_cast<double>(data.Positions[i].z));
+                                    static_cast<double>(positions[i].x),
+                                    static_cast<double>(positions[i].y),
+                                    static_cast<double>(positions[i].z));
                 }
             }
 

@@ -29,6 +29,7 @@ import RHI.Device;
 import RHI.Transfer;
 
 import Geometry.PointCloud;
+import Geometry.Properties;
 import Geometry.Handle;
 import Core.SystemFeatureCatalog;
 import Graphics.LifecycleUtils;
@@ -65,79 +66,105 @@ namespace Graphics::Systems::PointCloudLifecycle
                         pcData.HasGpuNormals = (geo->GetLayout().NormalsSize > 0);
                     pcData.GpuDirty = false;
                 }
-                else if (!pcData.CloudRef || pcData.CloudRef->IsEmpty())
+                else
                 {
-                    // Cloud is empty or null — release any existing GPU geometry.
-                    if (pcData.GpuGeometry.IsValid())
+                    // Sync GeometrySources from CloudRef when it is available.
+                    // CloudRef is an optional computation tool — after this call,
+                    // GeometrySources::Vertices is the authoritative CPU data.
+                    if (pcData.CloudRef && !pcData.CloudRef->IsEmpty())
                     {
-                        geometryStorage.Remove(pcData.GpuGeometry, device->GetGlobalFrameNumber());
-                        pcData.GpuGeometry = {};
+                        ECS::Components::GeometrySources::PopulateFromCloud(
+                            registry, entity, *pcData.CloudRef);
                     }
-                    pcData.CachedColors.clear();
-                    pcData.CachedRadii.clear();
-                    pcData.GpuPointCount = 0;
-                    pcData.HasGpuNormals = false;
-                    pcData.GpuDirty = false;
-                    // Fall through to Phase 3 (GpuGeometry invalid -> skip).
+
+                    // Read from authoritative GeometrySources.
+                    auto* geoVerts = registry.try_get<ECS::Components::GeometrySources::Vertices>(entity);
+
+                    if (!geoVerts)
+                    {
+                        // No data source — release any existing GPU geometry.
+                        if (pcData.GpuGeometry.IsValid())
+                        {
+                            geometryStorage.Remove(pcData.GpuGeometry, device->GetGlobalFrameNumber());
+                            pcData.GpuGeometry = {};
+                        }
+                        pcData.CachedColors.clear();
+                        pcData.CachedRadii.clear();
+                        pcData.GpuPointCount = 0;
+                        pcData.HasGpuNormals = false;
+                        pcData.GpuDirty = false;
+                        // Fall through to Phase 3 (GpuGeometry invalid → skip).
+                    }
+                    else
+                    {
+                        auto posProp = geoVerts->Properties.Get<glm::vec3>("v:position");
+
+                        if (!posProp || posProp.Vector().empty())
+                        {
+                            if (pcData.GpuGeometry.IsValid())
+                            {
+                                geometryStorage.Remove(pcData.GpuGeometry, device->GetGlobalFrameNumber());
+                                pcData.GpuGeometry = {};
+                            }
+                            pcData.CachedColors.clear();
+                            pcData.CachedRadii.clear();
+                            pcData.GpuPointCount = 0;
+                            pcData.HasGpuNormals = false;
+                            pcData.GpuDirty = false;
+                        }
+                        else
+                        {
+                            const auto& posVec = posProp.Vector();
+                            const std::span<const glm::vec3> positions{posVec};
+
+                            // Check for canonical normal property.
+                            auto normProp = geoVerts->Properties.Get<glm::vec3>("v:normal");
+                            const bool hasNormals = normProp && !normProp.Vector().empty();
+
+                            // Extract per-point colors and radii from GeometrySources.
+                            auto pointColors = PointCloudPropertyHelpers::ExtractPointColorsFromPropertySet(
+                                geoVerts->Properties, pcData.Visualization.VertexColors);
+                            auto pointRadii = PointCloudPropertyHelpers::ExtractPointRadiiFromPropertySet(
+                                geoVerts->Properties);
+
+                            // Release previous geometry before allocating new.
+                            if (pcData.GpuGeometry.IsValid())
+                            {
+                                geometryStorage.Remove(pcData.GpuGeometry, device->GetGlobalFrameNumber());
+                                pcData.GpuGeometry = {};
+                            }
+
+                            GeometryUploadRequest upload{};
+                            upload.Positions = positions;
+                            if (hasNormals)
+                                upload.Normals = std::span<const glm::vec3>{normProp.Vector()};
+                            upload.Topology = PrimitiveTopology::Points;
+                            upload.UploadMode = GeometryUploadMode::Staged;
+
+                            auto [newGpuData, token] = GeometryGpuData::CreateAsync(
+                                device, transferManager, bufferManager, upload, &geometryStorage);
+
+                            if (!newGpuData || !newGpuData->GetVertexBuffer())
+                            {
+                                HandleUploadFailure(dispatcher, entity, "PointCloudLifecycle");
+                                pcData.CachedColors.clear();
+                                pcData.CachedRadii.clear();
+                                pcData.GpuPointCount = 0;
+                                pcData.HasGpuNormals = false;
+                                pcData.GpuDirty = false;
+                            }
+                            else
+                            {
+                                pcData.GpuGeometry = geometryStorage.Add(std::move(*newGpuData));
+                                pcData.CachedColors = std::move(pointColors);
+                                pcData.CachedRadii = std::move(pointRadii);
+                                pcData.GpuPointCount = static_cast<uint32_t>(positions.size());
+                                pcData.HasGpuNormals = hasNormals;
+                                pcData.GpuDirty = false;
+                            }
+                        }
+                    }
                 }
-                else
-                {
-
-                auto& cloud = *pcData.CloudRef;
-
-                // --- Read positions and normals directly from Cloud spans ---
-                // Cloud provides contiguous span accessors for zero-copy upload.
-                const auto positions = cloud.Positions();
-
-                // Surfel/EWA require real normals; no synthetic default-up normals.
-                const bool hasNormals = cloud.HasNormals();
-
-                auto pointColors = PointCloudPropertyHelpers::ExtractPointColors(
-                    cloud, pcData.Visualization.VertexColors);
-                auto pointRadii = PointCloudPropertyHelpers::ExtractPointRadii(cloud);
-
-                // Release previous geometry before allocating new.
-                if (pcData.GpuGeometry.IsValid())
-                {
-                    geometryStorage.Remove(pcData.GpuGeometry, device->GetGlobalFrameNumber());
-                    pcData.GpuGeometry = {};
-                }
-
-                // --- Upload to GPU via Staged mode (device-local for static clouds) ---
-                // Cloud data is borrowed from the shared instance; Staged mode
-                // copies to a staging belt then transfers to device-local memory,
-                // optimal for clouds that don't change every frame.
-                GeometryUploadRequest upload{};
-                upload.Positions = positions;
-                if (hasNormals)
-                    upload.Normals = cloud.Normals();
-                upload.Topology = PrimitiveTopology::Points;
-                upload.UploadMode = GeometryUploadMode::Staged;
-
-                auto [newGpuData, token] = GeometryGpuData::CreateAsync(
-                    device, transferManager, bufferManager, upload, &geometryStorage);
-
-                if (!newGpuData || !newGpuData->GetVertexBuffer())
-                {
-                    HandleUploadFailure(dispatcher, entity, "PointCloudLifecycle");
-                    pcData.CachedColors.clear();
-                    pcData.CachedRadii.clear();
-                    pcData.GpuPointCount = 0;
-                    pcData.HasGpuNormals = false;
-                    pcData.GpuDirty = false;
-                }
-                else
-                {
-
-                pcData.GpuGeometry = geometryStorage.Add(std::move(*newGpuData));
-                pcData.CachedColors = std::move(pointColors);
-                pcData.CachedRadii = std::move(pointRadii);
-                pcData.GpuPointCount = static_cast<uint32_t>(positions.size());
-                pcData.HasGpuNormals = hasNormals;
-                pcData.GpuDirty = false;
-
-                } // else (upload succeeded)
-                } // else (cloud not empty)
             } // if (GpuDirty)
 
             // -----------------------------------------------------------------

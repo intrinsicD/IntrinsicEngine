@@ -23,9 +23,9 @@ TEST(Geometry, CpuDataToRequest)
     using namespace Graphics;
 
     GeometryCpuData cpu;
-    cpu.Positions = {{0, 0, 0}, {1, 1, 1}};
-    cpu.Normals = {{0, 1, 0}, {0, 1, 0}};
-    cpu.Aux = {{0, 0, 0, 0}, {1, 1, 0, 0}};
+    cpu.Positions() = {{0, 0, 0}, {1, 1, 1}};
+    cpu.Normals() = {{0, 1, 0}, {0, 1, 0}};
+    cpu.Attrs() = {{0, 0, 0, 0}, {1, 1, 0, 0}};
     cpu.Indices = {0, 1};
 
     auto req = cpu.ToUploadRequest();

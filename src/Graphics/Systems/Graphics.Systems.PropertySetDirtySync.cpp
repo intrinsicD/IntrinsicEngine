@@ -142,41 +142,37 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
-    // Graph entity: re-extract per-node attributes from PropertySets.
+    // Graph entity: re-extract per-node attributes from GeometrySources.
     // =====================================================================
-    // Only safe when the GPU vertex buffer is still valid and the graph
-    // vertex count matches GpuVertexCount (no structural changes since
-    // last full upload). If counts diverge, escalate to full re-upload.
     static void SyncGraphVertexAttributes(entt::registry& registry)
     {
         auto view = registry.view<ECS::DirtyTag::VertexAttributes, ECS::Graph::Data>();
 
         for (auto [entity, graphData] : view.each())
         {
-            if (!graphData.GraphRef || !graphData.GpuGeometry.IsValid())
+            auto* geoNodes = registry.try_get<ECS::Components::GeometrySources::Nodes>(entity);
+
+            if (!geoNodes || !graphData.GpuGeometry.IsValid())
             {
-                // No graph or no GPU geometry yet — escalate to full re-upload.
+                // No authoritative data or no GPU geometry yet — escalate.
                 graphData.GpuDirty = true;
                 continue;
             }
 
-            auto& graph = *graphData.GraphRef;
-
-            // Safety check: if vertex count diverged (vertices added/deleted
-            // since last full upload), attribute-only extraction would produce
-            // misaligned data. Escalate to full re-upload.
-            if (graphData.GpuVertexCount != graph.VertexCount())
+            // Safety: count divergence → escalate to full re-upload.
+            const std::size_t aliveNodes =
+                ECS::Components::GeometrySources::NodeCount(*geoNodes);
+            if (graphData.GpuVertexCount != static_cast<uint32_t>(aliveNodes))
             {
                 graphData.GpuDirty = true;
                 continue;
             }
 
-            // --- Re-extract per-node colors and radii via shared helpers ---
-            graphData.CachedNodeColors = GraphPropertyHelpers::ExtractNodeColors(
-                graph, graphData.Visualization.VertexColors);
-            graphData.CachedNodeRadii = GraphPropertyHelpers::ExtractNodeRadii(graph);
+            graphData.CachedNodeColors = GraphPropertyHelpers::ExtractNodeColorsFromPropertySet(
+                geoNodes->Properties, graphData.Visualization.VertexColors);
+            graphData.CachedNodeRadii = GraphPropertyHelpers::ExtractNodeRadiiFromPropertySet(
+                geoNodes->Properties);
 
-            // --- Update Point::Component flags ---
             if (auto* pt = registry.try_get<ECS::Point::Component>(entity))
             {
                 pt->HasPerPointColors = !graphData.CachedNodeColors.empty();
@@ -186,7 +182,7 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
-    // Graph entity: re-extract per-edge attributes from PropertySets.
+    // Graph entity: re-extract per-edge attributes from GeometrySources.
     // =====================================================================
     static void SyncGraphEdgeAttributes(entt::registry& registry)
     {
@@ -194,26 +190,25 @@ namespace Graphics::Systems::PropertySetDirtySync
 
         for (auto [entity, graphData] : view.each())
         {
-            if (!graphData.GraphRef || !graphData.GpuGeometry.IsValid())
+            auto* geoEdges = registry.try_get<ECS::Components::GeometrySources::Edges>(entity);
+
+            if (!geoEdges || !graphData.GpuGeometry.IsValid())
             {
                 graphData.GpuDirty = true;
                 continue;
             }
 
-            auto& graph = *graphData.GraphRef;
-
-            // Safety: if edge count diverged, escalate.
-            if (graphData.GpuEdgeCount != graph.EdgeCount())
+            const std::size_t aliveEdges =
+                ECS::Components::GeometrySources::EdgeCount(*geoEdges);
+            if (graphData.GpuEdgeCount != static_cast<uint32_t>(aliveEdges))
             {
                 graphData.GpuDirty = true;
                 continue;
             }
 
-            // --- Re-extract per-edge colors via shared helper ---
-            graphData.CachedEdgeColors = GraphPropertyHelpers::ExtractEdgeColors(
-                graph, graphData.Visualization.EdgeColors);
+            graphData.CachedEdgeColors = GraphPropertyHelpers::ExtractEdgeColorsFromPropertySet(
+                geoEdges->Properties, graphData.Visualization.EdgeColors);
 
-            // --- Update Line::Component flags ---
             if (auto* line = registry.try_get<ECS::Line::Component>(entity))
             {
                 line->HasPerEdgeColors = !graphData.CachedEdgeColors.empty();
@@ -222,7 +217,7 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
-    // PointCloud entity: re-extract per-point attributes from Cloud.
+    // PointCloud entity: re-extract per-point attributes from GeometrySources.
     // =====================================================================
     static void SyncPointCloudAttributes(entt::registry& registry)
     {
@@ -230,26 +225,27 @@ namespace Graphics::Systems::PropertySetDirtySync
 
         for (auto [entity, pcData] : view.each())
         {
-            if (!pcData.CloudRef || !pcData.GpuGeometry.IsValid())
+            auto* geoVerts = registry.try_get<ECS::Components::GeometrySources::Vertices>(entity);
+
+            if (!geoVerts || !pcData.GpuGeometry.IsValid())
             {
                 pcData.GpuDirty = true;
                 continue;
             }
 
-            auto& cloud = *pcData.CloudRef;
-
-            // Safety: if point count diverged, escalate.
-            if (pcData.GpuPointCount != static_cast<uint32_t>(cloud.VerticesSize()))
+            const std::size_t aliveVerts =
+                ECS::Components::GeometrySources::VertexCount(*geoVerts);
+            if (pcData.GpuPointCount != static_cast<uint32_t>(aliveVerts))
             {
                 pcData.GpuDirty = true;
                 continue;
             }
 
-            pcData.CachedColors = PointCloudPropertyHelpers::ExtractPointColors(
-                cloud, pcData.Visualization.VertexColors);
-            pcData.CachedRadii = PointCloudPropertyHelpers::ExtractPointRadii(cloud);
+            pcData.CachedColors = PointCloudPropertyHelpers::ExtractPointColorsFromPropertySet(
+                geoVerts->Properties, pcData.Visualization.VertexColors);
+            pcData.CachedRadii = PointCloudPropertyHelpers::ExtractPointRadiiFromPropertySet(
+                geoVerts->Properties);
 
-            // --- Update Point::Component flags ---
             if (auto* pt = registry.try_get<ECS::Point::Component>(entity))
             {
                 pt->HasPerPointColors = !pcData.CachedColors.empty();
@@ -322,15 +318,22 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
-    // Mesh vertex attributes dirty: extract per-vertex colors from Mesh::Data
-    // PropertySets into Surface::Component::CachedVertexColors.
+    // Mesh vertex attributes dirty: extract per-vertex colors.
+    // Prefers GeometrySources::Vertices (authoritative) over MeshRef.
     // =====================================================================
     static void SyncMeshVertexAttributes(entt::registry& registry)
     {
         auto view = registry.view<ECS::DirtyTag::VertexAttributes, ECS::Mesh::Data, ECS::Surface::Component>();
         for (auto [entity, meshData, surfComp] : view.each())
         {
-            if (!meshData.MeshRef)
+            // Resolve the authoritative vertex PropertySet.
+            Geometry::PropertySet* vertProps = nullptr;
+            if (auto* geoVerts = registry.try_get<ECS::Components::GeometrySources::Vertices>(entity))
+                vertProps = &geoVerts->Properties;
+            else if (meshData.MeshRef)
+                vertProps = &meshData.MeshRef->VertexProperties();
+
+            if (!vertProps)
                 continue;
 
             auto& vtxConfig = meshData.Visualization.VertexColors;
@@ -338,23 +341,20 @@ namespace Graphics::Systems::PropertySetDirtySync
 
             if (!vtxConfig.PropertyName.empty())
             {
-                auto result = ColorMapper::MapProperty(
-                    meshData.MeshRef->VertexProperties(), vtxConfig);
+                auto result = ColorMapper::MapProperty(*vertProps, vtxConfig);
                 if (result)
                     surfComp.CachedVertexColors = std::move(result->Colors);
             }
 
             surfComp.UseNearestVertexColors = meshData.Visualization.UseNearestVertexColors;
 
-            // Centroid-based Voronoi: extract raw vertex labels + centroid data
-            // so the shader can compute distance to centroids (not vertices).
+            // Centroid-based Voronoi: extract vertex labels + centroid data.
             surfComp.CachedVertexLabels.clear();
             surfComp.CachedCentroids.clear();
 
             if (surfComp.UseNearestVertexColors && !meshData.KMeansCentroids.empty())
             {
-                auto& mesh = *meshData.MeshRef;
-                auto labelProp = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
+                auto labelProp = vertProps->Get<uint32_t>("v:kmeans_label");
                 if (labelProp.IsValid())
                 {
                     const auto& labelData = labelProp.Vector();
@@ -362,8 +362,6 @@ namespace Graphics::Systems::PropertySetDirtySync
                     for (std::size_t i = 0; i < labelData.size(); ++i)
                         surfComp.CachedVertexLabels.push_back(labelData[i]);
 
-                    // Build centroid entries: position + color.
-                    // Derive each centroid's color from the first vertex bearing that label.
                     const uint32_t k = static_cast<uint32_t>(meshData.KMeansCentroids.size());
                     surfComp.CachedCentroids.resize(k);
                     std::vector<bool> colorFound(k, false);
@@ -380,7 +378,6 @@ namespace Graphics::Systems::PropertySetDirtySync
                         }
                     }
 
-                    // Fallback for any centroid without a vertex representative.
                     for (uint32_t i = 0; i < k; ++i)
                     {
                         if (!colorFound[i])
@@ -395,15 +392,21 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
-    // Mesh face attributes dirty: extract per-face colors from Mesh::Data
-    // PropertySets into Surface::Component::CachedFaceColors.
+    // Mesh face attributes dirty: extract per-face colors.
+    // Prefers GeometrySources::Faces (authoritative) over MeshRef.
     // =====================================================================
     static void SyncMeshFaceAttributes(entt::registry& registry)
     {
         auto view = registry.view<ECS::DirtyTag::FaceAttributes, ECS::Mesh::Data, ECS::Surface::Component>();
         for (auto [entity, meshData, surfComp] : view.each())
         {
-            if (!meshData.MeshRef)
+            Geometry::PropertySet* faceProps = nullptr;
+            if (auto* geoFaces = registry.try_get<ECS::Components::GeometrySources::Faces>(entity))
+                faceProps = &geoFaces->Properties;
+            else if (meshData.MeshRef)
+                faceProps = &meshData.MeshRef->FaceProperties();
+
+            if (!faceProps)
                 continue;
 
             auto& faceConfig = meshData.Visualization.FaceColors;
@@ -411,8 +414,7 @@ namespace Graphics::Systems::PropertySetDirtySync
 
             if (!faceConfig.PropertyName.empty())
             {
-                auto result = ColorMapper::MapProperty(
-                    meshData.MeshRef->FaceProperties(), faceConfig);
+                auto result = ColorMapper::MapProperty(*faceProps, faceConfig);
                 if (result)
                     surfComp.CachedFaceColors = std::move(result->Colors);
             }
@@ -447,7 +449,8 @@ namespace Graphics::Systems::PropertySetDirtySync
             return "Entity";
         };
 
-        // Mesh entities
+        // Mesh entities — prefer GeometrySources for positions/properties,
+        // fall back to MeshRef for topology-dependent computations (midpoints).
         {
             auto view = registry.view<ECS::Mesh::Data>();
             for (auto [entity, meshData] : view.each())
@@ -456,41 +459,94 @@ namespace Graphics::Systems::PropertySetDirtySync
                 if (!viz.VectorFieldsDirty)
                     continue;
 
-                if (meshData.MeshRef)
+                // Resolve vertex positions.
+                std::span<const glm::vec3> vertPositions;
+                Geometry::PropertySet* vertProps = nullptr;
+                if (auto* geoVerts = registry.try_get<ECS::Components::GeometrySources::Vertices>(entity))
                 {
+                    vertProps = &geoVerts->Properties;
+                    if (auto posProp = geoVerts->Properties.Get<glm::vec3>("v:position"))
+                        vertPositions = posProp.Span();
+                }
+
+                // Topology helpers still require MeshRef when GeometrySources
+                // halfedge topology is not yet used by VectorFieldManager.
+                if (!vertPositions.empty() && vertProps)
+                {
+                    if (meshData.MeshRef)
+                    {
+                        PublishVec3Property(
+                            meshData.MeshRef->EdgeProperties(),
+                            "e:vf_center",
+                            BuildMeshEdgeMidpoints(*meshData.MeshRef));
+                        // Mirror into GeometrySources::Edges if present.
+                        if (auto* geoEdges = registry.try_get<ECS::Components::GeometrySources::Edges>(entity))
+                            PublishVec3Property(geoEdges->Properties, "e:vf_center",
+                                                BuildMeshEdgeMidpoints(*meshData.MeshRef));
+
+                        PublishVec3Property(
+                            meshData.MeshRef->FaceProperties(),
+                            "f:vf_center",
+                            BuildMeshFaceCentroids(*meshData.MeshRef));
+                        if (auto* geoFaces = registry.try_get<ECS::Components::GeometrySources::Faces>(entity))
+                            PublishVec3Property(geoFaces->Properties, "f:vf_center",
+                                                BuildMeshFaceCentroids(*meshData.MeshRef));
+
+                        VectorFieldManager::SyncVectorFields(
+                            registry, entity, vertPositions,
+                            Graphics::VectorFieldDomain::Vertex,
+                            *vertProps, viz, getName(entity));
+
+                        VectorFieldManager::SyncVectorFields(
+                            registry, entity,
+                            BuildMeshEdgeMidpoints(*meshData.MeshRef),
+                            Graphics::VectorFieldDomain::Edge,
+                            meshData.MeshRef->EdgeProperties(),
+                            viz, getName(entity));
+
+                        VectorFieldManager::SyncVectorFields(
+                            registry, entity,
+                            BuildMeshFaceCentroids(*meshData.MeshRef),
+                            Graphics::VectorFieldDomain::Face,
+                            meshData.MeshRef->FaceProperties(),
+                            viz, getName(entity));
+                    }
+                    else
+                    {
+                        // No MeshRef — only vertex-domain vector fields are available.
+                        VectorFieldManager::SyncVectorFields(
+                            registry, entity, vertPositions,
+                            Graphics::VectorFieldDomain::Vertex,
+                            *vertProps, viz, getName(entity));
+                    }
+                    viz.VectorFieldsDirty = false;
+                }
+                else if (meshData.MeshRef)
+                {
+                    // Legacy path: no GeometrySources, use MeshRef directly.
                     PublishVec3Property(
                         meshData.MeshRef->EdgeProperties(),
                         "e:vf_center",
                         BuildMeshEdgeMidpoints(*meshData.MeshRef));
-
                     PublishVec3Property(
                         meshData.MeshRef->FaceProperties(),
                         "f:vf_center",
                         BuildMeshFaceCentroids(*meshData.MeshRef));
 
                     VectorFieldManager::SyncVectorFields(
-                        registry, entity,
-                        meshData.MeshRef->Positions(),
+                        registry, entity, meshData.MeshRef->Positions(),
                         Graphics::VectorFieldDomain::Vertex,
-                        meshData.MeshRef->VertexProperties(),
-                        viz,
-                        getName(entity));
-
+                        meshData.MeshRef->VertexProperties(), viz, getName(entity));
                     VectorFieldManager::SyncVectorFields(
                         registry, entity,
                         BuildMeshEdgeMidpoints(*meshData.MeshRef),
                         Graphics::VectorFieldDomain::Edge,
-                        meshData.MeshRef->EdgeProperties(),
-                        viz,
-                        getName(entity));
-
+                        meshData.MeshRef->EdgeProperties(), viz, getName(entity));
                     VectorFieldManager::SyncVectorFields(
                         registry, entity,
                         BuildMeshFaceCentroids(*meshData.MeshRef),
                         Graphics::VectorFieldDomain::Face,
-                        meshData.MeshRef->FaceProperties(),
-                        viz,
-                        getName(entity));
+                        meshData.MeshRef->FaceProperties(), viz, getName(entity));
                     viz.VectorFieldsDirty = false;
                 }
                 else
@@ -500,9 +556,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             }
         }
 
-        // Graph entities — skip vector field children (which also have
-        // Graph::Data) by requiring VectorFieldsDirty, which is only set
-        // by the UI or position-change handlers on source entities.
+        // Graph entities — prefer GeometrySources::Nodes for positions.
         {
             auto view = registry.view<ECS::Graph::Data>();
             for (auto [entity, graphData] : view.each())
@@ -511,8 +565,57 @@ namespace Graphics::Systems::PropertySetDirtySync
                 if (!viz.VectorFieldsDirty)
                     continue;
 
-                if (graphData.GraphRef)
+                auto* geoNodes = registry.try_get<ECS::Components::GeometrySources::Nodes>(entity);
+                auto* geoEdges = registry.try_get<ECS::Components::GeometrySources::Edges>(entity);
+
+                if (geoNodes)
                 {
+                    auto posProp = geoNodes->Properties.Get<glm::vec3>("v:position");
+                    if (!posProp) { viz.VectorFieldsDirty = false; continue; }
+
+                    const auto& posVec = posProp.Vector();
+                    const std::size_t vSize = posVec.size();
+
+                    // Build edge midpoints from GeometrySources connectivity.
+                    std::vector<glm::vec3> edgeMidpoints;
+                    if (geoEdges)
+                    {
+                        auto v0Prop = geoEdges->Properties.Get<uint32_t>("e:v0");
+                        auto v1Prop = geoEdges->Properties.Get<uint32_t>("e:v1");
+                        if (v0Prop && v1Prop)
+                        {
+                            const auto& v0Vec = v0Prop.Vector();
+                            const auto& v1Vec = v1Prop.Vector();
+                            edgeMidpoints.reserve(std::min(v0Vec.size(), v1Vec.size()));
+                            for (std::size_t i = 0; i < std::min(v0Vec.size(), v1Vec.size()); ++i)
+                            {
+                                const uint32_t i0 = v0Vec[i], i1 = v1Vec[i];
+                                if (i0 < vSize && i1 < vSize)
+                                    edgeMidpoints.push_back(0.5f * (posVec[i0] + posVec[i1]));
+                                else
+                                    edgeMidpoints.emplace_back(0.0f);
+                            }
+                            PublishVec3Property(geoEdges->Properties, "e:vf_center", edgeMidpoints);
+                        }
+                    }
+
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity, posVec,
+                        Graphics::VectorFieldDomain::Vertex,
+                        geoNodes->Properties, viz, getName(entity));
+
+                    if (geoEdges && !edgeMidpoints.empty())
+                    {
+                        VectorFieldManager::SyncVectorFields(
+                            registry, entity, edgeMidpoints,
+                            Graphics::VectorFieldDomain::Edge,
+                            geoEdges->Properties, viz, getName(entity));
+                    }
+                    viz.VectorFieldsDirty = false;
+                }
+                else if (graphData.GraphRef)
+                {
+                    // Legacy path: no GeometrySources, use GraphRef directly.
                     auto& graph = *graphData.GraphRef;
                     const std::size_t vSize = graph.VerticesSize();
                     std::vector<glm::vec3> positions(vSize);
@@ -522,26 +625,17 @@ namespace Graphics::Systems::PropertySetDirtySync
                         positions[i] = graph.IsDeleted(v) ? glm::vec3(0.0f) : graph.VertexPosition(v);
                     }
 
-                    PublishVec3Property(
-                        graph.EdgeProperties(),
-                        "e:vf_center",
-                        BuildGraphEdgeMidpoints(graph));
+                    PublishVec3Property(graph.EdgeProperties(), "e:vf_center",
+                                        BuildGraphEdgeMidpoints(graph));
 
                     VectorFieldManager::SyncVectorFields(
-                        registry, entity,
-                        positions,
+                        registry, entity, positions,
                         Graphics::VectorFieldDomain::Vertex,
-                        graph.VertexProperties(),
-                        viz,
-                        getName(entity));
-
+                        graph.VertexProperties(), viz, getName(entity));
                     VectorFieldManager::SyncVectorFields(
-                        registry, entity,
-                        BuildGraphEdgeMidpoints(graph),
+                        registry, entity, BuildGraphEdgeMidpoints(graph),
                         Graphics::VectorFieldDomain::Edge,
-                        graph.EdgeProperties(),
-                        viz,
-                        getName(entity));
+                        graph.EdgeProperties(), viz, getName(entity));
                     viz.VectorFieldsDirty = false;
                 }
                 else
@@ -551,7 +645,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             }
         }
 
-        // PointCloud entities
+        // PointCloud entities — prefer GeometrySources::Vertices.
         {
             auto view = registry.view<ECS::PointCloud::Data>();
             for (auto [entity, pcData] : view.each())
@@ -560,15 +654,23 @@ namespace Graphics::Systems::PropertySetDirtySync
                 if (!viz.VectorFieldsDirty)
                     continue;
 
-                if (pcData.CloudRef)
+                if (auto* geoVerts = registry.try_get<ECS::Components::GeometrySources::Vertices>(entity))
+                {
+                    auto posProp = geoVerts->Properties.Get<glm::vec3>("v:position");
+                    if (!posProp) { viz.VectorFieldsDirty = false; continue; }
+
+                    VectorFieldManager::SyncVectorFields(
+                        registry, entity, posProp.Vector(),
+                        Graphics::VectorFieldDomain::Vertex,
+                        geoVerts->Properties, viz, getName(entity));
+                    viz.VectorFieldsDirty = false;
+                }
+                else if (pcData.CloudRef)
                 {
                     VectorFieldManager::SyncVectorFields(
-                        registry, entity,
-                        pcData.CloudRef->Positions(),
+                        registry, entity, pcData.CloudRef->Positions(),
                         Graphics::VectorFieldDomain::Vertex,
-                        pcData.CloudRef->PointProperties(),
-                        viz,
-                        getName(entity));
+                        pcData.CloudRef->PointProperties(), viz, getName(entity));
                     viz.VectorFieldsDirty = false;
                 }
                 else

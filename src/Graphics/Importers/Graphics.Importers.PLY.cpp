@@ -448,9 +448,12 @@ namespace Graphics
         const bool hasAlpha = (idxA >= 0);
 
         GeometryCpuData outData;
-        outData.Positions.resize(vertexElement.Count);
-        outData.Normals.resize(vertexElement.Count, glm::vec3(0, 1, 0));
-        outData.Aux.resize(vertexElement.Count, glm::vec4(1));
+        auto& outPositions = outData.Positions();
+        auto& outNormals   = outData.Normals();
+        auto& outAttrs     = outData.Attrs();
+        outPositions.resize(vertexElement.Count);
+        outNormals.resize(vertexElement.Count, glm::vec3(0, 1, 0));
+        outAttrs.resize(vertexElement.Count, glm::vec4(1));
 
         const bool isBinary = (format != PlyFormat::Ascii);
         const bool fileIsLittle = (format == PlyFormat::BinaryLittleEndian);
@@ -498,15 +501,15 @@ namespace Graphics
                 std::getline(bodyStream, line);
                 Importers::TextParse::SplitWhitespace(line, tokens);
 
-                if (idxX >= 0 && (size_t)idxX < tokens.size()) outData.Positions[i].x = ParseFloat(tokens[(size_t)idxX]);
-                if (idxY >= 0 && (size_t)idxY < tokens.size()) outData.Positions[i].y = ParseFloat(tokens[(size_t)idxY]);
-                if (idxZ >= 0 && (size_t)idxZ < tokens.size()) outData.Positions[i].z = ParseFloat(tokens[(size_t)idxZ]);
+                if (idxX >= 0 && (size_t)idxX < tokens.size()) outPositions[i].x = ParseFloat(tokens[(size_t)idxX]);
+                if (idxY >= 0 && (size_t)idxY < tokens.size()) outPositions[i].y = ParseFloat(tokens[(size_t)idxY]);
+                if (idxZ >= 0 && (size_t)idxZ < tokens.size()) outPositions[i].z = ParseFloat(tokens[(size_t)idxZ]);
 
                 if (hasNormals)
                 {
-                    if ((size_t)idxNX < tokens.size()) outData.Normals[i].x = ParseFloat(tokens[(size_t)idxNX]);
-                    if ((size_t)idxNY < tokens.size()) outData.Normals[i].y = ParseFloat(tokens[(size_t)idxNY]);
-                    if ((size_t)idxNZ < tokens.size()) outData.Normals[i].z = ParseFloat(tokens[(size_t)idxNZ]);
+                    if ((size_t)idxNX < tokens.size()) outNormals[i].x = ParseFloat(tokens[(size_t)idxNX]);
+                    if ((size_t)idxNY < tokens.size()) outNormals[i].y = ParseFloat(tokens[(size_t)idxNY]);
+                    if ((size_t)idxNZ < tokens.size()) outNormals[i].z = ParseFloat(tokens[(size_t)idxNZ]);
                 }
 
                 if (hasColors)
@@ -515,13 +518,13 @@ namespace Graphics
                     float g = Detail::NormalizeColorChannelToUnitRange(ParseFloat(tokens[(size_t)idxG]));
                     float b = Detail::NormalizeColorChannelToUnitRange(ParseFloat(tokens[(size_t)idxB]));
                     float a = hasAlpha ? Detail::NormalizeColorChannelToUnitRange(ParseFloat(tokens[(size_t)idxA])) : 1.0f;
-                    outData.Aux[i] = glm::vec4(r, g, b, a);
+                    outAttrs[i] = glm::vec4(r, g, b, a);
                 }
 
                 if (hasUVs)
                 {
-                    outData.Aux[i].x = ParseFloat(tokens[(size_t)idxS]);
-                    outData.Aux[i].y = ParseFloat(tokens[(size_t)idxT]);
+                    outAttrs[i].x = ParseFloat(tokens[(size_t)idxS]);
+                    outAttrs[i].y = ParseFloat(tokens[(size_t)idxT]);
                 }
             }
 
@@ -611,14 +614,14 @@ namespace Graphics
                         {
                             const std::byte* v = base + i * vertexElement.BinaryStrideBytes;
 
-                            outData.Positions[i] = glm::vec3(
+                            outPositions[i] = glm::vec3(
                                 (float)readFromBlobAsDouble(v, px),
                                 (float)readFromBlobAsDouble(v, py),
                                 (float)readFromBlobAsDouble(v, pz));
 
                             if (pnx && pny && pnz)
                             {
-                                outData.Normals[i] = glm::vec3(
+                                outNormals[i] = glm::vec3(
                                     (float)readFromBlobAsDouble(v, *pnx),
                                     (float)readFromBlobAsDouble(v, *pny),
                                     (float)readFromBlobAsDouble(v, *pnz));
@@ -642,13 +645,13 @@ namespace Graphics
                                     bf = Detail::NormalizeColorChannelToUnitRange(bf);
                                     af = Detail::NormalizeColorChannelToUnitRange(af);
                                 }
-                                outData.Aux[i] = glm::vec4(rf, gf, bf, af);
+                                outAttrs[i] = glm::vec4(rf, gf, bf, af);
                             }
 
                             if (ps && pt)
                             {
-                                outData.Aux[i].x = (float)readFromBlobAsDouble(v, *ps);
-                                outData.Aux[i].y = (float)readFromBlobAsDouble(v, *pt);
+                                outAttrs[i].x = (float)readFromBlobAsDouble(v, *ps);
+                                outAttrs[i].y = (float)readFromBlobAsDouble(v, *pt);
                             }
                         }
                     }
@@ -709,17 +712,17 @@ namespace Graphics
                                 else if ((int)pIndex == idxA) rgba.a = (float)(*maybeVal);
                             }
 
-                            outData.Positions[i] = pos;
-                            if (hasNormals) outData.Normals[i] = nrm;
+                            outPositions[i] = pos;
+                            if (hasNormals) outNormals[i] = nrm;
                             if (hasColors && gotColor)
                             {
                                 float rf = Detail::NormalizeColorChannelToUnitRange(rgba.r);
                                 float gf = Detail::NormalizeColorChannelToUnitRange(rgba.g);
                                 float bf = Detail::NormalizeColorChannelToUnitRange(rgba.b);
                                 float af = hasAlpha ? Detail::NormalizeColorChannelToUnitRange(rgba.a) : 1.0f;
-                                outData.Aux[i] = glm::vec4(rf, gf, bf, af);
+                                outAttrs[i] = glm::vec4(rf, gf, bf, af);
                             }
-                            if (hasUVs) { outData.Aux[i].x = uv.x; outData.Aux[i].y = uv.y; }
+                            if (hasUVs) { outAttrs[i].x = uv.x; outAttrs[i].y = uv.y; }
                         }
                     }
                 }
