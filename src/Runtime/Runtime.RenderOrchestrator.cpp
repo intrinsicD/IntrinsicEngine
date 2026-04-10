@@ -108,7 +108,7 @@ namespace Runtime
             , FeatureRegistryRef(inFeatureRegistry)
             , FrameContextRing(frameContextCount, frameArenaSize)
         {
-            MaterialRegistry = std::make_unique<Graphics::MaterialRegistry>(textureManager, inAssetManager);
+            MaterialRegistry = std::make_unique<Graphics::MaterialRegistry>(*Device, textureManager, inAssetManager);
             InitPipeline(renderer, descriptorPool);
 
             if (PipelineLibrary && Device)
@@ -196,7 +196,9 @@ namespace Runtime
                 Device, Bindless, DescriptorLayoutRef);
             PipelineLibrary->BuildDefaults(ShaderRegistry,
                                            Swapchain.GetImageFormat(),
-                                           RHI::VulkanImage::FindDepthFormat(*Device));
+                                           RHI::VulkanImage::FindDepthFormat(*Device),
+                                           VK_FORMAT_R16G16B16A16_SFLOAT,
+                                           MaterialRegistry->GetMaterialSetLayout());
 
             Core::Log::Info("RenderOrchestrator: Creating RenderDriver...");
             Graphics::RenderDriverConfig rsConfig{};
@@ -521,6 +523,9 @@ namespace Runtime
         m_Impl->RenderDriver->RebindFrameAllocators(frame.GetRenderArena(), frame.GetRenderScope());
 
         m_Impl->RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
+
+        // Sync material data to GPU SSBO before rendering.
+        m_Impl->MaterialRegistry->SyncGpuBuffer();
 
         const Graphics::GlobalRenderModeOverride renderModeOverride =
             m_Impl->RenderDriver->GetGlobalRenderModeOverride();

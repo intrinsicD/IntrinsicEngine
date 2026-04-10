@@ -724,6 +724,16 @@ namespace Graphics::Passes
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
 
+                                        // Bind material SSBO (set=3) — shared across all batches.
+                                        VkDescriptorSet materialSet = ctx.MaterialRegistry.GetMaterialDescriptorSet();
+                                        if (materialSet != VK_NULL_HANDLE)
+                                        {
+                                            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                    pipeline->GetLayout(),
+                                                                    3, 1, &materialSet,
+                                                                    0, nullptr);
+                                        }
+
                                         // Descriptor sets are immutable once bound in a command buffer.
                                         // Cache one instance descriptor set per unique (instance, visibility) pair.
                                         std::unordered_map<uint64_t, VkDescriptorSet> instanceSetCache;
@@ -956,6 +966,16 @@ namespace Graphics::Passes
                                         1, 1, &globalTextures,
                                         0, nullptr);
 
+                // Bind material SSBO (set=3) — required by pipeline layout.
+                VkDescriptorSet materialSet = ctx.MaterialRegistry.GetMaterialDescriptorSet();
+                if (materialSet != VK_NULL_HANDLE)
+                {
+                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                            depthPipeline->GetLayout(),
+                                            3, 1, &materialSet,
+                                            0, nullptr);
+                }
+
                 // Descriptor sets are immutable once bound in a command buffer.
                 // Cache one instance descriptor set per unique (instance, visibility) pair.
                 std::unordered_map<uint64_t, VkDescriptorSet> instanceSetCache;
@@ -1174,6 +1194,16 @@ namespace Graphics::Passes
                                                                 gbufPipeline->GetLayout(),
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
+
+                                        // Bind material SSBO (set=3).
+                                        VkDescriptorSet materialSet = ctx.MaterialRegistry.GetMaterialDescriptorSet();
+                                        if (materialSet != VK_NULL_HANDLE)
+                                        {
+                                            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                    gbufPipeline->GetLayout(),
+                                                                    3, 1, &materialSet,
+                                                                    0, nullptr);
+                                        }
 
                                         std::unordered_map<uint64_t, VkDescriptorSet> instanceSetCache;
 

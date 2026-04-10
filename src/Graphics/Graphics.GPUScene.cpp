@@ -22,7 +22,7 @@ namespace Graphics
     namespace
     {
         constexpr uint32_t kPreserveGeometryId = GPUSceneConstants::kPreserveGeometryId;
-        constexpr uint32_t kPreserveTextureId = 0xFFFFFFFFu;
+        constexpr uint32_t kPreserveMaterialSlot = 0xFFFFFFFFu;
 
         void MergeUpdate(GpuUpdatePacket& dst, const GpuUpdatePacket& src)
         {
@@ -38,9 +38,9 @@ namespace Graphics
 
             dst.Data.Model = src.Data.Model;
 
-            // Sentinel contract(TextureID): 0xFFFFFFFF means "preserve existing".
-            if (src.Data.TextureID != kPreserveTextureId)
-                dst.Data.TextureID = src.Data.TextureID;
+            // Sentinel contract(MaterialSlot): 0xFFFFFFFF means "preserve existing".
+            if (src.Data.MaterialSlot != kPreserveMaterialSlot)
+                dst.Data.MaterialSlot = src.Data.MaterialSlot;
 
             // Sentinel contract(EntityID): 0 means "preserve existing".
             if (src.Data.EntityID != 0u)

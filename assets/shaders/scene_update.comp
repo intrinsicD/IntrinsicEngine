@@ -5,7 +5,7 @@ layout(local_size_x = 64) in;
 
 struct InstanceData {
     mat4 Model;
-    uint TextureID;
+    uint MaterialSlot;
     uint EntityID;
     uint GeometryID;
     uint Pad1;
@@ -40,10 +40,10 @@ void main()
 
     InstanceUpdate u = updates.Deltas[gid];
 
-    // Sentinel contract(TextureID): 0xFFFFFFFF means "preserve existing TextureID".
-    // This makes bindless slot 0 (default/error texture) a valid explicit value.
-    if (u.Data.TextureID == 0xFFFFFFFFu)
-        u.Data.TextureID = scene.Instances[u.SlotIndex].TextureID;
+    // Sentinel contract(MaterialSlot): 0xFFFFFFFF means "preserve existing MaterialSlot".
+    // This makes material slot 0 (default material) a valid explicit value.
+    if (u.Data.MaterialSlot == 0xFFFFFFFFu)
+        u.Data.MaterialSlot = scene.Instances[u.SlotIndex].MaterialSlot;
 
     // Sentinel contract(EntityID): 0 means "preserve existing EntityID".
     if (u.Data.EntityID == 0u)

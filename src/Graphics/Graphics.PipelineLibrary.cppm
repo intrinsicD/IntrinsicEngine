@@ -37,7 +37,8 @@ export namespace Graphics
         void BuildDefaults(const ShaderRegistry& shaderRegistry,
                            VkFormat swapchainFormat,
                            VkFormat depthFormat,
-                           VkFormat sceneColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT);
+                           VkFormat sceneColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT,
+                           VkDescriptorSetLayout materialSetLayout = VK_NULL_HANDLE);
 
         // Rebuild all graphics pipelines from the current ShaderRegistry SPV paths.
         // Caller must ensure no GPU work referencing old pipelines is in flight.
@@ -61,6 +62,9 @@ export namespace Graphics
 
         // Stage 1: set=2 layout for instance + visibility SSBOs used by Forward shaders.
         [[nodiscard]] VkDescriptorSetLayout GetStage1InstanceSetLayout() const;
+
+        // Material SSBO: set=3 layout for per-material data (PBR factors + texture IDs).
+        [[nodiscard]] VkDescriptorSetLayout GetMaterialSetLayout() const;
 
         // Stage 3: compute culling pipeline + set layout (set = 0 in compute pipeline).
         [[nodiscard]] VkDescriptorSetLayout GetCullSetLayout() const;

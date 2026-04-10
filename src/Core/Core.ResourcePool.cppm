@@ -166,6 +166,20 @@ export namespace Core
             return m_Slots.size();
         }
 
+        // Raw index access: returns pointer to data at the given slot index,
+        // or nullptr if the slot is inactive or out of range. Skips generation check.
+        // Used for bulk GPU buffer uploads where all active slots are written.
+        [[nodiscard]] const T* GetByIndex(uint32_t index) const
+        {
+            std::shared_lock lock(m_Mutex);
+            if (index >= m_Slots.size())
+                return nullptr;
+            const Slot& slot = m_Slots[index];
+            if (!slot.IsActive || !slot.Data.has_value())
+                return nullptr;
+            return &slot.Data.value();
+        }
+
     private:
         struct Slot
         {

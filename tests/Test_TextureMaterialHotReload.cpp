@@ -10,7 +10,7 @@ import ECS;
 
 // This test validates a key contract:
 // - When a material's bindless texture index (AlbedoID) changes, GPUSceneSync must queue an instance update
-//   that refreshes GpuInstanceData::TextureID for entities using that material.
+//   that refreshes GpuInstanceData::MaterialSlot for entities using that material.
 //
 // We keep it GPU-free by using a lightweight fake GPUScene that records QueueUpdate() calls.
 

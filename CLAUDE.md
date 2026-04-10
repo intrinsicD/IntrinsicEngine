@@ -275,6 +275,28 @@ struct CameraBufferObject {
 
 `Graphics::LightEnvironmentPacket` is the immutable CPU-side carrier extracted once per frame into `RenderWorld::Lighting`. `GlobalResources::Update()` copies it into the dynamic-offset UBO. The deferred composition pass (`deferred_lighting.frag`) receives the same data via push constants because it uses its own descriptor set layout (G-buffer samplers at set 0).
 
+### Material SSBO (set 3, binding 0)
+
+`GpuMaterialData` is a 48-byte std430 struct uploaded to a persistent SSBO managed by `MaterialRegistry`. Each `GpuInstanceData` carries a `MaterialSlot` index (replacing the old `TextureID` field) that the vertex shader uses to fetch the material from the SSBO.
+
+```cpp
+struct GpuMaterialData {
+    vec4  BaseColorFactor;     // 16 bytes — RGBA tint multiplied with albedo texture
+    float MetallicFactor;      //  4 bytes
+    float RoughnessFactor;     //  4 bytes
+    uint  AlbedoID;            //  4 bytes — bindless texture index
+    uint  NormalID;            //  4 bytes — bindless texture index
+    uint  MetallicRoughnessID; //  4 bytes — bindless texture index
+    uint  Flags;               //  4 bytes — reserved (alpha mode, double-sided)
+    uint  _pad0, _pad1;        //  8 bytes
+};
+```
+
+- **CPU flow:** `MaterialRegistry::Create()` allocates a pool slot and marks the SSBO dirty. `MaterialRegistry::SyncGpuBuffer()` uploads all active slots once per frame (called in `RenderOrchestrator::PrepareFrame()` after `UpdateGlobals()`).
+- **GPU flow:** `surface.vert` reads `inst.MaterialSlot` from the instance SSBO (set 2) → fetches `MaterialData` from the material SSBO (set 3) → passes `AlbedoID` as `fragTexID` and `MaterialSlot` as `fragMaterialSlot` to the fragment shader. The fragment shader's `ResolveSurfaceBaseColor()` applies `BaseColorFactor` in the texture fallback path. The G-buffer path writes real `RoughnessFactor`/`MetallicFactor` from the material SSBO.
+- **VisualizationConfig priority:** The visualization color waterfall (centroid Voronoi → nearest-vertex → interpolated vertex colors → face colors) takes priority over material textures. Material appearance is the fallback when no visualization color source is active. This is correct for geometry-processing workflows.
+- **Descriptor set layout:** Created by `MaterialRegistry::InitGpuResources()`, stored as `m_MaterialSetLayout`, passed to `PipelineLibrary::BuildDefaults()`, added as set 3 to all surface pipelines (Surface, SurfaceLines, SurfacePoints, GBuffer, DepthPrepass).
+
 ### Lifecycle Systems
 
 **System naming convention:**

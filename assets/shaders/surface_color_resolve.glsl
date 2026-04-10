@@ -120,6 +120,8 @@ vec4 ResolveSurfaceBaseColor()
         return unpackUnorm4x8(fBuf.color[gl_PrimitiveID]);
     }
 
-    // Fallback: texture.
-    return texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
+    // Fallback: material (texture * base color factor).
+    MaterialData mat = materials.Materials[fragMaterialSlot];
+    vec4 albedoTex = texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
+    return albedoTex * mat.BaseColorFactor;
 }
