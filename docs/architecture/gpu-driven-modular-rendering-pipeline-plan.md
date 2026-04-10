@@ -62,7 +62,7 @@ This is already mirrored in CPU tests and compute shaders; keep it as the canoni
 
 ## 2.2 Reuse with refactor (do not rewrite from scratch)
 
-1. **GPUScene slot allocator** → keep API shape, add generational handles and explicit free semantics.
+1. **GPUScene slot allocator** → keep API shape, add explicit free semantics and deferred reclaim. Note: `GeometryPool` already uses `Core::ResourcePool<GeometryGpuData, GeometryHandle, 3>` with generational `StrongHandle` validation (Index + Generation) and 3-frame retirement. The GPUScene *slot* allocator (simple free-list of `uint32_t`) is the one lacking generation checks — it must gain generational guards to match `GeometryPool`'s safety.
 2. **Lifecycle systems** → keep dirty workflows + pass population, move them to writing render-view handles instead of pass-specific duplication over time.
 3. **SurfacePass culling kernels** → keep shader/math, extract into dedicated `Graphics.Visibility` module.
 4. **RenderExtraction packet model** → keep immutable snapshot pattern, split into domain packets vs pass packets.
@@ -71,15 +71,57 @@ This is already mirrored in CPU tests and compute shaders; keep it as the canoni
 ## 2.3 Technical debt hotspots (must change)
 
 1. **Topology storage is not yet truly unified**
-   - Mesh/graph/point data still mostly rides through geometry-specific buffers in `GeometryPool`; single global vertex/index arena is not yet authoritative.
+   - Mesh/graph/point data rides through per-entity `GeometryGpuData` in `GeometryPool` (ref-counted `BufferLease` pairs). This is actually a strength for flexible geometry sharing (`ReuseVertexBuffersFrom`), but prevents global compaction and makes cross-entity deduplication impossible.
+   - **Trade-off:** A single global arena enables defragmentation and reduces descriptor/BDA overhead, but loses the simplicity of per-entity buffer isolation. The migration must preserve `ReuseVertexBuffersFrom` semantics within the arena (shared vertex range, distinct index range).
 2. **Visibility ownership is split**
-   - Surface is GPU-culled, Line/Point are currently CPU-culled.
-3. **ECS stores pass-shaped data**
-   - `Surface::Component`, `Line::Component`, `Point::Component` are practical now, but long-term modularity needs canonical render views + pass adapters.
+   - Surface is GPU-culled (`instance_cull_multigeo.comp` with per-geometry routing tables, atomic draw-count compaction, and visibility remap buffers). Line/Point are CPU-culled (`CullDrawPackets()` producing `CulledDrawList` index vectors).
+   - The GPU path produces `VkDrawIndexedIndirectCommand` + visibility remap per geometry. The CPU path produces `std::vector<uint32_t>` indices into span-based draw packets. These two output schemas must converge.
+3. **ECS render components are well-structured but pass-shaped**
+   - `Surface::Component`, `Line::Component`, `Point::Component` are pure data carriers (zero Vulkan coupling — verified). They hold `GeometryHandle`, cached colors, visibility flags, and domain hints. Long-term modularity would benefit from canonical render views + pass adapters, but the components themselves are not the bottleneck — the bottleneck is that extraction (`Runtime.RenderExtraction`) rebuilds draw packet vectors every frame from ECS queries rather than incrementally.
 4. **No explicit compaction schema authority**
-   - Indirect/visibility formats are pass-local, not centrally versioned.
+   - Indirect draw format (`DrawIndexedIndirect` + visibility remap + per-geometry draw counter) is defined only in SurfacePass shaders and C++ code. No centrally versioned definition exists.
 5. **No arena defragmentation protocol**
-   - Required once single global scene buffers become authoritative.
+   - `GeometryPool` free-list reuses slots but underlying GPU buffers only grow (`m_NextSlot` monotonically increases). Required once single global scene buffers become authoritative.
+6. **GPUScene slot allocator lacks generation checks**
+   - `GPUScene::AllocateSlot()` returns raw `uint32_t` with no generation counter. A freed-then-reallocated slot could be referenced by a stale ECS component. The `GeometryPool` already has generational `StrongHandle` validation — `GPUScene` does not.
+
+## 2.4 Existing infrastructure to leverage (not mentioned in 2.1/2.2)
+
+The following systems are already production-ready and must be accounted for in the migration plan:
+
+1. **`Core::StrongHandle<Tag>` + `Core::ResourcePool<T, Handle, RetirementFrames>`**
+   - Generational handles with compile-time type safety (tag-based discrimination).
+   - `ResourcePool` provides deferred deletion with configurable retirement frames.
+   - `GeometryPool` already uses `RetirementFrames=3` matching `MAX_FRAMES_IN_FLIGHT`.
+   - **Risk:** `ResourcePool` default `RetirementFrames=2` does not match `MAX_FRAMES_IN_FLIGHT=3`. All new pool instantiations must explicitly set `RetirementFrames=3`.
+
+2. **`RHI::TransferManager` + `RHI::StagingBelt`**
+   - Timeline semaphore-based async GPU transfer with atomic ticket system.
+   - `StagingBelt` is a persistent host-visible ring buffer with Retire/GarbageCollect.
+   - Batched uploads via `BeginUploadBatch`/`EnqueueUploadBuffer`/`EndUploadBatch`.
+   - **Constraint:** StagingBelt capacity is fixed at construction (no dynamic growth). The streaming budget policy (Phase D) must account for this — either size the belt conservatively or add a growth/fallback path.
+
+3. **`RHI::BufferManager` + `RHI::BufferLease`**
+   - Reference-counted buffer ownership via Lease pattern (move-only, RAII release).
+   - `GetDeviceAddress()` for BDA. `IsHostVisible()` disambiguates upload mode.
+   - **Constraint:** No suballocation — each buffer is monolithic. The unified arena (Phase B) must replace this model for topology storage while preserving the Lease pattern for standalone buffers.
+
+4. **Vulkan Sync2 barrier model**
+   - `vkCmdPipelineBarrier2` with `VK_PIPELINE_STAGE_2_*` / `VK_ACCESS_2_*` throughout.
+   - RenderGraph automatically generates barriers from resource usage DAG.
+   - This is the correct foundation for arena ownership transfers and visibility dispatch barriers.
+
+5. **Descriptor set layout allocation (sets 0–3 spoken for)**
+   - Set 0: Global camera + lighting UBO (`CameraBufferObject`).
+   - Set 1: Per-pass SSBO (line buffer, point buffer, etc.).
+   - Set 2: Instance SSBO (GPU-driven surface path).
+   - Set 3: Material SSBO (`MaterialRegistry`).
+   - **Constraint:** New attribute table SSBOs need descriptor set slots. Options: extend set 3, add set 4, or use BDA (no descriptor needed). BDA is preferred for consistency with existing vertex/index access patterns.
+
+6. **`PersistentDescriptorPool` vs `DescriptorAllocator`**
+   - Persistent pools for long-lived sets (instance, cull, compute). Transient allocator reset per-frame.
+   - SurfacePass already maintains per-frame descriptor set arrays (`m_InstanceSet[FRAMES]`).
+   - No epoch/generation system on descriptor sets themselves — this is a gap for Phase D.
 
 ---
 
@@ -154,9 +196,7 @@ Single large topology storage:
 
 This matches your “one vertex + one index GPU scene” objective while preserving domain-specific interpretation through metadata.
 
-## 4.3 ACTIVE.md visualization sketch integration (mandatory contract)
-
-Adopt the explicit rule from your sketch:
+## 4.3 Topology/attribute separation contract
 
 - **Topology and attributes are separated.**
 - **Positions remain in the shared topology vertex arena.**
@@ -256,12 +296,17 @@ $$
 ## 5.1 Phase A — Boundary extraction (minimal disruption)
 
 1. Create `Graphics.Visibility` module.
-   - Move culling dispatch/build logic out of `SurfacePass` into this module.
-   - Keep existing shader binaries and push-constant structure initially.
+   - **Do not move code out of `SurfacePass`.** Instead, introduce `Graphics.Visibility` as a new module that SurfacePass *calls into*. The SurfacePass becomes a thin adapter that delegates to `Visibility::DispatchFrustumCull()`.
+   - Consolidate: `CullDrawPackets()` (from `Graphics.RenderPipeline`) and the compute dispatch in SurfacePass share the same frustum math. The `Visibility` module unifies the frustum plane extraction and sphere test.
+   - Keep existing shader binaries (`instance_cull_multigeo.comp`, `instance_cull.comp`) and push-constant structure initially.
+   - Keep existing per-geometry routing table construction in SurfacePass — Phase C will generalize it.
 2. Add `ECS.RenderViews` components.
-   - Keep existing `Surface/Line/Point` components alive during transition.
+   - Keep existing `Surface/Line/Point` components alive during transition. These are pure data carriers (no Vulkan coupling) so dual-path maintenance cost is low.
+   - `RenderViews` components add handle indirection; existing components remain the data source during migration.
 3. Add `Graphics.RenderPackets` module.
+   - Extract `SurfaceDrawPacket`, `LineDrawPacket`, `PointDrawPacket` (and picking variants) from `Graphics.RenderPipeline.cppm` into a dedicated module.
    - Build immutable pass packets from `RenderWorld` + visibility outputs.
+   - **Note:** Current draw packets contain `std::vector` fields (e.g. `EdgeColors`, `Colors`, `Radii` in Line/Point packets). These must be replaced with `std::span` or arena-allocated ranges for true immutability.
 
 ## 5.2 Phase B — Unified GPU scene topology authority
 
@@ -275,23 +320,38 @@ $$
 ## 5.3 Phase C — Full GPU visibility authority
 
 1. Replace CPU cull for line/point with `Graphics.Visibility` outputs.
+   - Line/Point draw packets must carry `GeometryID` (currently only Surface instances do). Add `GeometryID` to `GPUScene` entries for line/point entities, or introduce a parallel lightweight visibility buffer for non-surface primitives.
 2. Emit per-pass indirect buffers from one compaction framework.
+   - Centralize the indirect schema: `DrawIndexedIndirectCommand` + `VisibilityRemap[]` + `DrawCount` per geometry, as currently implemented in `instance_cull_multigeo.comp`.
+   - Line/Point indirect commands use `VkDrawIndirectCommand` (non-indexed for lines, or indexed where applicable). Define both schemas in `Graphics.Visibility`.
 3. Add reason-code counters:
    - frustum reject
    - zero/invalid bounds reject
    - optional occlusion reject
-4. Add visualization override path:
-   - `VisualizationMode` toggles per pass/domain.
-   - shader permutations for scalar colormap, rgb/rgba attributes, and vector-field coloring/scaling.
-   - explicit precedence rule: visualization mode overrides standard texture mapping.
+4. **Transient content exclusion.**
+   - `DebugDraw` content (lines, points, triangles) must bypass GPU culling. These are per-frame transient uploads with no GPUScene slot or bounding sphere.
+   - Add a `TransientPacket` type (or a `NeverCull` flag on existing packets) that the visibility system skips and passes issue unconditionally.
+5. **Pick pipeline integration.**
+   - Pick passes (`pick_mesh`, `pick_line`, `pick_point`) must either use an unculled draw path or dispatch their own visibility with an inflated/full frustum. GPU-culled entities that are frustum-rejected but mouse-hovered become unpickable otherwise.
+6. Add visualization override path:
+   - `VisualizationMode` toggles per pass/domain. The existing `VisualizationConfig` + `ColorSource` system (per-entity, property-driven, with colormap LUT) provides the CPU-side data. The GPU path needs specialization constant-based shader variants.
+   - Use specialization constants (not separate SPIR-V binaries) for mode selection. Limit to at most 4 variants per domain × 3 domains = 12 pipeline permutations per pass.
+   - Explicit precedence rule: visualization mode overrides standard texture mapping (consistent with existing `VisualizationConfig` priority documented in CLAUDE.md).
 
 ## 5.4 Phase D — Robustness and streaming
 
 1. Add descriptor epoching for N-frames-in-flight consistency.
+   - `PersistentDescriptorPool` already provides persistent sets. What's missing is a generation token per descriptor set that gates stale-set usage. Wrap `VkDescriptorSet` in a `DescriptorSetHandle` with epoch validation.
+   - Coordinate with `GPUScene::kMaxFramesInFlight` (3) and `ResourcePool::RetirementFrames` (must be 3 everywhere).
 2. Add async streaming patch queue:
-   - staged uploads into free arena ranges
-   - atomic metadata commit per frame boundary
+   - Build on existing `RHI::TransferManager` (timeline semaphore-based) and `RHI::StagingBelt` (ring buffer).
+   - Staged uploads into free arena ranges; use `TransferToken` to track completion.
+   - Atomic metadata commit per frame boundary: update arena slice table only after `TransferToken::IsCompleted()` returns true.
+   - **Budget policy:** `StagingBelt` capacity is fixed at construction. Either (a) size it for peak burst (e.g. 64MB), (b) add a growth path via fallback staging buffers, or (c) throttle upload volume per frame and queue excess for next frame.
 3. Add defragmentation pass + remap fixups.
+   - Arena free-list must coalesce adjacent free ranges (Phase B baseline).
+   - Full defrag: copy live ranges to compact positions via transfer queue, update handle → offset tables, invalidate stale BDA pointers in instance SSBO.
+   - Gate defrag behind a per-frame budget (e.g. max 2MB relocated per frame) to avoid frame spikes.
 
 ---
 
@@ -313,6 +373,12 @@ Critical pieces still needed for true modularity:
 12. **Pass isolation** (no ECS queries inside pass execution).
 13. **Attribute-table ABI** for vertex/edge/face/point/vector domains (versioned layouts + shader compatibility checks).
 14. **Visualization permutation control** (bounded shader variant strategy + fallback when attributes missing).
+15. **Pick pipeline compatibility.** Three pick pipelines (`pick_mesh`, `pick_line`, `pick_point`) produce EntityId + PrimitiveId via dual MRT. They must consume the same unified visibility/packet model — otherwise picking breaks when GPU culling skips entities that the pick pass still expects to draw.
+16. **Shadow pass integration.** `Graphics.Passes.Shadow` exists and writes a shadow atlas. If the shadow pass culls from a light-space frustum, it needs its own visibility dispatch from `Graphics.Visibility` (separate frustum planes from the camera path).
+17. **Debug draw transient carve-out.** `DebugDraw` lines/points/triangles are per-frame transient uploads that bypass retained GPUScene. The packet model must have an explicit transient packet type (or a "non-culled" flag) so these draws are never frustum-culled or indirected.
+18. **PostProcess dependency chain.** `PostProcessPass` (tone mapping, bloom, FXAA/SMAA, histogram) reads scene color output from all three geometry passes. The render graph already sequences this correctly, but the packet model must not break the assumption that scene color is fully resolved before post-processing begins.
+19. **`StagingBelt` fixed-capacity risk.** The streaming budget (Phase D) must either size the belt large enough for peak upload bursts or add an overflow fallback (temporary staging buffers, throttled upload queue). Currently, staging allocation failure is caller-handled with no automatic retry.
+20. **`RetirementFrames` consistency.** All `ResourcePool` instantiations must explicitly set `RetirementFrames=3` to match `MAX_FRAMES_IN_FLIGHT`. The default of 2 is a latent use-after-free risk under heavy slot churn.
 
 ---
 
@@ -321,47 +387,91 @@ Critical pieces still needed for true modularity:
 To emulate expert subagents, split the effort into independent tracks with strict deliverables.
 
 ### Track A — Visibility & Indirect Authority
-- Extract culling logic from `SurfacePass` to `Graphics.Visibility`.
-- Unify indirect output schema for all passes.
-- Deliver parity tests + telemetry counters.
+- Introduce `Graphics.Visibility` module as a facade that SurfacePass calls into (not a code move — avoids regression risk).
+- Consolidate frustum plane extraction from `CullDrawPackets()` and `SurfacePass::PrepareStage3()`.
+- Unify indirect output schema: define `VisibilityOutputSchema` struct covering `DrawIndexedIndirectCommand`, `VisibilityRemap[]`, and `DrawCount` per geometry.
+- Deliver CPU/GPU parity tests on deterministic scenes.
+- Deliver telemetry counters (frustum reject, bounds reject, total visible).
 
 ### Track B — GPU Scene Unification
-- Implement global vertex/index arenas + slice handles.
-- Port lifecycle upload paths to arena-backed slices.
-- Deliver relocation-safe remap layer.
+- Implement global vertex/index arenas in `Graphics.GpuScene` with slice allocator + free-list.
+- Preserve `ReuseVertexBuffersFrom` semantics: shared vertex slice, distinct index slice.
+- Port lifecycle upload paths (`MeshRendererLifecycle`, `GraphLifecycle`, `PointCloudLifecycle`) to arena-backed slices.
+- Add generational handles to `GPUScene` slot allocator (currently raw `uint32_t`).
+- Deliver coalescing free-list (adjacent free ranges merged).
+- Deliver relocation-safe remap layer (deferred to Phase D for actual defrag).
 
 ### Track C — ECS View Contracts
-- Add `Render*View` ECS components.
-- Make lifecycle systems publish views, not pass-local render state.
-- Keep backward compatibility adapter until passes are switched.
+- Add `Render*View` ECS components with proper tag types (not `StrongHandle<uint64_t>`).
+- Make lifecycle systems publish views alongside existing pass components (dual-path).
+- Keep backward compatibility adapter until passes are switched (end of Phase C deadline).
+- Validate that `RenderViews` components carry no Vulkan types (matching existing component pattern).
 
 ### Track D — Render Packetization
-- Build packet builder module consuming extraction snapshot + visibility outputs.
+- Extract draw packet types from `Graphics.RenderPipeline.cppm` into `Graphics.RenderPackets`.
+- Replace `std::vector` fields in `LineDrawPacket`/`PointDrawPacket` with `std::span` or arena-backed ranges.
+- Add `TransientPacket` type for `DebugDraw` content (never culled, no GPUScene slot).
+- Build packet builder consuming extraction snapshot + visibility outputs.
 - Freeze immutable packet schema and lifetime contract.
 
 ### Track E — Validation & Telemetry
-- CPU/GPU cull parity tests.
-- stale-handle guard tests.
-- timeline/sync hazard tests.
-- GPU counters + frame-time markers.
+- CPU/GPU cull parity tests on canonical scenes (unit sphere grid, off-frustum entities, degenerate bounds).
+- Stale-handle guard tests (free + realloc slot, verify generation mismatch detected).
+- Timeline/sync hazard tests (concurrent `QueueUpdate` + `Sync` + `FreeSlot`).
+- GPU counters + frame-time markers via `RHI.Profiler`.
+- Pick pipeline regression tests (ensure picking works for GPU-culled entities near frustum edge).
+
+### Track F — Pick & Shadow Integration (new)
+- Audit pick pipelines (`pick_mesh`, `pick_line`, `pick_point`) for compatibility with `Graphics.Visibility` outputs.
+- Define pick visibility policy: unculled draw, or inflated-frustum dispatch.
+- Audit shadow pass (`Graphics.Passes.Shadow`) for light-space frustum culling via `Graphics.Visibility`.
+- Deliver integration tests for pick-under-cull and shadow-under-cull scenarios.
 
 ---
 
-## 8) Verification gates
+## 8) Migration risks and mitigations
 
-## 8.1 Correctness
+### 8.1 Regression risk during visibility extraction (Phase A)
+
+Moving culling out of `SurfacePass` into `Graphics.Visibility` changes the data flow for the most performance-critical path. **Mitigation:** Introduce `Graphics.Visibility` as a new module that SurfacePass *calls into* rather than extracting code. SurfacePass becomes a thin adapter. Existing culling tests validate parity before and after.
+
+### 8.2 Arena fragmentation under scene churn (Phase B)
+
+A single global vertex/index arena will fragment under repeated load/unload cycles (common in editor workflows). Without defragmentation, the arena high-water mark grows monotonically. **Mitigation:** Phase B must ship with at minimum a free-list compaction pass that coalesces adjacent free ranges. Full defragmentation (relocate + remap) can be deferred to Phase D, but the free-list must be compacting from day one.
+
+### 8.3 Dual-path maintenance burden (Phase A–C overlap)
+
+During the transition, both old per-pass components (`Surface::Component`, `Line::Component`, `Point::Component`) and new `RenderViews` components coexist. Every lifecycle system change must update both paths. **Mitigation:** Strict phase gating — no new features land on the old path once `RenderViews` components exist. Set a deadline for removing the compatibility adapter (end of Phase C).
+
+### 8.4 Pick pipeline breakage during GPU culling unification (Phase C)
+
+When Line/Point move to GPU culling, their pick pipelines must also move (or be explicitly excluded from culling). GPU-culled entities that are frustum-rejected but mouse-hovered become unpickable. **Mitigation:** Pick passes must use a separate, unculled draw path (or their own visibility dispatch with an inflated frustum). Document this contract in `Graphics.Visibility`.
+
+### 8.5 Descriptor set exhaustion under attribute table growth (Phase B)
+
+Adding 5 attribute-table SSBOs needs descriptor slots. Vulkan's guaranteed minimum for bound descriptor sets is 4 (already consumed by sets 0–3). **Mitigation:** Use BDA (buffer device addresses) for attribute tables, matching the existing vertex/index access pattern. No new descriptor sets required — attribute table base addresses travel via push constants or the existing instance SSBO.
+
+### 8.6 Shader permutation explosion from visualization modes (Phase C)
+
+Adding per-domain `VisualizationMode` toggles with scalar/rgb/rgba/vector variants can produce a combinatorial explosion. **Mitigation:** Use specialization constants (not separate SPIR-V binaries) for visualization mode selection. Limit the matrix: at most 4 specialization constant values per domain × 3 domains = 12 pipeline variants per pass. Fall back to uniform color when an attribute is missing rather than creating a "missing attribute" shader variant.
+
+---
+
+## 9) Verification gates
+
+## 9.1 Correctness
 
 - CPU/GPU visible set parity on canonical scenes.
 - No stale-handle dereference under slot reuse.
 - Deterministic packet contents for same extracted snapshot.
 
-## 8.2 Performance
+## 9.2 Performance
 
 - CPU render preparation P95 under target budget.
 - Visibility dispatch + compaction costs stable with instance growth.
 - Minimal per-frame allocations in hot path.
 
-## 8.3 Robustness
+## 9.3 Robustness
 
 - Degenerate geometry does not crash or explode bounds.
 - Missing normals/radii/covariance degrades to deterministic fallback modes.
@@ -369,19 +479,21 @@ To emulate expert subagents, split the effort into independent tracks with stric
 
 ---
 
-## 9) Practical migration order (recommended)
+## 10) Practical migration order (recommended)
 
-1. **Extract Visibility module first** (highest modular ROI, low risk).
-2. **Introduce render-view ECS components** (freeze contracts early).
-3. **Unify topology storage into global arenas** (largest change, done once contracts are stable).
-4. **Switch Line/Point to GPU culling + indirect**.
-5. **Enable streaming + defrag + LOD**.
+1. **Extract Visibility module first** (highest modular ROI, low risk). Introduce as a facade — SurfacePass calls into it. Add CPU/GPU parity tests before proceeding.
+2. **Extract RenderPackets module** (mechanical refactor, low risk). Move draw packet types out of `Graphics.RenderPipeline.cppm`. Replace `std::vector` fields with `std::span`.
+3. **Introduce render-view ECS components** (freeze contracts early). Dual-path with existing components during transition.
+4. **Unify topology storage into global arenas** (largest change, done once contracts are stable). Add generational handles to GPUScene. Preserve `ReuseVertexBuffersFrom` semantics.
+5. **Switch Line/Point to GPU culling + indirect**. Add transient content carve-out for DebugDraw. Verify pick pipeline compatibility.
+6. **Integrate pick & shadow passes** with unified visibility. Define pick visibility policy.
+7. **Enable streaming + defrag + descriptor epoching**. Build on existing `TransferManager` + `StagingBelt`.
 
-This order minimizes regressions while converging to your desired architecture.
+This order minimizes regressions while converging to the desired architecture. Steps 1–3 are mechanical refactors with low regression risk. Step 4 is the highest-risk structural change — it should only proceed once contracts from steps 1–3 are stable and tested.
 
 ---
 
-## 10) Final boundary litmus test
+## 11) Final boundary litmus test
 
 If the engine is modular, each answer is singular:
 
@@ -397,7 +509,7 @@ If any answer has multiple owners, modularity is still broken.
 
 ---
 
-## 11) C++23 module skeletons for the new boundaries
+## 12) C++23 module skeletons for the new boundaries
 
 These are minimal reference shapes to lock the API direction.
 
@@ -458,18 +570,24 @@ import Core.Handle;
 
 export namespace ECS::RenderViews
 {
+    // Tag types for type-safe handle discrimination.
+    // StrongHandle<Tag> uses the tag for compile-time type safety only —
+    // the tag is not stored at runtime.
+    struct GpuGeometrySliceTag {};
+    struct GpuAttrSliceTag {};
+
     struct RenderTopologyView
     {
-        Core::StrongHandle<uint64_t> GeometrySlice{};
+        Core::StrongHandle<GpuGeometrySliceTag> GeometrySlice{};
     };
 
     struct RenderAttributeViews
     {
-        Core::StrongHandle<uint64_t> VertexAttrs{};
-        Core::StrongHandle<uint64_t> EdgeAttrs{};
-        Core::StrongHandle<uint64_t> FaceAttrs{};
-        Core::StrongHandle<uint64_t> PointAttrs{};
-        Core::StrongHandle<uint64_t> VectorAttrs{};
+        Core::StrongHandle<GpuAttrSliceTag> VertexAttrs{};
+        Core::StrongHandle<GpuAttrSliceTag> EdgeAttrs{};
+        Core::StrongHandle<GpuAttrSliceTag> FaceAttrs{};
+        Core::StrongHandle<GpuAttrSliceTag> PointAttrs{};
+        Core::StrongHandle<GpuAttrSliceTag> VectorAttrs{};
     };
 }
 ```
