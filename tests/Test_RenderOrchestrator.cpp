@@ -103,7 +103,7 @@ TEST_F(RenderOrchestratorHeadlessTest, MaterialRegistryCreatable)
     // MaterialRegistry is one of the first things RenderOrchestrator creates.
     // Verify it can be constructed with headless Vulkan infrastructure.
     Core::Assets::AssetManager assetManager;
-    auto matSys = std::make_unique<Graphics::MaterialRegistry>(*m_TextureManager, assetManager);
+    auto matSys = std::make_unique<Graphics::MaterialRegistry>(*m_Device, *m_TextureManager, assetManager);
     EXPECT_NE(matSys, nullptr);
 
     // Create and destroy a material to exercise the pool.

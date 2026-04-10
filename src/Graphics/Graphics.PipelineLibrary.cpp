@@ -45,6 +45,7 @@ namespace Graphics
         RHI::DescriptorLayout& GlobalSetLayout;
         std::unordered_map<Core::Hash::StringID, std::unique_ptr<RHI::GraphicsPipeline>> Pipelines;
         VkDescriptorSetLayout Stage1InstanceSetLayout = VK_NULL_HANDLE;
+        VkDescriptorSetLayout MaterialSetLayout = VK_NULL_HANDLE; // set=3: per-material SSBO
         VkDescriptorSetLayout CullSetLayout = VK_NULL_HANDLE;
         std::unique_ptr<RHI::ComputePipeline> CullPipeline;
         VkDescriptorSetLayout SceneUpdateSetLayout = VK_NULL_HANDLE;
@@ -93,9 +94,13 @@ namespace Graphics
     void PipelineLibrary::BuildDefaults(const ShaderRegistry& shaderRegistry,
                                        VkFormat swapchainFormat,
                                        VkFormat depthFormat,
-                                       VkFormat sceneColorFormat)
+                                       VkFormat sceneColorFormat,
+                                       VkDescriptorSetLayout materialSetLayout)
     {
         (void)swapchainFormat;
+
+        // Store the material set layout (set=3) for surface pipelines.
+        m_Impl->MaterialSetLayout = materialSetLayout;
 
         // Local resolver helpers — avoid repeating the ShaderRegistry lambda at every call site.
         auto resolver    = [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); };
@@ -168,6 +173,10 @@ namespace Graphics
 
             builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
 
+            // Material SSBO (set = 3): per-material PBR data.
+            if (m_Impl->MaterialSetLayout != VK_NULL_HANDLE)
+                builder.AddDescriptorSetLayout(m_Impl->MaterialSetLayout);
+
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
             pushConstant.size = sizeof(RHI::MeshPushConstants);
@@ -218,6 +227,8 @@ namespace Graphics
                 builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
                 builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
                 builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
+                if (m_Impl->MaterialSetLayout != VK_NULL_HANDLE)
+                    builder.AddDescriptorSetLayout(m_Impl->MaterialSetLayout);
 
                 VkPushConstantRange pushConstant{};
                 pushConstant.offset = 0;
@@ -255,6 +266,8 @@ namespace Graphics
                 builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
                 builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
                 builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
+                if (m_Impl->MaterialSetLayout != VK_NULL_HANDLE)
+                    builder.AddDescriptorSetLayout(m_Impl->MaterialSetLayout);
 
                 VkPushConstantRange pushConstant{};
                 pushConstant.offset = 0;
@@ -302,6 +315,8 @@ namespace Graphics
             builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
             builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
             builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
+            if (m_Impl->MaterialSetLayout != VK_NULL_HANDLE)
+                builder.AddDescriptorSetLayout(m_Impl->MaterialSetLayout);
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -386,6 +401,8 @@ namespace Graphics
             builder.AddDescriptorSetLayout(m_Impl->GlobalSetLayout.GetHandle());
             builder.AddDescriptorSetLayout(m_Impl->Bindless.GetLayout());
             builder.AddDescriptorSetLayout(m_Impl->Stage1InstanceSetLayout);
+            if (m_Impl->MaterialSetLayout != VK_NULL_HANDLE)
+                builder.AddDescriptorSetLayout(m_Impl->MaterialSetLayout);
 
             // Use VERTEX|FRAGMENT stage flags to match the forward pipeline layout,
             // ensuring pipeline layout compatibility for descriptor set bindings.
@@ -747,7 +764,8 @@ namespace Graphics
         //
         // Caller MUST ensure GPU idle before calling this.
         // Exits the process on critical shader/pipeline failures (same as init).
-        BuildDefaults(shaderRegistry, swapchainFormat, depthFormat, sceneColorFormat);
+        BuildDefaults(shaderRegistry, swapchainFormat, depthFormat, sceneColorFormat,
+                      m_Impl->MaterialSetLayout);
     }
 
     std::optional<std::reference_wrapper<RHI::GraphicsPipeline>>
@@ -798,6 +816,11 @@ namespace Graphics
     VkDescriptorSetLayout PipelineLibrary::GetStage1InstanceSetLayout() const
     {
         return m_Impl->Stage1InstanceSetLayout;
+    }
+
+    VkDescriptorSetLayout PipelineLibrary::GetMaterialSetLayout() const
+    {
+        return m_Impl->MaterialSetLayout;
     }
 
     VkDescriptorSetLayout PipelineLibrary::GetCullSetLayout() const

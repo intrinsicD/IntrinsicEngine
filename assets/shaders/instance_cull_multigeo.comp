@@ -17,7 +17,7 @@ layout(local_size_x = 64) in;
 
 struct InstanceData {
     mat4 Model;
-    uint TextureID;
+    uint MaterialSlot;
     uint EntityID;
     uint GeometryID;
     uint Pad1;
