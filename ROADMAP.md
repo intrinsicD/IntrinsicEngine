@@ -43,6 +43,8 @@ This roadmap now explicitly tracks the staged runtime/frame-pipeline work captur
 
 This architecture track is intentionally cross-cutting: it enables later rendering, streaming, and interaction work without reordering the feature roadmap below.
 
+**GPU-driven pipeline plan:** `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It refines TODO.md C4/C9 and cross-references B1–B5.
+
 ### Architecture constraints (preserve during all refactor work)
 
 These constraints must be respected even when the underlying features are not being implemented yet:

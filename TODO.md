@@ -36,6 +36,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - `README.md` — user-facing architecture summary, build/test entry points, and SLOs.
 - `CLAUDE.md` — contributor conventions, C++23 policy, and markdown sync contract.
 - `PATTERNS.md` — reusable patterns catalog with canonical examples and usage guidance.
+- `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` — GPU-driven modular rendering pipeline plan (code-aware reuse + gap audit). Refines and implements C4 and C9; cross-references B1–B5.
 
 ---
 
@@ -355,12 +356,14 @@ P2 items are design-only: plan the interfaces and constraints, do not implement.
 
 ### C9. GPU-Driven Indirect Rendering
 
-The engine already has compute culling shaders (`instance_cull.comp`, `instance_cull_multigeo.comp`) but no runtime path exercises them. This bridges CPU-driven draw submission to GPU-driven indirect dispatch. B1 prepares draw packet structures to be consumable by this path.
+GPU-driven surface culling is **already live**: `SurfacePass` Stage 3 dispatches `instance_cull_multigeo.comp` and consumes indirect draw commands via `vkCmdDrawIndexedIndirectCount`. The remaining gap is extending GPU culling to Line/Point passes and centralizing the visibility authority. See `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` for the full implementation plan (Phases A–D).
 
-- [ ] Define `IndirectDrawBuffer` resource and `DrawIndirectCommand` packing.
-- [ ] Build a `GPUCullPass` that reads GPUScene SSBO + camera frustum, writes indirect draw commands.
-- [ ] `SurfacePass` variant that consumes `vkCmdDrawIndexedIndirect` from the cull output.
-- [ ] Feature-flagged: `FrameRecipe` selects CPU-driven or GPU-driven path.
+- [x] Define indirect draw buffer resource and command packing (existing in SurfacePass Stage 3).
+- [x] GPU cull pass consuming GPUScene SSBO + camera frustum (existing `instance_cull_multigeo.comp`).
+- [x] SurfacePass consuming `vkCmdDrawIndexedIndirectCount` from cull output.
+- [x] Feature-flagged: `m_EnableGpuCulling` selects CPU Stage 2 vs GPU Stage 3.
+- [ ] Extract centralized `Graphics.Visibility` module from SurfacePass culling code.
+- [ ] Extend GPU culling to Line/Point passes (requires GPUScene slots for non-surface entities).
 - [ ] Benchmark: compare CPU-culled vs. GPU-culled draw submission at 10K+ entities.
 - [ ] Plan multi-view extension (shadow cascade culling reuses the same path).
 
