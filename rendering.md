@@ -2,41 +2,79 @@
 
 ---
 
+## ⚠ Boundary Audit — Unclear Separation of Concerns
+
+The following issues were identified by reading the source. Each is cross-referenced
+to the section of this document where it is relevant. **These are the real boundary
+problems, not aspirational ones.**
+
+| # | Location | Problem |
+|---|---|---|
+| B1 | `RenderDriver` | Owns `LightEnvironmentPacket` (mutable scene state) + `GlobalRenderModeOverride` (view-mode intent), neither of which is a driver concept |
+| B2 | `RenderDriver.cpp` | Registers a 700-line ImGui "Render Target Viewer" panel in its constructor — Graphics layer has a hard dep on `Interface` for UI |
+| B3 | `RenderDriver::ProcessCompletedGpuWork` | Accepts `ECS::Scene&` and fires `GpuPickCompleted` via `dispatcher.enqueue()` — Graphics module couples directly into ECS |
+| B4 | `Runtime.RenderExtraction.cppm` | `FrameContext` and `FrameContextRing` (GPU slot + timeline sync) live in the extraction module alongside pure data structs (`RenderWorld`, `RenderViewPacket`) |
+| B5 | `RenderOrchestrator` vs `RenderDriver` | No documented contract for who owns what. You must read both constructors. `GeometryPool` and `MaterialRegistry` are *owned* by `RenderOrchestrator` but *borrowed* by `RenderDriver` as raw references — shared mutable state |
+| B6 | `RenderOrchestrator::Impl::InitPipeline()` | Shader filenames and source paths are hardcoded in the Runtime layer — Runtime knows about `"shaders/surface.vert.spv"` etc. |
+| B7 | `RenderDriver::BuildGraph()` | Combines three separate concerns: (a) frame resource setup pass, (b) GPUScene sync compute pass, (c) `DefaultPipeline::SetupFrame()`. The first two are hardcoded in the driver, not in the pipeline |
+| B8 | `BuildGraphInput` + `RenderPassContext` | Dual-struct problem: `RenderPassContext` is constructed by copying all ~20 fields of `BuildGraphInput` and adding GPU plumbing. Every draw packet, snapshot, and debug span exists in both structs |
+| B9 | `RenderOrchestrator::PrepareFrame()` | `GlobalRenderModeOverride` is *stored* in `RenderDriver`, *read* in `PrepareFrame`, used to *filter* `BuildGraphInput` spans — but the override itself is not visible in `BuildGraphInput`, so `BuildGraph` sees pre-filtered input with no indication of why draws are absent |
+| B10 | `PrepareEditorOverlay()` timing | GUI frame start/end lifecycle straddles `BeginFrame`/`AcquireFrame`. `RenderDriver::AcquireFrame()` calls `GUI::EndFrame()` on acquire failure — an acquire-failure edge case forces `RenderDriver` to know about the GUI frame lifecycle |
+| B11 | `LightEnvironmentPacket` definition | Defined in `Graphics.RenderPipeline.cppm` alongside render graph infra. It is a scene-state struct that has no business being co-located with `IRenderFeature`, `FrameRecipe`, and `RenderBlackboard` |
+| B12 | `rendering.md §5` (old) | `ProcessCompletedGpuWork` was shown as part of `PrepareFrame`. In reality it is called from `ResourceMaintenanceService::ProcessCompletedReadbacks()` in the **Maintenance lane**, which runs *after* the Render lane — not before GPU acquire |
+| B13 | Lane ordering | Old doc implied parallel lanes; the actual order in `RunFramePhasesStaged` is strictly sequential: `Streaming → Fixed → Render → Maintenance` |
+
+---
+
 ## 1. Ownership Hierarchy
 
 ```
 Runtime::Engine                         (src/Runtime/Runtime.Engine.cppm)
+ │
  ├── Runtime::GraphicsBackend           (Runtime.GraphicsBackend.cppm)
- │    ├── RHI::VulkanDevice             (RHI.Device.cppm)
- │    ├── RHI::VulkanSwapchain          (RHI.Swapchain.cppm)
- │    ├── RHI::SimpleRenderer           (RHI.Renderer.cppm)
- │    ├── RHI::BindlessDescriptorSystem (RHI.Bindless.cppm)
- │    ├── RHI::DescriptorAllocator      (RHI.Descriptors.cppm)
- │    ├── RHI::BufferManager            (RHI.Buffer.cppm)
- │    ├── RHI::TextureManager           (RHI.TextureManager.cppm)
- │    └── RHI::TransferManager          (RHI.Transfer.cppm)
+ │    │  Owns the Vulkan stack. Has no knowledge of scenes, passes, or draw packets.
+ │    ├── RHI::VulkanContext
+ │    ├── RHI::VulkanDevice (shared_ptr, exported to dependents)
+ │    ├── RHI::VulkanSwapchain
+ │    ├── RHI::SimpleRenderer           (frame sync, timeline semaphores, cmd buffers)
+ │    ├── RHI::BindlessDescriptorSystem
+ │    ├── RHI::DescriptorAllocator
+ │    ├── RHI::BufferManager
+ │    ├── RHI::TextureManager
+ │    └── RHI::TransferManager
  │
  ├── Runtime::RenderOrchestrator        (Runtime.RenderOrchestrator.cppm)
+ │    │  Owns everything needed to define *what* to render.
+ │    │  Coordinates the ECS FrameGraph tick + the GPU frame.
+ │    │  ⚠ See B5: also leaks GeometryPool/MaterialRegistry refs into RenderDriver.
  │    ├── Graphics::ShaderRegistry      (Graphics.ShaderRegistry.cppm)
+ │    │    ⚠ See B6: populated with hardcoded shader paths in RenderOrchestrator::Impl.
  │    ├── Graphics::PipelineLibrary     (Graphics.PipelineLibrary.cppm)
- │    ├── Graphics::GPUScene            (Graphics.GPUScene.cppm)
- │    ├── Graphics::MaterialRegistry    (Graphics.MaterialRegistry.cppm)
  │    ├── Graphics::GeometryPool        (Graphics.Geometry.cppm)
+ │    ├── Graphics::MaterialRegistry    (Graphics.MaterialRegistry.cppm)
  │    ├── Graphics::DebugDraw           (Graphics.DebugDraw.cppm)
  │    ├── Graphics::ShaderHotReloadSvc  (Graphics.ShaderHotReload.cppm)
- │    ├── Core::Memory::LinearArena     (per-frame scratch, per FrameContext)
- │    ├── Core::Memory::ScopeStack      (per-frame scratch, per FrameContext)
+ │    ├── Core::FrameGraph              (ECS system graph, not the render graph)
+ │    ├── Core::Memory::LinearArena     (per-frame scratch, global)
+ │    ├── Core::Memory::ScopeStack      (per-frame scratch, global)
+ │    ├── Runtime::FrameContextRing     (Runtime.RenderExtraction.cppm)  ⚠ B4
  │    └── Graphics::RenderDriver        (Graphics.RenderDriver.cppm)
+ │         │  Owns how to execute a GPU frame. Has no knowledge of ECS or scenes.
+ │         │  ⚠ See B1: also holds LightEnvironmentPacket + GlobalRenderModeOverride.
+ │         │  ⚠ See B3: calls ECS dispatcher in ProcessCompletedGpuWork.
+ │         │  ⚠ See B2: registers ImGui panel in constructor.
  │         ├── Graphics::GlobalResources    (Graphics.GlobalResources.cppm)
  │         │    ├── CameraUBO (VulkanBuffer, dynamic offsets × FramesInFlight)
  │         │    ├── GlobalDescriptorSet (set=0: UBO + shadow atlas sampler)
- │         │    └── RHI::TransientAllocator (transient image/buffer pool)
+ │         │    └── RHI::TransientAllocator
  │         ├── Graphics::PresentationSystem (Graphics.Presentation.cppm)
- │         │    ├── VulkanSwapchain (borrowed)
- │         │    └── Depth images (per swapchain image)
+ │         │    ├── VulkanSwapchain (borrowed ref)
+ │         │    └── Depth image (per swapchain image)
  │         ├── Graphics::InteractionSystem  (Graphics.Interaction.cppm)
- │         │    └── Pick readback buffer + GPU pick result
- │         └── Graphics::DefaultPipeline   (Graphics.Pipelines.cppm)
+ │         │    ├── Pick readback buffers (N slots)
+ │         │    └── DebugViewState (selected resource, depth range, culling toggle)
+ │         ├── Graphics::RenderGraph        (Graphics.RenderGraph.cppm)
+ │         └── Graphics::RenderPipeline     (Graphics.Pipelines.cppm — DefaultPipeline)
  │              └── IRenderFeature × N (the pass list, see §4)
  │
  ├── Runtime::SceneManager              (Runtime.SceneManager.cppm)
@@ -47,42 +85,52 @@ Runtime::Engine                         (src/Runtime/Runtime.Engine.cppm)
 
 ---
 
-## 2. Frame Loop
+## 2. Frame Loop — Lane Execution Order
 
-`Engine::Run()` drives three **lanes** every iteration (see `Runtime.FrameLoop.cppm`):
+`Engine::Run()` drives a **sequential** loop each iteration (see `Runtime.FrameLoop.cppm`).
+The three lanes run **in order**, not in parallel:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  PlatformFrameCoordinator::BeginFrame()                         │
-│   • glfwPollEvents, resize detection, idle-FPS throttle sleep   │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-          ┌────────────────┼────────────────┐
-          ▼                ▼                ▼
-   StreamingLane    MaintenanceLane    RenderLane
-   ─────────────    ───────────────    ──────────
-   ProcessIngest    GPU readbacks      ECS FrameGraph
-   MainThreadQ      Deferred destruct  Fixed-step tick
-   Upload fence GC  Transfer GC        Variable-step tick
-                    Texture/mat GC     ExtractRenderWorld
-                    Telemetry          ExecutePreparedFrame
-                    ShaderHotReload
+PlatformFrameCoordinator::BeginFrame()
+ • glfwPollEvents, resize detection, idle-FPS throttle sleep
+ │
+ ▼
+StreamingLane::BeginFrame()
+ • ProcessAssetIngest (main-thread queue drain)
+ • ProcessMainThreadQueue (RunOnMainThread() callbacks)
+ • ProcessUploads (transfer fence GC)
+ │
+ ▼
+[Fixed-step tick]
+ • RunFixedSteps → OnFixedUpdate → RegisterFixedSystems → ECS FrameGraph execute
+ │
+ ▼
+RenderLane::Run()
+ • OnUpdate(dt)         — Sandbox variable logic
+ • RegisterVariableSystems + ECS FrameGraph execute  — lifecycle, sync, BVH (see §3)
+ • DispatchDeferredEvents()  — entt::dispatcher::update()
+ • OnRender(alpha)      — DebugDraw calls
+ • PrepareEditorOverlay()    ⚠ B10: GUI::BeginFrame + DrawGUI before GPU acquire
+ • ExtractRenderWorld()
+ • ExecutePreparedFrame()    → PrepareFrame + ExecuteFrame + EndFrame
+ │
+ ▼
+MaintenanceLane::Run()                ⚠ B12/B13: runs AFTER Render, not during
+ • CaptureGpuSyncState   — timeline query, memory budgets
+ • ProcessCompletedReadbacks → RenderDriver::ProcessCompletedGpuWork  ⚠ B3
+ • CollectGpuDeferredDestructions
+ • GarbageCollectTransfers
+ • ProcessTextureDeletions / ProcessMaterialDeletions
+ • CaptureFrameTelemetry
+ • BookkeepHotReloads
 ```
-
-**`RenderLaneCoordinator::Run()`** does (in order):
-1. `OnUpdate(dt)` — Sandbox logic
-2. Register engine ECS systems into `Core::FrameGraph`
-3. `OnRegisterSystems()` — Sandbox systems
-4. `DispatchDeferredEvents()` — `entt::dispatcher::update()`
-5. `FrameGraphExecutor::Execute()` — compile + run ECS FrameGraph (lifecycle, sync, BVH)
-6. `OnRender(alpha)` — Sandbox render hook (debug draw calls live here)
-7. `ExtractRenderWorld()` → `ExecutePreparedFrame(renderWorld)`
 
 ---
 
-## 3. ECS FrameGraph Systems (run inside step 5 above)
+## 3. ECS FrameGraph Systems (run inside RenderLane, variable-tick)
 
-These run in dependency order via `Core::DAGScheduler`. All are registered in `RegisterEngineSystems()` (`Runtime.SystemBundles.cppm`).
+These run in dependency order via `Core::DAGScheduler`. All are registered in
+`RegisterEngineSystems()` (`Runtime.SystemBundles.cppm`).
 
 | System | File | What it does |
 |---|---|---|
@@ -100,64 +148,141 @@ These run in dependency order via `Core::DAGScheduler`. All are registered in `R
 
 File: `Runtime.RenderExtraction.cppm` + `Runtime.RenderOrchestrator.cpp`
 
-Produces an immutable `RenderWorld` struct:
+### 4.1 — What "extraction" means
+
+Extraction runs on the main thread at the end of the variable tick. It reads the
+current ECS world (via `WorldSnapshot`) and produces an **immutable** `RenderWorld`
+that the GPU frame consumes. No ECS mutation occurs after this point in the frame.
+
+### 4.2 — Inputs to extraction
+
+```
+RenderFrameInput {
+  Alpha         double
+  View          RenderViewPacket     ← camera matrices, viewport, FOV
+  World         WorldSnapshot        ← entt::registry snapshot (borrowed read)
+}
+```
+
+`RenderOrchestrator::ExtractRenderWorld()` calls the free function
+`Runtime::ExtractRenderWorld(input)` (which reads `WorldSnapshot`) then enriches
+the result with:
+- **Lighting** — reads `RenderDriver::GetLightEnvironment()` ⚠ B1
+- **Shadow cascade matrices** — computed from camera + light direction
+- **DebugDraw snapshots** — frozen copies from `DebugDraw` accumulator
+- **InteractionSystem snapshots** — `PendingPick`, `DebugViewState` (via `RenderDriver::GetInteraction()`)
+- **GpuSceneSnapshot** — active instance count from `GPUScene`
+
+### 4.3 — Output: `RenderWorld`
 
 ```
 RenderWorld {
-  RenderViewPacket View          ← camera matrices, viewport, FOV
-  LightEnvironmentPacket Lighting ← dir light, ambient, shadow params+cascades
-  []SurfaceDrawPacket             ← per-mesh: geo handle, world matrix, face/vertex colors
-  []LineDrawPacket                ← per-edge-set: geo+edge handles, color, width, bounding sphere
-  []PointDrawPacket               ← per-point-set: geo handle, color, size, mode, bounding sphere
-  []PickingSurfacePacket          ← surface picking: geo + triangle→face ID sidecar
-  []PickingLinePacket             ← line picking
-  []PickingPointPacket            ← point picking
-  SelectionOutlinePacket          ← selected+hovered PickIDs
-  []DebugDraw::LineSegment        ← depth-tested debug lines
-  []DebugDraw::LineSegment        ← overlay (no-depth) debug lines
-  []DebugDraw::PointMarker        ← debug points
-  []DebugDraw::TriangleVertex     ← debug triangles (face selection fill, etc.)
-  EditorOverlayPacket             ← HasDrawData flag for ImGuiPass
-  PickRequestSnapshot             ← pending pixel pick (x, y)
-  DebugViewSnapshot               ← which buffer to visualize + depth range
-  GpuSceneSnapshot                ← active instance count for cull dispatch
+  Alpha                     double
+  View                      RenderViewPacket
+  World                     WorldSnapshot
+  Lighting                  LightEnvironmentPacket
+  HasSelectionWork          bool
+  SelectionOutline          SelectionOutlinePacket
+  SurfacePicking[]          ← per-mesh picking draw data
+  LinePicking[]
+  PointPicking[]
+  SurfaceDraws[]            ← per-mesh rendering draw data
+  LineDraws[]
+  PointDraws[]
+  HtexPatchPreview?
+  EditorOverlay             EditorOverlayPacket (HasDrawData flag)
+  DebugDrawLines[]          ← frozen DebugDraw accumulator
+  DebugDrawOverlayLines[]
+  DebugDrawPoints[]
+  DebugDrawTriangles[]
+  PickRequest               PickRequestSnapshot
+  DebugView                 DebugViewSnapshot
+  GpuScene                  GpuSceneSnapshot
 }
 ```
 
 ---
 
-## 5. Frame Preparation (`PrepareFrame`)
+## 5. Frame Execution (`ExecutePreparedFrame`)
 
-File: `Runtime.RenderOrchestrator.cpp`
+`ExecutePreparedFrame(renderWorld)` calls the following in order, all on the main thread:
 
 ```
-PrepareEditorOverlay()              ← GUI::BeginFrame() + DrawGUI() → EditorOverlayPacket
-     ↓
-FrameContextRing::BeginFrame()      ← wait GPU timeline (vkWaitSemaphores), flush deferred deletions
-     ↓
+PrepareEditorOverlay()                       ⚠ B10
+  └─ GUI::BeginFrame() + GUI::DrawGUI()
+       → EditorOverlayPacket{HasDrawData=true}
+  [ImGui draw data is alive from here until EndFrame]
+          │
+          ▼
+FrameContextRing::BeginFrame()
+  └─ select next slot by ring index
+  └─ wait GPU timeline if slot was previously submitted
+  └─ FlushDeferredDeletions for this slot
+  └─ push cached GPU profiling sample to telemetry
+          │
+          ▼
 RenderDriver::BeginFrame()
-  └─ PresentationSystem::BeginFrame()   ← vkAcquireNextImageKHR
-     ↓
-RenderDriver::ProcessCompletedGpuWork() ← GPU pick readback, resolve GPU profiling timestamps
-     ↓
+  └─ GeometryPool::ProcessDeletions
+  └─ GarbageCollectRetiredPipelines
+  └─ BindlessSystem::FlushPending
+          │
+          ▼
+PresentationSystem::BeginFrame() ← vkAcquireNextImageKHR
+  [If acquire fails: GUI::EndFrame() is called here]  ⚠ B10
+          │
+          ▼
+  [RenderDriver::RebindFrameAllocators — per-slot LinearArena/ScopeStack]
+          │
+          ▼
 RenderDriver::UpdateGlobals()
+  └─ GlobalResources::BeginFrame(frameIndex)  ← reset transient allocator
   └─ GlobalResources::Update()
-       ├─ upload CameraBufferObject (view, proj, light dir/color/intensity, ambient)
-       └─ GlobalResources::BeginFrame() — reset TransientAllocator
-     ↓
-GPUScene::Sync(cmd, frameIndex)         ← dispatch scene_update.comp (scatter pending QueueUpdate()s)
-     ↓
-MaterialRegistry::SyncGpuBuffer()       ← upload GpuMaterialData[] to material SSBO
-     ↓
-ResolveDrawPacketBounds()               ← fill LocalBoundingSphere in Line/Point draw packets from GeometryPool
-     ↓
-CullDrawPackets()                       ← CPU frustum cull → CulledDrawList{VisibleLineIndices, VisiblePointIndices}
-     ↓
-RenderDriver::BuildGraph(BuildGraphInput)
-  └─ DefaultPipeline::SetupFrame(RenderPassContext)   ← adds all passes to RenderGraph (see §6)
-  └─ RenderGraph::Compile(frameIndex)                 ← barrier calculation + packetization (see §7)
-  └─ DefaultPipeline::PostCompile()                   ← update descriptor sets after image handles are known
+       ├─ upload CameraBufferObject (view, proj, light dir/color, ambient)
+       └─ ApplyPendingPipelineSwap (if a new RenderPipeline was requested)
+          │
+          ▼
+MaterialRegistry::SyncGpuBuffer()            ← upload GpuMaterialData[] SSBO
+          │
+          ▼
+[GlobalRenderModeOverride filtering]          ⚠ B9
+  └─ reads RenderDriver::GetGlobalRenderModeOverride()
+  └─ filters SurfaceDraws / LineDraws / PointDraws spans
+          │
+          ▼
+ResolveDrawPacketBounds()
+  └─ fills LocalBoundingSphere in Line/Point packets from GeometryPool
+          │
+          ▼
+CullDrawPackets()
+  └─ CPU frustum cull → CulledDrawList{VisibleLineIndices, VisiblePointIndices}
+  [Surface packets excluded: GPU-driven via GPUScene compute]
+          │
+          ▼
+RenderDriver::BuildGraph(BuildGraphInput)     ⚠ B7, B8
+  │
+  ├─ RenderGraph::Reset(frameIndex)
+  ├─ AddPass "FrameSetup"  ← imports Backbuffer + depth; creates frame-transient resources ⚠ B7
+  ├─ AddPass "SceneUpdate" ← dispatches scene_update.comp (GPUScene scatter)              ⚠ B7
+  └─ DefaultPipeline::SetupFrame(RenderPassContext)  ← registers all render passes (see §6)
+          │
+          ▼
+RenderDriver::ExecuteGraph()
+  ├─ RenderGraph::Compile(frameIndex)          ← barrier calc, aliasing, packetize
+  ├─ BuildDebugPassList / BuildDebugImageList  ← for UI + telemetry
+  ├─ ValidateCompiledGraph()                   ← structured diagnostics
+  ├─ DefaultPipeline::PostCompile()            ← update descriptor sets with final image views
+  ├─ GlobalResources::UpdateShadowAtlasBinding ← bind compiled atlas view to global set
+  └─ RenderGraph::Execute(primaryCmd)          ← record + submit secondary cmd bufs
+          │
+          ▼
+RenderDriver::EndFrame()
+  └─ PresentationSystem::EndFrame()
+       ├─ vkQueueSubmit (graphics queue, timeline semaphore signal)
+       └─ vkQueuePresentKHR
 ```
+
+Note: `ProcessCompletedGpuWork` (GPU pick readback + `GpuPickCompleted` dispatch) runs in
+the **Maintenance lane** (after this frame's render lane completes). See §2 and B12.
 
 ---
 
@@ -165,22 +290,29 @@ RenderDriver::BuildGraph(BuildGraphInput)
 
 File: `Graphics.Pipelines.cpp`
 
-Passes call `IRenderFeature::AddPasses(RenderPassContext&)` which registers lambdas via `RenderGraph::AddPass<Data>()`.
+Each pass is an `IRenderFeature` that calls `AddPasses(RenderPassContext&)`, which
+registers lambdas into the `RenderGraph` via `AddPass<Data>()`.
 
 ```
 Pass 1  — PickingPass            (Graphics.Passes.Picking.cppm)
-Pass 2  — ShadowPass             (Graphics.Passes.Shadow.cppm)        [optional, off by default]
+Pass 2  — ShadowPass             (Graphics.Passes.Shadow.cppm)      [disabled by default]
 Pass 3  — SurfacePass            (Graphics.Passes.Surface.cppm)
-Pass 4  — CompositionPass        (Graphics.Passes.Composition.cppm)   [deferred path only]
+Pass 4  — CompositionPass        (Graphics.Passes.Composition.cppm) [deferred path only]
 Pass 5  — LinePass               (Graphics.Passes.Line.cppm)
 Pass 6  — PointPass              (Graphics.Passes.Point.cppm)
 Pass 7  — PostProcessPass        (Graphics.Passes.PostProcess.cppm)
 Pass 8  — SelectionOutlinePass   (Graphics.Passes.SelectionOutline.cppm)
-Pass 9  — DebugViewPass          (Graphics.Passes.DebugView.cppm)     [optional]
+Pass 9  — DebugViewPass          (Graphics.Passes.DebugView.cppm)   [optional]
 Pass 10 — ImGuiPass              (Graphics.Passes.ImGui.cppm)
 ```
 
-Each pass is feature-gated via `Core::FeatureRegistry` (e.g., `"SurfacePass"_id`). Missing the feature key = pass skipped entirely.
+Each pass is feature-gated via `Core::FeatureRegistry` (e.g., `"SurfacePass"_id`).
+Missing the feature key = pass skipped entirely.
+
+`FrameSetup` and `SceneUpdate` are hardcoded in `RenderDriver::BuildGraph()` and
+run before any pipeline pass. ⚠ B7: these should logically be registered by the
+pipeline itself (e.g., as a `FramePrologueFeature : IRenderFeature`), not hardcoded
+in the driver.
 
 ---
 
@@ -192,12 +324,17 @@ Each pass is feature-gated via `Core::FeatureRegistry` (e.g., `"SurfacePass"_id`
 **When:** Only when a pick request is pending (`PickRequest.Pending = true`).  
 **What:** Dual-channel MRT. `EntityId` = entt entity handle. `PrimitiveId` = high 2 bits = domain (`00`=surface, `01`=line, `10`=point), low 30 bits = face/edge/point index. After this pass a copy-pass blits both buffers to CPU-readable readback buffers.
 
+The readback result is consumed the next maintenance lane via
+`InteractionSystem::ProcessReadbacks()` → `TryConsumePickResult()` →
+`GpuPickCompleted` dispatcher event. ⚠ B3: the dispatch crosses into ECS inside
+`RenderDriver::ProcessCompletedGpuWork`.
+
 ---
 
 ### Pass 2 — ShadowPass *(currently disabled)*
 **Shader:** `shadow_depth.vert`  
 **Writes:** `ShadowAtlas` (2048×N depth atlas, N cascades up to 4)  
-**What:** Renders scene depth from each cascade's orthographic LVP matrix into a packed depth atlas. Uses `instance_cull.comp` or a CPU-built indirect buffer (not wired yet).
+**What:** Renders scene depth from each cascade's orthographic LVP matrix into a packed depth atlas.
 
 ---
 
@@ -205,36 +342,33 @@ Each pass is feature-gated via `Core::FeatureRegistry` (e.g., `"SurfacePass"_id`
 **Shaders:** `surface.vert/frag`, `surface_gbuffer.frag`, `debug_surface.vert/frag`  
 **Writes:** `SceneColorHDR` (forward) or `SceneNormal`/`Albedo`/`Material0` (deferred), `SceneDepth`
 
-The surface pass has three sub-stages of increasing GPU-drivenness:
+Three sub-stages of increasing GPU-drivenness:
 
 #### Depth Prepass (optional, `FrameRecipe::DepthPrepass = true`)
-- Shader: `surface.vert` (depth-only, no fragment output)
-- Writes `SceneDepth` with `CLEAR`, so the main raster pass uses `LOAD`.
+Shader: `surface.vert` (depth-only). Writes `SceneDepth` with `CLEAR`; main raster uses `LOAD`.
 
-#### Stage 1/2 — CPU-driven forward/G-buffer
-CPU builds `GpuInstanceData[]` per visible entity → writes into `m_InstanceBuffer[frame]`.  
-CPU builds `VkDrawIndexedIndirectCommand[]` → writes into `m_Stage2IndirectIndexedBuffer[frame]`.  
+#### Stage 2 — CPU-driven forward/G-buffer
+CPU builds `GpuInstanceData[]` per visible entity → `m_InstanceBuffer[frame]`.  
+CPU builds `VkDrawIndexedIndirectCommand[]` → `m_Stage2IndirectIndexedBuffer[frame]`.  
 Draw: `vkCmdDrawIndexedIndirect`.
 
-#### Stage 3 — GPU-driven (active when `m_EnableGpuCulling = true`)
+#### Stage 3 — GPU-driven (`m_EnableGpuCulling = true`)
 1. CPU writes `GpuInstanceData[]` to `m_InstanceBuffer[frame]`.
-2. Compute dispatch `instance_cull_multigeo.comp` (workgroup 64):
-    - Reads: GPUScene bounds buffer, camera frustum, per-geometry index counts.
-    - Writes: `VkDrawIndexedIndirectCommand[]` into `m_Stage3IndirectPacked[frame]`, visibility remap into `m_Stage3VisibilityPacked[frame]`, draw count into `m_Stage3DrawCountsPacked[frame]`.
+2. Compute `instance_cull_multigeo.comp`: reads GPUScene bounds, camera frustum → writes indirect commands + visibility remap + draw count.
 3. Draw: `vkCmdDrawIndexedIndirectCount`.
 
-**Descriptor sets (surface.vert/frag):**
+**Descriptor sets:**
 | Set | Binding | Content |
 |---|---|---|
 | 0 | 0 | `CameraBufferObject` UBO (view/proj + lighting) |
-| 1 | 0 | Bindless texture array (all loaded textures) |
+| 1 | 0 | Bindless texture array |
 | 2 | 0 | `GpuInstanceData[]` SSBO |
 | 3 | 0 | `GpuMaterialData[]` SSBO |
 
 **Push constants (MeshPushConstants, 120 bytes):**
 `Model (mat4)` · `PtrPositions (BDA)` · `PtrNormals (BDA)` · `PtrFaceAttr (BDA)` · `PtrVertexAttr (BDA)` · `PtrIndices (BDA)` · `PtrCentroids (BDA)` · `VisibilityBase (u32)` · `MaterialSlot (u32)`
 
-**Transient debug triangles:** A separate `AddDebugTrianglePass` uploads the `DebugDraw::Triangle()` accumulator via host-visible BDA buffers and renders with `kPipeline_DebugSurface` (alpha blend, no depth write).
+**Transient debug triangles:** `AddDebugTrianglePass` uploads `DebugDraw::Triangle()` accumulator via host-visible BDA buffers and renders with `kPipeline_DebugSurface` (alpha blend, no depth write).
 
 ---
 
@@ -242,48 +376,46 @@ Draw: `vkCmdDrawIndexedIndirect`.
 **Shader:** `deferred_lighting.frag`  
 **Reads:** `SceneNormal`, `Albedo`, `Material0`, `SceneDepth`  
 **Writes:** `SceneColorHDR`  
-**What:** Fullscreen triangle lighting pass. Reconstructs world position from depth, reads G-buffer, evaluates the directional light + ambient from push constants that mirror the CameraBufferObject layout.
+**What:** Fullscreen triangle lighting pass. Reconstructs world position from depth, evaluates directional light + ambient from push constants mirroring the CameraBufferObject layout.
 
 ---
 
 ### Pass 5 — LinePass
 **Shaders:** `line.vert/frag`  
-**Reads:** `SceneDepth` (depth-tested variant), no depth (overlay variant)  
+**Reads:** `SceneDepth` (depth-tested), or none (overlay)  
 **Writes:** `SceneColorHDR`
 
-Two sub-pipelines: `m_Pipeline` (depth on) and `m_OverlayPipeline` (depth off, for editor overlays like contact normals).
+Two sub-pipelines: `m_Pipeline` (depth on) and `m_OverlayPipeline` (depth off).
 
 **Retained draws** (from `[]LineDrawPacket`, filtered by `CulledDrawList::VisibleLineIndices`):
 - `BDA PtrPositions` from shared vertex buffer
 - `BDA PtrEdges` from edge index buffer
 - `BDA PtrEdgeAttr` from persistent per-entity `m_EdgeAttrBuffers` (packed ABGR per edge)
 
-**Transient draws** (from `DebugDrawLines`/`DebugDrawOverlayLines`):
-- Each frame uploads flat `[start0,end0,start1,end1,…]` vec3 array to `m_TransientPosBuffer[frame]`
-- Identity edge pair buffer (pre-allocated `{0,1},{2,3},…`)
-- Optional per-segment color buffer `m_TransientColorBuffer[frame]`
+**Transient draws** (from `DebugDrawLines` / `DebugDrawOverlayLines`):
+- Per-frame flat `[start0,end0,start1,end1,…]` vec3 array → `m_TransientPosBuffer[frame]`
+- Identity edge pair buffer (pre-allocated)
+- Optional per-segment color buffer
 
-**Push constants (104 bytes):** `Model (mat4)` · `PtrPositions (BDA)` · `PtrEdges (BDA)` · `PtrEdgeAttr (BDA)` · `LineWidth (f32)` · `Color (vec4)`
+**Push constants (104 bytes):** `Model (mat4)` · `PtrPositions` · `PtrEdges` · `PtrEdgeAttr` · `LineWidth` · `Color`
 
 ---
 
 ### Pass 6 — PointPass
-**Shaders:** `point_flatdisc.vert/frag` (mode 0), `point_surfel.vert/frag` (mode 1/EWA), `point_sphere.vert/frag` (mode 3)  
+**Shaders:** `point_flatdisc.vert/frag` (mode 0), `point_surfel.vert/frag` (mode 1), `point_sphere.vert/frag` (mode 3)  
 **Writes:** `SceneColorHDR`, depth-tests against `SceneDepth`  
 **Depth bias:** `(-2.0, -2.0)` to prevent z-fighting with surface.
 
-Four per-mode pipelines. Each vertex expands a single position into a camera-facing quad (or surfel-oriented quad). Surfel/EWA mode uses the normal for orientation and EWA covariance for anisotropic splatting. Sphere mode adds analytical per-fragment normal.
+Four per-mode pipelines. Each vertex expands a position into a camera-facing quad (or surfel-oriented quad). Surfel/EWA mode uses the normal for orientation; sphere mode adds analytical per-fragment normal.
 
-**Push constants (120 bytes):** `Model (mat4)` · `PtrPositions (BDA)` · `PtrNormals (BDA)` · `PtrAttr (BDA)` · `PointSize (f32)` · `SizeMultiplier (f32)` · `Viewport (vec2)` · `Color (vec4)` · `Flags (u32)`
-
-Retained and transient paths same pattern as LinePass.
+**Push constants (120 bytes):** `Model (mat4)` · `PtrPositions` · `PtrNormals` · `PtrAttr` · `PointSize` · `SizeMultiplier` · `Viewport` · `Color` · `Flags`
 
 ---
 
 ### Pass 7 — PostProcessPass
 File: `Graphics.Passes.PostProcess.cppm`
 
-Orchestrates five **sub-passes** in sequence:
+Five sub-passes in sequence:
 
 ```
 SceneColorHDR
@@ -292,40 +424,38 @@ SceneColorHDR
 BloomSubPass           post_bloom_downsample.frag × N mips
     │                  post_bloom_upsample.frag × N mips
     ▼
-ToneMapSubPass         post_tonemap.frag (ACES filmic, or Reinhard)
-    │                  ← reads SceneColorHDR + bloom upsampled chain
-    ▼                  → writes SceneColorLDR
-FXAASubPass            post_fxaa.frag (reads SceneColorLDR)
-  or
-SMAASubPass            post_smaa_edge.frag → post_smaa_blend.frag → post_smaa_resolve.frag
-    │
+ToneMapSubPass         post_tonemap.frag (ACES filmic or Reinhard)
+    │                  reads SceneColorHDR + bloom upsampled chain
+    │                  writes SceneColorLDR
     ▼
-HistogramSubPass       post_histogram.comp (compute, 128-bucket luminance histogram)
-                       → async readback for auto-exposure/UI display
+FXAASubPass / SMAASubPass
+    │   FXAA:  post_fxaa.frag
+    │   SMAA:  post_smaa_edge → post_smaa_blend → post_smaa_resolve
+    ▼
+HistogramSubPass       post_histogram.comp (compute, 128-bucket luminance)
+                       → async readback for auto-exposure / UI display
 ```
-
-All read `SceneColorHDR` from the render blackboard. Final output lands in `SceneColorLDR` (swapchain format).
 
 ---
 
 ### Pass 8 — SelectionOutlinePass
 **Shader:** `selection_outline.frag` (fullscreen triangle)  
-**Reads:** `EntityId` (R32_UINT sampled image)  
+**Reads:** `EntityId` (R32_UINT sampled)  
 **Writes:** Presentation target (`SceneColorLDR` or `Backbuffer`)  
-**What:** Jump-flood or Sobel-style edge detect on the EntityId image. Pixels whose 8-neighbourhood contains a selected PickID get colored with the outline color. Hovered entity gets a distinct color. Thickness and colors are configurable via `SelectionOutlineSettings`.
+**What:** Sobel-style edge detect on EntityId. Pixels whose 8-neighbourhood contains a selected PickID get the outline color. Hovered entity gets a distinct color. Thickness and colors configurable via `SelectionOutlineSettings`.
 
 ---
 
 ### Pass 9 — DebugViewPass *(optional)*
 **Shader:** `debug_view.frag` / `debug_view.comp`  
-**Reads:** Selected render graph image (any of `EntityId`, `PrimitiveId`, `SceneNormal`, `Albedo`, `SceneDepth`, etc.)  
+**Reads:** Selected render graph image  
 **Writes:** Presentation target  
-**What:** Fullscreen blit with per-format decode (UINT visualized as hue, depth remapped by near/far, normal packed as RGB). An ImGui preview panel also renders a scaled-down version via a separate `m_PreviewImages[]` array.
+**What:** Fullscreen blit with per-format decode (UINT→hue, depth→near/far remap, normal packed as RGB). Preview panel renders a scaled-down version via `m_PreviewImages[]`.
 
 ---
 
 ### Pass 10 — ImGuiPass
-**What:** Calls `Interface::GUI::Render(cmd)` which calls `ImGui::Render()` + `ImGui_ImplVulkan_RenderDrawData()`. Skipped entirely if `EditorOverlay.HasDrawData = false`. Renders onto the presentation target with `LOAD` (preserves previous passes).
+**What:** Calls `Interface::GUI::Render(cmd)` which calls `ImGui::Render()` + `ImGui_ImplVulkan_RenderDrawData()`. Skipped when `EditorOverlay.HasDrawData = false`. Renders onto the presentation target with `LOAD`.
 
 ---
 
@@ -333,44 +463,38 @@ All read `SceneColorHDR` from the render blackboard. Final output lands in `Scen
 
 File: `Graphics.RenderGraph.cppm`
 
-### Compile phase (`RenderGraph::Compile(frameIndex)`)
-1. **`ResolveTransientResources()`** — for each non-imported resource, find or allocate from `m_ImagePool`/`m_BufferPool` using format+size+usage as the key. Resources live only within their `[StartPass, EndPass]` interval → memory aliasing.
-2. **`BuildSchedulerGraph()`** — builds a DAG: pass A → pass B when B reads a resource written by A. Feeds `Core::DAGScheduler` for topological sort → execution layers.
-3. **`CalculateBarriers()`** — walks each pass's access list in execution order. Computes `VkImageMemoryBarrier2` / `VkBufferMemoryBarrier2` deltas (srcStage/srcAccess/oldLayout → dstStage/dstAccess/newLayout). Stored as `span<>` in arena per pass.
-4. **`Packetize()`** — merges consecutive passes in the same execution layer into `ExecutionPacket`s if they share the same render attachments (or are both non-raster). Packets map 1:1 to secondary command buffers → fewer `vkBeginCommandBuffer` calls.
-5. **PostCompile callbacks** — `SelectionOutlinePass`, `DebugViewPass`, `CompositionPass`, `PostProcessPass` update their descriptor sets to point at the newly resolved `VkImageView` handles.
+### Compile (`RenderGraph::Compile(frameIndex)`)
+1. **`ResolveTransientResources()`** — allocate or reuse images/buffers from pool, keyed by format+size+usage. Resources live within `[StartPass, EndPass]` → memory aliasing.
+2. **`BuildSchedulerGraph()`** — DAG: pass A → pass B when B reads what A writes. `Core::DAGScheduler` topological sort → execution layers.
+3. **`CalculateBarriers()`** — per-pass `VkImageMemoryBarrier2` / `VkBufferMemoryBarrier2` deltas (srcStage/srcAccess/oldLayout → dstStage/dstAccess/newLayout). Stored per-pass in arena.
+4. **`Packetize()`** — merge consecutive same-layer passes sharing the same attachments into `ExecutionPacket`s (→ fewer `vkBeginCommandBuffer` calls).
+5. **PostCompile callbacks** — SelectionOutlinePass, DebugViewPass, CompositionPass, PostProcessPass update their descriptor sets to the newly resolved `VkImageView` handles.
 
-### Execute phase (`RenderGraph::Execute(cmd)`)
-For each execution layer (can be parallelized in future):
-- For each `ExecutionPacket` in the layer:
-    - Record into a secondary command buffer (inherited rendering state for raster packets)
-    - For each pass in the packet:
-        1. Emit barriers (`vkCmdPipelineBarrier2`)
-        2. If raster: `vkCmdBeginRendering` (dynamic rendering, Vulkan 1.3)
-        3. Call `pass.ExecuteFn(userData, registry, cmd)` — the lambda registered via `AddPass<>()`
-        4. If raster: `vkCmdEndRendering`
-    - `vkEndCommandBuffer` (secondary)
-    - `vkCmdExecuteCommands` on primary
+### Execute (`RenderGraph::Execute(cmd)`)
+For each execution layer:
+- For each `ExecutionPacket`:
+    - Record into a secondary command buffer
+    - For each pass: emit barriers → `vkCmdBeginRendering` → `ExecuteFn` → `vkCmdEndRendering`
+    - `vkEndCommandBuffer` (secondary) → `vkCmdExecuteCommands` on primary
 
 ---
 
 ## 9. Render Resources (Blackboard)
 
-All passes communicate via `RenderBlackboard` (name→`RGResourceHandle` map).
+All passes communicate via `RenderBlackboard` (StringID → `RGResourceHandle`).
 
 | Resource Name | Format | Lifetime | Producer | Consumer(s) |
 |---|---|---|---|---|
-| `Backbuffer` | swapchain | Imported | PresentationSystem | ImGui, SelectionOutline, Present.LDR |
+| `Backbuffer` | swapchain | Imported | PresentationSystem | ImGui, SelectionOutline |
 | `SceneDepth` | D32_SFLOAT | Imported | PresentationSystem | Picking, Surface, Line, Point |
-| `EntityId` | R32_UINT | Transient | PickingPass | SelectionOutline, DebugView |
-| `PrimitiveId` | R32_UINT | Transient | PickingPass | (readback copy pass) |
+| `EntityId` | R32_UINT | Transient | PickingPass | SelectionOutline, DebugView, readback copy |
+| `PrimitiveId` | R32_UINT | Transient | PickingPass | readback copy |
 | `SceneNormal` | R16G16B16A16_SFLOAT | Transient | SurfacePass (GBuffer) | CompositionPass |
 | `Albedo` | R8G8B8A8_UNORM | Transient | SurfacePass (GBuffer) | CompositionPass |
 | `Material0` | R16G16B16A16_SFLOAT | Transient | SurfacePass (GBuffer) | CompositionPass |
 | `SceneColorHDR` | R16G16B16A16_SFLOAT | Transient | SurfacePass / CompositionPass | Line, Point, PostProcess |
 | `SceneColorLDR` | swapchain | Transient | ToneMapSubPass | FXAA/SMAA, SelectionOutline, DebugView, ImGui |
-| `SelectionMask` | R8_UNORM | Transient | (future) | SelectionOutlinePass |
-| `ShadowAtlas` | D16_UNORM | Transient | ShadowPass | SurfacePass (sampler) |
+| `ShadowAtlas` | D16_UNORM | Transient | ShadowPass | SurfacePass (sampler, bound to global set) |
 
 ---
 
@@ -383,7 +507,7 @@ All passes communicate via `RenderBlackboard` (name→`RGResourceHandle` map).
 | GPUScene bounds SSBO | `GPUScene` | same | `instance_cull*.comp` |
 | Instance SSBO (per-frame) | `SurfacePass` | CPU each frame | `surface.vert` (set=2) |
 | Material SSBO | `MaterialRegistry` | `SyncGpuBuffer()` | `surface.frag` (set=3) |
-| Indirect draw buffer | `SurfacePass` | Stage2: CPU / Stage3: `instance_cull_multigeo.comp` | `vkCmdDrawIndexedIndirectCount` |
+| Indirect draw buffer | `SurfacePass` | Stage 2: CPU / Stage 3: `instance_cull_multigeo.comp` | `vkCmdDrawIndexedIndirectCount` |
 | Edge attr buffer (per entity) | `LinePass` | on first use / on dirty | `line.vert` (BDA PtrEdgeAttr) |
 | Point attr / radii buffer | `PointPass` | on first use / on dirty | `point_*.vert` (BDA PtrAttr) |
 | Face / vertex attr buffer | `SurfacePass` | on first use / on dirty | `surface.vert` (BDA PtrFaceAttr/PtrVertexAttr) |
@@ -402,90 +526,178 @@ All passes communicate via `RenderBlackboard` (name→`RGResourceHandle` map).
 | `pick_line.vert/frag` | `Pipeline.PickLine` | PipelineLibrary | PickingPass |
 | `pick_point.vert/frag` | `Pipeline.PickPoint` | PipelineLibrary | PickingPass |
 | `shadow_depth.vert` | `Pipeline.ShadowDepth` | PipelineLibrary | ShadowPass |
-| `line.vert/frag` | (built lazily) | LinePass | LinePass |
-| `point_flatdisc.vert/frag` | (built lazily) | PointPass | PointPass mode 0 |
-| `point_surfel.vert/frag` | (built lazily) | PointPass | PointPass mode 1/EWA |
-| `point_sphere.vert/frag` | (built lazily) | PointPass | PointPass mode 3 |
-| `scene_update.comp` | (compute) | PipelineLibrary | GPUScene::Sync |
+| `line.vert/frag` | (built by LinePass) | LinePass | LinePass |
+| `point_flatdisc.vert/frag` | (built by PointPass) | PointPass | PointPass mode 0 |
+| `point_surfel.vert/frag` | (built by PointPass) | PointPass | PointPass mode 1 |
+| `point_sphere.vert/frag` | (built by PointPass) | PointPass | PointPass mode 3 |
+| `scene_update.comp` | (compute) | PipelineLibrary | SceneUpdate pass (in BuildGraph ⚠ B7) |
 | `instance_cull_multigeo.comp` | (compute) | PipelineLibrary | SurfacePass Stage 3 |
-| `deferred_lighting.frag` | (built lazily) | CompositionPass | CompositionPass |
-| `post_tonemap.frag` | (built lazily) | ToneMapSubPass | PostProcessPass |
-| `post_bloom_*.frag` | (built lazily) | BloomSubPass | PostProcessPass |
-| `post_fxaa.frag` | (built lazily) | FXAASubPass | PostProcessPass |
-| `post_smaa_*.frag` | (built lazily) | SMAASubPass | PostProcessPass |
-| `post_histogram.comp` | (compute, built lazily) | HistogramSubPass | PostProcessPass |
-| `selection_outline.frag` | (built lazily) | SelectionOutlinePass | SelectionOutlinePass |
-| `debug_view.frag` | (built lazily) | DebugViewPass | DebugViewPass |
+| `deferred_lighting.frag` | (built by CompositionPass) | CompositionPass | CompositionPass |
+| `post_tonemap.frag` | (built by ToneMapSubPass) | ToneMapSubPass | PostProcessPass |
+| `post_bloom_*.frag` | (built by BloomSubPass) | BloomSubPass | PostProcessPass |
+| `post_fxaa.frag` | (built by FXAASubPass) | FXAASubPass | PostProcessPass |
+| `post_smaa_*.frag` | (built by SMAASubPass) | SMAASubPass | PostProcessPass |
+| `post_histogram.comp` | (compute) | HistogramSubPass | PostProcessPass |
+| `selection_outline.frag` | (built by SelectionOutlinePass) | SelectionOutlinePass | SelectionOutlinePass |
+| `debug_view.frag` | (built by DebugViewPass) | DebugViewPass | DebugViewPass |
 
 ---
 
 ## 12. Full Frame Data-Flow Diagram
 
 ```
-[GLFW input] ──────────────────────────────────────────────────────────────── ActivityTracker
-                                                                                    │
-ECS Scene (entt::registry)                                                          │
-    │                                                                               │
-    ▼  PropertySetDirtySync → MeshRendererLifecycle                                 │
-    │  MeshViewLifecycle → GraphLifecycle → PointCloudLifecycle                     │
-    │  GPUSceneSync                                                                 │
-    │  PrimitiveBVHBuild                                                            │
-    │                                                                               │
-    ▼  DispatchDeferredEvents (entt::dispatcher)                                    │
-    │                                                                               │
-    ▼  OnRender(alpha)  ──► DebugDraw accumulator (lines, points, triangles)        │
-    │                                                                               │
-    ▼  PrepareEditorOverlay                                                         │
-    │    └─ ImGui::NewFrame → all panels + gizmo → EditorOverlayPacket              │
-    │                                                                               ▼
-    ▼  ExtractRenderWorld (snapshot, immutable)                                FramePacing
-    │    └─ RenderWorld {View, Lighting, Surface/Line/Point packets,           (idle sleep)
-    │        DebugDraw snapshots, Pick request, DebugView, GpuScene}
+[GLFW input] ──────────────────────────────────────────────────────── ActivityTracker
+                                                                            │
+ECS Scene (entt::registry)                                                  │
+    │                                                                       │
+    ▼  ECS FrameGraph (variable-tick):                                      │
+    │  PropertySetDirtySync → MeshRendererLifecycle → MeshViewLifecycle     │
+    │  → GraphLifecycle → PointCloudLifecycle → GPUSceneSync                │
+    │  → PrimitiveBVHBuild                                                  │
+    │                                                                       │
+    ▼  DispatchDeferredEvents (entt::dispatcher::update)                    │
+    │                                                                       │
+    ▼  OnRender(alpha)  ──► DebugDraw accumulator                           │
+    │                                                                       ▼
+    ▼  PrepareEditorOverlay()  ──► ImGui::NewFrame + DrawGUI         FramePacing
+    │     → EditorOverlayPacket{HasDrawData=true}                    (idle sleep)
     │
-    ▼  BeginFrame (GPU timeline wait, deferred deletion flush)
+    ▼  ExtractRenderWorld()  → immutable RenderWorld snapshot
+    │     (enriched with Lighting from RenderDriver ⚠ B1,
+    │      InteractionSystem snapshots, DebugDraw frozen copies)
     │
-    ▼  vkAcquireNextImageKHR
+    ▼  FrameContextRing::BeginFrame()  (GPU timeline wait, deferred deletions)
     │
-    ▼  ProcessCompletedGpuWork (pick readback, GPU profiling)
+    ▼  PresentationSystem::BeginFrame()  ← vkAcquireNextImageKHR
+    │     [on failure: GUI::EndFrame() called here ⚠ B10]
     │
-    ▼  GlobalResources::Update (upload CameraBufferObject)
+    ▼  RenderDriver::UpdateGlobals()
+    │     └─ GlobalResources::Update() (CameraBufferObject upload)
+    │     └─ ApplyPendingPipelineSwap (if requested)
     │
-    ▼  GPUScene::Sync → scene_update.comp (scatter instance updates)
+    ▼  MaterialRegistry::SyncGpuBuffer()
     │
-    ▼  MaterialRegistry::SyncGpuBuffer (upload material SSBO)
+    ▼  GlobalRenderModeOverride filtering  ⚠ B9
+    │     (reads from RenderDriver, filters draw spans in-place)
     │
-    ▼  ResolveDrawPacketBounds + CullDrawPackets (CPU frustum cull lines/points)
+    ▼  ResolveDrawPacketBounds + CullDrawPackets  (CPU frustum cull lines/points)
     │
-    ▼  RenderGraph::AddPass<> × N  (DefaultPipeline::SetupFrame)
+    ▼  RenderDriver::BuildGraph(BuildGraphInput)  ⚠ B7, B8
+    │     ├─ RenderGraph::Reset
+    │     ├─ AddPass "FrameSetup" (resource import/create)  ⚠ B7
+    │     ├─ AddPass "SceneUpdate" (GPUScene sync dispatch)  ⚠ B7
+    │     └─ DefaultPipeline::SetupFrame(RenderPassContext)  ← all 10 passes
     │
-    ▼  RenderGraph::Compile
-    │    ├─ ResolveTransientResources (allocate/pool images+buffers)
-    │    ├─ BuildSchedulerGraph (DAG topology sort)
-    │    ├─ CalculateBarriers (Vulkan Sync2 barriers)
-    │    ├─ Packetize (merge into secondary cmd buf groups)
-    │    └─ PostCompile (update descriptor sets with final image views)
-    │
-    ▼  RenderGraph::Execute(primaryCmd)
-    │    ├─ [Layer 0] PickingPass (EntityId + PrimitiveId MRT) + Copy to readback
-    │    ├─ [Layer 1] ShadowPass (optional)
-    │    ├─ [Layer 2] SurfacePass
-    │    │    ├─ DepthPrepass (optional)
-    │    │    ├─ instance_cull_multigeo.comp (GPU culling → indirect draws)
-    │    │    ├─ surface.vert/frag  (forward) or surface_gbuffer.frag (deferred)
-    │    │    └─ debug_surface (transient triangles, alpha blend)
-    │    ├─ [Layer 3] CompositionPass (deferred only: deferred_lighting.frag)
-    │    ├─ [Layer 4] LinePass  (line.vert/frag, BDA push constants)
-    │    ├─ [Layer 5] PointPass (point_*.vert/frag, BDA push constants)
-    │    ├─ [Layer 6] PostProcessPass
-    │    │    ├─ Bloom (downsample + upsample chain)
-    │    │    ├─ ToneMap (ACES + bloom add → SceneColorLDR)
-    │    │    ├─ FXAA or SMAA (anti-aliasing on LDR)
-    │    │    └─ Histogram (compute, async readback)
-    │    ├─ [Layer 7] SelectionOutlinePass (Sobel on EntityId → tinted overlay)
-    │    ├─ [Layer 8] DebugViewPass (optional, fullscreen buffer visualizer)
-    │    └─ [Layer 9] ImGuiPass (ImGui_ImplVulkan_RenderDrawData)
+    ▼  RenderDriver::ExecuteGraph()
+    │     ├─ RenderGraph::Compile (barriers, aliasing, packetize)
+    │     ├─ ValidateCompiledGraph
+    │     ├─ DefaultPipeline::PostCompile (update descriptor sets)
+    │     ├─ GlobalResources::UpdateShadowAtlasBinding
+    │     └─ RenderGraph::Execute(primaryCmd)
+    │          ├─ [Layer 0] PickingPass (EntityId + PrimitiveId MRT)
+    │          ├─ [Layer 1] ShadowPass (optional)
+    │          ├─ [Layer 2] SurfacePass
+    │          │    ├─ DepthPrepass (optional)
+    │          │    ├─ instance_cull_multigeo.comp (GPU cull → indirect draws)
+    │          │    ├─ surface.vert/frag or surface_gbuffer.frag
+    │          │    └─ debug_surface (transient triangles, alpha blend)
+    │          ├─ [Layer 3] CompositionPass (deferred only)
+    │          ├─ [Layer 4] LinePass
+    │          ├─ [Layer 5] PointPass
+    │          ├─ [Layer 6] PostProcessPass (Bloom → ToneMap → FXAA/SMAA → Histogram)
+    │          ├─ [Layer 7] SelectionOutlinePass
+    │          ├─ [Layer 8] DebugViewPass (optional)
+    │          └─ [Layer 9] ImGuiPass
     │
     ▼  vkQueueSubmit (graphics queue, timeline semaphore signal)
     │
     ▼  vkQueuePresentKHR
+    │
+    ▼  [--- Maintenance lane runs AFTER this frame's render lane ---]  ⚠ B12/B13
+         CaptureGpuSyncState
+         ProcessCompletedReadbacks
+           └─ InteractionSystem::ProcessReadbacks
+           └─ TryConsumePickResult → GpuPickCompleted event  ⚠ B3
+         CollectGpuDeferredDestructions
+         GarbageCollectTransfers
+         ProcessTextureDeletions / ProcessMaterialDeletions
+         CaptureFrameTelemetry
+         BookkeepHotReloads
 ```
+
+---
+
+## 13. Recommended Refactoring Targets (Priority Order)
+
+These are concrete changes that would eliminate the boundaries listed in §⚠.
+
+### High priority
+
+**B3 — Decouple `RenderDriver` from ECS**  
+`RenderDriver::ProcessCompletedGpuWork(ECS::Scene&, uint64_t)` should return
+`std::optional<InteractionSystem::PickResultGpu>` and nothing more. The dispatch
+`scene.GetDispatcher().enqueue<GpuPickCompleted>()` belongs in
+`ResourceMaintenanceService::ProcessCompletedReadbacks()` at the Runtime layer,
+which already owns both `SceneManager` and `RenderOrchestrator`.
+
+**B1 — Move `LightEnvironmentPacket` out of `RenderDriver`**  
+Scene lighting is not a driver concept. It should live in `SceneManager` or be
+a first-class field on `RenderWorld`. `RenderDriver::GetLightEnvironment()` /
+`SetLightEnvironment()` is a mutating accessor that UI panels use directly —
+this is a scene-state side channel that bypasses the extraction contract.
+
+**B7 — Promote `FrameSetup` and `SceneUpdate` to pipeline passes**  
+Create a `FramePrologueFeature : IRenderFeature` that owns `AddFrameSetupPass()`
+and `AddSceneUpdatePass()`. Register it first in `DefaultPipeline`. Remove the
+two hardcoded `AddPass` calls from `RenderDriver::BuildGraph()`. The driver
+becomes a pure graph executor: it calls `m_ActivePipeline->SetupFrame()` and
+nothing more beyond `RenderGraph::Reset()`.
+
+### Medium priority
+
+**B9 — Make `GlobalRenderModeOverride` explicit in `BuildGraphInput`**  
+Add a `GlobalRenderModeOverride RenderMode` field to `BuildGraphInput`. Do the
+span filtering after populating `BuildGraphInput` and before calling
+`RenderDriver::BuildGraph`. This makes it visible and testable.
+
+**B8 — Eliminate `RenderPassContext` as a duplicate of `BuildGraphInput`**  
+`RenderPassContext` = `BuildGraphInput` + GPU plumbing (UBO, descriptor sets,
+renderer, bindless). Construct the plumbing fields inline at
+`DefaultPipeline::SetupFrame()`; passes can receive them as a smaller
+`GpuFrameContext` struct. The large draw-packet spans do not need to live on
+`RenderPassContext` at all — passes query what they need.
+
+**B4 — Move `FrameContext`/`FrameContextRing` to a dedicated module**  
+Create `Runtime.FrameContext.cppm`. `Runtime.RenderExtraction.cppm` should
+contain only the extraction data types (`RenderWorld`, `RenderViewPacket`,
+`RenderFrameInput`, `ExtractRenderWorld()`).
+
+**B2 — Extract `RenderDriver`'s ImGui panel to a dedicated file**  
+Create `Graphics.RenderTargetViewerPanel.cppm` (or place it in `EditorUI`).
+The panel registers itself via `GUI::RegisterPanel` during app startup, not
+inside `RenderDriver`'s constructor. `RenderDriver` exposes a thin read-only
+query interface (`DumpRenderGraphToString`, `GetLastDebugImages`, etc.) that
+the panel consumes.
+
+### Low priority
+
+**B6 — Move shader registration to a catalog file**  
+Create `Graphics.ShaderCatalog.cppm` with a constexpr table of
+`{StringID, spv_path, glsl_source}` entries. `RenderOrchestrator` calls
+`ShaderCatalog::RegisterAll(shaderRegistry, shaderSourceDir)` instead of
+inlining 40 registrations.
+
+**B10 — Document GUI frame lifecycle explicitly**  
+The `PrepareEditorOverlay → BeginFrame → AcquireFrame → [EndFrame on failure]`
+contract should be in a code comment on `AcquireFrame()`. Consider moving the
+`IsFrameActive()` guard to `PrepareEditorOverlay`'s caller rather than burying
+it in `AcquireFrame`.
+
+**B11 — Move `LightEnvironmentPacket` definition**  
+It lives in `Graphics.RenderPipeline.cppm` among render graph infrastructure.
+Move it to `Graphics.Camera.cppm` (already holds `CameraComponent`) or to a
+new `Graphics.SceneState.cppm`.
+
+
+### My Goal Architecture
+
