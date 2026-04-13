@@ -7,12 +7,12 @@
 
 ## 0. Philosophy
 
-- **One global geometry store.** No per-entity vertex/index buffers. One GVB, one GIB. Entities are views.
+- **BufferManager-managed geometry.** No per-entity vertex/index buffers. Geometry lives in managed buffers owned by `BufferManager`. Each entity holds a `BufferView` referencing a region within a managed buffer. Multiple managed buffers may exist (for capacity or format reasons); entities can reference different buffers from the manager.
 - **GPU drives execution.** A GPU-side LBVH determines visibility. The CPU hands the GPU a scene description; the GPU builds indirect draw commands.
-- **Positions and UVs in the vertex buffer only.** Everything else (normals, tangents, per-vertex scalars, colors) lives in per-entity attribute SSBOs accessed by BDA, or in textures (material data). This makes the GVB compact and stable.
+- **Positions and UVs in the vertex buffer only.** Everything else (normals, tangents, per-vertex scalars, colors) lives in per-entity attribute SSBOs accessed by BDA, or in textures (material data). This keeps managed vertex buffers compact and stable.
 - **Deferred by default.** All opaque surfaces write to a G-buffer. Lighting is a single full-screen pass. Lines, points, and transparent objects are a forward sub-pass composited on top.
 - **Components are switches.** Presence of `SurfaceComponent`, `LineComponent`, or `PointComponent` determines which pipelines render an entity — no boolean flags, no enum routing.
-- **Push constants + SSBOs.** Per-entity rendering parameters go in a per-entity SSBO (indexed via `firstInstance`). Push constants carry only the per-draw-call index. No per-entity descriptor sets.
+- **Push constants + SSBOs.** Per-entity rendering parameters go in two per-entity SSBOs — `GpuInstanceData` (transform, identity — updated frequently) and `GpuEntityConfig` (visualization, BDA pointers — updated rarely). Push constants carry only the per-draw-call slot index. No per-entity descriptor sets.
 - **Visualization is a shader-level concern.** Scalar fields, color maps, isolines, and face/edge/vertex domain colors are resolved entirely in fragment shaders by reading from BDA-addressed attribute SSBOs. No additional passes required.
 
 ---
@@ -49,20 +49,21 @@ Runtime::Engine
 
 ### GpuWorld — the GPU's complete view of the scene
 
-`GpuWorld` is the GPU-side counterpart of `SceneManager`. Just as `SceneManager` owns all CPU entity state, `GpuWorld` owns all GPU-resident scene data. It is a single ownership boundary with four sub-allocators, each with its own strategy:
+`GpuWorld` is the GPU-side counterpart of `SceneManager`. Just as `SceneManager` owns all CPU entity state, `GpuWorld` owns all GPU-resident scene data. It is a single ownership boundary with five sub-allocators, each with its own strategy:
 
 ```
 GpuWorld
  │
- ├── GlobalGeometryStore    (§2 — GVB + GIB)
- │    └── FreeListAllocator  byte-range allocator over both buffers
+ ├── GlobalGeometryStore    (§2 — managed vertex + index buffers)
+ │    └── BufferManager      byte-range allocator; may manage multiple buffers
  │
- ├── InstanceBuffer         (§3 — GpuInstanceData[] SSBO)
+ ├── InstanceBuffer         (§3,5 — GpuInstanceData[] SSBO, updated frequently)
  │    └── SlotAllocator      integer slot allocator, max 100k entries
  │
- ├── AABBBuffer             (§3 — GpuAABB[] SSBO, parallel to InstanceBuffer)
+ ├── EntityConfigBuffer     (§5 — GpuEntityConfig[] SSBO, updated rarely)
+ │    └── SlotAllocator      parallel to InstanceBuffer (same slot index)
  │
- ├── EntityRenderDataBuffer (§5 — EntityRenderData[] SSBO, parallel to InstanceBuffer)
+ ├── AABBBuffer             (§3 — GpuAABB[] SSBO, parallel to InstanceBuffer)
  │
  ├── MaterialRegistry       (§8 — GpuMaterialData[] SSBO)
  │    └── SlotAllocator      integer slot allocator, independent of instance slots
@@ -72,9 +73,9 @@ GpuWorld
       └── DynamicBVHNodeBuffer (rebuilt every frame)
 ```
 
-**Why these four sub-allocators and not one?**
-- `GlobalGeometryStore`: byte-range allocator — geometry is variable-size, shared across multiple views of the same mesh.
-- `InstanceBuffer` / `EntityRenderDataBuffer`: integer slot allocator — one slot per live entity, fixed-size records.
+**Why these five sub-allocators and not one?**
+- `GlobalGeometryStore`: byte-range allocator via `BufferManager` — geometry is variable-size, shared across multiple views of the same mesh. Multiple managed buffers may exist; entities reference specific buffers via `BufferView`.
+- `InstanceBuffer` / `EntityConfigBuffer`: integer slot allocator — one slot per live entity, fixed-size records. Split by update frequency: transforms change every frame, visualization config changes rarely.
 - `MaterialRegistry`: integer slot allocator — one slot per material, independent lifetime from entities.
 
 They share the same ownership story (GPU-resident, scene-lifetime) but differ in allocation semantics. They live under one roof (`GpuWorld`) but are not merged into one buffer.
@@ -87,65 +88,63 @@ They share the same ownership story (GPU-resident, scene-lifetime) but differ in
 
 ### 2.1 Buffers
 
-| Buffer | Content | Layout |
-|--------|---------|--------|
-| **Global Vertex Buffer** (GVB) | `vec3 position`, `vec2 uv` per vertex | interleaved: `[x,y,z, u,v]` → 20 bytes/vertex |
-| **Global Index Buffer** (GIB) | `uint32_t` triangle indices (reused for edge pairs) | flat uint32 array |
+All geometry buffers are owned and managed by `BufferManager`. `GpuWorld::GlobalGeometryStore` allocates regions within these managed buffers. Multiple managed buffers may exist (e.g., when a single buffer reaches its capacity limit, a new one is allocated). Entities reference their data via `BufferView`, which identifies both the managed buffer and the region within it.
 
-**Invariant:** Normals, tangents, per-vertex scalars, per-vertex colors, and all other per-vertex attributes are **never** stored in the GVB. They come from:
-- **Material textures** (albedo, normal map, metallic-roughness) — sampled by UV from the GVB.
-- **Per-entity attribute SSBOs** (normals, visualization scalars/colors) — addressed by BDA pointer stored in `EntityRenderData`, indexed by `vertex_id` / `face_id` / `edge_id`.
+| Buffer type | Content | Layout |
+|-------------|---------|--------|
+| **Managed Vertex Buffer(s)** | `vec3 position`, `vec2 uv` per vertex | interleaved: `[x,y,z, u,v]` → 20 bytes/vertex |
+| **Managed Index Buffer(s)** | `uint32_t` triangle indices (reused for edge pairs) | flat uint32 array |
+
+**Invariant:** Normals, tangents, per-vertex scalars, per-vertex colors, and all other per-vertex attributes are **never** stored in vertex buffers. They come from:
+- **Material textures** (albedo, normal map, metallic-roughness) — sampled by UV.
+- **Per-entity attribute SSBOs** (normals, visualization scalars/colors) — addressed by BDA pointer stored in `GpuEntityConfig`, indexed by `vertex_id` / `face_id` / `edge_id`.
 
 ### 2.2 Entity Buffer View Component
 
 ```cpp
 // ECS::Components::BufferView
 struct BufferView {
-    uint32_t VertexOffset;   // first vertex index in GVB
+    uint32_t BufferID;       // which managed buffer this view references
+    uint32_t VertexOffset;   // first vertex index within the managed vertex buffer
     uint32_t VertexCount;
-    uint32_t IndexOffset;    // first index in GIB
+    uint32_t IndexOffset;    // first index within the managed index buffer
     uint32_t IndexCount;
     uint32_t GeometryID;     // stable ID for GPU-scene slot lookup
 };
 ```
 
+An entity's `BufferView` can reference any managed buffer from `BufferManager`. Different entities may reference different managed buffers. Shared views (e.g., wireframe reusing a mesh's vertices) reference the same `BufferID` + `VertexOffset` range.
+
 Lifecycle: created/updated by `MeshRendererLifecycle` (and graph/point-cloud equivalents) whenever geometry is uploaded or modified by an operator.
 
 ### 2.3 Buffer Management ✅
 
-**Strategy:** Free-list allocator with deferred compaction.
+**Strategy:** `BufferManager` with free-list allocation and deferred compaction.
 
-- The GVB and GIB are each allocated as a single large device-local buffer (e.g. 256 MB for the GVB, 512 MB for the GIB).
-- A free-list tracks available ranges (offset + size). Allocations are first-fit.
+- `BufferManager` allocates large device-local buffers on demand (e.g. 256 MB per vertex buffer, 512 MB per index buffer). When a buffer is full, a new one is allocated.
+- Each managed buffer has a free-list that tracks available ranges (offset + size). Allocations are first-fit.
 - **Deletion:** Freed ranges are not immediately reused. They are held for `MAX_FRAMES_IN_FLIGHT` frames (deferred deletion), then returned to the free list.
-- **Compaction:** Triggered when free-list fragmentation exceeds a threshold (e.g. total free space > 30% of buffer capacity but largest contiguous free range < requested allocation). A single `vkCmdCopyBuffer` pass packs live regions to the front; all `BufferView` components are updated in the same frame via a maintenance-lane scan.
-- **Dynamic geometry (operator result):** If the new vertex count is ≤ old vertex count, overwrite in-place (same range). If larger, free old range and reallocate.
+- **Compaction:** Triggered per-buffer when free-list fragmentation exceeds a threshold (e.g. total free space > 30% of buffer capacity but largest contiguous free range < requested allocation). A single `vkCmdCopyBuffer` pass packs live regions to the front; all `BufferView` components referencing that buffer are updated in the same frame via a maintenance-lane scan.
+- **Dynamic geometry (operator result):** If the new vertex count is ≤ old vertex count, overwrite in-place (same range, same buffer). If larger, free old range and reallocate (potentially in a different managed buffer if the current one lacks space).
 
 ### 2.4 Vertex Normal SSBO
 
-Vertex normals for smooth-shaded meshes are **not** in the GVB. They live in a per-entity device-local SSBO. The `EntityRenderData.VertexNormalPtr` field holds the BDA of this SSBO (or 0 if absent). The vertex shader fetches `normal = VertexNormalPtr[vertex_id]` and passes it as a varying for interpolation.
+Vertex normals for smooth-shaded meshes are **not** in managed vertex buffers. They live in a per-entity device-local SSBO. The `GpuEntityConfig.VertexNormalPtr` field holds the BDA of this SSBO (or 0 if absent). The vertex shader fetches `normal = VertexNormalPtr[vertex_id]` and passes it as a varying for interpolation.
 
-This allows geometry-processing operators to recompute normals and upload only the normal SSBO — no GVB rewrite needed.
+This allows geometry-processing operators to recompute normals and upload only the normal SSBO — no vertex buffer rewrite needed.
 
 ---
 
 ## 3. GPU-Driven Scene
 
-### 3.1 Per-Instance SSBO
+### 3.1 Per-Instance SSBOs
 
-One persistent SSBO. One `GpuInstanceData` record per entity slot (default max: 100 000 slots).
+Two persistent SSBOs per entity slot (default max: 100 000 slots), indexed by the same slot ID. See §5.1 for the full struct definitions.
 
-```glsl
-// std430
-struct GpuInstanceData {
-    mat4   Model;            // world transform
-    uint   MaterialSlot;     // index into GpuMaterialData[]
-    uint   EntityID;         // entt entity handle (for picking)
-    uint   GeometryID;       // slot in EntityRenderData[] SSBO
-    uint   RenderFlags;      // bitfield: SurfaceComponent|LineComponent|PointComponent
-                             // + visibility override + shading mode hint
-};
-```
+- **`GpuInstanceData[]`** (set=2, binding=0, 96 bytes/entity) — Model transform, EntityID, MaterialSlot, RenderFlags, vertex/index counts and offsets. Updated frequently (every frame for moving entities).
+- **`GpuEntityConfig[]`** (set=2, binding=1, 96 bytes/entity) — BDA attribute pointers (normals, scalars, colors, point sizes), visualization config (colormap, scalar range, isoline params), point rendering config. Updated rarely (on vis config change).
+
+The cull shader reads `GpuInstanceData` (transform + counts) to generate indirect draw commands. Fragment shaders read both SSBOs via the shared `SlotIndex` push constant.
 
 ### 3.2 AABB SSBO
 
@@ -198,21 +197,56 @@ When dirty, the static BVH is rebuilt once during the compute prologue and remai
 
 ### 3.4 Indirect Draw Buffers
 
-One `VkDrawIndexedIndirectCommand` buffer per component type (Surface / Line / Point). Each command maps to one entity:
+One indirect draw buffer per primitive type (Surface / Line / Point). The cull shader writes one command per visible entity into the appropriate buffer based on `RenderFlags`. All three buffers are consumed via `vkCmdDrawIndexedIndirectCount` (Surface, Line) or `vkCmdDrawIndirectCount` (Point).
+
+#### Surface (triangles, `VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST`)
 
 ```
-indexCount    ← EntityRenderData.IndexCount
-instanceCount ← 1
-firstIndex    ← EntityRenderData.IndexOffset
-vertexOffset  ← EntityRenderData.VertexOffset  (cast to int32_t)
-firstInstance ← EntityRenderData slot index    (→ gl_InstanceIndex in shader)
+VkDrawIndexedIndirectCommand {
+    indexCount    ← GpuInstanceData.IndexCount        // triangle indices
+    instanceCount ← 1
+    firstIndex    ← GpuInstanceData.IndexOffset
+    vertexOffset  ← GpuInstanceData.VertexOffset      (cast to int32_t)
+    firstInstance ← entity slot index                  (→ gl_InstanceIndex in shader)
+}
 ```
 
-All three indirect buffers are consumed via `vkCmdDrawIndexedIndirectCount`.
+#### Line (edges, `VK_PRIMITIVE_TOPOLOGY_LINE_LIST`)
+
+Edge pair indices are stored in managed index buffers alongside triangle indices. Each edge is 2 indices.
+
+```
+VkDrawIndexedIndirectCommand {
+    indexCount    ← GpuInstanceData.IndexCount        // edge pairs × 2
+    instanceCount ← 1
+    firstIndex    ← GpuInstanceData.IndexOffset       // edge index region
+    vertexOffset  ← GpuInstanceData.VertexOffset      // shared vertex buffer
+    firstInstance ← entity slot index                  (→ gl_InstanceIndex in shader)
+}
+```
+
+Line entities share the same vertex buffer region as their parent mesh/graph via `BufferView`. The `IndexOffset`/`IndexCount` fields on the `Line::Component`'s instance slot point to the edge index region, not the triangle index region.
+
+#### Point (billboards, `VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST`, synthesized quads)
+
+Points have no index buffer. The vertex shader synthesizes billboard quads from point positions read via BDA.
+
+```
+VkDrawIndirectCommand {
+    vertexCount   ← GpuInstanceData.VertexCount * 6   // 6 verts per point (2 triangles)
+    instanceCount ← 1
+    firstVertex   ← 0                                 // shader reads positions from BDA
+    firstInstance ← entity slot index                  (→ gl_InstanceIndex in shader)
+}
+```
+
+The point vertex shader computes `pointIndex = gl_VertexIndex / 6` and `cornerIndex = gl_VertexIndex % 6`, then reads `GpuEntityConfig.PtrPositions[pointIndex]` to get the point center and expands it into a billboard quad corner.
 
 ---
 
 ## 4. Deferred Rendering Pipeline
+
+> **Note:** The engine already has a working deferred/hybrid pipeline (`FrameLightingPath::Deferred`, `::Hybrid`), G-buffer MRT outputs, a composition pass, and `deferred_lighting.frag`. This section specifies **refinements** to the existing implementation: a revised G-buffer layout, the modular `LightingPassRegistry` (§4.5), and the unified ForwardPass entity-ID write-back for selection outline coverage across all primitive types.
 
 ### 4.1 G-Buffer Layout
 
@@ -233,7 +267,7 @@ Two-stage composition, evaluated per-fragment in `gbuffer.frag`:
 ```
 Stage 1 — Base normal (best available geometric normal):
 
-  if EntityRenderData.VertexNormalPtr != 0:
+  if GpuEntityConfig.VertexNormalPtr != 0:
       N_base = normalize(interpolated vertex normal from SSBO)
   else:
       N_base = normalize(cross(dFdx(worldPos), dFdy(worldPos)))   ← flat/geometric
@@ -279,7 +313,7 @@ vec3 derivative_tangent(vec3 worldPos, vec2 uv) {
 // bitangent = cross(N, T); TBN = mat3(T, B, N)
 ```
 
-This requires UVs to be present in the GVB. When UVs are all-zero (mesh without parameterization), TBN is degenerate → Stage 2 in §4.2 is skipped, and `N_base` (vertex normal or geometric) is used directly.
+This requires UVs to be present in the managed vertex buffer. When UVs are all-zero (mesh without parameterization), TBN is degenerate → Stage 2 in §4.2 is skipped, and `N_base` (vertex normal or geometric) is used directly.
 
 **Face normals (flat shading):** When `RenderFlags & FLAT_SHADING` is set, or when no normal source is available, the fragment shader uses `normalize(cross(dFdx(worldPos), dFdy(worldPos)))`. This gives a per-triangle geometric normal with correct deferred lighting, no per-vertex normal data required.
 
@@ -298,7 +332,7 @@ GBufferPass
   → writes GBuf_Depth(CLEAR), GBuf_EntityId, GBuf_Albedo, GBuf_Normal, GBuf_Material
   → GPU-driven: vkCmdDrawIndexedIndirectCount (surface indirect buffer)
   → shaders: gbuffer.vert + gbuffer.frag
-  → reads: GVB(BDA), GIB(BDA), EntityRenderData SSBO, GpuMaterialData SSBO, bindless textures
+  → reads: managed buffers (BDA), GpuInstanceData SSBO, GpuEntityConfig SSBO, GpuMaterialData SSBO, bindless textures
 
 DeferredLightingPass
   → reads GBuf_* + ShadowAtlas
@@ -306,9 +340,11 @@ DeferredLightingPass
   → fullscreen triangle
   → lighting model: modular (§4.5)
 
-ForwardPass  [writes SceneColorHDR(LOAD), GBuf_Depth(LOAD)]
+ForwardPass  [writes SceneColorHDR(LOAD), GBuf_Depth(LOAD), GBuf_EntityId(LOAD)]
   ├── LinePass     (mesh wireframe, graph edges, vector field arrows, debug lines)
+  │                writes GBuf_EntityId at covered pixels → selection outline for lines
   ├── PointPass    (mesh vertices, graph nodes, point clouds, debug points)
+  │                writes GBuf_EntityId at covered pixels → selection outline for points
   └── OverlaySurfacePass (overlay meshes, debug triangles — alpha blend, no depth write)
 
 [DEFERRED] TransparentSurfacePass — §13.5
@@ -371,24 +407,37 @@ These are the **only** per-entity rendering components. There are no `Mesh::Data
 
 Lifecycle systems emplace render components with appropriate defaults when an entity gains a `DataAuthority::*Tag` and `GeometrySources` data. Removal of the render component disables that rendering path — no data loss, since all persistent data remains in `GeometrySources`.
 
-### 5.1 EntityRenderData SSBO ✅
+### 5.1 Per-Entity GPU Data — Split by Update Frequency ✅
 
-One persistent SSBO (set=2, binding=0). Each entity occupies one slot, indexed by `gl_InstanceIndex` (= `firstInstance` from the indirect draw command).
+Per-entity GPU data is split across two persistent SSBOs with different update cadences. Both use the same slot index (parallel arrays), indexed by `gl_InstanceIndex` (= `firstInstance` from the indirect draw command).
+
+#### GpuInstanceData SSBO (set=2, binding=0) — updated frequently
+
+Transform and identity data. Updated every frame for moving entities, at allocation time for static ones.
 
 ```glsl
-// std430 — ~192 bytes per entity
-struct EntityRenderData {
-    // ---- Identity & transform ----
-    mat4   Model;               // 64 bytes
-    uint   EntityID;
-    uint   MaterialSlot;        // index into GpuMaterialData[]
-    uint   VertexOffset;        // into GVB (used by vertex shader for BDA arithmetic)
-    uint   IndexOffset;         // into GIB (written by cull shader into indirect cmd)
-    uint   IndexCount;          //           written by cull shader into indirect cmd
+// std430 — 96 bytes per entity
+struct GpuInstanceData {
+    mat4   Model;            // 64 bytes — world transform
+    uint   EntityID;         // entt entity handle (for picking / selection outline)
+    uint   MaterialSlot;     // index into GpuMaterialData[]
+    uint   RenderFlags;      // bitfield: Surface|Line|Point + shading mode + flat + unlit
     uint   VertexCount;
-    uint   RenderFlags;         // bitfield — shading mode, vis domain, unlit, flat, etc.
+    uint   VertexOffset;     // first vertex in managed buffer
+    uint   IndexOffset;      // first index in managed buffer
+    uint   IndexCount;
     uint   _pad0;
+};
+// sizeof(GpuInstanceData) = 96 bytes
+```
 
+#### GpuEntityConfig SSBO (set=2, binding=1) — updated rarely
+
+Visualization parameters and BDA attribute pointers. Updated only when the user changes visualization settings, an algorithm writes new properties, or attribute SSBOs are re-uploaded.
+
+```glsl
+// std430 — 96 bytes per entity
+struct GpuEntityConfig {
     // ---- Per-vertex attribute BDA pointers (0 = absent) ----
     uint64_t VertexNormalPtr;   // vec3[] normals for smooth shading
     uint64_t ScalarPropPtr;     // float[] per-vertex, per-face, or per-edge scalar values
@@ -402,7 +451,7 @@ struct EntityRenderData {
     uint   BinCount;            // 0 = continuous, >0 = quantize into k bins
 
     float  IsolineCount;        // 0 = disabled
-    float  IsolineWidth;
+    float  IsolineWidth;        // scalar-space width (fraction of one iso-interval)
     float  VisualizationAlpha;  // uniform alpha for color overlay (1.0 = opaque)
     uint   VisDomain;           // 0=vertex, 1=face, 2=edge
 
@@ -411,21 +460,23 @@ struct EntityRenderData {
     // ---- PointPass config ----
     float  PointSize;
     uint   PointMode;           // FlatDisc=0, Surfel=1, ImpostorSphere=2, GaussianSplat=3
+    uint   _pad0;
     uint   _pad1;
-    uint   _pad2;
 };
-// sizeof(EntityRenderData) = 192 bytes
+// sizeof(GpuEntityConfig) = 96 bytes
 ```
+
+**Why split?** Transform changes (camera orbit, animation) touch `GpuInstanceData` every frame for affected entities. Visualization config changes (user adjusts scalar range, switches colormap) are rare — typically once per user interaction. Separating them avoids uploading 96 bytes of unchanged visualization data on every transform update, and avoids dirtying the config SSBO on every frame. The cull shader reads only `GpuInstanceData` (transform + counts); fragment shaders read both.
 
 **Push constants** carry only the entity's slot index:
 
 ```glsl
 layout(push_constant) uniform PC {
-    uint SlotIndex;   // → EntityRenderData[SlotIndex]
+    uint SlotIndex;   // → GpuInstanceData[SlotIndex] and GpuEntityConfig[SlotIndex]
 };
 ```
 
-This keeps push constants minimal (4 bytes) and lets the shaders access all per-entity data via the SSBO.
+This keeps push constants minimal (4 bytes). Shaders access all per-entity data via the two SSBOs.
 
 ---
 
@@ -472,7 +523,14 @@ struct PickResult {
 
 ### 6.4 Selection Outline
 
-`SelectionOutlinePass` reads `GBuf_EntityId` (always written by `GBufferPass`) for Sobel-edge outline generation. The separate `Pick_EntityId` buffer is not needed for outline rendering — it is only needed for click-position readback. This resolves §13.13.
+`SelectionOutlinePass` reads `GBuf_EntityId` for Sobel-edge outline generation. The `GBuf_EntityId` attachment is written by **all rendering passes**, not just `GBufferPass`:
+
+1. **GBufferPass** writes `EntityID` for opaque surfaces (initial clear + write).
+2. **ForwardPass** loads `GBuf_EntityId` (no clear) and **LinePass** / **PointPass** write `EntityID` at their covered pixels, overwriting the surface entity ID where lines/points are visible.
+
+This ensures selection outlines work for all entity types — surfaces, wireframes, graph edges, point clouds — via a single unified `GBuf_EntityId` buffer. The separate `Pick_EntityId` buffer is not needed for outline rendering — it is only needed for click-position readback. This resolves §13.13.
+
+**Line/Point fragment shaders** must output `EntityID` as an MRT attachment (same format as `GBuf_EntityId`: `R32_UINT`). The `EntityID` is read from `GpuInstanceData[SlotIndex].EntityID` in the vertex shader and passed as a flat varying to the fragment shader.
 
 ---
 
@@ -487,7 +545,7 @@ Point clouds render in the **ForwardPass** (PointPass sub-pass), after deferred 
 | `ImpostorSphere`| Billboard with per-fragment sphere depth correction | `point_sphere.vert/frag` | ✅ |
 | `GaussianSplat` | Oriented anisotropic splat, view-dependent color | `point_splat.vert/frag` | **[DEFERRED — §13.8]** |
 
-Point size is per-entity (`EntityRenderData.PointSize`) or per-point (`EntityRenderData.PointSizePtr[point_id]`). UI sliders write to `Point::Component` which propagates to `EntityRenderData` on the next dirty sync.
+Point size is per-entity (`GpuEntityConfig.PointSize`) or per-point (`GpuEntityConfig.PointSizePtr[point_id]`). UI sliders write to `Point::Component` which propagates to `GpuEntityConfig` on the next dirty sync.
 
 ---
 
@@ -501,20 +559,22 @@ struct GpuMaterialData {
     vec4   BaseColorFactor;       // RGBA tint multiplied with albedo texture
     float  MetallicFactor;
     float  RoughnessFactor;
-    float  DisplacementScale;     // [DEFERRED — §13.6]
+    // float  DisplacementScale;  // [DEFERRED — §13.6] — uncomment when tessellation ships
+    uint   _reserved0;            // placeholder for DisplacementScale
     uint   Flags;                 // alpha mode, double-sided, emissive, unlit
     uint   AlbedoID;              // bindless texture index (0 = white)
     uint   NormalID;              // bindless texture index (0 = use vertex normal or derivative)
     uint   MetallicRoughnessID;   // bindless texture index (0 = use factors)
-    uint   DisplacementID;        // bindless texture index [DEFERRED — §13.6]
+    // uint   DisplacementID;     // [DEFERRED — §13.6] — uncomment when tessellation ships
+    uint   _reserved1;            // placeholder for DisplacementID
     uint   EmissiveID;            // bindless texture index (0 = none)
-    uint   _pad[3];
+    uint   _pad[2];
 };
 ```
 
 ### 8.2 Normal Map Absence — Albedo-Only Fallback ✅
 
-When `NormalID == 0` **and** `EntityRenderData.VertexNormalPtr == 0` **and** `Flags & UNLIT`:
+When `NormalID == 0` **and** `GpuEntityConfig.VertexNormalPtr == 0` **and** `Flags & UNLIT`:
 - The GBuffer fragment shader writes albedo to `GBuf_Albedo` but writes a sentinel (e.g. `vec3(0)`) to `GBuf_Normal`.
 - `DeferredLightingPass` reads the `GBuf_Normal` length: if near-zero, it skips BRDF evaluation and outputs albedo directly — **albedo-only, no lighting applied**.
 
@@ -522,33 +582,34 @@ When `NormalID == 0` **but** vertex normals or derivatives are available, lighti
 
 ### 8.3 Descriptor Sets (GBuffer Pass)
 
-| Set | Binding | Content |
-|-----|---------|---------|
-| 0 | 0 | `CameraBufferObject` UBO |
-| 1 | 0 | Bindless texture array |
-| 2 | 0 | `EntityRenderData[]` SSBO |
-| 3 | 0 | `GpuMaterialData[]` SSBO |
+| Set | Binding | Content | Update frequency |
+|-----|---------|---------|-----------------|
+| 0 | 0 | `CameraBufferObject` UBO | per-frame |
+| 1 | 0 | Bindless texture array | at load time |
+| 2 | 0 | `GpuInstanceData[]` SSBO | per-frame (transforms) |
+| 2 | 1 | `GpuEntityConfig[]` SSBO | on vis config change |
+| 3 | 0 | `GpuMaterialData[]` SSBO | on material change |
 
 ---
 
 ## 9. Visualization
 
-Visualization changes how **color** is derived in fragment shaders. It does **not** add new passes. All attribute data is accessed via BDA pointers in `EntityRenderData`.
+Visualization changes how **color** is derived in fragment shaders. It does **not** add new passes. All attribute data is accessed via BDA pointers in `GpuEntityConfig`.
 
 ### 9.1 Attribute SSBO Pattern ✅
 
-All per-primitive visualization data (scalars, colors) is uploaded to per-entity device-local SSBOs whose BDA pointers are stored in `EntityRenderData`. The shader indexes by:
+All per-primitive visualization data (scalars, colors) is uploaded to per-entity device-local SSBOs whose BDA pointers are stored in `GpuEntityConfig`. The shader indexes by:
 - `vertex_id` — fetched in the **vertex shader**, passed as a varying → **smooth interpolation** across faces.
 - `face_id` (`gl_PrimitiveID`) — fetched in the **fragment shader** → **flat per-face** value.
 - `edge_id` — fetched in the **vertex shader** (line primitives, same value for both endpoints) → **uniform per-edge** value.
 
-This is **Option B** for all geometry types (meshes, graphs, point clouds). No UV mapping is required for visualization. Material textures still use UV (§4.3). This resolves §13.9.
+This is **Option B** for all geometry types (meshes, graphs, point clouds). No UV mapping is required for visualization. Material textures still use UV (§4.3). Resolves §13.9.
 
 ### 9.2 Scalar Field Visualization
 
 **Supported types:** `bool`, `int32_t`, `uint32_t`, `float`, `double` — all converted to `float32` at upload.
 
-**Domain flag** (`EntityRenderData.VisDomain`):
+**Domain flag** (`GpuEntityConfig.VisDomain`):
 - `VERTEX (0)`: vertex shader fetches `ScalarPropPtr[vertex_id]` → interpolated in fragment shader.
 - `FACE (1)`: fragment shader fetches `ScalarPropPtr[gl_PrimitiveID]` → flat per-face.
 - `EDGE (2)`: vertex shader fetches `ScalarPropPtr[edge_id]` → uniform per edge (LinePass only).
@@ -565,18 +626,22 @@ vec3 color = texture(colormapLUT[ColormapID], t).rgb;
 
 #### 9.2.1 Isolines (Fragment Shader, Mesh-Only)
 
-Smooth anti-aliased isolines without mesh topology dependence:
+Smooth anti-aliased isolines without mesh topology dependence. The isoline width is specified in **scalar space** (fraction of one iso-interval), making it zoom-independent. `fwidth()` is used only for anti-aliasing — the smoothstep transition width — not for the line width itself.
 
 ```glsl
 // In fragment shader, after scalar fetch
 if (IsolineCount > 0.0) {
     float sv = s * IsolineCount;
-    float fw = fwidth(sv);
-    float dist = abs(fract(sv + 0.5) - 0.5);
-    float line = smoothstep(IsolineWidth * fw, 0.0, dist);
+    float fw = fwidth(sv);                       // screen-space rate of change (for AA only)
+    float dist = abs(fract(sv + 0.5) - 0.5);     // distance to nearest isoline in scalar space
+    float halfWidth = IsolineWidth * 0.5;         // IsolineWidth is scalar-space (e.g., 0.05)
+    float aaEdge = fw;                            // AA transition = ~1 pixel in scalar space
+    float line = 1.0 - smoothstep(halfWidth - aaEdge, halfWidth + aaEdge, dist);
     color = mix(color, IsolineColor.rgb, line * IsolineColor.a);
 }
 ```
+
+**Zoom behavior:** `IsolineWidth` is constant in scalar space, so isolines maintain their visual proportion relative to the scalar field gradient regardless of camera distance. At extreme zoom-out, when `fw` exceeds the isoline spacing, individual isolines naturally merge — this is correct behavior (the scalar field cannot be resolved at that scale). At extreme zoom-in, lines remain crisp with sub-pixel anti-aliasing.
 
 Only meaningful for vertex-domain scalars on meshes (interpolated across triangles). Disabled for face/edge domain and for graphs/point clouds via `RenderFlags`.
 
@@ -599,12 +664,12 @@ The vertex shader on line primitives maps each endpoint to the same `edge_id` �
 
 - `ColorPropPtr` holds a `vec3[]` or `vec4[]` buffer (flag in `RenderFlags` distinguishes).
 - Vertex shader fetches by `vertex_id` (or fragment shader by `gl_PrimitiveID` for face domain).
-- `VisualizationAlpha` (from `EntityRenderData`) multiplies the alpha of vec3 colors (default 1.0).
+- `VisualizationAlpha` (from `GpuEntityConfig`) multiplies the alpha of vec3 colors (default 1.0).
 - For `vec4` properties, the per-element alpha is used directly.
 
 ### 9.6 Texture Mapping & Htex Fallback **[DEFERRED — §13.10]**
 
-UVs in the GVB are used by material texture sampling (albedo, normal map, etc.) in the G-buffer pass. For meshes with a UV parameterization, visualization data can optionally be baked into property textures instead of SSBOs. **This path is deferred.** The SSBO path (§9.1) is the primary visualization mechanism.
+UVs in the managed vertex buffer are used by material texture sampling (albedo, normal map, etc.) in the G-buffer pass. For meshes with a UV parameterization, visualization data can optionally be baked into property textures instead of SSBOs. **This path is deferred.** The SSBO path (§9.1) is the primary visualization mechanism.
 
 Htex (Halfedge Textures) for UV-free meshes: **[DEFERRED — §13.10]**. The existing `HtexPatchPreviewPass` remains as-is until the deferred pipeline integration is specified.
 
@@ -619,7 +684,7 @@ Vector fields are rendered as overlay line segments via `LinePass`. Each active 
 | `Edge`   | `(v0 + v1) / 2` (edge midpoint, sampled on CPU) | midpoint + `vector[edge_i] * scale` |
 | `Face`   | face centroid `(v0+v1+v2)/3` (sampled on CPU) | centroid + `vector[face_i] * scale` |
 
-CPU-side baking happens in `PropertySetDirtySyncSystem` when `VectorFieldsDirty = true`. Baked vertex pairs are uploaded to the child Graph entity's GVB region.
+CPU-side baking happens in `PropertySetDirtySyncSystem` when `VectorFieldsDirty = true`. Baked vertex pairs are uploaded to the child Graph entity's managed buffer region.
 
 **Per-field controls** (in `VectorFieldEntry`):
 - `Normalize : bool` — normalize all vectors before scaling (UI toggle).
@@ -639,7 +704,7 @@ The child Graph entity uses `Line::Component` and `Point::Component` (nodes supp
 An **overlay** is a secondary entity (mesh, graph, or point cloud) parented to a primary entity via `Hierarchy::Component`.
 
 - Created/destroyed independently of the parent via `OverlayEntityFactory`.
-- Has its own `BufferView` → its own region in the global GVB/GIB.
+- Has its own `BufferView` → its own region in a managed buffer.
 - Rendered by the same pass as its data type.
 - Can set `Overlay = true` on `Line::Component` / `Point::Component` to disable depth testing.
 - Destruction: ECS `on_destroy` frees the `BufferView` region via deferred deletion.
@@ -687,11 +752,13 @@ Pass 04 — DeferredLightingPass [fullscreen triangle, LightingPassRegistry]
            contributors (in order): Directional → Ambient → [PointLight] → [SpotLight] → [IBL] → [AreaLight]
            [] = registered but feature-gated, not yet implemented
 
-Pass 05 — ForwardPass          [SceneColorHDR LOAD, GBuf_Depth LOAD]
+Pass 05 — ForwardPass          [SceneColorHDR LOAD, GBuf_Depth LOAD, GBuf_EntityId LOAD]
            ├── LinePass     (mesh edges, graph edges, vector field overlays, debug lines)
-           │                GPU-driven: Line indirect buffer + CPU-culled draw packets
+           │                GPU-driven: Line indirect buffer (vkCmdDrawIndexedIndirectCount)
+           │                writes GBuf_EntityId at covered pixels
            ├── PointPass    (mesh vertices, graph nodes, point clouds, debug points)
-           │                GPU-driven: Point indirect buffer + CPU-culled draw packets
+           │                GPU-driven: Point indirect buffer (vkCmdDrawIndirectCount)
+           │                writes GBuf_EntityId at covered pixels
            └── OverlaySurfacePass (alpha-blend, no depth write — debug triangles, overlay meshes)
            [DEFERRED] TransparentSurfacePass — §13.5
 
@@ -716,9 +783,9 @@ SceneManager (CPU, authoritative)
     ▼  SIMULATE PHASE — ECS DAGScheduler
     │  PropertySetDirtySync
     │  → MeshRendererLifecycle → GraphLifecycle → PointCloudLifecycle
-    │    (upload geometry to GpuWorld.GeoStore, update instance/ERD slots)
+    │    (upload geometry to GpuWorld.GeoStore, update instance + config slots)
     │  → GPUSceneSync         (transform → GpuWorld.InstanceBuffer)
-    │  → EntityRenderDataSync (vis config, BDA ptrs → GpuWorld.ERD SSBO)
+    │  → EntityConfigSync     (vis config, BDA ptrs → GpuWorld.EntityConfigBuffer)
     │  → StaticBVHDirtySync   (StaticTag changes → BVHBuilder.StaticDirty)
     │  → PrimitiveBVHBuild    (CPU BVH for picking)
     │  → VectorFieldSync      (bake child graph verts)
@@ -731,7 +798,7 @@ SceneManager (CPU, authoritative)
     │
     ▼  RENDER PHASE
     │  Renderer::BeginFrame()    (GPU timeline wait, deferred deletions)
-    │  GpuWorld::SyncFrame()     (scatter instance/ERD SSBO updates)
+    │  GpuWorld::SyncFrame()     (scatter instance + config SSBO updates)
     │  BVHBuilder::Build()       (static BVH if dirty; dynamic BVH always)
     │  instance_cull.comp        (both BVHs → indirect draw buffers)
     │
@@ -763,7 +830,7 @@ SceneManager (CPU, authoritative)
 |---|----------|
 | §13.1 | **Free-list allocator** with deferred compaction on fragmentation threshold. In-place overwrite for same-count edits, reallocation for larger. |
 | §13.3 | **Derivative-based TBN** computed in fragment shader from `dFdx/dFdy(worldPos, uv)`. No tangent vertex attribute. Falls back to vertex normal SSBO or geometric derivative when UVs absent. |
-| §13.7 | **`EntityRenderData` SSBO** fully specified in §5.1. ~192 bytes/entity. BDA pointers for vertex normals, scalar props, color props, per-point sizes. |
+| §13.7 | **Per-entity GPU data** fully specified in §5.1. Split into `GpuInstanceData` (96 bytes, frequent updates) + `GpuEntityConfig` (96 bytes, rare updates). BDA pointers for vertex normals, scalar props, color props, per-point sizes live in `GpuEntityConfig`. |
 | §13.9 | **Option B (SSBO + BDA)** for all geometry types and all domains. Vertex-domain = vertex shader fetch → varying interpolation. Face-domain = fragment shader `gl_PrimitiveID` → flat. Edge-domain = vertex shader on line primitives. |
 | §13.12 | `DebugDraw` remains per-frame transient. Overlay entities for persistent multi-frame content. |
 | §13.13 | `GBuf_EntityId` is always written by `GBufferPass`. Used by `SelectionOutlinePass`. Eliminates redundant picking-buffer entity channel. |
@@ -783,7 +850,7 @@ SceneManager (CPU, authoritative)
 |---|------|-------------|
 | §13.5 | **Transparency / OIT** — OIT approach not chosen (Weighted Blended, depth peeling, PPLL). Transparent surfaces slot into `ForwardPass` after `OverlaySurfacePass`. | Stable deferred pipeline |
 | §13.6 | **Vertex Displacement Mapping** — `DisplacementID` field is in `GpuMaterialData` as a placeholder. Visually meaningful only with tessellation shaders or very dense input meshes. | Tessellation shader support |
-| §13.8 | **Gaussian Splatting** — Requires per-splat covariance + SH coefficients in a separate `SplatAttributeBuffer` SSBO (BDA ptr in `EntityRenderData`). Requires depth-sort before rendering. Likely needs a dedicated `GaussianSplatPass` (forward, after deferred). | GS data model design |
+| §13.8 | **Gaussian Splatting** — Requires per-splat covariance + SH coefficients in a separate `SplatAttributeBuffer` SSBO (BDA ptr in `GpuEntityConfig`). Requires depth-sort before rendering. Likely needs a dedicated `GaussianSplatPass` (forward, after deferred). | GS data model design |
 | §13.10 | **Htex + Deferred Pipeline** — Htex atlas indices must reach `GBufferPass` fragment shader. Existing `HtexPatchPreviewPass` is forward-only. Integration path unspecified. | Stable GBuffer pass |
 | §13.11 | **Vector Field Arrowheads** — Options: geometry-shader cone, billboard quad tip, pre-baked arrow mesh per vector. No implementation yet. | Vector field pipeline stable |
 | — | **Transparency for point clouds** — Sorted splat blending (alpha-composited PointPass). | OIT / transparency pass |
@@ -815,7 +882,7 @@ The loop has four strictly sequential phases. The **extraction boundary** is the
 │    GraphLifecycleSystem          graph geometry → GpuWorld.GeoStore │
 │    PointCloudLifecycleSystem     cloud → GpuWorld.GeoStore          │
 │    GPUSceneSyncSystem            transforms → GpuWorld.InstanceBuf  │
-│    EntityRenderDataSyncSystem    vis config → GpuWorld.ERD SSBO     │
+│    EntityConfigSyncSystem        vis config → GpuWorld.EntityConfigBuf│
 │    StaticBVHDirtySyncSystem      StaticTag changes → BVH dirty      │
 │    PrimitiveBVHBuildSystem       CPU BVH for picking                │
 │    VectorFieldSyncSystem         bake vfield child graph verts      │
@@ -842,7 +909,7 @@ The loop has four strictly sequential phases. The **extraction boundary** is the
 │                                                                     │
 │  Renderer::BeginFrame()                                             │
 │    GPU timeline wait, deferred deletions, geometry pool GC          │
-│    GpuWorld::SyncFrame()  scatter pending instance/ERD updates      │
+│    GpuWorld::SyncFrame()  scatter pending instance + config updates  │
 │                                                                     │
 │  BVH compute prologue                                               │
 │    StaticBVH build (if dirty)                                       │
@@ -875,15 +942,15 @@ Each ECS system has exactly **one responsibility**. Systems are registered in `R
 | System | Reads | Writes | What it does |
 |--------|-------|--------|-------------|
 | `PropertySetDirtySyncSystem` | `DirtyTag::*` components | `GpuDirty` flag, escalated dirty tags | Translates domain dirty tags (vertex/edge/face) into `GpuDirty`. Attribute-only changes extract cached color/radius vectors without full re-upload. |
-| `MeshRendererLifecycleSystem` | `DataAuthority::MeshTag`, `GeometrySources::*`, `GpuDirty` | `GpuWorld::GeoStore` (GVB/GIB region), `BufferView`, `Surface::Component`, instance slot | Phase 1: upload geometry to global buffers. Phase 2: allocate/update instance slot + AABB. Phase 3: populate `Surface::Component`. No `Mesh::Data` — reads directly from GeometrySources. |
+| `MeshRendererLifecycleSystem` | `DataAuthority::MeshTag`, `GeometrySources::*`, `GpuDirty` | `GpuWorld::GeoStore` (managed buffer region), `BufferView`, `Surface::Component`, instance slot | Phase 1: upload geometry to managed buffers. Phase 2: allocate/update instance slot + AABB. Phase 3: populate `Surface::Component`. No `Mesh::Data` — reads directly from GeometrySources. |
 | `GraphLifecycleSystem` | `DataAuthority::GraphTag`, `GeometrySources::Nodes/Edges`, `GpuDirty` | `GpuWorld::GeoStore`, `BufferView`, `Line::Component`, `Point::Component`, instance slot | Same three phases as mesh lifecycle, for graph edge pairs and node positions. Upload mode selected per-entity by `ECS::StaticTag` presence. No `Graph::Data` — reads directly from GeometrySources. |
 | `PointCloudLifecycleSystem` | `DataAuthority::PointCloudTag`, `GeometrySources::Vertices`, `GpuDirty` | `GpuWorld::GeoStore`, `BufferView`, `Point::Component`, instance slot | Reads positions/normals spans from GeometrySources zero-copy, uploads via Staged mode. No `PointCloud::Data`. |
 | `GPUSceneSyncSystem` | `Transform::Component` changes | `GpuWorld::InstanceBuffer` (model matrix) | Transform-only updates: writes model matrix to instance slot without re-uploading geometry. |
-| `EntityRenderDataSyncSystem` | `Visualization::Config`, `GeometrySources`, `BufferView`, render components | `GpuWorld::EntityRenderDataBuffer` (BDA ptrs, vis config, material slot) | Syncs the full `EntityRenderData` record when any per-entity rendering config changes. Uploads attribute SSBOs (normals, scalar props, color props) and writes BDA pointers. |
+| `EntityConfigSyncSystem` | `Visualization::Config`, `GeometrySources`, `BufferView`, render components | `GpuWorld::EntityConfigBuffer` (BDA ptrs, vis config) | Syncs the `GpuEntityConfig` record when any per-entity visualization or attribute config changes. Uploads attribute SSBOs (normals, scalar props, color props) and writes BDA pointers. Does NOT touch `GpuInstanceData` (transforms are handled by `GPUSceneSyncSystem`). |
 | `StaticBVHDirtySyncSystem` | `ECS::StaticTag` add/remove | `GpuWorld::BVHBuilder.StaticDirty` flag | Detects when entities gain/lose `StaticTag` and marks the static BVH for rebuild. |
 | `PrimitiveBVHBuildSystem` | Geometry changes | CPU-side BVH (in `GeometryCollisionData`) | Rebuilds CPU BVH for entities that changed, used by the CPU picking refinement path. |
-| `VectorFieldSyncSystem` | `Visualization::Config::VectorFields`, `VectorFieldsDirty` | Child graph entity GVB region | CPU-bakes vector field endpoint pairs (base + base+vector*scale) for each domain. Uploads to child Graph entity's GVB region. |
-| `MeshViewLifecycleSystem` | `Surface::Component` (present/absent), `GeometrySources::Edges` | `Line::Component` (edge view), `Point::Component` (vertex view) | Creates/destroys wireframe and vertex visualization views that share the mesh's GVB region via `BufferView.ReuseFrom`. |
+| `VectorFieldSyncSystem` | `Visualization::Config::VectorFields`, `VectorFieldsDirty` | Child graph entity managed buffer region | CPU-bakes vector field endpoint pairs (base + base+vector*scale) for each domain. Uploads to child Graph entity's managed buffer region. |
+| `MeshViewLifecycleSystem` | `Surface::Component` (present/absent), `GeometrySources::Edges` | `Line::Component` (edge view), `Point::Component` (vertex view) | Creates/destroys wireframe and vertex visualization views that share the mesh's managed buffer region via `BufferView.ReuseFrom`. |
 
 ### 14.3 Module Boundaries
 
@@ -902,8 +969,8 @@ Runtime.SceneManager     ECS registry instance         ECS.Scene
 Runtime.RenderExtraction RenderWorld type + extractor  Runtime.SceneManager,
                                                         Graphics.GpuWorld (read)
 
-Graphics.GpuWorld        GVB, GIB, InstanceBuf,        RHI.Buffer, RHI.Transfer
-                         EntityRenderDataBuf,           RHI.ComputePipeline
+Graphics.GpuWorld        Managed vertex/index buffers,  RHI.BufferManager, RHI.Transfer
+                         InstanceBuf, EntityConfigBuf,  RHI.ComputePipeline
                          MaterialRegistry, BVHBuilder
 
 Graphics.RenderGraph     transient resource DAG,        RHI.Device, RHI.Buffer
@@ -991,9 +1058,9 @@ Before the clean design, here are the places where the ideas as stated **can't w
 
 #### ✅ Issue A — PropertySet Duality & ::Data Component Elimination (resolved)
 
-**Resolution — Live-Linked Mesh Interface:** The `Halfedge::Mesh` interface, when created for an entity, **links to the `GeometrySources` PropertySets** — it holds references to them, not copies. `MeshRef->VertexProperties()` IS `GeometrySources::Vertices.Properties` — the same object.
+**Resolution — Shared-Ownership Mesh Interface:** Each `GeometrySources` domain component holds its PropertySet via `std::shared_ptr<PropertySet>`. The `Halfedge::MeshView` interface, when created for an entity, takes shared ownership of these PropertySets — it holds `shared_ptr` copies, not raw references. `meshView.VertexProperties()` IS `GeometrySources::Vertices.Properties` — the same heap object, co-owned.
 
-Concretely: `Halfedge::Mesh` is constructed to accept externally-owned PropertySet references at construction time. When built for an entity, it receives pointers to the ECS `GeometrySources` components' PropertySets. All reads and writes through the mesh interface operate directly on the ECS data. No sync, no copy, no duality.
+Concretely: `GeometrySources::Vertices`, `::Edges`, `::Halfedges`, `::Faces` each store `std::shared_ptr<PropertySet> Properties`. When an algorithm creates a `MeshView`, it copies these `shared_ptr`s. This guarantees lifetime safety: even if entt reallocates its component pools (e.g., emplacing a component on another entity), the PropertySet data remains valid because the `MeshView` holds a shared reference. All reads and writes through the mesh interface operate directly on the ECS-owned PropertySet data. No sync, no copy of the data itself, no duality.
 
 **Algorithm-specific scratch data:** When an algorithm needs temporary working data that should NOT appear as a persistent entity property (e.g., intermediate quadric matrices during simplification), it creates a local `MeshScratchProperties` struct that it owns. This data is never written to `GeometrySources` and is discarded when the algorithm completes.
 
@@ -1019,7 +1086,7 @@ Concretely: `Halfedge::Mesh` is constructed to accept externally-owned PropertyS
 
 **Lifecycle systems** read `DataAuthority` tags + `GeometrySources` to determine what to create. They set appearance defaults on render components at creation time. There is no intermediate `::Data` component to bridge.
 
-**Migration note:** The halfedge mesh constructor gains a `PropertySets` parameter. All construction sites that currently build a mesh from a file or scratch must pass the entity's `GeometrySources` components. The existing `GeometrySourcesPopulate` logic (which already syncs mesh ↔ ECS) is replaced by this live-link construction. All lifecycle systems that currently read from `::Data` components switch to reading from `GeometrySources` + render components.
+**Migration note:** `GeometrySources` domain components change from owning `PropertySet` directly to owning `std::shared_ptr<PropertySet>`. The halfedge mesh constructor (`MeshView`) accepts `shared_ptr<PropertySet>` parameters. All construction sites that currently build a mesh from a file or scratch must pass the entity's `GeometrySources` components' shared pointers. The existing `GeometrySourcesPopulate` logic (which already syncs mesh ↔ ECS) is replaced by this shared-ownership construction. All lifecycle systems that currently read from `::Data` components switch to reading from `GeometrySources` + render components.
 
 #### ✅ Issue B — "Runtime Modules" = Compile-Time Registered Units
 
@@ -1059,7 +1126,7 @@ Entity
  ├── ECS::DataAuthority::MeshTag         ← IDENTITY (zero-size, one per entity)
  │
  ├── ECS::Components::GeometrySources::Vertices    ← AUTHORITATIVE for all vertex data
- │    └── Properties: PropertySet
+ │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
  │         "v:position"   vec3[]    — positions (canonical)
  │         "v:normal"     vec3[]    — normals (written by NormalEstimation or loader)
  │         "v:color"      vec3[]    — vertex colors (written by colorizing algorithms)
@@ -1068,18 +1135,18 @@ Entity
  │         ... any algorithm result with "v:" prefix
  │
  ├── ECS::Components::GeometrySources::Edges        ← AUTHORITATIVE for all edge data
- │    └── Properties: PropertySet
+ │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
  │         "e:v0", "e:v1"           — endpoint indices (topology, canonical)
  │         "e:length"   float[]     — edge lengths (written by MeshQuality)
  │         "e:color"    vec3[]      — per-edge colors
  │         ... any algorithm result with "e:" prefix
  │
  ├── ECS::Components::GeometrySources::Halfedges    ← AUTHORITATIVE for halfedge topology
- │    └── Properties: PropertySet
+ │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
  │         "h:to_vertex", "h:next", "h:face"        — topology (canonical)
  │
  ├── ECS::Components::GeometrySources::Faces        ← AUTHORITATIVE for all face data
- │    └── Properties: PropertySet
+ │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
  │         "f:halfedge"             — topology (canonical)
  │         "f:normal"   vec3[]      — face normals (written by MeshAnalysis or shader)
  │         "f:area"     float[]     — face areas
@@ -1104,22 +1171,23 @@ Entity
 
 **Halfedge::Mesh as on-demand computation interface:**
 
-When an algorithm needs topology traversal (neighbor iteration, valence queries, boundary detection), it creates a `Halfedge::MeshView` that **links to the entity's GeometrySources PropertySets**:
+When an algorithm needs topology traversal (neighbor iteration, valence queries, boundary detection), it creates a `Halfedge::MeshView` that **shares ownership of the entity's GeometrySources PropertySets** via `shared_ptr`:
 
 ```cpp
 // Algorithm code — NOT stored on any ECS component
 auto meshView = Halfedge::MeshView(
-    reg.get<GeometrySources::Vertices>(entity),
-    reg.get<GeometrySources::Edges>(entity),
-    reg.get<GeometrySources::Halfedges>(entity),
-    reg.get<GeometrySources::Faces>(entity)
+    reg.get<GeometrySources::Vertices>(entity).Properties,    // shared_ptr<PropertySet>
+    reg.get<GeometrySources::Edges>(entity).Properties,       // shared_ptr<PropertySet>
+    reg.get<GeometrySources::Halfedges>(entity).Properties,   // shared_ptr<PropertySet>
+    reg.get<GeometrySources::Faces>(entity).Properties        // shared_ptr<PropertySet>
 );
-// meshView.VertexProperties() IS GeometrySources::Vertices.Properties — same object
-// Reads and writes go directly to ECS data, zero copy
+// meshView.VertexProperties() IS GeometrySources::Vertices.Properties — same heap object
+// MeshView holds shared_ptr copies → safe even if entt reallocates component pools
+// Reads and writes go directly to ECS data, zero copy of the data itself
 auto result = Geometry::Smoothing::Smooth(meshView, params);
 ```
 
-The `MeshView` is a stack-local object. It is **never stored on an ECS component**. It holds references (not copies) to the PropertySets, so all mutations are live in the ECS. When the algorithm returns, the view is discarded. The algorithm's results are already in `GeometrySources` because the view wrote them there directly.
+The `MeshView` is a stack-local object. It is **never stored on an ECS component**. It holds `shared_ptr` copies to the PropertySets, so it is safe against entt component pool reallocation (e.g., emplacing a component on another entity between view creation and use). All mutations through the view are live in the ECS. When the algorithm returns, the view is discarded and releases its shared ownership. The algorithm's results are already in `GeometrySources` because the view wrote them there directly.
 
 **When an algorithm needs its own scratch data:** It creates a local `MeshScratchProperties` struct that it owns. This data is never written to `GeometrySources` and is discarded when the algorithm completes.
 
@@ -1157,13 +1225,13 @@ When the user selects a property for visualization, the engine:
 
 1. Reads the `float[]` or `vec3[]` data from the `GeometrySources` PropertySet.
 2. Uploads it to a per-entity device-local SSBO (via `TransferManager` staged upload).
-3. Writes the BDA pointer into `EntityRenderData.ScalarPropPtr` or `ColorPropPtr`.
-4. Sets `EntityRenderData.VisDomain` to vertex/face/edge.
-5. Sets dirty flag → `EntityRenderDataSyncSystem` picks it up next simulate phase.
+3. Writes the BDA pointer into `GpuEntityConfig.ScalarPropPtr` or `ColorPropPtr`.
+4. Sets `GpuEntityConfig.VisDomain` to vertex/face/edge.
+5. Sets dirty flag → `EntityConfigSyncSystem` picks it up next simulate phase.
 
 This is triggered by `Visualization::Config` changes (user selects a different `PropertyName`). The "baked" property is the currently active visualization selection — not all properties are uploaded simultaneously, only the active one per domain.
 
-The existing `Visualization::Config::VertexColors.PropertyName` (etc.) is the selector. The `EntityRenderDataSyncSystem` reads `Visualization::Config` + `GeometrySources` to determine what to upload and where the BDA pointer should point.
+The existing `Visualization::Config::VertexColors.PropertyName` (etc.) is the selector. The `EntityConfigSyncSystem` reads `Visualization::Config` + `GeometrySources` to determine what to upload and where the BDA pointer should point.
 
 ---
 
@@ -1250,7 +1318,7 @@ export namespace ECS::Visualization {
 }
 ```
 
-Lifecycle: Emplaced when the entity first needs visualization configuration (e.g., user selects a scalar field in the Inspector, or an algorithm writes a result property). Not present on entities that use only material-based rendering. `EntityRenderDataSyncSystem` reads `Visualization::Config` + `GeometrySources` to populate `EntityRenderData` (BDA pointers, colormap, scalar range, domain flags).
+Lifecycle: Emplaced when the entity first needs visualization configuration (e.g., user selects a scalar field in the Inspector, or an algorithm writes a result property). Not present on entities that use only material-based rendering. `EntityConfigSyncSystem` reads `Visualization::Config` + `GeometrySources` to populate `GpuEntityConfig` (BDA pointers, colormap, scalar range, domain flags).
 
 #### Algorithm Components — Self-contained per-algorithm state
 
@@ -1394,7 +1462,7 @@ UI: "Run KMeans" button clicked (from module's DrawWidget or menu entry)
        writes result scalars to GeometrySources::Vertices.Properties["v:cluster_id"]
        updates ECS::KMeans::Component on entity
        emits DirtyTag::VertexAttributes → PropertySetDirtySyncSystem picks up
-       → EntityRenderDataSyncSystem uploads attribute SSBO
+       → EntityConfigSyncSystem uploads attribute SSBO
        → GPU shows updated colors next frame
 ```
 
@@ -1408,11 +1476,11 @@ Vector fields spawn child `Graph` overlay entities (§9.7). The base-position do
 
 | Domain | Base positions sourced from | Stored as |
 |--------|----------------------------|----------|
-| `Vertex` | `GeometrySources::Vertices["v:position"]` | Directly from parent GVB region |
+| `Vertex` | `GeometrySources::Vertices["v:position"]` | Directly from parent managed buffer region |
 | `Edge` | Computed: `(v0_pos + v1_pos) / 2` on CPU | `GeometrySources::Edges["e:midpoint"]` (cached property) |
 | `Face` | Computed: centroid of face vertices on CPU | `GeometrySources::Faces["f:centroid"]` (cached property) |
 
-Edge midpoints and face centroids are computed **once** and stored as properties in the parent entity's domain PropertySets. Subsequent vector field reconfigurations reuse them without recomputing. The child overlay's GVB region contains the baked `[base, base + vector * scale]` endpoint pairs.
+Edge midpoints and face centroids are computed **once** and stored as properties in the parent entity's domain PropertySets. Subsequent vector field reconfigurations reuse them without recomputing. The child overlay's managed buffer region contains the baked `[base, base + vector * scale]` endpoint pairs.
 
 **UI widget:** The existing `VectorFieldWidget` in `Runtime::EditorUI` already covers add/remove/configure. Extensions needed:
 - Domain picker (Vertex / Edge / Face)
@@ -1427,16 +1495,18 @@ Edge midpoints and face centroids are computed **once** and stored as properties
 
 Any overlay entity (child parented via `Hierarchy::Component`) can be **baked** into an independent entity via the UI. This is a one-way, non-undoable operation.
 
-**Bake procedure:**
-1. Allocate new GVB/GIB region in `GpuWorld::GlobalGeometryStore` (free-list allocation).
-2. `vkCmdCopyBuffer` the parent's GVB data (referenced by the overlay's `BufferView`) into the new region.
-3. Copy all relevant `GeometrySources` properties from the overlay or its parent into new ECS components on the new entity.
-4. Remove `Hierarchy::Component` from the new entity (detach from parent).
-5. Emplace `ECS::DataAuthority::*Tag`, `NameTag`, `Transform::Component` on the new entity.
+**Bake procedure (CPU first, then GPU):**
+1. Create a new entity. Emplace `ECS::DataAuthority::*Tag`, `NameTag`, `Transform::Component` (world-space transform resolved from overlay + parent chain).
+2. Copy all relevant `GeometrySources` properties from the overlay or its parent into new `GeometrySources` components on the new entity. Each domain gets a fresh `shared_ptr<PropertySet>` with deep-copied data.
+3. Remove `Hierarchy::Component` from the new entity (detach from parent).
+4. The new entity is now a standalone CPU entity with complete `GeometrySources` data.
+5. Normal lifecycle systems detect the new entity (has `DataAuthority::*Tag` + `GeometrySources` but no GPU representation) and handle GPU upload on the next frame — allocating a managed buffer region, uploading geometry, creating `GpuInstanceData`/`GpuEntityConfig` slots, and emplacing render components.
 6. The parent entity is **not modified**.
 7. The original overlay entity is **not destroyed** (user can delete it manually if desired).
 
-**Why not undoable:** The bake copies potentially large geometry buffers (GPU + CPU). Storing the "before" state for undo would require holding duplicate geometry in memory. The operation is non-destructive to the parent, so it's safe to simply not undo it.
+**Why CPU-first:** The baked entity is constructed as a complete CPU entity, and GPU resources are derived from that CPU data through the standard lifecycle path. This avoids `vkCmdCopyBuffer` from the parent's GPU region (which may be freed or compacted) and ensures the new entity's GPU representation is authoritative from its own `GeometrySources`. The 1-frame latency before the baked entity appears is acceptable (same as any new entity).
+
+**Why not undoable:** The bake deep-copies potentially large geometry PropertySets. Storing the "before" state for undo would require holding duplicate geometry in memory. The operation is non-destructive to the parent, so it's safe to simply not undo it.
 
 ---
 
@@ -1455,13 +1525,13 @@ Phase 1 — Asset (CPU only):
 Phase 2 — Instance (CPU + GPU):
   User clicks "Make Visible" (or scene load auto-instantiates)
   → MeshRendererLifecycleSystem emplace Surface/Line/Point components
-  → GpuWorld::GlobalGeometryStore allocates GVB/GIB region
+  → GpuWorld::GlobalGeometryStore allocates managed buffer region
   → Async staged upload begins (TransferManager)
   → On transfer complete: GpuDirty cleared, GpuWorld::InstanceBuffer slot allocated
   → NEXT FRAME: entity appears in rendered output (1-frame latency is inherent)
 ```
 
-**Multiple instances from one asset:** Multiple entities can hold `AssetRef` pointing to the same asset. Each gets its own `BufferView` (their own GVB/GIB region) and their own instance slot. Geometry is NOT shared at the GPU level (no instancing of the same GVB region) unless explicitly requested via `ReuseVertexBuffersFrom`. This is fine for a research/editor tool; instanced rendering is a separate concern.
+**Multiple instances from one asset:** Multiple entities can hold `AssetRef` pointing to the same asset. Each gets its own `BufferView` (their own managed buffer region) and their own instance slot. Geometry is NOT shared at the GPU level (no instancing of the same buffer region) unless explicitly requested via `ReuseVertexBuffersFrom`. This is fine for a research/editor tool; instanced rendering is a separate concern.
 
 **Handle model:** `StrongHandle<AssetData>` uses the existing `Core::ResourcePool` generational index system. The handle keeps the CPU asset data alive even if the entity is destroyed, allowing re-instantiation. When the last handle is released, the CPU asset is freed.
 
@@ -1537,8 +1607,8 @@ This section is a checklist of breaking changes implied by §15. Nothing in §15
 | M7 | Algorithm UI state | `InspectorController::m_*Ui` members + hardcoded menu items | `DrawWidget` closure state in each module + `AlgorithmRegistry` menu entries | `InspectorController`, all `DrawXxxWidget` callsites, `MenuBar` |
 | M8 | Algorithm invocation | Direct call in widget `Draw*` | `entt::dispatcher` event → module sink → job | `GeometryWorkflowController`, all `DrawXxxWidget` impls |
 | M9 | Inspector component sections | Hardcoded per-algorithm `if (has<KMeans>)` | `ComponentRegistry::DrawAlgorithmPanels()` | `InspectorController::Draw()` |
-| M10 | Attribute SSBO upload | `CachedVertexColors` vectors in render components | `EntityRenderData.ColorPropPtr` / `ScalarPropPtr` BDA | `PropertySetDirtySyncSystem`, `EntityRenderDataSyncSystem` (new), all lifecycle systems |
-| M11 | GVB/GIB ownership | Per-entity `GeometryPool` handles | `GpuWorld::GlobalGeometryStore` free-list | `GeometryPool`, all lifecycle systems, `GeometryGpuData::CreateAsync` |
+| M10 | Attribute SSBO upload | `CachedVertexColors` vectors in render components | `GpuEntityConfig.ColorPropPtr` / `ScalarPropPtr` BDA | `PropertySetDirtySyncSystem`, `EntityConfigSyncSystem` (new), all lifecycle systems |
+| M11 | Geometry buffer ownership | Per-entity `GeometryPool` handles | `GpuWorld::GlobalGeometryStore` via `BufferManager` | `GeometryPool`, all lifecycle systems, `GeometryGpuData::CreateAsync` |
 | M12 | GPUScene scope | `Graphics::GPUScene` (instances + AABBs only) | `GpuWorld` (all GPU scene data) | `RenderOrchestrator`, `RenderDriver`, `Graphics.GPUScene` module |
 | M13 | Normal map composition | Priority chain (normal map overrides vertex normals) | Two-stage composition (base normal + normal map perturbation in TBN) | `gbuffer.frag` shader, §4.2 |
 | M14 | On-demand mesh interface | `Mesh::Data::MeshRef` (persistent shared_ptr) | `Halfedge::MeshView` created on stack by algorithm code | All algorithm callsites that use `MeshRef` for topology traversal |
