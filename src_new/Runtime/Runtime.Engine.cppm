@@ -1,4 +1,7 @@
-export module Extrinsic.Core.Engine;
+//
+// Created by alex on 14.04.26.
+//
+export module Extrinsic.Runtime.Engine;
 
 import <cstdint>;
 import <memory>;
@@ -10,7 +13,6 @@ import Extrinsic.Render.Renderer;
 
 namespace Extrinsic::Runtime
 {
-
     export struct EngineConfig
     {
         Core::RenderConfig Render;

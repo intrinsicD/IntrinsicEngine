@@ -1,4 +1,4 @@
-module Extrinsic.Core.Engine;
+module Extrinsic.Runtime.Engine;
 
 import <chrono>;
 import <thread>;
@@ -11,7 +11,7 @@ import Extrinsic.Render.Renderer;
 
 namespace Extrinsic::Runtime
 {
-    Engine::Engine(EngineConfig config, std::unique_ptr<IApplication> application)
+    Engine::Engine(EngineConfig config, std::unique_ptr<Core::IApplication> application)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
     {
