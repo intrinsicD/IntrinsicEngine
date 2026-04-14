@@ -1,4 +1,4 @@
-export module RHI.Device;
+export module Extrinsic.RHI.Device;
 
 import <memory>;
 import Extrinsic.Platform.Window;
@@ -28,5 +28,4 @@ namespace Extrinsic::RHI
         virtual ICommandContext& GetGraphicsContext(std::uint32_t frameIndex) = 0;
     };
 
-    export std::unique_ptr<IDevice> CreateDevice(Core::GraphicsBackend backend);
 }
