@@ -1,8 +1,11 @@
 module Extrinsic.Runtime.Engine;
 
 import <chrono>;
+import <memory>;
+import <stdexcept>;
 import <thread>;
 import <utility>;
+import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Application;
 import Extrinsic.Core.Config;
 import Extrinsic.Platform.Window;
@@ -11,6 +14,20 @@ import Extrinsic.Render.Renderer;
 
 namespace Extrinsic::Runtime
 {
+    namespace
+    {
+        std::unique_ptr<RHI::IDevice> CreateDevice(const Core::RenderConfig& config)
+        {
+            switch (config.Backend)
+            {
+            case Core::GraphicsBackend::Vulkan:
+                return Backends::Vulkan::CreateVulkanDevice();
+            }
+
+            throw std::runtime_error("Unsupported graphics backend.");
+        }
+    }
+
     Engine::Engine(EngineConfig config, std::unique_ptr<Core::IApplication> application)
         : m_Config(std::move(config))
         , m_Application(std::move(application))
@@ -32,7 +49,7 @@ namespace Extrinsic::Runtime
     void Engine::Initialize()
     {
         m_Window = Platform::CreateWindow(m_Config.Window);
-        m_Device = RHI::CreateDevice(m_Config.Render.Backend);
+        m_Device = CreateDevice(m_Config.Render);
         m_Device->Initialize(*m_Window, m_Config.Render);
 
         m_Renderer = Render::CreateRenderer();
