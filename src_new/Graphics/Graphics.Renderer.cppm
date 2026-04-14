@@ -1,9 +1,12 @@
+//
+// Created by alex on 14.04.26.
+//
 export module Extrinsic.Render.Renderer;
 
 import <memory>;
 import Extrinsic.RHI.Device;
 
-namespace Extrinsic::Graphics
+namespace Extrinsic::Render
 {
     export class IRenderer
     {

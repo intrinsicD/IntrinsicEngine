@@ -8,23 +8,21 @@ import Extrinsic.Runtime.Engine;
 
 namespace Sandbox
 {
-    class App final : public Extrinsic::Core::IApplication
+    export class App final : public Extrinsic::Core::IApplication
     {
     public:
-        void OnInitialize(Engine::Core::Engine& engine) override
+        void OnInitialize(Extrinsic::Runtime::Engine& engine) override
         {
             (void)engine;
-            // Load scene, assets, camera, systems.
         }
 
-        void OnUpdate(Engine::Core::Engine& engine, double deltaSeconds) override
+        void OnUpdate(Extrinsic::Runtime::Engine& engine, double deltaSeconds) override
         {
             (void)engine;
             (void)deltaSeconds;
-            // Gameplay/editor update.
         }
 
-        void OnShutdown(Engine::Core::Engine& engine) override
+        void OnShutdown(Extrinsic::Runtime::Engine& engine) override
         {
             (void)engine;
         }
