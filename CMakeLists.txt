@@ -171,6 +171,7 @@ add_subdirectory(src/Graphics)    # needs Asset
 add_subdirectory(src/Interface)
 add_subdirectory(src/EditorUI)
 add_subdirectory(src/Runtime)     # needs Asset
+add_subdirectory(src_new)     # needs Asset
 
 if(INTRINSIC_BUILD_SANDBOX)
     add_subdirectory(src/Apps/Sandbox)

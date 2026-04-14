@@ -1,0 +1,10 @@
+set(EXTRINSIC_BACKEND "Vulkan" CACHE STRING "Graphics backend to use (Vulkan, DirectX12, Metal)")
+set(EXTRINSIC_PLATFORM "Linux" CACHE STRING "Platform to build for (Windows, Linux, macOS)")
+
+add_subdirectory(App)
+add_subdirectory(Assets)
+add_subdirectory(Core)
+add_subdirectory(ECS)
+add_subdirectory(Graphics)
+add_subdirectory(Platform)
+add_subdirectory(Runtime)
