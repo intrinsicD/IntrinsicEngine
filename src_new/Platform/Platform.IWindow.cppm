@@ -1,9 +1,10 @@
+module;
+
+#include <memory>
+
 export module Extrinsic.Platform.Window;
 
-import <cstdint>;
-import <memory>;
-
-import Extrinsic.Core.Config;
+import Extrinsic.Core.Config.Window;
 
 namespace Extrinsic::Platform
 {
@@ -27,5 +28,5 @@ namespace Extrinsic::Platform
         virtual void* GetNativeHandle() const = 0;
     };
 
-    export std::unique_ptr<IWindow> CreateWindow(const Extrinsic::Core::WindowConfig& config);
+    export std::unique_ptr<IWindow> CreateWindow(const Core::Config::WindowConfig& config);
 }

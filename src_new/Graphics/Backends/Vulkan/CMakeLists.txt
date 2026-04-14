@@ -1,7 +1,6 @@
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-        Backends.Vulkan.Device.cppm
         Backends.Vulkan.cppm
         PRIVATE
         Backends.Vulkan.cpp

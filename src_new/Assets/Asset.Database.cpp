@@ -1,4 +1,4 @@
 //
 // Created by alex on 14.04.26.
 //
-module Asset.Database;
+module Extrinsic.Asset.Database;

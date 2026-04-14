@@ -1,6 +1,8 @@
-export module Extrinsic.RHI.FrameHandle;
+module;
 
-import <cstdint>;
+#include <cstdint>
+
+export module Extrinsic.RHI.FrameHandle;
 
 namespace Extrinsic::RHI
 {

@@ -1,4 +1,2 @@
-//
-// Created by alex on 14.04.26.
-//
+module;
 module Extrinsic.ECS.Scene.Database;

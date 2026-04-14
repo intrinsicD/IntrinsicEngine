@@ -1,3 +1,4 @@
+module;
 export module Extrinsic.RHI.CommandContext;
 
 namespace Extrinsic::RHI

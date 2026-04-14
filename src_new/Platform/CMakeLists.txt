@@ -9,6 +9,10 @@ target_sources(${target_name}
 
 target_include_directories(${target_name} PUBLIC .)
 
+target_link_libraries(${target_name}
+        PUBLIC
+        ExtrinsicCore)
+
 if (EXTRINSIC_PLATFORM STREQUAL "Linux")
     if (EXTRINSIC_BACKEND STREQUAL "Vulkan")
         add_subdirectory(LinuxGlfwVulkan)

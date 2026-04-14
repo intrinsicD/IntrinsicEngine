@@ -1,17 +1,17 @@
-//
-// Created by alex on 14.04.26.
-//
-module Extrinsic.Render.Renderer;
+module;
 
-import <memory>;
+#include <memory>
+
+module Extrinsic.Graphics.Renderer;
+
 import Extrinsic.RHI.Device;
 
-namespace Extrinsic::Render
+namespace Extrinsic::Graphics
 {
     class NullRenderer final : public IRenderer
     {
     public:
-        void Initialize(Extrinsic::RHI::IDevice& device) override
+        void Initialize(RHI::IDevice& device) override
         {
             (void)device;
         }
@@ -24,7 +24,7 @@ namespace Extrinsic::Render
             (void)height;
         }
 
-        void RenderFrame(const Extrinsic::RHI::FrameHandle& frame) override
+        void RenderFrame(const RHI::FrameHandle& frame) override
         {
             (void)frame;
         }

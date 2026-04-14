@@ -1,36 +1,38 @@
+module;
+
+#include <chrono>
+#include <memory>
+#include <thread>
+#include <utility>
+
 module Extrinsic.Runtime.Engine;
 
-import <chrono>;
-import <memory>;
-import <stdexcept>;
-import <thread>;
-import <utility>;
 import Extrinsic.Backends.Vulkan;
-import Extrinsic.Core.Application;
-import Extrinsic.Core.Config;
+import Extrinsic.Core.Config.Render;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
-import Extrinsic.Render.Renderer;
+import Extrinsic.RHI.FrameHandle;
+import Extrinsic.Graphics.Renderer;
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
-        std::unique_ptr<RHI::IDevice> CreateDevice(const Core::RenderConfig& config)
+        std::unique_ptr<RHI::IDevice> CreateDevice(const Core::Config::RenderConfig& config)
         {
             switch (config.Backend)
             {
-            case Core::GraphicsBackend::Vulkan:
+            case Core::Config::GraphicsBackend::Vulkan:
                 return Backends::Vulkan::CreateVulkanDevice();
             }
 
-            throw std::runtime_error("Unsupported graphics backend.");
+            std::terminate();
         }
     }
 
-    Engine::Engine(EngineConfig config, std::unique_ptr<Core::IApplication> application)
+    Engine::Engine(Core::Config::EngineConfig config, std::unique_ptr<IApplication> application)
         : m_Config(std::move(config))
-        , m_Application(std::move(application))
+          , m_Application(std::move(application))
     {
         if (!m_Application)
         {
@@ -52,7 +54,7 @@ namespace Extrinsic::Runtime
         m_Device = CreateDevice(m_Config.Render);
         m_Device->Initialize(*m_Window, m_Config.Render);
 
-        m_Renderer = Render::CreateRenderer();
+        m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
 
         m_Application->OnInitialize(*this);
@@ -170,7 +172,7 @@ namespace Extrinsic::Runtime
         return *m_Device;
     }
 
-    Render::IRenderer& Engine::GetRenderer() noexcept
+    Graphics::IRenderer& Engine::GetRenderer() noexcept
     {
         return *m_Renderer;
     }

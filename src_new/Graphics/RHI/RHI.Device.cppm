@@ -1,10 +1,13 @@
+module;
+
+#include <memory>
+
 export module Extrinsic.RHI.Device;
 
-import <memory>;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.FrameHandle;
-import Extrinsic.Core.Config;
+import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::RHI
 {
@@ -13,7 +16,7 @@ namespace Extrinsic::RHI
     public:
         virtual ~IDevice() = default;
 
-        virtual void Initialize(Platform::IWindow& window, const Core::RenderConfig& config) = 0;
+        virtual void Initialize(Platform::IWindow& window, const Core::Config::RenderConfig& config) = 0;
         virtual void Shutdown() = 0;
 
         virtual void WaitIdle() = 0;
@@ -27,5 +30,4 @@ namespace Extrinsic::RHI
 
         virtual ICommandContext& GetGraphicsContext(std::uint32_t frameIndex) = 0;
     };
-
 }

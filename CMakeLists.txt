@@ -28,8 +28,9 @@ if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
     # Search for versioned binaries first, then generic
     find_program(CLANG_SCAN_DEPS_PATH
             NAMES
+            clang-scan-deps-23
+            clang-scan-deps-22
             clang-scan-deps-20
-            clang-scan-deps-19
             clang-scan-deps
             HINTS
             $ENV{LLVM_DIR}/bin

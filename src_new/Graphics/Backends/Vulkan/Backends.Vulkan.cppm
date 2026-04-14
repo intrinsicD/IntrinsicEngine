@@ -1,7 +1,13 @@
-//
-// Created by alex on 14.04.26.
-//
+module;
+
+#include <memory>
 
 export module Extrinsic.Backends.Vulkan;
 
-export import Extrinsic.Backends.Vulkan.Device;
+import Extrinsic.RHI.Device;
+
+namespace Extrinsic::Backends::Vulkan
+{
+    export std::unique_ptr<RHI::IDevice> CreateVulkanDevice();
+}
+

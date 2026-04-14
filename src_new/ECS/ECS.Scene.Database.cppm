@@ -1,5 +1,12 @@
-//
-// Created by alex on 14.04.26.
-//
+module;
 
 export module Extrinsic.ECS.Scene.Database;
+
+namespace Extrinsic::ECS::Scene
+{
+    export class Database
+    {
+    public:
+    private:
+    };
+}

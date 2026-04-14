@@ -1,6 +1,3 @@
-//
-// Created by alex on 14.04.26.
-//
 module;
 
 #include <memory>
@@ -12,7 +9,7 @@ namespace Extrinsic::Platform
     class NullWindow final : public IWindow
     {
     public:
-        explicit NullWindow(const Extrinsic::Core::WindowConfig& config)
+        explicit NullWindow(const Core::Config::WindowConfig& config)
             : m_Extent{.Width = config.Width, .Height = config.Height}
         {
         }
@@ -55,7 +52,7 @@ namespace Extrinsic::Platform
         bool m_WasResized{false};
     };
 
-    std::unique_ptr<IWindow> CreateWindow(const Extrinsic::Core::WindowConfig& config)
+    std::unique_ptr<IWindow> CreateWindow(const Core::Config::WindowConfig& config)
     {
         return std::make_unique<NullWindow>(config);
     }
