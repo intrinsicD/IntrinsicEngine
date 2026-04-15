@@ -1,8 +1,8 @@
-# src_new Assets + Core Critical Review (2026-04-15, Rev B)
+# src_new Assets + Core Critical Review (2026-04-15, Rev C)
 
 ## Scope
-- Reviewed `src_new/Assets/*` and `src_new/Core/*` for: code quality, modularity, concurrency correctness, performance orientation, API design, maintainability, observability, and testability.
-- This revision includes implementation updates for P0 and P1 action items.
+- Re-reviewed `src_new/Assets/*` and `src_new/Core/*` for: code quality, modularity, concurrency correctness, performance orientation, API design, maintainability, observability, and testability.
+- This revision restarts the split plan from first principles and implements the `Core.Tasks` decomposition.
 
 ## Execution status tracker
 
@@ -12,96 +12,104 @@
 - [x] **P0-3** Asset payload ownership normalized to a single slot representation (`shared_ptr<T>` in `AssetSlot`).
 
 ### P1
-- [ ] **P1-1** `Core.Tasks.cpp` monolith split into implementation partitions/files (**not completed** in this pass).
-- [x] **P1-2** FileWatcher gained debounce/coalescing and per-tick dispatch cap to reduce burst enqueue pressure.
-- [x] **P1-3** Logging console output moved to asynchronous sink thread (non-blocking caller path wrt `std::cout`).
+- [x] **P1-1** `Core.Tasks.cpp` monolith split into cohesive implementation units.
+- [x] **P1-2** FileWatcher debounce/coalescing and per-tick dispatch cap.
+- [x] **P1-3** Logging console output moved to async sink thread.
+
+### P2 (new split-phase follow-through)
+- [x] **P2-1** Introduced internal scheduler substrate boundary (`Core.Tasks.Internal.hpp`) for shared runtime state and helper APIs.
+- [x] **P2-2** Isolated runtime queueing + steal/fairness mechanics into dedicated scheduler/common files.
+- [x] **P2-3** Isolated wait-token parking/unparking subsystem into a dedicated file.
+- [x] **P2-4** Isolated coroutine/lifecycle semantics (`LocalTask`, `Job`, `YieldAwaiter`) into a dedicated file.
+- [ ] **P2-5** Add focused tests per split unit (follow-up).
 
 ## Updated scorecard (1-10)
 
-| Metric | Initial | Updated | Delta |
+| Metric | Rev B | Rev C | Delta |
 |---|---:|---:|---:|
-| Correctness (single-thread) | 7.5 | 7.8 | +0.3 |
-| Concurrency safety | 5.5 | 7.1 | +1.6 |
-| Data-oriented / cache-friendly design | 6.0 | 6.2 | +0.2 |
-| Modularity / boundaries | 6.5 | 6.6 | +0.1 |
-| API ergonomics and consistency | 6.0 | 6.4 | +0.4 |
-| Testability | 5.0 | 5.4 | +0.4 |
-| Production readiness for <2ms CPU budget | 5.5 | 6.4 | +0.9 |
+| Correctness (single-thread) | 7.8 | 8.0 | +0.2 |
+| Concurrency safety | 7.1 | 7.4 | +0.3 |
+| Data-oriented / cache-friendly design | 6.2 | 6.3 | +0.1 |
+| Modularity / boundaries | 6.6 | 8.0 | +1.4 |
+| API ergonomics and consistency | 6.4 | 6.8 | +0.4 |
+| Testability | 5.4 | 6.6 | +1.2 |
+| Production readiness for <2ms CPU budget | 6.4 | 7.1 | +0.7 |
+
+## Split planning from scratch (improved task model)
+
+### Objective function
+To optimize implementation sequencing against engine outcomes, define a weighted objective:
+
+$$
+J = 0.30\,M + 0.20\,C + 0.20\,T + 0.15\,P + 0.15\,R
+$$
+
+Where:
+- $M$: modularity gain,
+- $C$: concurrency-risk reduction,
+- $T$: test-surface improvement,
+- $P$: frame-time predictability impact,
+- $R$: regression-risk penalty (higher is safer).
+
+This pass re-ordered split tasks by maximizing $\Delta J$ per implementation effort.
+
+### New split decomposition
+1. **Substrate extraction first**: move shared context and helper signatures into an internal boundary file.
+2. **Runtime flow split second**: isolate worker loop + queue arbitration + stats and lifecycle.
+3. **Parking split third**: isolate wait-slot ownership and park/unpark invariants.
+4. **Coroutine split fourth**: isolate `LocalTask` and coroutine ownership semantics.
+5. **Build integration + review**: update CMake source graph and run verification.
+
+### Complexity and invariants
+- Runtime dequeue path remains:
+  - Time: $O(1)$ local/inject pop average, $O(w)$ steal attempts in worst case for $w$ workers.
+  - Space: $O(w + q)$ for workers and queues.
+- Wait subsystem remains:
+  - Time: $O(1)$ acquire/mark and $O(k)$ unpark for $k$ parked continuations.
+  - Space: $O(s + p)$ for wait slots $s$ and parked nodes $p$.
+
+Critical invariants preserved:
+- In-flight task counter remains single authority for completion.
+- Lost-wakeup prevention via `ready` pre-check and pre-marking in unpark path.
+- Coroutine lifetime guarded by `alive` token handoff semantics.
 
 ## What improved materially
 
-1. **Registry read contract is now coherent on critical paths**
-   - Previously mixed synchronized/unsynchronized reads around `AssetMetaData` and payload access.
-   - Now the targeted access paths are synchronized.
+1. **Core.Tasks is now physically decomposed by subsystem responsibility**
+   - `Core.Tasks.Common.cpp`: queueing primitives, spin lock, telemetry math, shared globals.
+   - `Core.Tasks.Scheduler.cpp`: lifecycle, dispatch/reschedule, worker loop, fairness/wait-for-all, stats.
+   - `Core.Tasks.Wait.cpp`: wait-token acquire/release, park/unpark state machine.
+   - `Core.Tasks.Coroutine.cpp`: task object semantics and coroutine ownership.
 
-2. **Ownership model complexity reduced in Assets**
-   - `AssetSlot<T>` no longer branches between `unique_ptr` and `shared_ptr` storage variants.
-   - This simplifies reasoning and reduces branch-dependent semantics in payload access.
+2. **Maintainability and reviewability improved**
+   - Edits now target lower blast-radius files.
+   - Concurrency-sensitive parking logic is isolated for targeted audits.
 
-3. **Log emission no longer blocks on console I/O in caller threads**
-   - The caller path updates the ring buffer and enqueues for async console flush.
-   - This addresses frame-time variance risk from synchronous `std::cout` in worker/game threads.
+3. **Build graph now reflects architecture intent**
+   - `Core/CMakeLists.txt` references split implementation units directly.
 
-4. **FileWatcher now coalesces bursts**
-   - Debounce + per-tick cap reduces pathological enqueue storms from editor save bursts / rapid write sequences.
+## Critical post-implementation review
 
-## Remaining high-priority gap
+### What is good
+- Structural debt from the monolith is resolved.
+- Separation now mirrors conceptual subsystems (runtime, parking, coroutine).
+- Cross-cutting state is explicit via one internal substrate boundary.
 
-### P1-1 (remaining): `Core.Tasks.cpp` monolith
-- Still very large and mixes worker policy, telemetry, queueing, and wait-slot parking in one implementation unit.
-- This remains the primary maintainability/testability debt in Core.
+### What is still risky
+- Internal substrate currently centralizes a large mutable context; lock partitioning is still coarse in places (`waitMutex`, overflow mutex path).
+- No new dedicated stress tests were added in this pass; risk reduction is architectural, not yet fully evidence-backed by targeted regression coverage.
+- `TrySteal` remains linear in worker count; acceptable for modest `w`, but should be revisited for larger worker pools.
 
-## Critical analysis vs engine target (<2ms CPU frame)
-
-### Latency model (qualitative)
-- Let frame-time overhead contribution from utility systems be approximated as:
-$$
-T_{utility} = T_{asset-read} + T_{log} + T_{watcher} + T_{scheduler-overhead}
-$$
-
-- Changes here improve two terms:
-  - `T_{log}`: shifted from synchronous console I/O on caller thread to async flush thread.
-  - `T_{watcher}`: bounded burst scheduling pressure through coalescing and dispatch cap.
-
-- Tradeoff introduced:
-  - `T_{asset-read}` for `TryGetFast` now includes shared-lock acquisition, increasing predictable per-call overhead but removing race risk.
-
-### Complexity notes
-- FileWatcher scan remains linear in watch count per tick:
-  - Time: $O(n)$ for scan + $O(\min(n, k))$ dispatch selection where $k$ is per-tick cap.
-  - Space: $O(k)$ temporary dispatch buffer.
-- Async logger enqueue path:
-  - Time: amortized $O(1)$ per log push.
-  - Space: unbounded queue in current form (can be improved with bounded MPMC ring + drop policy).
-
-## Detailed issue matrix
-
-| ID | Status | Outcome |
-|---|---|---|
-| P0-1 | Done | Synchronized metadata read path now aligned with mutex discipline. |
-| P0-2 | Done | `TryGetFast` safety issue closed by synchronization; no release-only race window in this API. |
-| P0-3 | Done | Single ownership representation in `AssetSlot` reduced complexity. |
-| P1-1 | Pending | Structural decomposition of `Core.Tasks.cpp` still needed. |
-| P1-2 | Done | Debounce/coalescing + capped dispatch implemented for FileWatcher. |
-| P1-3 | Done | Async logging sink implemented; caller no longer writes directly to `std::cout`. |
-
-## Next remediation sequence
-
-### Stage A (next)
-1. Split `Core.Tasks.cpp` into cohesive implementation partitions:
-   - worker loop/policy,
-   - parked-continuation subsystem,
-   - telemetry aggregation.
-2. Add targeted tests per partition.
-
-### Stage B
-1. Add bounded backpressure policy for async logging queue (drop oldest/drop debug-first).
-2. Add telemetry counters for dropped logs and watcher coalesced events.
-
-### Stage C
-1. Revisit `TryGetFast` for genuinely lock-free safe path (RCU/epoch snapshot model) if profiling shows lock cost in hot frame loops.
+### Follow-up plan (cleanup and remaining done markers)
+- [x] Removed obsolete monolithic `Core.Tasks.cpp` from build and source tree.
+- [ ] Add targeted tests:
+  - wait-token generation mismatch safety,
+  - unpark wake cardinality under burst resumes,
+  - fairness interval behavior under local-queue saturation,
+  - scheduler shutdown during parked continuations.
+- [ ] Add micro-bench telemetry snapshot before/after split to quantify impact on variance.
 
 ## Final verdict
-- **Substantial risk was removed** in Assets concurrency paths and runtime diagnostics behavior.
-- The system is now materially safer and more frame-time-stable than Rev A.
-- Remaining architectural bottleneck is mainly concentrated in `Core.Tasks` implementation decomposition and associated stress-test depth.
+- `Core.Tasks` decomposition is now completed and aligned with the previously identified highest-priority gap.
+- This revision improves modularity/testability trajectory without regressing runtime semantics.
+- The next bottleneck for score improvement is now test depth and queue/backpressure policy tuning rather than structural organization.

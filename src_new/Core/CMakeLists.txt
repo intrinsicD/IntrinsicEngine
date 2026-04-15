@@ -17,7 +17,10 @@ target_sources(${target_name}
         PRIVATE
         Core.Filesystem.cpp
         Core.Logging.cpp
-        Core.Tasks.cpp
+        Core.Tasks.Common.cpp
+        Core.Tasks.Coroutine.cpp
+        Core.Tasks.Scheduler.cpp
+        Core.Tasks.Wait.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
