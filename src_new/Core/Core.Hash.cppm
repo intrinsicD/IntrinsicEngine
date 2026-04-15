@@ -7,7 +7,7 @@ export module Extrinsic.Core.Hash;
 
 namespace Extrinsic::Core::Hash
 {
-    constexpr uint32_t HashString(std::string_view str)
+    export constexpr uint32_t HashString(std::string_view str)
     {
         uint32_t hash = 2166136261u;
         for (char c : str)
@@ -59,12 +59,12 @@ namespace Extrinsic::Core::Hash
     };
 
     // User-defined literal for convenient IDs, e.g. "Backbuffer"_id.
-    constexpr StringID operator""_id(const char* str, size_t len)
+    export constexpr StringID operator""_id(const char* str, size_t len)
     {
         return {std::string_view(str, len)};
     }
 
-    struct U64Hash
+    export struct U64Hash
     {
         size_t operator()(uint64_t v) const { return std::hash<uint64_t>{}(v); }
     };

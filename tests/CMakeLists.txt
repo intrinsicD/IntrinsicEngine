@@ -249,3 +249,4 @@ intrinsic_test_executable(IntrinsicGeometryTests
 )
 
 add_subdirectory(Asset)
+add_subdirectory(Core)

@@ -1,7 +1,7 @@
 intrinsic_test_object_lib(AssetTestObjs
         SOURCES
-        Test_CoreAssets.cpp
-        Test_CoreAssetSafety.cpp
+        Test_Assets.cpp
+        Test_AssetSafety.cpp
         DEPS ExtrinsicCore ExtrinsicAssets EnTT::EnTT
 )
 
