@@ -8,6 +8,7 @@ module;
 #include <mutex>
 #include <optional>
 #include <atomic>
+#include <chrono>
 
 export module Extrinsic.Core.Filesystem;
 
@@ -44,6 +45,8 @@ namespace Extrinsic::Core::Filesystem
             std::filesystem::path Path;
             std::filesystem::file_time_type LastTime;
             ChangeCallback Callback;
+            bool Pending = false;
+            std::chrono::steady_clock::time_point LastDetected{};
         };
 
         static void ThreadFunc();
