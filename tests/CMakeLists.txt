@@ -247,3 +247,5 @@ intrinsic_test_executable(IntrinsicGeometryTests
     OBJECTS  GeometryTestObjs
     LINK_LIBS IntrinsicCore IntrinsicGeometry
 )
+
+add_subdirectory(Asset)

@@ -7,11 +7,17 @@ target_sources(${target_name}
         Core.Config.Window.cppm
         Core.Config.Render.cppm
         Core.Config.Engine.cppm
-        Core.StrongHandle.cppm
         Core.Error.cppm
+        Core.Filesystem.cppm
         Core.Hash.cppm
+        Core.LockFreeQueue.cppm
+        Core.Logging.cppm
+        Core.StrongHandle.cppm
+        Core.Tasks.cppm
         PRIVATE
-
+        Core.Filesystem.cpp
+        Core.Logging.cpp
+        Core.Tasks.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

@@ -4,7 +4,6 @@ module;
 
 export module Extrinsic.Asset.Handle;
 
-
 namespace Extrinsic::Assets
 {
     export using AssetHandle = entt::entity;

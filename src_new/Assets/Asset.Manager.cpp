@@ -3,16 +3,23 @@ module;
 #include <memory>
 #include <cassert>
 #include <mutex>
-#include <filesystem>
+#include <shared_mutex>
 #include <expected>
+#include <utility>
 #include <entt/entity/registry.hpp>
 
 module Extrinsic.Asset.Manager;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Tasks;
 
 namespace Extrinsic::Assets
 {
+    [[nodiscard]] bool AssetManager::IsValid(AssetHandle handle) const
+    {
+        return m_Registry.valid(handle);
+    }
+
     void AssetManager::BeginReadPhase() const
     {
 #ifndef NDEBUG
@@ -65,72 +72,14 @@ namespace Extrinsic::Assets
                     runPersistent.reserve(listeners.size());
 
                     // Copy valid callbacks only
-                    for(const auto& [id, cb] : listeners) {
-                        if(cb) runPersistent.push_back(cb);
+                    for (const auto& [id, cb] : listeners)
+                    {
+                        if (cb) runPersistent.push_back(cb);
                     }
                 }
             }
             // Execute OUTSIDE lock (Safe to call Load() recursively now)
             for (const auto& cb : runPersistent) cb(handle);
-        }
-    }
-
-    Core::Expected<AssetHandle> AssetManager::CreateAsset(AssetMetaData metaData, std::function<void(std::string_view)> &&loader)
-    {
-
-        using LoaderFunc = std::function<AssetHandle(std::string_view)>;
-        if (!metaData.ReloadAction)
-        {
-            return Core::Err<AssetHandle>(Core::ErrorCode::AssetLoaderMissing);
-        }
-
-        if (metaData.FilePath.empty())
-        {
-            return Core::Err<AssetHandle>(Core::ErrorCode::InvalidPath);
-        }
-
-        std::string key = std::filesystem::absolute(metaData.FilePath).string();
-
-        Core::Hash::StringID id(key); // Hashes here
-        std::unique_lock lock(m_Mutex);
-
-        if (m_Lookup.contains(id)) return m_Lookup[id];
-
-        AssetHandle handle = m_Registry.create();
-
-        m_Registry.emplace<AssetMetaData>(handle, std::move(metaData));
-        m_Lookup[id] = handle;
-
-        auto sharedLoader = std::make_shared<std::decay_t<LoaderFunc>>(std::forward<LoaderFunc>(loader));
-
-        auto reloadAction = std::make_shared<std::function<void()>>(
-            [this, handle, sharedLoader]() mutable
-            {
-                this->Reload(handle, *sharedLoader);
-            });
-
-        lock.unlock(); // Reload locks internally
-        Reload(handle, *sharedLoader);
-        return Core::Ok(handle);
-    }
-
-    void AssetManager::Reload(AssetHandle handle, std::function<void(std::string_view)> &&loader)
-    {
-        std::string path;
-        {
-            std::unique_lock lock(m_Mutex);
-            if (m_Registry.valid(handle))
-            {
-                auto &metaData = m_Registry.get<AssetMetaData>(handle);
-                metaData.State = LoadState::Loading;
-                path = metaData.FilePath;
-            }
-        }
-
-        if (!path.empty())
-        {
-            auto result = loader(path);
-            //TODO... figure out how to reload properly
         }
     }
 
@@ -184,9 +133,18 @@ namespace Extrinsic::Assets
         }
     }
 
-    Core::Expected<const AssetMetaData&> AssetManager::GetAssetMetaData(AssetHandle handle) const
+    void AssetManager::MoveToProcessing(AssetHandle handle)
     {
-        return m_Registry.get<AssetMetaData>(handle);
+        std::unique_lock lock(m_Mutex);
+        if (m_Registry.valid(handle))
+        {
+            m_Registry.get<AssetMetaData>(handle).State = LoadState::Processing;
+        }
+    }
+
+    Core::Expected<const AssetMetaData*> AssetManager::GetAssetMetaData(AssetHandle handle) const
+    {
+        return m_Registry.try_get<AssetMetaData>(handle);
     }
 
     [[nodiscard]] LoadState AssetManager::GetState(AssetHandle handle) const
@@ -205,7 +163,7 @@ namespace Extrinsic::Assets
         {
             std::unique_lock lock(m_Mutex);
             if (!m_Registry.valid(handle))
-                return {0};
+                return 0;
 
             const uint32_t id = s_ListenerIdCounter++;
             out = {id};
