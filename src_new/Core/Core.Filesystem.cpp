@@ -259,15 +259,33 @@ namespace Extrinsic::Core::Filesystem
             return;
         }
 
-        s_Watches.push_back({path, time, std::move(callback)});
+        s_Watches.push_back({
+            .Path = path,
+            .LastTime = time,
+            .Callback = std::move(callback),
+            .Pending = false,
+            .LastDetected = {}
+        });
     }
 
     void FileWatcher::ThreadFunc()
     {
+        static constexpr auto kScanInterval = std::chrono::milliseconds(500);
+        static constexpr auto kDebounceWindow = std::chrono::milliseconds(150);
+        static constexpr std::size_t kMaxDispatchesPerTick = 32;
+
         while (s_Running)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            std::vector<Entry> change_entries;
+            std::this_thread::sleep_for(kScanInterval);
+            struct DispatchItem
+            {
+                ChangeCallback Callback;
+                std::string Path;
+            };
+            std::vector<DispatchItem> dispatchItems;
+            dispatchItems.reserve(kMaxDispatchesPerTick);
+
+            const auto now = std::chrono::steady_clock::now();
 
             {
                 std::scoped_lock lock(s_Mutex);
@@ -282,23 +300,34 @@ namespace Extrinsic::Core::Filesystem
                     if (currentTime > entry.LastTime)
                     {
                         entry.LastTime = currentTime;
-
-                        if (entry.Callback)
-                        {
-                            change_entries.push_back(entry);
-                        }
-
+                        entry.Pending = true;
+                        entry.LastDetected = now;
                         Log::Info("[HotReload] Detected change: {}", entry.Path.string());
                     }
                 }
+
+                std::size_t dispatched = 0;
+                for (auto& entry : s_Watches)
+                {
+                    if (dispatched >= kMaxDispatchesPerTick) break;
+                    if (!entry.Pending || !entry.Callback) continue;
+                    if ((now - entry.LastDetected) < kDebounceWindow) continue;
+
+                    dispatchItems.push_back(DispatchItem{
+                        .Callback = entry.Callback,
+                        .Path = entry.Path.string()
+                    });
+                    entry.Pending = false;
+                    ++dispatched;
+                }
             }
 
-            for (auto& entry : change_entries)
+            for (auto& item : dispatchItems)
             {
-                if (entry.Callback)
+                Tasks::Scheduler::Dispatch([cb = std::move(item.Callback), path = std::move(item.Path)]()
                 {
-                    Tasks::Scheduler::Dispatch([entry]() { entry.Callback(entry.Path.string()); });
-                }
+                    cb(path);
+                });
             }
         }
     }

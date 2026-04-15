@@ -8,7 +8,11 @@ module;
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <deque>
+#include <condition_variable>
 #include <vector>
+#include <utility>
 
 module Extrinsic.Core.Logging;
 
@@ -31,37 +35,117 @@ namespace Extrinsic::Core::Log
     static std::mutex         s_LogMutex;
     static std::atomic<uint64_t> s_Sequence{0};
 
+    struct AsyncConsoleSink
+    {
+        std::mutex Mutex;
+        std::condition_variable Cv;
+        std::deque<LogEntry> Queue;
+        bool Running = true;
+        std::thread Worker;
+    };
+
+    static AsyncConsoleSink s_ConsoleSink;
+    static std::once_flag s_ConsoleSinkInitOnce;
+
+    [[nodiscard]] static auto ColoredLabel(const Level level) noexcept -> std::pair<const char*, const char*>
+    {
+        switch (level)
+        {
+        case Level::Info: return {"\033[32m", "[INFO] "}; // Green
+        case Level::Warning: return {"\033[33m", "[WARN] "}; // Yellow
+        case Level::Error: return {"\033[31m", "[ERR]  "}; // Red
+        case Level::Debug: return {"\033[36m", "[DBG]  "}; // Cyan
+        }
+
+        return {"\033[0m", "[INFO] "};
+    }
+
+    static void ConsoleSinkWorker()
+    {
+        for (;;)
+        {
+            std::vector<LogEntry> batch;
+            {
+                std::unique_lock lock(s_ConsoleSink.Mutex);
+                s_ConsoleSink.Cv.wait(lock, []
+                {
+                    return !s_ConsoleSink.Running || !s_ConsoleSink.Queue.empty();
+                });
+
+                if (!s_ConsoleSink.Running && s_ConsoleSink.Queue.empty())
+                    return;
+
+                batch.reserve(s_ConsoleSink.Queue.size());
+                while (!s_ConsoleSink.Queue.empty())
+                {
+                    batch.push_back(std::move(s_ConsoleSink.Queue.front()));
+                    s_ConsoleSink.Queue.pop_front();
+                }
+            }
+
+            for (const auto& entry : batch)
+            {
+                const auto [color, label] = ColoredLabel(entry.Lvl);
+                std::cout << color << label << entry.Message << "\033[0m" << std::endl;
+            }
+        }
+    }
+
+    static void EnsureConsoleSinkInitialized()
+    {
+        std::call_once(s_ConsoleSinkInitOnce, []
+        {
+            s_ConsoleSink.Worker = std::thread(ConsoleSinkWorker);
+        });
+    }
+
+    struct ConsoleSinkShutdown
+    {
+        ~ConsoleSinkShutdown()
+        {
+            {
+                std::lock_guard lock(s_ConsoleSink.Mutex);
+                s_ConsoleSink.Running = false;
+            }
+            s_ConsoleSink.Cv.notify_all();
+            if (s_ConsoleSink.Worker.joinable())
+                s_ConsoleSink.Worker.join();
+        }
+    };
+
+    static ConsoleSinkShutdown s_ConsoleSinkShutdown;
+
     // -------------------------------------------------------------------------
     // Core write path
     // -------------------------------------------------------------------------
 
     void PrintColored(const Level level, const std::string_view msg)
     {
+        EnsureConsoleSinkInitialized();
+
+        // Append to ring buffer (snapshot data path)
         std::lock_guard lock(s_LogMutex);
-
-        // ANSI Color Codes
-        const char* color = "\033[0m";
-        const char* label = "[INFO]";
-
-        switch (level) {
-        case Level::Info:    color = "\033[32m"; label = "[INFO] "; break; // Green
-        case Level::Warning: color = "\033[33m"; label = "[WARN] "; break; // Yellow
-        case Level::Error:   color = "\033[31m"; label = "[ERR]  "; break; // Red
-        case Level::Debug:   color = "\033[36m"; label = "[DBG]  "; break; // Cyan
-        }
-
-        std::cout << color << label << msg << "\033[0m" << std::endl;
+        LogEntry pendingEntry{
+            .Lvl = level,
+            .Message = std::string(msg)
+        };
 
         // Append to ring buffer
         auto& entry = s_Ring.Entries[s_Ring.WritePos % kLogCapacity];
-        entry.Lvl     = level;
-        entry.Message = std::string(msg);
+        entry = pendingEntry;
 
         ++s_Ring.WritePos;
         if (s_Ring.Count < kLogCapacity)
             ++s_Ring.Count;
 
         s_Sequence.fetch_add(1, std::memory_order_release);
+
+        // Queue async console output (I/O path)
+        {
+            std::lock_guard qLock(s_ConsoleSink.Mutex);
+            s_ConsoleSink.Queue.push_back(std::move(pendingEntry));
+        }
+        s_ConsoleSink.Cv.notify_one();
     }
 
     // -------------------------------------------------------------------------

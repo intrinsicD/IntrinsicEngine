@@ -56,12 +56,12 @@ namespace Extrinsic::Assets
     template <typename T>
     struct AssetSlot
     {
-        std::unique_ptr<T> Unique{};
         std::shared_ptr<T> Shared;
         std::atomic<std::uint32_t> PinCount{0};
 
-        explicit AssetSlot(std::unique_ptr<T> resource) : Unique(std::move(resource))
+        explicit AssetSlot(std::unique_ptr<T> resource)
         {
+            Shared = std::shared_ptr<T>(std::move(resource));
         }
 
         explicit AssetSlot(std::shared_ptr<T> resource) : Shared(std::move(resource))
@@ -70,7 +70,7 @@ namespace Extrinsic::Assets
 
         [[nodiscard]] T* Get() const noexcept
         {
-            return Unique ? Unique.get() : Shared.get();
+            return Shared.get();
         }
     };
 
@@ -172,12 +172,12 @@ namespace Extrinsic::Assets
 
         [[nodiscard]] bool IsValid(AssetHandle handle) const;
 
-        // Debug-verified phase ordering for TryGetFast.
-        // BeginReadPhase/EndReadPhase must bracket any parallel read usage.
+        // Optional debug instrumentation hook for higher-level frame/read phases.
+        // Not required for correctness of TryGet/TryGetFast (which are synchronized).
         void BeginReadPhase() const;
 
-        // Debug-verified phase ordering for TryGetFast.
-        // BeginReadPhase/EndReadPhase must bracket any parallel read usage.
+        // Optional debug instrumentation hook for higher-level frame/read phases.
+        // Not required for correctness of TryGet/TryGetFast (which are synchronized).
         void EndReadPhase() const;
 
         void Update();
@@ -546,10 +546,7 @@ namespace Extrinsic::Assets
     template <typename T>
     T* AssetManager::TryGetFast(AssetHandle handle)
     {
-#ifndef NDEBUG
-        assert(m_DebugReadPhase.load(std::memory_order_relaxed) > 0 &&
-            "AssetManager::GetLockfree called outside read phase. Use BeginReadPhase/EndReadPhase or TryGet/AcquireLease.");
-#endif
+        std::shared_lock lock(m_Mutex);
         if (!m_Registry.valid(handle)) return nullptr;
 
         const auto* payload = m_Registry.try_get<AssetPayload<T>>(handle);
@@ -560,10 +557,7 @@ namespace Extrinsic::Assets
     template <typename T>
     const T* AssetManager::TryGetFast(AssetHandle handle) const
     {
-#ifndef NDEBUG
-        assert(m_DebugReadPhase.load(std::memory_order_relaxed) > 0 &&
-            "AssetManager::GetLockfree called outside read phase. Use BeginReadPhase/EndReadPhase or TryGet/AcquireLease.");
-#endif
+        std::shared_lock lock(m_Mutex);
         if (!m_Registry.valid(handle)) return nullptr;
 
         const auto* payload = m_Registry.try_get<AssetPayload<T>>(handle);

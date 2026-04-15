@@ -144,6 +144,7 @@ namespace Extrinsic::Assets
 
     Core::Expected<const AssetMetaData*> AssetManager::GetAssetMetaData(AssetHandle handle) const
     {
+        std::shared_lock lock(m_Mutex);
         return m_Registry.try_get<AssetMetaData>(handle);
     }
 
