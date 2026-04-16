@@ -10,6 +10,7 @@ target_sources(${target_name}
         Asset.PayloadStore.cppm
         Asset.Registry.cppm
         Asset.Service.cppm
+        Asset.TypePool.cppm
         PRIVATE
         Asset.EventBus.cpp
         Asset.LoadPipeline.cpp

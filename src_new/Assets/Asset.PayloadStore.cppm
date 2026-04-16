@@ -11,6 +11,7 @@ export module Extrinsic.Asset.PayloadStore;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.TypePool;
 
 namespace Extrinsic::Assets
 {
@@ -32,17 +33,7 @@ namespace Extrinsic::Assets
         [[nodiscard]] Core::Result Retire(AssetId id);
 
     private:
-        using TypeId = std::uintptr_t;
-
-        template <typename T>
-        struct TypeInfo
-        {
-            static TypeId Id() noexcept
-            {
-                static char s_TypeTag;
-                return reinterpret_cast<TypeId>(&s_TypeTag);
-            }
-        };
+        using TypeId = TypePools<AssetId>::TypeId;
 
         struct Entry
         {
@@ -50,70 +41,11 @@ namespace Extrinsic::Assets
             TypeId typeId = 0;
         };
 
-        struct ITypePool
-        {
-            virtual ~ITypePool() = default;
-            [[nodiscard]] virtual TypeId PoolType() const noexcept = 0;
-            virtual bool Erase(AssetId id) = 0;
-        };
-
-        template <class T>
-        struct TypePool final : ITypePool
-        {
-            std::unordered_map<AssetId, std::vector<T>> values{};
-
-            [[nodiscard]] TypeId PoolType() const noexcept override
-            {
-                return TypeInfo<T>::Id();
-            }
-
-            bool Erase(AssetId id) override
-            {
-                return values.erase(id) > 0;
-            }
-        };
-
-        template <class T>
-        [[nodiscard]] TypePool<std::remove_cvref_t<T>>& GetOrCreatePool();
-
-        template <class T>
-        [[nodiscard]] const TypePool<std::remove_cvref_t<T>>* TryGetPool() const;
-
         mutable std::mutex m_Mutex{};
         std::unordered_map<AssetId, Entry> m_Entries{};
-        std::unordered_map<TypeId, std::unique_ptr<ITypePool>> m_Pools{};
+        TypePools<AssetId> m_TypePools{};
         std::atomic<uint32_t> m_NextSlot{1};
     };
-
-    template <class T>
-    auto AssetPayloadStore::GetOrCreatePool() -> TypePool<std::remove_cvref_t<T>>&
-    {
-        using StoredT = std::remove_cvref_t<T>;
-        const auto typeId = TypeInfo<StoredT>::Id();
-        auto it = m_Pools.find(typeId);
-        if (it == m_Pools.end())
-        {
-            auto pool = std::make_unique<TypePool<StoredT>>();
-            auto* ptr = pool.get();
-            m_Pools.emplace(typeId, std::move(pool));
-            return *ptr;
-        }
-
-        return *static_cast<TypePool<StoredT>*>(it->second.get());
-    }
-
-    template <class T>
-    auto AssetPayloadStore::TryGetPool() const -> const TypePool<std::remove_cvref_t<T>>*
-    {
-        using StoredT = std::remove_cvref_t<T>;
-        const auto typeId = TypeInfo<StoredT>::Id();
-        const auto it = m_Pools.find(typeId);
-        if (it == m_Pools.end())
-        {
-            return nullptr;
-        }
-        return static_cast<const TypePool<StoredT>*>(it->second.get());
-    }
 
     template <class T>
     Core::Expected<PayloadTicket> AssetPayloadStore::Publish(AssetId id, T&& value)
@@ -121,7 +53,7 @@ namespace Extrinsic::Assets
         using StoredT = std::remove_cvref_t<T>;
         std::scoped_lock lock(m_Mutex);
 
-        auto& pool = GetOrCreatePool<StoredT>();
+        auto& pool = m_TypePools.GetOrCreate<StoredT>();
         auto& entry = m_Entries[id];
 
         if (entry.ticket.slot == 0)
@@ -134,7 +66,7 @@ namespace Extrinsic::Assets
             ++entry.ticket.generation;
         }
 
-        entry.typeId = TypeInfo<StoredT>::Id();
+        entry.typeId = TypePools<AssetId>::Type<StoredT>();
         pool.values[id] = std::vector<StoredT>{std::forward<T>(value)};
         return entry.ticket;
     }
@@ -149,19 +81,19 @@ namespace Extrinsic::Assets
             return Core::Err<std::span<const T>>(Core::ErrorCode::AssetNotLoaded);
         }
 
-        if (entryIt->second.typeId != TypeInfo<T>::Id())
+        if (entryIt->second.typeId != TypePools<AssetId>::Type<T>())
         {
             return Core::Err<std::span<const T>>(Core::ErrorCode::TypeMismatch);
         }
 
-        const auto* pool = TryGetPool<T>();
-        if (pool == nullptr)
+        const auto* poolValues = m_TypePools.TryGet<T>();
+        if (poolValues == nullptr)
         {
             return Core::Err<std::span<const T>>(Core::ErrorCode::ResourceNotFound);
         }
 
-        const auto valueIt = pool->values.find(id);
-        if (valueIt == pool->values.end())
+        const auto valueIt = poolValues->find(id);
+        if (valueIt == poolValues->end())
         {
             return Core::Err<std::span<const T>>(Core::ErrorCode::ResourceNotFound);
         }

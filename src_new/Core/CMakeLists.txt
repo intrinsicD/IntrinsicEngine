@@ -14,6 +14,7 @@ target_sources(${target_name}
         Core.Logging.cppm
         Core.StrongHandle.cppm
         Core.Tasks.cppm
+        Core.Tasks.CounterEvent.cppm
         Core.Tasks.Internal.cppm
         Core.Tasks.LocalTask.cppm
         FILE_SET tasks_impl TYPE CXX_MODULES FILES
@@ -21,6 +22,7 @@ target_sources(${target_name}
         PRIVATE
         Core.Filesystem.cpp
         Core.Logging.cpp
+        Core.Tasks.CounterEvent.cpp
         Core.Tasks.Dispatch.cpp
         Core.Tasks.Job.cpp
         Core.Tasks.Lifecycle.cpp
