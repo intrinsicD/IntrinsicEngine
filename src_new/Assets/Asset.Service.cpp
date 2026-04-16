@@ -1,6 +1,7 @@
 module;
 
 #include <mutex>
+#include <string>
 
 module Extrinsic.Asset.Service;
 
@@ -12,45 +13,25 @@ namespace Extrinsic::Assets
         m_LoadPipeline.BindEventBus(&m_EventBus);
     }
 
-    Core::Result AssetService::Reload(AssetId id)
+    Core::Expected<AssetMeta> AssetService::GetMeta(AssetId id) const
     {
-        if (!m_Registry.IsAlive(id))
-        {
-            return Core::Err(Core::ErrorCode::ResourceNotFound);
-        }
+        return m_Registry.GetMeta(id);
+    }
 
-        auto toUnloaded = m_Registry.SetState(id, AssetState::Ready, AssetState::Unloaded);
-        if (!toUnloaded.has_value())
-        {
-            return toUnloaded;
-        }
+    bool AssetService::IsAlive(AssetId id) const noexcept
+    {
+        return m_Registry.IsAlive(id);
+    }
 
-        std::string path;
+    Core::Expected<std::string> AssetService::GetPath(AssetId id) const
+    {
+        std::scoped_lock lock(m_PathMutex);
+        const auto it = m_PathById.find(id);
+        if (it == m_PathById.end())
         {
-            std::scoped_lock lock(m_PathMutex);
-            const auto pathIt = m_PathById.find(id);
-            if (pathIt == m_PathById.end())
-            {
-                return Core::Err(Core::ErrorCode::ResourceNotFound);
-            }
-            path = pathIt->second;
+            return Core::Err<std::string>(Core::ErrorCode::ResourceNotFound);
         }
-
-        const auto meta = m_Registry.GetMeta(id);
-        if (!meta.has_value())
-        {
-            return std::unexpected(meta.error());
-        }
-
-        LoadRequest req{.id = id, .typeId = meta->typeId, .path = path.c_str(), .needsGpuUpload = false};
-        auto result = m_LoadPipeline.EnqueueIO(req);
-        if (!result.has_value())
-        {
-            return result;
-        }
-
-        m_EventBus.Publish(id, AssetEvent::Reloaded);
-        return Core::Ok();
+        return it->second;
     }
 
     Core::Result AssetService::Destroy(AssetId id)
@@ -59,6 +40,10 @@ namespace Extrinsic::Assets
         {
             return Core::Err(Core::ErrorCode::ResourceNotFound);
         }
+
+        // Drop any in-flight load state so the pipeline does not leak a
+        // LoadRequest when a previously queued asset is destroyed (B6).
+        m_LoadPipeline.Cancel(id);
 
         std::string path;
         {

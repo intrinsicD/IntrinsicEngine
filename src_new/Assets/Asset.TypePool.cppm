@@ -18,7 +18,7 @@ export namespace Extrinsic::Assets
         template <class T>
         [[nodiscard]] static TypeId Type() noexcept
         {
-            using StoredT = std::remove_cvref_t<T>;
+            // Per-type unique tag: its address is a stable, RTTI-free type id.
             static char s_TypeTag;
             return reinterpret_cast<TypeId>(&s_TypeTag);
         }
