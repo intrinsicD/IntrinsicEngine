@@ -21,6 +21,8 @@ namespace Extrinsic::Core::Tasks
             threadCount = std::thread::hardware_concurrency();
         if (threadCount > 2) threadCount--;
 
+        threadCount = std::max(threadCount, 1u);
+
         s_Ctx->workerStates.resize(threadCount);
 
         for (unsigned i = 0; i < threadCount; ++i)

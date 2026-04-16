@@ -85,7 +85,7 @@ namespace Extrinsic::Assets
 
     bool AssetManager::DestroyAsset(AssetHandle handle)
     {
-        std::unique_lock lock(m_Mutex);
+        std::unique_lock lock(m_EventQueueMutex);
         if (!m_Registry.valid(handle))
         {
             return false;

@@ -462,6 +462,8 @@ namespace Core::Tasks
             if (threadCount > 2) threadCount--; // Leave core for OS/Main
         }
 
+        threadCount = std::max(threadCount, 1u);
+
         Log::Info("Initializing Scheduler with {} worker threads.", threadCount);
 
         s_Ctx->workerStates.resize(threadCount);
