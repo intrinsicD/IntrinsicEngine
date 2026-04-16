@@ -1,8 +1,8 @@
 module;
 
 #include <cstdint>
-#include <span>
-#include <expected>
+#include <mutex>
+#include <vector>
 
 export module Extrinsic.Asset.Registry;
 
@@ -35,5 +35,15 @@ export namespace Extrinsic::Assets
         [[nodiscard]] Core::Expected<AssetMeta> GetMeta(AssetId id) const;
         [[nodiscard]] Core::Result SetState(AssetId id, AssetState expected, AssetState next);
         [[nodiscard]] Core::Result Destroy(AssetId id);
+        [[nodiscard]] bool IsAliveLocked(AssetId id) const noexcept;
+
+        mutable std::mutex m_Mutex{};
+        std::vector<uint32_t> m_PathHashes{};
+        std::vector<AssetState> m_States{};
+        std::vector<uint32_t> m_TypeIds{};
+        std::vector<uint32_t> m_PayloadSlots{};
+        std::vector<uint32_t> m_Generations{};
+        std::vector<uint8_t> m_Allocated{};
+        std::vector<uint32_t> m_FreeList{};
     };
 }

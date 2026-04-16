@@ -1,11 +1,15 @@
 intrinsic_test_object_lib(AssetTestObjs
         SOURCES
-        Test_Assets.cpp
-        Test_AssetSafety.cpp
-        DEPS ExtrinsicCore ExtrinsicAssets EnTT::EnTT
+        Test.Asset.EventBus.cpp
+        Test.Asset.LoadPipeline.cpp
+        Test.Asset.PathIndex.cpp
+        Test.Asset.PayloadStore.cpp
+        Test.Asset.Registry.cpp
+        Test.Asset.Service.cpp
+        DEPS ExtrinsicCore ExtrinsicAssets
 )
 
 intrinsic_test_executable(ExtrinsicAssetTests
         OBJECTS  AssetTestObjs
-        LINK_LIBS ExtrinsicCore ExtrinsicAssets EnTT::EnTT
+        LINK_LIBS ExtrinsicCore ExtrinsicAssets
 )

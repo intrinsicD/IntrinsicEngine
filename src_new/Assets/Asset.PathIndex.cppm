@@ -1,5 +1,6 @@
 module;
 
+#include <mutex>
 #include <string_view>
 #include <string>
 #include <unordered_map>
@@ -19,6 +20,7 @@ namespace Extrinsic::Assets
         [[nodiscard]] Core::Result Erase(std::string_view absolutePath, AssetId id);
 
     private:
+        mutable std::mutex m_Mutex;
         std::unordered_map<std::string, AssetId> m_Index{};
     };
 }

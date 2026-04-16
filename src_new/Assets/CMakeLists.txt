@@ -4,10 +4,7 @@ intrinsic_add_module_library(${target_name})
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-        Asset.Error.cppm
         Asset.EventBus.cppm
-        Asset.Handle.cppm
-        Asset.Manager.cppm
         Asset.LoadPipeline.cppm
         Asset.PathIndex.cppm
         Asset.PayloadStore.cppm
@@ -15,7 +12,6 @@ target_sources(${target_name}
         Asset.Service.cppm
         PRIVATE
         Asset.EventBus.cpp
-        Asset.Manager.cpp
         Asset.LoadPipeline.cpp
         Asset.PathIndex.cpp
         Asset.PayloadStore.cpp
@@ -26,7 +22,6 @@ target_sources(${target_name}
 target_link_libraries(${target_name}
         PUBLIC
         ExtrinsicCore
-        EnTT::EnTT
 )
 
 target_include_directories(${target_name} PUBLIC .)

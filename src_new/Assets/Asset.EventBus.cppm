@@ -1,6 +1,9 @@
 module;
+#include <atomic>
 #include <cstdint>
 #include <functional>
+#include <queue>
+#include <mutex>
 
 export module Extrinsic.Asset.EventBus;
 
@@ -20,5 +23,16 @@ export namespace Extrinsic::Assets
         void Unsubscribe(AssetId id, ListenerToken token);
         void Publish(AssetId id, AssetEvent ev);
         void Flush(); // main-thread fanout
+    private:
+        struct QueuedEvent
+        {
+            AssetId id{};
+            AssetEvent ev = AssetEvent::Ready;
+        };
+
+        mutable std::mutex m_Mutex{};
+        std::atomic<uint32_t> m_NextToken{};
+        std::unordered_map<AssetId, std::unordered_map<ListenerToken, ListenerCallback>> m_Listeners;
+        std::vector<QueuedEvent> m_PendingEvents;
    };
 }
