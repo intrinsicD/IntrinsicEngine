@@ -7,31 +7,16 @@ module;
 #include <cmath>
 #include <algorithm>
 
-module Extrinsic.Core.Tasks.Internal;
+module Extrinsic.Core.Tasks:Internal.Impl;
+import :Internal;
 
 namespace Extrinsic::Core::Tasks
 {
+    std::unique_ptr<Detail::SchedulerContext> s_Ctx{};
+    thread_local int s_WorkerIndex = -1;
+
     namespace Detail
     {
-        [[nodiscard]] bool CpuRelaxOnce() noexcept
-        {
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-            _mm_pause();
-            return true;
-#elif defined(__aarch64__) || defined(__arm__)
-            asm volatile("yield" ::: "memory");
-            return true;
-#else
-            return false;
-#endif
-        }
-
-        void CpuRelaxOrYield() noexcept
-        {
-            if (!CpuRelaxOnce())
-                std::this_thread::yield();
-        }
-
         bool SpinLock::try_lock()
         {
             return !locked.exchange(true, std::memory_order_acquire);
@@ -64,6 +49,25 @@ namespace Extrinsic::Core::Tasks
         {
             locked.store(false, std::memory_order_release);
             locked.notify_one();
+        }
+
+        void CpuRelaxOrYield() noexcept
+        {
+            if (!CpuRelaxOnce())
+                std::this_thread::yield();
+        }
+
+        [[nodiscard]] bool CpuRelaxOnce() noexcept
+        {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+            _mm_pause();
+            return true;
+#elif defined(__aarch64__) || defined(__arm__)
+            asm volatile("yield" ::: "memory");
+            return true;
+#else
+            return false;
+#endif
         }
 
         SchedulerContext::WorkerState::WorkerState(WorkerState&& other) noexcept
@@ -105,6 +109,13 @@ namespace Extrinsic::Core::Tasks
             return 1ull << (histogram.size() - 2);
         }
 
+        void RecordLatencySample(
+            std::array<std::atomic<uint64_t>, SchedulerContext::LatencyBucketCount>& histogram,
+            const uint64_t latencyNs)
+        {
+            histogram[LatencyBucketIndex(latencyNs)].fetch_add(1, std::memory_order_relaxed);
+        }
+
         size_t LatencyBucketIndex(const uint64_t latencyNs)
         {
             if (latencyNs == 0)
@@ -112,13 +123,6 @@ namespace Extrinsic::Core::Tasks
 
             const uint32_t msb = std::bit_width(latencyNs) - 1;
             return std::min<size_t>(msb + 1, SchedulerContext::LatencyBucketCount - 1);
-        }
-
-        void RecordLatencySample(
-            std::array<std::atomic<uint64_t>, SchedulerContext::LatencyBucketCount>& histogram,
-            const uint64_t latencyNs)
-        {
-            histogram[LatencyBucketIndex(latencyNs)].fetch_add(1, std::memory_order_relaxed);
         }
     }
 }

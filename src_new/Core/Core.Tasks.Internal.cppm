@@ -7,8 +7,9 @@ module;
 #include <thread>
 #include <coroutine>
 #include <memory>
+#include <optional>
 
-export module Extrinsic.Core.Tasks.Internal;
+export module Extrinsic.Core.Tasks:Internal;
 
 import Extrinsic.Core.Tasks.LocalTask;
 import Extrinsic.Core.LockFreeQueue;
@@ -116,4 +117,15 @@ export namespace Extrinsic::Core::Tasks
             std::array<std::atomic<uint64_t>, SchedulerContext::LatencyBucketCount>& histogram,
             uint64_t latencyNs);
     }
+
+    bool EnqueueInject(LocalTask&& task);
+    bool TryPopGlobalInject(LocalTask& outTask);
+    bool TryPopLocal(unsigned workerIndex, LocalTask& outTask);
+    bool TrySteal(unsigned thiefIndex, LocalTask& outTask);
+    bool TryPopTask(LocalTask& outTask, std::optional<unsigned> workerIndex);
+    void OnTaskDequeuedAndRun(LocalTask& task);
+    // Global scheduler state declarations.
+    // These are defined exactly once in Core.Tasks.State.cpp.
+    extern std::unique_ptr<Detail::SchedulerContext> s_Ctx;
+    extern thread_local int s_WorkerIndex;
 }
