@@ -18,11 +18,15 @@ export namespace Extrinsic::Assets
     public:
         using ListenerCallback = std::function<void(AssetId, AssetEvent)>;
         using ListenerToken = uint32_t;
+        // 0 is reserved for "invalid / failed subscribe".
+        static constexpr ListenerToken InvalidToken = 0u;
 
         [[nodiscard]] ListenerToken Subscribe(AssetId id, ListenerCallback cb);
         void Unsubscribe(AssetId id, ListenerToken token);
         void Publish(AssetId id, AssetEvent ev);
         void Flush(); // main-thread fanout
+        [[nodiscard]] std::size_t PendingCount() const;
+
     private:
         struct QueuedEvent
         {
@@ -31,8 +35,8 @@ export namespace Extrinsic::Assets
         };
 
         mutable std::mutex m_Mutex{};
-        std::atomic<uint32_t> m_NextToken{};
+        std::atomic<uint32_t> m_NextToken{1};
         std::unordered_map<AssetId, std::unordered_map<ListenerToken, ListenerCallback>> m_Listeners;
         std::vector<QueuedEvent> m_PendingEvents;
-   };
+    };
 }

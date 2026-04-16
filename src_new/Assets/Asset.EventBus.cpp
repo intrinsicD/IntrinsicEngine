@@ -80,4 +80,10 @@ namespace Extrinsic::Assets
             }
         }
     }
+
+    [[nodiscard]] std::size_t AssetEventBus::PendingCount() const
+    {
+        std::scoped_lock lock(m_Mutex);
+        return m_PendingEvents.size();
+    }
 }
