@@ -13,10 +13,12 @@ export namespace Extrinsic::Assets
     class AssetEventBus
     {
     public:
-        using Listener = std::function<void(AssetId, AssetEvent)>;
-        [[nodiscard]] uint32_t Subscribe(AssetId id, Listener cb);
-        void Unsubscribe(AssetId id, uint32_t token);
+        using ListenerCallback = std::function<void(AssetId, AssetEvent)>;
+        using ListenerToken = uint32_t;
+
+        [[nodiscard]] ListenerToken Subscribe(AssetId id, ListenerCallback cb);
+        void Unsubscribe(AssetId id, ListenerToken token);
         void Publish(AssetId id, AssetEvent ev);
         void Flush(); // main-thread fanout
-    };
+   };
 }

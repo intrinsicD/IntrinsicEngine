@@ -1,5 +1,4 @@
 module;
-#include <cstdint>
 
 module Extrinsic.Asset.EventBus;
 
@@ -7,11 +6,11 @@ import Extrinsic.Asset.Registry;
 
 namespace Extrinsic::Assets
 {
-    [[nodiscard]] uint32_t AssetEventBus::Subscribe(AssetId id, Listener cb)
+    AssetEventBus::ListenerToken AssetEventBus::Subscribe(AssetId id, ListenerCallback cb)
     {
     }
 
-    void AssetEventBus::Unsubscribe(AssetId id, uint32_t token)
+    void AssetEventBus::Unsubscribe(AssetId id, ListenerToken token)
     {
     }
 
@@ -19,7 +18,7 @@ namespace Extrinsic::Assets
     {
     }
 
-    void AssetEventBus::Flush();
+    void AssetEventBus::Flush()
     {
     }
 }
