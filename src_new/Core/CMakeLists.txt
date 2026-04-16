@@ -14,13 +14,15 @@ target_sources(${target_name}
         Core.Logging.cppm
         Core.StrongHandle.cppm
         Core.Tasks.cppm
+        Core.Tasks.Internal.cppm
+        Core.Tasks.LocalTask.cppm
         PRIVATE
         Core.Filesystem.cpp
         Core.Logging.cpp
-        Core.Tasks.Common.cpp
-        Core.Tasks.Coroutine.cpp
+        Core.Tasks.Internal.cpp
+        Core.Tasks.Job.cpp
+        Core.Tasks.LocalTask.cpp
         Core.Tasks.Scheduler.cpp
-        Core.Tasks.Wait.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

@@ -7,7 +7,7 @@ export module Extrinsic.Asset.Error;
 
 import Extrinsic.Core.Error;
 
-namespace Extrinsic::Asset::Error
+namespace Extrinsic::Assets::Error
 {
     export enum class AssetError : std::uint32_t
     {

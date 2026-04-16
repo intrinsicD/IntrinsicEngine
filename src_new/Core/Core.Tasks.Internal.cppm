@@ -1,31 +1,20 @@
-#pragma once
+module;
 
-#include <algorithm>
 #include <array>
 #include <atomic>
-#include <bit>
-#include <chrono>
-#include <cmath>
-#include <coroutine>
-#include <cstdint>
 #include <deque>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <thread>
 #include <vector>
+#include <thread>
+#include <coroutine>
+#include <memory>
 
-namespace Extrinsic::Core
+export module Extrinsic.Core.Tasks.Internal;
+
+import Extrinsic.Core.Tasks.LocalTask;
+import Extrinsic.Core.LockFreeQueue;
+
+export namespace Extrinsic::Core::Tasks
 {
-    template <typename T>
-    class LockFreeQueue;
-}
-
-namespace Extrinsic::Core::Tasks
-{
-    class LocalTask;
-
     namespace Detail
     {
         [[nodiscard]] bool CpuRelaxOnce() noexcept;
@@ -127,14 +116,4 @@ namespace Extrinsic::Core::Tasks
             std::array<std::atomic<uint64_t>, SchedulerContext::LatencyBucketCount>& histogram,
             uint64_t latencyNs);
     }
-
-    extern std::unique_ptr<Detail::SchedulerContext> s_Ctx;
-    extern thread_local int s_WorkerIndex;
-
-    [[nodiscard]] bool EnqueueInject(LocalTask&& task);
-    [[nodiscard]] bool TryPopInject(LocalTask& outTask);
-    [[nodiscard]] bool TryPopLocal(unsigned workerIndex, LocalTask& outTask);
-    [[nodiscard]] bool TrySteal(unsigned thiefIndex, LocalTask& outTask);
-    [[nodiscard]] bool TryPopTask(LocalTask& outTask, std::optional<unsigned> workerIndex);
-    void OnTaskDequeuedAndRun(LocalTask& task);
 }
