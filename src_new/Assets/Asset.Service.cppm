@@ -8,10 +8,13 @@ module;
 #include <expected>
 #include <functional>
 #include <memory>
+#include <type_traits>
 
 export module Extrinsic.Asset.Service;
 
 import Extrinsic.Core.Error;
+import Extrinsic.Core.CallbackRegistry;
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.PathIndex;
 import Extrinsic.Asset.PayloadStore;
@@ -23,16 +26,32 @@ import Extrinsic.Core.Filesystem;
 
 export namespace Extrinsic::Assets
 {
+    // Tag type for loader-callback tokens. Distinct from other StrongHandle
+    // tags (AssetTag, etc.) so tokens cannot be accidentally mixed.
+    struct AssetLoaderTag
+    {
+    };
+
+    // A loader thunk decodes the file into the payload store and updates the
+    // asset's payload slot. It returns a Core::Result; the surrounding state
+    // machine (transitions, pipeline enqueue, event bus) lives in Reload(id).
+    using LoaderRegistry = Core::CallbackRegistry<Core::Result(std::string_view), AssetLoaderTag>;
+    using LoaderToken = LoaderRegistry::Token;
+
     class AssetService
     {
     public:
         AssetService();
         AssetService(const AssetService&) = delete;
         AssetService& operator=(const AssetService&) = delete;
+        AssetService(AssetService&&) = delete;
+        AssetService& operator=(AssetService&&) = delete;
 
         template <class T, class Loader>
         [[nodiscard]] Core::Expected<AssetId> Load(std::string_view path, Loader&& loader);
 
+        // One-shot reload with an explicit loader. Primarily useful for tests
+        // and for overriding the captured loader in ad-hoc contexts.
         template <class T, class Loader>
         Core::Result Reload(AssetId id, Loader&& loader);
 
@@ -44,6 +63,16 @@ export namespace Extrinsic::Assets
 
         [[nodiscard]] Core::Expected<std::string> GetPath(AssetId id) const;
 
+        // Returns the token captured during Load<T>() for this asset. Stable
+        // across concurrent loads and safe to hand to a FileWatcher or any
+        // long-lived consumer. Returns AssetLoaderMissing if the asset was
+        // never associated with a loader (e.g. created via a test harness).
+        [[nodiscard]] Core::Expected<LoaderToken> GetReloadToken(AssetId id) const;
+
+        // Parameterless reload uses the loader captured at Load<T>() time.
+        // This is the path a FileWatcher, hot-reload service, or editor
+        // action should drive. Runs the full state machine and publishes a
+        // Reloaded event on success.
         Core::Result Reload(AssetId id);
         Core::Result Destroy(AssetId id);
 
@@ -56,6 +85,7 @@ export namespace Extrinsic::Assets
         [[nodiscard]] AssetPayloadStore& PayloadStore() noexcept { return m_PayloadStore; }
         [[nodiscard]] AssetLoadPipeline& LoadPipeline() noexcept { return m_LoadPipeline; }
         [[nodiscard]] AssetPathIndex& PathIndex() noexcept { return m_PathIndex; }
+        [[nodiscard]] LoaderRegistry& LoaderCallbacks() noexcept { return m_LoaderRegistry; }
 
         // Produce a stable type id for a C++ type T. The same type yields the
         // same id within a single process.
@@ -63,6 +93,17 @@ export namespace Extrinsic::Assets
         [[nodiscard]] static uint32_t TypeIdOf() noexcept;
 
     private:
+        // Lookup token -> owned-by-this-service. Protected by m_LoaderMutex.
+        [[nodiscard]] Core::Expected<LoaderToken> FindLoaderToken(AssetId id) const;
+
+        // Unregister and forget the loader for this asset. Safe to call even
+        // if no loader was ever registered (returns false silently).
+        void EraseLoader(AssetId id);
+
+        // Member declaration order matters: subsystems declared first are
+        // destroyed last. The loader registry holds thunks that capture
+        // AssetService* - it is declared last so its slots (and any captured
+        // state) drain before the subsystems they reference.
         AssetPathIndex m_PathIndex;
         AssetRegistry m_Registry;
         AssetPayloadStore m_PayloadStore;
@@ -72,20 +113,9 @@ export namespace Extrinsic::Assets
         mutable std::mutex m_PathMutex;
         std::unordered_map<AssetId, std::string> m_PathById{};
 
-        struct Loaders
-        {
-            std::shared_ptr<std::function<void(std::string_view)>> FindLoader(uint32_t typeId)
-            {
-                auto it = m_LoaderByType.find(typeId);
-                if (it != m_LoaderByType.end())
-                {
-                    return it->second;
-                }
-                return {};
-            }
-
-            std::unordered_map<uint32_t, std::shared_ptr<std::function<void(std::string_view)>>> m_LoaderByType{};
-        };
+        mutable std::mutex m_LoaderMutex;
+        std::unordered_map<AssetId, LoaderToken> m_LoaderByAsset{};
+        LoaderRegistry m_LoaderRegistry;
     };
 
     template <class T>
@@ -119,6 +149,10 @@ export namespace Extrinsic::Assets
             return *found;
         }
 
+        // Run the loader once for the initial decode. Even after the switch
+        // to token-captured loaders, keeping the initial decode synchronous
+        // preserves the existing contract that a failed first Load leaves no
+        // ghost asset behind.
         auto payload = loader(std::string_view(abs), AssetId{});
         if (!payload.has_value())
         {
@@ -177,9 +211,57 @@ export namespace Extrinsic::Assets
             return std::unexpected(r.error());
         }
 
+        // Capture the loader for later Reload(id) calls. The thunk does the
+        // type-specific work (decode + publish + slot update) so the
+        // registry only needs a single erased signature. The surrounding
+        // state machine is owned by Reload(id).
+        auto captured = std::forward<Loader>(loader);
+        auto thunk = [captured = std::move(captured), this, id](
+                         std::string_view p) -> Core::Result {
+            // Narrow the race window between a concurrent Destroy and a
+            // parameterless Reload. The registry's generational IsAlive
+            // check ensures we do not publish against a recycled AssetId.
+            // The window is not zero (Destroy can still interleave after
+            // this check), but any further race devolves into writing to
+            // a no-longer-referenced PayloadStore entry that will be
+            // retired when Destroy calls PayloadStore::Retire.
+            if (!m_Registry.IsAlive(id))
+            {
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+            }
+            auto decoded = captured(p, id);
+            if (!decoded.has_value())
+            {
+                return std::unexpected(decoded.error());
+            }
+            auto ticketInner = m_PayloadStore.Publish(id, std::move(*decoded));
+            if (!ticketInner.has_value())
+            {
+                return std::unexpected(ticketInner.error());
+            }
+            if (auto r = m_Registry.SetPayloadSlot(
+                    id, static_cast<uint32_t>(ticketInner->slot));
+                !r.has_value())
+            {
+                return std::unexpected(r.error());
+            }
+            return Core::Ok();
+        };
+
+        const LoaderToken token = m_LoaderRegistry.Register(std::move(thunk));
+        {
+            std::scoped_lock lock(m_LoaderMutex);
+            m_LoaderByAsset[id] = token;
+        }
+
         LoadRequest req{.id = id, .typeId = typeId, .path = abs, .needsGpuUpload = false};
         if (auto q = m_LoadPipeline.EnqueueIO(std::move(req)); !q.has_value())
         {
+            (void)m_LoaderRegistry.Unregister(token);
+            {
+                std::scoped_lock lock(m_LoaderMutex);
+                m_LoaderByAsset.erase(id);
+            }
             (void)m_PayloadStore.Retire(id);
             (void)m_PathIndex.Erase(abs, id);
             {
