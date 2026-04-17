@@ -13,7 +13,7 @@ namespace Extrinsic::Assets
     {
         if (!cb)
         {
-            return 0;
+            return InvalidToken;
         }
 
         const ListenerToken token = m_NextToken.fetch_add(1, std::memory_order_relaxed);
@@ -22,8 +22,25 @@ namespace Extrinsic::Assets
         return token;
     }
 
+    AssetEventBus::ListenerToken AssetEventBus::SubscribeAll(ListenerCallback cb)
+    {
+        if (!cb)
+        {
+            return InvalidToken;
+        }
+
+        const ListenerToken token = m_NextToken.fetch_add(1, std::memory_order_relaxed);
+        std::scoped_lock lock(m_Mutex);
+        m_BroadcastListeners.emplace(token, std::move(cb));
+        return token;
+    }
+
     void AssetEventBus::Unsubscribe(AssetId id, ListenerToken token)
     {
+        if (token == InvalidToken)
+        {
+            return;
+        }
         std::scoped_lock lock(m_Mutex);
         const auto it = m_Listeners.find(id);
         if (it == m_Listeners.end())
@@ -36,6 +53,16 @@ namespace Extrinsic::Assets
         {
             m_Listeners.erase(it);
         }
+    }
+
+    void AssetEventBus::UnsubscribeAll(ListenerToken token)
+    {
+        if (token == InvalidToken)
+        {
+            return;
+        }
+        std::scoped_lock lock(m_Mutex);
+        m_BroadcastListeners.erase(token);
     }
 
     void AssetEventBus::Publish(AssetId id, AssetEvent ev)
@@ -56,18 +83,26 @@ namespace Extrinsic::Assets
             events.swap(m_PendingEvents);
         }
 
+
         for (const auto& evt : events)
         {
             std::vector<ListenerCallback> callbacks;
             {
                 std::scoped_lock lock(m_Mutex);
+
+                callbacks.reserve(m_BroadcastListeners.size());
+                for (const auto& [_, cb] : m_BroadcastListeners)
+                {
+                    callbacks.push_back(cb);
+                }
+
                 const auto it = m_Listeners.find(evt.id);
                 if (it == m_Listeners.end())
                 {
                     continue;
                 }
 
-                callbacks.reserve(it->second.size());
+                callbacks.reserve(it->second.size() + callbacks.size());
                 for (const auto& [_, cb] : it->second)
                 {
                     callbacks.push_back(cb);

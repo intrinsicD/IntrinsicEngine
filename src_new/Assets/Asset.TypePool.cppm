@@ -18,7 +18,6 @@ export namespace Extrinsic::Assets
         template <class T>
         [[nodiscard]] static TypeId Type() noexcept
         {
-            using StoredT = std::remove_cvref_t<T>;
             static char s_TypeTag;
             return reinterpret_cast<TypeId>(&s_TypeTag);
         }

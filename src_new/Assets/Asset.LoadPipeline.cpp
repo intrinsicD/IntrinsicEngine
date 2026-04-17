@@ -8,6 +8,18 @@ import Extrinsic.Core.Tasks;
 
 namespace Extrinsic::Assets
 {
+    namespace
+    {
+        // Call SetState on the registry while NOT holding the pipeline's mutex.
+        // The pipeline mutex only protects m_AssetsInFlight + binding pointers;
+        // Registry has its own lock. Keeping the order strict avoids any cross-
+        // lock ordering concern.
+        Core::Result SetStateChecked(AssetRegistry* registry, AssetId id, AssetState from, AssetState to)
+        {
+            return registry->SetState(id, from, to);
+        }
+    }
+
     void AssetLoadPipeline::BindRegistry(AssetRegistry* registry)
     {
         std::scoped_lock lock(m_Mutex);
@@ -20,113 +32,212 @@ namespace Extrinsic::Assets
         m_EventBus = eventBus;
     }
 
-    Core::Result AssetLoadPipeline::EnqueueIO(const LoadRequest& req)
+    Core::Result AssetLoadPipeline::EnqueueIO(LoadRequest req)
     {
+        const AssetId id = req.id;
+        AssetRegistry* registry = nullptr;
         {
             std::scoped_lock lock(m_Mutex);
             if (m_Registry == nullptr)
             {
                 return Core::Err(Core::ErrorCode::InvalidState);
             }
+            registry = m_Registry;
+        }
 
-            if (auto state = m_Registry->SetState(req.id, AssetState::Unloaded, AssetState::QueuedIO); !state.
-                has_value())
-            {
-                return state;
-            }
+        if (auto state = SetStateChecked(registry, id, AssetState::Unloaded, AssetState::QueuedIO); !state.
+            has_value())
+        {
+            return state;
+        }
 
-            m_AssetsInFlight[req.id] = req;
+        {
+            std::scoped_lock lock(m_Mutex);
+            m_AssetsInFlight[id] = std::move(req);
         }
 
         if (Core::Tasks::Scheduler::IsInitialized())
         {
-            Core::Tasks::Scheduler::Dispatch([this, id = req.id]
+            Core::Tasks::Scheduler::Dispatch([this, id]
             {
                 (void)OnCpuDecoded(id);
             });
-            //TODO: Should we log here that we dispatch it or log the fallback use?
             return Core::Ok();
         }
 
-        return OnCpuDecoded(req.id);
+        return OnCpuDecoded(id);
     }
 
     Core::Result AssetLoadPipeline::OnCpuDecoded(AssetId id)
     {
-        std::scoped_lock lock(m_Mutex);
-        if (m_Registry == nullptr)
+        AssetRegistry* registry = nullptr;
+        AssetEventBus* eventBus = nullptr;
+        bool needsGpu = false;
+
         {
-            return Core::Err(Core::ErrorCode::InvalidState); //TODO: What about these ErrorCodes? Should we make them more explicit to exactly know whats wrong? like: Core::ErrorCode::AssetRegistryNotBound?
+            std::scoped_lock lock(m_Mutex);
+            if (m_Registry == nullptr)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
+            const auto it = m_AssetsInFlight.find(id);
+            if (it == m_AssetsInFlight.end())
+            {
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+            }
+
+            registry = m_Registry;
+            eventBus = m_EventBus;
+            needsGpu = it->second.needsGpuUpload;
         }
 
-        const auto it = m_AssetsInFlight.find(id);
-        if (it == m_AssetsInFlight.end())
+        if (auto toCpu = SetStateChecked(registry, id, AssetState::QueuedIO, AssetState::LoadedCPU); !toCpu.has_value())
         {
-            return Core::Err(Core::ErrorCode::ResourceNotFound);
-        }
-
-        if (auto toCpu = m_Registry->SetState(id, AssetState::QueuedIO, AssetState::LoadedCPU); !toCpu.has_value())
-        {
+            std::scoped_lock lock(m_Mutex);
+            m_AssetsInFlight.erase(id);
             return toCpu;
         }
 
-        if (it->second.needsGpuUpload)
+        if (needsGpu)
         {
-            if (auto q = m_Registry->SetState(id, AssetState::LoadedCPU, AssetState::QueuedGPU); !q.has_value())
+            if (auto q = SetStateChecked(registry, id, AssetState::LoadedCPU, AssetState::QueuedGPU); !q.has_value())
             {
-                (void)m_Registry->SetState(id, AssetState::LoadedCPU, AssetState::Failed);
-                if (m_EventBus != nullptr)
+                SetStateChecked(registry, id, AssetState::LoadedCPU, AssetState::Failed);
+                if (eventBus != nullptr)
                 {
-                    m_EventBus->Publish(id, AssetEvent::Failed);
+                    eventBus->Publish(id, AssetEvent::Failed);
                 }
+                std::scoped_lock lock(m_Mutex);
+                m_AssetsInFlight.erase(id);
                 return q;
             }
             return Core::Ok();
         }
 
-        if (auto ready = m_Registry->SetState(id, AssetState::LoadedCPU, AssetState::Ready); !ready.has_value())
+        if (auto ready = SetStateChecked(registry, id, AssetState::LoadedCPU, AssetState::Ready); !ready.has_value())
         {
-            (void)m_Registry->SetState(id, AssetState::LoadedCPU, AssetState::Failed);
-            if (m_EventBus != nullptr)
+            SetStateChecked(registry, id, AssetState::LoadedCPU, AssetState::Failed);
+            if (eventBus != nullptr)
             {
-                m_EventBus->Publish(id, AssetEvent::Failed);
+                eventBus->Publish(id, AssetEvent::Failed);
             }
+            std::scoped_lock lock(m_Mutex);
+            m_AssetsInFlight.erase(id);
             return ready;
         }
 
-        if (m_EventBus != nullptr)
+        if (eventBus != nullptr)
         {
-            m_EventBus->Publish(id, AssetEvent::Ready);
+            eventBus->Publish(id, AssetEvent::Ready);
         }
 
-        m_AssetsInFlight.erase(it);
+        std::scoped_lock lock(m_Mutex);
+        m_AssetsInFlight.erase(id);
         return Core::Ok();
     }
 
     Core::Result AssetLoadPipeline::OnGpuUploaded(AssetId id)
     {
-        std::scoped_lock lock(m_Mutex);
-        if (m_Registry == nullptr)
+        AssetRegistry* registry = nullptr;
+        AssetEventBus* eventBus = nullptr;
+
         {
-            return Core::Err(Core::ErrorCode::InvalidState);
+            std::scoped_lock lock(m_Mutex);
+            if (m_Registry == nullptr)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
+            registry = m_Registry;
+            eventBus = m_EventBus;
         }
 
-        if (auto ready = m_Registry->SetState(id, AssetState::QueuedGPU, AssetState::Ready); !ready.has_value())
+        if (auto ready = SetStateChecked(registry, id, AssetState::QueuedGPU, AssetState::Ready); !ready.has_value())
         {
-            (void)m_Registry->SetState(id, AssetState::QueuedGPU, AssetState::Failed);
-            if (m_EventBus != nullptr)
+            SetStateChecked(registry, id, AssetState::QueuedGPU, AssetState::Failed);
+            if (eventBus != nullptr)
             {
-                m_EventBus->Publish(id, AssetEvent::Failed);
+                eventBus->Publish(id, AssetEvent::Failed);
             }
+
+            std::scoped_lock lock(m_Mutex);
+            m_AssetsInFlight.erase(id);
             return ready;
         }
 
-        if (m_EventBus != nullptr)
+        if (eventBus != nullptr)
         {
-            m_EventBus->Publish(id, AssetEvent::Ready);
+            eventBus->Publish(id, AssetEvent::Ready);
         }
 
+        std::scoped_lock lock(m_Mutex);
         m_AssetsInFlight.erase(id);
         return Core::Ok();
+    }
+
+    Core::Result AssetLoadPipeline::MarkFailed(AssetId id)
+    {
+        AssetRegistry* registry = nullptr;
+        AssetEventBus* eventBus = nullptr;
+        {
+            std::scoped_lock lock(m_Mutex);
+            if (m_Registry == nullptr)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
+            registry = m_Registry;
+            eventBus = m_EventBus;
+        }
+
+        // Retry-loop the compare-and-swap: the state may change between
+        // our read and our write; tolerate benign races by re-reading.
+        for (int attempt = 0; attempt < 8; ++attempt)
+        {
+            const auto meta = registry->GetMeta(id);
+            if (!meta.has_value())
+            {
+                return Core::Err(meta.error());
+            }
+            if (meta->state == AssetState::Failed)
+            {
+                std::scoped_lock lock(m_Mutex);
+                m_AssetsInFlight.erase(id);
+                return Core::Ok();
+            }
+            auto r = SetStateChecked(registry, id, meta->state, AssetState::Failed);
+            if (r.has_value())
+            {
+                if (eventBus != nullptr)
+                {
+                    eventBus->Publish(id, AssetEvent::Failed);
+                }
+                std::scoped_lock lock(m_Mutex);
+                m_AssetsInFlight.erase(id);
+                return Core::Ok();
+            }
+            if (r.error() != Core::ErrorCode::InvalidState)
+            {
+                return r;
+            }
+            // InvalidState = someone moved the state under us - retry.
+        }
+        return Core::Err(Core::ErrorCode::ResourceBusy);
+    }
+
+    void AssetLoadPipeline::Cancel(AssetId id)
+    {
+        std::scoped_lock lock(m_Mutex);
+        m_AssetsInFlight.erase(id);
+    }
+
+    std::size_t AssetLoadPipeline::InFlightCount() const
+    {
+        std::scoped_lock lock(m_Mutex);
+        return m_AssetsInFlight.size();
+    }
+
+    bool AssetLoadPipeline::IsInFlight(AssetId id) const
+    {
+        std::scoped_lock lock(m_Mutex);
+        return m_AssetsInFlight.find(id) != m_AssetsInFlight.end();
     }
 }

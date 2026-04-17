@@ -20,11 +20,11 @@ namespace Extrinsic::Assets
         return m_Allocated[id.Index] != 0u && m_Generations[id.Index] == id.Generation;
     }
 
-    [[nodiscard]] Core::Expected<AssetId> AssetRegistry::Create(uint32_t pathHash, uint32_t typeId)
+    Core::Expected<AssetId> AssetRegistry::Create(uint32_t pathHash, uint32_t typeId)
     {
         std::scoped_lock lock(m_Mutex);
 
-        uint32_t index = 0;
+        uint32_t index;
         if (!m_FreeList.empty())
         {
             index = m_FreeList.back();
@@ -36,6 +36,7 @@ namespace Extrinsic::Assets
             m_TypeIds[index] = typeId;
             m_PayloadSlots[index] = 0u;
 
+            ++m_LiveCount;
             return AssetId{index, m_Generations[index]};
         }
 
@@ -47,16 +48,17 @@ namespace Extrinsic::Assets
         m_Generations.push_back(1u);
         m_Allocated.push_back(1u);
 
+        ++m_LiveCount;
         return AssetId{index, 1u};
     }
 
-    [[nodiscard]] bool AssetRegistry::IsAlive(AssetId id) const noexcept
+    bool AssetRegistry::IsAlive(AssetId id) const noexcept
     {
         std::scoped_lock lock(m_Mutex);
         return IsAliveLocked(id);
     }
 
-    [[nodiscard]] Core::Expected<AssetMeta> AssetRegistry::GetMeta(AssetId id) const
+    Core::Expected<AssetMeta> AssetRegistry::GetMeta(AssetId id) const
     {
         std::scoped_lock lock(m_Mutex);
         if (!IsAliveLocked(id))
@@ -72,7 +74,17 @@ namespace Extrinsic::Assets
         };
     }
 
-    [[nodiscard]] Core::Result AssetRegistry::SetState(AssetId id, AssetState expected, AssetState next)
+    Core::Expected<AssetState> AssetRegistry::GetState(AssetId id) const
+    {
+        std::scoped_lock lock(m_Mutex);
+        if (!IsAliveLocked(id))
+        {
+            return Core::Err<AssetState>(Core::ErrorCode::ResourceNotFound);
+        }
+        return m_States[id.Index];
+    }
+
+    Core::Result AssetRegistry::SetState(AssetId id, AssetState expected, AssetState next)
     {
         std::scoped_lock lock(m_Mutex);
         if (!IsAliveLocked(id))
@@ -89,7 +101,18 @@ namespace Extrinsic::Assets
         return Core::Ok();
     }
 
-    [[nodiscard]] Core::Result AssetRegistry::Destroy(AssetId id)
+    Core::Result AssetRegistry::SetPayloadSlot(AssetId id, uint32_t slot)
+    {
+        std::scoped_lock lock(m_Mutex);
+        if (!IsAliveLocked(id))
+        {
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+        }
+        m_PayloadSlots[id.Index] = slot;
+        return Core::Ok();
+    }
+
+    Core::Result AssetRegistry::Destroy(AssetId id)
     {
         std::scoped_lock lock(m_Mutex);
         if (!IsAliveLocked(id))
@@ -104,7 +127,20 @@ namespace Extrinsic::Assets
         m_TypeIds[id.Index] = 0u;
         m_PayloadSlots[id.Index] = 0u;
         m_FreeList.push_back(id.Index);
+        --m_LiveCount;
 
         return Core::Ok();
+    }
+
+    std::size_t AssetRegistry::LiveCount() const noexcept
+    {
+        std::scoped_lock lock(m_Mutex);
+        return m_LiveCount;
+    }
+
+    std::size_t AssetRegistry::Capacity() const noexcept
+    {
+        std::scoped_lock lock(m_Mutex);
+        return m_Generations.size();
     }
 }
