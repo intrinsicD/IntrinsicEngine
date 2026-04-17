@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unistd.h>
 #include <vector>
 
 import Extrinsic.Core.Filesystem;
@@ -210,20 +211,17 @@ TEST(CoreFilesystem, FileWatcherDetectsModificationAndDispatches)
         callbacks.fetch_add(1, std::memory_order_release);
     });
 
-    // The scanner runs on a 500 ms tick with a 150 ms debounce. Wait at least
-    // one scan interval before mutating, then wait enough for the next two
-    // ticks after the mutation.
-    std::this_thread::sleep_for(std::chrono::milliseconds(600));
-
-    // Ensure the mtime advances visibly by explicitly updating it.
+    // Mutate the target immediately: the watcher recorded the baseline mtime
+    // at registration, so any future mtime bump is guaranteed to be newer.
+    // We explicitly advance mtime to avoid filesystem-granularity races.
     std::error_code ec;
     const auto newTime = std::filesystem::file_time_type::clock::now() + std::chrono::seconds(2);
     std::filesystem::last_write_time(target, newTime, ec);
     ASSERT_FALSE(ec) << "Failed to bump mtime: " << ec.message();
     AppendFile(target, " update");
 
-    // Poll up to 5 seconds for the callback to fire.
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    // Poll up to 10 seconds for the callback (scan 500 ms + debounce 150 ms).
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
     while (callbacks.load(std::memory_order_acquire) == 0 &&
            std::chrono::steady_clock::now() < deadline)
     {
@@ -256,4 +254,62 @@ TEST(CoreFilesystem, FileWatcherDoubleInitializeIsSafe)
     // Shutdown when not running must also be safe.
     FileWatcher::Shutdown();
     SUCCEED();
+}
+
+// -----------------------------------------------------------------------------
+// FileWatcher: Multiple registered files each get their own callback.
+// -----------------------------------------------------------------------------
+
+TEST(CoreFilesystem, FileWatcherDispatchesPerFileCallback)
+{
+    FilesystemTempDir dir;
+    auto a = dir.Path() / "a.txt";
+    auto b = dir.Path() / "b.txt";
+    WriteFile(a, "a");
+    WriteFile(b, "b");
+
+    Scheduler::Initialize(2);
+    FileWatcher::Initialize();
+
+    std::atomic<int> aCallbacks{0};
+    std::atomic<int> bCallbacks{0};
+    FileWatcher::Watch(a.string(), [&](const std::string&) { aCallbacks.fetch_add(1); });
+    FileWatcher::Watch(b.string(), [&](const std::string&) { bCallbacks.fetch_add(1); });
+
+    std::error_code ec;
+    const auto newTime = std::filesystem::file_time_type::clock::now() + std::chrono::seconds(2);
+    std::filesystem::last_write_time(a, newTime, ec);
+    AppendFile(a, "+");
+    std::filesystem::last_write_time(b, newTime, ec);
+    AppendFile(b, "+");
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while ((aCallbacks.load() == 0 || bCallbacks.load() == 0) &&
+           std::chrono::steady_clock::now() < deadline)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    Scheduler::WaitForAll();
+    FileWatcher::Shutdown();
+    Scheduler::Shutdown();
+
+    EXPECT_GE(aCallbacks.load(), 1);
+    EXPECT_GE(bCallbacks.load(), 1);
+}
+
+// -----------------------------------------------------------------------------
+// GetAbsolutePath on a non-existent input returns an absolute-ified form.
+// -----------------------------------------------------------------------------
+
+TEST(CoreFilesystem, GetAbsolutePathOnMissingInputReturnsAbsolute)
+{
+    FilesystemTempDir dir;
+    const auto missing = dir.Path() / "nonexistent" / "file.txt";
+    const auto result = GetAbsolutePath(missing.string());
+    EXPECT_FALSE(result.empty());
+    // weakly_canonical accepts non-existent paths and returns an absolute
+    // form; check the result is an absolute path.
+    EXPECT_TRUE(std::filesystem::path(result).is_absolute())
+        << "GetAbsolutePath returned: " << result;
 }

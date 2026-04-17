@@ -19,6 +19,7 @@ using Extrinsic::Core::Log::ClearEntries;
 using Extrinsic::Core::Log::Info;
 using Extrinsic::Core::Log::Warn;
 using Extrinsic::Core::Log::Error;
+using Extrinsic::Core::Log::Debug;
 
 namespace
 {
@@ -162,33 +163,66 @@ TEST(CoreLogging, EntryCountTracksWrites)
 // Ring-buffer overwrite behaviour
 // -----------------------------------------------------------------------------
 
-TEST(CoreLogging, RingOverwritesOldestWhenCapacityReached)
+TEST(CoreLogging, RingSaturatesAndOverwritesOldest)
 {
     ResetLog();
 
-    // The internal capacity is 2048. Writing more than that should cap the
-    // count at capacity and the oldest entries must be evicted.
-    constexpr std::size_t kOverflow = 2048 + 32;
-    for (std::size_t i = 0; i < kOverflow; ++i)
+    // Discover the ring capacity by writing until the count stops growing.
+    // This avoids a hardcoded dependency on Core.Logging's internal kLogCapacity
+    // (per CLAUDE.md guidance on hardcoded-count regressions).
+    std::size_t prev = 0;
+    std::size_t capacity = 0;
+    for (std::size_t i = 0; i < 16384; ++i)
     {
-        Info("entry-{}", i);
+        Info("probe-{}", i);
+        const auto now = GetEntryCount();
+        if (now == prev && now > 0)
+        {
+            capacity = now;
+            break;
+        }
+        prev = now;
     }
+    ASSERT_GT(capacity, 0u) << "Ring buffer capacity was not discovered";
 
-    EXPECT_EQ(GetEntryCount(), 2048u);
+    ResetLog();
+    // Write capacity + 16 entries; the oldest 16 must be evicted.
+    const std::size_t overflow = capacity + 16;
+    for (std::size_t i = 0; i < overflow; ++i)
+        Info("entry-{}", i);
 
+    EXPECT_EQ(GetEntryCount(), capacity);
     auto snap = TakeSnapshot();
-    ASSERT_EQ(snap.Entries.size(), 2048u);
+    ASSERT_EQ(snap.Entries.size(), capacity);
 
-    // Oldest surviving entry should be index (kOverflow - 2048), newest should
-    // be kOverflow - 1.
-    const std::size_t expectedOldest = kOverflow - 2048u;
+    const std::size_t expectedOldest = overflow - capacity;
     EXPECT_EQ(snap.Entries.front().Message, "entry-" + std::to_string(expectedOldest));
-    EXPECT_EQ(snap.Entries.back().Message, "entry-" + std::to_string(kOverflow - 1));
+    EXPECT_EQ(snap.Entries.back().Message, "entry-" + std::to_string(overflow - 1));
 }
 
 // -----------------------------------------------------------------------------
 // Concurrent writers must not corrupt the ring.
 // -----------------------------------------------------------------------------
+
+TEST(CoreLogging, DebugWriteIsCompiledOutInReleaseBuilds)
+{
+    ResetLog();
+    const auto seqBefore = GetSequenceNumber();
+    Debug("debug-line {}", 7);
+
+#ifdef NDEBUG
+    // Release: Debug() is a no-op, nothing is appended.
+    EXPECT_EQ(GetSequenceNumber(), seqBefore);
+    EXPECT_EQ(GetEntryCount(), 0u);
+#else
+    // Debug: entry appended with Debug level.
+    EXPECT_GT(GetSequenceNumber(), seqBefore);
+    auto snap = TakeSnapshot();
+    ASSERT_FALSE(snap.Entries.empty());
+    EXPECT_EQ(snap.Entries.back().Lvl, Level::Debug);
+    EXPECT_EQ(snap.Entries.back().Message, "debug-line 7");
+#endif
+}
 
 TEST(CoreLogging, ConcurrentWritersProduceConsistentSnapshot)
 {
