@@ -1,11 +1,14 @@
 intrinsic_test_object_lib(ExtrinsicCoreTestObjs
         SOURCES
-        #Test_CoreFilesystem.cpp
-        Test.Core.Hash.cpp
         Test.Core.CallbackRegistry.cpp
-        #Test_CoreLockFreeQueue.cpp
-        #Test_CoreLogging.cpp
-        #Test_CoreTasks.cpp
+        Test.Core.Config.cpp
+        Test.Core.Error.cpp
+        Test.Core.Filesystem.cpp
+        Test.Core.Hash.cpp
+        Test.Core.LockFreeQueue.cpp
+        Test.Core.Logging.cpp
+        Test.Core.StrongHandle.cpp
+        Test.Core.Tasks.cpp
         DEPS ExtrinsicCore
 )
 
