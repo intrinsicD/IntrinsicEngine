@@ -1,6 +1,7 @@
 intrinsic_test_object_lib(ExtrinsicCoreTestObjs
         SOURCES
         #Test_CoreFilesystem.cpp
+        Test_CoreCallbackRegistry.cpp
         Test_CoreHash.cpp
         #Test_CoreLockFreeQueue.cpp
         #Test_CoreLogging.cpp
