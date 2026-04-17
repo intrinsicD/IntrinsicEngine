@@ -7,7 +7,7 @@ module;
 
 export module Extrinsic.Core.Tasks;
 
-import Extrinsic.Core.Tasks.LocalTask;
+import :LocalTask;
 
 namespace Extrinsic::Core::Tasks
 {

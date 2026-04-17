@@ -251,6 +251,149 @@ TEST(AssetService, ReloadRejectedFromNonReadyState)
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ErrorCode::InvalidState);
 }
+
+// -----------------------------------------------------------------------------
+// Captured loader + reload token
+// -----------------------------------------------------------------------------
+
+TEST(AssetService, GetReloadTokenReturnsValidTokenAfterLoad)
+{
+    TmpFile f("svc_token_after_load.bin");
+    AssetService svc;
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
+
+    auto token = svc.GetReloadToken(id);
+    ASSERT_TRUE(token.has_value());
+    EXPECT_TRUE(token->IsValid());
+    EXPECT_TRUE(svc.LoaderCallbacks().Contains(*token));
+}
+
+TEST(AssetService, GetReloadTokenUnknownIdReturnsNotFound)
+{
+    AssetService svc;
+    auto r = svc.GetReloadToken(AssetId{});
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ErrorCode::ResourceNotFound);
+}
+
+TEST(AssetService, ParameterlessReloadReinvokesCapturedLoader)
+{
+    // The captured loader is stateful (counter-based) so Reload(id) must
+    // re-run it and the payload must reflect the next value produced by
+    // the same loader object.
+    TmpFile f("svc_reload_captured.bin");
+    AssetService svc;
+
+    auto counter = std::make_shared<int>(0);
+    auto loader = [counter](std::string_view, AssetId) -> Expected<Mesh>
+    {
+        return Mesh{.triangles = ++(*counter)};
+    };
+
+    auto id = svc.Load<Mesh>(f.path.string(), loader).value();
+    EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 1);
+
+    ASSERT_TRUE(svc.Reload(id).has_value());
+    EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 2);
+
+    ASSERT_TRUE(svc.Reload(id).has_value());
+    EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 3);
+}
+
+TEST(AssetService, ParameterlessReloadOnUnknownIdReturnsNotFound)
+{
+    AssetService svc;
+    auto r = svc.Reload(AssetId{});
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ErrorCode::ResourceNotFound);
+}
+
+TEST(AssetService, ParameterlessReloadFailedLoaderKeepsPreviousPayload)
+{
+    TmpFile f("svc_reload_captured_keeps_old.bin");
+    AssetService svc;
+
+    auto shouldFail = std::make_shared<bool>(false);
+    auto loader = [shouldFail](std::string_view, AssetId) -> Expected<Mesh>
+    {
+        if (*shouldFail) return std::unexpected(ErrorCode::AssetDecodeFailed);
+        return Mesh{.triangles = 42};
+    };
+
+    auto id = svc.Load<Mesh>(f.path.string(), loader).value();
+
+    *shouldFail = true;
+    auto r = svc.Reload(id);
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ErrorCode::AssetDecodeFailed);
+
+    // Old payload intact, asset still Ready.
+    EXPECT_EQ(svc.GetMeta(id).value().state, AssetState::Ready);
+    EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 42);
+}
+
+TEST(AssetService, ParameterlessReloadRejectedFromNonReadyState)
+{
+    TmpFile f("svc_reload_captured_nonready.bin");
+    AssetService svc;
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
+
+    ASSERT_TRUE(svc.Registry().SetState(id, AssetState::Ready, AssetState::Failed).has_value());
+    auto r = svc.Reload(id);
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ErrorCode::InvalidState);
+}
+
+TEST(AssetService, DestroyUnregistersCapturedLoader)
+{
+    TmpFile f("svc_destroy_unregisters.bin");
+    AssetService svc;
+
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
+    auto token = svc.GetReloadToken(id).value();
+    ASSERT_TRUE(svc.LoaderCallbacks().Contains(token));
+
+    ASSERT_TRUE(svc.Destroy(id).has_value());
+    EXPECT_FALSE(svc.LoaderCallbacks().Contains(token));
+    EXPECT_EQ(svc.LoaderCallbacks().Size(), 0u);
+
+    // Token lookup on the destroyed id must now report not-found.
+    auto r = svc.GetReloadToken(id);
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ErrorCode::ResourceNotFound);
+}
+
+TEST(AssetService, ReloadPublishesReloadedEvent)
+{
+    TmpFile f("svc_reload_event.bin");
+    AssetService svc;
+    std::atomic<int> reloaded{0};
+    (void)svc.EventBus().SubscribeAll([&](AssetId, AssetEvent e)
+    {
+        if (e == AssetEvent::Reloaded) ++reloaded;
+    });
+
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
+    ASSERT_TRUE(svc.Reload(id).has_value());
+    svc.Tick();
+    EXPECT_EQ(reloaded.load(), 1);
+}
+
+TEST(AssetService, ReloadTokenDirectlyInvokableViaRegistry)
+{
+    // Demonstrates the use case: a FileWatcher (or similar) could hold the
+    // token and eventually drive AssetService::Reload(id). This test
+    // verifies only that the token is observably live in the registry -
+    // direct Invoke must NOT be used to bypass the state machine, but the
+    // registry surface area is exposed for test / diagnostic inspection.
+    TmpFile f("svc_reload_token_live.bin");
+    AssetService svc;
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(7)).value();
+    auto token = svc.GetReloadToken(id).value();
+
+    EXPECT_TRUE(svc.LoaderCallbacks().Contains(token));
+    EXPECT_EQ(svc.LoaderCallbacks().Size(), 1u);
+}
  
 // -----------------------------------------------------------------------------
 // Destroy

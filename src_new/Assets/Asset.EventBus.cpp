@@ -97,15 +97,13 @@ namespace Extrinsic::Assets
                 }
 
                 const auto it = m_Listeners.find(evt.id);
-                if (it == m_Listeners.end())
+                if (it != m_Listeners.end())
                 {
-                    continue;
-                }
-
-                callbacks.reserve(it->second.size() + callbacks.size());
-                for (const auto& [_, cb] : it->second)
-                {
-                    callbacks.push_back(cb);
+                    callbacks.reserve(it->second.size() + callbacks.size());
+                    for (const auto& [_, cb] : it->second)
+                    {
+                        callbacks.push_back(cb);
+                    }
                 }
             }
 

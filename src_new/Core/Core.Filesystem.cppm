@@ -13,20 +13,10 @@ module;
 export module Extrinsic.Core.Filesystem;
 
 import Extrinsic.Core.Hash;
+//import Extrinsic.Core.CallbackRegistry; //TODO: Should the Filewatcher use the CallbaclRegistry? own one itself, or dependency injection? Im unsure...
 
 namespace Extrinsic::Core::Filesystem
 {
-    export std::filesystem::path GetRoot();
-
-    export std::string GetAssetPath(const std::string& relativePath);
-
-    export std::string GetShaderPath(const std::string& relativePath);
-
-    export std::string GetAbsolutePath(const std::string& relativePath);
-
-    //TODO: Is this here really the right place to resolve a shader path? maybe, maybe not?
-    using ShaderPathLookup = std::function<std::optional<std::string>(Hash::StringID)>;
-    export [[nodiscard]] std::string ResolveShaderPathOrExit(ShaderPathLookup lookup, Hash::StringID name);
 
     export class FileWatcher
     {

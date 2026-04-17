@@ -7,7 +7,9 @@ target_sources(${target_name}
         Core.Config.Window.cppm
         Core.Config.Render.cppm
         Core.Config.Engine.cppm
+        Core.CallbackRegistry.cppm
         Core.Error.cppm
+        Core.Filesystem.PathResolver.cppm
         Core.Filesystem.cppm
         Core.Hash.cppm
         Core.LockFreeQueue.cppm
@@ -19,14 +21,15 @@ target_sources(${target_name}
         Core.Tasks.LocalTask.cppm
         FILE_SET tasks_impl TYPE CXX_MODULES FILES
         Core.Tasks.Internal.cpp
+        Core.Tasks.LocalTask.cpp
         PRIVATE
         Core.Filesystem.cpp
+        Core.Filesystem.PathResolver.cpp
         Core.Logging.cpp
         Core.Tasks.CounterEvent.cpp
         Core.Tasks.Dispatch.cpp
         Core.Tasks.Job.cpp
         Core.Tasks.Lifecycle.cpp
-        Core.Tasks.LocalTask.cpp
         Core.Tasks.Stats.cpp
         Core.Tasks.WaitToken.cpp
         Core.Tasks.Worker.cpp

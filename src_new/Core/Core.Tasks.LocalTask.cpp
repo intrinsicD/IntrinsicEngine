@@ -2,7 +2,8 @@ module;
 
 #include <memory>
 
-module Extrinsic.Core.Tasks.LocalTask;
+module Extrinsic.Core.Tasks:LocalTask.impl;
+import :LocalTask;
 
 namespace Extrinsic::Core::Tasks
 {

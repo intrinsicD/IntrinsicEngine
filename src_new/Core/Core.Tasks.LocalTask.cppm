@@ -2,7 +2,7 @@ module;
 
 #include <memory>
 
-export module Extrinsic.Core.Tasks.LocalTask;
+export module Extrinsic.Core.Tasks:LocalTask;
 
 namespace Extrinsic::Core::Tasks
 {

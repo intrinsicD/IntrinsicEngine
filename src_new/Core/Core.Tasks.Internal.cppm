@@ -11,7 +11,7 @@ module;
 
 export module Extrinsic.Core.Tasks:Internal;
 
-import Extrinsic.Core.Tasks.LocalTask;
+import :LocalTask;
 import Extrinsic.Core.LockFreeQueue;
 
 export namespace Extrinsic::Core::Tasks
