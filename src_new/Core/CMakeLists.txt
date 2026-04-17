@@ -7,6 +7,7 @@ target_sources(${target_name}
         Core.Config.Window.cppm
         Core.Config.Render.cppm
         Core.Config.Engine.cppm
+        Core.CallbackRegistry.cppm
         Core.Error.cppm
         Core.Filesystem.cppm
         Core.Hash.cppm
