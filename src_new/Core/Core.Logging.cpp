@@ -40,6 +40,8 @@ namespace Extrinsic::Core::Log
         std::mutex Mutex;
         std::condition_variable Cv;
         std::deque<LogEntry> Queue;
+        std::size_t MaxQueueSize = 8192;
+        std::atomic<uint64_t> DroppedCount{0};
         bool Running = true;
         std::thread Worker;
     };
@@ -143,6 +145,11 @@ namespace Extrinsic::Core::Log
         // Queue async console output (I/O path)
         {
             std::lock_guard qLock(s_ConsoleSink.Mutex);
+            while (s_ConsoleSink.Queue.size() >= s_ConsoleSink.MaxQueueSize)
+            {
+                s_ConsoleSink.Queue.pop_front();
+                s_ConsoleSink.DroppedCount.fetch_add(1, std::memory_order_relaxed);
+            }
             s_ConsoleSink.Queue.push_back(std::move(pendingEntry));
         }
         s_ConsoleSink.Cv.notify_one();

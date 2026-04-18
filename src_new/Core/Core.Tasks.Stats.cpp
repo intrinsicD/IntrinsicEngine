@@ -87,6 +87,9 @@ namespace Extrinsic::Core::Tasks
 
     const std::atomic<uint64_t>& Scheduler::ParkCountAtomic() noexcept
     {
+        static std::atomic<uint64_t> s_ZeroParkCount{0};
+        if (!s_Ctx)
+            return s_ZeroParkCount;
         return s_Ctx->parkCount;
     }
 }

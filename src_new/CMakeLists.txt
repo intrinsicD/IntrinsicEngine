@@ -8,3 +8,15 @@ add_subdirectory(ECS)
 add_subdirectory(Graphics)
 add_subdirectory(Platform)
 add_subdirectory(Runtime)
+
+add_custom_target(src_new_module_inventory
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/generate_src_new_module_inventory.py
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Generating src_new module inventory"
+)
+
+add_custom_target(src_new_module_inventory_check
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/generate_src_new_module_inventory.py --check
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Checking src_new module inventory drift"
+)

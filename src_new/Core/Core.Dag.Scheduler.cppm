@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <memory>
 
 export module Extrinsic.Core.DagScheduler;
 
@@ -149,4 +150,36 @@ export namespace Extrinsic::Core::Dag
 
         virtual ~DagScheduler() = default;
     };
+
+    class CpuTaskGraph
+    {
+    public:
+        virtual Result Submit(const PendingTaskDesc& task) = 0;
+        [[nodiscard]] virtual Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) = 0;
+        virtual void Reset() = 0;
+        virtual ~CpuTaskGraph() = default;
+    };
+
+    class GpuFrameGraph
+    {
+    public:
+        virtual Result Submit(const PendingTaskDesc& pass) = 0;
+        [[nodiscard]] virtual Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) = 0;
+        virtual void Reset() = 0;
+        virtual ~GpuFrameGraph() = default;
+    };
+
+    class AsyncStreamingGraph
+    {
+    public:
+        virtual Result Submit(const PendingTaskDesc& task) = 0;
+        [[nodiscard]] virtual Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) = 0;
+        virtual void Reset() = 0;
+        virtual ~AsyncStreamingGraph() = default;
+    };
+
+    [[nodiscard]] std::unique_ptr<DagScheduler> CreateDagScheduler();
+    [[nodiscard]] std::unique_ptr<CpuTaskGraph> CreateCpuTaskGraph();
+    [[nodiscard]] std::unique_ptr<GpuFrameGraph> CreateGpuFrameGraph();
+    [[nodiscard]] std::unique_ptr<AsyncStreamingGraph> CreateAsyncStreamingGraph();
 }

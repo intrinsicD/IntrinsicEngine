@@ -3,7 +3,7 @@ module;
 #include <span>
 #include <unordered_map>
 #include <mutex>
-#include <vector>
+#include <array>
 #include <atomic>
 #include <memory>
 
@@ -41,16 +41,25 @@ namespace Extrinsic::Assets
 
     private:
         using TypeId = TypePools<AssetId>::TypeId;
+        static constexpr std::size_t kShardCount = 32;
 
         struct Entry
         {
             PayloadTicket ticket{};
             TypeId typeId = 0;
+            std::shared_ptr<const void> payload{};
+            std::size_t count = 0;
+            const void* (*dataFn)(const std::shared_ptr<const void>&) = nullptr;
         };
 
-        mutable std::mutex m_Mutex{};
-        std::unordered_map<AssetId, Entry> m_Entries{};
-        TypePools<AssetId> m_TypePools{};
+        struct Shard
+        {
+            mutable std::mutex mutex{};
+            std::unordered_map<AssetId, Entry> entries{};
+        };
+
+        [[nodiscard]] static std::size_t ShardIndex(AssetId id) noexcept;
+        std::array<Shard, kShardCount> m_Shards{};
         std::atomic<uint64_t> m_NextSlot{1};
     };
 
@@ -63,19 +72,15 @@ namespace Extrinsic::Assets
             return Core::Err<PayloadTicket>(Core::ErrorCode::InvalidArgument);
         }
 
-        std::scoped_lock lock(m_Mutex);
-
-        auto& entry = m_Entries[id];
         const auto newTypeId = TypePools<AssetId>::Type<StoredT>();
-
-        // If an entry with a different type exists, clear the old pool bucket
-        // so we do not leak a stale vector in the previous TypePool.
-        if (entry.typeId != 0 && entry.typeId != newTypeId)
+        auto payload = std::make_shared<StoredT>(std::forward<T>(value));
+        auto dataFn = +[](const std::shared_ptr<const void>& p) -> const void*
         {
-            (void)m_TypePools.Erase(entry.typeId, id);
-        }
-
-        auto& pool = m_TypePools.GetOrCreate<StoredT>();
+            return static_cast<const StoredT*>(p.get());
+        };
+        auto& shard = m_Shards[ShardIndex(id)];
+        std::scoped_lock lock(shard.mutex);
+        auto& entry = shard.entries[id];
         if (entry.ticket.slot == 0)
         {
             entry.ticket.slot = m_NextSlot.fetch_add(1, std::memory_order_relaxed);
@@ -87,7 +92,9 @@ namespace Extrinsic::Assets
         }
 
         entry.typeId = newTypeId;
-        pool[id] = std::vector<StoredT>{std::forward<T>(value)};
+        entry.payload = std::move(payload);
+        entry.count = 1;
+        entry.dataFn = dataFn;
 
         return entry.ticket;
     }
@@ -96,9 +103,10 @@ namespace Extrinsic::Assets
     Core::Expected<std::span<const T>> AssetPayloadStore::ReadSpan(AssetId id) const
     {
         using StoredT = std::remove_cvref_t<T>;
-        std::scoped_lock lock(m_Mutex);
-        const auto entryIt = m_Entries.find(id);
-        if (entryIt == m_Entries.end())
+        const auto& shard = m_Shards[ShardIndex(id)];
+        std::scoped_lock lock(shard.mutex);
+        const auto entryIt = shard.entries.find(id);
+        if (entryIt == shard.entries.end())
         {
             return Core::Err<std::span<const T>>(Core::ErrorCode::AssetNotLoaded);
         }
@@ -108,18 +116,12 @@ namespace Extrinsic::Assets
             return Core::Err<std::span<const T>>(Core::ErrorCode::TypeMismatch);
         }
 
-        const auto* poolValues = m_TypePools.TryGet<StoredT>();
-        if (poolValues == nullptr)
+        if (!entryIt->second.payload || entryIt->second.dataFn == nullptr)
         {
             return Core::Err<std::span<const T>>(Core::ErrorCode::ResourceNotFound);
         }
 
-        const auto valueIt = poolValues->find(id);
-        if (valueIt == poolValues->end())
-        {
-            return Core::Err<std::span<const T>>(Core::ErrorCode::ResourceNotFound);
-        }
-
-        return std::span<const T>(valueIt->second.data(), valueIt->second.size());
+        const auto* typed = static_cast<const StoredT*>(entryIt->second.dataFn(entryIt->second.payload));
+        return std::span<const T>(typed, entryIt->second.count);
     }
 }

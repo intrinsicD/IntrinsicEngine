@@ -6,26 +6,32 @@ module Extrinsic.Asset.PayloadStore;
 
 namespace Extrinsic::Assets
 {
+    std::size_t AssetPayloadStore::ShardIndex(const AssetId id) noexcept
+    {
+        return (static_cast<std::size_t>(id.Index) ^ (static_cast<std::size_t>(id.Generation) << 1)) % kShardCount;
+    }
+
     Core::Result AssetPayloadStore::Retire(AssetId id)
     {
-        std::scoped_lock lock(m_Mutex);
-        const auto it = m_Entries.find(id);
-        if (it == m_Entries.end())
+        auto& shard = m_Shards[ShardIndex(id)];
+        std::scoped_lock lock(shard.mutex);
+        const auto it = shard.entries.find(id);
+        if (it == shard.entries.end())
         {
             return Core::Err(Core::ErrorCode::ResourceNotFound);
         }
 
-        (void)m_TypePools.Erase(it->second.typeId, id);
-        m_Entries.erase(it);
+        shard.entries.erase(it);
 
         return Core::Ok();
     }
 
     Core::Expected<PayloadTicket> AssetPayloadStore::GetTicket(AssetId id) const
     {
-        std::scoped_lock lock(m_Mutex);
-        const auto it = m_Entries.find(id);
-        if (it == m_Entries.end())
+        const auto& shard = m_Shards[ShardIndex(id)];
+        std::scoped_lock lock(shard.mutex);
+        const auto it = shard.entries.find(id);
+        if (it == shard.entries.end())
         {
             return Core::Err<PayloadTicket>(Core::ErrorCode::AssetNotLoaded);
         }
@@ -34,7 +40,12 @@ namespace Extrinsic::Assets
 
     std::size_t AssetPayloadStore::Size() const
     {
-        std::scoped_lock lock(m_Mutex);
-        return m_Entries.size();
+        std::size_t total = 0;
+        for (const auto& shard : m_Shards)
+        {
+            std::scoped_lock lock(shard.mutex);
+            total += shard.entries.size();
+        }
+        return total;
     }
 }

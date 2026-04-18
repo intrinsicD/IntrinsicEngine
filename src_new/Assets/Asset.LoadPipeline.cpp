@@ -2,6 +2,7 @@ module;
 
 #include <mutex>
 #include <chrono>
+#include <algorithm>
 
 module Extrinsic.Asset.LoadPipeline;
 
@@ -19,6 +20,7 @@ namespace Extrinsic::Assets
         {
             return registry->SetState(id, from, to);
         }
+
     }
 
     void AssetLoadPipeline::AppendStageStamp(InFlightEntry& entry, Stage stage)
@@ -27,6 +29,35 @@ namespace Extrinsic::Assets
             .stage = stage,
             .timestamp = std::chrono::steady_clock::now(),
         });
+    }
+
+    void AssetLoadPipeline::ArchiveTrailUnlocked(const AssetId id)
+    {
+        const auto it = m_AssetsInFlight.find(id);
+        if (it == m_AssetsInFlight.end())
+        {
+            return;
+        }
+        m_CompletedStageTrails[id] = it->second.stages;
+        m_CompletedTrailOrder.push_back(id);
+        m_AssetsInFlight.erase(it);
+
+        while (m_CompletedTrailOrder.size() > kCompletedTrailCapacity)
+        {
+            const auto oldest = m_CompletedTrailOrder.front();
+            m_CompletedTrailOrder.pop_front();
+            m_CompletedStageTrails.erase(oldest);
+        }
+
+        for (auto fenceIt = m_FenceWaiters.begin(); fenceIt != m_FenceWaiters.end(); )
+        {
+            auto& ids = fenceIt->second;
+            ids.erase(std::remove(ids.begin(), ids.end(), id), ids.end());
+            if (ids.empty())
+                fenceIt = m_FenceWaiters.erase(fenceIt);
+            else
+                ++fenceIt;
+        }
     }
 
     void AssetLoadPipeline::BindRegistry(AssetRegistry* registry)
@@ -111,7 +142,7 @@ namespace Extrinsic::Assets
         if (auto toCpu = SetStateChecked(registry, id, AssetState::QueuedIO, AssetState::LoadedCPU); !toCpu.has_value())
         {
             std::scoped_lock lock(m_Mutex);
-            m_AssetsInFlight.erase(id);
+            ArchiveTrailUnlocked(id);
             return toCpu;
         }
 
@@ -125,7 +156,7 @@ namespace Extrinsic::Assets
                     eventBus->Publish(id, AssetEvent::Failed);
                 }
                 std::scoped_lock lock(m_Mutex);
-                m_AssetsInFlight.erase(id);
+                ArchiveTrailUnlocked(id);
                 return q;
             }
             return Core::Ok();
@@ -150,7 +181,7 @@ namespace Extrinsic::Assets
                 eventBus->Publish(id, AssetEvent::Failed);
             }
             std::scoped_lock lock(m_Mutex);
-            m_AssetsInFlight.erase(id);
+            ArchiveTrailUnlocked(id);
             return ready;
         }
 
@@ -160,7 +191,7 @@ namespace Extrinsic::Assets
         }
 
         std::scoped_lock lock(m_Mutex);
-        m_AssetsInFlight.erase(id);
+        ArchiveTrailUnlocked(id);
         return Core::Ok();
     }
 
@@ -218,7 +249,7 @@ namespace Extrinsic::Assets
             }
 
             std::scoped_lock lock(m_Mutex);
-            m_AssetsInFlight.erase(id);
+            ArchiveTrailUnlocked(id);
             return ready;
         }
 
@@ -228,8 +259,49 @@ namespace Extrinsic::Assets
         }
 
         std::scoped_lock lock(m_Mutex);
-        m_AssetsInFlight.erase(id);
+        ArchiveTrailUnlocked(id);
         return Core::Ok();
+    }
+
+    Core::Result AssetLoadPipeline::ArmGpuFence(const AssetId id, const uint64_t fenceValue)
+    {
+        std::scoped_lock lock(m_Mutex);
+        const auto it = m_AssetsInFlight.find(id);
+        if (it == m_AssetsInFlight.end())
+        {
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+        }
+        if (!it->second.decodeDone)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+        m_FenceWaiters[fenceValue].push_back(id);
+        return Core::Ok();
+    }
+
+    uint32_t AssetLoadPipeline::CompleteGpuFence(const uint64_t fenceValue)
+    {
+        std::vector<AssetId> ready{};
+        {
+            std::scoped_lock lock(m_Mutex);
+            const auto it = m_FenceWaiters.find(fenceValue);
+            if (it == m_FenceWaiters.end())
+            {
+                return 0;
+            }
+            ready = std::move(it->second);
+            m_FenceWaiters.erase(it);
+        }
+
+        uint32_t completed = 0;
+        for (const auto id : ready)
+        {
+            if (OnGpuUploaded(id).has_value())
+            {
+                ++completed;
+            }
+        }
+        return completed;
     }
 
     Core::Result AssetLoadPipeline::MarkFailed(AssetId id)
@@ -258,7 +330,7 @@ namespace Extrinsic::Assets
             if (meta->state == AssetState::Failed)
             {
                 std::scoped_lock lock(m_Mutex);
-                m_AssetsInFlight.erase(id);
+                ArchiveTrailUnlocked(id);
                 return Core::Ok();
             }
             auto r = SetStateChecked(registry, id, meta->state, AssetState::Failed);
@@ -269,7 +341,7 @@ namespace Extrinsic::Assets
                     eventBus->Publish(id, AssetEvent::Failed);
                 }
                 std::scoped_lock lock(m_Mutex);
-                m_AssetsInFlight.erase(id);
+                ArchiveTrailUnlocked(id);
                 return Core::Ok();
             }
             if (r.error() != Core::ErrorCode::InvalidState)
@@ -284,7 +356,7 @@ namespace Extrinsic::Assets
     void AssetLoadPipeline::Cancel(AssetId id)
     {
         std::scoped_lock lock(m_Mutex);
-        m_AssetsInFlight.erase(id);
+        ArchiveTrailUnlocked(id);
     }
 
     std::size_t AssetLoadPipeline::InFlightCount() const
@@ -303,10 +375,16 @@ namespace Extrinsic::Assets
     {
         std::scoped_lock lock(m_Mutex);
         const auto it = m_AssetsInFlight.find(id);
-        if (it == m_AssetsInFlight.end())
+        if (it != m_AssetsInFlight.end())
+        {
+            return it->second.stages;
+        }
+
+        const auto completedIt = m_CompletedStageTrails.find(id);
+        if (completedIt == m_CompletedStageTrails.end())
         {
             return Core::Err<std::vector<StageStamp>>(Core::ErrorCode::ResourceNotFound);
         }
-        return it->second.stages;
+        return completedIt->second;
     }
 }

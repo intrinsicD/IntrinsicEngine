@@ -1,3 +1,5 @@
+module;
+
 export module Extrinsic.Core.Config.Engine;
 
 import Extrinsic.Core.Config.Render;

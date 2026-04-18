@@ -211,3 +211,33 @@ TEST(AssetLoadPipeline, StageTrailTracksIoDecodeForGpuPath)
     EXPECT_EQ((*trail)[0].stage, AssetLoadPipeline::Stage::AssetIO);
     EXPECT_EQ((*trail)[1].stage, AssetLoadPipeline::Stage::AssetDecode);
 }
+
+TEST(AssetLoadPipeline, CompleteGpuFenceFinalizesQueuedGpuAssets)
+{
+    PipelineFixture f;
+    auto id = f.NewAsset();
+
+    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = true};
+    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
+    ASSERT_EQ(f.registry.GetState(id).value(), AssetState::QueuedGPU);
+    ASSERT_TRUE(f.pipeline.ArmGpuFence(id, 17u).has_value());
+
+    EXPECT_EQ(f.pipeline.CompleteGpuFence(17u), 1u);
+    EXPECT_EQ(f.registry.GetState(id).value(), AssetState::Ready);
+    EXPECT_FALSE(f.pipeline.IsInFlight(id));
+}
+
+TEST(AssetLoadPipeline, StageTrailRemainsAvailableAfterCompletion)
+{
+    PipelineFixture f;
+    auto id = f.NewAsset();
+    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = false};
+    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
+
+    auto trail = f.pipeline.GetStageTrail(id);
+    ASSERT_TRUE(trail.has_value());
+    ASSERT_GE(trail->size(), 3u);
+    EXPECT_EQ((*trail)[0].stage, AssetLoadPipeline::Stage::AssetIO);
+    EXPECT_EQ((*trail)[1].stage, AssetLoadPipeline::Stage::AssetDecode);
+    EXPECT_EQ(trail->back().stage, AssetLoadPipeline::Stage::Finalize);
+}
