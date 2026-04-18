@@ -19,7 +19,6 @@ namespace Extrinsic::Assets
         {
             return registry->SetState(id, from, to);
         }
-
     }
 
     void AssetLoadPipeline::AppendStageStamp(InFlightEntry& entry, Stage stage)
@@ -169,6 +168,7 @@ namespace Extrinsic::Assets
     {
         AssetRegistry* registry = nullptr;
         AssetEventBus* eventBus = nullptr;
+        AssetState stateBefore = AssetState::Unloaded;
 
         {
             std::scoped_lock lock(m_Mutex);
@@ -178,6 +178,22 @@ namespace Extrinsic::Assets
             }
             registry = m_Registry;
             eventBus = m_EventBus;
+        }
+        {
+            const auto current = registry->GetState(id);
+            if (!current.has_value())
+            {
+                return Core::Err(current.error());
+            }
+            stateBefore = *current;
+            if (stateBefore != AssetState::QueuedGPU)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
+        }
+
+        {
+            std::scoped_lock lock(m_Mutex);
             const auto it = m_AssetsInFlight.find(id);
             if (it == m_AssetsInFlight.end())
             {

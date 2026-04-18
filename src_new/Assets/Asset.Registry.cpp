@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <mutex>
+#include <vector>
 
 module Extrinsic.Asset.Registry;
 

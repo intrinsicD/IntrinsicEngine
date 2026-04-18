@@ -126,16 +126,6 @@ namespace Extrinsic::Core::Filesystem
         return GetShaderPath(*path);
     }
 
-    std::string ResolveShaderPathOrExit(ShaderPathLookup lookup, Hash::StringID name)
-    {
-        auto resolved = TryResolveShaderPath(std::move(lookup), name);
-        if (!resolved.has_value())
-        {
-            return {};
-        }
-        return std::move(*resolved);
-    }
-
     std::string GetAssetPath(const std::string& relativePath)
     {
         auto path = GetRoot() / "assets" / relativePath;

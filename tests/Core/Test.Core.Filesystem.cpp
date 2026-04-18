@@ -8,6 +8,7 @@ import Extrinsic.Core.Hash;
 import Extrinsic.Core.Error;
 
 using namespace Extrinsic::Core;
+using namespace Extrinsic::Core::Hash;
 
 TEST(CoreFilesystemPathResolver, TryResolveShaderPathReturnsErrorWhenLookupMissing)
 {
@@ -20,18 +21,6 @@ TEST(CoreFilesystemPathResolver, TryResolveShaderPathReturnsErrorWhenLookupMissi
 
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ErrorCode::ResourceNotFound);
-}
-
-TEST(CoreFilesystemPathResolver, ResolveShaderPathOrExitNoLongerTerminates)
-{
-    auto s = Filesystem::ResolveShaderPathOrExit(
-        [](Hash::StringID) -> std::optional<std::string>
-        {
-            return std::nullopt;
-        },
-        "Missing.Shader"_id);
-
-    EXPECT_TRUE(s.empty());
 }
 
 TEST(CoreFilesystemWatcher, StatsCanBeResetAndRead)

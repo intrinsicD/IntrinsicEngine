@@ -13,7 +13,6 @@ namespace Extrinsic::Core::Filesystem
 {
     using ShaderPathLookup = std::function<std::optional<std::string>(Hash::StringID)>;
     export [[nodiscard]] Expected<std::string> TryResolveShaderPath(ShaderPathLookup lookup, Hash::StringID name);
-    export [[nodiscard]] std::string ResolveShaderPathOrExit(ShaderPathLookup lookup, Hash::StringID name);
 
     export std::string GetAssetPath(const std::string& relativePath);
 
