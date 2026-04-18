@@ -6,6 +6,7 @@ module;
 #include <unordered_map>
 #include <chrono>
 #include <vector>
+#include <deque>
 
 export module Extrinsic.Asset.LoadPipeline;
 
@@ -50,6 +51,8 @@ export namespace Extrinsic::Assets
         Core::Result EnqueueIO(LoadRequest req);
         Core::Result OnCpuDecoded(AssetId id);
         Core::Result OnGpuUploaded(AssetId id);
+        Core::Result ArmGpuFence(AssetId id, uint64_t fenceValue);
+        uint32_t CompleteGpuFence(uint64_t fenceValue);
 
         Core::Result MarkFailed(AssetId id);
         void Cancel(AssetId id);
@@ -68,10 +71,15 @@ export namespace Extrinsic::Assets
             bool finalized = false;
         };
         static void AppendStageStamp(InFlightEntry& entry, Stage stage);
+        void ArchiveTrailUnlocked(AssetId id);
 
         mutable std::mutex m_Mutex{};
+        static constexpr std::size_t kCompletedTrailCapacity = 256;
         AssetRegistry* m_Registry = nullptr;
         AssetEventBus* m_EventBus = nullptr;
         std::unordered_map<AssetId, InFlightEntry> m_AssetsInFlight{};
+        std::unordered_map<AssetId, std::vector<StageStamp>> m_CompletedStageTrails{};
+        std::deque<AssetId> m_CompletedTrailOrder{};
+        std::unordered_map<uint64_t, std::vector<AssetId>> m_FenceWaiters{};
     };
 }

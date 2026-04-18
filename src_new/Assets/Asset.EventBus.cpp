@@ -4,6 +4,7 @@ module;
 #include <utility>
 #include <vector>
 #include <atomic>
+#include <unordered_set>
 
 module Extrinsic.Asset.EventBus;
 
@@ -74,6 +75,8 @@ namespace Extrinsic::Assets
     void AssetEventBus::Flush()
     {
         std::vector<QueuedEvent> events;
+        std::vector<ListenerCallback> broadcastCallbacks;
+        std::unordered_map<AssetId, std::vector<ListenerCallback>> perAssetCallbacks;
         {
             std::scoped_lock lock(m_Mutex);
             if (m_PendingEvents.empty())
@@ -81,35 +84,47 @@ namespace Extrinsic::Assets
                 return;
             }
             events.swap(m_PendingEvents);
-        }
+            broadcastCallbacks.reserve(m_BroadcastListeners.size());
+            for (const auto& [_, cb] : m_BroadcastListeners)
+            {
+                broadcastCallbacks.push_back(cb);
+            }
 
+            std::unordered_set<AssetId> ids;
+            ids.reserve(events.size());
+            for (const auto& evt : events)
+            {
+                ids.insert(evt.id);
+            }
+            perAssetCallbacks.reserve(ids.size());
+            for (const auto id : ids)
+            {
+                const auto it = m_Listeners.find(id);
+                if (it == m_Listeners.end())
+                {
+                    continue;
+                }
+                auto& dst = perAssetCallbacks[id];
+                dst.reserve(it->second.size());
+                for (const auto& [_, cb] : it->second)
+                {
+                    dst.push_back(cb);
+                }
+            }
+        }
 
         for (const auto& evt : events)
         {
-            std::vector<ListenerCallback> callbacks;
-            {
-                std::scoped_lock lock(m_Mutex);
-
-                callbacks.reserve(m_BroadcastListeners.size());
-                for (const auto& [_, cb] : m_BroadcastListeners)
-                {
-                    callbacks.push_back(cb);
-                }
-
-                const auto it = m_Listeners.find(evt.id);
-                if (it != m_Listeners.end())
-                {
-                    callbacks.reserve(it->second.size() + callbacks.size());
-                    for (const auto& [_, cb] : it->second)
-                    {
-                        callbacks.push_back(cb);
-                    }
-                }
-            }
-
-            for (const auto& cb : callbacks)
+            for (const auto& cb : broadcastCallbacks)
             {
                 cb(evt.id, evt.ev);
+            }
+            if (const auto it = perAssetCallbacks.find(evt.id); it != perAssetCallbacks.end())
+            {
+                for (const auto& cb : it->second)
+                {
+                    cb(evt.id, evt.ev);
+                }
             }
         }
     }

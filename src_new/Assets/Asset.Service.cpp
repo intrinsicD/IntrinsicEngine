@@ -116,30 +116,25 @@ namespace Extrinsic::Assets
             path = pathIt->second;
         }
 
-        // Invoke the captured loader BEFORE mutating any state so a failed
-        // reload leaves the asset in its prior Ready state with its old
-        // payload intact (mirroring the B3 contract of Reload<T>).
+        // State machine: transition to Unloaded to reflect that the old
+        // payload is about to be superseded.
+        auto toUnloaded = m_Registry.SetState(id, AssetState::Ready, AssetState::Unloaded);
+        if (!toUnloaded.has_value())
+        {
+            return toUnloaded;
+        }
+
+        // Invoke the captured loader while in Unloaded state. The thunk
+        // publishes payload and updates payload slot only on success.
         //
-        // The thunk re-publishes to PayloadStore and updates the registry
-        // payload slot on success. On failure it returns an error without
-        // touching PayloadStore state.
+        // If invocation fails we best-effort restore Ready so callers can
+        // retry and retain previous behavior expectations for reload failure.
         auto invokeResult = m_LoaderRegistry.InvokeOr(
             token, Core::ErrorCode::AssetLoaderMissing, std::string_view(path));
         if (!invokeResult.has_value())
         {
+            (void)m_Registry.SetState(id, AssetState::Unloaded, AssetState::Ready);
             return invokeResult;
-        }
-
-        // State machine: transition to Unloaded to reflect that the old
-        // payload is superseded, then enqueue IO for downstream stages, then
-        // fire the Reloaded event.
-        auto toUnloaded = m_Registry.SetState(id, AssetState::Ready, AssetState::Unloaded);
-        if (!toUnloaded.has_value())
-        {
-            // A concurrent Destroy or Reload ran between our loader
-            // invocation and the state transition. The asset is no longer
-            // Ready; surface the transition error.
-            return toUnloaded;
         }
 
         LoadRequest req{.id = id, .typeId = meta->typeId, .path = path, .needsGpuUpload = false};

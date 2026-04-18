@@ -7,11 +7,17 @@ module Extrinsic.Asset.PathIndex;
 
 namespace Extrinsic::Assets
 {
+    std::size_t AssetPathIndex::ShardIndex(const std::string_view absolutePath) noexcept
+    {
+        return StringHash{}(absolutePath) % kShardCount;
+    }
+
     Core::Expected<AssetId> AssetPathIndex::Find(std::string_view absolutePath) const
     {
-        std::scoped_lock lock(m_Mutex);
-        const auto it = m_Index.find(absolutePath);
-        if (it == m_Index.end())
+        auto& shard = m_Shards[ShardIndex(absolutePath)];
+        std::scoped_lock lock(shard.mutex);
+        const auto it = shard.index.find(absolutePath);
+        if (it == shard.index.end())
         {
             return Core::Err<AssetId>(Core::ErrorCode::ResourceNotFound);
         }
@@ -25,8 +31,9 @@ namespace Extrinsic::Assets
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
 
-        std::scoped_lock lock(m_Mutex);
-        const auto [_, inserted] = m_Index.emplace(std::string(absolutePath), id);
+        auto& shard = m_Shards[ShardIndex(absolutePath)];
+        std::scoped_lock lock(shard.mutex);
+        const auto [_, inserted] = shard.index.emplace(std::string(absolutePath), id);
         if (!inserted)
         {
             return Core::Err(Core::ErrorCode::ResourceBusy);
@@ -36,9 +43,10 @@ namespace Extrinsic::Assets
 
     Core::Result AssetPathIndex::Erase(std::string_view absolutePath, AssetId id)
     {
-        std::scoped_lock lock(m_Mutex);
-        const auto it = m_Index.find(absolutePath);
-        if (it == m_Index.end())
+        auto& shard = m_Shards[ShardIndex(absolutePath)];
+        std::scoped_lock lock(shard.mutex);
+        const auto it = shard.index.find(absolutePath);
+        if (it == shard.index.end())
         {
             return Core::Err(Core::ErrorCode::ResourceNotFound);
         }
@@ -46,19 +54,25 @@ namespace Extrinsic::Assets
         {
             return Core::Err(Core::ErrorCode::InvalidArgument);
         }
-        m_Index.erase(it);
+        shard.index.erase(it);
         return Core::Ok();
     }
 
     bool AssetPathIndex::Contains(std::string_view absolutePath) const
     {
-        std::scoped_lock lock(m_Mutex);
-        return m_Index.find(absolutePath) != m_Index.end();
+        auto& shard = m_Shards[ShardIndex(absolutePath)];
+        std::scoped_lock lock(shard.mutex);
+        return shard.index.find(absolutePath) != shard.index.end();
     }
 
     std::size_t AssetPathIndex::Size() const
     {
-        std::scoped_lock lock(m_Mutex);
-        return m_Index.size();
+        std::size_t total = 0;
+        for (const auto& shard : m_Shards)
+        {
+            std::scoped_lock lock(shard.mutex);
+            total += shard.index.size();
+        }
+        return total;
     }
 }

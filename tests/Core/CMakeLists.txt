@@ -4,6 +4,8 @@ intrinsic_test_object_lib(ExtrinsicCoreTestObjs
         Test.Core.Hash.cpp
         Test.Core.Filesystem.cpp
         Test.Core.CallbackRegistry.cpp
+        Test.Core.DagScheduler.cpp
+        Test.Core.GraphInterfaces.cpp
         #Test_CoreLockFreeQueue.cpp
         #Test_CoreLogging.cpp
         #Test_CoreTasks.cpp
