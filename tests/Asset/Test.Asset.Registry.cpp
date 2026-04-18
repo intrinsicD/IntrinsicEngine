@@ -182,3 +182,17 @@ TEST(AssetRegistry_Accounting, CapacityGrowsMonotonically)
     (void)r.Create(0u, 0u); // reuses slot - no growth
     EXPECT_EQ(r.Capacity(), cap);
 }
+
+TEST(AssetRegistry_Debug, SnapshotReturnsLiveEntriesOnly)
+{
+    AssetRegistry r;
+    auto a = r.Create(11u, 1u).value();
+    auto b = r.Create(22u, 2u).value();
+    ASSERT_TRUE(r.Destroy(a).has_value());
+
+    auto snapshot = r.Snapshot();
+    ASSERT_EQ(snapshot.size(), 1u);
+    EXPECT_EQ(snapshot[0].id, b);
+    EXPECT_EQ(snapshot[0].meta.pathHash, 22u);
+    EXPECT_EQ(snapshot[0].meta.typeId, 2u);
+}

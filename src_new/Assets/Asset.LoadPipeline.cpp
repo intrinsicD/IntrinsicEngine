@@ -1,6 +1,7 @@
 module;
 
 #include <mutex>
+#include <chrono>
 
 module Extrinsic.Asset.LoadPipeline;
 
@@ -18,6 +19,15 @@ namespace Extrinsic::Assets
         {
             return registry->SetState(id, from, to);
         }
+
+    }
+
+    void AssetLoadPipeline::AppendStageStamp(InFlightEntry& entry, Stage stage)
+    {
+        entry.stages.push_back(StageStamp{
+            .stage = stage,
+            .timestamp = std::chrono::steady_clock::now(),
+        });
     }
 
     void AssetLoadPipeline::BindRegistry(AssetRegistry* registry)
@@ -53,7 +63,13 @@ namespace Extrinsic::Assets
 
         {
             std::scoped_lock lock(m_Mutex);
-            m_AssetsInFlight[id] = std::move(req);
+            auto& entry = m_AssetsInFlight[id];
+            entry.request = std::move(req);
+            entry.stages.clear();
+            entry.decodeDone = false;
+            entry.uploadDone = false;
+            entry.finalized = false;
+            AppendStageStamp(entry, Stage::AssetIO);
         }
 
         if (Core::Tasks::Scheduler::IsInitialized())
@@ -88,7 +104,9 @@ namespace Extrinsic::Assets
 
             registry = m_Registry;
             eventBus = m_EventBus;
-            needsGpu = it->second.needsGpuUpload;
+            needsGpu = it->second.request.needsGpuUpload;
+            AppendStageStamp(it->second, Stage::AssetDecode);
+            it->second.decodeDone = true;
         }
 
         if (auto toCpu = SetStateChecked(registry, id, AssetState::QueuedIO, AssetState::LoadedCPU); !toCpu.has_value())
@@ -112,6 +130,17 @@ namespace Extrinsic::Assets
                 return q;
             }
             return Core::Ok();
+        }
+
+        {
+            std::scoped_lock lock(m_Mutex);
+            const auto it = m_AssetsInFlight.find(id);
+            if (it == m_AssetsInFlight.end() || !it->second.decodeDone)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
+            AppendStageStamp(it->second, Stage::Finalize);
+            it->second.finalized = true;
         }
 
         if (auto ready = SetStateChecked(registry, id, AssetState::LoadedCPU, AssetState::Ready); !ready.has_value())
@@ -149,6 +178,19 @@ namespace Extrinsic::Assets
             }
             registry = m_Registry;
             eventBus = m_EventBus;
+            const auto it = m_AssetsInFlight.find(id);
+            if (it == m_AssetsInFlight.end())
+            {
+                return Core::Err(Core::ErrorCode::ResourceNotFound);
+            }
+            AppendStageStamp(it->second, Stage::AssetUpload);
+            it->second.uploadDone = true;
+            if (!it->second.decodeDone)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
+            AppendStageStamp(it->second, Stage::Finalize);
+            it->second.finalized = true;
         }
 
         if (auto ready = SetStateChecked(registry, id, AssetState::QueuedGPU, AssetState::Ready); !ready.has_value())
@@ -239,5 +281,16 @@ namespace Extrinsic::Assets
     {
         std::scoped_lock lock(m_Mutex);
         return m_AssetsInFlight.find(id) != m_AssetsInFlight.end();
+    }
+
+    Core::Expected<std::vector<AssetLoadPipeline::StageStamp>> AssetLoadPipeline::GetStageTrail(AssetId id) const
+    {
+        std::scoped_lock lock(m_Mutex);
+        const auto it = m_AssetsInFlight.find(id);
+        if (it == m_AssetsInFlight.end())
+        {
+            return Core::Err<std::vector<StageStamp>>(Core::ErrorCode::ResourceNotFound);
+        }
+        return it->second.stages;
     }
 }

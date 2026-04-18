@@ -28,6 +28,10 @@ namespace Extrinsic::Core::Filesystem
     std::mutex FileWatcher::s_Mutex;
     std::atomic<bool> FileWatcher::s_Running = false;
     std::thread FileWatcher::s_Thread;
+    std::atomic<uint64_t> FileWatcher::s_DeferredEventCount = 0;
+    std::atomic<uint64_t> FileWatcher::s_DroppedEventCount = 0;
+    std::atomic<uint64_t> FileWatcher::s_InlineDispatchCount = 0;
+    std::atomic<uint64_t> FileWatcher::s_SchedulerDispatchCount = 0;
 
     void FileWatcher::Initialize()
     {
@@ -55,6 +59,7 @@ namespace Extrinsic::Core::Filesystem
         if (ec)
         {
             Log::Debug("FileWatcher: Could not find file to watch '{}'", path);
+            s_DroppedEventCount.fetch_add(1, std::memory_order_relaxed);
             return;
         }
 
@@ -65,6 +70,24 @@ namespace Extrinsic::Core::Filesystem
             .Pending = false,
             .LastDetected = {}
         });
+    }
+
+    FileWatcher::Stats FileWatcher::GetStats() noexcept
+    {
+        return Stats{
+            .DeferredEventCount = s_DeferredEventCount.load(std::memory_order_relaxed),
+            .DroppedEventCount = s_DroppedEventCount.load(std::memory_order_relaxed),
+            .InlineDispatchCount = s_InlineDispatchCount.load(std::memory_order_relaxed),
+            .SchedulerDispatchCount = s_SchedulerDispatchCount.load(std::memory_order_relaxed),
+        };
+    }
+
+    void FileWatcher::ResetStatsForTests() noexcept
+    {
+        s_DeferredEventCount.store(0, std::memory_order_relaxed);
+        s_DroppedEventCount.store(0, std::memory_order_relaxed);
+        s_InlineDispatchCount.store(0, std::memory_order_relaxed);
+        s_SchedulerDispatchCount.store(0, std::memory_order_relaxed);
     }
 
     void FileWatcher::ThreadFunc()
@@ -119,14 +142,31 @@ namespace Extrinsic::Core::Filesystem
                     entry.Pending = false;
                     ++dispatched;
                 }
+
+                for (const auto& entry : s_Watches)
+                {
+                    if (entry.Pending)
+                    {
+                        s_DeferredEventCount.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
             }
 
             for (auto& item : dispatchItems)
             {
-                Tasks::Scheduler::Dispatch([cb = std::move(item.Callback), path = std::move(item.Path)]()
+                if (Tasks::Scheduler::IsInitialized())
                 {
-                    cb(path);
-                });
+                    s_SchedulerDispatchCount.fetch_add(1, std::memory_order_relaxed);
+                    Tasks::Scheduler::Dispatch([cb = std::move(item.Callback), path = std::move(item.Path)]()
+                    {
+                        cb(path);
+                    });
+                }
+                else
+                {
+                    s_InlineDispatchCount.fetch_add(1, std::memory_order_relaxed);
+                    item.Callback(item.Path);
+                }
             }
         }
     }

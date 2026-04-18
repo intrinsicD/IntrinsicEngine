@@ -335,3 +335,38 @@ Operational SLOs:
 - `Dag.ReadyQueueDepth.P99` bounded under representative workloads.
 - `Asset.PacketEmit.FailCount` == 0 in normal operation.
 
+---
+
+## 7) Implementation Status Audit (2026-04-18)
+
+Legend: ✅ implemented, 🟡 partially implemented, ❌ missing.
+
+1. **I-01 Coarse lock topology across Assets** — 🟡
+   Basic lock partitioning exists per subsystem (`AssetRegistry`, `AssetLoadPipeline`, `AssetPayloadStore`), but no epoch-local append buffer + single publish commit + shard-by-index strategy is present yet.
+
+2. **I-02 `AssetRegistry` encapsulation leakage** — ✅
+   Registry internals are now private, and a read-only `Snapshot()` API is available for diagnostics/telemetry.
+
+3. **I-03 `AssetLoadPipeline` semantic gap** — 🟡
+   Explicit per-asset stage trail (`AssetIO`, `AssetDecode`, `AssetUpload`, `Finalize`) with timestamps is now tracked, and transitions are guarded by stage completion flags. A full DAG packet bridge + fence-driven completion is still pending.
+
+4. **I-04 unsafe `std::exit` in low-level path resolver** — ✅
+   Path resolver now exposes `TryResolveShaderPath(...) -> Expected<std::string>` and no longer terminates the process in this low-level utility.
+
+5. **I-05 FileWatcher scheduler liveness coupling** — ✅
+   FileWatcher now supports scheduler-absent inline callback fallback, and exposes counters for deferred/dropped/inline/scheduler dispatch.
+
+6. **I-06 Payload store allocation inefficiency** — ❌
+   Current implementation still stores single payloads as `std::vector<T>{value}` and retains per-type unordered maps.
+
+7. **I-07 Type-erasure overhead in hot path** — ❌
+   `TypePools` still uses virtual dispatch (`ITypePool`) for erase/type-erased ownership.
+
+8. **I-08 Documentation drift automation** — ❌
+   No auto-generated module inventory/CI guard detected in this pass.
+
+9. **I-09 Old graph stack vs new DagScheduler parity gap** — 🟡
+   Gap remains: `src_new/Core/Core.DagScheduler.cppm` defines interface/types only; no planner implementation partition is present yet.
+
+10. **I-10 One graph vs three graphs decision** — 🟡
+    Directional alignment appears documented, but no configurable one-graph prototype mode switch was found in this pass.

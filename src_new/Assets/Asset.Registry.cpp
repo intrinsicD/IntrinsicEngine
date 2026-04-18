@@ -143,4 +143,32 @@ namespace Extrinsic::Assets
         std::scoped_lock lock(m_Mutex);
         return m_Generations.size();
     }
+
+    std::vector<AssetRegistrySnapshotEntry> AssetRegistry::Snapshot() const
+    {
+        std::scoped_lock lock(m_Mutex);
+
+        std::vector<AssetRegistrySnapshotEntry> out;
+        out.reserve(m_LiveCount);
+
+        for (uint32_t i = 0; i < m_Allocated.size(); ++i)
+        {
+            if (m_Allocated[i] == 0u)
+            {
+                continue;
+            }
+
+            out.push_back(AssetRegistrySnapshotEntry{
+                .id = AssetId{i, m_Generations[i]},
+                .meta = AssetMeta{
+                    .pathHash = m_PathHashes[i],
+                    .state = m_States[i],
+                    .typeId = m_TypeIds[i],
+                    .payloadSlot = m_PayloadSlots[i],
+                },
+            });
+        }
+
+        return out;
+    }
 }
