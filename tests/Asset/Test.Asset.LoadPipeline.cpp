@@ -196,3 +196,18 @@ TEST(AssetLoadPipeline, CancelOnUnknownIdIsHarmless)
     f.pipeline.Cancel(AssetId{42u, 1u});
     SUCCEED();
 }
+
+TEST(AssetLoadPipeline, StageTrailTracksIoDecodeForGpuPath)
+{
+    PipelineFixture f;
+    auto id = f.NewAsset();
+
+    LoadRequest req{.id = id, .typeId = 0u, .path = "/tmp/a", .needsGpuUpload = true};
+    ASSERT_TRUE(f.pipeline.EnqueueIO(std::move(req)).has_value());
+
+    auto trail = f.pipeline.GetStageTrail(id);
+    ASSERT_TRUE(trail.has_value());
+    ASSERT_GE(trail->size(), 2u);
+    EXPECT_EQ((*trail)[0].stage, AssetLoadPipeline::Stage::AssetIO);
+    EXPECT_EQ((*trail)[1].stage, AssetLoadPipeline::Stage::AssetDecode);
+}

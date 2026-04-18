@@ -115,15 +115,25 @@ namespace Extrinsic::Core::Filesystem
         return s_Root;
     }
 
-    std::string ResolveShaderPathOrExit(ShaderPathLookup lookup, Hash::StringID name)
+    Expected<std::string> TryResolveShaderPath(ShaderPathLookup lookup, Hash::StringID name)
     {
         auto path = lookup(name);
         if (!path)
         {
-            Log::Error("CRITICAL: Missing shader configuration for ID: 0x{:08X}", name.Value);
-            std::exit(-1);
+            Log::Error("Missing shader configuration for ID: 0x{:08X}", name.Value);
+            return Err<std::string>(ErrorCode::ResourceNotFound);
         }
         return GetShaderPath(*path);
+    }
+
+    std::string ResolveShaderPathOrExit(ShaderPathLookup lookup, Hash::StringID name)
+    {
+        auto resolved = TryResolveShaderPath(std::move(lookup), name);
+        if (!resolved.has_value())
+        {
+            return {};
+        }
+        return std::move(*resolved);
     }
 
     std::string GetAssetPath(const std::string& relativePath)

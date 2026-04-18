@@ -4,6 +4,8 @@ module;
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <chrono>
+#include <vector>
 
 export module Extrinsic.Asset.LoadPipeline;
 
@@ -24,6 +26,20 @@ export namespace Extrinsic::Assets
     class AssetLoadPipeline
     {
     public:
+        enum class Stage : uint8_t
+        {
+            AssetIO = 0,
+            AssetDecode,
+            AssetUpload,
+            Finalize,
+        };
+
+        struct StageStamp
+        {
+            Stage stage = Stage::AssetIO;
+            std::chrono::steady_clock::time_point timestamp{};
+        };
+
         AssetLoadPipeline() = default;
         AssetLoadPipeline(const AssetLoadPipeline&) = delete;
         AssetLoadPipeline& operator=(const AssetLoadPipeline&) = delete;
@@ -40,11 +56,22 @@ export namespace Extrinsic::Assets
 
         [[nodiscard]] std::size_t InFlightCount() const;
         [[nodiscard]] bool IsInFlight(AssetId id) const;
+        [[nodiscard]] Core::Expected<std::vector<StageStamp>> GetStageTrail(AssetId id) const;
 
     private:
+        struct InFlightEntry
+        {
+            LoadRequest request{};
+            std::vector<StageStamp> stages{};
+            bool decodeDone = false;
+            bool uploadDone = false;
+            bool finalized = false;
+        };
+        static void AppendStageStamp(InFlightEntry& entry, Stage stage);
+
         mutable std::mutex m_Mutex{};
         AssetRegistry* m_Registry = nullptr;
         AssetEventBus* m_EventBus = nullptr;
-        std::unordered_map<AssetId, LoadRequest> m_AssetsInFlight{};
+        std::unordered_map<AssetId, InFlightEntry> m_AssetsInFlight{};
     };
 }

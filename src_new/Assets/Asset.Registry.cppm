@@ -27,6 +27,12 @@ export namespace Extrinsic::Assets
         uint32_t payloadSlot = 0;
     };
 
+    struct AssetRegistrySnapshotEntry
+    {
+        AssetId id{};
+        AssetMeta meta{};
+    };
+
     class AssetRegistry
     {
     public:
@@ -41,10 +47,12 @@ export namespace Extrinsic::Assets
         [[nodiscard]] Core::Result SetState(AssetId id, AssetState expected, AssetState next);
         [[nodiscard]] Core::Result SetPayloadSlot(AssetId id, uint32_t slot);
         [[nodiscard]] Core::Result Destroy(AssetId id);
-        [[nodiscard]] bool IsAliveLocked(AssetId id) const noexcept;
         [[nodiscard]] std::size_t LiveCount() const noexcept;
         [[nodiscard]] std::size_t Capacity() const noexcept;
+        [[nodiscard]] std::vector<AssetRegistrySnapshotEntry> Snapshot() const;
 
+    private:
+        [[nodiscard]] bool IsAliveLocked(AssetId id) const noexcept;
         mutable std::mutex m_Mutex{};
         std::vector<uint32_t> m_PathHashes{};
         std::vector<AssetState> m_States{};
