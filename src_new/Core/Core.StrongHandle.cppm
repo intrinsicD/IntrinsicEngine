@@ -53,21 +53,17 @@ export namespace Extrinsic::Core
 
         auto operator<=>(const StrongHandle&) const = default;
     };
-}
 
-
-// Allow StrongHandle to be used in unordered containers
-namespace std
-{
+    // Exported hasher for use in unordered containers across module boundaries.
+    // std::hash specializations in module purviews are not reliably visible to
+    // consumers that instantiate std::unordered_map in their own GMF. This
+    // explicit functor sidesteps the issue entirely.
     template <typename Tag>
-    struct hash<Extrinsic::Core::StrongHandle<Tag>>
+    struct StrongHandleHash
     {
-        std::size_t operator()(Extrinsic::Core::StrongHandle<Tag> const& h) const noexcept
+        std::size_t operator()(StrongHandle<Tag> const& h) const noexcept
         {
-            // Pack into 64-bit integer (assuming 32-bit index/gen)
             uint64_t val = (static_cast<uint64_t>(h.Generation) << 32) | h.Index;
-
-            // MurmurHash3 Mix / WyHash Mix (Very fast, high avalanche)
             val ^= val >> 33;
             val *= 0xff51afd7ed558ccd;
             val ^= val >> 33;

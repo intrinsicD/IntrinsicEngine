@@ -25,7 +25,7 @@ namespace Extrinsic::Assets
         struct Shard
         {
             mutable std::mutex mutex{};
-            std::unordered_map<AssetId, Entry> entries{};
+            std::unordered_map<AssetId, Entry, AssetIdHash> entries{};
         };
 
         std::array<Shard, kShardCount> shards{};

@@ -2,8 +2,10 @@ module;
 #include <atomic>
 #include <cstdint>
 #include <functional>
-#include <queue>
 #include <mutex>
+#include <queue>
+#include <unordered_map>
+#include <vector>
 
 export module Extrinsic.Asset.EventBus;
 
@@ -20,6 +22,9 @@ export namespace Extrinsic::Assets
         using ListenerToken = uint32_t;
         // 0 is reserved for "invalid / failed subscribe".
         static constexpr ListenerToken InvalidToken = 0u;
+
+        AssetEventBus();
+        ~AssetEventBus();
 
         [[nodiscard]] ListenerToken Subscribe(AssetId id, ListenerCallback cb);
         [[nodiscard]] ListenerToken SubscribeAll(ListenerCallback cb);
@@ -38,7 +43,7 @@ export namespace Extrinsic::Assets
 
         mutable std::mutex m_Mutex{};
         std::atomic<uint32_t> m_NextToken{1};
-        std::unordered_map<AssetId, std::unordered_map<ListenerToken, ListenerCallback>> m_Listeners;
+        std::unordered_map<AssetId, std::unordered_map<ListenerToken, ListenerCallback>, AssetIdHash> m_Listeners;
         std::unordered_map<ListenerToken, ListenerCallback> m_BroadcastListeners;
         std::vector<QueuedEvent> m_PendingEvents;
     };

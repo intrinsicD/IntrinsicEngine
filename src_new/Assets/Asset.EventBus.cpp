@@ -11,6 +11,9 @@ module Extrinsic.Asset.EventBus;
 
 namespace Extrinsic::Assets
 {
+    AssetEventBus::AssetEventBus() = default;
+    AssetEventBus::~AssetEventBus() = default;
+
     AssetEventBus::ListenerToken AssetEventBus::Subscribe(AssetId id, ListenerCallback cb)
     {
         if (!cb)
@@ -77,7 +80,7 @@ namespace Extrinsic::Assets
     {
         std::vector<QueuedEvent> events;
         std::vector<ListenerCallback> broadcastCallbacks;
-        std::unordered_map<AssetId, std::vector<ListenerCallback>> perAssetCallbacks;
+        std::unordered_map<AssetId, std::vector<ListenerCallback>, AssetIdHash> perAssetCallbacks;
         {
             std::scoped_lock lock(m_Mutex);
             if (m_PendingEvents.empty())
@@ -91,7 +94,7 @@ namespace Extrinsic::Assets
                 broadcastCallbacks.push_back(cb);
             }
 
-            std::unordered_set<AssetId> ids;
+            std::unordered_set<AssetId, AssetIdHash> ids;
             ids.reserve(events.size());
             for (const auto& evt : events)
             {

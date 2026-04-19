@@ -7,12 +7,13 @@ module;
 export module Extrinsic.Asset.Registry;
 
 import Extrinsic.Core.Error;
-import Extrinsic.Core.StrongHandle;
+export import Extrinsic.Core.StrongHandle;
 
 export namespace Extrinsic::Assets
 {
     struct AssetTag;
     using AssetId = Core::StrongHandle<AssetTag>;
+    using AssetIdHash = Core::StrongHandleHash<AssetTag>;
 
     enum class AssetState : uint8_t
     {

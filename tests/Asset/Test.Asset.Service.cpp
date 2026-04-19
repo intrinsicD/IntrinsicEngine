@@ -265,7 +265,7 @@ TEST(AssetService, GetReloadTokenReturnsValidTokenAfterLoad)
     auto token = svc.GetReloadToken(id);
     ASSERT_TRUE(token.has_value());
     EXPECT_TRUE(token->IsValid());
-    EXPECT_TRUE(svc.LoaderCallbacks().Contains(*token));
+    EXPECT_TRUE(svc.HasLoaderCallback(*token));
 }
 
 TEST(AssetService, GetReloadTokenUnknownIdReturnsNotFound)
@@ -351,11 +351,11 @@ TEST(AssetService, DestroyUnregistersCapturedLoader)
 
     auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
     auto token = svc.GetReloadToken(id).value();
-    ASSERT_TRUE(svc.LoaderCallbacks().Contains(token));
+    ASSERT_TRUE(svc.HasLoaderCallback(token));
 
     ASSERT_TRUE(svc.Destroy(id).has_value());
-    EXPECT_FALSE(svc.LoaderCallbacks().Contains(token));
-    EXPECT_EQ(svc.LoaderCallbacks().Size(), 0u);
+    EXPECT_FALSE(svc.HasLoaderCallback(token));
+    EXPECT_EQ(svc.LoaderCallbackCount(), 0u);
 
     // Token lookup on the destroyed id must now report not-found.
     auto r = svc.GetReloadToken(id);
@@ -391,8 +391,8 @@ TEST(AssetService, ReloadTokenDirectlyInvokableViaRegistry)
     auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(7)).value();
     auto token = svc.GetReloadToken(id).value();
 
-    EXPECT_TRUE(svc.LoaderCallbacks().Contains(token));
-    EXPECT_EQ(svc.LoaderCallbacks().Size(), 1u);
+    EXPECT_TRUE(svc.HasLoaderCallback(token));
+    EXPECT_EQ(svc.LoaderCallbackCount(), 1u);
 }
  
 // -----------------------------------------------------------------------------
@@ -467,8 +467,8 @@ TEST(AssetService, FailedLoadLeavesNoGhostAsset)
  
     // Registry is empty, PathIndex has no entry for this path.
     EXPECT_EQ(svc.Registry().LiveCount(), 0u);
-    EXPECT_FALSE(svc.PathIndex().Contains(std::filesystem::absolute(f.path).string()));
- 
+    EXPECT_FALSE(svc.PathIndexContains(std::filesystem::absolute(f.path).string()));
+
     // Retrying with a good loader must succeed.
     auto ok = svc.Load<Mesh>(f.path.string(), MeshLoader(7));
     ASSERT_TRUE(ok.has_value());

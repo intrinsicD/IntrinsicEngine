@@ -36,10 +36,10 @@ TEST(AssetPayloadStore, PublishAssignsTicket)
     EXPECT_TRUE(ticket->IsValid());
     EXPECT_EQ(ticket->generation, 1u);
 }
- 
+
+
 TEST(AssetPayloadStore, PublishRejectsInvalidId)
 {
-    //TODO: There seems to be a mutex deadlock somehow...
     AssetPayloadStore store;
     auto ticket = store.Publish(AssetId{}, Mesh{});
     ASSERT_FALSE(ticket.has_value());

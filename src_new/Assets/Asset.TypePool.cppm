@@ -15,8 +15,11 @@ export namespace Extrinsic::Assets
         template <class T>
         [[nodiscard]] static TypeId Type() noexcept
         {
-            static char s_TypeTag;
-            return reinterpret_cast<TypeId>(&s_TypeTag);
+            return reinterpret_cast<TypeId>(&s_TypeTag<T>);
         }
+
+    private:
+        template <class T>
+        static inline char s_TypeTag{};
     };
 }

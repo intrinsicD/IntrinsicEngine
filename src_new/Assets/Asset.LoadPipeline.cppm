@@ -77,8 +77,8 @@ export namespace Extrinsic::Assets
         static constexpr std::size_t kCompletedTrailCapacity = 256;
         AssetRegistry* m_Registry = nullptr;
         AssetEventBus* m_EventBus = nullptr;
-        std::unordered_map<AssetId, InFlightEntry> m_AssetsInFlight{};
-        std::unordered_map<AssetId, std::vector<StageStamp>> m_CompletedStageTrails{};
+        std::unordered_map<AssetId, InFlightEntry, AssetIdHash> m_AssetsInFlight{};
+        std::unordered_map<AssetId, std::vector<StageStamp>, AssetIdHash> m_CompletedStageTrails{};
         std::deque<AssetId> m_CompletedTrailOrder{};
         std::unordered_map<uint64_t, std::vector<AssetId>> m_FenceWaiters{};
     };

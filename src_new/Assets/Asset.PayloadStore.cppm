@@ -1,7 +1,6 @@
 module;
 
 #include <cstddef>
-#include <unistd.h>
 #include <span>
 #include <memory>
 #include <type_traits>
@@ -68,22 +67,17 @@ namespace Extrinsic::Assets
     Core::Expected<PayloadTicket> AssetPayloadStore::Publish(AssetId id, T&& value)
     {
         using StoredT = std::remove_cvref_t<T>;
-        (void)::write(2, "P0\n", 3);
         if (!id.IsValid())
         {
             return Core::Err<PayloadTicket>(Core::ErrorCode::InvalidArgument);
         }
 
-        (void)::write(2, "P1\n", 3);
         const auto newTypeId = TypePools<AssetId>::Type<StoredT>();
-        (void)::write(2, "P2\n", 3);
         auto payload = std::make_shared<StoredT>(std::forward<T>(value));
-        (void)::write(2, "P3\n", 3);
         auto dataFn = +[](const std::shared_ptr<const void>& p) -> const void*
         {
             return static_cast<const StoredT*>(p.get());
         };
-        (void)::write(2, "P4\n", 3);
         return PublishUntyped(id, newTypeId, std::move(payload), 1, dataFn);
     }
 
