@@ -1,11 +1,11 @@
 module;
 
+#include <cstddef>
+#include <unistd.h>
 #include <span>
-#include <unordered_map>
-#include <mutex>
-#include <array>
-#include <atomic>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 export module Extrinsic.Asset.PayloadStore;
 
@@ -27,6 +27,9 @@ namespace Extrinsic::Assets
     export class AssetPayloadStore
     {
     public:
+        AssetPayloadStore();
+        ~AssetPayloadStore();
+
         template <class T>
         [[nodiscard]] Core::Expected<PayloadTicket> Publish(AssetId id, T&& value);
 
@@ -42,86 +45,59 @@ namespace Extrinsic::Assets
     private:
         using TypeId = TypePools<AssetId>::TypeId;
         static constexpr std::size_t kShardCount = 32;
-
-        struct Entry
+        struct Impl;
+        struct ReadView
         {
-            PayloadTicket ticket{};
-            TypeId typeId = 0;
-            std::shared_ptr<const void> payload{};
+            const void* ptr = nullptr;
             std::size_t count = 0;
-            const void* (*dataFn)(const std::shared_ptr<const void>&) = nullptr;
-        };
-
-        struct Shard
-        {
-            mutable std::mutex mutex{};
-            std::unordered_map<AssetId, Entry> entries{};
         };
 
         [[nodiscard]] static std::size_t ShardIndex(AssetId id) noexcept;
-        std::array<Shard, kShardCount> m_Shards{};
-        std::atomic<uint64_t> m_NextSlot{1};
+        [[nodiscard]] Core::Expected<PayloadTicket> PublishUntyped(
+            AssetId id,
+            TypeId typeId,
+            std::shared_ptr<const void> payload,
+            std::size_t count,
+            const void* (*dataFn)(const std::shared_ptr<const void>&));
+        [[nodiscard]] Core::Expected<ReadView> ReadUntyped(AssetId id, TypeId typeId) const;
+
+        std::unique_ptr<Impl> m_Impl;
     };
 
     template <class T>
     Core::Expected<PayloadTicket> AssetPayloadStore::Publish(AssetId id, T&& value)
     {
         using StoredT = std::remove_cvref_t<T>;
+        (void)::write(2, "P0\n", 3);
         if (!id.IsValid())
         {
             return Core::Err<PayloadTicket>(Core::ErrorCode::InvalidArgument);
         }
 
+        (void)::write(2, "P1\n", 3);
         const auto newTypeId = TypePools<AssetId>::Type<StoredT>();
+        (void)::write(2, "P2\n", 3);
         auto payload = std::make_shared<StoredT>(std::forward<T>(value));
+        (void)::write(2, "P3\n", 3);
         auto dataFn = +[](const std::shared_ptr<const void>& p) -> const void*
         {
             return static_cast<const StoredT*>(p.get());
         };
-        auto& shard = m_Shards[ShardIndex(id)];
-        std::scoped_lock lock(shard.mutex);
-        auto& entry = shard.entries[id];
-        if (entry.ticket.slot == 0)
-        {
-            entry.ticket.slot = m_NextSlot.fetch_add(1, std::memory_order_relaxed);
-            entry.ticket.generation = 1;
-        }
-        else
-        {
-            ++entry.ticket.generation;
-        }
-
-        entry.typeId = newTypeId;
-        entry.payload = std::move(payload);
-        entry.count = 1;
-        entry.dataFn = dataFn;
-
-        return entry.ticket;
+        (void)::write(2, "P4\n", 3);
+        return PublishUntyped(id, newTypeId, std::move(payload), 1, dataFn);
     }
 
     template <class T>
     Core::Expected<std::span<const T>> AssetPayloadStore::ReadSpan(AssetId id) const
     {
         using StoredT = std::remove_cvref_t<T>;
-        const auto& shard = m_Shards[ShardIndex(id)];
-        std::scoped_lock lock(shard.mutex);
-        const auto entryIt = shard.entries.find(id);
-        if (entryIt == shard.entries.end())
+        auto view = ReadUntyped(id, TypePools<AssetId>::Type<StoredT>());
+        if (!view.has_value())
         {
-            return Core::Err<std::span<const T>>(Core::ErrorCode::AssetNotLoaded);
+            return Core::Err<std::span<const T>>(view.error());
         }
 
-        if (entryIt->second.typeId != TypePools<AssetId>::Type<StoredT>())
-        {
-            return Core::Err<std::span<const T>>(Core::ErrorCode::TypeMismatch);
-        }
-
-        if (!entryIt->second.payload || entryIt->second.dataFn == nullptr)
-        {
-            return Core::Err<std::span<const T>>(Core::ErrorCode::ResourceNotFound);
-        }
-
-        const auto* typed = static_cast<const StoredT*>(entryIt->second.dataFn(entryIt->second.payload));
-        return std::span<const T>(typed, entryIt->second.count);
+        const auto* typed = static_cast<const StoredT*>(view->ptr);
+        return std::span<const T>(typed, view->count);
     }
 }

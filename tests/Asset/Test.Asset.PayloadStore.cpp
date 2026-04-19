@@ -39,6 +39,7 @@ TEST(AssetPayloadStore, PublishAssignsTicket)
  
 TEST(AssetPayloadStore, PublishRejectsInvalidId)
 {
+    //TODO: There seems to be a mutex deadlock somehow...
     AssetPayloadStore store;
     auto ticket = store.Publish(AssetId{}, Mesh{});
     ASSERT_FALSE(ticket.has_value());

@@ -21,10 +21,10 @@ target_sources(${target_name}
         Core.Tasks.Internal.cppm
         Core.Tasks.LocalTask.cppm
         FILE_SET tasks_impl TYPE CXX_MODULES FILES
-        Core.Dag.Scheduler.cpp
         Core.Tasks.Internal.cpp
         Core.Tasks.LocalTask.cpp
         PRIVATE
+        Core.Dag.Scheduler.cpp
         Core.Filesystem.cpp
         Core.Filesystem.PathResolver.cpp
         Core.Logging.cpp

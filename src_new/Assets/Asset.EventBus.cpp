@@ -5,6 +5,7 @@ module;
 #include <vector>
 #include <atomic>
 #include <unordered_set>
+#include <unordered_map>
 
 module Extrinsic.Asset.EventBus;
 

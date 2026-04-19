@@ -1,10 +1,9 @@
 module;
 
-#include <mutex>
+#include <cstddef>
 #include <string_view>
 #include <string>
-#include <unordered_map>
-#include <array>
+#include <memory>
 
 export module Extrinsic.Asset.PathIndex;
 
@@ -16,7 +15,8 @@ namespace Extrinsic::Assets
     export class AssetPathIndex
     {
     public:
-        AssetPathIndex() = default;
+        AssetPathIndex();
+        ~AssetPathIndex();
         AssetPathIndex(const AssetPathIndex&) = delete;
         AssetPathIndex& operator=(const AssetPathIndex&) = delete;
 
@@ -29,28 +29,10 @@ namespace Extrinsic::Assets
 
     private:
         static constexpr std::size_t kShardCount = 32;
-        struct StringHash
-        {
-            using is_transparent = void;
 
-            [[nodiscard]] std::size_t operator()(std::string_view sv) const noexcept
-            {
-                return std::hash<std::string_view>{}(sv);
-            }
-
-            [[nodiscard]] std::size_t operator()(const std::string& s) const noexcept
-            {
-                return std::hash<std::string_view>{}(s);
-            }
-        };
-
-        struct Shard
-        {
-            mutable std::mutex mutex;
-            std::unordered_map<std::string, AssetId, StringHash, std::equal_to<>> index{};
-        };
+        struct Impl;
 
         [[nodiscard]] static std::size_t ShardIndex(std::string_view absolutePath) noexcept;
-        std::array<Shard, kShardCount> m_Shards{};
+        std::unique_ptr<Impl> m_Impl;
     };
 }
