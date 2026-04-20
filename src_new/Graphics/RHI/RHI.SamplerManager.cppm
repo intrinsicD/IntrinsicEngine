@@ -5,7 +5,7 @@ module;
 
 export module Extrinsic.RHI.SamplerManager;
 
-import Extrinsic.Core.Lease;
+import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;

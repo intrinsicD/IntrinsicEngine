@@ -16,7 +16,7 @@ _Generated on 2026-04-18 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Core.Config.Engine` | `src_new/Core/Core.Config.Engine.cppm` | `Core` |
 | `Extrinsic.Core.Config.Render` | `src_new/Core/Core.Config.Render.cppm` | `Core` |
 | `Extrinsic.Core.Config.Window` | `src_new/Core/Core.Config.Window.cppm` | `Core` |
-| `Extrinsic.Core.DagScheduler` | `src_new/Core/Core.Dag.Scheduler.cppm` | `Core` |
+| `Extrinsic.Core.Dag.Scheduler` | `src_new/Core/Core.Dag.Scheduler.cppm` | `Core` |
 | `Extrinsic.Core.Error` | `src_new/Core/Core.Error.cppm` | `Core` |
 | `Extrinsic.Core.Filesystem.PathResolver` | `src_new/Core/Core.Filesystem.PathResolver.cppm` | `Core` |
 | `Extrinsic.Core.Filesystem` | `src_new/Core/Core.Filesystem.cppm` | `Core` |
@@ -33,9 +33,8 @@ _Generated on 2026-04-18 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.ECS.Component.MetaData` | `src_new/ECS/Components/ECS.Component.MetaData.cppm` | `ECS` |
 | `Extrinsic.ECS.Component.RenderGeometry` | `src_new/ECS/Components/ECS.Component.RenderGeometry.cppm` | `ECS` |
 | `Extrinsic.ECS.Component.Transform` | `src_new/ECS/Components/ECS.Component.Transform.cppm` | `ECS` |
-| `Extrinsic.ECS.Scene.Database` | `src_new/ECS/ECS.Scene.Database.cppm` | `ECS` |
 | `Extrinsic.ECS.Scene.Handle` | `src_new/ECS/ECS.Scene.Handle.cppm` | `ECS` |
-| `Extrinsic.ECS.Scene.Manager` | `src_new/ECS/ECS.Scene.Manager.cppm` | `ECS` |
+| `Extrinsic.ECS.Scene.Registry` | `src_new/ECS/ECS.Scene.Registry.cppm` | `ECS` |
 | `Extrinsic.ECS.System.RenderSync` | `src_new/ECS/Systems/ECS.System.RenderSync.cppm` | `ECS` |
 | `Extrinsic.ECS.System.TransformHierarchy` | `src_new/ECS/Systems/ECS.System.TransformHierarchy.cppm` | `ECS` |
 | `Extrinsic.Backends.Vulkan` | `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.cppm` | `Graphics` |

@@ -6,8 +6,6 @@ This directory contains the `ECS` module/files.
 
 - `CMakeLists.txt`
 - `Components`
-- `ECS.Scene.Database.cpp`
-- `ECS.Scene.Database.cppm`
 - `ECS.Scene.Handle.cppm`
-- `ECS.Scene.Manager.cppm`
+- `ECS.Scene.Registry.cppm`
 - `Systems`

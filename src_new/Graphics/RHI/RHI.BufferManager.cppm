@@ -5,7 +5,7 @@ module;
 
 export module Extrinsic.RHI.BufferManager;
 
-import Extrinsic.Core.Lease;
+import Extrinsic.Core.HandleLease;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;

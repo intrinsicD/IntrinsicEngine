@@ -1,7 +1,7 @@
 module;
 #include <entt/entity/registry.hpp>
 
-export module Extrinsic.ECS.Scene.Manager;
+export module Extrinsic.ECS.Scene.Registry;
 
 namespace Extrinsic::ECS
 {

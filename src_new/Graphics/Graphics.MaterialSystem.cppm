@@ -7,7 +7,7 @@ module;
 
 export module Extrinsic.Graphics.MaterialSystem;
 
-import Extrinsic.Core.Lease;
+import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.BufferManager;
