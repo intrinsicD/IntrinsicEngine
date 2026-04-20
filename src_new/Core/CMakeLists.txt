@@ -13,6 +13,7 @@ target_sources(${target_name}
         Core.Filesystem.PathResolver.cppm
         Core.Filesystem.cppm
         Core.Hash.cppm
+        Core.HandleLease.cppm
         Core.LockFreeQueue.cppm
         Core.Logging.cppm
         Core.Memory.cppm

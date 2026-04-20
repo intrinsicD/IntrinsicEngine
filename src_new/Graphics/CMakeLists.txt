@@ -7,8 +7,13 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Graphics.Renderer.cppm
+        Graphics.Material.cppm
+        Graphics.MaterialSystem.cppm
+        Graphics.CullingSystem.cppm
         PRIVATE
         Graphics.Renderer.cpp
+        Graphics.MaterialSystem.cpp
+        Graphics.CullingSystem.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
