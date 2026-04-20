@@ -7,7 +7,7 @@ module;
 #include <string_view>
 #include <memory>
 
-export module Extrinsic.Core.DagScheduler;
+export module Extrinsic.Core.Dag.Scheduler;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.StrongHandle;

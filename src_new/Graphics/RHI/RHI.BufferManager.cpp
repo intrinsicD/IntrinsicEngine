@@ -10,7 +10,7 @@ module;
 
 module Extrinsic.RHI.BufferManager;
 
-import Extrinsic.Core.Lease;
+import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.BufferView;

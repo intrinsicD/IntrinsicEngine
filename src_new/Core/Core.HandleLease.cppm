@@ -3,7 +3,7 @@ module;
 #include <concepts>
 #include <utility>
 
-export module Extrinsic.Core.Lease;
+export module Extrinsic.Core.HandleLease;
 
 namespace Extrinsic::Core
 {

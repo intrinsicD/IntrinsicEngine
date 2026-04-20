@@ -14,7 +14,10 @@ namespace Extrinsic::Core::Memory
         auto res = m_Arena.AllocBytes(bytes, alignment);
         if (!res)
         {
-            //TODO: Why not use Core::Log::Error() here?
+            // std::pmr::memory_resource::do_allocate must either return a valid
+            // pointer or terminate; it cannot fail. We deliberately avoid
+            // Core::Log here: logging sinks may themselves allocate through a
+            // pmr resource and re-enter this path. Raw fprintf is reentrant-safe.
             std::fprintf(stderr,
                          "[EXTRINSIC] ArenaMemoryResource allocation failed: %s\n",
                          Core::Error::ToString(res.error()).data());

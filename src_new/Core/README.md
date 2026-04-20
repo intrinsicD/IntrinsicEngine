@@ -11,7 +11,7 @@
 - `Extrinsic.Core.Config.Render`
 - `Extrinsic.Core.Config.Engine`
 - `Extrinsic.Core.CallbackRegistry`
-- `Extrinsic.Core.DagScheduler`
+- `Extrinsic.Core.Dag.Scheduler`
 - `Extrinsic.Core.Error`
 - `Extrinsic.Core.Filesystem.PathResolver`
 - `Extrinsic.Core.Filesystem`

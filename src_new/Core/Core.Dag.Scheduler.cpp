@@ -7,7 +7,7 @@ module;
 #include <vector>
 #include <span>
 
-module Extrinsic.Core.DagScheduler;
+module Extrinsic.Core.Dag.Scheduler;
 
 namespace Extrinsic::Core::Dag
 {
