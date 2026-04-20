@@ -162,3 +162,58 @@ TEST(CoreDagScheduler, RejectsDuplicateTaskIds)
     ASSERT_FALSE(plan.has_value());
     EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
+
+
+TEST(CoreDagScheduler, RegisterProducerRejectsNullQuery)
+{
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+
+    auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "null_query", .subsystemId = 1, .preferredDomain = QueueDomain::Cpu},
+        nullptr,
+        nullptr);
+    ASSERT_FALSE(producer.has_value());
+    EXPECT_EQ(producer.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
+}
+
+TEST(CoreDagScheduler, UnregisterMissingProducerReturnsNotFound)
+{
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+
+    auto result = scheduler->UnregisterProducer(ProducerId{999, 1});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::ResourceNotFound);
+}
+
+TEST(CoreDagScheduler, ResetEpochClearsCachedTasks)
+{
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+
+    ProducerCtx ctx{
+        .ids = {TaskId{10, 1}, TaskId{11, 1}, TaskId{12, 1}},
+        .resources = {ResourceId{99, 1}}
+    };
+
+    auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "unit_reset", .subsystemId = 8, .preferredDomain = QueueDomain::Cpu},
+        &ctx,
+        &EmitLinear);
+    ASSERT_TRUE(producer.has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+
+    auto firstPlan = scheduler->BuildSchedule(BuildConfig{});
+    ASSERT_TRUE(firstPlan.has_value());
+    ASSERT_EQ(firstPlan->orderedTasks.size(), 3u);
+
+    scheduler->ResetEpoch();
+
+    auto secondPlan = scheduler->BuildSchedule(BuildConfig{});
+    ASSERT_TRUE(secondPlan.has_value());
+    EXPECT_TRUE(secondPlan->orderedTasks.empty());
+
+    const auto stats = scheduler->GetLastStats();
+    EXPECT_EQ(stats.taskCount, 0u);
+}
