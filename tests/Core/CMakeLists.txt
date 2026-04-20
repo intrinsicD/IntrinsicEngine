@@ -11,6 +11,7 @@ intrinsic_test_object_lib(ExtrinsicCoreTestObjs
         Test.Core.StrongHandle.cpp
         Test.Core.LockFreeQueue.cpp
         Test.Core.Logging.cpp
+        Test.Core.Memory.cpp
         Test.Core.Tasks.cpp
         DEPS ExtrinsicCore
 )
