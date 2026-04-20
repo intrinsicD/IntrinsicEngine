@@ -22,6 +22,19 @@ namespace Extrinsic::Core::Dag
 
         using TaskList = std::vector<CachedTask>;
 
+        // HLFET (Highest Levels First with Estimated Times): among all
+        // ready tasks, emit the one with the most urgent priority, breaking
+        // ties on longest remaining path to a sink (a.k.a. the node's "level").
+        // This approximates makespan-minimizing critical-path scheduling and
+        // respects TaskPriority as a hard override.
+        //
+        // Passes:
+        //   1. Build index + adjacency; reject missing deps / duplicate ids.
+        //   2. Kahn topological pre-pass → topo order (and cycle detection).
+        //   3. Reverse DP over the topo order → level[i] = cost[i] + max(level[succ]).
+        //   4. Priority-aware Kahn emission: ready set is a priority queue
+        //      keyed by (priority, -level, insertion) to guarantee a stable
+        //      total ordering.
         [[nodiscard]] Expected<std::vector<PlanTask>> BuildPlanFromTasks(
             const TaskList& tasks,
             const BuildConfig& config,
@@ -31,102 +44,143 @@ namespace Extrinsic::Core::Dag
             if (tasks.empty())
                 return std::vector<PlanTask>{};
 
+            const auto N = tasks.size();
+
+            // Pass 1: index and adjacency.
             std::unordered_map<TaskId, std::size_t, StrongHandleHash<TaskTag>> idToIndex;
-            idToIndex.reserve(tasks.size());
-            for (std::size_t i = 0; i < tasks.size(); ++i)
+            idToIndex.reserve(N);
+            for (std::size_t i = 0; i < N; ++i)
             {
                 const auto [_, inserted] = idToIndex.emplace(tasks[i].desc.id, i);
                 if (!inserted)
-                {
                     return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
-                }
             }
 
-            std::vector<uint32_t> inDegree(tasks.size(), 0);
-            std::vector<std::vector<std::size_t>> graph(tasks.size());
-
-            for (std::size_t i = 0; i < tasks.size(); ++i)
+            std::vector<uint32_t> inDegree(N, 0);
+            std::vector<std::vector<std::size_t>> successors(N);
+            for (std::size_t i = 0; i < N; ++i)
             {
                 for (const auto dep : tasks[i].dependsOn)
                 {
                     const auto depIt = idToIndex.find(dep);
                     if (depIt == idToIndex.end())
-                    {
                         return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
-                    }
-                    graph[depIt->second].push_back(i);
+                    successors[depIt->second].push_back(i);
                     inDegree[i] += 1;
                     outStats.edgeCount += 1;
                 }
             }
 
-            std::queue<std::size_t> ready;
-            for (std::size_t i = 0; i < inDegree.size(); ++i)
+            // Pass 2: topological pre-pass. Also detects cycles.
+            std::vector<std::size_t> topo;
+            topo.reserve(N);
             {
-                if (inDegree[i] == 0)
-                    ready.push(i);
+                std::vector<uint32_t> inDeg = inDegree;
+                std::queue<std::size_t> q;
+                for (std::size_t i = 0; i < N; ++i)
+                    if (inDeg[i] == 0)
+                        q.push(i);
+                while (!q.empty())
+                {
+                    const auto u = q.front();
+                    q.pop();
+                    topo.push_back(u);
+                    for (const auto v : successors[u])
+                        if (--inDeg[v] == 0)
+                            q.push(v);
+                }
+                if (topo.size() != N)
+                    return Err<std::vector<PlanTask>>(ErrorCode::InvalidState);
             }
 
-            uint32_t order = 0;
-            uint32_t cpuLane = 0;
-            uint32_t gpuLane = 0;
-            uint32_t streamLane = 0;
+            // Pass 3: reverse DP for the longest remaining path (a.k.a. level).
+            std::vector<uint32_t> level(N, 0);
+            for (auto it = topo.rbegin(); it != topo.rend(); ++it)
+            {
+                const auto u = *it;
+                uint32_t maxSucc = 0;
+                for (const auto v : successors[u])
+                    maxSucc = std::max(maxSucc, level[v]);
+                level[u] = tasks[u].desc.estimatedCost + maxSucc;
+            }
+
+            outStats.criticalPathCost = 0;
+            for (std::size_t i = 0; i < N; ++i)
+                if (inDegree[i] == 0)
+                    outStats.criticalPathCost = std::max(outStats.criticalPathCost, level[i]);
+
+            // Pass 4: priority-aware Kahn emission.
+            struct ReadyEntry
+            {
+                uint8_t priority;     // TaskPriority rank; lower = more urgent
+                uint32_t level;       // longest remaining path including self
+                uint32_t insertion;   // stable tie-breaker
+                std::size_t index;
+            };
+            // std::priority_queue is a max-heap; order so the "best" entry
+            // comes out on top. "Best" = lowest priority, then highest level,
+            // then lowest insertion.
+            const auto cmp = [](const ReadyEntry& a, const ReadyEntry& b) noexcept
+            {
+                if (a.priority != b.priority) return a.priority > b.priority;
+                if (a.level != b.level) return a.level < b.level;
+                return a.insertion > b.insertion;
+            };
+
+            std::priority_queue<ReadyEntry, std::vector<ReadyEntry>, decltype(cmp)> ready(cmp);
+            uint32_t nextInsertion = 0;
+            const auto enqueue = [&](const std::size_t i)
+            {
+                ready.push(ReadyEntry{
+                    .priority = static_cast<uint8_t>(tasks[i].desc.priority),
+                    .level = level[i],
+                    .insertion = nextInsertion++,
+                    .index = i,
+                });
+            };
+            for (std::size_t i = 0; i < N; ++i)
+                if (inDegree[i] == 0)
+                    enqueue(i);
+
+            std::vector<uint32_t> inDeg = inDegree;
             const auto cpuBudget = std::max<uint32_t>(config.queueBudgetCpu, 1u);
             const auto gpuBudget = std::max<uint32_t>(config.queueBudgetGpu, 1u);
             const auto streamBudget = std::max<uint32_t>(config.queueBudgetStreaming, 1u);
+            uint32_t cpuLane = 0, gpuLane = 0, streamLane = 0;
+            uint32_t order = 0;
 
-            std::vector<PlanTask> plan{};
-            plan.reserve(tasks.size());
-            std::vector<uint32_t> longestPath(tasks.size(), 0);
+            std::vector<PlanTask> plan;
+            plan.reserve(N);
 
             while (!ready.empty())
             {
-                outStats.maxReadyQueueDepth = std::max<uint32_t>(outStats.maxReadyQueueDepth,
-                                                                 static_cast<uint32_t>(ready.size()));
-                const auto idx = ready.front();
+                outStats.maxReadyQueueDepth = std::max<uint32_t>(
+                    outStats.maxReadyQueueDepth, static_cast<uint32_t>(ready.size()));
+                const auto entry = ready.top();
                 ready.pop();
 
-                const auto& task = tasks[idx].desc;
+                const auto& task = tasks[entry.index].desc;
                 uint32_t lane = 0;
                 switch (task.domain)
                 {
-                case QueueDomain::Cpu:
-                    lane = cpuLane++ % cpuBudget;
-                    break;
-                case QueueDomain::Gpu:
-                    lane = gpuLane++ % gpuBudget;
-                    break;
-                case QueueDomain::Streaming:
-                    lane = streamLane++ % streamBudget;
-                    break;
+                case QueueDomain::Cpu:       lane = cpuLane++ % cpuBudget; break;
+                case QueueDomain::Gpu:       lane = gpuLane++ % gpuBudget; break;
+                case QueueDomain::Streaming: lane = streamLane++ % streamBudget; break;
                 }
 
                 plan.push_back(PlanTask{
                     .id = task.id,
                     .domain = task.domain,
                     .lane = lane,
-                    .topoOrder = order,
+                    .topoOrder = order++,
                     .batch = static_cast<uint32_t>(task.priority),
                 });
-                ++order;
 
-                for (const auto next : graph[idx])
-                {
-                    longestPath[next] = std::max(longestPath[next], longestPath[idx] + tasks[idx].desc.estimatedCost);
-                    if (--inDegree[next] == 0)
-                        ready.push(next);
-                }
+                for (const auto v : successors[entry.index])
+                    if (--inDeg[v] == 0)
+                        enqueue(v);
             }
 
-            if (plan.size() != tasks.size())
-                return Err<std::vector<PlanTask>>(ErrorCode::InvalidState);
-
-            outStats.criticalPathCost = 0;
-            for (std::size_t i = 0; i < tasks.size(); ++i)
-            {
-                outStats.criticalPathCost = std::max(outStats.criticalPathCost,
-                                                     longestPath[i] + tasks[i].desc.estimatedCost);
-            }
             return plan;
         }
 
