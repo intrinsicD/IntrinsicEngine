@@ -105,10 +105,10 @@ TEST(CoreDagScheduler, BuildsTopologicalPlanAndStats)
 
     auto plan = scheduler->BuildSchedule(cfg);
     ASSERT_TRUE(plan.has_value());
-    ASSERT_EQ(plan->orderedTasks.size(), 3u);
-    EXPECT_EQ(plan->orderedTasks[0].id, ctx.ids[0]);
-    EXPECT_EQ(plan->orderedTasks[1].id, ctx.ids[1]);
-    EXPECT_EQ(plan->orderedTasks[2].id, ctx.ids[2]);
+    ASSERT_EQ(plan->size(), 3u);
+    EXPECT_EQ((*plan)[0].id, ctx.ids[0]);
+    EXPECT_EQ((*plan)[1].id, ctx.ids[1]);
+    EXPECT_EQ((*plan)[2].id, ctx.ids[2]);
 
     const auto stats = scheduler->GetLastStats();
     EXPECT_EQ(stats.producerCount, 1u);
@@ -206,14 +206,146 @@ TEST(CoreDagScheduler, ResetEpochClearsCachedTasks)
 
     auto firstPlan = scheduler->BuildSchedule(BuildConfig{});
     ASSERT_TRUE(firstPlan.has_value());
-    ASSERT_EQ(firstPlan->orderedTasks.size(), 3u);
+    ASSERT_EQ(firstPlan->size(), 3u);
 
     scheduler->ResetEpoch();
 
     auto secondPlan = scheduler->BuildSchedule(BuildConfig{});
     ASSERT_TRUE(secondPlan.has_value());
-    EXPECT_TRUE(secondPlan->orderedTasks.empty());
+    EXPECT_TRUE(secondPlan->empty());
 
     const auto stats = scheduler->GetLastStats();
     EXPECT_EQ(stats.taskCount, 0u);
+}
+
+// -----------------------------------------------------------------------------
+// HLFET scheduling behavior: priority > level > insertion order.
+// These tests drive the scheduler through DomainTaskGraph for directness;
+// DagScheduler uses the same BuildPlanFromTasks core.
+// -----------------------------------------------------------------------------
+
+TEST(CoreDagScheduler, PriorityOverridesInsertionOrder)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    // Two independent tasks. Low priority is submitted first; Critical must
+    // still come out first per HLFET.
+    PendingTaskDesc low{
+        .id = TaskId{1, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Low,
+    };
+    PendingTaskDesc critical{
+        .id = TaskId{2, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Critical,
+    };
+
+    ASSERT_TRUE(graph->Submit(low).has_value());
+    ASSERT_TRUE(graph->Submit(critical).has_value());
+
+    auto plan = graph->BuildPlan(BuildConfig{});
+    ASSERT_TRUE(plan.has_value());
+    ASSERT_EQ(plan->size(), 2u);
+    EXPECT_EQ((*plan)[0].id, critical.id);
+    EXPECT_EQ((*plan)[1].id, low.id);
+}
+
+TEST(CoreDagScheduler, LongerCriticalPathBreaksPriorityTie)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    // Two roots at equal priority: one heads a 3-node chain, the other is
+    // a singleton. The root of the longer chain must be scheduled first
+    // (minimizes makespan under critical-path scheduling).
+    //
+    //   t0 -> t1 -> t2   (chain root t0; level = 3)
+    //   t3                (singleton; level = 1)
+    const PendingTaskDesc t0{
+        .id = TaskId{10, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Normal, .estimatedCost = 1,
+    };
+    const TaskId t0DepArr[1] = {t0.id};
+    const PendingTaskDesc t1{
+        .id = TaskId{11, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Normal, .estimatedCost = 1,
+        .dependsOn = std::span<const TaskId>(t0DepArr, 1),
+    };
+    const TaskId t1DepArr[1] = {t1.id};
+    const PendingTaskDesc t2{
+        .id = TaskId{12, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Normal, .estimatedCost = 1,
+        .dependsOn = std::span<const TaskId>(t1DepArr, 1),
+    };
+    const PendingTaskDesc t3{
+        .id = TaskId{13, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Normal, .estimatedCost = 1,
+    };
+
+    // Submit t3 FIRST so insertion order would otherwise favor it.
+    ASSERT_TRUE(graph->Submit(t3).has_value());
+    ASSERT_TRUE(graph->Submit(t0).has_value());
+    ASSERT_TRUE(graph->Submit(t1).has_value());
+    ASSERT_TRUE(graph->Submit(t2).has_value());
+
+    auto plan = graph->BuildPlan(BuildConfig{});
+    ASSERT_TRUE(plan.has_value());
+    ASSERT_EQ(plan->size(), 4u);
+    EXPECT_EQ((*plan)[0].id, t0.id) << "Critical-path root must precede the singleton.";
+    EXPECT_EQ((*plan)[1].id, t1.id) << "Chain continues while it still has longer remaining path.";
+}
+
+TEST(CoreDagScheduler, StableOrderingOnFullTies)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    // Two independent tasks at identical priority and identical level.
+    // The lower-insertion (earlier-submitted) one must come out first.
+    const PendingTaskDesc a{
+        .id = TaskId{100, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Normal, .estimatedCost = 1,
+    };
+    const PendingTaskDesc b{
+        .id = TaskId{101, 1}, .domain = QueueDomain::Cpu,
+        .priority = TaskPriority::Normal, .estimatedCost = 1,
+    };
+
+    ASSERT_TRUE(graph->Submit(a).has_value());
+    ASSERT_TRUE(graph->Submit(b).has_value());
+
+    auto plan = graph->BuildPlan(BuildConfig{});
+    ASSERT_TRUE(plan.has_value());
+    ASSERT_EQ(plan->size(), 2u);
+    EXPECT_EQ((*plan)[0].id, a.id);
+    EXPECT_EQ((*plan)[1].id, b.id);
+}
+
+TEST(CoreDagScheduler, CycleReturnsInvalidState)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    // Two-task cycle: t0 -> t1 -> t0. No zero-indegree node exists; Kahn
+    // cannot produce a full topological order, so BuildPlan must reject
+    // with InvalidState.
+    const TaskId id0{200, 1};
+    const TaskId id1{201, 1};
+    const TaskId dep0[1] = {id1};  // t0 depends on t1
+    const TaskId dep1[1] = {id0};  // t1 depends on t0
+
+    const PendingTaskDesc t0{
+        .id = id0, .domain = QueueDomain::Cpu,
+        .dependsOn = std::span<const TaskId>(dep0, 1),
+    };
+    const PendingTaskDesc t1{
+        .id = id1, .domain = QueueDomain::Cpu,
+        .dependsOn = std::span<const TaskId>(dep1, 1),
+    };
+    ASSERT_TRUE(graph->Submit(t0).has_value());
+    ASSERT_TRUE(graph->Submit(t1).has_value());
+
+    auto plan = graph->BuildPlan(BuildConfig{});
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
 }
