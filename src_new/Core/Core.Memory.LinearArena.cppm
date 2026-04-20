@@ -32,11 +32,11 @@ export namespace Extrinsic::Core::Memory
         LinearArena& operator=(LinearArena&& other) noexcept;
         ~LinearArena();
 
-        [[nodiscard]] MemoryExpected<std::span<std::byte>>
+        [[nodiscard]] std::expected<std::span<std::byte>, AllocError>
         AllocBytes(size_t size, size_t align = kDefaultAlignment) noexcept;
 
         template <typename T, typename... Args>
-        [[nodiscard]] MemoryExpected<T*> New(Args&&... args) noexcept
+        [[nodiscard]] std::expected<T*, AllocError> New(Args&&... args) noexcept
         {
             static_assert(std::is_trivially_destructible_v<T>,
                           "LinearArena::New<T> only supports trivially destructible types.");
@@ -49,7 +49,7 @@ export namespace Extrinsic::Core::Memory
         }
 
         template <typename T>
-        [[nodiscard]] MemoryExpected<std::span<T>> NewArray(size_t count) noexcept
+        [[nodiscard]] std::expected<std::span<T>, AllocError> NewArray(size_t count) noexcept
         {
             static_assert(std::is_trivially_destructible_v<T>,
                           "LinearArena::NewArray<T> only supports trivially destructible types.");
@@ -58,7 +58,7 @@ export namespace Extrinsic::Core::Memory
                 return std::span<T>{};
 
             if (count > std::numeric_limits<size_t>::max() / sizeof(T))
-                return std::unexpected(MemoryError::OutOfRange);
+                return std::unexpected(AllocError::Overflow);
 
             return AllocBytes(count * sizeof(T), alignof(T))
                 .transform([&](std::span<std::byte> mem)
@@ -71,7 +71,7 @@ export namespace Extrinsic::Core::Memory
         }
 
         [[nodiscard]] ArenaMarker Mark() const noexcept { return ArenaMarker{m_Offset, m_Epoch}; }
-        [[nodiscard]] MemoryExpected<Extrinsic::Core::Unit> Rewind(ArenaMarker marker) noexcept;
+        [[nodiscard]] std::expected<void, AllocError> Rewind(ArenaMarker marker) noexcept;
         void Reset() noexcept;
 
         [[nodiscard]] size_t Used() const noexcept { return m_Offset; }

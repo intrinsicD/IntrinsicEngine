@@ -7,7 +7,6 @@
 #include <vector>
 
 import Extrinsic.Core.Memory;
-import Extrinsic.Core.Error;
 
 using namespace Extrinsic::Core::Memory;
 
@@ -75,7 +74,7 @@ TEST(CoreMemoryLinearArena, CrossThreadViolation)
     auto ok = arena.New<int>(42);
     ASSERT_TRUE(ok.has_value());
 
-    Extrinsic::Core::ErrorCode err = Extrinsic::Core::ErrorCode::OutOfMemory;
+    AllocError err = AllocError::OutOfMemory;
     std::thread worker([&]()
     {
         auto result = arena.AllocBytes(8, alignof(uint64_t));
@@ -84,7 +83,7 @@ TEST(CoreMemoryLinearArena, CrossThreadViolation)
     });
     worker.join();
 
-    EXPECT_EQ(err, Extrinsic::Core::ErrorCode::ThreadViolation);
+    EXPECT_EQ(err, AllocError::ThreadViolation);
 }
 
 TEST(CoreMemoryScopeStack, NonTrivialDestructorsOnReset)
@@ -130,16 +129,6 @@ TEST(CoreMemoryPmr, WorksWithPmrString)
 
     EXPECT_EQ(s, "extrinsic-memory");
     EXPECT_GT(arena.Used(), 0u);
-}
-
-TEST(CoreMemoryPmr, TryAllocateReturnsCoreError)
-{
-    LinearArena arena(64);
-    ArenaMemoryResource mr(arena);
-
-    auto res = mr.TryAllocate(1024, 16);
-    ASSERT_FALSE(res.has_value());
-    EXPECT_EQ(res.error(), Extrinsic::Core::ErrorCode::OutOfMemory);
 }
 
 

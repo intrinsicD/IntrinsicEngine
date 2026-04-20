@@ -20,13 +20,13 @@ namespace Extrinsic::Core::Memory
             return x != 0 && (x & (x - 1)) == 0;
         }
 
-        [[nodiscard]] MemoryExpected<size_t> AlignUp(const size_t x, const size_t align) noexcept
+        [[nodiscard]] std::expected<size_t, AllocError> AlignUp(const size_t x, const size_t align) noexcept
         {
             if (!IsPowerOfTwo(align))
-                return std::unexpected(MemoryError::InvalidArgument);
+                return std::unexpected(AllocError::InvalidAlignment);
 
             if (x > std::numeric_limits<size_t>::max() - (align - 1))
-                return std::unexpected(MemoryError::OutOfRange);
+                return std::unexpected(AllocError::Overflow);
 
             return (x + (align - 1)) & ~(align - 1);
         }
@@ -108,20 +108,20 @@ namespace Extrinsic::Core::Memory
         return *this;
     }
 
-    MemoryExpected<std::span<std::byte>> LinearArena::AllocBytes(const size_t size, const size_t align) noexcept
+    std::expected<std::span<std::byte>, AllocError> LinearArena::AllocBytes(const size_t size, const size_t align) noexcept
     {
         if (m_OwningThread != std::this_thread::get_id())
         {
             std::fprintf(stderr,
                          "[EXTRINSIC] LinearArena thread violation: allocation from non-owning thread.\n");
-            return std::unexpected(MemoryError::ThreadViolation);
+            return std::unexpected(AllocError::ThreadViolation);
         }
 
         if (!m_Start)
-            return std::unexpected(MemoryError::OutOfMemory);
+            return std::unexpected(AllocError::OutOfMemory);
 
         if (size > m_Capacity || align > m_Capacity)
-            return std::unexpected(MemoryError::OutOfRange);
+            return std::unexpected(AllocError::Overflow);
 
         const size_t safeAlign = std::max(align, alignof(std::max_align_t));
         auto alignedOffset = AlignUp(m_Offset, safeAlign);
@@ -130,20 +130,20 @@ namespace Extrinsic::Core::Memory
 
         const size_t offset = *alignedOffset;
         if (offset > m_Capacity || size > (m_Capacity - offset))
-            return std::unexpected(MemoryError::OutOfMemory);
+            return std::unexpected(AllocError::OutOfMemory);
 
         m_Offset = offset + size;
         Telemetry::RecordAlloc(size);
         return std::span<std::byte>(m_Start + offset, size);
     }
 
-    MemoryExpected<Extrinsic::Core::Unit> LinearArena::Rewind(const ArenaMarker marker) noexcept
+    std::expected<void, AllocError> LinearArena::Rewind(const ArenaMarker marker) noexcept
     {
         if (marker.Epoch != m_Epoch || marker.Offset > m_Offset)
-            return std::unexpected(MemoryError::InvalidState);
+            return std::unexpected(AllocError::InvalidMarker);
 
         m_Offset = marker.Offset;
-        return Extrinsic::Core::Ok();
+        return {};
     }
 
     void LinearArena::Reset() noexcept

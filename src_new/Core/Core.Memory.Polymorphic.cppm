@@ -1,6 +1,5 @@
 module;
 
-#include <cstdlib>
 #include <cstddef>
 #include <limits>
 #include <memory_resource>
@@ -24,24 +23,19 @@ export namespace Extrinsic::Core::Memory
         template <typename U>
         ArenaAllocator(const ArenaAllocator<U>& other) noexcept : m_Arena(other.m_Arena) {}
 
-        [[nodiscard]] MemoryExpected<T*> TryAllocate(const std::size_t n) noexcept
-        {
-            if (n == 0)
-                return static_cast<T*>(nullptr);
-
-            if (!m_Arena || n > std::numeric_limits<size_t>::max() / sizeof(T))
-                return std::unexpected(MemoryError::OutOfRange);
-
-            return m_Arena->AllocBytes(n * sizeof(T), alignof(T))
-                .transform([](std::span<std::byte> mem) { return reinterpret_cast<T*>(mem.data()); });
-        }
-
         [[nodiscard]] T* allocate(const std::size_t n)
         {
-            auto mem = TryAllocate(n);
+            if (n == 0)
+                return nullptr;
+
+            if (!m_Arena || n > std::numeric_limits<size_t>::max() / sizeof(T))
+                std::terminate();
+
+            auto mem = m_Arena->AllocBytes(n * sizeof(T), alignof(T));
             if (!mem)
                 std::terminate();
-            return *mem;
+
+            return reinterpret_cast<T*>(mem->data());
         }
 
         void deallocate(T*, std::size_t) noexcept {}
@@ -68,8 +62,6 @@ export namespace Extrinsic::Core::Memory
     {
     public:
         explicit ArenaMemoryResource(LinearArena& arena) noexcept : m_Arena(arena) {}
-
-        [[nodiscard]] MemoryExpected<void*> TryAllocate(size_t bytes, size_t alignment) noexcept;
 
     protected:
         [[nodiscard]] void* do_allocate(size_t bytes, size_t alignment) override;

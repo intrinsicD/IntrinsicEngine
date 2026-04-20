@@ -26,9 +26,9 @@ export namespace Extrinsic::Core::Memory
         ~ScopeStack() { Reset(); }
 
         template <typename T, typename... Args>
-        [[nodiscard]] MemoryExpected<T*> New(Args&&... args) noexcept
+        [[nodiscard]] std::expected<T*, AllocError> New(Args&&... args) noexcept
         {
-            return m_Arena.AllocBytes(sizeof(T), alignof(T)).and_then([&](std::span<std::byte> mem) -> MemoryExpected<T*>
+            return m_Arena.AllocBytes(sizeof(T), alignof(T)).and_then([&](std::span<std::byte> mem) -> std::expected<T*, AllocError>
             {
                 T* ptr = std::construct_at(reinterpret_cast<T*>(mem.data()), std::forward<Args>(args)...);
 
@@ -54,7 +54,7 @@ export namespace Extrinsic::Core::Memory
         }
 
         template <typename T>
-        [[nodiscard]] MemoryExpected<std::span<T>> NewArray(size_t count) noexcept
+        [[nodiscard]] std::expected<std::span<T>, AllocError> NewArray(size_t count) noexcept
         {
             static_assert(std::is_default_constructible_v<T>,
                           "ScopeStack::NewArray requires default constructible T.");
@@ -63,10 +63,10 @@ export namespace Extrinsic::Core::Memory
                 return std::span<T>{};
 
             if (count > std::numeric_limits<size_t>::max() / sizeof(T))
-                return std::unexpected(MemoryError::OutOfRange);
+                return std::unexpected(AllocError::Overflow);
 
             return m_Arena.AllocBytes(sizeof(T) * count, alignof(T)).and_then(
-                [&](std::span<std::byte> mem) -> MemoryExpected<std::span<T>>
+                [&](std::span<std::byte> mem) -> std::expected<std::span<T>, AllocError>
                 {
                     T* ptr = reinterpret_cast<T*>(mem.data());
                     for (size_t i = 0; i < count; ++i)
