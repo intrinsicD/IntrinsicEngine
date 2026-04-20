@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <span>
+
 import Extrinsic.Core.DagScheduler;
+import Extrinsic.Core.Error;
 
 using namespace Extrinsic::Core::Dag;
 
