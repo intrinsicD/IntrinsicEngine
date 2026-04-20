@@ -60,3 +60,23 @@ TEST(CoreGraphInterfaces, StreamingGraphBuildsTopoPlan)
     EXPECT_EQ(plan->orderedTasks[0].id, T(3));
     EXPECT_EQ(plan->orderedTasks[1].id, T(4));
 }
+
+
+TEST(CoreGraphInterfaces, GraphResetClearsSubmittedTasks)
+{
+    auto graph = CreateCpuTaskGraph();
+    ASSERT_NE(graph, nullptr);
+
+    PendingTaskDesc task{.id = T(100), .domain = QueueDomain::Cpu};
+    ASSERT_TRUE(graph->Submit(task).has_value());
+
+    auto first = graph->BuildPlan(BuildConfig{});
+    ASSERT_TRUE(first.has_value());
+    ASSERT_EQ(first->orderedTasks.size(), 1u);
+
+    graph->Reset();
+
+    auto second = graph->BuildPlan(BuildConfig{});
+    ASSERT_TRUE(second.has_value());
+    EXPECT_TRUE(second->orderedTasks.empty());
+}
