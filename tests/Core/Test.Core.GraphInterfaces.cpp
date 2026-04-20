@@ -24,8 +24,8 @@ TEST(CoreGraphInterfaces, CpuGraphAcceptsCpuTasks)
     cfg.queueBudgetCpu = 2;
     auto plan = graph->BuildPlan(cfg);
     ASSERT_TRUE(plan.has_value());
-    ASSERT_EQ(plan->orderedTasks.size(), 1u);
-    EXPECT_EQ(plan->orderedTasks[0].domain, QueueDomain::Cpu);
+    ASSERT_EQ(plan->size(), 1u);
+    EXPECT_EQ((*plan)[0].domain, QueueDomain::Cpu);
 }
 
 TEST(CoreGraphInterfaces, GpuGraphRejectsWrongDomain)
@@ -56,9 +56,9 @@ TEST(CoreGraphInterfaces, StreamingGraphBuildsTopoPlan)
     cfg.queueBudgetStreaming = 2;
     auto plan = graph->BuildPlan(cfg);
     ASSERT_TRUE(plan.has_value());
-    ASSERT_EQ(plan->orderedTasks.size(), 2u);
-    EXPECT_EQ(plan->orderedTasks[0].id, T(3));
-    EXPECT_EQ(plan->orderedTasks[1].id, T(4));
+    ASSERT_EQ(plan->size(), 2u);
+    EXPECT_EQ((*plan)[0].id, T(3));
+    EXPECT_EQ((*plan)[1].id, T(4));
 }
 
 
@@ -72,11 +72,11 @@ TEST(CoreGraphInterfaces, GraphResetClearsSubmittedTasks)
 
     auto first = graph->BuildPlan(BuildConfig{});
     ASSERT_TRUE(first.has_value());
-    ASSERT_EQ(first->orderedTasks.size(), 1u);
+    ASSERT_EQ(first->size(), 1u);
 
     graph->Reset();
 
     auto second = graph->BuildPlan(BuildConfig{});
     ASSERT_TRUE(second.has_value());
-    EXPECT_TRUE(second->orderedTasks.empty());
+    EXPECT_TRUE(second->empty());
 }

@@ -192,19 +192,12 @@ namespace Extrinsic::Core::Dag
                 return Ok();
             }
 
-            Expected<SchedulePlanView> BuildSchedule(const BuildConfig& config) override
+            Expected<std::vector<PlanTask>> BuildSchedule(const BuildConfig& config) override
             {
-                m_LastPlan.clear();
                 m_LastStats = {};
                 m_LastStats.producerCount = static_cast<uint32_t>(m_Producers.size());
 
-                auto plan = BuildPlanFromTasks(m_CachedTasks, config, m_LastStats);
-                if (!plan.has_value())
-                    return Err<SchedulePlanView>(plan.error());
-
-                m_LastPlan = std::move(*plan);
-                m_LastView = {.orderedTasks = std::span<const PlanTask>(m_LastPlan.data(), m_LastPlan.size())};
-                return m_LastView;
+                return BuildPlanFromTasks(m_CachedTasks, config, m_LastStats);
             }
 
             ScheduleStats GetLastStats() const override
@@ -215,9 +208,7 @@ namespace Extrinsic::Core::Dag
             void ResetEpoch() override
             {
                 m_CachedTasks.clear();
-                m_LastPlan.clear();
                 m_LastStats = {};
-                m_LastView = {};
             }
 
         private:
@@ -239,9 +230,7 @@ namespace Extrinsic::Core::Dag
             uint32_t m_NextProducerIndex = 0;
             std::vector<ProducerEntry> m_Producers{};
             TaskList m_CachedTasks{};
-            std::vector<PlanTask> m_LastPlan{};
             ScheduleStats m_LastStats{};
-            SchedulePlanView m_LastView{};
         };
 
         class DomainGraphBase
@@ -264,39 +253,29 @@ namespace Extrinsic::Core::Dag
                 return Ok();
             }
 
-            Expected<SchedulePlanView> BuildPlan(const BuildConfig& config)
+            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config)
             {
                 m_LastStats = {};
-                auto plan = BuildPlanFromTasks(m_Tasks, config, m_LastStats);
-                if (!plan.has_value())
-                    return Err<SchedulePlanView>(plan.error());
-
-                m_LastPlan = std::move(*plan);
-                m_LastView = {.orderedTasks = std::span<const PlanTask>(m_LastPlan.data(), m_LastPlan.size())};
-                return m_LastView;
+                return BuildPlanFromTasks(m_Tasks, config, m_LastStats);
             }
 
             void Reset()
             {
                 m_Tasks.clear();
-                m_LastPlan.clear();
                 m_LastStats = {};
-                m_LastView = {};
             }
 
         private:
             QueueDomain m_Domain;
             TaskList m_Tasks{};
-            std::vector<PlanTask> m_LastPlan{};
             ScheduleStats m_LastStats{};
-            SchedulePlanView m_LastView{};
         };
 
         class CpuTaskGraphImpl final : public CpuTaskGraph
         {
         public:
             Result Submit(const PendingTaskDesc& task) override { return m_Base.Submit(task); }
-            Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
+            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
             void Reset() override { m_Base.Reset(); }
 
         private:
@@ -307,7 +286,7 @@ namespace Extrinsic::Core::Dag
         {
         public:
             Result Submit(const PendingTaskDesc& task) override { return m_Base.Submit(task); }
-            Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
+            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
             void Reset() override { m_Base.Reset(); }
 
         private:
@@ -318,7 +297,7 @@ namespace Extrinsic::Core::Dag
         {
         public:
             Result Submit(const PendingTaskDesc& task) override { return m_Base.Submit(task); }
-            Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
+            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
             void Reset() override { m_Base.Reset(); }
 
         private:

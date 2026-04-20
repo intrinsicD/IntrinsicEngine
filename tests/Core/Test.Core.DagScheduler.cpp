@@ -105,10 +105,10 @@ TEST(CoreDagScheduler, BuildsTopologicalPlanAndStats)
 
     auto plan = scheduler->BuildSchedule(cfg);
     ASSERT_TRUE(plan.has_value());
-    ASSERT_EQ(plan->orderedTasks.size(), 3u);
-    EXPECT_EQ(plan->orderedTasks[0].id, ctx.ids[0]);
-    EXPECT_EQ(plan->orderedTasks[1].id, ctx.ids[1]);
-    EXPECT_EQ(plan->orderedTasks[2].id, ctx.ids[2]);
+    ASSERT_EQ(plan->size(), 3u);
+    EXPECT_EQ((*plan)[0].id, ctx.ids[0]);
+    EXPECT_EQ((*plan)[1].id, ctx.ids[1]);
+    EXPECT_EQ((*plan)[2].id, ctx.ids[2]);
 
     const auto stats = scheduler->GetLastStats();
     EXPECT_EQ(stats.producerCount, 1u);
@@ -206,13 +206,13 @@ TEST(CoreDagScheduler, ResetEpochClearsCachedTasks)
 
     auto firstPlan = scheduler->BuildSchedule(BuildConfig{});
     ASSERT_TRUE(firstPlan.has_value());
-    ASSERT_EQ(firstPlan->orderedTasks.size(), 3u);
+    ASSERT_EQ(firstPlan->size(), 3u);
 
     scheduler->ResetEpoch();
 
     auto secondPlan = scheduler->BuildSchedule(BuildConfig{});
     ASSERT_TRUE(secondPlan.has_value());
-    EXPECT_TRUE(secondPlan->orderedTasks.empty());
+    EXPECT_TRUE(secondPlan->empty());
 
     const auto stats = scheduler->GetLastStats();
     EXPECT_EQ(stats.taskCount, 0u);

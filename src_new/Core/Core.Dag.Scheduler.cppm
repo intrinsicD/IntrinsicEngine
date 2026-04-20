@@ -1,11 +1,11 @@
 module;
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string_view>
 #include <memory>
+#include <vector>
 
 export module Extrinsic.Core.Dag.Scheduler;
 
@@ -101,11 +101,6 @@ export namespace Extrinsic::Core::Dag
         uint32_t batch = 0;
     };
 
-    struct SchedulePlanView
-    {
-        std::span<const PlanTask> orderedTasks{};
-    };
-
     struct ScheduleStats
     {
         uint32_t producerCount = 0;
@@ -141,8 +136,10 @@ export namespace Extrinsic::Core::Dag
         virtual Result QueryAllPending() = 0;
 
         // Builds a complete topological schedule over the currently cached
-        // pending-task snapshot.
-        [[nodiscard]] virtual Expected<SchedulePlanView> BuildSchedule(const BuildConfig& config) = 0;
+        // pending-task snapshot. The returned vector is owned by the caller;
+        // there are no lifetime dependencies on the scheduler's internal
+        // storage.
+        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildSchedule(const BuildConfig& config) = 0;
 
         [[nodiscard]] virtual ScheduleStats GetLastStats() const = 0;
 
@@ -155,7 +152,7 @@ export namespace Extrinsic::Core::Dag
     {
     public:
         virtual Result Submit(const PendingTaskDesc& task) = 0;
-        [[nodiscard]] virtual Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) = 0;
+        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
         virtual void Reset() = 0;
         virtual ~CpuTaskGraph() = default;
     };
@@ -164,7 +161,7 @@ export namespace Extrinsic::Core::Dag
     {
     public:
         virtual Result Submit(const PendingTaskDesc& pass) = 0;
-        [[nodiscard]] virtual Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) = 0;
+        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
         virtual void Reset() = 0;
         virtual ~GpuFrameGraph() = default;
     };
@@ -173,7 +170,7 @@ export namespace Extrinsic::Core::Dag
     {
     public:
         virtual Result Submit(const PendingTaskDesc& task) = 0;
-        [[nodiscard]] virtual Expected<SchedulePlanView> BuildPlan(const BuildConfig& config) = 0;
+        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
         virtual void Reset() = 0;
         virtual ~AsyncStreamingGraph() = default;
     };
