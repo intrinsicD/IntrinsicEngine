@@ -11,6 +11,8 @@ import Extrinsic.Core.Error;
 using namespace Extrinsic::Core;
 using namespace Extrinsic::Core::Hash;
 
+inline std::filesystem::path AsPath(const std::string& p) { return std::filesystem::path(p); }
+
 TEST(CoreFilesystemPathResolver, TryResolveShaderPathReturnsErrorWhenLookupMissing)
 {
     auto r = Filesystem::TryResolveShaderPath(
@@ -37,22 +39,25 @@ TEST(CoreFilesystemWatcher, StatsCanBeResetAndRead)
 
 TEST(CoreFilesystemPathResolver, ShaderPathFallbackReturnsRelativeWhenMissing)
 {
-    const std::string rel = "no/such/shader.spv";
+    const std::string rel = AsPath("no") / "such" / "shader.spv";
     const auto resolved = Filesystem::GetShaderPath(rel);
     EXPECT_EQ(resolved, rel);
 }
 
 TEST(CoreFilesystemPathResolver, AbsolutePathRoundTrip)
 {
-    const std::string rel = "tests/Core/Test.Core.Filesystem.cpp";
+    const auto rel = AsPath("tests") / "Core" / "Test.Core.Filesystem.cpp";
     const auto abs = Filesystem::GetAbsolutePath(rel);
+    const auto expected = std::filesystem::absolute(rel).string();
     EXPECT_FALSE(abs.empty());
+    EXPECT_EQ(abs, expected);
     EXPECT_TRUE(std::filesystem::path(abs).is_absolute());
 }
 
 TEST(CoreFilesystemPathResolver, AssetPathContainsAssetsSegment)
 {
-    const auto path = Filesystem::GetAssetPath("textures/checker.ktx2");
+    const std::string rel = AsPath("textures") / "checker.ktx2";
+    const auto path = Filesystem::GetAssetPath(rel);
     EXPECT_NE(path.find("assets"), std::string::npos);
     EXPECT_NE(path.find("textures/checker.ktx2"), std::string::npos);
 }

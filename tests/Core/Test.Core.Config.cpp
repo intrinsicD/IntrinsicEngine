@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Render;
 
 using namespace Extrinsic::Core::Config;
 

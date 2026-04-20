@@ -23,8 +23,13 @@ namespace Extrinsic::Core::Filesystem
         {
             std::error_code ec;
             auto c = std::filesystem::weakly_canonical(p, ec);
-            if (!ec) return c;
-            return std::filesystem::absolute(p, ec);
+            if (!ec && c.is_absolute()) return c;
+
+            ec.clear();
+            const auto abs = std::filesystem::absolute(c.empty() ? p : c, ec);
+            if (!ec) return abs;
+
+            return p;
         }
 
         [[nodiscard]] std::filesystem::path GetExecutablePath()
