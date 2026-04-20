@@ -9,6 +9,7 @@ intrinsic_test_object_lib(ExtrinsicCoreTestObjs
         Test.Core.Config.cpp
         Test.Core.Error.cpp
         Test.Core.StrongHandle.cpp
+        Test.Core.HandleLease.cpp
         Test.Core.LockFreeQueue.cpp
         Test.Core.Logging.cpp
         Test.Core.Memory.cpp
