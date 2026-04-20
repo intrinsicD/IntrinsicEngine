@@ -388,24 +388,22 @@ export namespace Core::Memory
     public:
         using value_type = T;
 
-#ifndef NDEBUG
         LinearArena* m_Arena = nullptr;
+#ifndef NDEBUG
         ArenaGeneration m_Generation = 0;
 #endif
 
-        explicit ArenaAllocator(LinearArena& arena) noexcept
+        explicit ArenaAllocator(LinearArena& arena) noexcept : m_Arena(&arena)
         {
 #ifndef NDEBUG
-            m_Arena = &arena;
             m_Generation = arena.GetGeneration();
 #endif
         }
 
         template <typename U>
-        ArenaAllocator(const ArenaAllocator<U>& other) noexcept
+        ArenaAllocator(const ArenaAllocator<U>& other) noexcept : m_Arena(other.m_Arena)
         {
 #ifndef NDEBUG
-            m_Arena = other.m_Arena;
             m_Generation = other.m_Generation;
 #endif
         }
@@ -416,9 +414,7 @@ export namespace Core::Memory
         {
             if (n == 0) return nullptr;
             if (n > std::numeric_limits<std::size_t>::max() / sizeof(T))
-            {
                 std::terminate();
-            }
 
 #ifndef NDEBUG
             assert(m_Arena != nullptr && "ArenaAllocator: arena pointer is null");
@@ -430,21 +426,9 @@ export namespace Core::Memory
                    "ArenaAllocator: arena lifetime violation — arena was destroyed or moved since this allocator was created");
 #endif
 
-            auto res =
-#ifndef NDEBUG
-                m_Arena->Alloc(n * sizeof(T), alignof(T));
-#else
-                // In release builds we don't keep a back-pointer to the arena to avoid extra state; this allocator
-                // is intended for per-frame containers where OOM is fatal anyway.
-                // NOTE: This must be constructed and used within the lifetime of the referenced arena.
-                // We rely on the caller contract here.
-                std::terminate(), std::expected<void*, AllocatorError>{};
-#endif
-
+            auto res = m_Arena->Alloc(n * sizeof(T), alignof(T));
             if (!res)
-            {
                 std::terminate();
-            }
             return static_cast<T*>(*res);
         }
 
@@ -464,13 +448,7 @@ export namespace Core::Memory
 
         friend bool operator==(const ArenaAllocator& a, const ArenaAllocator& b) noexcept
         {
-#ifndef NDEBUG
             return a.m_Arena == b.m_Arena;
-#else
-            (void)a;
-            (void)b;
-            return true;
-#endif
         }
     };
 }
