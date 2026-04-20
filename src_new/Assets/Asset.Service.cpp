@@ -138,6 +138,15 @@ namespace Extrinsic::Assets
 
         if (auto found = m_Impl->pathIndex.Find(abs); found.has_value())
         {
+            const auto meta = m_Impl->registry.GetMeta(*found);
+            if (!meta.has_value())
+            {
+                return std::unexpected(meta.error());
+            }
+            if (meta->typeId != typeId)
+            {
+                return Core::Err<AssetId>(Core::ErrorCode::TypeMismatch);
+            }
             return *found;
         }
 

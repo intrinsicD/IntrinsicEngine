@@ -46,6 +46,36 @@ namespace
 
         return Extrinsic::Core::Ok();
     }
+
+    Extrinsic::Core::Result EmitWithMissingDependency(void* producerCtx, void* emitCtx, EmitPendingTaskFn emit)
+    {
+        auto* ctx = static_cast<ProducerCtx*>(producerCtx);
+        std::array<TaskId, 1> missingDep{TaskId{99, 1}};
+        PendingTaskDesc t0{
+            .id = ctx->ids[0],
+            .domain = QueueDomain::Cpu,
+            .estimatedCost = 1,
+            .dependsOn = std::span<const TaskId>(missingDep.data(), missingDep.size())
+        };
+        if (!emit(emitCtx, t0))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+        return Extrinsic::Core::Ok();
+    }
+
+    Extrinsic::Core::Result EmitDuplicateIds(void* producerCtx, void* emitCtx, EmitPendingTaskFn emit)
+    {
+        auto* ctx = static_cast<ProducerCtx*>(producerCtx);
+
+        PendingTaskDesc t0{.id = ctx->ids[0], .domain = QueueDomain::Cpu, .estimatedCost = 1};
+        if (!emit(emitCtx, t0))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+
+        PendingTaskDesc t1{.id = ctx->ids[0], .domain = QueueDomain::Gpu, .estimatedCost = 1};
+        if (!emit(emitCtx, t1))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+
+        return Extrinsic::Core::Ok();
+    }
 }
 
 TEST(CoreDagScheduler, BuildsTopologicalPlanAndStats)
@@ -83,4 +113,50 @@ TEST(CoreDagScheduler, BuildsTopologicalPlanAndStats)
     EXPECT_EQ(stats.taskCount, 3u);
     EXPECT_EQ(stats.edgeCount, 2u);
     EXPECT_GE(stats.criticalPathCost, 10u);
+}
+
+TEST(CoreDagScheduler, RejectsMissingDependencyIds)
+{
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+
+    ProducerCtx ctx{
+        .ids = {TaskId{1, 1}, TaskId{2, 1}, TaskId{3, 1}},
+        .resources = {ResourceId{9, 1}}
+    };
+
+    auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "unit_missing_dep", .subsystemId = 7, .preferredDomain = QueueDomain::Cpu},
+        &ctx,
+        &EmitWithMissingDependency);
+    ASSERT_TRUE(producer.has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+
+    BuildConfig cfg{};
+    auto plan = scheduler->BuildSchedule(cfg);
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
+}
+
+TEST(CoreDagScheduler, RejectsDuplicateTaskIds)
+{
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+
+    ProducerCtx ctx{
+        .ids = {TaskId{1, 1}, TaskId{2, 1}, TaskId{3, 1}},
+        .resources = {ResourceId{9, 1}}
+    };
+
+    auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "unit_duplicate_id", .subsystemId = 7, .preferredDomain = QueueDomain::Cpu},
+        &ctx,
+        &EmitDuplicateIds);
+    ASSERT_TRUE(producer.has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+
+    BuildConfig cfg{};
+    auto plan = scheduler->BuildSchedule(cfg);
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
