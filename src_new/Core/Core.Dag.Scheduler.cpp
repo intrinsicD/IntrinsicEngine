@@ -34,7 +34,11 @@ namespace Extrinsic::Core::Dag
             idToIndex.reserve(tasks.size());
             for (std::size_t i = 0; i < tasks.size(); ++i)
             {
-                idToIndex.emplace(tasks[i].desc.id, i);
+                const auto [_, inserted] = idToIndex.emplace(tasks[i].desc.id, i);
+                if (!inserted)
+                {
+                    return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
+                }
             }
 
             std::vector<uint32_t> inDegree(tasks.size(), 0);
@@ -46,7 +50,9 @@ namespace Extrinsic::Core::Dag
                 {
                     const auto depIt = idToIndex.find(dep);
                     if (depIt == idToIndex.end())
-                        continue;
+                    {
+                        return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
+                    }
                     graph[depIt->second].push_back(i);
                     inDegree[i] += 1;
                     outStats.edgeCount += 1;

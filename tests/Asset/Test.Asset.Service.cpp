@@ -94,6 +94,21 @@ TEST(AssetService, LoadSamePathReturnsSameId)
     auto b = svc.Load<Mesh>(f.path.string(), MeshLoader(99)).value();
     EXPECT_EQ(a, b);
 }
+
+TEST(AssetService, LoadSamePathWithDifferentTypeRejected)
+{
+    TmpFile f("svc_load_same_different_type.bin");
+    AssetService svc;
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1));
+    ASSERT_TRUE(id.has_value());
+
+    auto wrongType = svc.Load<Texture>(f.path.string(), [](std::string_view, AssetId) -> Expected<Texture>
+    {
+        return Texture{.name = "albedo"};
+    });
+    ASSERT_FALSE(wrongType.has_value());
+    EXPECT_EQ(wrongType.error(), ErrorCode::TypeMismatch);
+}
  
 TEST(AssetService, LoadDifferentPathsReturnDistinctIds)
 {
