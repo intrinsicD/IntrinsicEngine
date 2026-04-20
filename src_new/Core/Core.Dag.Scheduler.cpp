@@ -5,6 +5,7 @@ module;
 #include <queue>
 #include <unordered_map>
 #include <vector>
+#include <span>
 
 module Extrinsic.Core.DagScheduler;
 
@@ -30,7 +31,7 @@ namespace Extrinsic::Core::Dag
             if (tasks.empty())
                 return std::vector<PlanTask>{};
 
-            std::unordered_map<TaskId, std::size_t> idToIndex;
+            std::unordered_map<TaskId, std::size_t, StrongHandleHash<TaskTag>> idToIndex;
             idToIndex.reserve(tasks.size());
             for (std::size_t i = 0; i < tasks.size(); ++i)
             {
