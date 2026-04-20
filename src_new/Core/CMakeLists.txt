@@ -15,6 +15,12 @@ target_sources(${target_name}
         Core.Hash.cppm
         Core.LockFreeQueue.cppm
         Core.Logging.cppm
+        Core.Memory.cppm
+        Core.Memory.Common.cppm
+        Core.Memory.LinearArena.cppm
+        Core.Memory.ScopeStack.cppm
+        Core.Memory.Polymorphic.cppm
+        Core.Memory.Telemetry.cppm
         Core.StrongHandle.cppm
         Core.Tasks.cppm
         Core.Tasks.CounterEvent.cppm
@@ -23,6 +29,11 @@ target_sources(${target_name}
         FILE_SET tasks_impl TYPE CXX_MODULES FILES
         Core.Tasks.Internal.cpp
         Core.Tasks.LocalTask.cpp
+        FILE_SET memory_impl TYPE CXX_MODULES FILES
+        Core.Memory.LinearArena.cpp
+        Core.Memory.ScopeStack.cpp
+        Core.Memory.Polymorphic.cpp
+        Core.Memory.Telemetry.cpp
         PRIVATE
         Core.Dag.Scheduler.cpp
         Core.Filesystem.cpp
