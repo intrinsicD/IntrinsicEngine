@@ -1,9 +1,11 @@
 module;
 
-#include <new>
+#include <cstdio>
+#include <cstdlib>
 
 module Extrinsic.Core.Memory:Polymorphic.Impl;
 import :Polymorphic;
+import Extrinsic.Core.Error;
 
 namespace Extrinsic::Core::Memory
 {
@@ -11,7 +13,13 @@ namespace Extrinsic::Core::Memory
     {
         auto res = m_Arena.AllocBytes(bytes, alignment);
         if (!res)
-            throw std::bad_alloc{};
+        {
+            //TODO: Why not use Core::Log::Error() here?
+            std::fprintf(stderr,
+                         "[EXTRINSIC] ArenaMemoryResource allocation failed: %s\n",
+                         Core::Error::ToString(res.error()).data());
+            std::abort();
+        }
         return res->data();
     }
 }

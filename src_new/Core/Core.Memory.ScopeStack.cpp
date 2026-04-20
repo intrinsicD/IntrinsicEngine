@@ -1,5 +1,7 @@
 module;
 
+#include <utility>
+
 module Extrinsic.Core.Memory:ScopeStack.Impl;
 import :ScopeStack;
 

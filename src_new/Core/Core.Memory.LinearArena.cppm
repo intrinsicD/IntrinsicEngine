@@ -3,8 +3,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <memory>
 #include <limits>
-#include <new>
 #include <span>
 #include <thread>
 #include <type_traits>
@@ -12,16 +12,17 @@ module;
 
 export module Extrinsic.Core.Memory:LinearArena;
 import :Common;
+import Extrinsic.Core.Error;
 
 export namespace Extrinsic::Core::Memory
 {
-    export struct ArenaMarker
+    struct ArenaMarker
     {
         size_t Offset = 0;
         uint64_t Epoch = 0;
     };
 
-    export class LinearArena final
+    class LinearArena final
     {
     public:
         LinearArena(const LinearArena&) = delete;
@@ -32,11 +33,11 @@ export namespace Extrinsic::Core::Memory
         LinearArena& operator=(LinearArena&& other) noexcept;
         ~LinearArena();
 
-        [[nodiscard]] std::expected<std::span<std::byte>, AllocError>
+        [[nodiscard]] std::expected<std::span<std::byte>, ErrorCode>
         AllocBytes(size_t size, size_t align = kDefaultAlignment) noexcept;
 
         template <typename T, typename... Args>
-        [[nodiscard]] std::expected<T*, AllocError> New(Args&&... args) noexcept
+        [[nodiscard]] std::expected<T*, ErrorCode> New(Args&&... args) noexcept
         {
             static_assert(std::is_trivially_destructible_v<T>,
                           "LinearArena::New<T> only supports trivially destructible types.");
@@ -49,7 +50,7 @@ export namespace Extrinsic::Core::Memory
         }
 
         template <typename T>
-        [[nodiscard]] std::expected<std::span<T>, AllocError> NewArray(size_t count) noexcept
+        [[nodiscard]] std::expected<std::span<T>, ErrorCode> NewArray(size_t count) noexcept
         {
             static_assert(std::is_trivially_destructible_v<T>,
                           "LinearArena::NewArray<T> only supports trivially destructible types.");
@@ -58,7 +59,7 @@ export namespace Extrinsic::Core::Memory
                 return std::span<T>{};
 
             if (count > std::numeric_limits<size_t>::max() / sizeof(T))
-                return std::unexpected(AllocError::Overflow);
+                return std::unexpected(Core::ErrorCode::OutOfRange);
 
             return AllocBytes(count * sizeof(T), alignof(T))
                 .transform([&](std::span<std::byte> mem)
@@ -71,7 +72,7 @@ export namespace Extrinsic::Core::Memory
         }
 
         [[nodiscard]] ArenaMarker Mark() const noexcept { return ArenaMarker{m_Offset, m_Epoch}; }
-        [[nodiscard]] std::expected<void, AllocError> Rewind(ArenaMarker marker) noexcept;
+        [[nodiscard]] std::expected<void, ErrorCode> Rewind(ArenaMarker marker) noexcept;
         void Reset() noexcept;
 
         [[nodiscard]] size_t Used() const noexcept { return m_Offset; }

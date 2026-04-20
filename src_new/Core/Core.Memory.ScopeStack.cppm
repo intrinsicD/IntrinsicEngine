@@ -2,8 +2,8 @@ module;
 
 #include <cstddef>
 #include <expected>
+#include <memory>
 #include <limits>
-#include <new>
 #include <span>
 #include <type_traits>
 #include <utility>
@@ -11,24 +11,22 @@ module;
 export module Extrinsic.Core.Memory:ScopeStack;
 import :Common;
 import :LinearArena;
+import Extrinsic.Core.Error;
 
 export namespace Extrinsic::Core::Memory
 {
-    export class ScopeStack final
+    class ScopeStack final
     {
     public:
-        ScopeStack(const ScopeStack&) = delete;
-        ScopeStack& operator=(const ScopeStack&) = delete;
-
-        explicit ScopeStack(size_t bytes) noexcept : m_Arena(bytes) {}
+        explicit ScopeStack(size_t bytes) noexcept : m_Arena(bytes) {} // NOLINT(cppcoreguidelines-pro-type-member-init)
         ScopeStack(ScopeStack&& other) noexcept;
         ScopeStack& operator=(ScopeStack&& other) noexcept;
         ~ScopeStack() { Reset(); }
 
         template <typename T, typename... Args>
-        [[nodiscard]] std::expected<T*, AllocError> New(Args&&... args) noexcept
+        [[nodiscard]] std::expected<T*, ErrorCode> New(Args&&... args) noexcept
         {
-            return m_Arena.AllocBytes(sizeof(T), alignof(T)).and_then([&](std::span<std::byte> mem) -> std::expected<T*, AllocError>
+            return m_Arena.AllocBytes(sizeof(T), alignof(T)).and_then([&](std::span<std::byte> mem) -> std::expected<T*, Core::ErrorCode>
             {
                 T* ptr = std::construct_at(reinterpret_cast<T*>(mem.data()), std::forward<Args>(args)...);
 
@@ -54,7 +52,7 @@ export namespace Extrinsic::Core::Memory
         }
 
         template <typename T>
-        [[nodiscard]] std::expected<std::span<T>, AllocError> NewArray(size_t count) noexcept
+        [[nodiscard]] std::expected<std::span<T>, ErrorCode> NewArray(size_t count) noexcept
         {
             static_assert(std::is_default_constructible_v<T>,
                           "ScopeStack::NewArray requires default constructible T.");
@@ -63,10 +61,10 @@ export namespace Extrinsic::Core::Memory
                 return std::span<T>{};
 
             if (count > std::numeric_limits<size_t>::max() / sizeof(T))
-                return std::unexpected(AllocError::Overflow);
+                return std::unexpected(Core::ErrorCode::OutOfRange);
 
             return m_Arena.AllocBytes(sizeof(T) * count, alignof(T)).and_then(
-                [&](std::span<std::byte> mem) -> std::expected<std::span<T>, AllocError>
+                [&](std::span<std::byte> mem) -> std::expected<std::span<T>, Core::ErrorCode>
                 {
                     T* ptr = reinterpret_cast<T*>(mem.data());
                     for (size_t i = 0; i < count; ++i)
