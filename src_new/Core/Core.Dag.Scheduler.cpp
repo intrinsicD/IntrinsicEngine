@@ -233,12 +233,12 @@ namespace Extrinsic::Core::Dag
             ScheduleStats m_LastStats{};
         };
 
-        class DomainGraphBase
+        class DomainTaskGraphImpl final : public DomainTaskGraph
         {
         public:
-            explicit DomainGraphBase(const QueueDomain domain) : m_Domain(domain) {}
+            explicit DomainTaskGraphImpl(const QueueDomain domain) : m_Domain(domain) {}
 
-            Result Submit(const PendingTaskDesc& task)
+            Result Submit(const PendingTaskDesc& task) override
             {
                 if (!task.id.IsValid() || task.domain != m_Domain)
                     return Err(ErrorCode::InvalidArgument);
@@ -253,13 +253,15 @@ namespace Extrinsic::Core::Dag
                 return Ok();
             }
 
-            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config)
+            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override
             {
                 m_LastStats = {};
                 return BuildPlanFromTasks(m_Tasks, config, m_LastStats);
             }
 
-            void Reset()
+            QueueDomain Domain() const noexcept override { return m_Domain; }
+
+            void Reset() override
             {
                 m_Tasks.clear();
                 m_LastStats = {};
@@ -270,39 +272,6 @@ namespace Extrinsic::Core::Dag
             TaskList m_Tasks{};
             ScheduleStats m_LastStats{};
         };
-
-        class CpuTaskGraphImpl final : public CpuTaskGraph
-        {
-        public:
-            Result Submit(const PendingTaskDesc& task) override { return m_Base.Submit(task); }
-            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
-            void Reset() override { m_Base.Reset(); }
-
-        private:
-            DomainGraphBase m_Base{QueueDomain::Cpu};
-        };
-
-        class GpuFrameGraphImpl final : public GpuFrameGraph
-        {
-        public:
-            Result Submit(const PendingTaskDesc& task) override { return m_Base.Submit(task); }
-            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
-            void Reset() override { m_Base.Reset(); }
-
-        private:
-            DomainGraphBase m_Base{QueueDomain::Gpu};
-        };
-
-        class AsyncStreamingGraphImpl final : public AsyncStreamingGraph
-        {
-        public:
-            Result Submit(const PendingTaskDesc& task) override { return m_Base.Submit(task); }
-            Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) override { return m_Base.BuildPlan(config); }
-            void Reset() override { m_Base.Reset(); }
-
-        private:
-            DomainGraphBase m_Base{QueueDomain::Streaming};
-        };
     }
 
     std::unique_ptr<DagScheduler> CreateDagScheduler()
@@ -310,18 +279,8 @@ namespace Extrinsic::Core::Dag
         return std::make_unique<DagSchedulerImpl>();
     }
 
-    std::unique_ptr<CpuTaskGraph> CreateCpuTaskGraph()
+    std::unique_ptr<DomainTaskGraph> CreateDomainTaskGraph(const QueueDomain domain)
     {
-        return std::make_unique<CpuTaskGraphImpl>();
-    }
-
-    std::unique_ptr<GpuFrameGraph> CreateGpuFrameGraph()
-    {
-        return std::make_unique<GpuFrameGraphImpl>();
-    }
-
-    std::unique_ptr<AsyncStreamingGraph> CreateAsyncStreamingGraph()
-    {
-        return std::make_unique<AsyncStreamingGraphImpl>();
+        return std::make_unique<DomainTaskGraphImpl>(domain);
     }
 }

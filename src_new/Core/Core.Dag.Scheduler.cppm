@@ -148,35 +148,21 @@ export namespace Extrinsic::Core::Dag
         virtual ~DagScheduler() = default;
     };
 
-    class CpuTaskGraph
+    // Single-domain task graph. Each instance is bound to exactly one
+    // QueueDomain at construction time; Submit() rejects tasks whose
+    // .domain does not match. This replaces the previous three parallel
+    // CpuTaskGraph/GpuFrameGraph/AsyncStreamingGraph classes, which had
+    // identical interfaces and identical implementations.
+    class DomainTaskGraph
     {
     public:
         virtual Result Submit(const PendingTaskDesc& task) = 0;
         [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
+        [[nodiscard]] virtual QueueDomain Domain() const noexcept = 0;
         virtual void Reset() = 0;
-        virtual ~CpuTaskGraph() = default;
-    };
-
-    class GpuFrameGraph
-    {
-    public:
-        virtual Result Submit(const PendingTaskDesc& pass) = 0;
-        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
-        virtual void Reset() = 0;
-        virtual ~GpuFrameGraph() = default;
-    };
-
-    class AsyncStreamingGraph
-    {
-    public:
-        virtual Result Submit(const PendingTaskDesc& task) = 0;
-        [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
-        virtual void Reset() = 0;
-        virtual ~AsyncStreamingGraph() = default;
+        virtual ~DomainTaskGraph() = default;
     };
 
     [[nodiscard]] std::unique_ptr<DagScheduler> CreateDagScheduler();
-    [[nodiscard]] std::unique_ptr<CpuTaskGraph> CreateCpuTaskGraph();
-    [[nodiscard]] std::unique_ptr<GpuFrameGraph> CreateGpuFrameGraph();
-    [[nodiscard]] std::unique_ptr<AsyncStreamingGraph> CreateAsyncStreamingGraph();
+    [[nodiscard]] std::unique_ptr<DomainTaskGraph> CreateDomainTaskGraph(QueueDomain domain);
 }

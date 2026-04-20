@@ -14,8 +14,9 @@ namespace
 
 TEST(CoreGraphInterfaces, CpuGraphAcceptsCpuTasks)
 {
-    auto graph = CreateCpuTaskGraph();
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
     ASSERT_NE(graph, nullptr);
+    EXPECT_EQ(graph->Domain(), QueueDomain::Cpu);
 
     PendingTaskDesc task{.id = T(1), .domain = QueueDomain::Cpu};
     EXPECT_TRUE(graph->Submit(task).has_value());
@@ -30,8 +31,9 @@ TEST(CoreGraphInterfaces, CpuGraphAcceptsCpuTasks)
 
 TEST(CoreGraphInterfaces, GpuGraphRejectsWrongDomain)
 {
-    auto graph = CreateGpuFrameGraph();
+    auto graph = CreateDomainTaskGraph(QueueDomain::Gpu);
     ASSERT_NE(graph, nullptr);
+    EXPECT_EQ(graph->Domain(), QueueDomain::Gpu);
 
     PendingTaskDesc wrong{.id = T(2), .domain = QueueDomain::Cpu};
     auto r = graph->Submit(wrong);
@@ -41,8 +43,9 @@ TEST(CoreGraphInterfaces, GpuGraphRejectsWrongDomain)
 
 TEST(CoreGraphInterfaces, StreamingGraphBuildsTopoPlan)
 {
-    auto graph = CreateAsyncStreamingGraph();
+    auto graph = CreateDomainTaskGraph(QueueDomain::Streaming);
     ASSERT_NE(graph, nullptr);
+    EXPECT_EQ(graph->Domain(), QueueDomain::Streaming);
 
     PendingTaskDesc a{.id = T(3), .domain = QueueDomain::Streaming};
     TaskId depArr[1] = {T(3)};
@@ -64,7 +67,7 @@ TEST(CoreGraphInterfaces, StreamingGraphBuildsTopoPlan)
 
 TEST(CoreGraphInterfaces, GraphResetClearsSubmittedTasks)
 {
-    auto graph = CreateCpuTaskGraph();
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
     ASSERT_NE(graph, nullptr);
 
     PendingTaskDesc task{.id = T(100), .domain = QueueDomain::Cpu};
