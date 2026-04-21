@@ -11,8 +11,8 @@ module;
 module Extrinsic.Core.Memory:LinearArena.Impl;
 #include <span>
 import :LinearArena;
-import :Telemetry;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Telemetry;
 
 namespace Extrinsic::Core::Memory
 {
@@ -141,7 +141,7 @@ namespace Extrinsic::Core::Memory
             return std::unexpected(ErrorCode::OutOfMemory);
 
         m_Offset = offset + size;
-        Telemetry::RecordAlloc(size);
+        Telemetry::Alloc::RecordAlloc(size);
         return std::span<std::byte>(m_Start + offset, size);
     }
 

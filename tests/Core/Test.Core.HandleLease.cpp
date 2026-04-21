@@ -12,7 +12,6 @@ namespace
 
     struct MockManager
     {
-        using LeaseType = Extrinsic::Core::Lease<Handle, MockManager>;
 
         int RetainCalls = 0;
         int ReleaseCalls = 0;
@@ -28,12 +27,14 @@ namespace
             ++ReleaseCalls;
         }
 
-        [[nodiscard]] LeaseType AcquireLease(Handle handle)
+        [[nodiscard]] auto AcquireLease(Handle handle)
         {
             ++AcquireCalls;
-            return LeaseType::RetainNew(*this, handle);
+            using LT = Extrinsic::Core::Lease<Handle, MockManager>;
+            return LT::RetainNew(*this, handle);
         }
     };
+
 
     [[nodiscard]] Handle ValidHandle()
     {
@@ -41,10 +42,12 @@ namespace
     }
 }
 
+using MockLease = Extrinsic::Core::Lease<Extrinsic::Core::StrongHandle<LeaseTag>, MockManager>;
+
 TEST(CoreHandleLease, DefaultAndInvalidShareAreNoOps)
 {
     MockManager manager;
-    MockManager::LeaseType lease;
+    MockLease lease;
 
     EXPECT_FALSE(lease.IsValid());
     EXPECT_FALSE(static_cast<bool>(lease));
@@ -62,7 +65,7 @@ TEST(CoreHandleLease, AdoptDoesNotRetainButReleasesOnDestruction)
 {
     MockManager manager;
     {
-        auto lease = MockManager::LeaseType::Adopt(manager, ValidHandle());
+        auto lease = MockLease::Adopt(manager, ValidHandle());
         ASSERT_TRUE(lease.IsValid());
         EXPECT_EQ(lease.GetHandle(), ValidHandle());
         EXPECT_EQ(manager.RetainCalls, 0);
@@ -77,7 +80,7 @@ TEST(CoreHandleLease, RetainNewRetainsAndReleases)
 {
     MockManager manager;
     {
-        auto lease = MockManager::LeaseType::RetainNew(manager, ValidHandle());
+        auto lease = MockLease::RetainNew(manager, ValidHandle());
         EXPECT_EQ(manager.RetainCalls, 1);
         EXPECT_TRUE(lease.IsValid());
     }
@@ -88,7 +91,7 @@ TEST(CoreHandleLease, RetainNewRetainsAndReleases)
 TEST(CoreHandleLease, ShareDelegatesToManagerAcquireLease)
 {
     MockManager manager;
-    auto lease = MockManager::LeaseType::Adopt(manager, ValidHandle());
+    auto lease = MockLease::Adopt(manager, ValidHandle());
 
     {
         auto shared = lease.Share();
@@ -103,7 +106,7 @@ TEST(CoreHandleLease, ShareDelegatesToManagerAcquireLease)
 TEST(CoreHandleLease, MoveConstructionTransfersOwnership)
 {
     MockManager manager;
-    auto source = MockManager::LeaseType::Adopt(manager, ValidHandle());
+    auto source = MockLease::Adopt(manager, ValidHandle());
 
     auto moved = std::move(source);
     EXPECT_FALSE(source.IsValid());
@@ -116,8 +119,8 @@ TEST(CoreHandleLease, MoveConstructionTransfersOwnership)
 TEST(CoreHandleLease, MoveAssignmentReleasesPreviousHandle)
 {
     MockManager manager;
-    auto lhs = MockManager::LeaseType::Adopt(manager, ValidHandle());
-    auto rhs = MockManager::LeaseType::Adopt(manager, ValidHandle());
+    auto lhs = MockLease::Adopt(manager, ValidHandle());
+    auto rhs = MockLease::Adopt(manager, ValidHandle());
 
     lhs = std::move(rhs);
     EXPECT_EQ(manager.ReleaseCalls, 1);
@@ -131,7 +134,7 @@ TEST(CoreHandleLease, MoveAssignmentReleasesPreviousHandle)
 TEST(CoreHandleLease, SelfMoveAssignmentIsSafeNoExtraRelease)
 {
     MockManager manager;
-    auto lease = MockManager::LeaseType::Adopt(manager, ValidHandle());
+    auto lease = MockLease::Adopt(manager, ValidHandle());
 
     lease = std::move(lease);
     EXPECT_TRUE(lease.IsValid());

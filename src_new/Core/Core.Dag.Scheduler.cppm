@@ -148,21 +148,26 @@ export namespace Extrinsic::Core::Dag
         virtual ~DagScheduler() = default;
     };
 
-    // Single-domain task graph. Each instance is bound to exactly one
-    // QueueDomain at construction time; Submit() rejects tasks whose
-    // .domain does not match. This replaces the previous three parallel
-    // CpuTaskGraph/GpuFrameGraph/AsyncStreamingGraph classes, which had
-    // identical interfaces and identical implementations.
+    [[nodiscard]] std::unique_ptr<DagScheduler> CreateDagScheduler();
+
+    // -----------------------------------------------------------------------
+    // DomainTaskGraph — low-level, PendingTaskDesc-based task graph.
+    // Each instance is bound to one QueueDomain; Submit() rejects mismatched
+    // domains. This is the raw scheduling primitive used directly by tests
+    // and by the streaming / GPU pass-ordering layers.
+    //
+    // For the higher-level closure-based API (AddPass / Execute), see
+    // Extrinsic.Core.Dag.TaskGraph (TaskGraph / TaskGraphBuilder).
+    // -----------------------------------------------------------------------
     class DomainTaskGraph
     {
     public:
+        virtual ~DomainTaskGraph() = default;
         virtual Result Submit(const PendingTaskDesc& task) = 0;
         [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
         [[nodiscard]] virtual QueueDomain Domain() const noexcept = 0;
         virtual void Reset() = 0;
-        virtual ~DomainTaskGraph() = default;
     };
 
-    [[nodiscard]] std::unique_ptr<DagScheduler> CreateDagScheduler();
     [[nodiscard]] std::unique_ptr<DomainTaskGraph> CreateDomainTaskGraph(QueueDomain domain);
 }

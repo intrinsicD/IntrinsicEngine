@@ -1,0 +1,232 @@
+module;
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string_view>
+#include <vector>
+
+export module Extrinsic.Core.Dag.TaskGraph;
+
+import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Error;
+import Extrinsic.Core.Hash;
+
+// -----------------------------------------------------------------------
+// Extrinsic::Core::Dag::TaskGraph — General-purpose per-domain task graph.
+//
+// A TaskGraph is bound to exactly one QueueDomain at construction time and
+// serves as the execution primitive for all three scheduled work domains:
+//
+//   QueueDomain::Cpu       — ECS system scheduling, fiber-dispatched.
+//                            Execute() fires registered closures in
+//                            topological layer order; parallel within each
+//                            layer via Tasks::Scheduler::Dispatch.
+//
+//   QueueDomain::Gpu       — GPU render-pass ordering. Virtual resources
+//                            (images, buffers) are declared per pass; the
+//                            compiled plan drives barrier emission.
+//                            Execute() is a no-op; callers iterate
+//                            BuildPlan() and record GPU commands.
+//
+//   QueueDomain::Streaming — Background IO / geometry processing.
+//                            Priority-ordered async work items.
+//                            Execute() is a no-op; the streaming scheduler
+//                            drives execution via BuildPlan().
+//
+// API (three phases — must be called in order each epoch/frame):
+//
+//   1. Setup  — AddPass(name, setup_fn, execute_fn) × N
+//   2. Compile — Compile()  → error on dependency cycle
+//   3. Execute — Execute()  → CPU: fires closures in topo-layer order
+//             or BuildPlan() → returns ordered PlanTask vector for
+//                              GPU / Streaming callers
+//   4. Reset  — Reset() to begin the next epoch
+// -----------------------------------------------------------------------
+
+export namespace Extrinsic::Core::Dag
+{
+    class TaskGraph;
+
+    // -----------------------------------------------------------------------
+    // TaskGraphBuilder — passed to the user's setup lambda in AddPass().
+    // Accumulates per-pass resource accesses and ordering constraints.
+    // -----------------------------------------------------------------------
+    class TaskGraphBuilder
+    {
+    public:
+        explicit TaskGraphBuilder(TaskGraph& graph, uint32_t passIndex) noexcept
+            : m_Graph(graph), m_PassIndex(passIndex) {}
+
+        // --- Data dependency declarations ---
+
+        // TypeToken-based component dependency (CPU domain / ECS use case).
+        // Translates the compile-time type token to a ResourceId automatically.
+        template <typename T>
+        void Read();
+
+        template <typename T>
+        void Write();
+
+        // Explicit ResourceId-based resource access (GPU / Streaming use case).
+        // ResourceIds are assigned by the caller and must be consistent within
+        // a single epoch (i.e., same ID → same logical resource each frame).
+        void ReadResource(ResourceId resource);
+        void WriteResource(ResourceId resource);
+
+        // --- Ordering constraints (label-based) ---
+        // WaitFor: this pass may not start until all passes that Signal(label)
+        //          in the same graph have completed.
+        void WaitFor(Hash::StringID label);
+
+        // Signal: this pass "produces" the named label (other passes may WaitFor it).
+        void Signal(Hash::StringID label);
+
+    private:
+        TaskGraph& m_Graph;
+        uint32_t   m_PassIndex;
+    };
+
+    // -----------------------------------------------------------------------
+    // TaskGraph
+    // -----------------------------------------------------------------------
+    class TaskGraph
+    {
+    public:
+        explicit TaskGraph(QueueDomain domain);
+        ~TaskGraph();
+        TaskGraph(const TaskGraph&) = delete;
+        TaskGraph& operator=(const TaskGraph&) = delete;
+        TaskGraph(TaskGraph&&) noexcept;
+        TaskGraph& operator=(TaskGraph&&) noexcept;
+
+        [[nodiscard]] QueueDomain Domain() const noexcept;
+
+        // ----- Phase 1: Setup -----
+
+        // Register a pass. setup_fn receives a TaskGraphBuilder to declare
+        // dependencies. execute_fn is the work closure (stored as
+        // std::move_only_function — no heap SBO if closure fits in 64 bytes).
+        //
+        // Returns a PassHandle that can be used to query pass metadata.
+        // For GPU/Streaming domains the execute_fn is stored but never called
+        // by Execute(); callers iterate BuildPlan() to drive execution themselves.
+        template <typename SetupFn, typename ExecuteFn>
+        void AddPass(std::string_view name, SetupFn&& setup, ExecuteFn&& execute)
+        {
+            const uint32_t idx = AddPassInternal(name,
+                std::move_only_function<void()>(std::forward<ExecuteFn>(execute)));
+            TaskGraphBuilder builder(*this, idx);
+            setup(builder);
+        }
+
+        // Convenience: pass with no resource dependencies (ordering via labels only).
+        template <typename ExecuteFn>
+        void AddPass(std::string_view name, ExecuteFn&& execute)
+        {
+            AddPass(name, [](TaskGraphBuilder&){}, std::forward<ExecuteFn>(execute));
+        }
+
+        // ----- Phase 2: Compile -----
+
+        // Build the topological execution schedule. Must be called once after all
+        // AddPass() calls and before Execute()/BuildPlan().
+        // Returns Err on cycle detection.
+        [[nodiscard]] Core::Result Compile();
+
+        // ----- Phase 3a: Execute (CPU domain) -----
+
+        // Fire all pass closures in topological layer order.
+        // Passes within the same layer have no mutual dependencies and may be
+        // dispatched in parallel (currently sequential; Tasks::Scheduler
+        // integration is a planned follow-up — see TODO.md).
+        //
+        // Asserts (Debug) or returns Err (Release) if called on GPU/Streaming domain.
+        [[nodiscard]] Core::Result Execute();
+
+        // ----- Phase 3b: BuildPlan (GPU / Streaming domains) -----
+
+        // Returns the topologically sorted execution plan.
+        // The caller (GPU render graph or streaming scheduler) iterates the
+        // returned vector and drives pass execution.
+        [[nodiscard]] Core::Expected<std::vector<PlanTask>> BuildPlan(
+            const BuildConfig& config = {});
+
+        // ----- Reset -----
+        void Reset();
+
+        // ----- Introspection -----
+        [[nodiscard]] uint32_t PassCount() const noexcept;
+        [[nodiscard]] std::string_view PassName(uint32_t index) const noexcept;
+        [[nodiscard]] uint64_t LastCompileTimeNs()     const noexcept;
+        [[nodiscard]] uint64_t LastExecuteTimeNs()     const noexcept;
+        [[nodiscard]] uint64_t LastCriticalPathTimeNs()const noexcept;
+        [[nodiscard]] ScheduleStats GetScheduleStats() const noexcept;
+
+    private:
+        friend class TaskGraphBuilder;
+
+        // Called by the typed AddPass template above.
+        uint32_t AddPassInternal(std::string_view name,
+                                 std::move_only_function<void()> execute);
+
+        // Label resource-key helpers (tag bit distinguishes labels from TypeTokens).
+        static constexpr std::size_t kLabelTag =
+            std::size_t{1} << (sizeof(std::size_t) * 8 - 1);
+
+        // TypeToken → ResourceId translation (stable within an epoch; reset on Reset()).
+        ResourceId TokenToResource(std::size_t token);
+
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
+    };
+
+    // -----------------------------------------------------------------------
+    // Template implementations (must be in interface for module visibility)
+    // -----------------------------------------------------------------------
+    template <typename T>
+    void TaskGraphBuilder::Read()
+    {
+        // Compute compile-time type token then delegate to the explicit-id path.
+        // TypeToken is defined in Core.FrameGraph; here we replicate the hash
+        // so TaskGraph has no dependency on FrameGraph.
+        constexpr auto kMask = std::numeric_limits<std::size_t>::max() >> 1;
+#if defined(__clang__) || defined(__GNUC__)
+        constexpr std::string_view sig = __PRETTY_FUNCTION__;
+#else
+        constexpr std::string_view sig = __FUNCSIG__;
+#endif
+        constexpr auto ComputeToken = [](std::string_view s) constexpr -> std::size_t {
+            uint64_t h = 14695981039346656037ULL;
+            for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
+            return static_cast<std::size_t>(h) & kMask;
+        };
+        static constexpr std::size_t kToken = ComputeToken(sig);
+        ReadResource(m_Graph.TokenToResource(kToken));
+    }
+
+    template <typename T>
+    void TaskGraphBuilder::Write()
+    {
+        constexpr auto kMask = std::numeric_limits<std::size_t>::max() >> 1;
+#if defined(__clang__) || defined(__GNUC__)
+        constexpr std::string_view sig = __PRETTY_FUNCTION__;
+#else
+        constexpr std::string_view sig = __FUNCSIG__;
+#endif
+        constexpr auto ComputeToken = [](std::string_view s) constexpr -> std::size_t {
+            uint64_t h = 14695981039346656037ULL;
+            for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
+            return static_cast<std::size_t>(h) & kMask;
+        };
+        static constexpr std::size_t kToken = ComputeToken(sig);
+        WriteResource(m_Graph.TokenToResource(kToken));
+    }
+
+    // -----------------------------------------------------------------------
+    // Factory (produces a concrete TaskGraph implementation)
+    // -----------------------------------------------------------------------
+    [[nodiscard]] std::unique_ptr<TaskGraph> CreateTaskGraph(QueueDomain domain);
+}
+

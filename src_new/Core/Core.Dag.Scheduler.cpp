@@ -287,22 +287,35 @@ namespace Extrinsic::Core::Dag
             ScheduleStats m_LastStats{};
         };
 
+    }
+
+    std::unique_ptr<DagScheduler> CreateDagScheduler()
+    {
+        return std::make_unique<DagSchedulerImpl>();
+    }
+
+    // -----------------------------------------------------------------------
+    // DomainTaskGraph — raw PendingTaskDesc-based submit/plan graph
+    // -----------------------------------------------------------------------
+    namespace
+    {
         class DomainTaskGraphImpl final : public DomainTaskGraph
         {
         public:
-            explicit DomainTaskGraphImpl(const QueueDomain domain) : m_Domain(domain) {}
+            explicit DomainTaskGraphImpl(QueueDomain domain) : m_Domain(domain) {}
 
             Result Submit(const PendingTaskDesc& task) override
             {
                 if (!task.id.IsValid() || task.domain != m_Domain)
                     return Err(ErrorCode::InvalidArgument);
-
                 CachedTask cached{};
                 cached.desc = task;
                 cached.dependsOn.assign(task.dependsOn.begin(), task.dependsOn.end());
                 cached.resources.assign(task.resources.begin(), task.resources.end());
-                cached.desc.dependsOn = std::span<const TaskId>(cached.dependsOn.data(), cached.dependsOn.size());
-                cached.desc.resources = std::span<const ResourceAccess>(cached.resources.data(), cached.resources.size());
+                cached.desc.dependsOn = std::span<const TaskId>(
+                    cached.dependsOn.data(), cached.dependsOn.size());
+                cached.desc.resources = std::span<const ResourceAccess>(
+                    cached.resources.data(), cached.resources.size());
                 m_Tasks.push_back(std::move(cached));
                 return Ok();
             }
@@ -315,25 +328,16 @@ namespace Extrinsic::Core::Dag
 
             QueueDomain Domain() const noexcept override { return m_Domain; }
 
-            void Reset() override
-            {
-                m_Tasks.clear();
-                m_LastStats = {};
-            }
+            void Reset() override { m_Tasks.clear(); m_LastStats = {}; }
 
         private:
-            QueueDomain m_Domain;
-            TaskList m_Tasks{};
+            QueueDomain   m_Domain;
+            TaskList      m_Tasks{};
             ScheduleStats m_LastStats{};
         };
     }
 
-    std::unique_ptr<DagScheduler> CreateDagScheduler()
-    {
-        return std::make_unique<DagSchedulerImpl>();
-    }
-
-    std::unique_ptr<DomainTaskGraph> CreateDomainTaskGraph(const QueueDomain domain)
+    std::unique_ptr<DomainTaskGraph> CreateDomainTaskGraph(QueueDomain domain)
     {
         return std::make_unique<DomainTaskGraphImpl>(domain);
     }

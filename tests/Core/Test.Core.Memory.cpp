@@ -8,6 +8,7 @@
 
 import Extrinsic.Core.Memory;
 import Extrinsic.Core.Error;
+import Extrinsic.Core.Telemetry;
 
 using namespace Extrinsic::Core::Memory;
 
@@ -135,7 +136,7 @@ TEST(CoreMemoryPmr, WorksWithPmrString)
 
 TEST(CoreMemoryTelemetry, TracksAllocations)
 {
-    Telemetry::Reset();
+    Extrinsic::Core::Telemetry::Alloc::Reset();
 
     LinearArena arena(1024);
     auto a = arena.AllocBytes(64, 16);
@@ -143,7 +144,6 @@ TEST(CoreMemoryTelemetry, TracksAllocations)
     ASSERT_TRUE(a.has_value());
     ASSERT_TRUE(b.has_value());
 
-    const auto snap = Telemetry::Snapshot();
-    EXPECT_GE(snap.AllocCount, 2u);
-    EXPECT_GE(snap.AllocBytes, 96u);
+    EXPECT_GE(Extrinsic::Core::Telemetry::Alloc::SnapshotCount(), 2u);
+    EXPECT_GE(Extrinsic::Core::Telemetry::Alloc::SnapshotBytes(), 96u);
 }

@@ -362,4 +362,24 @@ namespace Extrinsic::Assets
     {
         return m_Impl->pathIndex.Contains(absolutePath);
     }
+
+    AssetEventBus::ListenerToken AssetService::SubscribeAll(AssetEventBus::ListenerCallback cb)
+    {
+        return m_Impl->eventBus.SubscribeAll(std::move(cb));
+    }
+
+    void AssetService::UnsubscribeAll(AssetEventBus::ListenerToken token)
+    {
+        m_Impl->eventBus.UnsubscribeAll(token);
+    }
+
+    std::size_t AssetService::LiveAssetCount() const noexcept
+    {
+        return m_Impl->registry.LiveCount();
+    }
+
+    Core::Result AssetService::ForceAssetState(AssetId id, AssetState expected, AssetState next)
+    {
+        return m_Impl->registry.SetState(id, expected, next);
+    }
 }

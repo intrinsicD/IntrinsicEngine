@@ -215,6 +215,8 @@ The engine uses **activity-aware idle throttling** to conserve CPU/GPU resources
   ```
 - The non-const move capture ensures the lambda itself is nothrow-move-constructible.
 
+**`src_new/` policy — do not port `InplaceFunction`:** `Core.InplaceFunction` is a legacy `src/` type with no consumers in `src_new/`. When `src_new/Graphics/RHI` needs deferred GPU-resource destruction, use **`std::move_only_function`** (C++23 `<functional>`) instead. It is standard, nothrow-move-constructible from move-only captures, and requires no hand-rolled SBO machinery. Do not add an `Extrinsic.Core.InplaceFunction` module.
+
 ## Geometry Processing Operator Pattern
 
 New geometry operators follow a consistent interface contract (see `Geometry::Simplification::Simplify()` as the canonical example):

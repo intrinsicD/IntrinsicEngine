@@ -6,4 +6,4 @@ export import :Common;
 export import :LinearArena;
 export import :ScopeStack;
 export import :Polymorphic;
-export import :Telemetry;
+// Allocation telemetry moved to Extrinsic.Core.Telemetry (Alloc namespace).

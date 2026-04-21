@@ -73,10 +73,18 @@ export namespace Extrinsic::Assets
         template <class T>
         [[nodiscard]] static uint32_t TypeIdOf() noexcept;
 
+        // Event bus subscription (public — consumers such as Graphics subscribe
+        // to Ready/Reloaded/Destroyed events; Runtime wires subscriptions).
+        [[nodiscard]] AssetEventBus::ListenerToken SubscribeAll(AssetEventBus::ListenerCallback cb);
+        void UnsubscribeAll(AssetEventBus::ListenerToken token);
+
         // Test/debug introspection (thin wrappers over internal state).
         [[nodiscard]] bool HasLoaderCallback(LoaderToken token) const;
         [[nodiscard]] std::size_t LoaderCallbackCount() const;
         [[nodiscard]] bool PathIndexContains(std::string_view absolutePath) const;
+        [[nodiscard]] std::size_t LiveAssetCount() const noexcept;
+        // Force an asset into an arbitrary state — for unit tests only.
+        Core::Result ForceAssetState(AssetId id, AssetState expected, AssetState next);
 
     private:
         // Internal module accessors. These used to be public ("exposed for

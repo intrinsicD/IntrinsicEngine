@@ -8,6 +8,12 @@ target_sources(${target_name}
         Core.Config.Render.cppm
         Core.Config.Engine.cppm
         Core.Dag.Scheduler.cppm
+        Core.Dag.TaskGraph.cppm
+        Core.FrameGraph.cppm
+        Core.IOBackend.cppm
+        Core.Process.cppm
+        Core.ResourcePool.cppm
+        Core.Telemetry.cppm
         Core.CallbackRegistry.cppm
         Core.Error.cppm
         Core.Filesystem.PathResolver.cppm
@@ -21,7 +27,6 @@ target_sources(${target_name}
         Core.Memory.LinearArena.cppm
         Core.Memory.ScopeStack.cppm
         Core.Memory.Polymorphic.cppm
-        Core.Memory.Telemetry.cppm
         Core.StrongHandle.cppm
         Core.Tasks.cppm
         Core.Tasks.CounterEvent.cppm
@@ -34,12 +39,16 @@ target_sources(${target_name}
         Core.Memory.LinearArena.cpp
         Core.Memory.ScopeStack.cpp
         Core.Memory.Polymorphic.cpp
-        Core.Memory.Telemetry.cpp
         PRIVATE
         Core.Dag.Scheduler.cpp
+        Core.Dag.TaskGraph.cpp
+        Core.FrameGraph.cpp
         Core.Filesystem.cpp
         Core.Filesystem.PathResolver.cpp
+        Core.IOBackend.cpp
         Core.Logging.cpp
+        Core.Process.cpp
+        Core.Telemetry.cpp
         Core.Tasks.CounterEvent.cpp
         Core.Tasks.Dispatch.cpp
         Core.Tasks.Job.cpp

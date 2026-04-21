@@ -28,7 +28,7 @@ namespace Extrinsic::ECS::Scene
 
         [[nodiscard]] EntityHandle Create() { return m_Registry.create(); }
 
-        void Destroy(const EntityHandle entity) { m_Registry.destroy(entity); }
+        void Destroy(const EntityHandle entity) { if (IsValid(entity)) m_Registry.destroy(entity); }
 
         [[nodiscard]] bool IsValid(const EntityHandle entity) const noexcept
         {

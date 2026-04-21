@@ -260,7 +260,7 @@ TEST(AssetService, ReloadRejectedFromNonReadyState)
     TmpFile f("svc_reload_nonready.bin");
     AssetService svc;
     auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
-    ASSERT_TRUE(svc.Registry().SetState(id, AssetState::Ready, AssetState::Failed).has_value());
+    ASSERT_TRUE(svc.ForceAssetState(id, AssetState::Ready, AssetState::Failed).has_value());
  
     auto r = svc.Reload<Mesh>(id, MeshLoader(2));
     ASSERT_FALSE(r.has_value());
@@ -353,7 +353,7 @@ TEST(AssetService, ParameterlessReloadRejectedFromNonReadyState)
     AssetService svc;
     auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
 
-    ASSERT_TRUE(svc.Registry().SetState(id, AssetState::Ready, AssetState::Failed).has_value());
+    ASSERT_TRUE(svc.ForceAssetState(id, AssetState::Ready, AssetState::Failed).has_value());
     auto r = svc.Reload(id);
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ErrorCode::InvalidState);
@@ -383,7 +383,7 @@ TEST(AssetService, ReloadPublishesReloadedEvent)
     TmpFile f("svc_reload_event.bin");
     AssetService svc;
     std::atomic<int> reloaded{0};
-    (void)svc.EventBus().SubscribeAll([&](AssetId, AssetEvent e)
+    (void)svc.SubscribeAll([&](AssetId, AssetEvent e)
     {
         if (e == AssetEvent::Reloaded) ++reloaded;
     });
@@ -458,7 +458,7 @@ TEST(AssetService, TickFlushesEventBus)
     TmpFile f("svc_tick.bin");
     AssetService svc;
     std::atomic<int> destroyed{0};
-    (void)svc.EventBus().SubscribeAll([&](AssetId, AssetEvent e)
+    (void)svc.SubscribeAll([&](AssetId, AssetEvent e)
     {
         if (e == AssetEvent::Destroyed) ++destroyed;
     });
@@ -481,7 +481,7 @@ TEST(AssetService, FailedLoadLeavesNoGhostAsset)
     ASSERT_FALSE(failedResult.has_value());
  
     // Registry is empty, PathIndex has no entry for this path.
-    EXPECT_EQ(svc.Registry().LiveCount(), 0u);
+    EXPECT_EQ(svc.LiveAssetCount(), 0u);
     EXPECT_FALSE(svc.PathIndexContains(std::filesystem::absolute(f.path).string()));
 
     // Retrying with a good loader must succeed.
