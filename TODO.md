@@ -44,7 +44,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## 1a. `src_new/` Reimplementation — Top-Level Milestones
 
-The engine is being reimplemented in `src_new/` with stricter modular boundaries. Geometry is reused from `src/` as-is. See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract.
+The engine is being reimplemented in `src_new/` with stricter modular boundaries. Geometry is reused from `src/` as-is. See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, including the **module partitions — internal structure contract** (umbrella interface re-exporting one partition per internal concern, public vs. private partition split, README + module-inventory synchronization) that applies to every subsystem below.
 
 - [ ] **Core parity.** Bring `src_new/Core` to feature parity with `src/Core`: memory (arena, scope, polymorphic, telemetry), tasks (scheduler, job, counter-event, local-task), filesystem, logging, config, handles, error types. Add focused tests under `CoreTestObjs`.
 - [ ] **Assets parity.** Bring `src_new/Assets` (`Extrinsic.Asset.*`) to parity with `src/Asset`: registry, payload store, load pipeline with GPU fence waits, event bus, path index, read-phase protocol. Keep `Assets` dependent on `Core` only.

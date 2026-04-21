@@ -45,6 +45,26 @@ Concretely, every `src_new/` module must be *better than its `src/` counterpart*
 - **No reverse dependencies.** Legacy `src/` code must not import `Extrinsic.*` modules. New `src_new/` code may not import legacy `src/` modules other than `Geometry`. If you find yourself wanting to do either, stop and re-check the layering.
 - **Migration discipline.** When a `src_new` subsystem reaches feature parity with its `src/` counterpart, retire the legacy subsystem in a dedicated commit (separate from feature work). Do not leave dead code paths behind.
 
+### Module partitions — internal structure contract
+
+Every non-trivial `src_new` module is structured as **one umbrella interface plus one partition per internal concern**, with a clean public/private split. This is a first-class design rule, not an optimization afterthought.
+
+- **One umbrella interface per module.** `<Subsystem>.<Component>.cppm` declares `export module Extrinsic.<Subsystem>.<Component>;` and is the *only* thing consumers import. Consumers never name a partition directly from the outside.
+- **Partitions carry internal concerns.** Split the module along responsibility seams — allocation strategies, protocol state machines, independent data types, telemetry hooks, scheduler internals — into `<Subsystem>.<Component>.<Partition>.cppm` files declaring `export module Extrinsic.<Subsystem>.<Component>:<Partition>;`. A partition has one responsibility, just like a module.
+- **Re-export, don't re-declare.** The umbrella interface `export import :<Partition>;` the public partitions. It contains only re-exports, shared type aliases, and cross-partition declarations — not duplicated logic.
+- **Public vs. private partitions.** Keep partitions that expose engine-facing API types as `export`ed partition interfaces re-exported by the umbrella. Keep helper-only partitions (implementation details, protocol internals, storage plumbing) as non-`export`ed or `:Internal`-style partitions, imported by sibling partitions but **not** re-exported from the umbrella. Consumers must not be able to reach internal types by importing the public module.
+- **Implementation goes in `.cpp`, not in the interface.** Partition interface (`.cppm`) files declare and export. Non-inline function bodies live in `<Subsystem>.<Component>.<Partition>.cpp` units attached to the same partition (`module Extrinsic.<Subsystem>.<Component>:<Partition>;`). The interface must not drag in heavy transitive includes just to define a function.
+- **Partition granularity.** If two partitions always change together, merge them. If one partition accumulates unrelated concerns, split it. Rule of thumb: a reader should be able to name each partition's single responsibility in one sentence.
+- **Naming is consistent with the module rule.** Dotted subsystem/component, colon-qualified partition: `Extrinsic.Core.Memory:LinearArena`, `Extrinsic.Core.Memory:ScopeStack`, `Extrinsic.Core.Tasks:Internal`, `Extrinsic.Core.Tasks:LocalTask`. Do not introduce `_Impl`, `_Detail`, or camelCase variants.
+- **README reflects the split.** Each subsystem README lists the umbrella module *and* its partitions (see `src_new/Core/README.md` for the canonical shape). When you add, remove, or rename a partition, update the owning README and regenerate `docs/architecture/src_new_module_inventory.md` in the same change.
+
+Canonical examples already in `src_new`:
+
+- `Extrinsic.Core.Memory` umbrella re-exports `:Common`, `:LinearArena`, `:ScopeStack`, `:Polymorphic`, `:Telemetry`.
+- `Extrinsic.Core.Tasks` umbrella re-exports the scheduler surface and keeps `:Internal` / `:LocalTask` as partitions; `CounterEvent` is a sibling public module (`Extrinsic.Core.Tasks.CounterEvent`) because it is also useful standalone.
+
+When planning a new module, do the partition split **before** writing the first `.cppm` — not during cleanup later. A module that starts monolithic tends to stay monolithic.
+
 ### Reference documents
 
 - `docs/architecture/src_new-rendering-architecture.md` — target rendering architecture for `src_new/Graphics` (deferred-by-default, GPU-driven, BufferManager-managed geometry, presence-of-component as the rendering switch).
