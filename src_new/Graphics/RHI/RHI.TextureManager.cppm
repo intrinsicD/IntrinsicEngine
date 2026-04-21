@@ -5,6 +5,7 @@ module;
 
 export module Extrinsic.RHI.TextureManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
@@ -77,9 +78,10 @@ export namespace Extrinsic::RHI
         /// Allocate a GPU texture and optionally register it in the bindless heap.
         /// Pass a valid SamplerHandle to get a non-zero BindlessIndex for shader access.
         /// Pass an invalid SamplerHandle ({}) to skip bindless registration.
-        /// Returns an empty (invalid) lease on device allocation failure.
-        [[nodiscard]] TextureLease Create(const TextureDesc& desc,
-                                          SamplerHandle       sampler = {});
+        /// Returns a Core::ErrorCode on failure:
+        ///   - OutOfDeviceMemory: IDevice::CreateTexture returned an invalid handle.
+        [[nodiscard]] Core::Expected<TextureLease> Create(const TextureDesc& desc,
+                                                          SamplerHandle       sampler = {});
 
         // -----------------------------------------------------------------
         // LeasableManager concept requirements

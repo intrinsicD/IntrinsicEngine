@@ -10,6 +10,7 @@ module;
 
 module Extrinsic.RHI.TextureManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
@@ -91,12 +92,13 @@ namespace Extrinsic::RHI
     TextureManager::~TextureManager() = default;
 
     // -----------------------------------------------------------------
-    TextureManager::TextureLease TextureManager::Create(const TextureDesc& desc,
-                                                        SamplerHandle       sampler)
+    Core::Expected<TextureManager::TextureLease> TextureManager::Create(
+        const TextureDesc& desc,
+        SamplerHandle       sampler)
     {
         TextureHandle deviceHandle = m_Impl->Device.CreateTexture(desc);
         if (!deviceHandle.IsValid())
-            return {};
+            return Core::Err<TextureLease>(Core::ErrorCode::OutOfDeviceMemory);
 
         // Register into the bindless heap before we publish the pool handle
         // so that GetBindlessIndex() is always valid once the lease is returned.
