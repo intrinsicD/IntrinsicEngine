@@ -116,6 +116,10 @@ namespace Extrinsic::RHI
         // desc hash → pool index (only live entries)
         std::unordered_map<std::uint64_t, std::uint32_t> DedupTable;
 
+        // Outstanding SamplerLease instances. See BufferManager.cpp for the
+        // F2 rationale.
+        std::atomic<std::uint32_t>      LiveLeaseCount{0};
+
         explicit Impl(IDevice& device) : Device(device) {}
 
         [[nodiscard]] SamplerSlot* Resolve(SamplerHandle handle) noexcept
@@ -144,7 +148,14 @@ namespace Extrinsic::RHI
         : m_Impl(std::make_unique<Impl>(device))
     {}
 
-    SamplerManager::~SamplerManager() = default;
+    SamplerManager::~SamplerManager()
+    {
+        const auto alive = m_Impl->LiveLeaseCount.load(std::memory_order_acquire);
+        assert(alive == 0 &&
+               "SamplerManager destroyed while leases are still alive — drop "
+               "all SamplerLease instances before destroying this manager.");
+        (void)alive;
+    }
 
     // -----------------------------------------------------------------
     Core::Expected<SamplerManager::SamplerLease> SamplerManager::GetOrCreate(const SamplerDesc& desc)
@@ -163,6 +174,7 @@ namespace Extrinsic::RHI
                    "SamplerDesc hash collision — two distinct descs mapped to the same hash");
 
             slot.RefCount.fetch_add(1, std::memory_order_relaxed);
+            m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
             SamplerHandle poolHandle{idx, slot.Generation};
             // Lease::Adopt — we already incremented refcount above.
             return SamplerLease::Adopt(*this, poolHandle);
@@ -199,6 +211,7 @@ namespace Extrinsic::RHI
         m_Impl->DedupTable[hash] = index;
 
         SamplerHandle poolHandle{index, generation};
+        m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
         return SamplerLease::Adopt(*this, poolHandle);
     }
 
@@ -208,7 +221,10 @@ namespace Extrinsic::RHI
         SamplerSlot* slot = m_Impl->Resolve(handle);
         assert(slot && "Retain called on invalid or released handle");
         if (slot)
+        {
             slot->RefCount.fetch_add(1, std::memory_order_relaxed);
+            m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
+        }
     }
 
     // -----------------------------------------------------------------
@@ -222,6 +238,8 @@ namespace Extrinsic::RHI
             slot->RefCount.fetch_sub(1, std::memory_order_acq_rel);
 
         assert(prev > 0 && "Refcount underflow");
+
+        m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
 
         if (prev == 1)
         {
