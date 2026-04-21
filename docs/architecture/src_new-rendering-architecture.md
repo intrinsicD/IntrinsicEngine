@@ -1,7 +1,8 @@
-# IntrinsicEngine — New Rendering Architecture
+# IntrinsicEngine — `src_new/Graphics` Rendering Architecture
 
-> **Status:** Design document. Describes the target architecture, not the current implementation.
+> **Status:** Design document. Describes the target rendering architecture for the in-progress `src_new/Graphics` reimplementation, not the legacy `src/Graphics` code that still ships.
 > Resolved decisions are marked ✅. Deferred items are marked **[DEFERRED]**. Remaining open questions are in §13.
+> See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract that gates work against this design.
 
 ---
 

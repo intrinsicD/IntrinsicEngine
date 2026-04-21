@@ -26,17 +26,37 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## 1. Related Documents
 
-- `docs/architecture/rendering-three-pass.md` — canonical runtime rendering architecture spec (pass contracts, data contracts, invariants).
-- `docs/architecture/frame-loop-rollback-strategy.md` — concrete rollback toggle, shim, and pass/fail gates for frame-loop migration phases.
-- `docs/architecture/runtime-subsystem-boundaries.md` — current runtime ownership map, dependency directions, and startup/per-frame/shutdown lifecycle.
+- `docs/architecture/src_new-rendering-architecture.md` — target rendering architecture for the `src_new/Graphics` reimplementation (deferred-by-default, GPU-driven, BufferManager-managed geometry).
+- `docs/architecture/src_new_module_inventory.md` — auto-generated inventory of every `src_new` module (regenerate via `tools/generate_src_new_module_inventory.py`).
+- `docs/architecture/rendering-three-pass.md` — canonical legacy `src/` rendering architecture spec (pass contracts, data contracts, invariants).
+- `docs/architecture/frame-loop-rollback-strategy.md` — concrete rollback toggle, shim, and pass/fail gates for legacy frame-loop migration phases.
+- `docs/architecture/runtime-subsystem-boundaries.md` — legacy runtime ownership map, dependency directions, and startup/per-frame/shutdown lifecycle.
 - `docs/architecture/post-merge-audit-checklist.md` — required stabilization gate for architecture-touching PRs (contracts, telemetry, graph ownership, config ownership, UI churn checks).
-- `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` — ratified default runtime migration path.
+- `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` — ratified default runtime migration path (legacy tree).
 - `PLAN.md` — archival index for the completed three-pass migration.
 - `ROADMAP.md` — medium/long-horizon feature roadmap and phase ordering.
 - `README.md` — user-facing architecture summary, build/test entry points, and SLOs.
-- `CLAUDE.md` — contributor conventions, C++23 policy, and markdown sync contract.
+- `CLAUDE.md` — contributor conventions, C++23 policy, `src_new` migration contract, and markdown sync contract.
 - `PATTERNS.md` — reusable patterns catalog with canonical examples and usage guidance.
 - `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` — GPU-driven modular rendering pipeline plan (code-aware reuse + gap audit). Refines and implements C4 and C9; cross-references B1–B5.
+
+---
+
+## 1a. `src_new/` Reimplementation — Top-Level Milestones
+
+The engine is being reimplemented in `src_new/` with stricter modular boundaries. Geometry is reused from `src/` as-is. See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, including the **module partitions — internal structure contract** (umbrella interface re-exporting one partition per internal concern, public vs. private partition split, README + module-inventory synchronization) that applies to every subsystem below.
+
+- [ ] **Core parity.** Bring `src_new/Core` to feature parity with `src/Core`: memory (arena, scope, polymorphic, telemetry), tasks (scheduler, job, counter-event, local-task), filesystem, logging, config, handles, error types. Add focused tests under `CoreTestObjs`.
+- [ ] **Assets parity.** Bring `src_new/Assets` (`Extrinsic.Asset.*`) to parity with `src/Asset`: registry, payload store, load pipeline with GPU fence waits, event bus, path index, read-phase protocol. Keep `Assets` dependent on `Core` only.
+- [ ] **ECS parity.** Bring `src_new/ECS` to parity with `src/ECS`: scene registry, scene handles, components (Transform, Hierarchy, MetaData, CpuGeometry, RenderGeometry), systems (TransformHierarchy, RenderSync). No direct knowledge of `Graphics` internals.
+- [ ] **Platform subsystem.** Implement `src_new/Platform` (`Extrinsic.Platform.IWindow`, `Extrinsic.Platform.Input`) plus the `LinuxGlfwVulkan` backend. Platform must be pluggable behind a port-style interface so headless tests can run without GLFW.
+- [ ] **RHI + Vulkan backend.** Build out `src_new/Graphics/RHI` (`Device`, `CommandContext`, `BufferManager`, `TextureManager`, `SamplerManager`, `PipelineManager`, `Bindless`, `Transfer`, `Profiler`, `FrameHandle`) with `Backends/Vulkan` as the first implementation. Keep RHI free of scene/ECS knowledge.
+- [ ] **Graphics renderer.** Implement `src_new/Graphics/Graphics.Renderer` following `docs/architecture/src_new-rendering-architecture.md` (GpuWorld, deferred-by-default, per-entity `Surface`/`Line`/`Point` component switches, managed geometry buffers, picking, render graph, default pipeline).
+- [ ] **`GpuAssetCache` bridge.** Implement the Assets ↔ Graphics bridge (`CLAUDE.md` → "Assets ↔ Graphics boundary"): Graphics-owned side table keyed by `AssetId`, per-asset state machine (`NotRequested → CpuPending → GpuUploading → Ready` / `Failed`), synchronous `Request` + non-blocking `TryGet`, upload submission via `RHI::TransferManager` (no second staging queue), `AssetEventBus` subscription wired by `Runtime`, hot-reload atomic swap with old-view preservation, no GPU writeback into `AssetRegistry`. ECS components must store `AssetId` only.
+- [ ] **Runtime composition root.** Implement `src_new/Runtime/Runtime.Engine` as the composition root: explicit subsystem instantiation order, `begin_frame → extract_render_world → prepare_frame → execute_frame → end_frame` lifecycle, deterministic shutdown.
+- [ ] **Sandbox app.** Implement `src_new/App/Sandbox` as the reference integration target. Must build, launch, render a triangle, and exercise the asset load → render loop.
+- [ ] **Tests.** Each `src_new` subsystem gets at least one focused test file (`Test_Extrinsic<Subsystem>_<Topic>.cpp`) in the matching `tests/CMakeLists.txt` OBJECT library.
+- [ ] **Legacy retirement.** When a `src_new` subsystem reaches parity, remove its `src/` counterpart in a dedicated commit (do not leave dead code paths).
 
 ---
 
@@ -356,12 +376,8 @@ P2 items are design-only: plan the interfaces and constraints, do not implement.
 
 ### C9. GPU-Driven Indirect Rendering
 
-GPU-driven surface culling is **already live**: `SurfacePass` Stage 3 dispatches `instance_cull_multigeo.comp` and consumes indirect draw commands via `vkCmdDrawIndexedIndirectCount`. The remaining gap is extending GPU culling to Line/Point passes and centralizing the visibility authority. See `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` for the full implementation plan (Phases A–D).
+GPU-driven surface culling is **already live**: `SurfacePass` Stage 3 dispatches `instance_cull_multigeo.comp` and consumes indirect draw commands via `vkCmdDrawIndexedIndirectCount`. Indirect draw buffer packing, the GPU cull pass consuming the GPUScene SSBO + camera frustum, the indirect-count draw path, and the `m_EnableGpuCulling` feature gate for Stage 2 vs Stage 3 are all in place. The remaining gap is extending GPU culling to Line/Point passes and centralizing the visibility authority. See `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` for the full implementation plan (Phases A–D).
 
-- [x] Define indirect draw buffer resource and command packing (existing in SurfacePass Stage 3).
-- [x] GPU cull pass consuming GPUScene SSBO + camera frustum (existing `instance_cull_multigeo.comp`).
-- [x] SurfacePass consuming `vkCmdDrawIndexedIndirectCount` from cull output.
-- [x] Feature-flagged: `m_EnableGpuCulling` selects CPU Stage 2 vs GPU Stage 3.
 - [ ] Extract centralized `Graphics.Visibility` module from SurfacePass culling code.
 - [ ] Extend GPU culling to Line/Point passes (requires GPUScene slots for non-surface entities).
 - [ ] Benchmark: compare CPU-culled vs. GPU-culled draw submission at 10K+ entities.
