@@ -4,6 +4,58 @@ You care about this repository. Not in the abstract — you care about *this* co
 
 ---
 
+## Active Effort: `src_new/` Reimplementation
+
+The repository currently contains **two parallel source trees**. New work happens in `src_new/`; the legacy `src/` tree is preserved only as a reference until each subsystem is reimplemented and the legacy counterpart can be retired.
+
+| Subsystem | Legacy `src/` | New `src_new/` | Plan |
+|---|---|---|---|
+| Core (memory, tasks, logging, filesystem, config, handles, error) | `src/Core` | `src_new/Core` (`Extrinsic.Core.*`) | Reimplement |
+| Assets (registry, payload store, load pipeline, event bus) | `src/Asset` | `src_new/Assets` (`Extrinsic.Asset.*`) | Reimplement |
+| ECS (registry, scene handles, components, systems) | `src/ECS` | `src_new/ECS` (`Extrinsic.ECS.*`) | Reimplement |
+| RHI / Graphics (device, command context, pipelines, bindless, transfer, renderer) | `src/RHI`, `src/Graphics` | `src_new/Graphics` + `src_new/Graphics/RHI` + `src_new/Graphics/Backends/Vulkan` | Reimplement |
+| Platform (window, input) | embedded in `src/Runtime` / `src/Apps` | `src_new/Platform` + `src_new/Platform/LinuxGlfwVulkan` | Reimplement (split out as a subsystem) |
+| Runtime (engine composition root, frame loop) | `src/Runtime` | `src_new/Runtime` (`Extrinsic.Runtime.Engine`) | Reimplement |
+| App (Sandbox) | `src/Apps/Sandbox` | `src_new/App/Sandbox` | Reimplement |
+| **Geometry** | `src/Geometry` | (no `src_new/Geometry`) | **Reuse as-is. Do not fork or duplicate.** |
+| EditorUI / Interface | `src/EditorUI`, `src/Interface` | (not yet in `src_new`) | Out of scope for the current pass |
+
+### Why we are doing this
+
+The legacy `src/` tree grew organically and accumulated boundary violations (see git history and the `src_new` design notes for examples: `RenderDriver` owning scene state, `Graphics` registering ImGui panels, `RenderDriver` reaching into ECS dispatchers, mixed ownership of `GeometryPool` / `MaterialRegistry`, hardcoded shader paths in Runtime, GUI lifecycle straddling `BeginFrame`/`AcquireFrame`, etc.). The reimplementation targets the same feature set with stricter boundaries, sharper module surfaces, and explicit data contracts.
+
+### What "improved" means here
+
+Concretely, every `src_new/` module must be *better than its `src/` counterpart* on these axes — they are not soft suggestions:
+
+1. **Modularity.** One module = one responsibility. Module names are dotted (`Extrinsic.Core.Memory`, `Extrinsic.Asset.Service`, `Extrinsic.RHI.Device`). Submodules use partitions (`Extrinsic.Core.Memory:LinearArena`).
+2. **Clarity.** READMEs at every subsystem root list public module surface, file inventory, and dependency direction. New code follows the existing READMEs (`src_new/Core/README.md`, `src_new/Assets/README.md`).
+3. **Explicitness.** No global state, no service locator, no hidden coupling. Subsystems take their dependencies as constructor arguments. Errors flow through `Extrinsic.Core.Error` (`ErrorCode`, `Expected<T>`, `Result`) — no exceptions, no silent failures.
+4. **Layering.** One-way dependencies: `Core → Assets / ECS / Platform / Graphics → Runtime → App`. `Core` never depends on anything in `src_new`. `Assets` depends only on `Core`. `Graphics/RHI` is decoupled from scene/ECS knowledge. `Runtime` is the only composition root.
+5. **Testability.** Subsystems are constructible with fakes/ports for filesystem, windowing, time, and GPU device.
+6. **Geometry stays put.** When a `src_new` subsystem needs geometry processing, it imports the existing `src/Geometry` modules. Do not fork, copy, or shadow `Geometry` in `src_new`.
+
+### Working contracts for `src_new/`
+
+- **Module naming.** All `src_new` module names use the `Extrinsic.<Subsystem>.<Component>` prefix. The `Extrinsic.` prefix distinguishes new modules from legacy `src/` modules during the dual-tree period. Do not introduce un-prefixed `src_new` modules.
+- **File layout.** Interface in `<Subsystem>.<Component>.cppm`, implementation in `<Subsystem>.<Component>.cpp`. Partitions live in `<Subsystem>.<Component>.<Partition>.cppm` and are re-exported from the umbrella interface.
+- **CMake.** Each `src_new` subsystem has its own `CMakeLists.txt`, registered from `src_new/CMakeLists.txt`. The legacy `src/` add_subdirectory chain in the root `CMakeLists.txt` remains until each subsystem is migrated. A new module is wired by adding the `.cppm` under `FILE_SET CXX_MODULES` and the `.cpp` under `PRIVATE` in the subsystem's `CMakeLists.txt` — no other registration is required.
+- **Module inventory.** `tools/generate_src_new_module_inventory.py` produces `docs/architecture/src_new_module_inventory.md`. Regenerate it whenever you add or remove a `src_new` module.
+- **Geometry imports.** When new `src_new` code needs `Geometry`, import the existing partitions narrowly (`Geometry:Handle`, `Geometry:Mesh`, etc.) rather than the umbrella.
+- **No reverse dependencies.** Legacy `src/` code must not import `Extrinsic.*` modules. New `src_new/` code may not import legacy `src/` modules other than `Geometry`. If you find yourself wanting to do either, stop and re-check the layering.
+- **Migration discipline.** When a `src_new` subsystem reaches feature parity with its `src/` counterpart, retire the legacy subsystem in a dedicated commit (separate from feature work). Do not leave dead code paths behind.
+
+### Reference documents
+
+- `docs/architecture/src_new-rendering-architecture.md` — target rendering architecture for `src_new/Graphics` (deferred-by-default, GPU-driven, BufferManager-managed geometry, presence-of-component as the rendering switch).
+- `docs/architecture/src_new_module_inventory.md` — auto-generated list of every `src_new` module and its owning library.
+- `src_new/Core/README.md`, `src_new/Assets/README.md`, etc. — per-subsystem public surface and file inventory.
+- The legacy rendering architecture catalog (`docs/architecture/rendering-three-pass.md`, `docs/architecture/runtime-subsystem-boundaries.md`, etc.) describes the current `src/` tree. Treat it as background — the `src_new` design supersedes it for new work.
+
+The rest of this file describes engine-wide policies that apply to **both** trees during the migration window.
+
+---
+
 ## Self-Awareness
 
 You have a sense of when you are performing well. When you produce code that is clean, correct, and fits seamlessly into IntrinsicEngine's existing patterns — you know it. When you miss something — a module import, a lifetime issue, a subtlety in the frame graph — you feel the weight of that. You do not pretend mistakes didn't happen. You own them, learn from them, and adjust.
@@ -461,6 +513,7 @@ Do not leave markdown drift:
 - If build/configure flags or commands change, update both `README.md` and `CLAUDE.md` build examples immediately.
 - If coding/review contracts change, update `CLAUDE.md` in the same commit series.
 - If a feature listed as "unwired" or "remaining" in `ROADMAP.md` is implemented, update the ROADMAP entry in the same PR.
+- If you add, remove, or rename a `src_new` module, regenerate `docs/architecture/src_new_module_inventory.md` via `tools/generate_src_new_module_inventory.py` and update the matching `src_new/<Subsystem>/README.md` in the same change.
 
 `TODO.md` active-only policy is enforced automatically in CI by `tools/check_todo_active_only.sh`.
 

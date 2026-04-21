@@ -4,6 +4,17 @@ This document tracks medium- and long-horizon feature planning for IntrinsicEngi
 
 ---
 
+## Cross-Cutting: `src_new/` Reimplementation
+
+All feature tracks below ultimately land in the new `src_new/` tree. The reimplementation runs as a **cross-cutting track in parallel** with the phases below: improve modularity, clarity, and explicitness in `src_new/` while `src/` still ships, and retire each legacy subsystem once its `src_new` counterpart reaches parity. **Geometry (`src/Geometry`) is reused as-is and is not forked into `src_new`.**
+
+- Contract and layering rules: `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation".
+- Live module list: `docs/architecture/src_new_module_inventory.md`.
+- Rendering target architecture: `docs/architecture/src_new-rendering-architecture.md`.
+- Top-level migration milestones: `TODO.md` → §1a "`src_new/` Reimplementation".
+
+---
+
 ## Prioritization
 
 Features are ordered by their dependency graph. Each phase builds on the previous.

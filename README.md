@@ -6,7 +6,24 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 
 ---
 
-## Canonical Architecture Docs
+## Active Reimplementation: `src_new/`
+
+The repository hosts **two source trees** in parallel:
+
+- `src/` — the legacy implementation, still built and shipped while features are migrated.
+- `src_new/` — the in-progress reimplementation. Same feature surface, sharper module boundaries, explicit dependencies, and one-way layering.
+
+The new tree is organized as `Core`, `Assets`, `ECS`, `Graphics` (`RHI` + `Backends/Vulkan`), `Platform` (`LinuxGlfwVulkan`), `Runtime`, `App/Sandbox`. All `src_new` modules use the `Extrinsic.<Subsystem>.<Component>` naming convention. **`Geometry` is reused from the legacy tree as-is** and is not reimplemented; new code in `src_new` imports the existing `src/Geometry` modules.
+
+See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, and:
+
+- `docs/architecture/src_new-rendering-architecture.md` — target rendering architecture for `src_new/Graphics`.
+- `docs/architecture/src_new_module_inventory.md` — auto-generated module list (regenerate via `tools/generate_src_new_module_inventory.py`).
+- `src_new/<Subsystem>/README.md` — per-subsystem public surface and file inventory.
+
+## Canonical Architecture Docs (legacy `src/` tree)
+
+These describe the current shipping `src/` implementation. They remain authoritative for legacy code and as background for the `src_new` redesign.
 
 - `docs/architecture/rendering-three-pass.md` — pass contracts, render-resource invariants, and render-graph expectations.
 - `docs/architecture/frame-loop-rollback-strategy.md` — staged-frame-loop rollback toggle, compatibility-shim policy, and pass/fail cutover gates.
@@ -17,7 +34,7 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 - `docs/architecture/ground-up-redesign-blueprint-2026.md` — full-state redesign blueprint for a 3-graph runtime (CPU tasks, GPU frame graph, async streaming), robust geometry contracts, and migration gates.
 - `docs/architecture/ground-up-redesign-vision.md` — deep architectural assessment of what to preserve, what to change (10 areas), and a phased implementation priority stack.
 
-Runtime code follows a subsystem-first access policy: `Engine` acts as the composition root and frame-loop orchestrator, while lower-level GPU, scene, asset, and render state is accessed through the owning subsystem getters (`GetGraphicsBackend()`, `GetAssetPipeline()`, `GetSceneManager()`, `GetRenderOrchestrator()`).
+Runtime code in the legacy tree follows a subsystem-first access policy: `Engine` acts as the composition root and frame-loop orchestrator, while lower-level GPU, scene, asset, and render state is accessed through the owning subsystem getters (`GetGraphicsBackend()`, `GetAssetPipeline()`, `GetSceneManager()`, `GetRenderOrchestrator()`).
 
 ## Build & Test Entry Points
 

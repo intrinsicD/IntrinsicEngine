@@ -2,6 +2,8 @@
 
 This document catalogs the main reusable patterns in the IntrinsicEngine codebase, with canonical examples and guidance on when/how to apply each pattern.
 
+> **Dual-tree note.** The canonical examples below live in the legacy `src/` tree. These patterns apply to the in-progress `src_new/` reimplementation as well — prefer them verbatim when porting a subsystem. The `src_new` migration contract (`CLAUDE.md` → "Active Effort: `src_new/` Reimplementation") requires *stricter* adherence on modularity, explicit dependencies, and one-way layering, not looser.
+
 ---
 
 ## 1. Subsystem Injection Pattern
