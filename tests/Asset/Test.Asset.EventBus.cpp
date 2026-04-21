@@ -245,3 +245,136 @@ TEST(AssetEventBus, ConcurrentSubscriberTokensAreUnique)
     auto it = std::unique(flat.begin(), flat.end());
     EXPECT_EQ(it, flat.end());
 }
+
+// -----------------------------------------------------------------------------
+// Re-entrancy regression tests
+//
+// The EventBus originally held m_Mutex across callback invocation in Flush().
+// A subscriber callback that called back into Publish / Subscribe / Unsubscribe
+// deadlocked on the same mutex. Commit 3355038 fixed this by copying callbacks
+// and pending events into local storage under the lock, then invoking them
+// without holding the lock. These tests pin that contract so future refactors
+// cannot silently regress.
+// -----------------------------------------------------------------------------
+
+TEST(AssetEventBus, CallbackPublishDuringFlushQueuesForNextFlush)
+{
+    // A callback that Publishes a new event must NOT deadlock and must NOT
+    // be delivered this Flush — the new event joins the pending queue and
+    // fires on the next Flush.
+    AssetEventBus bus;
+    std::atomic<int> aHits{0}, bHits{0};
+    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent)
+    {
+        ++aHits;
+        bus.Publish(MakeId(2u), AssetEvent::Reloaded);
+    });
+    (void)bus.Subscribe(MakeId(2u), [&](AssetId, AssetEvent){ ++bHits; });
+
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+    bus.Flush(); // must return in bounded time — no deadlock
+
+    EXPECT_EQ(aHits.load(), 1);
+    EXPECT_EQ(bHits.load(), 0) << "Re-publish in callback must defer to next Flush.";
+    EXPECT_EQ(bus.PendingCount(), 1u);
+
+    bus.Flush();
+    EXPECT_EQ(bHits.load(), 1);
+}
+
+TEST(AssetEventBus, CallbackUnsubscribesSelfDuringFlush)
+{
+    // Self-unsubscribe from inside a callback is a common pattern (one-shot
+    // listeners). It must not deadlock; the current delivery completes; the
+    // listener is gone by the next Flush.
+    AssetEventBus bus;
+    std::atomic<int> hits{0};
+
+    // Subscribe then store the token in a shared slot the callback can read.
+    AssetEventBus::ListenerToken tok = AssetEventBus::InvalidToken;
+    tok = bus.Subscribe(MakeId(1u), [&](AssetId id, AssetEvent)
+    {
+        ++hits;
+        bus.Unsubscribe(id, tok);
+    });
+    ASSERT_NE(tok, AssetEventBus::InvalidToken);
+
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+    bus.Flush();
+    EXPECT_EQ(hits.load(), 1);
+
+    // Subsequent Publish must not re-fire the unsubscribed callback.
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+    bus.Flush();
+    EXPECT_EQ(hits.load(), 1);
+}
+
+TEST(AssetEventBus, CallbackSubscribesNewListenerDuringFlush)
+{
+    // A callback that Subscribes a new listener must not deadlock. The new
+    // listener joins the listener table; it does not see the current event
+    // (already dispatched to the copied snapshot) but receives subsequent ones.
+    AssetEventBus bus;
+    std::atomic<int> newHits{0};
+    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent)
+    {
+        (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent){ ++newHits; });
+    });
+
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+    bus.Flush();
+    EXPECT_EQ(newHits.load(), 0) << "Newly subscribed listener must not see the event already being delivered.";
+
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+    bus.Flush();
+    EXPECT_EQ(newHits.load(), 1);
+}
+
+TEST(AssetEventBus, BroadcastCallbackPublishDuringFlushDoesNotDeadlock)
+{
+    // Same re-entrancy contract for broadcast (SubscribeAll) callbacks.
+    AssetEventBus bus;
+    std::atomic<int> broadcastHits{0}, otherHits{0};
+    (void)bus.SubscribeAll([&](AssetId id, AssetEvent)
+    {
+        ++broadcastHits;
+        if (id == MakeId(1u))
+            bus.Publish(MakeId(2u), AssetEvent::Reloaded);
+    });
+    (void)bus.Subscribe(MakeId(2u), [&](AssetId, AssetEvent){ ++otherHits; });
+
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+    bus.Flush();
+
+    EXPECT_EQ(broadcastHits.load(), 1);
+    EXPECT_EQ(otherHits.load(), 0) << "Re-publish from broadcast callback must defer to next Flush.";
+    EXPECT_EQ(bus.PendingCount(), 1u);
+
+    bus.Flush();
+    EXPECT_EQ(broadcastHits.load(), 2);
+    EXPECT_EQ(otherHits.load(), 1);
+}
+
+TEST(AssetEventBus, BurstyReEntrantPublishTerminates)
+{
+    // Smoke test: cascaded re-entrant Publishes. If Flush ever regresses to
+    // holding m_Mutex across callback invocation, this deadlocks (GTest's
+    // default timeout fails the test). Bounded fan-out so Flush must
+    // terminate even under the fixed code.
+    AssetEventBus bus;
+    std::atomic<int> hits{0};
+    (void)bus.SubscribeAll([&](AssetId id, AssetEvent)
+    {
+        ++hits;
+        if (id.Index < 8u) // bounded cascade; no infinite recursion
+            bus.Publish(AssetId{id.Index + 1u, 1u}, AssetEvent::Ready);
+    });
+
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+    for (int i = 0; i < 16 && bus.PendingCount() > 0u; ++i)
+    {
+        bus.Flush();
+    }
+    EXPECT_EQ(bus.PendingCount(), 0u);
+    EXPECT_GE(hits.load(), 8) << "All 8 cascaded events should have fired.";
+}
