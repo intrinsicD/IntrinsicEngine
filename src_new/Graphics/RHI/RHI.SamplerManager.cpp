@@ -12,6 +12,7 @@ module;
 
 module Extrinsic.RHI.SamplerManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
@@ -146,7 +147,7 @@ namespace Extrinsic::RHI
     SamplerManager::~SamplerManager() = default;
 
     // -----------------------------------------------------------------
-    SamplerManager::SamplerLease SamplerManager::GetOrCreate(const SamplerDesc& desc)
+    Core::Expected<SamplerManager::SamplerLease> SamplerManager::GetOrCreate(const SamplerDesc& desc)
     {
         const std::uint64_t hash = HashSamplerDesc(desc);
 
@@ -170,7 +171,7 @@ namespace Extrinsic::RHI
         // --- not found: allocate new GPU sampler ---
         SamplerHandle deviceHandle = m_Impl->Device.CreateSampler(desc);
         if (!deviceHandle.IsValid())
-            return {};
+            return Core::Err<SamplerLease>(Core::ErrorCode::OutOfDeviceMemory);
 
         std::uint32_t index;
         std::uint32_t generation;

@@ -5,6 +5,7 @@ module;
 
 export module Extrinsic.RHI.SamplerManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
@@ -74,8 +75,9 @@ export namespace Extrinsic::RHI
         /// Creates the GPU sampler on first call for a given desc;
         /// subsequent calls with the same desc increment the refcount and
         /// return a new lease to the existing object.
-        /// Returns an empty lease on device allocation failure.
-        [[nodiscard]] SamplerLease GetOrCreate(const SamplerDesc& desc);
+        /// Returns a Core::ErrorCode on failure:
+        ///   - OutOfDeviceMemory: IDevice::CreateSampler returned an invalid handle.
+        [[nodiscard]] Core::Expected<SamplerLease> GetOrCreate(const SamplerDesc& desc);
 
         // -----------------------------------------------------------------
         // LeasableManager concept requirements
