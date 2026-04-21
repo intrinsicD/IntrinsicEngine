@@ -60,6 +60,11 @@ namespace Extrinsic::RHI
         std::deque<TextureSlot>    Slots;       // stable addresses on growth
         std::vector<std::uint32_t> FreeList;
 
+        // Outstanding TextureLease instances. See BufferManager.cpp for the
+        // F2 rationale — the destructor asserts this is zero to catch
+        // lease-outlives-manager use-after-free in Debug.
+        std::atomic<std::uint32_t> LiveLeaseCount{0};
+
         Impl(IDevice& device, IBindlessHeap& bindless)
             : Device(device), Bindless(bindless) {}
 
@@ -89,7 +94,18 @@ namespace Extrinsic::RHI
         : m_Impl(std::make_unique<Impl>(device, bindlessHeap))
     {}
 
-    TextureManager::~TextureManager() = default;
+    TextureManager::~TextureManager()
+    {
+        // Every TextureLease issued by this manager must be destroyed before
+        // the manager itself. A lingering lease will call Release() on a
+        // freed m_Impl (UAF). See BufferManager::~BufferManager for the same
+        // pattern and the class-level Lifetime contract paragraph.
+        const auto alive = m_Impl->LiveLeaseCount.load(std::memory_order_acquire);
+        assert(alive == 0 &&
+               "TextureManager destroyed while leases are still alive — drop "
+               "all TextureLease instances before destroying this manager.");
+        (void)alive;
+    }
 
     // -----------------------------------------------------------------
     Core::Expected<TextureManager::TextureLease> TextureManager::Create(
@@ -136,6 +152,7 @@ namespace Extrinsic::RHI
         }
 
         TextureHandle poolHandle{index, generation};
+        m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
         return TextureLease::Adopt(*this, poolHandle);
     }
 
@@ -145,7 +162,10 @@ namespace Extrinsic::RHI
         TextureSlot* slot = m_Impl->Resolve(handle);
         assert(slot && "Retain called on invalid or released handle");
         if (slot)
+        {
             slot->RefCount.fetch_add(1, std::memory_order_relaxed);
+            m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
+        }
     }
 
     // -----------------------------------------------------------------
@@ -159,6 +179,10 @@ namespace Extrinsic::RHI
             slot->RefCount.fetch_sub(1, std::memory_order_acq_rel);
 
         assert(prev > 0 && "Refcount underflow");
+
+        // Decrement manager-wide live-lease counter, paired with the
+        // destructor's acquire-load.
+        m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
 
         if (prev == 1)
         {
