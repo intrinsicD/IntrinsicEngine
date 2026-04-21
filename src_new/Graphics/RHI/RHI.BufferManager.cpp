@@ -121,6 +121,11 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     Core::Expected<BufferManager::BufferLease> BufferManager::Create(const BufferDesc& desc)
     {
+        // F14: short-circuit when the backend is a stub so callers get a
+        // distinctive error rather than a lease wrapping a fake handle.
+        if (!m_Impl->Device.IsOperational())
+            return Core::Err<BufferLease>(Core::ErrorCode::DeviceNotOperational);
+
         // Ask the device to allocate the GPU resource.
         BufferHandle deviceHandle = m_Impl->Device.CreateBuffer(desc);
         if (!deviceHandle.IsValid())

@@ -160,6 +160,13 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     Core::Expected<SamplerManager::SamplerLease> SamplerManager::GetOrCreate(const SamplerDesc& desc)
     {
+        // F14: short-circuit on stub backends. Checked before the mutex so
+        // the stub case takes the fastest possible path with no contention.
+        // A non-operational backend can never have populated the dedup table,
+        // so hash-lookup would miss anyway.
+        if (!m_Impl->Device.IsOperational())
+            return Core::Err<SamplerLease>(Core::ErrorCode::DeviceNotOperational);
+
         const std::uint64_t hash = HashSamplerDesc(desc);
 
         std::lock_guard lock{m_Impl->Mutex};
