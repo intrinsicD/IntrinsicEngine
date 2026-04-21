@@ -39,6 +39,7 @@ namespace Extrinsic::Core
         ShaderCompilationFailed = 402,
         PipelineCreationFailed = 403,
         SwapchainOutOfDate = 404,
+        DeviceNotOperational = 405,  // backend stub / no real GPU wired yet
 
         // Asset errors (500-599)
         AssetNotLoaded = 500,
@@ -87,6 +88,7 @@ namespace Extrinsic::Core::Error
         case ErrorCode::ShaderCompilationFailed: return "ShaderCompilationFailed";
         case ErrorCode::PipelineCreationFailed: return "PipelineCreationFailed";
         case ErrorCode::SwapchainOutOfDate: return "SwapchainOutOfDate";
+        case ErrorCode::DeviceNotOperational: return "DeviceNotOperational";
         case ErrorCode::AssetNotLoaded: return "AssetNotLoaded";
         case ErrorCode::AssetLoadFailed: return "AssetLoadFailed";
         case ErrorCode::AssetTypeMismatch: return "AssetTypeMismatch";
