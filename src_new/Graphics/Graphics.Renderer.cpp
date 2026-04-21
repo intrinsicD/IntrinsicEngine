@@ -1,5 +1,6 @@
 module;
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 
@@ -12,6 +13,8 @@ import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.CullingSystem;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderWorld;
 
 namespace Extrinsic::Graphics
 {
@@ -27,8 +30,8 @@ namespace Extrinsic::Graphics
             m_MaterialSystem .emplace();
             m_MaterialSystem->Initialize(device, *m_BufferManager);
             m_CullingSystem  .emplace();
-            // CullingSystem::Initialize requires a shader path — concrete renderers
-            // supply it.  NullRenderer skips the cull dispatch (no-op RenderFrame).
+            // CullingSystem::Initialize requires a shader path — concrete
+            // renderers supply it.  NullRenderer skips the cull dispatch.
         }
 
         void Shutdown() override
@@ -43,14 +46,47 @@ namespace Extrinsic::Graphics
 
         void Resize(std::uint32_t, std::uint32_t) override {}
 
-        void RenderFrame(const RHI::FrameHandle&) override
+        // ── Per-frame phases ──────────────────────────────────────────────
+
+        bool BeginFrame(RHI::FrameHandle&) override
         {
+            // NullRenderer has no swapchain; always reports "frame available"
+            // so the rest of the loop exercises the extraction/prepare/execute
+            // seams even without a real GPU backend.
+            return true;
+        }
+
+        RenderWorld ExtractRenderWorld(const RenderFrameInput& input) override
+        {
+            return RenderWorld{
+                .Viewport = input.Viewport,
+                .Alpha    = input.Alpha,
+            };
+        }
+
+        void PrepareFrame(RenderWorld&) override
+        {
+            // Sync CPU-side GPU resources (pipeline cache, material SSBO,
+            // GPU scene SSBO).  No actual culling without a camera UBO.
             m_PipelineManager->CommitPending();
             m_MaterialSystem->SyncGpuBuffer();
             m_CullingSystem->SyncGpuBuffer();
-            // DispatchCull() is called by the concrete renderer pass that
-            // owns the camera UBO and command context for this frame.
         }
+
+        void ExecuteFrame(const RHI::FrameHandle&,
+                          const RenderWorld&) override
+        {
+            // No command recording in the null backend.
+        }
+
+        std::uint64_t EndFrame(const RHI::FrameHandle&) override
+        {
+            // No GPU timeline — report zero so maintenance callers
+            // never block waiting for a value that will never arrive.
+            return 0;
+        }
+
+        // ── Resource managers ─────────────────────────────────────────────
 
         RHI::BufferManager&   GetBufferManager()   override { return *m_BufferManager;   }
         RHI::TextureManager&  GetTextureManager()  override { return *m_TextureManager;  }
@@ -60,7 +96,6 @@ namespace Extrinsic::Graphics
         CullingSystem&         GetCullingSystem()   override { return *m_CullingSystem;   }
 
     private:
-        // Constructed lazily in Initialize() once IDevice is live.
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;

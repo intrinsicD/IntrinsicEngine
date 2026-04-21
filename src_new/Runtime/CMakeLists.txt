@@ -5,6 +5,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
+        Runtime.FrameClock.cppm
         PRIVATE
         Runtime.Engine.cpp
 )

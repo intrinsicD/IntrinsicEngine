@@ -84,73 +84,186 @@ B3 (Frame-Context Ownership) ──→ B4a (Task Graph + Barriers)
 B4a ──→ B4b (Incremental Parallelization)
 ```
 
-#### B1.0 Reference main loop (canonical migration target)
+#### B1.0 Reference main loop (canonical — implemented in `src_new/Runtime/Runtime.Engine.cpp`)
 
-Use the following loop shape as the canonical reference. Adaptation to current Intrinsic ownership should happen *under* this shape, not by changing the shape itself:
+The loop below is the authoritative implementation shape. It lives in
+`Engine::RunFrame()`. **Do not change the phase ordering or add logic between
+phases without updating this block and the Runtime README.**
+
+```
+// ════════════════════════════════════════════════════════════════════════
+// THREE-GRAPH ARCHITECTURE — where each graph enters RunFrame
+//
+//  ① CPU Task Graph (fiber-based, work-stealing)
+//       Drives Phase 2 (sim tick job-graph) and Phase 7 (render-prep jobs).
+//       Phase 2 ends with a world.commit_tick() barrier — world is stable
+//       before Phase 4 snapshots it.  Phase 7 ends with a cull-done barrier
+//       before Phase 8 submits to the GPU.
+//
+//  ② GPU Frame Graph (transient DAG, Vulkan 1.3 Sync2)
+//       Lives entirely inside Phase 8 (ExecuteFrame).
+//       Declares virtual resources, resolves barriers and aliasing,
+//       schedules async compute passes, records and submits command buffers.
+//       RunFrame never touches a VkImage, VkBuffer, or pipeline barrier.
+//
+//  ③ Async Streaming Graph (background priority queues)
+//       Runs continuously — no frame affinity.
+//       Results surface at Phase 6 (GpuAssetCache::TryGet — non-blocking)
+//       and are retired at Phase 10 (CollectCompletedTransfers advances the
+//       NotRequested → CpuPending → GpuUploading → Ready state machine).
+// ════════════════════════════════════════════════════════════════════════
+```
 
 ```cpp
-while (!app.should_quit())
+void Engine::RunFrame()
 {
-    platform.pump_events();          // window, input, quit, resize
-    clock.begin_frame();
+    // ── Phase 1: Platform ─────────────────────────────────────────────────
+    // Pump OS events before measuring frame time so resize/close are visible
+    // before we commit to a frame.
 
-    if (app.is_minimized())
+    m_Window->PollEvents();
+    m_FrameClock.BeginFrame();
+
+    if (m_Window->IsMinimized())
     {
-        platform.wait_for_events_or_timeout();
-        continue;
+        // Sleep until an OS event arrives, then resample so the sleep duration
+        // does not inflate the next frame's fixed-step delta.
+        m_Window->WaitForEventsTimeout(kIdleSleepSeconds);
+        m_FrameClock.Resample();
+        return;
     }
 
-    // 1) Advance fixed-step simulation
-    accumulator += clock.frame_delta_clamped();
-
-    while (accumulator >= fixed_dt)
+    // Swapchain resize: drain GPU, resize resources, acknowledge.
+    if (m_Window->WasResized())
     {
-        input_system.begin_sim_tick();
-        simulation.run_fixed_tick(fixed_dt);
-        gameplay.run_fixed_tick(fixed_dt);
-        physics.run_fixed_tick(fixed_dt);
-        animation.run_fixed_tick(fixed_dt);
-        world.commit_tick();         // authoritative state becomes consistent
-        accumulator -= fixed_dt;
+        const auto extent = m_Window->GetFramebufferExtent();
+        if (extent.Width > 0 && extent.Height > 0)
+        {
+            m_Device->WaitIdle();
+            m_Device->Resize(extent.Width, extent.Height);
+            m_Renderer->Resize(extent.Width, extent.Height);
+        }
+        m_Window->AcknowledgeResize();
     }
 
-    const double alpha = accumulator / fixed_dt;
+    // ── Phase 2: Fixed-step simulation  [① CPU Task Graph] ───────────────
+    // The task graph schedules one job-graph per tick:
+    //   input → sim → physics → anim → world.commit_tick()  ← barrier
+    // world.commit_tick() is the phase boundary: world state is authoritative
+    // and immutable from this point until the next Phase 2.
+    // Clamp prevents spiral-of-death. MaxSubSteps caps catch-up work.
 
-    // 2) Build render snapshot from stable world state
-    RenderFrameInput render_input{};
-    render_input.alpha = alpha;
-    render_input.camera = camera_system.interpolate(alpha);
-    render_input.viewport = platform.viewport();
-    render_input.world_snapshot = world.create_readonly_snapshot();
-    render_input.input_snapshot = input_system.render_snapshot();
+    m_Accumulator += m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
 
-    // 3) Start frame context
-    FrameContext& frame = renderer.begin_frame();
+    int substeps = 0;
+    while (m_Accumulator >= m_FixedDt && substeps < m_MaxSubSteps)
+    {
+        m_Application->OnSimTick(*this, m_FixedDt);  // schedules & awaits one tick graph
+        m_Accumulator -= m_FixedDt;
+        ++substeps;
+    }
 
-    // 4) Extract immutable render data
-    RenderWorld render_world = renderer.extract_render_world(render_input);
+    // alpha ∈ [0,1): interpolation blend between last committed tick and next.
+    const double alpha = m_Accumulator / m_FixedDt;
 
-    // 5) Prepare render graph/jobs
-    renderer.prepare_frame(frame, render_world);
+    // ── Phase 3: Variable tick ────────────────────────────────────────────
+    // Camera, UI, input processing — once per rendered frame, outside sim.
 
-    // 6) Execute GPU frame
-    renderer.execute_frame(frame);
+    m_Application->OnVariableTick(*this, alpha, m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta));
 
-    // 7) End frame / retire finished work
-    renderer.end_frame(frame);
-    resource_system.collect_garbage(renderer.completed_gpu_value());
+    // ── Phase 4: Build render snapshot ───────────────────────────────────
+    // Immutable input to the renderer.  Reads the stable world committed in
+    // Phase 2.  No mutable ECS/asset refs escape this struct.
+    // Grows as WorldSnapshot, InputSnapshot, and CameraParams are wired in.
 
-    clock.end_frame();
+    const Graphics::RenderFrameInput renderInput{
+        .Alpha    = alpha,
+        .Viewport = m_Window->GetFramebufferExtent(),
+    };
+
+    // ── Phase 5: Renderer — BeginFrame ───────────────────────────────────
+    // Acquire swapchain image, open command contexts.
+    // Returns false → out-of-date / device-lost; skip this frame.
+
+    RHI::FrameHandle frame{};
+    if (!m_Renderer->BeginFrame(frame))
+    {
+        m_FrameClock.EndFrame();
+        return;
+    }
+
+    // ── Phase 6: Renderer — ExtractRenderWorld  [③ Async Streaming] ──────
+    // Snapshot committed world state into an immutable RenderWorld.
+    // GpuAssetCache::TryGet(assetId) is called here — non-blocking.
+    // Assets whose state machine has reached Ready supply a BufferView.
+    // Assets still uploading (GpuUploading) return nullopt → draw skipped
+    // or placeholder substituted this frame.
+    // Engine must not touch ECS/asset state after this call.
+
+    Graphics::RenderWorld renderWorld = m_Renderer->ExtractRenderWorld(renderInput);
+
+    // ── Phase 7: Renderer — PrepareFrame  [① CPU Task Graph] ─────────────
+    // Job-graph: frustum cull → draw-packet sort → LOD selection → staging.
+    // Reads renderWorld (stable after Phase 6).  Barrier at end ensures all
+    // prep jobs complete before Phase 8 submits to the GPU.
+    // Future: explicit job-graph node replacing the sequential call (B1, B4a).
+
+    m_Renderer->PrepareFrame(renderWorld);
+
+    // ── Phase 8: Renderer — ExecuteFrame  [② GPU Frame Graph] ────────────
+    // The GPU frame graph runs entirely here:
+    //   declare virtual resources → compile DAG → alias transient memory
+    //   → resolve Sync2 barriers → record passes in topological order:
+    //       DepthPrepass / ShadowPass (async compute) / GBuffer
+    //       / Lighting / Surface+Line+Point / PostProcess / Present
+    //   → submit command buffers to graphics + async compute queues.
+    // RunFrame never sees a VkImage, VkBuffer, or pipeline barrier.
+    // Future: secondary command buffer recording per pass node (B4b).
+
+    m_Renderer->ExecuteFrame(frame, renderWorld);
+
+    // ── Phase 9: Renderer — EndFrame + Present ───────────────────────────
+    // Release frame context back to the in-flight ring.
+    // completedGpuValue = timeline value of the oldest frame now retired.
+
+    const std::uint64_t completedGpuValue = m_Renderer->EndFrame(frame);
+    m_Device->Present(frame);
+
+    // ── Phase 10: Maintenance  [③ Async Streaming rendezvous] ────────────
+    // CollectCompletedTransfers() advances the asset state machine:
+    //   GpuUploading → Ready  (staging allocation retired, BufferView live)
+    // completedGpuValue gates deferred deletion so GPU resources are only
+    // reclaimed after the GPU has finished consuming them.
+    // Future: m_MaintenanceService->CollectGarbage(completedGpuValue); (B6)
+
+    m_Device->CollectCompletedTransfers();
+
+    // ── Phase 11: Clock EndFrame ──────────────────────────────────────────
+    m_FrameClock.EndFrame();   // records LastRawDelta() for telemetry
 }
 ```
 
-Mapping guidance for current Intrinsic code:
+**Ownership map** (`src_new/` types):
 
-- `platform` maps to `RuntimePlatformFrameHost` + `PlatformFrameCoordinator` (main-thread ownership, pump/minimize, framebuffer extent capture).
-- `world` maps to `SceneManager` + authoritative ECS scene ownership, with an explicit `commit_tick()` / readonly snapshot boundary.
-- `renderer` maps to `RenderOrchestrator` plus `RenderDriver`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
-- `resource_system` maps to `Runtime::ResourceMaintenanceService` (GPU sync capture, readback, deferred-destruction, transfer GC, texture/material retirement).
-- `RenderFrameInput`, `RenderWorld`, and `FrameContext` are first-class types rather than remaining implicit in `Engine::Run()` / `RenderDriver::OnUpdate(...)`.
+| B1.0 concept | `src_new/` owner |
+|---|---|
+| `platform.pump_events` / minimize / resize | `Platform::IWindow` (`PollEvents`, `WaitForEventsTimeout`, `WasResized`) |
+| `clock` | `Runtime::FrameClock` (`Runtime.FrameClock` module) |
+| fixed-step sim loop | `IApplication::OnSimTick(engine, fixedDt)` — 0..N per frame |
+| variable tick | `IApplication::OnVariableTick(engine, alpha, dt)` — once per frame |
+| `RenderFrameInput` | `Graphics::RenderFrameInput` (`Graphics.RenderFrameInput` module) |
+| `RenderWorld` | `Graphics::RenderWorld` (`Graphics.RenderWorld` module) |
+| `renderer.*` | `Graphics::IRenderer` (5-phase interface in `Graphics.Renderer` module) |
+| `resource_system.collect_garbage` | `IDevice::CollectCompletedTransfers()` now; `IMaintenanceService::CollectGarbage(completedGpuValue)` when B6 lands in `src_new/` |
+
+**Extension points** (do not add inline logic — extend via the named seams):
+
+- Phase 2 sim content → implement in `IApplication::OnSimTick`.
+- Phase 3 variable content (camera, UI) → implement in `IApplication::OnVariableTick`.
+- Phase 4 snapshot fields → expand `Graphics::RenderFrameInput` when `WorldSnapshot`/`CameraParams` land.
+- Phase 7 cull parallelism → convert `PrepareFrame` to a job-graph node (B1, B4a).
+- Phase 8 command parallelism → secondary command buffers inside `ExecuteFrame` (B4b).
+- Phase 10 GC → inject `IMaintenanceService` into `Engine` and call `CollectGarbage(completedGpuValue)` (B6).
 
 #### B1. Render Preparation as Job-Scheduled Work
 

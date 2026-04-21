@@ -7,6 +7,8 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Graphics.Renderer.cppm
+        Graphics.RenderFrameInput.cppm
+        Graphics.RenderWorld.cppm
         Graphics.Material.cppm
         Graphics.MaterialSystem.cppm
         Graphics.CullingSystem.cppm
@@ -25,3 +27,4 @@ target_link_libraries(${target_name}
 )
 
 add_subdirectory(Backends)
+add_subdirectory(Passes)

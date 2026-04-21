@@ -312,6 +312,72 @@ Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `
 - **GPU PrimitiveID pipeline**: Dual-channel MRT picking produces both `EntityId` and `PrimitiveId` (R32_UINT each) in one GPU frame. Three dedicated pick pipelines: `pick_mesh`, `pick_line`, and `pick_point`. `PrimitiveId` is self-describing: the high 2 bits encode the primitive domain (`00` surface triangle, `01` line segment, `10` point). For surfaces, the low 30 bits encode the authoritative mesh face ID when a triangle→face sidecar is available; otherwise they fall back to the raster triangle index. For lines and points, the low 30 bits encode the zero-based segment or point index. All three pipelines share a unified 112-byte `PickMRTPushConsts` struct. `SelectionModule::ApplyFromGpuPick()` treats GPU `PrimitiveId` as a domain hint, not the final authority: once the entity is known, the picker completes the full `Picked` tuple from the projected hit point. Meshes resolve point-on-face → closest edge → closest vertex, graphs resolve the nearest edge/node pair around the hit, and point clouds keep direct point primitive IDs. The invalid primitive sentinel is `UINT_MAX`, so primitive index `0` must remain selectable.
 - **CPU mesh backup picker**: When `Selection::PickBackend::CPU` is active, mesh selection does not rely exclusively on `ECS::MeshCollider::Component`. If a renderable mesh entity only has authoritative `ECS::Mesh::Data::MeshRef`, the picker raycasts the retained halfedge mesh directly, then resolves face → closest edge → closest vertex from the object-space hit point. This preserves a functional backup workflow for collider-free procedural/editor meshes, mirroring the intent of the old `Engine24` CPU picker.
 
+## Owner / Worker Split (engine-wide canonical rule)
+
+**Owners own state. Workers perform work using injected owner references. Never mix the two.**
+
+This is the P0 architectural rule for every module in `src_new/`. It applies identically to GPU rendering, CPU simulation, asset loading, ECS systems, and audio. The full pattern with rationale, canonical examples, and the runtime technique-switching model is in `PATTERNS.md` → **Pattern 19**. The principle in one sentence:
+
+> If an object outlives a single invocation, it is an **Owner**. If it only exists to perform one unit of work, it is a **Worker**.
+
+### The two roles
+
+| Role | Naming | Responsibility | What it must NOT do |
+|---|---|---|---|
+| **Owner** (System / Manager / Registry) | `*.System`, `*.Manager`, `*.Registry`, `*.Cache` | Owns resources (GPU buffers, CPU data structures, slot pools, pipelines). Manages registration, dirty tracking, and CPU↔GPU sync. Exposes a pure-data API. | Take an execution-context parameter (`ICommandContext&`, `JobContext&`, `TickContext&`). Perform work. Sequence other owners. |
+| **Worker** (Pass / Job / Handler / Tick) | `Passes/Pass.*`, `Jobs/Job.*`, `*Handler`, `*Tick` | Performs one unit of work this invocation. Injected with Owner references. Records commands or runs algorithms. Exits without retaining state. | Own persistent resources. Have a non-trivial destructor that frees GPU/heap memory. |
+
+### The ownership test
+
+Ask: *"Does this object outlive one invocation?"*
+- **Yes** → it is an Owner. It owns resources. It has `Initialize()` / `Shutdown()`.
+- **No** → it is a Worker. It borrows references. It has `Execute()` / `Run()` / `OnTick()`.
+
+### Domain examples
+
+**Graphics (GPU frame graph):**
+```
+CullingSystem     — Owner: owns CullDataBuffer, DrawCommandBuffer, pipeline, slot pool
+Pass.Culling      — Worker: calls SyncGpuBuffer(), dispatches compute via injected CullingSystem&
+ShadowSystem      — Owner: owns ShadowAtlas texture array, light slot pool, shadow pipeline
+Pass.Shadows      — Worker: records draw calls into atlas slices via injected ShadowSystem&
+```
+
+**Simulation (CPU task graph):**
+```
+PhysicsWorld      — Owner: owns rigid bodies, broadphase BVH, constraint solver state
+PhysicsTickJob    — Worker: runs one fixed-dt solve step via injected PhysicsWorld&
+```
+
+**Assets (async streaming graph):**
+```
+AssetRegistry     — Owner: owns CPU payload store, path index, ref counts
+AssetLoadJob      — Worker: reads disk, decodes, inserts payload via injected AssetRegistry&
+GpuAssetCache     — Owner: owns GPU-side state machine (NotRequested→Ready), BufferViews
+GpuUploadJob      — Worker: submits staging transfer via injected GpuAssetCache& + TransferManager&
+```
+
+**ECS (DAG scheduler):**
+```
+TransformSystem   — Owner: owns Transform component storage (via entt registry)
+TransformHierarchyJob — Worker: propagates parent→child matrices, WaitFor("TransformUpdate")
+```
+
+### Enforcement rules
+
+- An Owner method that takes an execution-context parameter (`ICommandContext&`, `JobContext&`, etc.) is a violation. Move that method body to a Worker.
+- A Worker that allocates persistent GPU or heap memory in its constructor is a violation. Move that resource to an Owner.
+- A Worker stub with no corresponding Owner is a gap. Implement the Owner first.
+- **All existing `src_new/` code is subject to this rule — there are no grandfathered exceptions.**
+
+### System / Pass Boundary (src_new/ Graphics — specific application)
+
+Within `src_new/Graphics/` the Owner/Worker split maps to:
+- A **System** (`Graphics.*System.cppm`) is the Owner. It **never** takes an `ICommandContext&`.
+- A **Pass** (`Passes/Pass.*.cppm`) is the Worker. It owns no persistent GPU state.
+- **Compute prologue nodes** (`Pass.Culling`, `Pass.BVH`) are Workers — they record `vkCmdDispatch` inside a frame-graph compute node.
+- Any existing system method that takes `ICommandContext&` (e.g. `CullingSystem::ResetCounters`, `CullingSystem::DispatchCull`) violates the rule and must be moved to its pass.
+
 ## Three-Pass Rendering Architecture
 
 The engine uses a unified three-pass rendering architecture with one pass per primitive type. Each pass owns its own pipeline, shaders, and ECS component type, handling both retained-mode and transient data internally. No routing logic between passes. Adding a new rendering method = new shader + pipeline variant + register in `DefaultPipeline`.

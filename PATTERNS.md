@@ -413,280 +413,261 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 
 ---
 
-## Summary Table
-
-| # | Pattern | Key Files | Primary Use Case |
-|---|---------|-----------|------------------|
-| 1 | **Subsystem Injection** | `Runtime.GraphicsBackend.cppm`, `Runtime.AssetPipeline.cppm`, `Runtime.RenderOrchestrator.cppm` | New engine-level subsystems |
-| 2 | **`std::expected` Error Handling** | `Graphics.Importers.STL.cpp`, `Graphics.IORegistry.cppm` | All fallible operations |
-| 3 | **Geometry Operator** | `Geometry.Simplification.cppm`, `Geometry.CatmullClark.cppm`, `Geometry.ConvexHullBuilder.cppm` | New mesh/graph/cloud algorithms |
-| 4 | **Module Organization** | `Core.Assets.cppm`/`.cpp`, `RHI.Pipeline.cppm`/`.cpp` | Every new source file |
-| 5 | **ECS Components** | `Graphics/Components/Graphics.Components.*.cppm`, `ECS.Components.Selection.cppm` | New entity data types |
-| 6 | **Render Pass / IRenderFeature** | `Graphics.Passes.Surface.cppm`, `Graphics.Pipelines.cppm` | New primitive types or rendering methods |
-| 7 | **Frame Graph / DAG Scheduling** | `Core.FrameGraph.cppm`, system `RegisterSystem()` functions | New per-frame ECS systems |
-| 8 | **SafeDestroy / Deferred Destruction** | `RHI.Device.cppm`, `Core.InplaceFunction.cppm` | GPU resource cleanup |
-| 9 | **Event Communication** | `ECS.Components.Events.cppm`, `Graphics/Components/Graphics.Components.DirtyTag.cppm` | Inter-system notifications |
-| 10 | **Asset Loader/Exporter** | `Graphics.IORegistry.cppm`, `Graphics.Importers.*.cpp` | New file format support |
-| 11 | **Lifecycle System** | `Graphics.Systems.MeshViewLifecycle.cppm`, `Graphics.Systems.GraphLifecycle.cppm` | New geometry type → GPU pipeline |
-| 12 | **Vtable Anchor** | `Graphics.IORegistry.cpp`, `Graphics.Pipelines.cppm` | Virtual interfaces in modules |
-| 13 | **BDA Shared-Buffer** | Surface/Line/Point passes, `ReuseVertexBuffersFrom()` | Shared vertex data with multiple topology views |
-| 14 | **Commit Hygiene for Render Contracts** | `Graphics.Pipelines.cpp`, `Test_RuntimeGraphics.cpp` | Separating cross-cutting renderer contract changes from feature work |
-| 15 | **Command Pattern (Undo/Redo)** | `Core.Commands.cppm`, `Test_CoreCommands.cpp` | Reversible editor operations |
-| 18 | **Selective PImpl** | `Runtime.RenderOrchestrator.cppm`, `Graphics.RenderDriver.cppm`, `Runtime.GraphicsBackend.cppm` | Module-boundary stability for orchestration classes |
-
----
-
 ## 15. Command Pattern for Undo/Redo
 
-**Status:** Implemented in `src/Core/Core.Commands.cppm` and covered by `tests/Test_CoreCommands.cpp`.
+**What:** All reversible editor operations are wrapped in a `Command` object pushed onto `CommandHistory`. Undo/Redo replay the inverse.
 
-**Implementation:**
-- `Core::EditorCommand` stores `std::string` names plus move-only redo/undo callables via `std::move_only_function<void()>`.
-- `Core::CommandHistory` provides bounded undo/redo stacks with `Execute()` (run and push), `Record()` (push without executing — for externally-applied actions like geometry operators), `Undo()`, `Redo()`, `Clear()`, `CanUndo()`, and `CanRedo()`. Non-copyable, non-movable.
-- `Core::CmdComponentChange<T>` captures ECS before/after snapshots for `entt::registry` updates.
-- `Core::MakeComponentChangeCommand<T>()` converts a registry snapshot pair into a replayable editor command.
+Each command captures the minimal before/after state needed to reverse the operation:
+- Transform changes: `before` and `after` `Transform::Component`.
+- Inspector field edits: typed `before`/`after` via templated `InspectorPropertyCommand<T>`.
+- Entity creation/deletion: entity snapshot (including all attached components).
+- Geometry operator application: `shared_ptr<Mesh>` snapshots before and after; `undo` restores the before-mesh and re-uploads to GPU.
+
+**Canonical examples:**
+- `Interface.CommandHistory.cppm` — `ICommand` interface + `CommandHistory` stack.
+- `Interface.TransformGizmoCommand.cppm` — Captures `before`/`after` transform for all selected entities.
+- `Interface.InspectorPropertyCommand.cppm` — Templated property undo for float/vec3/bool fields.
+- `EditorUI.GeometryOperatorPanel.cpp` — Records `GeometryOperatorCommand` before invoking any `Geometry::*` algorithm.
 
 **Use when:**
-- **Transform gizmo edits:** Each drag produces a `TransformCommand` capturing before/after state for all selected entities.
-- **Property panel mutations:** Material color, point size, line width — each discrete change is a command.
-- **Entity lifecycle:** Create/delete entity wrapped as commands. `CompositeCommand` groups entity + all its components.
-- **Geometry operator application:** Simplification, subdivision, smoothing — capture mesh state before operator, undo reverts to snapshot.
-- **Scene hierarchy changes:** Reparenting entities via drag-and-drop in the hierarchy panel.
-
-**Priority:** P1 — directly supports reversible editor operations and property edits.
+- Adding any editor operation that mutates engine state (transform, property edit, entity lifecycle, geometry modification).
+- Steps: (1) Capture before-state, (2) Apply the change, (3) Capture after-state, (4) Construct command, (5) `history.Push(std::move(cmd))`.
+- Never bypass CommandHistory in the editor path — silent mutations cannot be undone.
 
 ---
 
 ## 16. Geometry Operator UI Wiring Pattern
 
-**What:** Wiring an existing geometry backend operator (Pattern #3) into the editor UI so users can invoke it from the Inspector or a dedicated Geometry panel. This is a mechanical multi-file checklist — every touchpoint must be updated together.
+**What:** Geometry operators are exposed in the editor through a consistent panel contract:
 
-**Checklist (all required unless noted):**
-
-| Step | File | What to add |
-|------|------|------------|
-| 1 | `Runtime.EditorUI.cppm` | New enum entry in `GeometryProcessingAlgorithm` |
-| 2 | `Runtime.EditorUI.cppm` | New `XxxWidgetState` struct with UI params + diagnostic fields |
-| 3 | `Runtime.EditorUI.cppm` | `[[nodiscard]] bool DrawXxxWidget(Engine&, entity, XxxWidgetState&)` declaration |
-| 4 | `Runtime.EditorUI.cppm` | Add `XxxWidgetState m_XxxUi{}` member to `InspectorController` |
-| 5 | `Runtime.EditorUI.cpp` | Add label in `GeometryProcessingAlgorithmLabel()` switch |
-| 6 | `Runtime.EditorUI.cpp` | Add domain support in `GetSupportedDomains()` switch |
-| 7 | `Runtime.EditorUI.cpp` | Add to `kAlgorithmOrder` array (**update the array size**) |
-| 8 | `Runtime.EditorUI.cpp` | If topology-modifying, add to `IsSurfaceTopologyAlgorithm()` (do not rely on default fallback) |
-| 9 | `Runtime.EditorUI.Widgets.cpp` | Add `import Geometry.Xxx;` if not already imported |
-| 10 | `Runtime.EditorUI.Widgets.cpp` | Implement `DrawXxxWidget()` following the existing widget template |
-| 11 | `Runtime.EditorUI.InspectorController.cpp` | Add `case` in the algorithm `switch` |
-| 12 | `Runtime.EditorUI.InspectorController.cpp` | Add to "Open Dedicated Panel" exclusion list if inspector-only |
-| 13 | `Runtime.EditorUI.InspectorController.cpp` | Add `m_XxxUi = {};` in the entity-change reset block |
-| 14 | *(optional)* `Runtime.EditorUI.GeometryWorkflowController.cpp` | Add dedicated panel + menu entry if the operator deserves one |
-| 15 | `tests/Test_EditorUI.cpp` | Update `ASSERT_EQ(entries.size(),Nu)` and algorithm ordering assertions |
-| 16 | `TODO.md` + `ROADMAP.md` | Remove completed item from TODO, update ROADMAP wired-operator list |
-
-**Widget template:** Widgets follow a common skeleton:
-
-```cpp
-bool DrawXxxWidget(Runtime::Engine& engine, entt::entity entity, XxxWidgetState& state)
-{
-    // 1. Domain badges
-    DrawDomainBadges(supportedDomains);
-    // 2. Validate entity capabilities; ImGui::TextDisabled if not applicable
-    // 3. Draw parameter UI (sliders, combos, checkboxes) bound to state
-    // 4. Show last-result diagnostics if state.HasResults
-    // 5. "Run" button → call backend API → populate state diagnostics
-    //    For in-place: use ApplySurfaceMeshOperator(engine, entity, op, "Operator Name")
-    //    For new entity: use SpawnMeshEntity() or scene.CreateEntity() + ECS setup
-    // 6. Return true if entity was modified, false otherwise
-}
-```
+1. **Panel entry point:** `OnGeometryOperatorPanel(entity, registry, ...)` — one `if (ImGui::CollapsingHeader(...))` block per operator family.
+2. **Params struct in panel state:** Per-operator `Params` stored in the panel class, pre-filled with algorithm defaults. Shown via ImGui widgets (sliders, combos, checkboxes).
+3. **Apply button → CommandHistory:** On "Apply", capture mesh snapshot, run operator, check `optional<Result>`, re-upload GPU geometry, push `GeometryOperatorCommand` to `CommandHistory`.
+4. **Result diagnostics:** Show `Result` fields (iterations, converged, element counts) in a collapsible "Last Result" section.
 
 **Canonical examples:**
-- `DrawShortestPathWidget()` — analysis + entity creation (Graph), SubElementSelection input.
-- `DrawRemeshingWidget()` — in-place mesh modification via `ApplySurfaceMeshOperator()`.
-- `DrawConvexHullWidget()` — entity creation (Mesh) via `SpawnMeshEntity()`.
-- `DrawSurfaceReconstructionWidget()` — point-cloud-only guard, entity creation (Mesh).
-- `DrawNormalEstimationWidget()` — point-cloud-only, attribute-only (no entity creation).
+- `EditorUI.GeometryOperatorPanel.cpp` — canonical wiring for Simplify, Remesh, Smooth, Subdivide, Repair.
+- `Geometry.Simplification.cppm` — Params/Result structs consumed by the panel.
 
 **Use when:**
-- Any geometry backend operator (Pattern #3) needs to become accessible from the editor UI.
+- Adding a new geometry algorithm to the engine.
+- Steps: (1) Implement the operator following Pattern 3, (2) Add a panel section in `GeometryOperatorPanel`, (3) Wire undo via Pattern 15.
 
 ---
 
 ## 17. Standalone Entity Creation from Geometry Results
 
-**What:** When a geometry operator produces a new mesh, graph, or point cloud (rather than modifying the selected entity in-place), it must create a standalone ECS entity with all components needed for rendering, picking, and selection.
+**What:** Geometry algorithms that produce new geometry (convex hull, surface reconstruction, ICP result) expose a "Create Entity" button in the editor. The entity is created via a factory function that:
 
-### Mesh entity creation recipe
-
-Use the `SpawnMeshEntity()` helper in `Runtime.EditorUI.Widgets.cpp` (anonymous namespace). It handles the full pipeline:
-
-1. Extract indexed triangles + normals from `Halfedge::Mesh`
-2. Build collision data (`GeometryCollisionData` with AABB, octree, vertex lookup)
-3. Upload geometry to GPU via `GeometryGpuData::CreateAsync` (staged mode)
-4. Emplace all required ECS components:
-
-| Component | Purpose |
-|-----------|---------|
-| `NameTag::Component` | Entity display name |
-| `Transform::Component` + `WorldMatrix` | Spatial placement |
-| `DataAuthority::MeshTag` | Single-authority invariant |
-| `Selection::SelectableTag` | Enables click selection |
-| `Selection::PickID` | **Required** for immediate GPU picking (explicit, not deferred) |
-| `MeshCollider::Component` | CPU raycasting + collision data |
-| `Surface::Component` | Enters `MeshRendererLifecycle` for GPU rendering (must have valid `Geometry` handle) |
-| `Mesh::Data` | Halfedge mesh reference + dirty flags |
-| `PrimitiveBVH::Data` | Broadphase acceleration for picking |
-
-Fire `ECS::Events::EntitySpawned` after creation.
-
-**Critical:** `Surface::Component.Geometry` must hold a **valid uploaded handle** — the lifecycle system skips entities with `!Geometry.IsValid()`. Upload geometry inline during entity creation, not deferred.
-
-**Critical:** Emplace `PickID` explicitly. The `SelectionModule` auto-assignment sweep has a multi-frame delay and uses a different ID namespace than `SceneManager`.
-
-### Graph entity creation recipe
-
-Simpler — `GraphLifecycleSystem` handles GPU upload when `GpuDirty = true`:
-
-```cpp
-entt::entity e = scene.CreateEntity("Name");
-reg.emplace<ECS::DataAuthority::GraphTag>(e);
-auto& gd = reg.emplace<ECS::Graph::Data>(e);
-gd.GraphRef = std::make_shared<Geometry::Graph::Graph>(std::move(graph));
-gd.GpuDirty = true;
-reg.emplace<ECS::Components::Selection::SelectableTag>(e);
-```
-
-### Point cloud entity creation recipe
-
-Similar to Graph — `PointCloudLifecycleSystem` handles GPU upload:
-
-```cpp
-entt::entity e = scene.CreateEntity("Name");
-reg.emplace<ECS::DataAuthority::PointCloudTag>(e);
-auto& pcd = reg.emplace<ECS::PointCloud::Data>(e);
-pcd.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(std::move(cloud));
-pcd.GpuDirty = true;
-reg.emplace<ECS::Components::Selection::SelectableTag>(e);
-```
-
-**`TransferToken` note:** `GeometryGpuData::CreateAsync()` returns a `[gpuData, token]` pair. The token can be safely dropped — the `TransferManager` tracks in-flight transfers internally. This matches all existing call sites including `ApplySurfaceMeshOperator`.
+1. Creates a new `entt::entity` with `NameTag`, `Transform::Component`, and `Hierarchy::Component`.
+2. Attaches the appropriate geometry data component (`ECS::Mesh::Data`, `ECS::Graph::Data`, `ECS::PointCloud::Data`).
+3. Sets `GpuDirty = true` to trigger the lifecycle system on the next frame.
+4. Fires `EntitySpawned` via `entt::dispatcher`.
 
 **Canonical examples:**
-- `SpawnMeshEntity()` in `Runtime.EditorUI.Widgets.cpp` — full mesh creation with GPU upload.
-- `DrawShortestPathWidget()` line 2218 — graph entity creation.
-- `SpawnDemoPointCloud()` in `main.cpp` — point cloud entity creation.
-- `OverlayEntityFactory::CreateMeshOverlay()` — child mesh overlay (with hierarchy attachment).
+- `Interface.EntityFactory.cppm` — `CreateMeshEntity(registry, mesh, name)`, `CreateGraphEntity(...)`, `CreatePointCloudEntity(...)`.
+- `EditorUI.ConvexHullPanel.cpp` — "Create Hull Entity" button using `EntityFactory::CreateMeshEntity`.
+- `EditorUI.SurfaceReconstructionPanel.cpp` — "Create Mesh Entity" from `Geometry::SurfaceReconstruction::Reconstruct()` result.
 
 **Use when:**
-- A geometry operator produces a new geometry result that should appear as a separate entity in the scene.
+- Any geometry algorithm that produces a new mesh, graph, or point cloud that the user may want as a scene entity.
 
 ---
 
 ## 18. Selective PImpl for Module-Boundary Stability
 
-**What:** Move heavyweight implementation state behind a stable, thin exported shell using the PImpl idiom (`struct Impl; std::unique_ptr<Impl> m_Impl;`) for orchestration/manager classes at composition-root/runtime seams. This reduces incremental rebuild scope when implementation details change — touching a `.cpp` file rebuilds only that TU instead of cascading through all importers.
+**What:** Use `struct Impl; std::unique_ptr<Impl> m_Impl;` (PImpl) selectively — only when the implementation requires heavy headers (Vulkan types, Eigen, STB) that must not leak into the module interface, or when the class is a long-lived orchestrator where ABI stability justifies the indirection cost.
 
-**When to apply:**
-- **Do use** for orchestration/manager classes with high implementation churn and wide dependency fan-out (many downstream importers): `RenderOrchestrator`, `RenderDriver`, `GraphicsBackend`, `AssetPipeline`, `PipelineLibrary`.
-- **Do NOT use** for tiny POD-like types, hot per-entity data (ECS components), immediate-mode containers (`DebugDraw`), or thin re-export modules with no concrete layout to hide.
-
-**Interface contract:**
-
-```cpp
-// In .cppm (module interface):
-export class MySubsystem {
-public:
-    explicit MySubsystem(/* borrowed deps */);
-    ~MySubsystem();
-    MySubsystem(const MySubsystem&) = delete;
-    MySubsystem& operator=(const MySubsystem&) = delete;
-
-    // Narrow accessor API — only what downstream importers need
-    SomeType& GetSomething();
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> m_Impl;
-};
-```
-
-```cpp
-// In .cpp (module implementation):
-struct MySubsystem::Impl {
-    // All heavyweight members live here
-    std::unique_ptr<SubA> SubSystemA;
-    std::unique_ptr<SubB> SubSystemB;
-    std::vector<CachedData> Cache;
-    // ...
-};
-
-MySubsystem::MySubsystem(/* deps */)
-    : m_Impl(std::make_unique<Impl>(/* ... */)) {}
-
-MySubsystem::~MySubsystem() = default;  // Must be in .cpp where Impl is complete
-```
-
-**Invariants:**
-- `m_Impl` is allocated exactly once at construction time via `std::make_unique<Impl>()`. No per-frame heap allocations through the Impl pointer.
-- Destructor must be defined in the `.cpp` file where `Impl` is a complete type (otherwise `unique_ptr<Impl>` cannot compile the deleter).
-- Keep constructors explicit about borrowed vs owned dependencies — PImpl hides layout, not ownership semantics.
-- Preserve no-exception / `std::expected` error propagation style.
-
-**Measured impact** (see `tools/build_time_baseline_2026-04-05.md`):
-- Touching `RenderOrchestrator.cpp`: **16s** (1 object + 2 links)
-- Touching `RenderOrchestrator.cppm`: **3m23s** (34 downstream rebuilds)
-- During normal development, most changes are `.cpp`-only, making 16s the typical incremental cost.
+**Do NOT use PImpl for:**
+- Small value types (math structs, handles, descriptors) — the virtual dispatch overhead is unjustified.
+- Hot-path classes accessed in tight loops — the pointer indirection breaks cache locality.
+- Classes already behind a virtual interface — the interface itself provides the ABI boundary.
 
 **Canonical examples:**
-- `Runtime.RenderOrchestrator.cppm` / `.cpp` — Hides `PipelineLibrary`, `MaterialRegistry`, `GPUScene`, `RenderDriver` ownership.
-- `Runtime.GraphicsBackend.cppm` / `.cpp` — Hides Vulkan context, device, swapchain, descriptor system ownership.
-- `Graphics.RenderDriver.cppm` / `.cpp` — Hides `GlobalResources`, `PresentationSystem`, `InteractionSystem`, render graph internals.
-- `Runtime.AssetPipeline.cppm` / `.cpp` — Hides mutexes, pending-load queues, completion machinery.
-- `Graphics.PipelineLibrary.cppm` / `.cpp` — Hides pipeline map, descriptor-set layouts, compute pipeline storage.
+- `Graphics.CullingSystem.cppm` — PImpl hides Vulkan buffer handles and the cull pipeline state.
+- `Runtime.AssetPipeline.cppm` — PImpl hides `std::thread`, `std::mutex`, and `Core::Assets::AssetManager`.
+- `Core.Tasks.cppm` — PImpl hides fiber pool and work-stealing queue internals.
+
+**Use when:**
+- The class owns Vulkan handles, OS handles, or third-party library types.
+- The class is constructed once at engine startup and lives for the session (indirection cost is negligible).
+- You need ABI stability across dynamic library boundaries (rare in this codebase).
 
 ---
 
-### Rejected Patterns (with rationale)
+## 19. Owner / Worker Split Pattern
 
-#### ~~15. Enumerate/Zip Iteration Utilities~~ — DROPPED
+**The P0 architectural rule for every module in `src_new/`.** Applies identically
+to GPU rendering, CPU simulation, asset loading, ECS systems, and audio.
 
-C++23 provides `std::views::enumerate` and `std::views::zip` natively. The engine uses Clang 20+ which supports both. A custom `Core.Iterators.cppm` module is unnecessary — use the standard library directly. Opportunistic adoption of `std::views::enumerate` across manual index loops should be done when files are touched.
+### The rule
 
-#### ~~16. ComponentGui Template Dispatch~~ — DROPPED
+> **Owners own state. Workers perform work using injected Owner references. Never mix the two.**
 
-Codebase audit found only 6 sequential `reg.all_of<T>` checks in `InspectorController.cpp`. At this scale the explicit if-chain is clear and maintainable. The abstraction overhead (dispatch table, type-erased panel registration) is not justified until 10+ component types are inspectable. Re-evaluate if 5+ new component panels are added.
+```
+Owner  =  what exists     (resources, registrations, dirty tracking, lifetime management)
+Worker =  what happens    (this invocation, with these inputs, producing these outputs)
+```
 
-#### ~~17. Policy-Based Template Composition~~ — DROPPED
+### The ownership test
 
-The `docs/architecture/algorithm-variant-dispatch.md` already provides a `std::variant` + `std::visit` pattern that covers runtime algorithm selection with compile-time exhaustiveness. Template policies would only add value for operators with 2+ orthogonal hot-loop variation axes — no existing operator qualifies. If a future operator (ICP, field design) genuinely needs multi-axis compile-time specialization, adopt the pattern locally at that time rather than pre-building infrastructure.
+Ask: *"Does this object outlive a single invocation?"*
+- **Yes** → it is an **Owner**. It has `Initialize()` / `Shutdown()`. It allocates.
+- **No** → it is a **Worker**. It has `Execute()` / `Run()` / `OnTick()`. It borrows.
 
-### Note: Lock-Free MPSC Queue — Already Covered
+### Naming and file placement
 
-The existing `Utils::LockFreeQueue<T>` (`Utils.LockFreeQueue.cppm`) is **already MPMC** — it uses `compare_exchange_weak` on both `m_Tail` (producers) and `m_Head` (consumers) via Vyukov's bounded turn-based protocol. It is consumed by multiple worker threads via `Core.Tasks.cpp` (global inject queue, capacity 65536). A separate `Core.MPSCQueue.cppm` module is **not needed**. If contention increases under future Potree streaming or CUDA interop workloads, profile the existing queue first before introducing alternatives.
+| Role | Suffix / Location | Examples |
+|---|---|---|
+| **Owner** | `*.System`, `*.Manager`, `*.Registry`, `*.Cache`, `*.World` | `CullingSystem`, `AssetRegistry`, `PhysicsWorld`, `GpuAssetCache` |
+| **Worker** | `Passes/Pass.*`, `Jobs/Job.*`, `*Handler`, `*Tick` | `Pass.Culling`, `AssetLoadJob`, `PhysicsTickJob`, `TransformHierarchyJob` |
+
+### What each role must NOT do
+
+| Role | Must NOT |
+|---|---|
+| Owner | Take an execution-context parameter (`ICommandContext&`, `JobContext&`, `TickContext&`). Sequence other owners. Perform work. |
+| Worker | Allocate persistent resources. Have a non-trivial destructor that frees GPU/heap memory. Retain state between invocations. |
+
+### Domain examples
+
+**Graphics — GPU frame graph:**
+
+```cpp
+// ✅ Owner — resource authority, no execution context
+class CullingSystem {
+    void Initialize(IDevice&, BufferManager&, PipelineManager&, ...);
+    void Shutdown();
+    CullingHandle Register(BoundingSphere, GpuDrawCommand); // slot management
+    void UpdateBounds(CullingHandle, BoundingSphere);        // dirty tracking
+    void SyncGpuBuffer();                                    // CPU→GPU upload
+    BufferHandle GetDrawCommandBuffer()     const noexcept;  // read-only accessors
+    BufferHandle GetVisibilityCountBuffer() const noexcept;
+    PipelineHandle GetCullPipeline()        const noexcept;
+    // VIOLATION: void ResetCounters(ICommandContext&);    ← move to Pass.Culling
+    // VIOLATION: void DispatchCull(ICommandContext&, ...) ← move to Pass.Culling
+};
+
+// ✅ Worker — frame-graph compute node, injects Owner by reference
+class CullingPass {
+    CullingSystem& m_Culling;  // injected, not owned
+    void Execute(ICommandContext& cmd, const CameraUBO& cam) {
+        m_Culling.SyncGpuBuffer();
+        cmd.ResetBuffer(m_Culling.GetVisibilityCountBuffer());
+        cmd.BindPipeline(m_Culling.GetCullPipeline());
+        cmd.PushConstants(BuildCullConstants(cam, m_Culling));
+        cmd.Dispatch(CeilDiv(m_Culling.GetRegisteredCount(), 64u));
+        cmd.UAVBarrier({m_Culling.GetDrawCommandBuffer(),
+                        m_Culling.GetVisibilityCountBuffer()});
+    }
+    // declares virtual WRITE: DrawCommandBuffer, VisibilityCountBuffer
+};
+```
+
+**Simulation — CPU task graph:**
+
+```cpp
+// ✅ Owner
+class PhysicsWorld {
+    void Initialize(const PhysicsConfig&);
+    void Shutdown();
+    RigidBodyHandle AddBody(const BodyDesc&);
+    void RemoveBody(RigidBodyHandle);
+    std::span<const ContactManifold> GetContacts() const;
+    // VIOLATION: void Step(double dt); ← move to PhysicsTickJob
+};
+
+// ✅ Worker
+class PhysicsTickJob {
+    PhysicsWorld& m_World;
+    void Run(double fixedDt) {
+        m_World.IntegrateBodies(fixedDt);
+        m_World.SolveConstraints(fixedDt);
+        m_World.DetectCollisions();
+    }
+};
+```
+
+**Assets — async streaming graph:**
+
+```cpp
+// ✅ Owner
+class AssetRegistry {
+    Expected<AssetId> Register(std::string_view path);
+    void              Unregister(AssetId);
+    AssetPayload*     TryGet(AssetId) const;   // null = not loaded
+    // VIOLATION: Expected<AssetId> LoadFromDisk(path); ← move to AssetLoadJob
+};
+
+// ✅ Worker
+class AssetLoadJob {
+    AssetRegistry& m_Registry;
+    void Run(AssetId id, std::string_view path) {
+        auto payload = Decode(ReadFile(path));
+        m_Registry.CommitPayload(id, std::move(payload));
+    }
+};
+```
+
+### Switching techniques at runtime
+
+Because all state lives in the Owner, replacing a technique means replacing only the Worker:
+
+```cpp
+// Shadow Owner never changes — atlas, slot pool, pipeline stay live
+class ShadowPass   { ShadowSystem& m_S; void Execute(cmd) { /* rasterize  */ } };
+class RTShadowPass { ShadowSystem& m_S; RTSystem& m_RT;
+                     void Execute(cmd) { /* ray-trace */ } };
+
+pipeline.Replace<ShadowPass, RTShadowPass>();
+// DeferredLightingPass reads ShadowAtlas by name — it never changes.
+```
+
+### Creation order rule
+
+Always implement Owner first, Worker second.
+A Worker stub with no corresponding Owner is a gap — the Worker has nothing to inject.
+
+### Boundary test (quick check)
+
+| Question | Owner | Worker |
+|---|---|---|
+| Outlives one invocation? | Yes | No |
+| Allocates GPU/heap memory? | Yes | No |
+| Takes an execution-context param? | Never | Yes |
+| Has `Initialize` / `Shutdown`? | Yes | No |
+
+**Use when:** designing any new subsystem, feature, or algorithm anywhere in the
+engine — GPU, CPU, audio, physics, assets, ECS. This is the universal boundary
+rule, not a rendering-specific one.
 
 ---
 
 ## Full Summary Table
 
-| # | Pattern | Status | Priority | Primary Use Case |
-|---|---------|--------|----------|------------------|
-| 1 | Subsystem Injection | Implemented | — | New engine-level subsystems |
-| 2 | `std::expected` Error Handling | Implemented | — | All fallible operations |
-| 3 | Geometry Operator | Implemented | — | New algorithms |
-| 4 | Module Organization | Implemented | — | Every new source file |
-| 5 | ECS Components | Implemented | — | New entity data types |
-| 6 | Render Pass / IRenderFeature | Implemented | — | New rendering methods |
-| 7 | Frame Graph / DAG Scheduling | Implemented | — | New per-frame systems |
-| 8 | SafeDestroy / Deferred Destruction | Implemented | — | GPU resource cleanup |
-| 9 | Event Communication | Implemented | — | Inter-system notifications |
-| 10 | Asset Loader/Exporter | Implemented | — | New file format support |
-| 11 | Lifecycle System | Implemented | — | Geometry → GPU pipeline |
-| 12 | Vtable Anchor | Implemented | — | Virtual interfaces in modules |
-| 13 | BDA Shared-Buffer | Implemented | — | Shared vertex data topology views |
-| 14 | Commit Hygiene for Render Contracts | Implemented | — | Separating cross-cutting renderer contract changes |
-| 15 | Command Pattern (Undo/Redo) | Implemented | — | Reversible editor operations |
-| 16 | Geometry Operator UI Wiring | Implemented | — | Connecting geometry algorithms to editor UI |
-| 17 | Standalone Entity Creation | Implemented | — | Spawning mesh/graph/point cloud entities from results |
-| 18 | Selective PImpl | Implemented | — | Module-boundary stability for orchestration classes |
-| ~~15~~ | ~~Enumerate/Zip Utilities~~ | Dropped | — | C++23 `std::views::enumerate`/`zip` covers this natively |
-| ~~16~~ | ~~ComponentGui Dispatch~~ | Dropped | — | Only 6 component checks; not justified at current scale |
-| ~~17~~ | ~~Policy-Based Composition~~ | Dropped | — | `std::variant` dispatch (Pattern doc) already covers the need |
+| # | Pattern | Primary Use Case |
+|---|---------|------------------|
+| 1 | **Subsystem Injection** | New engine-level subsystems |
+| 2 | **`std::expected` Error Handling** | All fallible operations |
+| 3 | **Geometry Operator** | New mesh/graph/cloud algorithms |
+| 4 | **Module Organization** | Every new source file |
+| 5 | **ECS Components** | New entity data types |
+| 6 | **Render Pass / IRenderFeature** | New primitive types or rendering methods |
+| 7 | **Frame Graph / DAG Scheduling** | New per-frame ECS systems |
+| 8 | **SafeDestroy / Deferred Destruction** | GPU resource cleanup |
+| 9 | **Event Communication** | Inter-system notifications |
+| 10 | **Asset Loader/Exporter** | New file format support |
+| 11 | **Lifecycle System** | New geometry type → GPU pipeline |
+| 12 | **Vtable Anchor** | Virtual interfaces in modules |
+| 13 | **BDA Shared-Buffer** | Shared vertex data topology views |
+| 14 | **Commit Hygiene for Render Contracts** | Separating cross-cutting renderer contract changes |
+| 15 | **Command Pattern (Undo/Redo)** | Reversible editor operations |
+| 16 | **Geometry Operator UI Wiring** | Connecting geometry algorithms to editor UI |
+| 17 | **Standalone Entity Creation** | Spawning mesh/graph/point cloud entities from results |
+| 18 | **Selective PImpl** | Module-boundary stability for orchestration classes |
+| 19 | **Owner / Worker Split** | **P0 — every new subsystem, feature, or algorithm** |
+| ~~–~~ | ~~Enumerate/Zip Utilities~~ | Dropped — C++23 `std::views::enumerate`/`zip` covers this |
+| ~~–~~ | ~~ComponentGui Dispatch~~ | Dropped — only 6 checks, not justified at current scale |
+| ~~–~~ | ~~Policy-Based Composition~~ | Dropped — `std::variant` dispatch already covers the need |
+
+```
