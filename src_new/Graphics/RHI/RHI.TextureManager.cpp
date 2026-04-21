@@ -112,6 +112,10 @@ namespace Extrinsic::RHI
         const TextureDesc& desc,
         SamplerHandle       sampler)
     {
+        // F14: short-circuit on stub backends.
+        if (!m_Impl->Device.IsOperational())
+            return Core::Err<TextureLease>(Core::ErrorCode::DeviceNotOperational);
+
         TextureHandle deviceHandle = m_Impl->Device.CreateTexture(desc);
         if (!deviceHandle.IsValid())
             return Core::Err<TextureLease>(Core::ErrorCode::OutOfDeviceMemory);

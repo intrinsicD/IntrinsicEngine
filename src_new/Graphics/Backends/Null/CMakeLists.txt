@@ -1,9 +1,9 @@
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-        Backends.Vulkan.cppm
+        Backends.Null.cppm
         PRIVATE
-        Backends.Vulkan.cpp
+        Backends.Null.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

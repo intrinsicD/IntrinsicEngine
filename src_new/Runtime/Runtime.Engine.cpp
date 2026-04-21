@@ -7,7 +7,7 @@ module;
 
 module Extrinsic.Runtime.Engine;
 
-import Extrinsic.Backends.Vulkan;
+import Extrinsic.Backends.Null;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
@@ -23,7 +23,11 @@ namespace Extrinsic::Runtime
             switch (config.Backend)
             {
             case Core::Config::GraphicsBackend::Vulkan:
-                return Backends::Vulkan::CreateVulkanDevice();
+                // Real Vulkan is not wired yet; route the user's "Vulkan"
+                // preference through the Null stub. IDevice::IsOperational()
+                // returns false so upstream managers surface
+                // DeviceNotOperational rather than faking success.
+                return Backends::Null::CreateNullDevice();
             }
 
             std::terminate();

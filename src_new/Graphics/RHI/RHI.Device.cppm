@@ -35,6 +35,18 @@ namespace Extrinsic::RHI
         virtual void Shutdown()   = 0;
         virtual void WaitIdle()   = 0;
 
+        // ---- Backend status ------------------------------------------
+        /// Whether this backend can actually issue GPU work. Real backends
+        /// inherit the default true. Stub / null backends override this to
+        /// false so callers can short-circuit cleanly without waiting for
+        /// per-call failures. Must be stable for the lifetime of the
+        /// device (return the same value on every call).
+        ///
+        /// Upstream managers (BufferManager, TextureManager, etc.) consult
+        /// this inside Create() and return Core::ErrorCode::DeviceNotOperational
+        /// when false, so no GPU-shaped call touches a stub backend.
+        [[nodiscard]] virtual bool IsOperational() const noexcept { return true; }
+
         // ---- Frame lifecycle -----------------------------------------
         virtual bool BeginFrame(FrameHandle& outFrame)    = 0;
         virtual void EndFrame(const FrameHandle& frame)   = 0;

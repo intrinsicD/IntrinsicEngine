@@ -168,6 +168,10 @@ namespace Extrinsic::RHI
         const PipelineDesc&      desc,
         PipelineCompiledCallback onCompiled)
     {
+        // F14: short-circuit on stub backends.
+        if (!m_Impl->Device.IsOperational())
+            return Core::Err<PipelineLease>(Core::ErrorCode::DeviceNotOperational);
+
         // Compile synchronously on the calling (render) thread.
         PipelineHandle deviceHandle = m_Impl->Device.CreatePipeline(desc);
         if (!deviceHandle.IsValid())

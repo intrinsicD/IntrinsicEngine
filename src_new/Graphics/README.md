@@ -29,7 +29,8 @@ production on top of RHI.
 
 ### Backends (under `Backends/`)
 
-- `Extrinsic.Backends.Vulkan` — Vulkan 1.3 implementation of RHI.
+- `Extrinsic.Backends.Null` — stub IDevice (`IsOperational() == false`);
+  scaffold for a future `Extrinsic.Backends.Vulkan` module.
 
 ## Target architecture
 

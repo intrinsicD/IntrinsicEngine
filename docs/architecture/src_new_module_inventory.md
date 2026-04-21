@@ -37,7 +37,7 @@ _Generated on 2026-04-18 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.ECS.Scene.Registry` | `src_new/ECS/ECS.Scene.Registry.cppm` | `ECS` |
 | `Extrinsic.ECS.System.RenderSync` | `src_new/ECS/Systems/ECS.System.RenderSync.cppm` | `ECS` |
 | `Extrinsic.ECS.System.TransformHierarchy` | `src_new/ECS/Systems/ECS.System.TransformHierarchy.cppm` | `ECS` |
-| `Extrinsic.Backends.Vulkan` | `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.cppm` | `Graphics` |
+| `Extrinsic.Backends.Null` | `src_new/Graphics/Backends/Null/Backends.Null.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Renderer` | `src_new/Graphics/Graphics.Renderer.cppm` | `Graphics` |
 | `Extrinsic.RHI.CommandContext` | `src_new/Graphics/RHI/RHI.CommandContext.cppm` | `Graphics` |
 | `Extrinsic.RHI.Device` | `src_new/Graphics/RHI/RHI.Device.cppm` | `Graphics` |
