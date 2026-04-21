@@ -66,6 +66,13 @@ namespace Extrinsic::RHI
         std::deque<BufferSlot>        Slots;
         std::vector<std::uint32_t>    FreeList;
 
+        // Count of live BufferLease instances outstanding against this manager.
+        // Incremented on every Create (primary lease) and every Retain
+        // (additional lease via Share / AcquireLease). Decremented on every
+        // Release. The destructor asserts this is zero to catch the
+        // lease-outlives-manager UAF in Debug (see F2 in the code review).
+        std::atomic<std::uint32_t>    LiveLeaseCount{0};
+
         explicit Impl(IDevice& device) : Device(device) {}
 
         // Returns the slot if the handle is live and generation matches.
@@ -95,7 +102,21 @@ namespace Extrinsic::RHI
         : m_Impl(std::make_unique<Impl>(device))
     {}
 
-    BufferManager::~BufferManager() = default;
+    BufferManager::~BufferManager()
+    {
+        // Contract: every BufferLease issued by this manager must be destroyed
+        // before this destructor runs. A lingering lease will call Release()
+        // on a manager whose m_Impl has been freed — classic use-after-free.
+        // The assertion catches this in Debug; in Release builds (NDEBUG), the
+        // UAF will still occur but the class-level doc makes the contract
+        // explicit.
+        const auto alive = m_Impl->LiveLeaseCount.load(std::memory_order_acquire);
+        assert(alive == 0 &&
+               "BufferManager destroyed while leases are still alive — drop all "
+               "BufferLease instances (and any BufferManager::BufferLease "
+               "members of other objects) before destroying this manager.");
+        (void)alive; // avoid unused-variable warning in NDEBUG builds
+    }
 
     // -----------------------------------------------------------------
     Core::Expected<BufferManager::BufferLease> BufferManager::Create(const BufferDesc& desc)
@@ -135,6 +156,7 @@ namespace Extrinsic::RHI
 
         // Issue our own pool handle — callers never see the device-internal handle.
         BufferHandle poolHandle{index, generation};
+        m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
         return BufferLease::Adopt(*this, poolHandle);
     }
 
@@ -145,7 +167,10 @@ namespace Extrinsic::RHI
         BufferSlot* slot = m_Impl->Resolve(handle);
         assert(slot && "Retain called on invalid or released handle");
         if (slot)
+        {
             slot->RefCount.fetch_add(1, std::memory_order_relaxed);
+            m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
+        }
     }
 
     // -----------------------------------------------------------------
@@ -159,6 +184,10 @@ namespace Extrinsic::RHI
             slot->RefCount.fetch_sub(1, std::memory_order_acq_rel);
 
         assert(prev > 0 && "Refcount underflow");
+
+        // Decrement the manager-wide live-lease counter. acq_rel so the
+        // destructor's acquire-load synchronises with the last Release.
+        m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
 
         if (prev == 1)
         {

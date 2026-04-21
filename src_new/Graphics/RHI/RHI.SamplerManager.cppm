@@ -35,6 +35,11 @@ import Extrinsic.RHI.Device;
 //   - Retain() / Release() — atomic, any thread.
 //   - Release() at zero — render thread (calls IDevice::DestroySampler).
 //
+// Lifetime contract: identical to BufferManager — every SamplerLease
+// issued by this manager must be destroyed before the manager itself,
+// or Release() will use-after-free into the freed Impl. Asserted in
+// Debug; documented here for Release builds.
+//
 // Usage:
 //
 //   SamplerManager mgr{device};

@@ -32,6 +32,17 @@ import Extrinsic.RHI.Device;
 //   - View() / GetDesc() are read-only and lock-free after
 //     Create() has returned.
 //
+// Lifetime contract:
+//   Every BufferLease issued by this manager MUST be destroyed
+//   before the manager itself is destroyed. A lingering lease
+//   will call Release() on a manager whose internal state has
+//   been freed — classic use-after-free. The destructor asserts
+//   this invariant in Debug; Release builds with NDEBUG will
+//   still fault but the contract is explicit here. Typical
+//   culprits: raw pointer captures in long-lived lambdas,
+//   BufferLease members of async-task state, caches that
+//   outlive the frame graph.
+//
 // Usage:
 //
 //   BufferManager mgr{device};

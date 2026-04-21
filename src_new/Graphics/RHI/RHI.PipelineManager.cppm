@@ -47,6 +47,11 @@ import Extrinsic.RHI.Device;
 //   - Retain() / Release() — atomic, any thread.
 //   - GetDeviceHandle() / IsReady() — lock-free read, any thread.
 //
+// Lifetime contract: identical to BufferManager — every PipelineLease
+// issued by this manager must be destroyed before the manager itself,
+// or Release() will use-after-free into the freed Impl. Asserted in
+// Debug; documented here for Release builds.
+//
 // Usage:
 //
 //   PipelineManager mgr{device};
