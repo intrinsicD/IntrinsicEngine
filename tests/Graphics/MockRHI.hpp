@@ -72,7 +72,7 @@ namespace Extrinsic::Tests
         void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
-                                      std::uint64_t, std::uint32_t, std::uint32_t) override {}
+                                      std::uint64_t, std::uint32_t) override {}
         void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
         void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
