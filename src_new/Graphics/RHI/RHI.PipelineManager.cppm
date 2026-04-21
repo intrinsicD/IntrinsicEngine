@@ -7,6 +7,7 @@ module;
 
 export module Extrinsic.RHI.PipelineManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
@@ -90,9 +91,11 @@ export namespace Extrinsic::RHI
         /// Compile a new pipeline synchronously and return a lease.
         /// The optional callback fires on CommitPending() after every
         /// successful compile (initial + hot-reload).
-        /// Returns an empty lease on compilation failure.
-        [[nodiscard]] PipelineLease Create(const PipelineDesc&             desc,
-                                           PipelineCompiledCallback         onCompiled = {});
+        /// Returns a Core::ErrorCode on failure:
+        ///   - PipelineCreationFailed: IDevice::CreatePipeline returned an
+        ///     invalid handle (shader compile, layout mismatch, OOM, etc.).
+        [[nodiscard]] Core::Expected<PipelineLease> Create(const PipelineDesc&            desc,
+                                                           PipelineCompiledCallback        onCompiled = {});
 
         // -----------------------------------------------------------------
         // LeasableManager concept requirements
