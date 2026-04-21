@@ -111,6 +111,10 @@ namespace Extrinsic::RHI
         std::mutex                   PendingMutex;  // guards PendingCommits
         std::vector<PendingCommit>   PendingCommits;
 
+        // Outstanding PipelineLease instances. See BufferManager.cpp for the
+        // F2 rationale.
+        std::atomic<std::uint32_t>   LiveLeaseCount{0};
+
         explicit Impl(IDevice& device) : Device(device) {}
 
         [[nodiscard]] PipelineSlot* Resolve(PipelineHandle handle) noexcept
@@ -141,8 +145,20 @@ namespace Extrinsic::RHI
 
     PipelineManager::~PipelineManager()
     {
-        // Drain any pending commits that were never promoted (e.g. shutdown
-        // race).  Destroy the newly compiled but unswapped device pipelines.
+        // F2: every PipelineLease issued by this manager must be destroyed
+        // before this destructor runs. A lingering lease will call Release()
+        // on a freed m_Impl — use-after-free.
+        const auto alive = m_Impl->LiveLeaseCount.load(std::memory_order_acquire);
+        assert(alive == 0 &&
+               "PipelineManager destroyed while leases are still alive — drop "
+               "all PipelineLease instances before destroying this manager.");
+        (void)alive;
+
+        // Drain any pending hot-reload commits that were never promoted (e.g.
+        // shutdown race during a Recompile). Destroy the newly compiled but
+        // unswapped device pipelines. This is unrelated to lease lifetime —
+        // pending commits reference the NEW device pipeline, not user-held
+        // leases.
         for (const PendingCommit& pc : m_Impl->PendingCommits)
             m_Impl->Device.DestroyPipeline(pc.NewDeviceHandle);
     }
@@ -192,6 +208,7 @@ namespace Extrinsic::RHI
         if (m_Impl->Slots[index].OnCompiled)
             m_Impl->Slots[index].OnCompiled(poolHandle);
 
+        m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
         return PipelineLease::Adopt(*this, poolHandle);
     }
 
@@ -201,7 +218,10 @@ namespace Extrinsic::RHI
         PipelineSlot* slot = m_Impl->Resolve(handle);
         assert(slot && "Retain called on invalid or released handle");
         if (slot)
+        {
             slot->RefCount.fetch_add(1, std::memory_order_relaxed);
+            m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
+        }
     }
 
     // -----------------------------------------------------------------
@@ -215,6 +235,8 @@ namespace Extrinsic::RHI
             slot->RefCount.fetch_sub(1, std::memory_order_acq_rel);
 
         assert(prev > 0 && "Refcount underflow");
+
+        m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
 
         if (prev == 1)
         {
