@@ -63,3 +63,19 @@ Asset.Service.cpp
 ## Dependency note
 
 `Assets` depends on `Core`, but `Core` does not depend on `Assets`.
+
+## Assets ↔ Graphics boundary
+
+`Assets` is **CPU-only and GPU-agnostic**. It does not link against `RHI`,
+`Graphics`, or any Vulkan type. `AssetRegistry` stores CPU payload authority
+only — never a `BufferView`, `TextureId`, bindless slot, or any other GPU
+handle.
+
+GPU-side state lives in a Graphics-owned side table (`GpuAssetCache`), keyed
+by `AssetId`. The bridge is event-driven: `AssetEventBus` publishes `Ready`,
+`Reloaded`, `Failed`, and `Destroyed`; `Graphics` subscribes. `Runtime` wires
+the subscription — it is the only layer that names both sides.
+
+See `CLAUDE.md` → "Assets ↔ Graphics boundary" for the full contract
+(per-asset state machine, `TransferManager` reuse, `AssetId`-in-components
+rule, hot-reload atomicity).

@@ -65,6 +65,22 @@ Canonical examples already in `src_new`:
 
 When planning a new module, do the partition split **before** writing the first `.cppm` — not during cleanup later. A module that starts monolithic tends to stay monolithic.
 
+### Assets ↔ Graphics boundary
+
+Cross-subsystem state between `Extrinsic.Asset.*` and `Extrinsic.Graphics.*` follows a one-way, event-bridged contract. This is binding for every asset-backed GPU resource (meshes, textures, materials, shaders, volumes, clouds — everything).
+
+- **Dependency direction is Graphics → Assets. Never the reverse.** `Assets` knows nothing about `Graphics`, `RHI`, or any GPU type. `Graphics` is a read-only consumer of `Extrinsic.Asset.Service`.
+- **`AssetRegistry` holds CPU payload authority only.** Do not write `BufferView`, `TextureId`, bindless slot, or any other GPU handle back into the registry. Doing so forces `Assets` to carry a Graphics-shaped field, breaks headless testability, and entangles hot-reload with GPU invalidation.
+- **Events are the bridge, not direct calls.** `Assets` publishes `Ready` / `Reloaded` / `Failed` / `Destroyed` via `Extrinsic.Asset.EventBus`. `Graphics` subscribes. `Runtime` wires the subscription during composition — it is the only layer allowed to name both sides.
+- **GPU-side state lives in a Graphics-owned side table: `GpuAssetCache`.** Keyed by `AssetId`. Exposes a synchronous `Request(AssetId)` entry point for the "use it this frame" path and an asynchronous `TryGet(AssetId) -> optional<BufferView>` for render extraction. `TryGet` **must not block**; `nullopt` means the draw is skipped or a placeholder is substituted this frame.
+- **Per-asset state machine.** Each cache entry transitions through `NotRequested → CpuPending → GpuUploading → Ready` (plus `Failed`). `Request` either returns the view, kicks `AssetService::Load`, or records "upload after Ready fires". On `AssetEventBus::Ready(id)` the cache enqueues the GPU upload; on transfer completion it flips to `Ready`.
+- **Reuse `RHI::TransferManager` for the upload lane.** It already owns the timeline-semaphore-gated staging queue. `GpuAssetCache` submits into it and observes the timeline value — do **not** invent a second upload queue, a second staging allocator, or a second fence pool.
+- **Hot-reload is the same state machine with a new payload.** Keep the old `BufferView` alive until the new one reaches `Ready`, then perform a one-frame atomic swap. No flicker, no mid-frame invalidation.
+- **ECS components hold `AssetId`, not `BufferView`.** `AssetId` is stable across hot-reload, device-lost, and swapchain recreate; a `BufferView` / bindless index is not. Geometry-bearing components (`Mesh`, `Graph`, `PointCloud`, material references, texture references) store the handle. Render extraction resolves `AssetId → BufferView` once per frame via `GpuAssetCache::TryGet`.
+- **Failure handling is a render-side policy.** The "requested but not ready" state is visible by design. Lifecycle systems may enqueue the request; render extraction decides skip vs. placeholder vs. fallback. Do not hide the latency behind a synchronous blocking load.
+
+Keep all of this policy concentrated inside `GpuAssetCache`. Scattering eviction, reload atomicity, or readiness checks across scene systems is exactly the failure mode that produced the legacy tree's mixed `GeometryPool` / `MaterialRegistry` ownership.
+
 ### Reference documents
 
 - `docs/architecture/src_new-rendering-architecture.md` — target rendering architecture for `src_new/Graphics` (deferred-by-default, GPU-driven, BufferManager-managed geometry, presence-of-component as the rendering switch).

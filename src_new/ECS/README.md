@@ -46,3 +46,12 @@ Systems/
 `Runtime`. Render-side synchronization lives in `Systems/ECS.System.RenderSync`
 and communicates with `Graphics` through data contracts carried on components
 (`RenderGeometry`), not through direct imports of graphics internals.
+
+## Asset references on components
+
+Geometry-bearing components (`Mesh`, `Graph`, `PointCloud`, material/texture
+references) store an `AssetId` — **never** a `BufferView`, bindless index, or
+other GPU handle. `AssetId` is stable across hot-reload, device-lost, and
+swapchain recreate; a GPU handle is not. Graphics resolves `AssetId →
+BufferView` per frame via its `GpuAssetCache::TryGet`. See `CLAUDE.md` →
+"Assets ↔ Graphics boundary".

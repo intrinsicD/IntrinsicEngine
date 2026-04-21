@@ -46,10 +46,40 @@ The rendering design that `src_new/Graphics` builds toward is documented in
   or `PointComponent` determines which pipelines render an entity — no boolean
   flags, no enum routing.
 
+## Assets ↔ Graphics boundary
+
+`Graphics` is the **read-only consumer** of `Extrinsic.Asset.Service`. The
+dependency is strictly one-way: Graphics may import Assets; Assets never
+imports Graphics.
+
+GPU-side state for asset-backed resources lives in a Graphics-owned side
+table — `GpuAssetCache` — keyed by `AssetId`. Its contract:
+
+- **Per-asset state machine:** `NotRequested → CpuPending → GpuUploading →
+  Ready` (plus `Failed`). `Request(AssetId)` is the synchronous "use this
+  frame" entry point; `TryGet(AssetId) -> optional<BufferView>` is the
+  non-blocking render-extraction accessor. `nullopt` means skip or
+  substitute this frame.
+- **Upload lane:** reuse `RHI::TransferManager`. Do not invent a second
+  staging queue, fence pool, or timeline. The cache submits into
+  `TransferManager` and observes the timeline value to flip state.
+- **Reload atomicity:** on `AssetEventBus::Reloaded(id)`, the new payload
+  runs through the same state machine while the old `BufferView` stays
+  alive; the swap to the new view happens in one frame when it reaches
+  `Ready`. No flicker, no mid-frame invalidation.
+- **No writeback into `AssetRegistry`.** GPU handles live only in this
+  cache.
+
+ECS components store `AssetId`, not `BufferView`. Render extraction resolves
+the handle via `GpuAssetCache::TryGet` once per frame.
+
+See `CLAUDE.md` → "Assets ↔ Graphics boundary" for the full policy.
+
 ## Dependency note
 
-`Graphics` depends on `Core` (and, when rendering a scene, on `ECS` component
-contracts). It must not depend on `Runtime`, `Platform` backends directly, or
+`Graphics` depends on `Core` and `Assets` (read-only via `AssetService` +
+`AssetEventBus`). When rendering a scene it also depends on `ECS` component
+contracts. It must not depend on `Runtime`, `Platform` backends directly, or
 on any `App`. Platform surfaces are passed in by `Runtime` at composition
 time; `Graphics` accepts a borrowed `Extrinsic.Platform.Window` reference and
 does not know which backend created it.
