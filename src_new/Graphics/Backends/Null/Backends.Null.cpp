@@ -1,7 +1,10 @@
 module;
 
-// Global Module Fragment: Vulkan headers live ONLY here.
-// Nothing in this file's exported surface ever exposes a Vk* type.
+// Null backend — stub IDevice implementation with no GPU calls. Kept
+// here as a compile-time scaffold and test fixture. When a real Vulkan
+// backend arrives it should live alongside this as Extrinsic.Backends.Vulkan,
+// at which point the global module fragment below will grow the actual
+// vulkan.h / vk_mem_alloc.h includes.
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -10,7 +13,7 @@ module;
 #include <string_view>
 #include <cassert>
 
-module Extrinsic.Backends.Vulkan;
+module Extrinsic.Backends.Null;
 
 import Extrinsic.Core.Config.Render;
 import Extrinsic.RHI.CommandContext;
@@ -25,7 +28,7 @@ import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 
-namespace Extrinsic::Backends::Vulkan
+namespace Extrinsic::Backends::Null
 {
     // ===========================================================
     // Internal generational pool
@@ -231,11 +234,25 @@ namespace Extrinsic::Backends::Vulkan
     };
 
     // ===========================================================
-    // VulkanDevice — implements IDevice with handle-indexed tables
+    // NullDevice — stub IDevice with handle-indexed tables
     // ===========================================================
-    class VulkanDevice final : public RHI::IDevice
+    // Returns well-formed pool handles so upstream managers can exercise
+    // their full refcount / lease / dedup machinery without a live GPU.
+    // IsOperational() returns false so managers short-circuit Create() with
+    // Core::ErrorCode::DeviceNotOperational rather than wrapping a handle
+    // that points to nothing.
+    //
+    // TODO markers throughout this file mark the seams where a real Vulkan
+    // implementation would plug in. When that real backend arrives it
+    // should live in a sibling Backends/Vulkan/ directory as its own module
+    // rather than an in-place rewrite of this file — keeping the null
+    // backend as a reliable test fixture.
+    class NullDevice final : public RHI::IDevice
     {
     public:
+        // ---- Backend status ------------------------------------------
+        [[nodiscard]] bool IsOperational() const noexcept override { return false; }
+
         // ---- Device lifecycle ----------------------------------------
         void Initialize(Platform::IWindow& window,
                         const Core::Config::RenderConfig& config) override
@@ -448,9 +465,9 @@ namespace Extrinsic::Backends::Vulkan
     // ===========================================================
     // Public factory — the only symbol exported by this module
     // ===========================================================
-    std::unique_ptr<RHI::IDevice> CreateVulkanDevice()
+    std::unique_ptr<RHI::IDevice> CreateNullDevice()
     {
-        return std::make_unique<VulkanDevice>();
+        return std::make_unique<NullDevice>();
     }
 }
 
