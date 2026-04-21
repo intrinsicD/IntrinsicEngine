@@ -12,6 +12,7 @@ module;
 
 module Extrinsic.RHI.PipelineManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
@@ -147,14 +148,14 @@ namespace Extrinsic::RHI
     }
 
     // -----------------------------------------------------------------
-    PipelineManager::PipelineLease PipelineManager::Create(
+    Core::Expected<PipelineManager::PipelineLease> PipelineManager::Create(
         const PipelineDesc&      desc,
         PipelineCompiledCallback onCompiled)
     {
         // Compile synchronously on the calling (render) thread.
         PipelineHandle deviceHandle = m_Impl->Device.CreatePipeline(desc);
         if (!deviceHandle.IsValid())
-            return {};
+            return Core::Err<PipelineLease>(Core::ErrorCode::PipelineCreationFailed);
 
         std::uint32_t index;
         std::uint32_t generation;

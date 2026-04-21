@@ -145,14 +145,16 @@ namespace Extrinsic::Graphics
             const std::uint64_t drawBytes  = capacity * sizeof(RHI::GpuDrawCommand);
             const std::uint64_t countBytes = sizeof(std::uint32_t);
 
-            CullDataBuffer = BufferMgr->Create({
+            auto cullOr = BufferMgr->Create({
                 .SizeBytes   = cullBytes,
                 .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
                 .HostVisible = false,
                 .DebugName   = "CullDataBuffer",
             });
+            if (!cullOr.has_value()) return false;
+            CullDataBuffer = std::move(*cullOr);
 
-            DrawCommandBuffer = BufferMgr->Create({
+            auto drawOr = BufferMgr->Create({
                 .SizeBytes   = drawBytes,
                 .Usage       = RHI::BufferUsage::Storage
                               | RHI::BufferUsage::Indirect
@@ -160,17 +162,17 @@ namespace Extrinsic::Graphics
                 .HostVisible = false,
                 .DebugName   = "DrawCommandBuffer",
             });
+            if (!drawOr.has_value()) return false;
+            DrawCommandBuffer = std::move(*drawOr);
 
-            VisibilityCountBuffer = BufferMgr->Create({
+            auto visOr = BufferMgr->Create({
                 .SizeBytes   = countBytes,
                 .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
                 .HostVisible = false,
                 .DebugName   = "VisibilityCountBuffer",
             });
-
-            if (!CullDataBuffer.IsValid() || !DrawCommandBuffer.IsValid()
-                || !VisibilityCountBuffer.IsValid())
-                return false;
+            if (!visOr.has_value()) return false;
+            VisibilityCountBuffer = std::move(*visOr);
 
             // Cache BDAs so DispatchCull() doesn't call GetBufferDeviceAddress() each frame.
             CullDataBDA        = Device->GetBufferDeviceAddress(CullDataBuffer.GetHandle());

@@ -10,6 +10,7 @@ module;
 
 module Extrinsic.RHI.BufferManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
@@ -97,12 +98,12 @@ namespace Extrinsic::RHI
     BufferManager::~BufferManager() = default;
 
     // -----------------------------------------------------------------
-    BufferManager::BufferLease BufferManager::Create(const BufferDesc& desc)
+    Core::Expected<BufferManager::BufferLease> BufferManager::Create(const BufferDesc& desc)
     {
         // Ask the device to allocate the GPU resource.
         BufferHandle deviceHandle = m_Impl->Device.CreateBuffer(desc);
         if (!deviceHandle.IsValid())
-            return {}; // allocation failed — propagate empty lease
+            return Core::Err<BufferLease>(Core::ErrorCode::OutOfDeviceMemory);
 
         std::uint32_t index;
         std::uint32_t generation;

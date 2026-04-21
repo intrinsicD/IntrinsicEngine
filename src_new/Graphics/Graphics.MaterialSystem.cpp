@@ -157,8 +157,9 @@ namespace Extrinsic::Graphics
                 .DebugName  = "MaterialSSBO",
             };
 
-            auto newBuffer = BufferMgr->Create(desc);
-            if (!newBuffer.IsValid()) return false;
+            auto newBufferOr = BufferMgr->Create(desc);
+            if (!newBufferOr.has_value()) return false;
+            auto newBuffer = std::move(*newBufferOr);
 
             // If we had a previous buffer, upload the existing slots first
             // so the new SSBO has valid data from slot 0 upward.

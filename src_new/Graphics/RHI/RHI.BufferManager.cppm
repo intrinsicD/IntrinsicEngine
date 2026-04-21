@@ -5,6 +5,7 @@ module;
 
 export module Extrinsic.RHI.BufferManager;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
@@ -77,8 +78,9 @@ export namespace Extrinsic::RHI
 
         /// Allocate a new GPU buffer and return a ref-counted lease.
         /// Refcount starts at 1 — the returned lease is the sole owner.
-        /// Returns an empty (invalid) lease if allocation fails.
-        [[nodiscard]] BufferLease Create(const BufferDesc& desc);
+        /// Returns a Core::ErrorCode on failure:
+        ///   - OutOfDeviceMemory: IDevice::CreateBuffer returned an invalid handle.
+        [[nodiscard]] Core::Expected<BufferLease> Create(const BufferDesc& desc);
 
         // -----------------------------------------------------------------
         // LeasableManager concept requirements (called by Lease internals)
