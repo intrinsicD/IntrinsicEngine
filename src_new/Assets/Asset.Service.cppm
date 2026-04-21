@@ -70,13 +70,6 @@ export namespace Extrinsic::Assets
         Core::Result Destroy(AssetId id);
         void Tick();
 
-        // Exposed for advanced wiring / testing.
-        [[nodiscard]] AssetRegistry& Registry() noexcept;
-        [[nodiscard]] AssetEventBus& EventBus() noexcept;
-        [[nodiscard]] AssetPayloadStore& PayloadStore() noexcept;
-        [[nodiscard]] const AssetPayloadStore& PayloadStore() const noexcept;
-        [[nodiscard]] AssetLoadPipeline& LoadPipeline() noexcept;
-
         template <class T>
         [[nodiscard]] static uint32_t TypeIdOf() noexcept;
 
@@ -86,6 +79,19 @@ export namespace Extrinsic::Assets
         [[nodiscard]] bool PathIndexContains(std::string_view absolutePath) const;
 
     private:
+        // Internal module accessors. These used to be public ("exposed for
+        // advanced wiring / testing") but that let callers bypass AssetService's
+        // invariants (lock ordering, state transitions, pathIndex/registry
+        // coupling). They are private now; the templated Load/Read/Reload
+        // methods below need them for type dispatch and are AssetService
+        // members, so access is preserved. No non-member external caller
+        // existed before this change.
+        [[nodiscard]] AssetRegistry& Registry() noexcept;
+        [[nodiscard]] AssetEventBus& EventBus() noexcept;
+        [[nodiscard]] AssetPayloadStore& PayloadStore() noexcept;
+        [[nodiscard]] const AssetPayloadStore& PayloadStore() const noexcept;
+        [[nodiscard]] AssetLoadPipeline& LoadPipeline() noexcept;
+
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
     };
