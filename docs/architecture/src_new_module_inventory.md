@@ -51,9 +51,34 @@ _Generated on 2026-04-21 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.ECS.System.TransformHierarchy` | `src_new/ECS/Systems/ECS.System.TransformHierarchy.cppm` | `ECS` |
 | `Extrinsic.Backends.Null` | `src_new/Graphics/Backends/Null/Backends.Null.cppm` | `Graphics` |
 | `Extrinsic.Graphics.CullingSystem` | `src_new/Graphics/Graphics.CullingSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.DeferredSystem` | `src_new/Graphics/Graphics.DeferredSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.ForwardSystem` | `src_new/Graphics/Graphics.ForwardSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.LightSystem` | `src_new/Graphics/Graphics.LightSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Material` | `src_new/Graphics/Graphics.Material.cppm` | `Graphics` |
 | `Extrinsic.Graphics.MaterialSystem` | `src_new/Graphics/Graphics.MaterialSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.PostProcessSystem` | `src_new/Graphics/Graphics.PostProcessSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderFrameInput` | `src_new/Graphics/Graphics.RenderFrameInput.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderWorld` | `src_new/Graphics/Graphics.RenderWorld.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Renderer` | `src_new/Graphics/Graphics.Renderer.cppm` | `Graphics` |
+| `Extrinsic.Graphics.SelectionSystem` | `src_new/Graphics/Graphics.SelectionSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.ShadowSystem` | `src_new/Graphics/Graphics.ShadowSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Culling` | `src_new/Graphics/Passes/Pass.Culling.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `src_new/Graphics/Passes/Pass.Deferred.GBuffers.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Deferred.Lighting` | `src_new/Graphics/Passes/Pass.Deferred.Lighting.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Forward.Line` | `src_new/Graphics/Passes/Pass.Forward.Line.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Forward.Point` | `src_new/Graphics/Passes/Pass.Forward.Point.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Forward.Surface` | `src_new/Graphics/Passes/Pass.Forward.Surface.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.PostProcess.Bloom` | `src_new/Graphics/Passes/Pass.PostProcess.Bloom.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.PostProcess.FXAA` | `src_new/Graphics/Passes/Pass.PostProcess.FXAA.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.PostProcess.Histogram` | `src_new/Graphics/Passes/Pass.PostProcess.Histogram.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.PostProcess.SMAA` | `src_new/Graphics/Passes/Pass.PostProcess.SMAA.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.PostProcess.ToneMap` | `src_new/Graphics/Passes/Pass.PostProcess.ToneMap.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Selection.EdgeId` | `src_new/Graphics/Passes/Pass.Selection.EdgeId.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Selection.EntityId` | `src_new/Graphics/Passes/Pass.Selection.EntityId.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Selection.FaceId` | `src_new/Graphics/Passes/Pass.Selection.FaceId.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Selection.Outline` | `src_new/Graphics/Passes/Pass.Selection.Outline.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Selection.PointId` | `src_new/Graphics/Passes/Pass.Selection.PointId.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Shadows` | `src_new/Graphics/Passes/Pass.Shadows.cppm` | `Graphics` |
 | `Extrinsic.RHI.Bindless` | `src_new/Graphics/RHI/RHI.Bindless.cppm` | `Graphics` |
 | `Extrinsic.RHI.BufferManager` | `src_new/Graphics/RHI/RHI.BufferManager.cppm` | `Graphics` |
 | `Extrinsic.RHI.BufferView` | `src_new/Graphics/RHI/RHI.BufferView.cppm` | `Graphics` |
@@ -71,5 +96,6 @@ _Generated on 2026-04-21 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Platform.Window` | `src_new/Platform/Platform.IWindow.cppm` | `Platform` |
 | `Extrinsic.Platform.Input` | `src_new/Platform/Platform.Input.cppm` | `Platform` |
 | `Extrinsic.Runtime.Engine` | `src_new/Runtime/Runtime.Engine.cppm` | `Runtime` |
+| `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `Runtime` |
 
-Total modules: **67**
+Total modules: **93**

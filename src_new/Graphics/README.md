@@ -10,6 +10,23 @@ production on top of RHI.
 
 - `Extrinsic.Graphics.Renderer`
 
+### Systems
+
+- `Extrinsic.Graphics.MaterialSystem` — material type/instance owner and GPU SSBO authority.
+- `Extrinsic.Graphics.CullingSystem` — GPU-driven culling buffer/pipeline authority.
+- `Extrinsic.Graphics.LightSystem` — frame-global lighting state owner for camera UBO population.
+- `Extrinsic.Graphics.SelectionSystem` — selection request/result owner for selection passes.
+- `Extrinsic.Graphics.ForwardSystem` — forward pass family owner scaffold.
+- `Extrinsic.Graphics.DeferredSystem` — deferred pass family owner scaffold.
+- `Extrinsic.Graphics.PostProcessSystem` — post-process pass family owner scaffold.
+- `Extrinsic.Graphics.ShadowSystem` — shadow pass family owner scaffold.
+
+### Data contracts
+
+- `Extrinsic.Graphics.Material`
+- `Extrinsic.Graphics.RenderFrameInput`
+- `Extrinsic.Graphics.RenderWorld`
+
 ### RHI (under `RHI/`)
 
 - `Extrinsic.RHI.Device`
@@ -31,6 +48,26 @@ production on top of RHI.
 
 - `Extrinsic.Backends.Null` — stub IDevice (`IsOperational() == false`);
   scaffold for a future `Extrinsic.Backends.Vulkan` module.
+
+### Passes (under `Passes/`)
+
+- `Extrinsic.Graphics.Pass.Culling`
+- `Extrinsic.Graphics.Pass.Deferred.GBuffers`
+- `Extrinsic.Graphics.Pass.Deferred.Lighting`
+- `Extrinsic.Graphics.Pass.Forward.Surface`
+- `Extrinsic.Graphics.Pass.Forward.Line`
+- `Extrinsic.Graphics.Pass.Forward.Point`
+- `Extrinsic.Graphics.Pass.PostProcess.Bloom`
+- `Extrinsic.Graphics.Pass.PostProcess.FXAA`
+- `Extrinsic.Graphics.Pass.PostProcess.Histogram`
+- `Extrinsic.Graphics.Pass.PostProcess.SMAA`
+- `Extrinsic.Graphics.Pass.PostProcess.ToneMap`
+- `Extrinsic.Graphics.Pass.Selection.EntityId`
+- `Extrinsic.Graphics.Pass.Selection.PointId`
+- `Extrinsic.Graphics.Pass.Selection.EdgeId`
+- `Extrinsic.Graphics.Pass.Selection.FaceId`
+- `Extrinsic.Graphics.Pass.Selection.Outline`
+- `Extrinsic.Graphics.Pass.Shadows`
 
 ## Target architecture
 

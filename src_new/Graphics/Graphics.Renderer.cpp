@@ -13,6 +13,12 @@ import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.CullingSystem;
+import Extrinsic.Graphics.LightSystem;
+import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Graphics.ForwardSystem;
+import Extrinsic.Graphics.DeferredSystem;
+import Extrinsic.Graphics.PostProcessSystem;
+import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 
@@ -30,12 +36,39 @@ namespace Extrinsic::Graphics
             m_MaterialSystem .emplace();
             m_MaterialSystem->Initialize(device, *m_BufferManager);
             m_CullingSystem  .emplace();
+            m_LightSystem    .emplace();
+            m_LightSystem->Initialize();
+            m_SelectionSystem.emplace();
+            m_SelectionSystem->Initialize();
+            m_ForwardSystem.emplace();
+            m_ForwardSystem->Initialize();
+            m_DeferredSystem.emplace();
+            m_DeferredSystem->Initialize();
+            m_PostProcessSystem.emplace();
+            m_PostProcessSystem->Initialize();
+            m_ShadowSystem.emplace();
+            m_ShadowSystem->Initialize();
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
         }
 
         void Shutdown() override
         {
+            if (m_SelectionSystem) m_SelectionSystem->Shutdown();
+            if (m_LightSystem)     m_LightSystem->Shutdown();
+            if (m_ForwardSystem)   m_ForwardSystem->Shutdown();
+            if (m_DeferredSystem)  m_DeferredSystem->Shutdown();
+            if (m_PostProcessSystem) m_PostProcessSystem->Shutdown();
+            if (m_ShadowSystem)    m_ShadowSystem->Shutdown();
+            if (m_CullingSystem)   m_CullingSystem->Shutdown();
+            if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
+
+            m_SelectionSystem.reset();
+            m_LightSystem    .reset();
+            m_ForwardSystem  .reset();
+            m_DeferredSystem .reset();
+            m_PostProcessSystem.reset();
+            m_ShadowSystem   .reset();
             m_CullingSystem  .reset();
             m_MaterialSystem .reset();
             m_PipelineManager.reset();
@@ -94,6 +127,12 @@ namespace Extrinsic::Graphics
         RHI::PipelineManager& GetPipelineManager() override { return *m_PipelineManager; }
         MaterialSystem&        GetMaterialSystem()  override { return *m_MaterialSystem;  }
         CullingSystem&         GetCullingSystem()   override { return *m_CullingSystem;   }
+        LightSystem&           GetLightSystem()     override { return *m_LightSystem;     }
+        SelectionSystem&       GetSelectionSystem() override { return *m_SelectionSystem; }
+        ForwardSystem&         GetForwardSystem()   override { return *m_ForwardSystem;   }
+        DeferredSystem&        GetDeferredSystem()  override { return *m_DeferredSystem;  }
+        PostProcessSystem&     GetPostProcessSystem() override { return *m_PostProcessSystem; }
+        ShadowSystem&          GetShadowSystem()    override { return *m_ShadowSystem;    }
 
     private:
         std::optional<RHI::BufferManager>   m_BufferManager;
@@ -102,6 +141,12 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager> m_PipelineManager;
         std::optional<MaterialSystem>        m_MaterialSystem;
         std::optional<CullingSystem>         m_CullingSystem;
+        std::optional<LightSystem>           m_LightSystem;
+        std::optional<SelectionSystem>       m_SelectionSystem;
+        std::optional<ForwardSystem>         m_ForwardSystem;
+        std::optional<DeferredSystem>        m_DeferredSystem;
+        std::optional<PostProcessSystem>     m_PostProcessSystem;
+        std::optional<ShadowSystem>          m_ShadowSystem;
     };
 
     std::unique_ptr<IRenderer> CreateRenderer()

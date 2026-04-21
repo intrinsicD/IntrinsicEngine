@@ -1,0 +1,40 @@
+target_sources(${target_name}
+		PUBLIC
+		FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+		Pass.Culling.cppm
+		Pass.Deferred.GBuffers.cppm
+		Pass.Deferred.Lighting.cppm
+		Pass.Forward.Line.cppm
+		Pass.Forward.Point.cppm
+		Pass.Forward.Surface.cppm
+		Pass.PostProcess.Bloom.cppm
+		Pass.PostProcess.FXAA.cppm
+		Pass.PostProcess.Histogram.cppm
+		Pass.PostProcess.SMAA.cppm
+		Pass.PostProcess.ToneMap.cppm
+		Pass.Selection.EdgeId.cppm
+		Pass.Selection.EntityId.cppm
+		Pass.Selection.FaceId.cppm
+		Pass.Selection.Outline.cppm
+		Pass.Selection.PointId.cppm
+		Pass.Shadows.cppm
+		PRIVATE
+		Pass.Culling.cpp
+		Pass.Deferred.GBuffers.cpp
+		Pass.Deferred.Lighting.cpp
+		Pass.Forward.Line.cpp
+		Pass.Forward.Point.cpp
+		Pass.Forward.Surface.cpp
+		Pass.PostProcess.Bloom.cpp
+		Pass.PostProcess.FXAA.cpp
+		Pass.PostProcess.Histogram.cpp
+		Pass.PostProcess.SMAA.cpp
+		Pass.PostProcess.ToneMap.cpp
+		Pass.Selection.EdgeId.cpp
+		Pass.Selection.EntityId.cpp
+		Pass.Selection.FaceId.cpp
+		Pass.Selection.Outline.cpp
+		Pass.Selection.PointId.cpp
+		Pass.Shadows.cpp
+)
+

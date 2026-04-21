@@ -12,10 +12,22 @@ target_sources(${target_name}
         Graphics.Material.cppm
         Graphics.MaterialSystem.cppm
         Graphics.CullingSystem.cppm
+        Graphics.LightSystem.cppm
+        Graphics.SelectionSystem.cppm
+        Graphics.ForwardSystem.cppm
+        Graphics.DeferredSystem.cppm
+        Graphics.PostProcessSystem.cppm
+        Graphics.ShadowSystem.cppm
         PRIVATE
         Graphics.Renderer.cpp
         Graphics.MaterialSystem.cpp
         Graphics.CullingSystem.cpp
+        Graphics.LightSystem.cpp
+        Graphics.SelectionSystem.cpp
+        Graphics.ForwardSystem.cpp
+        Graphics.DeferredSystem.cpp
+        Graphics.PostProcessSystem.cpp
+        Graphics.ShadowSystem.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

@@ -13,6 +13,12 @@ import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.CullingSystem;
+import Extrinsic.Graphics.LightSystem;
+import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Graphics.ForwardSystem;
+import Extrinsic.Graphics.DeferredSystem;
+import Extrinsic.Graphics.PostProcessSystem;
+import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 
@@ -75,6 +81,12 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineManager& GetPipelineManager() = 0;
         [[nodiscard]] virtual MaterialSystem&        GetMaterialSystem()  = 0;
         [[nodiscard]] virtual CullingSystem&         GetCullingSystem()   = 0;
+        [[nodiscard]] virtual LightSystem&           GetLightSystem()     = 0;
+        [[nodiscard]] virtual SelectionSystem&       GetSelectionSystem() = 0;
+        [[nodiscard]] virtual ForwardSystem&         GetForwardSystem()   = 0;
+        [[nodiscard]] virtual DeferredSystem&        GetDeferredSystem()  = 0;
+        [[nodiscard]] virtual PostProcessSystem&     GetPostProcessSystem() = 0;
+        [[nodiscard]] virtual ShadowSystem&          GetShadowSystem()    = 0;
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();
