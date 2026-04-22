@@ -7,6 +7,10 @@ module Extrinsic.Runtime.Engine;
 
 import Extrinsic.Backends.Null;
 import Extrinsic.Core.Config.Render;
+import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Dag.TaskGraph;
+import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Tasks;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
@@ -14,6 +18,8 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.FrameClock;
+import Extrinsic.Asset.Service;
+import Extrinsic.ECS.Scene.Registry;
 
 namespace Extrinsic::Runtime
 {
@@ -33,6 +39,37 @@ namespace Extrinsic::Runtime
                 return Backends::Null::CreateNullDevice();
             }
             std::terminate();
+        }
+
+        // Drain and dispatch all tasks produced by the streaming graph's plan.
+        // Called once per frame in the maintenance lane (Phase 10).
+        // No-op if the graph has no passes registered this frame.
+        void TickStreamingGraph(Core::Dag::TaskGraph& graph)
+        {
+            if (graph.PassCount() == 0)
+                return;
+
+            if (auto r = graph.Compile(); !r.has_value())
+                return; // cycle or empty graph — skip silently
+
+            auto plan = graph.BuildPlan();
+            if (!plan.has_value())
+                return;
+
+            // Move each pass's closure out of the graph before Reset() so the
+            // worker thread's capture outlives the graph's internal storage.
+            // After TakePassExecute the graph slot is null — no double-fire.
+            for (const auto& task : *plan)
+            {
+                auto fn = graph.TakePassExecute(task.id.Index);
+                if (fn)
+                {
+                    Core::Tasks::Scheduler::Dispatch(
+                        [f = std::move(fn)]() mutable { f(); });
+                }
+            }
+
+            graph.Reset();
         }
     }
 
@@ -57,12 +94,30 @@ namespace Extrinsic::Runtime
 
     void Engine::Initialize()
     {
+        // ── 1. CPU fiber scheduler ────────────────────────────────────────
+        // Must be first — all three graphs dispatch through it.
+        Core::Tasks::Scheduler::Initialize(m_Config.Simulation.WorkerThreadCount);
+
+        // ── 2. Subsystems ─────────────────────────────────────────────────
         m_Window   = Platform::CreateWindow(m_Config.Window);
         m_Device   = CreateDevice(m_Config.Render);
         m_Device->Initialize(*m_Window, m_Config.Render);
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
 
+        // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
+        m_FrameGraph = std::make_unique<Core::FrameGraph>();
+
+        // ── 4. Streaming task graph (asset IO / geometry processing) ──────
+        m_StreamingGraph = Core::Dag::CreateTaskGraph(Core::Dag::QueueDomain::Streaming);
+
+        // ── 5. Asset service ──────────────────────────────────────────────
+        m_AssetService = std::make_unique<Assets::AssetService>();
+
+        // ── 6. ECS scene ──────────────────────────────────────────────────
+        m_Scene = std::make_unique<ECS::Scene::Registry>();
+
+        // ── 7. Application ────────────────────────────────────────────────
         m_Application->OnInitialize(*this);
 
         m_Initialized = true;
@@ -79,6 +134,14 @@ namespace Extrinsic::Runtime
         if (m_Application)
             m_Application->OnShutdown(*this);
 
+        // Drain any in-flight streaming tasks before tearing down the scheduler.
+        Core::Tasks::Scheduler::WaitForAll();
+
+        m_Scene.reset();
+        m_AssetService.reset();
+        m_StreamingGraph.reset();
+        m_FrameGraph.reset();
+
         if (m_Renderer)
         {
             m_Renderer->Shutdown();
@@ -92,6 +155,11 @@ namespace Extrinsic::Runtime
         }
 
         m_Window.reset();
+
+        // Shut down the fiber scheduler last — worker threads must exit cleanly
+        // before any other thread-local storage or allocators are destroyed.
+        Core::Tasks::Scheduler::Shutdown();
+
         m_Initialized = false;
     }
 
@@ -106,17 +174,11 @@ namespace Extrinsic::Runtime
     void Engine::RunFrame()
     {
         // ── Phase 1: Platform ─────────────────────────────────────────────
-        // Event pumping must happen before any frame-time measurement so that
-        // resize / close events are visible before we commit to a frame.
-
         m_Window->PollEvents();
         m_FrameClock.BeginFrame();
 
         if (m_Window->IsMinimized())
         {
-            // Block until the OS delivers an event (window restore, input, etc.)
-            // then resample the clock so the sleep time does not count as
-            // frame delta — preventing a single huge substep on restore.
             m_Window->WaitForEventsTimeout(kIdleSleepSeconds);
             m_FrameClock.Resample();
             return;
@@ -137,10 +199,9 @@ namespace Extrinsic::Runtime
             m_Window->AcknowledgeResize();
         }
 
-        // ── Phase 2: Fixed-step simulation ────────────────────────────────
-        // Advance the accumulator by a wall-clock delta clamped to
-        // m_MaxFrameDelta.  The clamp prevents the spiral-of-death when a
-        // frame takes longer than the fixed timestep (e.g. debugger pause).
+        // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
+        // Each tick: app adds FrameGraph passes → Engine compiles and executes
+        // the ECS system DAG → reset for next tick.
 
         const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
         m_Accumulator += frameDt;
@@ -148,35 +209,36 @@ namespace Extrinsic::Runtime
         int substeps = 0;
         while (m_Accumulator >= m_FixedDt && substeps < m_MaxSubSteps)
         {
+            // App registers system passes via engine.GetFrameGraph().AddPass(...)
             m_Application->OnSimTick(*this, m_FixedDt);
+
+            // CPU task graph: compile dependency order, execute in topo-layer
+            // sequence (parallel within each layer via Tasks::Scheduler), reset.
+            if (m_FrameGraph->PassCount() > 0)
+            {
+                if (auto r = m_FrameGraph->Compile(); r.has_value())
+                {
+                    (void)m_FrameGraph->Execute();
+                }
+                m_FrameGraph->Reset();
+            }
+
             m_Accumulator -= m_FixedDt;
             ++substeps;
         }
 
-        // alpha ∈ [0, 1): blend factor between the last committed tick and
-        // the next one.  Used by the renderer for position interpolation.
         const double alpha = m_Accumulator / m_FixedDt;
 
         // ── Phase 3: Variable tick ────────────────────────────────────────
-        // Camera, UI state, input processing — anything that runs once per
-        // rendered frame and is NOT part of the deterministic simulation.
-
         m_Application->OnVariableTick(*this, alpha, frameDt);
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
-        // Construct the immutable input that the renderer reads during
-        // extraction.  No mutable engine / ECS / asset references are passed.
-
         const Graphics::RenderFrameInput renderInput{
             .Alpha    = alpha,
             .Viewport = m_Window->GetFramebufferExtent(),
         };
 
-        // ── Phase 5: Renderer — BeginFrame ────────────────────────────────
-        // Acquire the swapchain image and open command contexts.
-        // Returns false on out-of-date / device-lost / other transient errors;
-        // skip the rest of the frame in that case.
-
+        // ── Phase 5: Renderer — BeginFrame (GPU task graph — acquire) ─────
         RHI::FrameHandle frame{};
         if (!m_Renderer->BeginFrame(frame))
         {
@@ -185,43 +247,35 @@ namespace Extrinsic::Runtime
         }
 
         // ── Phase 6: Renderer — ExtractRenderWorld ────────────────────────
-        // Snapshot immutable render data from the committed world state.
-        // After this call the renderer owns the extracted data; Engine does
-        // not touch ECS / asset state until the next frame's Phase 2.
-
         Graphics::RenderWorld renderWorld =
             m_Renderer->ExtractRenderWorld(renderInput);
 
         // ── Phase 7: Renderer — PrepareFrame ──────────────────────────────
-        // CPU frustum cull, draw-packet sort, per-frame staging uploads.
-        // Reads renderWorld (populated above); may write culled draw lists
-        // back into it for Phase 8.
-
         m_Renderer->PrepareFrame(renderWorld);
 
-        // ── Phase 8: Renderer — ExecuteFrame ──────────────────────────────
-        // Record and submit GPU command buffers.  The renderer drives all
-        // pass sequencing internally; the loop knows nothing about passes.
-
+        // ── Phase 8: Renderer — ExecuteFrame (GPU task graph) ─────────────
+        // IRenderer owns its GPU Dag::TaskGraph(Gpu) internally.
+        // It compiles render-pass dependencies, resolves virtual-resource
+        // lifetimes, emits Vulkan Sync2 barriers, and records command buffers.
         m_Renderer->ExecuteFrame(frame, renderWorld);
 
         // ── Phase 9: Renderer — EndFrame + Present ────────────────────────
-        // Release the frame context back to the ring.
-        // completedGpuValue is the timeline value of the oldest in-flight
-        // frame that has now finished — used by the maintenance phase below.
-
         const std::uint64_t completedGpuValue = m_Renderer->EndFrame(frame);
         m_Device->Present(frame);
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         // GPU-side resource retirement, staging GC, readback processing.
-        // Keyed on completedGpuValue so work is only reclaimed after the
-        // GPU has actually finished consuming the resources.
-        //
-        // Future: m_MaintenanceService->CollectGarbage(completedGpuValue);
-
         m_Device->CollectCompletedTransfers();
-        (void)completedGpuValue; // suppress unused-variable until maintenance service lands
+        (void)completedGpuValue; // placeholder until GpuAssetCache / deferred-delete lands
+
+        // Streaming task graph: dispatch background IO / geometry-processing
+        // tasks registered this frame.  TickStreamingGraph compiles the DAG,
+        // hands leaf tasks to Tasks::Scheduler, and resets for next frame.
+        TickStreamingGraph(*m_StreamingGraph);
+
+        // Asset service main-thread tick: advances state machines, fires
+        // AssetEventBus::Ready / Reloaded / Destroyed callbacks.
+        m_AssetService->Tick();
 
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();
@@ -232,7 +286,11 @@ namespace Extrinsic::Runtime
     bool Engine::IsRunning() const noexcept { return m_Running; }
     void Engine::RequestExit()      noexcept { m_Running = false; }
 
-    Platform::IWindow&   Engine::GetWindow()   noexcept { return *m_Window;   }
-    RHI::IDevice&        Engine::GetDevice()   noexcept { return *m_Device;   }
-    Graphics::IRenderer& Engine::GetRenderer() noexcept { return *m_Renderer; }
+    Platform::IWindow&    Engine::GetWindow()        noexcept { return *m_Window;        }
+    RHI::IDevice&         Engine::GetDevice()        noexcept { return *m_Device;        }
+    Graphics::IRenderer&  Engine::GetRenderer()      noexcept { return *m_Renderer;      }
+    Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
+    ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
+    Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
+    Core::Dag::TaskGraph& Engine::GetStreamingGraph() noexcept { return *m_StreamingGraph; }
 }

@@ -6,6 +6,7 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Core.Config.Window.cppm
         Core.Config.Render.cppm
+        Core.Config.Simulation.cppm
         Core.Config.Engine.cppm
         Core.Dag.Scheduler.cppm
         Core.Dag.TaskGraph.cppm

@@ -217,6 +217,9 @@ namespace Extrinsic::Backends::Null
         void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
         void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
+        void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t,
+                                      RHI::BufferHandle, std::uint64_t,
+                                      std::uint32_t) override {}
 
         // Compute
         void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
@@ -334,6 +337,11 @@ namespace Extrinsic::Backends::Null
         {
             (void)handle; (void)data; (void)size; (void)offset;
             // TODO: vmaMapMemory / memcpy / vmaUnmapMemory (or staging upload).
+        }
+
+        [[nodiscard]] std::uint64_t GetBufferDeviceAddress(RHI::BufferHandle) const override
+        {
+            return 0; // BDA not available on Null device
         }
 
         // ---- Texture resources ---------------------------------------

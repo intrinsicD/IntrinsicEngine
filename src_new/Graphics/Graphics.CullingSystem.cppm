@@ -7,9 +7,10 @@ module;
 export module Extrinsic.Graphics.CullingSystem;
 
 import Extrinsic.Core.StrongHandle;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
-import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.Types;
 
@@ -40,129 +41,6 @@ import Extrinsic.RHI.Types;
 // Thread-safety:
 //   All methods — render thread only.
 //   GetXxxBuffer() / GetPipeline() — lock-free read, any thread after Initialize().
-// ============================================================
-
-export namespace Extrinsic::Graphics
-{
-    struct CullingTag;
-    using CullingHandle = Core::StrongHandle<CullingTag>;
-
-    class CullingSystem
-    {
-    public:
-        // ── Lifecycle ─────────────────────────────────────────────────────
-
-        CullingSystem();
-        ~CullingSystem();
-
-        CullingSystem(const CullingSystem&)            = delete;
-        CullingSystem& operator=(const CullingSystem&) = delete;
-
-        /// Allocate GPU buffers and compile the cull compute pipeline.
-        /// cullShaderPath — path to the compiled cull SPIR-V.
-        void Initialize(RHI::IDevice&         device,
-                        RHI::BufferManager&   bufferMgr,
-                        RHI::PipelineManager& pipelineMgr,
-                        std::string_view      cullShaderPath);
-
-        void Shutdown();
-
-        // ── Renderable registration ───────────────────────────────────────
-
-        /// Register a renderable for culling.
-        /// sphere       — world-space bounding sphere.
-        /// drawTemplate — GpuDrawCommand written to DrawCommandBuffer when visible.
-        [[nodiscard]] CullingHandle Register(const RHI::BoundingSphere& sphere,
-                                             const RHI::GpuDrawCommand& drawTemplate);
-
-        /// Remove a previously registered renderable. Slot is recycled.
-        void Unregister(CullingHandle handle);
-
-        /// Update world-space bounding sphere. Marks slot dirty for SyncGpuBuffer().
-        void UpdateBounds(CullingHandle handle, const RHI::BoundingSphere& sphere);
-
-        /// Update draw template (e.g. LOD switch changes index count).
-        void SetDrawTemplate(CullingHandle handle, const RHI::GpuDrawCommand& cmd);
-
-        // ── Per-frame CPU sync ────────────────────────────────────────────
-        // Call SyncGpuBuffer() once per frame before Pass.Culling dispatches.
-
-        /// Upload dirty GpuCullData entries to CullDataBuffer.
-        void SyncGpuBuffer();
-
-        // ── Output buffer accessors (read-only, for Pass.Culling + draw calls) ──
-
-        /// Handle of the cull compute pipeline — bound by Pass.Culling.
-        [[nodiscard]] RHI::PipelineHandle GetCullPipeline()         const noexcept;
-
-        /// SSBO of GpuDrawCommand[] — argBuffer for DrawIndexedIndirectCount.
-        [[nodiscard]] RHI::BufferHandle   GetDrawCommandBuffer()     const noexcept;
-
-        /// Single uint32 — countBuffer for DrawIndexedIndirectCount.
-        [[nodiscard]] RHI::BufferHandle   GetVisibilityCountBuffer() const noexcept;
-
-        /// Input SSBO of GpuCullData[] — read by the compute shader via BDA.
-        [[nodiscard]] RHI::BufferHandle   GetCullDataBuffer()        const noexcept;
-
-        // ── Diagnostics ───────────────────────────────────────────────────
-
-        [[nodiscard]] std::uint32_t GetRegisteredCount() const noexcept;
-        [[nodiscard]] std::uint32_t GetCapacity()        const noexcept;
-
-    private:
-        struct Impl;
-        std::unique_ptr<Impl> m_Impl;
-    };
-}
-
-
-// ============================================================
-// CullingSystem
-// ============================================================
-// GPU-driven frustum culling via a compute shader.
-//
-// Architecture overview:
-//
-//   CPU registers renderables → CullDataBuffer (SSBO, device-local)
-//   DispatchCull() → compute shader tests each sphere → populates:
-//     DrawCommandBuffer (GpuDrawCommand[], indirect draw args)
-//     VisibilityCountBuffer (single uint32 atomic counter)
-//   Renderer calls DrawIndexedIndirectCount(DrawCommandBuffer,
-//     VisibilityCountBuffer) — zero CPU readback needed.
-//
-// Buffer layout (all device-local, bound via BDA in push constants):
-//
-//   CullDataBuffer       — GpuCullData[]         input  (set once / per-frame if dirty)
-//   DrawCommandBuffer    — GpuDrawCommand[]       output (written by compute, read by draw)
-//   VisibilityCountBuffer — uint32                output (atomic counter reset each frame)
-//
-// Push constants (exactly 128 bytes = CullPushConstants in RHI.Types):
-//   - 6 frustum planes extracted from the ViewProj matrix (Gribb-Hartmann)
-//   - DrawCount (total registered entries)
-//   - BDA pointers for all three buffers
-//
-// Per-frame usage:
-//
-//   // 1. Sync any updated bounds to GPU
-//   cull.SyncGpuBuffer();
-//
-//   // 2. Reset the visibility counter at frame start
-//   cull.ResetCounters(cmd);
-//   cmd.BufferBarrier(cull.GetVisibilityCountBuffer());
-//
-//   // 3. Dispatch the cull compute (inserts UAV barriers internally)
-//   cull.DispatchCull(cmd, cameraUBO);
-//
-//   // 4. Draw with the GPU-determined count
-//   cmd.DrawIndexedIndirectCount(
-//       cull.GetDrawCommandBuffer(), 0,
-//       cull.GetVisibilityCountBuffer(), 0,
-//       cull.GetCapacity());
-//
-// Thread-safety:
-//   - Register / Unregister / UpdateBounds — render thread only.
-//   - DispatchCull / ResetCounters / SyncGpuBuffer — render thread only.
-//   - GetXxxBuffer() — lock-free read, any thread.
 // ============================================================
 
 export namespace Extrinsic::Graphics

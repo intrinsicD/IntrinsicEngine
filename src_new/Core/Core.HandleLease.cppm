@@ -34,6 +34,12 @@ namespace Extrinsic::Core
     // -------------------------------------------------------------------------
     // RAII ownership wrapper for a ref-counted opaque handle.
     //
+    // ManagerType is unconstrained in the template parameter list so that
+    // `using Lease<H, M>` may appear inside M's own class body (while M is
+    // still incomplete).  The LeasableManager concept is verified via a
+    // static_assert inside Reset() — which is only instantiated when M is
+    // complete.
+    //
     // Design decisions:
     //   - Opaque: exposes only HandleType, never T*.  Data access goes through
     //     the manager (manager.Get(lease.GetHandle())).  This keeps resource
@@ -47,7 +53,7 @@ namespace Extrinsic::Core
     //       Lease::Retain(mgr, h) — increment refcount then take ownership
     //                               (use when producing a secondary ref)
     // -------------------------------------------------------------------------
-    export template <typename HandleType, LeasableManager<HandleType> ManagerType>
+    export template <typename HandleType, typename ManagerType>
     class Lease
     {
     public:
@@ -109,6 +115,10 @@ namespace Extrinsic::Core
 
         void Reset()
         {
+            // Deferred concept check: ManagerType must satisfy LeasableManager<HandleType>
+            // when Reset() is instantiated (at which point ManagerType is complete).
+            static_assert(LeasableManager<ManagerType, HandleType>,
+                "ManagerType must implement Retain(HandleType) and Release(HandleType)");
             if (m_Manager && m_Handle.IsValid())
                 m_Manager->Release(m_Handle);
             m_Handle  = {};

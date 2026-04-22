@@ -1,6 +1,6 @@
 # src_new Module Inventory (auto-generated)
 
-_Generated on 2026-04-21 by `tools/generate_src_new_module_inventory.py`._
+_Generated on 2026-04-22 by `tools/generate_src_new_module_inventory.py`._
 
 | Module | File | Library |
 |---|---|---|
@@ -15,6 +15,7 @@ _Generated on 2026-04-21 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Core.CallbackRegistry` | `src_new/Core/Core.CallbackRegistry.cppm` | `Core` |
 | `Extrinsic.Core.Config.Engine` | `src_new/Core/Core.Config.Engine.cppm` | `Core` |
 | `Extrinsic.Core.Config.Render` | `src_new/Core/Core.Config.Render.cppm` | `Core` |
+| `Extrinsic.Core.Config.Simulation` | `src_new/Core/Core.Config.Simulation.cppm` | `Core` |
 | `Extrinsic.Core.Config.Window` | `src_new/Core/Core.Config.Window.cppm` | `Core` |
 | `Extrinsic.Core.Dag.Scheduler` | `src_new/Core/Core.Dag.Scheduler.cppm` | `Core` |
 | `Extrinsic.Core.Dag.TaskGraph` | `src_new/Core/Core.Dag.TaskGraph.cppm` | `Core` |
@@ -98,4 +99,4 @@ _Generated on 2026-04-21 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Runtime.Engine` | `src_new/Runtime/Runtime.Engine.cppm` | `Runtime` |
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `Runtime` |
 
-Total modules: **93**
+Total modules: **94**

@@ -2,6 +2,7 @@ module;
 
 #include <memory>
 
+#include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
 module Extrinsic.Graphics.LightSystem;

@@ -216,7 +216,8 @@ namespace Extrinsic::Graphics
         cullDesc.PushConstantSize  = sizeof(RHI::CullPushConstants);
         cullDesc.DebugName         = "CullCompute";
 
-        m_Impl->CullPipeline = pipelineMgr.Create(cullDesc);
+        if (auto pipelineOr = pipelineMgr.Create(cullDesc); pipelineOr.has_value())
+            m_Impl->CullPipeline = std::move(*pipelineOr);
         assert(m_Impl->CullPipeline.IsValid() && "CullingSystem: cull pipeline compile failed");
     }
 

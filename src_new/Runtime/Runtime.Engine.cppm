@@ -6,10 +6,14 @@ module;
 export module Extrinsic.Runtime.Engine;
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Dag.TaskGraph;
+import Extrinsic.Core.FrameGraph;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.FrameClock;
+import Extrinsic.Asset.Service;
+import Extrinsic.ECS.Scene.Registry;
 
 namespace Extrinsic::Runtime
 {
@@ -21,11 +25,12 @@ namespace Extrinsic::Runtime
     // Lifecycle order guaranteed by Engine:
     //
     //   OnInitialize(engine)           — once, after all subsystems are live.
+    //                                    Register FrameGraph system passes here.
     //
     //   per frame:
     //     OnSimTick(engine, fixedDt)   — 0..N times, fixed timestep.
-    //                                    World state is authoritative after
-    //                                    the last tick of each frame.
+    //                                    Add FrameGraph passes each tick;
+    //                                    Engine calls Compile→Execute→Reset.
     //     OnVariableTick(engine,       — once per frame, after all sim ticks.
     //                    alpha, dt)      alpha = accumulator / fixedDt ∈ [0,1).
     //                                    Use for camera, UI, interpolation.
@@ -45,6 +50,7 @@ namespace Extrinsic::Runtime
 
         /// Called 0..N times per frame with the fixed simulation timestep.
         /// N is bounded by EngineConfig::Simulation::MaxSubSteps.
+        /// Add FrameGraph passes via engine.GetFrameGraph().AddPass(...) here.
         virtual void OnSimTick(Engine& engine, double fixedDt) = 0;
 
         /// Called once per frame after all sim ticks complete.
@@ -59,25 +65,48 @@ namespace Extrinsic::Runtime
     // ============================================================
     // Engine — composition root and frame-loop owner.
     //
-    // Owns: Window, IDevice, IRenderer, FrameClock.
-    // Wires: subsystem instantiation order, deterministic shutdown.
+    // Owns: Window, IDevice, IRenderer, FrameClock,
+    //       Tasks::Scheduler (static — initialized/shutdown here),
+    //       AssetService, Scene::Registry, FrameGraph (CPU),
+    //       Streaming TaskGraph.
     //
-    // Frame shape (executed inside Run() ):
+    // Three task graphs:
+    //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
+    //             Drives ECS system scheduling each sim tick.
+    //             IApplication::OnSimTick adds passes; Engine calls
+    //             Compile → Execute → Reset per tick.
+    //
+    //   GPU     — Owned internally by IRenderer.
+    //             Engine drives it via BeginFrame / ExecuteFrame / EndFrame.
+    //
+    //   Streaming — Dag::TaskGraph(Streaming) owned by Engine.
+    //               Asset IO / geometry processing tasks.
+    //               IApplication or systems add passes; Engine calls
+    //               Compile → BuildPlan → dispatches via Tasks::Scheduler
+    //               in Phase 10 (maintenance lane) each frame.
+    //
+    // Frame shape (executed inside Run()):
     //
     //   PollEvents → BeginFrame(clock)
     //     [if minimized: WaitForEventsTimeout → Resample → continue]
     //     [if resized:   WaitIdle → Resize]
-    //   FixedStepLoop { OnSimTick × N }
+    //   FixedStepLoop {
+    //     OnSimTick × N
+    //       FrameGraph: Compile → Execute → Reset  (CPU task graph)
+    //   }
     //   OnVariableTick(alpha, dt)
     //   BuildRenderFrameInput
-    //   Renderer::BeginFrame
+    //   Renderer::BeginFrame      (GPU task graph — acquire)
     //     [if skip: EndFrame(clock) → continue]
     //   Renderer::ExtractRenderWorld
     //   Renderer::PrepareFrame
-    //   Renderer::ExecuteFrame
+    //   Renderer::ExecuteFrame    (GPU task graph — compile/record/submit)
     //   Renderer::EndFrame → completedGpuValue
     //   Device::Present
     //   Device::CollectCompletedTransfers
+    //   StreamingGraph: Compile → BuildPlan → dispatch (Streaming task graph)
+    //   AssetService::Tick
+    //   StreamingGraph: Reset
     //   EndFrame(clock)
     // ============================================================
 
@@ -99,18 +128,31 @@ namespace Extrinsic::Runtime
         void RequestExit()                      noexcept;
 
         // ── Subsystem accessors (valid after Initialize()) ────────────────
-        [[nodiscard]] Platform::IWindow&    GetWindow()   noexcept;
-        [[nodiscard]] RHI::IDevice&         GetDevice()   noexcept;
-        [[nodiscard]] Graphics::IRenderer&  GetRenderer() noexcept;
+        [[nodiscard]] Platform::IWindow&      GetWindow()        noexcept;
+        [[nodiscard]] RHI::IDevice&           GetDevice()        noexcept;
+        [[nodiscard]] Graphics::IRenderer&    GetRenderer()      noexcept;
+        [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
+        [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
+        [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
+        [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
 
     private:
         void RunFrame();      // executes one full frame — called by Run()
 
-        Core::Config::EngineConfig        m_Config;
-        std::unique_ptr<IApplication>     m_Application;
-        std::unique_ptr<Platform::IWindow> m_Window;
-        std::unique_ptr<RHI::IDevice>     m_Device;
+        Core::Config::EngineConfig           m_Config;
+        std::unique_ptr<IApplication>        m_Application;
+        std::unique_ptr<Platform::IWindow>   m_Window;
+        std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
+
+        // CPU task graph — ECS system scheduling
+        std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
+        // Streaming task graph — async asset IO / geometry processing
+        std::unique_ptr<Core::Dag::TaskGraph>  m_StreamingGraph;
+        // Asset service — CPU payload authority
+        std::unique_ptr<Assets::AssetService>  m_AssetService;
+        // ECS scene registry
+        std::unique_ptr<ECS::Scene::Registry>  m_Scene;
 
         FrameClock m_FrameClock{};
 

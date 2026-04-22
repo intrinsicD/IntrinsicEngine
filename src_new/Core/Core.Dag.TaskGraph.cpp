@@ -270,6 +270,22 @@ namespace Extrinsic::Core::Dag
         return plan;
     }
 
+    void TaskGraph::ExecutePass(uint32_t passIndex)
+    {
+        if (passIndex < static_cast<uint32_t>(m_Impl->Passes.size()))
+        {
+            if (m_Impl->Passes[passIndex].Execute)
+                m_Impl->Passes[passIndex].Execute();
+        }
+    }
+
+    std::move_only_function<void()> TaskGraph::TakePassExecute(uint32_t passIndex)
+    {
+        if (passIndex < static_cast<uint32_t>(m_Impl->Passes.size()))
+            return std::move(m_Impl->Passes[passIndex].Execute);
+        return {};
+    }
+
     void TaskGraph::Reset()
     {
         m_Impl->Passes.clear();

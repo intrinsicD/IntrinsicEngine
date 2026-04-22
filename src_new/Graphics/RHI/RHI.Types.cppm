@@ -108,6 +108,12 @@ export namespace Extrinsic::RHI
         std::uint32_t MaterialTypeID      = 0;   // registered type index
         std::uint32_t Flags               = 0;   // MaterialFlags bitmask
 
+        // Padding to align CustomData to byte 64
+        std::uint32_t _pad0 = 0;
+        std::uint32_t _pad1 = 0;
+        std::uint32_t _pad2 = 0;
+        std::uint32_t _pad3 = 0;
+
         // Custom params  (bytes 64–127)
         alignas(16) glm::vec4 CustomData[4]{};
     };

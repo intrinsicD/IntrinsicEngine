@@ -12,10 +12,18 @@ namespace Sandbox
             (void)engine;
         }
 
-        void OnUpdate(Extrinsic::Runtime::Engine& engine, double deltaSeconds) override
+        void OnSimTick(Extrinsic::Runtime::Engine& engine, double fixedDt) override
         {
             (void)engine;
-            (void)deltaSeconds;
+            (void)fixedDt;
+        }
+
+        void OnVariableTick(Extrinsic::Runtime::Engine& engine,
+                            double alpha, double dt) override
+        {
+            (void)engine;
+            (void)alpha;
+            (void)dt;
         }
 
         void OnShutdown(Extrinsic::Runtime::Engine& engine) override

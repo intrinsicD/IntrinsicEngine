@@ -175,6 +175,18 @@ export namespace Extrinsic::Core::Dag
         [[nodiscard]] Core::Expected<std::vector<PlanTask>> BuildPlan(
             const BuildConfig& config = {});
 
+        // ----- Execute single pass (Streaming / GPU domains) -----
+        // Fire the closure registered for pass at `passIndex` (i.e. PlanTask::id.Index).
+        // For GPU passes the closure records GPU commands.
+        // For Streaming passes the closure performs IO / geometry processing.
+        // Asserts that passIndex is in range.
+        void ExecutePass(uint32_t passIndex);
+
+        // Move the execute closure out of the pass node so it can be dispatched
+        // to a worker thread that outlives the next Reset() call.
+        // After this call the pass's stored closure is null (no double-fire).
+        [[nodiscard]] std::move_only_function<void()> TakePassExecute(uint32_t passIndex);
+
         // ----- Reset -----
         void Reset();
 
