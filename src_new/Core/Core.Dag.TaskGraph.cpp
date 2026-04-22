@@ -18,6 +18,16 @@ import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Core::Dag
 {
+    namespace
+    {
+        constexpr std::size_t kLabelTag = std::size_t{1} << (sizeof(std::size_t) * 8 - 1);
+
+        [[nodiscard]] constexpr uint64_t PackResourceKey(ResourceId resource) noexcept
+        {
+            return (static_cast<uint64_t>(resource.Generation) << 32) | resource.Index;
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Impl — internal state for one TaskGraph instance
     // -----------------------------------------------------------------------
@@ -60,26 +70,28 @@ namespace Extrinsic::Core::Dag
             const uint32_t N = static_cast<uint32_t>(Passes.size());
             if (N == 0) return Core::Ok();
 
-            // Build adjacency from resource hazards (RAW, WAW, WAR).
-            // We use a direct pass-to-pass dependency matrix for small N.
+            // Build adjacency from resource hazards.
+            // For each resource, we walk conflicting accesses in registration
+            // order and emit a single forward edge per hazardous pair.
             std::vector<std::vector<uint32_t>> adj(N);
             std::vector<uint32_t> inDegree(N, 0);
 
-            // For each resource, collect ordered (write, read) pairs.
-            // Key: (resource index) → passes that write to it.
-            std::unordered_map<uint32_t, std::vector<uint32_t>> writers;
-            std::unordered_map<uint32_t, std::vector<uint32_t>> readers;
+            struct AccessEntry
+            {
+                uint32_t PassIndex = 0;
+                ResourceAccessMode Mode = ResourceAccessMode::Read;
+            };
+
+            std::unordered_map<uint64_t, std::vector<AccessEntry>> accesses;
 
             for (uint32_t i = 0; i < N; ++i)
             {
                 for (const auto& ra : Passes[i].Resources)
                 {
-                    if (ra.mode == ResourceAccessMode::Write ||
-                        ra.mode == ResourceAccessMode::ReadWrite)
-                        writers[ra.resource.Index].push_back(i);
-                    if (ra.mode == ResourceAccessMode::Read ||
-                        ra.mode == ResourceAccessMode::ReadWrite)
-                        readers[ra.resource.Index].push_back(i);
+                    accesses[PackResourceKey(ra.resource)].push_back(AccessEntry{
+                        .PassIndex = i,
+                        .Mode = ra.mode,
+                    });
                 }
             }
 
@@ -90,23 +102,20 @@ namespace Extrinsic::Core::Dag
                 ++inDegree[to];
             };
 
-            // RAW: writer → reader
-            for (auto& [res, ws] : writers)
-                for (uint32_t w : ws)
-                    for (uint32_t r : readers[res])
-                        AddEdge(w, r);
-
-            // WAW: writer → later writer
-            for (auto& [res, ws] : writers)
-                for (std::size_t a = 0; a < ws.size(); ++a)
-                    for (std::size_t b = a + 1; b < ws.size(); ++b)
-                        AddEdge(ws[a], ws[b]);
-
-            // WAR: reader → writer (all reads before any write)
-            for (auto& [res, rs] : readers)
-                for (uint32_t r : rs)
-                    for (uint32_t w : writers[res])
-                        AddEdge(r, w);
+            for (const auto& [resourceKey, entries] : accesses)
+            {
+                (void)resourceKey;
+                for (std::size_t a = 0; a < entries.size(); ++a)
+                {
+                    for (std::size_t b = a + 1; b < entries.size(); ++b)
+                    {
+                        const bool aWrites = entries[a].Mode != ResourceAccessMode::Read;
+                        const bool bWrites = entries[b].Mode != ResourceAccessMode::Read;
+                        if (aWrites || bWrites)
+                            AddEdge(entries[a].PassIndex, entries[b].PassIndex);
+                    }
+                }
+            }
 
             // Label deps: WaitLabel pseudo-resource RAW edges
             for (uint32_t i = 0; i < N; ++i)
@@ -328,7 +337,8 @@ namespace Extrinsic::Core::Dag
             idx = m_Graph.m_Impl->NextLabelIdx++;
             lm.emplace(label.Value, idx);
         }
-        m_Graph.m_Impl->Passes[m_PassIndex].WaitLabels.push_back(ResourceId{idx, 0});
+        m_Graph.m_Impl->Passes[m_PassIndex].WaitLabels.push_back(
+            ResourceId{static_cast<uint32_t>(idx | kLabelTag), 0});
     }
 
     void TaskGraphBuilder::Signal(Hash::StringID label)
@@ -342,7 +352,8 @@ namespace Extrinsic::Core::Dag
             idx = m_Graph.m_Impl->NextLabelIdx++;
             lm.emplace(label.Value, idx);
         }
-        m_Graph.m_Impl->Passes[m_PassIndex].SignalLabels.push_back(ResourceId{idx, 0});
+        m_Graph.m_Impl->Passes[m_PassIndex].SignalLabels.push_back(
+            ResourceId{static_cast<uint32_t>(idx | kLabelTag), 0});
     }
 }
 

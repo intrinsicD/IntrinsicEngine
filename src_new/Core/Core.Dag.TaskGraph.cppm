@@ -49,6 +49,28 @@ export namespace Extrinsic::Core::Dag
 {
     class TaskGraph;
 
+    namespace Detail
+    {
+        template <typename T>
+        [[nodiscard]] constexpr std::size_t TypeTokenValue() noexcept
+        {
+            constexpr auto kMask = std::numeric_limits<std::size_t>::max() >> 1;
+#if defined(__clang__) || defined(__GNUC__)
+            constexpr std::string_view sig = __PRETTY_FUNCTION__;
+#elif defined(_MSC_VER)
+            constexpr std::string_view sig = __FUNCSIG__;
+#else
+            constexpr std::string_view sig = "TypeTokenValue<unknown>";
+#endif
+            constexpr auto ComputeToken = [](std::string_view s) constexpr -> std::size_t {
+                uint64_t h = 14695981039346656037ULL;
+                for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
+                return static_cast<std::size_t>(h) & kMask;
+            };
+            return ComputeToken(sig);
+        }
+    }
+
     // -----------------------------------------------------------------------
     // TaskGraphBuilder — passed to the user's setup lambda in AddPass().
     // Accumulates per-pass resource accesses and ordering constraints.
@@ -188,40 +210,14 @@ export namespace Extrinsic::Core::Dag
     template <typename T>
     void TaskGraphBuilder::Read()
     {
-        // Compute compile-time type token then delegate to the explicit-id path.
-        // TypeToken is defined in Core.FrameGraph; here we replicate the hash
-        // so TaskGraph has no dependency on FrameGraph.
-        constexpr auto kMask = std::numeric_limits<std::size_t>::max() >> 1;
-#if defined(__clang__) || defined(__GNUC__)
-        constexpr std::string_view sig = __PRETTY_FUNCTION__;
-#else
-        constexpr std::string_view sig = __FUNCSIG__;
-#endif
-        constexpr auto ComputeToken = [](std::string_view s) constexpr -> std::size_t {
-            uint64_t h = 14695981039346656037ULL;
-            for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
-            return static_cast<std::size_t>(h) & kMask;
-        };
-        static constexpr std::size_t kToken = ComputeToken(sig);
-        ReadResource(m_Graph.TokenToResource(kToken));
+        // Compute a compile-time type token then delegate to the explicit-id path.
+        ReadResource(m_Graph.TokenToResource(Detail::TypeTokenValue<T>()));
     }
 
     template <typename T>
     void TaskGraphBuilder::Write()
     {
-        constexpr auto kMask = std::numeric_limits<std::size_t>::max() >> 1;
-#if defined(__clang__) || defined(__GNUC__)
-        constexpr std::string_view sig = __PRETTY_FUNCTION__;
-#else
-        constexpr std::string_view sig = __FUNCSIG__;
-#endif
-        constexpr auto ComputeToken = [](std::string_view s) constexpr -> std::size_t {
-            uint64_t h = 14695981039346656037ULL;
-            for (unsigned char c : s) { h ^= c; h *= 1099511628211ULL; }
-            return static_cast<std::size_t>(h) & kMask;
-        };
-        static constexpr std::size_t kToken = ComputeToken(sig);
-        WriteResource(m_Graph.TokenToResource(kToken));
+        WriteResource(m_Graph.TokenToResource(Detail::TypeTokenValue<T>()));
     }
 
     // -----------------------------------------------------------------------

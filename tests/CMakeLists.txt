@@ -77,12 +77,10 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_FeatureRegistry.cpp
         Test_SystemFeatureCatalog.cpp
         Test_InplaceFunction.cpp
-        Test_ResourcePool.cpp
         Test_Benchmark.cpp
         Test_Profiling.cpp
         Test_CoreError.cpp
         Test_LogRingBuffer.cpp
-        Test_Process.cpp
     DEPS IntrinsicCore EnTT::EnTT
 )
 

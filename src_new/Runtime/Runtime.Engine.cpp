@@ -142,7 +142,8 @@ namespace Extrinsic::Runtime
         // m_MaxFrameDelta.  The clamp prevents the spiral-of-death when a
         // frame takes longer than the fixed timestep (e.g. debugger pause).
 
-        m_Accumulator += m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
+        const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
+        m_Accumulator += frameDt;
 
         int substeps = 0;
         while (m_Accumulator >= m_FixedDt && substeps < m_MaxSubSteps)
@@ -160,7 +161,7 @@ namespace Extrinsic::Runtime
         // Camera, UI state, input processing — anything that runs once per
         // rendered frame and is NOT part of the deterministic simulation.
 
-        m_Application->OnVariableTick(*this, alpha, m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta));
+        m_Application->OnVariableTick(*this, alpha, frameDt);
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
         // Construct the immutable input that the renderer reads during

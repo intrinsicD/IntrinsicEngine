@@ -128,7 +128,7 @@ export namespace Extrinsic::Core
         void AddPass(std::string_view name, SetupFn&& setup, ExecuteFn&& execute)
         {
             m_Graph->AddPass(name,
-                [this, setupFn = std::forward<SetupFn>(setup)](Dag::TaskGraphBuilder& b) mutable
+                [setupFn = std::forward<SetupFn>(setup)](Dag::TaskGraphBuilder& b) mutable
                 {
                     FrameGraphBuilder fgb(std::move(b));
                     setupFn(fgb);
