@@ -10,6 +10,7 @@ import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Logging;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
@@ -50,11 +51,21 @@ namespace Extrinsic::Runtime
                 return;
 
             if (auto r = graph.Compile(); !r.has_value())
-                return; // cycle or empty graph — skip silently
+            {
+                Log::Error("[Runtime] StreamingGraph Compile() failed: error={}",
+                           static_cast<int>(r.error()));
+                graph.Reset();
+                return;
+            }
 
             auto plan = graph.BuildPlan();
             if (!plan.has_value())
+            {
+                Log::Error("[Runtime] StreamingGraph BuildPlan() failed: error={}",
+                           static_cast<int>(plan.error()));
+                graph.Reset();
                 return;
+            }
 
             // Move each pass's closure out of the graph before Reset() so the
             // worker thread's capture outlives the graph's internal storage.
@@ -213,12 +224,21 @@ namespace Extrinsic::Runtime
             m_Application->OnSimTick(*this, m_FixedDt);
 
             // CPU task graph: compile dependency order, execute in topo-layer
-            // sequence (parallel within each layer via Tasks::Scheduler), reset.
+            // sequence (currently sequential execution), then reset.
             if (m_FrameGraph->PassCount() > 0)
             {
                 if (auto r = m_FrameGraph->Compile(); r.has_value())
                 {
-                    (void)m_FrameGraph->Execute();
+                    if (auto exec = m_FrameGraph->Execute(); !exec.has_value())
+                    {
+                        Log::Error("[Runtime] FrameGraph Execute() failed: error={}",
+                                   static_cast<int>(exec.error()));
+                    }
+                }
+                else
+                {
+                    Log::Error("[Runtime] FrameGraph Compile() failed: error={}",
+                               static_cast<int>(r.error()));
                 }
                 m_FrameGraph->Reset();
             }

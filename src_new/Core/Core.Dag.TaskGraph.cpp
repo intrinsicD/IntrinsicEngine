@@ -272,6 +272,8 @@ namespace Extrinsic::Core::Dag
 
     void TaskGraph::ExecutePass(uint32_t passIndex)
     {
+        assert(passIndex < static_cast<uint32_t>(m_Impl->Passes.size()) &&
+               "TaskGraph::ExecutePass pass index out of range");
         if (passIndex < static_cast<uint32_t>(m_Impl->Passes.size()))
         {
             if (m_Impl->Passes[passIndex].Execute)
@@ -281,6 +283,8 @@ namespace Extrinsic::Core::Dag
 
     std::move_only_function<void()> TaskGraph::TakePassExecute(uint32_t passIndex)
     {
+        assert(passIndex < static_cast<uint32_t>(m_Impl->Passes.size()) &&
+               "TaskGraph::TakePassExecute pass index out of range");
         if (passIndex < static_cast<uint32_t>(m_Impl->Passes.size()))
             return std::move(m_Impl->Passes[passIndex].Execute);
         return {};
@@ -372,4 +376,3 @@ namespace Extrinsic::Core::Dag
             ResourceId{static_cast<uint32_t>(idx | kLabelTag), 0});
     }
 }
-
