@@ -41,19 +41,33 @@ _Generated on 2026-04-22 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Core.Tasks:LocalTask` | `src_new/Core/Core.Tasks.LocalTask.cppm` | `Core` |
 | `Extrinsic.Core.Tasks` | `src_new/Core/Core.Tasks.cppm` | `Core` |
 | `Extrinsic.Core.Telemetry` | `src_new/Core/Core.Telemetry.cppm` | `Core` |
-| `Extrinsic.ECS.Component.CpuGeometry` | `src_new/ECS/Components/ECS.Component.CpuGeometry.cppm` | `ECS` |
+| `Extrinsic.ECS.Components.AssetInstance` | `src_new/ECS/Components/ECS.Component.AssetInstance.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.Collider` | `src_new/ECS/Components/ECS.Component.Collider.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.Culling.Local` | `src_new/ECS/Components/ECS.Component.Culling.Local.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.Culling.Proxy` | `src_new/ECS/Components/ECS.Component.Culling.Proxy.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.Culling.World` | `src_new/ECS/Components/ECS.Component.Culling.World.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.DirtyTags` | `src_new/ECS/Components/ECS.Component.DirtyTags.cppm` | `ECS` |
+| `Extrinsic.ECS.Components.GeometrySources` | `src_new/ECS/Components/ECS.Component.GeometrySources.cppm` | `ECS` |
 | `Extrinsic.ECS.Component.Hierarchy` | `src_new/ECS/Components/ECS.Component.Hierarchy.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.Light` | `src_new/ECS/Components/ECS.Component.Light.cppm` | `ECS` |
 | `Extrinsic.ECS.Component.MetaData` | `src_new/ECS/Components/ECS.Component.MetaData.cppm` | `ECS` |
-| `Extrinsic.ECS.Component.RenderGeometry` | `src_new/ECS/Components/ECS.Component.RenderGeometry.cppm` | `ECS` |
-| `Extrinsic.ECS.Component.Transform` | `src_new/ECS/Components/ECS.Component.Transform.cppm` | `ECS` |
+| `Extrinsic.ECS.Components.Selection` | `src_new/ECS/Components/ECS.Component.Selection.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.ShadowCaster` | `src_new/ECS/Components/ECS.Component.ShadowCaster.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.Transform` | `src_new/ECS/Components/ECS.Component.Transform.Local.cppm` | `ECS` |
+| `Extrinsic.ECS.Component.Transform.WorldMatrix` | `src_new/ECS/Components/ECS.Component.Transform.World.cppm` | `ECS` |
 | `Extrinsic.ECS.Scene.Handle` | `src_new/ECS/ECS.Scene.Handle.cppm` | `ECS` |
 | `Extrinsic.ECS.Scene.Registry` | `src_new/ECS/ECS.Scene.Registry.cppm` | `ECS` |
 | `Extrinsic.ECS.System.RenderSync` | `src_new/ECS/Systems/ECS.System.RenderSync.cppm` | `ECS` |
 | `Extrinsic.ECS.System.TransformHierarchy` | `src_new/ECS/Systems/ECS.System.TransformHierarchy.cppm` | `ECS` |
 | `Extrinsic.Backends.Null` | `src_new/Graphics/Backends/Null/Backends.Null.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Component.GpuSceneSlot` | `src_new/Graphics/Components/Graphics.Component.GpuSceneSlot.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Component.Material` | `src_new/Graphics/Components/Graphics.Component.Material.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Component.RenderGeometry` | `src_new/Graphics/Components/Graphics.Component.RenderGeometry.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Colormap` | `src_new/Graphics/Graphics.Colormap.cppm` | `Graphics` |
 | `Extrinsic.Graphics.CullingSystem` | `src_new/Graphics/Graphics.CullingSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.DeferredSystem` | `src_new/Graphics/Graphics.DeferredSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.ForwardSystem` | `src_new/Graphics/Graphics.ForwardSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.GpuScene` | `src_new/Graphics/Graphics.GpuScene.cppm` | `Graphics` |
 | `Extrinsic.Graphics.LightSystem` | `src_new/Graphics/Graphics.LightSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Material` | `src_new/Graphics/Graphics.Material.cppm` | `Graphics` |
 | `Extrinsic.Graphics.MaterialSystem` | `src_new/Graphics/Graphics.MaterialSystem.cppm` | `Graphics` |
@@ -63,17 +77,21 @@ _Generated on 2026-04-22 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Graphics.Renderer` | `src_new/Graphics/Graphics.Renderer.cppm` | `Graphics` |
 | `Extrinsic.Graphics.SelectionSystem` | `src_new/Graphics/Graphics.SelectionSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.ShadowSystem` | `src_new/Graphics/Graphics.ShadowSystem.cppm` | `Graphics` |
+| `Graphics.TransformSyncSystem` | `src_new/Graphics/Graphics.TransformSyncSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Culling` | `src_new/Graphics/Passes/Pass.Culling.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `src_new/Graphics/Passes/Pass.Deferred.GBuffers.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `src_new/Graphics/Passes/Pass.Deferred.Lighting.cppm` | `Graphics` |
+| `Pass.PreDepth` | `src_new/Graphics/Passes/Pass.DepthPrepass.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Forward.Line` | `src_new/Graphics/Passes/Pass.Forward.Line.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Forward.Point` | `src_new/Graphics/Passes/Pass.Forward.Point.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Forward.Surface` | `src_new/Graphics/Passes/Pass.Forward.Surface.cppm` | `Graphics` |
+| `Pass.ImGui` | `src_new/Graphics/Passes/Pass.ImGui.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.Bloom` | `src_new/Graphics/Passes/Pass.PostProcess.Bloom.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.FXAA` | `src_new/Graphics/Passes/Pass.PostProcess.FXAA.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.Histogram` | `src_new/Graphics/Passes/Pass.PostProcess.Histogram.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.SMAA` | `src_new/Graphics/Passes/Pass.PostProcess.SMAA.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.ToneMap` | `src_new/Graphics/Passes/Pass.PostProcess.ToneMap.cppm` | `Graphics` |
+| `Pass.Present` | `src_new/Graphics/Passes/Pass.Present.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Selection.EdgeId` | `src_new/Graphics/Passes/Pass.Selection.EdgeId.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Selection.EntityId` | `src_new/Graphics/Passes/Pass.Selection.EntityId.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Selection.FaceId` | `src_new/Graphics/Passes/Pass.Selection.FaceId.cppm` | `Graphics` |
@@ -99,4 +117,4 @@ _Generated on 2026-04-22 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Runtime.Engine` | `src_new/Runtime/Runtime.Engine.cppm` | `Runtime` |
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `Runtime` |
 
-Total modules: **94**
+Total modules: **112**

@@ -3,7 +3,6 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
-#include <memory>
 #include <entt/entity/registry.hpp>
 
 export module Extrinsic.ECS.Components.GeometrySources;
@@ -14,30 +13,30 @@ export namespace Extrinsic::ECS::Components::GeometrySources
 {
     struct Vertices
     {
-        std::shared_ptr<Geometry::PropertySet> PropertiesPtr{};
+        Geometry::PropertySet* PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
     struct Edges
     {
-        std::shared_ptr<Geometry::PropertySet> PropertiesPtr{};
+        Geometry::PropertySet* PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
     struct Halfedges
     {
-        std::shared_ptr<Geometry::PropertySet> PropertiesPtr{};
+        Geometry::PropertySet* PropertiesPtr{};
     };
 
     struct Faces
     {
-        std::shared_ptr<Geometry::PropertySet> PropertiesPtr{};
+        Geometry::PropertySet* PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
     struct Nodes
     {
-        std::shared_ptr<Geometry::PropertySet> PropertiesPtr{};
+        Geometry::PropertySet* PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
@@ -65,27 +64,35 @@ export namespace Extrinsic::ECS::Components::GeometrySources
 
     [[nodiscard]] inline std::size_t VertexCount(const Vertices& source) noexcept
     {
-        return AliveCount(source.PropertiesPtr->Size(), source.NumDeleted);
+        return source.PropertiesPtr
+            ? AliveCount(source.PropertiesPtr->Size(), source.NumDeleted)
+            : 0;
     }
 
     [[nodiscard]] inline std::size_t EdgeCount(const Edges& source) noexcept
     {
-        return AliveCount(source.PropertiesPtr->Size(), source.NumDeleted);
+        return source.PropertiesPtr
+            ? AliveCount(source.PropertiesPtr->Size(), source.NumDeleted)
+            : 0;
     }
 
     [[nodiscard]] inline std::size_t HalfedgeCount(const Halfedges& source) noexcept
     {
-        return source.PropertiesPtr->Size();
+        return source.PropertiesPtr ? source.PropertiesPtr->Size() : 0;
     }
 
     [[nodiscard]] inline std::size_t FaceCount(const Faces& source) noexcept
     {
-        return AliveCount(source.PropertiesPtr->Size(), source.NumDeleted);
+        return source.PropertiesPtr
+            ? AliveCount(source.PropertiesPtr->Size(), source.NumDeleted)
+            : 0;
     }
 
     [[nodiscard]] inline std::size_t NodeCount(const Nodes& source) noexcept
     {
-        return AliveCount(source.PropertiesPtr->Size(), source.NumDeleted);
+        return source.PropertiesPtr
+            ? AliveCount(source.PropertiesPtr->Size(), source.NumDeleted)
+            : 0;
     }
 
     struct ConstSourceView
@@ -170,28 +177,22 @@ export namespace Extrinsic::ECS::Components::GeometrySources
                                                         entt::entity entity)
     {
         ConstSourceView view{};
-        view.ActiveDomain = Domain::None;
-        if (registry.try_get<Nodes>(entity))
-        {
-            view.ActiveDomain = Domain::Unknown;
-            view.NodeSource = registry.try_get<Nodes>(entity);
-        }
-        if (registry.try_get<Vertices>(entity))
-        {
-            view.ActiveDomain = Domain::PointCloud;
-            view.VertexSource = registry.try_get<Vertices>(entity);
-        }
-        if (registry.try_get<HasGraphTopology>(entity))
-        {
-            view.ActiveDomain = Domain::Graph;
-            view.EdgeSource = registry.try_get<Edges>(entity);
-            view.HalfedgeSource = registry.try_get<Halfedges>(entity);
-        }
-        if (registry.try_get<HasMeshTopology>(entity))
-        {
-            view.ActiveDomain = Domain::Mesh;
-            view.FaceSource = registry.try_get<Faces>(entity);
-        }
+        view.VertexSource = registry.try_get<Vertices>(entity);
+        view.EdgeSource = registry.try_get<Edges>(entity);
+        view.HalfedgeSource = registry.try_get<Halfedges>(entity);
+        view.FaceSource = registry.try_get<Faces>(entity);
+        view.NodeSource = registry.try_get<Nodes>(entity);
+
+        const bool hasMeshTopology = registry.all_of<HasMeshTopology>(entity);
+        const bool hasGraphTopology = registry.all_of<HasGraphTopology>(entity);
+
+        view.ActiveDomain = DetectDomain(
+            view.VertexSource != nullptr,
+            view.EdgeSource != nullptr || hasGraphTopology,
+            view.HalfedgeSource != nullptr || hasGraphTopology,
+            view.FaceSource != nullptr || hasMeshTopology,
+            view.NodeSource != nullptr);
+
         return view;
     }
 
@@ -199,28 +200,22 @@ export namespace Extrinsic::ECS::Components::GeometrySources
                                                             entt::entity entity)
     {
         MutableSourceView view{};
-        view.ActiveDomain = Domain::None;
-        if (registry.try_get<Nodes>(entity))
-        {
-            view.ActiveDomain = Domain::Unknown;
-            view.NodeSource = registry.try_get<Nodes>(entity);
-        }
-        if (registry.try_get<Vertices>(entity))
-        {
-            view.ActiveDomain = Domain::PointCloud;
-            view.VertexSource = registry.try_get<Vertices>(entity);
-        }
-        if (registry.try_get<HasGraphTopology>(entity))
-        {
-            view.ActiveDomain = Domain::Graph;
-            view.EdgeSource = registry.try_get<Edges>(entity);
-            view.HalfedgeSource = registry.try_get<Halfedges>(entity);
-        }
-        if (registry.try_get<HasMeshTopology>(entity))
-        {
-            view.ActiveDomain = Domain::Mesh;
-            view.FaceSource = registry.try_get<Faces>(entity);
-        }
+        view.VertexSource = registry.try_get<Vertices>(entity);
+        view.EdgeSource = registry.try_get<Edges>(entity);
+        view.HalfedgeSource = registry.try_get<Halfedges>(entity);
+        view.FaceSource = registry.try_get<Faces>(entity);
+        view.NodeSource = registry.try_get<Nodes>(entity);
+
+        const bool hasMeshTopology = registry.all_of<HasMeshTopology>(entity);
+        const bool hasGraphTopology = registry.all_of<HasGraphTopology>(entity);
+
+        view.ActiveDomain = DetectDomain(
+            view.VertexSource != nullptr,
+            view.EdgeSource != nullptr || hasGraphTopology,
+            view.HalfedgeSource != nullptr || hasGraphTopology,
+            view.FaceSource != nullptr || hasMeshTopology,
+            view.NodeSource != nullptr);
+
         return view;
     }
 }
