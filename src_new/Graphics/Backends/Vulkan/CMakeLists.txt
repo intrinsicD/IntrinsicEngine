@@ -16,6 +16,7 @@ target_link_libraries(${target_name}
         PUBLIC
         ExtrinsicRHI
         PRIVATE
+        ExtrinsicCore
         Vulkan::Vulkan
         volk
         VulkanMemoryAllocator

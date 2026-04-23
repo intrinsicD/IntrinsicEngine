@@ -48,6 +48,7 @@ module Extrinsic.Backends.Vulkan;
 
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.ResourcePool;
+import Extrinsic.Core.Telemetry;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -1005,6 +1006,7 @@ void VulkanProfiler::ResetFrame(uint32_t frameIndex, VkCommandBuffer cmd)
 
 void VulkanProfiler::BeginFrame(uint32_t frameIndex, uint32_t /*maxScopesHint*/)
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanProfiler::BeginFrame", Extrinsic::Core::Telemetry::HashString("VulkanProfiler::BeginFrame")};
     std::scoped_lock lock{m_Mutex};
     const uint32_t slot = frameIndex % m_FramesInFlight;
     m_Frames[slot].FrameIndex = frameIndex;
@@ -1012,6 +1014,7 @@ void VulkanProfiler::BeginFrame(uint32_t frameIndex, uint32_t /*maxScopesHint*/)
 
 void VulkanProfiler::EndFrame()
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanProfiler::EndFrame", Extrinsic::Core::Telemetry::HashString("VulkanProfiler::EndFrame")};
     if (!m_Supported || !m_Cmd) return;
     // Each frame slot — write frame-end timestamp via current cmd buffer.
     // ResetFrame already wrote frame-begin; here we close the bracket.
@@ -1339,6 +1342,7 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
                                                       uint64_t size,
                                                       uint64_t offset)
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadBufferRaw", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadBufferRaw")};
     if (!m_Buffers) return {};
     auto* buf = m_Buffers->GetIfValid(dst);
     if (!buf) return {};
@@ -1357,6 +1361,7 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
                                                       std::span<const std::byte> src,
                                                       uint64_t offset)
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadBufferSpan", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadBufferSpan")};
     return UploadBuffer(dst, src.data(), static_cast<uint64_t>(src.size_bytes()), offset);
 }
 
@@ -1366,6 +1371,7 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
                                                        uint32_t mipLevel,
                                                        uint32_t arrayLayer)
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadTexture", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadTexture")};
     if (!m_Images) return {};
     auto* img = m_Images->GetIfValid(dst);
     if (!img) return {};
@@ -1420,6 +1426,7 @@ bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const
 
 void VulkanTransferQueue::CollectCompleted()
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::CollectCompleted", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::CollectCompleted")};
     const uint64_t done = QueryCompletedValue();
     m_Belt->GarbageCollect(done);
 }
@@ -1447,6 +1454,7 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
 
 void VulkanCommandContext::Begin()
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanCommandContext::Begin", Extrinsic::Core::Telemetry::HashString("VulkanCommandContext::Begin")};
     VkCommandBufferBeginInfo ci{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     ci.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     VK_CHECK_FATAL(vkBeginCommandBuffer(m_Cmd, &ci));
@@ -1454,6 +1462,7 @@ void VulkanCommandContext::Begin()
 
 void VulkanCommandContext::End()
 {
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanCommandContext::End", Extrinsic::Core::Telemetry::HashString("VulkanCommandContext::End")};
     VK_CHECK_FATAL(vkEndCommandBuffer(m_Cmd));
 }
 
