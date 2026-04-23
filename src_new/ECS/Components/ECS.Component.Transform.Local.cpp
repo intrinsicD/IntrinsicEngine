@@ -7,11 +7,11 @@ module;
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-module Extrinsic.ECS.Components.Transform;
+module Extrinsic.ECS.Component.Transform;
 
-namespace Extrinsic::ECS::Components
+namespace Extrinsic::ECS::Components::Transform
 {
-    [[nodiscard]] glm::mat4 GetMatrix(const Transform& transform)
+    [[nodiscard]] glm::mat4 GetMatrix(const Component& transform)
     {
         glm::mat4 mat = glm::translate(glm::mat4(1.0f), transform.Position);
         mat = mat * glm::mat4_cast(transform.Rotation); // Apply rotation
@@ -19,8 +19,10 @@ namespace Extrinsic::ECS::Components
         return mat;
     }
 
-    [[nodiscard]] bool TryDecomposeMatrix(const glm::mat4& matrix, Transform& outTransform)
+    [[nodiscard]] bool TryDecomposeMatrix(const glm::mat4& matrix, Component& outTransform)
     {
+        constexpr float kScaleEpsilon = 1e-8f;
+
         glm::vec3 skew{0.0f};
         glm::vec4 perspective{0.0f};
         glm::vec3 scale{1.0f};
@@ -30,8 +32,19 @@ namespace Extrinsic::ECS::Components
         if (!glm::decompose(matrix, scale, rotation, position, skew, perspective))
             return false;
 
+        if (!std::isfinite(scale.x) || !std::isfinite(scale.y) || !std::isfinite(scale.z))
+            return false;
+        if (std::abs(scale.x) < kScaleEpsilon ||
+            std::abs(scale.y) < kScaleEpsilon ||
+            std::abs(scale.z) < kScaleEpsilon)
+            return false;
+
+        if (!std::isfinite(rotation.w) || !std::isfinite(rotation.x) ||
+            !std::isfinite(rotation.y) || !std::isfinite(rotation.z))
+            return false;
+
         outTransform.Position = position;
-        outTransform.Rotation = rotation;
+        outTransform.Rotation = glm::normalize(rotation);
         outTransform.Scale = scale;
         return true;
     }
@@ -39,7 +52,7 @@ namespace Extrinsic::ECS::Components
 
     [[nodiscard]] bool TryComputeLocalTransform(const glm::mat4& worldMatrix,
                                                 const glm::mat4& parentWorldMatrix,
-                                                Transform& outLocalTransform)
+                                                Component& outLocalTransform)
     {
         const float parentDeterminant = glm::determinant(parentWorldMatrix);
         if (!std::isfinite(parentDeterminant) || std::abs(parentDeterminant) < 1e-8f)

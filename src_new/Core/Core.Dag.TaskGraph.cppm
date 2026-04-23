@@ -22,7 +22,7 @@ import Extrinsic.Core.Hash;
 //   QueueDomain::Cpu       — ECS system scheduling, fiber-dispatched.
 //                            Execute() fires registered closures in
 //                            topological layer order; parallel within each
-//                            layer via Tasks::Scheduler::Dispatch.
+//                            layer is a planned follow-up (currently sequential).
 //
 //   QueueDomain::Gpu       — GPU render-pass ordering. Virtual resources
 //                            (images, buffers) are declared per pass; the
@@ -237,4 +237,3 @@ export namespace Extrinsic::Core::Dag
     // -----------------------------------------------------------------------
     [[nodiscard]] std::unique_ptr<TaskGraph> CreateTaskGraph(QueueDomain domain);
 }
-

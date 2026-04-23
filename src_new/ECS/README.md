@@ -14,10 +14,19 @@ plain data; systems are stateless functions that operate on components.
 ### Components
 
 - `Extrinsic.ECS.Component.Transform`
+- `Extrinsic.ECS.Component.Transform.WorldMatrix`
 - `Extrinsic.ECS.Component.Hierarchy`
 - `Extrinsic.ECS.Component.MetaData`
-- `Extrinsic.ECS.Component.CpuGeometry`
-- `Extrinsic.ECS.Component.RenderGeometry`
+- `Extrinsic.ECS.Components.GeometrySources`
+- `Extrinsic.ECS.Component.Culling.Local`
+- `Extrinsic.ECS.Component.Culling.World`
+- `Extrinsic.ECS.Component.Culling.Proxy`
+- `Extrinsic.ECS.Component.AssetInstance`
+- `Extrinsic.ECS.Component.Collider`
+- `Extrinsic.ECS.Component.Light`
+- `Extrinsic.ECS.Component.Selection`
+- `Extrinsic.ECS.Component.ShadowCaster`
+- `Extrinsic.ECS.Component.DirtyTags`
 
 ### Systems
 
@@ -30,11 +39,20 @@ plain data; systems are stateless functions that operate on components.
 ECS.Scene.Handle.cppm
 ECS.Scene.Registry.cppm
 Components/
-  ECS.Component.Transform.cppm
+  ECS.Component.Transform.Local.cppm
+  ECS.Component.Transform.World.cppm
   ECS.Component.Hierarchy.cppm
   ECS.Component.MetaData.cppm
-  ECS.Component.CpuGeometry.cppm
-  ECS.Component.RenderGeometry.cppm
+  ECS.Component.GeometrySources.cppm
+  ECS.Component.Culling.Local.cppm
+  ECS.Component.Culling.World.cppm
+  ECS.Component.Culling.Proxy.cppm
+  ECS.Component.AssetInstance.cppm
+  ECS.Component.Collider.cppm
+  ECS.Component.Light.cppm
+  ECS.Component.Selection.cppm
+  ECS.Component.ShadowCaster.cppm
+  ECS.Component.DirtyTags.cppm
 Systems/
   ECS.System.TransformHierarchy.{cppm,cpp}
   ECS.System.RenderSync.{cppm,cpp}
@@ -45,7 +63,7 @@ Systems/
 `ECS` depends on `Core`. It does **not** depend on `Graphics`, `Platform`, or
 `Runtime`. Render-side synchronization lives in `Systems/ECS.System.RenderSync`
 and communicates with `Graphics` through data contracts carried on components
-(`RenderGeometry`), not through direct imports of graphics internals.
+(`GeometrySources` + culling/light tags), not through direct imports of graphics internals.
 
 ## Asset references on components
 
