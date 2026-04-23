@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -11,32 +12,56 @@ import Geometry.Properties;
 
 export namespace Extrinsic::ECS::Components::GeometrySources
 {
+    template <typename T>
+    struct ObserverPtr
+    {
+        T* Ptr{nullptr};
+
+        constexpr ObserverPtr() = default;
+        constexpr ObserverPtr(T* ptr) : Ptr(ptr) {}
+
+        [[nodiscard]] constexpr explicit operator bool() const noexcept { return Ptr != nullptr; }
+        [[nodiscard]] constexpr T* Get() const noexcept { return Ptr; }
+
+        [[nodiscard]] constexpr T& operator*() const
+        {
+            assert(Ptr != nullptr && "ObserverPtr dereference on nullptr");
+            return *Ptr;
+        }
+
+        [[nodiscard]] constexpr T* operator->() const
+        {
+            assert(Ptr != nullptr && "ObserverPtr dereference on nullptr");
+            return Ptr;
+        }
+    };
+
     struct Vertices
     {
-        Geometry::PropertySet* PropertiesPtr{};
+        ObserverPtr<Geometry::PropertySet> PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
     struct Edges
     {
-        Geometry::PropertySet* PropertiesPtr{};
+        ObserverPtr<Geometry::PropertySet> PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
     struct Halfedges
     {
-        Geometry::PropertySet* PropertiesPtr{};
+        ObserverPtr<Geometry::PropertySet> PropertiesPtr{};
     };
 
     struct Faces
     {
-        Geometry::PropertySet* PropertiesPtr{};
+        ObserverPtr<Geometry::PropertySet> PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
     struct Nodes
     {
-        Geometry::PropertySet* PropertiesPtr{};
+        ObserverPtr<Geometry::PropertySet> PropertiesPtr{};
         size_t NumDeleted{0};
     };
 
@@ -193,6 +218,9 @@ export namespace Extrinsic::ECS::Components::GeometrySources
             view.FaceSource != nullptr || hasMeshTopology,
             view.NodeSource != nullptr);
 
+        assert(view.ActiveDomain != Domain::Mesh || view.FaceSource != nullptr || hasMeshTopology);
+        assert(view.ActiveDomain != Domain::Graph || view.NodeSource != nullptr || hasGraphTopology);
+
         return view;
     }
 
@@ -215,6 +243,9 @@ export namespace Extrinsic::ECS::Components::GeometrySources
             view.HalfedgeSource != nullptr || hasGraphTopology,
             view.FaceSource != nullptr || hasMeshTopology,
             view.NodeSource != nullptr);
+
+        assert(view.ActiveDomain != Domain::Mesh || view.FaceSource != nullptr || hasMeshTopology);
+        assert(view.ActiveDomain != Domain::Graph || view.NodeSource != nullptr || hasGraphTopology);
 
         return view;
     }
