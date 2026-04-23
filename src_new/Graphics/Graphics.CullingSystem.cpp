@@ -381,7 +381,9 @@ namespace Extrinsic::Graphics
             m_Impl->VisibilityCountBuffer.GetHandle(),
             &zero, sizeof(zero), 0);
 
-        cmd.BufferBarrier(m_Impl->VisibilityCountBuffer.GetHandle());
+        cmd.BufferBarrier(m_Impl->VisibilityCountBuffer.GetHandle(),
+                          RHI::MemoryAccess::TransferWrite,
+                          RHI::MemoryAccess::ShaderWrite);
     }
 
     // -----------------------------------------------------------------
@@ -409,12 +411,16 @@ namespace Extrinsic::Graphics
         const std::uint32_t groups =
             (m_Impl->LiveCount + kCullGroupSize - 1) / kCullGroupSize;
         if (groups > 0)
-            cmd.Dispatch(groups);
+            cmd.Dispatch(groups, 1, 1);
 
         // UAV barriers: subsequent indirect-draw and visibility-count reads
         // must see the compute shader's writes.
-        cmd.BufferBarrier(m_Impl->DrawCommandBuffer.GetHandle());
-        cmd.BufferBarrier(m_Impl->VisibilityCountBuffer.GetHandle());
+        cmd.BufferBarrier(m_Impl->DrawCommandBuffer.GetHandle(),
+                          RHI::MemoryAccess::ShaderWrite,
+                          RHI::MemoryAccess::IndirectRead);
+        cmd.BufferBarrier(m_Impl->VisibilityCountBuffer.GetHandle(),
+                          RHI::MemoryAccess::ShaderWrite,
+                          RHI::MemoryAccess::ShaderRead);
     }
 
     // -----------------------------------------------------------------

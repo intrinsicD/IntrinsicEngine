@@ -1,3 +1,7 @@
+module;
+
+#include <cstdint>
+
 export module Extrinsic.Graphics.Colormap;
 
 export namespace Extrinsic::Graphics::Colormap

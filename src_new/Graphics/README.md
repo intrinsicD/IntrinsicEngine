@@ -20,6 +20,7 @@ production on top of RHI.
 - `Extrinsic.Graphics.DeferredSystem` — deferred pass family owner scaffold.
 - `Extrinsic.Graphics.PostProcessSystem` — post-process pass family owner scaffold.
 - `Extrinsic.Graphics.ShadowSystem` — shadow pass family owner scaffold.
+- `Extrinsic.Graphics.TransformSyncSystem` — transform SSBO / world-matrix sync scaffold.
 
 ### Data contracts
 
@@ -52,6 +53,7 @@ production on top of RHI.
 ### Passes (under `Passes/`)
 
 - `Extrinsic.Graphics.Pass.Culling`
+- `Extrinsic.Graphics.Pass.DepthPrepass`
 - `Extrinsic.Graphics.Pass.Deferred.GBuffers`
 - `Extrinsic.Graphics.Pass.Deferred.Lighting`
 - `Extrinsic.Graphics.Pass.Forward.Surface`
@@ -68,6 +70,8 @@ production on top of RHI.
 - `Extrinsic.Graphics.Pass.Selection.FaceId`
 - `Extrinsic.Graphics.Pass.Selection.Outline`
 - `Extrinsic.Graphics.Pass.Shadows`
+- `Extrinsic.Graphics.Pass.ImGui`
+- `Extrinsic.Graphics.Pass.Present`
 
 ## Target architecture
 

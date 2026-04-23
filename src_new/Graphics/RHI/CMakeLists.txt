@@ -8,6 +8,7 @@ target_sources(${target_name}
         RHI.Descriptors.cppm
         RHI.Handles.cppm
         RHI.Transfer.cppm
+        RHI.TransferQueue.cppm
         RHI.Profiler.cppm
         RHI.Bindless.cppm
         RHI.Types.cppm

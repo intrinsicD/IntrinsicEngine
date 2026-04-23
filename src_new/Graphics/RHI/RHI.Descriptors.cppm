@@ -158,31 +158,21 @@ export namespace Extrinsic::RHI
     enum class Topology  : uint32_t { TriangleList, TriangleStrip, LineList, LineStrip, PointList };
 
     // ----------------------------------------------------------
-    // Vertex attribute descriptor (API-agnostic)
+    // Present / frame-pacing policy
     // ----------------------------------------------------------
-    enum class VertexFormat : uint32_t
+    // Backend maps this to the best available API mode:
+    //   VSync        → FIFO              (always supported, tear-free)
+    //   LowLatency   → Mailbox → FIFO fallback
+    //   Uncapped     → Immediate → FIFO fallback
+    //   Throttled    → FIFO_RELAXED → FIFO fallback  (editor idle)
+    enum class PresentMode : uint32_t
     {
-        Float1, Float2, Float3, Float4,
-        UInt1,  UInt2,  UInt3,  UInt4,
-        SInt1,  SInt2,  SInt3,  SInt4,
-        Half2,  Half4,
-        UNorm4_8,  // 4 × uint8 normalised (e.g. RGBA8_UNORM packed)
+        VSync      = 0,
+        LowLatency = 1,
+        Uncapped   = 2,
+        Throttled  = 3,
     };
 
-    struct VertexAttribute
-    {
-        uint32_t     Location = 0;   // shader location
-        uint32_t     Binding  = 0;   // vertex buffer binding slot
-        VertexFormat Format   = VertexFormat::Float3;
-        uint32_t     Offset   = 0;   // byte offset within the vertex
-    };
-
-    struct VertexBinding
-    {
-        uint32_t Binding   = 0;
-        uint32_t Stride    = 0;
-        bool     PerInstance = false;
-    };
 
     // ----------------------------------------------------------
     // Resource descriptors
@@ -257,9 +247,7 @@ export namespace Extrinsic::RHI
     };
 
     // Maximum counts — kept small for now; increase as needed.
-    constexpr uint32_t MaxVertexAttributes = 16;
-    constexpr uint32_t MaxVertexBindings   = 8;
-    constexpr uint32_t MaxColorTargets     = 8;
+    constexpr uint32_t MaxColorTargets      = 8;
     constexpr uint32_t MaxPushConstantBytes = 128;
 
     struct PipelineDesc
@@ -270,11 +258,11 @@ export namespace Extrinsic::RHI
         std::string FragmentShaderPath;
         std::string ComputeShaderPath;   // non-empty → compute pipeline
 
-        // Vertex layout
-        VertexAttribute VertexAttributes[MaxVertexAttributes]{};
-        uint32_t        VertexAttributeCount = 0;
-        VertexBinding   VertexBindings[MaxVertexBindings]{};
-        uint32_t        VertexBindingCount = 0;
+        // BDA-ONLY: vertex input state is intentionally absent.
+        // All geometry is read from device-local buffers via Buffer Device Address
+        // pushed as push constants.  vkCmdBindVertexBuffers is never called.
+        // The Vulkan backend creates all graphics pipelines with
+        // VkPipelineVertexInputStateCreateInfo { .vertexBindingDescriptionCount = 0 }.
 
         // Per-stage state
         Topology         PrimitiveTopology = Topology::TriangleList;
@@ -283,7 +271,13 @@ export namespace Extrinsic::RHI
         ColorBlendDesc   ColorBlend[MaxColorTargets]{};
         uint32_t         ColorTargetCount = 1;
 
-        // Push-constant range
+        // Render target formats — required for dynamic rendering (VK_KHR_dynamic_rendering).
+        // ColorTargetFormats[i] must be set for each of the ColorTargetCount slots.
+        // DepthTargetFormat = Format::Undefined means no depth attachment.
+        Format ColorTargetFormats[MaxColorTargets]{};
+        Format DepthTargetFormat = Format::Undefined;
+
+        // Push-constant size in bytes.  Must be <= MaxPushConstantBytes (128).
         uint32_t PushConstantSize = 0;
 
         const char* DebugName = nullptr;

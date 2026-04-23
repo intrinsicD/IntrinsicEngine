@@ -5,13 +5,13 @@ module;
 // backend arrives it should live alongside this as Extrinsic.Backends.Vulkan,
 // at which point the global module fragment below will grow the actual
 // vulkan.h / vk_mem_alloc.h includes.
-#include <cstdint>
+#include <atomic>
 #include <memory>
+#include <span>
 #include <vector>
 #include <expected>
 #include <string>
 #include <string_view>
-#include <cassert>
 #include <chrono>
 #include <mutex>
 #include <unordered_map>
@@ -20,11 +20,13 @@ module;
 module Extrinsic.Backends.Null;
 
 import Extrinsic.Core.Config.Render;
+import Extrinsic.Core.ResourcePool;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
-import Extrinsic.RHI.Handles;  // all typed resource handles
+import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
@@ -32,49 +34,6 @@ import Extrinsic.Platform.Window;
 
 namespace Extrinsic::Backends::Null
 {
-    template<typename T>
-    class ResourcePool
-    {
-    public:
-        std::pair<std::uint32_t, std::uint32_t> Allocate()
-        {
-            if (!m_FreeList.empty())
-            {
-                const std::uint32_t idx = m_FreeList.back();
-                m_FreeList.pop_back();
-                m_Alive[idx] = true;
-                return {idx, m_Generations[idx]};
-            }
-            const std::uint32_t idx = static_cast<std::uint32_t>(m_Data.size());
-            m_Data.emplace_back();
-            m_Generations.push_back(0);
-            m_Alive.push_back(true);
-            return {idx, 0};
-        }
-
-        void Free(std::uint32_t index, std::uint32_t generation)
-        {
-            if (index >= m_Data.size() || !m_Alive[index] || m_Generations[index] != generation)
-                return;
-            m_Alive[index] = false;
-            ++m_Generations[index];
-            m_Data[index] = T{};
-            m_FreeList.push_back(index);
-        }
-
-        [[nodiscard]] T* Get(std::uint32_t index, std::uint32_t generation)
-        {
-            if (index >= m_Data.size() || !m_Alive[index] || m_Generations[index] != generation)
-                return nullptr;
-            return &m_Data[index];
-        }
-
-    private:
-        std::vector<T>             m_Data;
-        std::vector<std::uint32_t> m_Generations;
-        std::vector<bool>          m_Alive;
-        std::vector<std::uint32_t> m_FreeList;
-    };
 
     struct BufferEntry
     {
@@ -312,13 +271,12 @@ namespace Extrinsic::Backends::Null
     public:
         void Begin() override {}
         void End() override {}
-        void BeginRenderPass(RHI::TextureHandle, RHI::TextureHandle) override {}
+        void BeginRenderPass(const RHI::RenderPassDesc&) override {}
         void EndRenderPass() override {}
         void SetViewport(float, float, float, float, float, float) override {}
         void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
         void BindPipeline(RHI::PipelineHandle) override {}
-        void BindVertexBuffer(std::uint32_t, RHI::BufferHandle, std::uint64_t) override {}
-        void BindIndexBuffer(RHI::BufferHandle, std::uint64_t, bool) override {}
+        // BDA-only: BindVertexBuffer / BindIndexBuffer removed.
         void PushConstants(const void*, std::uint32_t, std::uint32_t) override {}
         void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
@@ -330,11 +288,51 @@ namespace Extrinsic::Backends::Null
         void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
         void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
-        void BufferBarrier(RHI::BufferHandle) override {}
+        void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle,
                         std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,
                                  RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
+    };
+
+    // ---- Null transfer queue ----------------------------------------
+    // Immediately marks every upload as complete — no GPU work occurs.
+    class NullTransferQueue final : public RHI::ITransferQueue
+    {
+    public:
+        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
+                                                      const void*,
+                                                      std::uint64_t,
+                                                      std::uint64_t) override
+        {
+            return RHI::TransferToken{++m_Next};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
+                                                      std::span<const std::byte>,
+                                                      std::uint64_t) override
+        {
+            return RHI::TransferToken{++m_Next};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadTexture(RHI::TextureHandle,
+                                                       const void*,
+                                                       std::uint64_t,
+                                                       std::uint32_t,
+                                                       std::uint32_t) override
+        {
+            return RHI::TransferToken{++m_Next};
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
+        {
+            return token.Value <= m_Next.load(std::memory_order_relaxed);
+        }
+
+        void CollectCompleted() override {}
+
+    private:
+        std::atomic<std::uint64_t> m_Next{0};
     };
 
     class NullDevice final : public RHI::IDevice
@@ -359,7 +357,13 @@ namespace Extrinsic::Backends::Null
             return true;
         }
 
-        void EndFrame(const RHI::FrameHandle&) override {}
+        void EndFrame(const RHI::FrameHandle&) override
+        {
+            m_Buffers.ProcessDeletions(m_FrameIndex);
+            m_Textures.ProcessDeletions(m_FrameIndex);
+            m_Samplers.ProcessDeletions(m_FrameIndex);
+            m_Pipelines.ProcessDeletions(m_FrameIndex);
+        }
         void Present(const RHI::FrameHandle&) override {}
 
         void Resize(std::uint32_t width, std::uint32_t height) override
@@ -373,6 +377,16 @@ namespace Extrinsic::Backends::Null
             return m_BackbufferExtent;
         }
 
+        void SetPresentMode(RHI::PresentMode mode) override { m_PresentMode = mode; }
+        [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }
+
+        [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle&) const override
+        {
+            // Null backend has no real swapchain — return a fixed sentinel handle
+            // (index=0, generation=0) that the Null command context silently ignores.
+            return RHI::TextureHandle{0, 0};
+        }
+
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override
         {
             return m_CommandContext;
@@ -380,18 +394,17 @@ namespace Extrinsic::Backends::Null
 
         [[nodiscard]] RHI::BufferHandle CreateBuffer(const RHI::BufferDesc& desc) override
         {
-            auto [idx, gen] = m_Buffers.Allocate();
-            BufferEntry* e = m_Buffers.Get(idx, gen);
-            e->SizeBytes = desc.SizeBytes;
-            e->Usage = desc.Usage;
-            e->HostVisible = desc.HostVisible;
-            return RHI::BufferHandle{idx, gen};
+            return m_Buffers.Add(BufferEntry{
+                .SizeBytes   = desc.SizeBytes,
+                .Usage       = desc.Usage,
+                .HostVisible = desc.HostVisible,
+            });
         }
 
         void DestroyBuffer(RHI::BufferHandle handle) override
         {
             if (!handle.IsValid()) return;
-            m_Buffers.Free(handle.Index, handle.Generation);
+            m_Buffers.Remove(handle, m_FrameIndex);
         }
 
         void WriteBuffer(RHI::BufferHandle, const void*, std::uint64_t, std::uint64_t) override {}
@@ -403,81 +416,49 @@ namespace Extrinsic::Backends::Null
 
         [[nodiscard]] RHI::TextureHandle CreateTexture(const RHI::TextureDesc& desc) override
         {
-            auto [idx, gen] = m_Textures.Allocate();
-            TextureEntry* e = m_Textures.Get(idx, gen);
-            e->Width = desc.Width;
-            e->Height = desc.Height;
-            e->MipLevels = desc.MipLevels;
-            e->Fmt = desc.Fmt;
-            e->Layout = desc.InitialLayout;
-            return RHI::TextureHandle{idx, gen};
+            return m_Textures.Add(TextureEntry{
+                .Width     = desc.Width,
+                .Height    = desc.Height,
+                .MipLevels = desc.MipLevels,
+                .Fmt       = desc.Fmt,
+                .Layout    = desc.InitialLayout,
+            });
         }
 
         void DestroyTexture(RHI::TextureHandle handle) override
         {
             if (!handle.IsValid()) return;
-            m_Textures.Free(handle.Index, handle.Generation);
+            m_Textures.Remove(handle, m_FrameIndex);
         }
 
         void WriteTexture(RHI::TextureHandle, const void*, std::uint64_t, std::uint32_t, std::uint32_t) override {}
 
         [[nodiscard]] RHI::SamplerHandle CreateSampler(const RHI::SamplerDesc& desc) override
         {
-            auto [idx, gen] = m_Samplers.Allocate();
-            SamplerEntry* e = m_Samplers.Get(idx, gen);
-            e->Desc = desc;
-            return RHI::SamplerHandle{idx, gen};
+            return m_Samplers.Add(SamplerEntry{.Desc = desc});
         }
 
         void DestroySampler(RHI::SamplerHandle handle) override
         {
             if (!handle.IsValid()) return;
-            m_Samplers.Free(handle.Index, handle.Generation);
+            m_Samplers.Remove(handle, m_FrameIndex);
         }
 
         [[nodiscard]] RHI::PipelineHandle CreatePipeline(const RHI::PipelineDesc& desc) override
         {
-            auto [idx, gen] = m_Pipelines.Allocate();
-            PipelineEntry* e = m_Pipelines.Get(idx, gen);
-            e->IsCompute = !desc.ComputeShaderPath.empty();
-            e->DebugName = desc.DebugName ? desc.DebugName : "";
-            return RHI::PipelineHandle{idx, gen};
+            return m_Pipelines.Add(PipelineEntry{
+                .DebugName = desc.DebugName ? desc.DebugName : "",
+                .IsCompute = !desc.ComputeShaderPath.empty(),
+            });
         }
 
         void DestroyPipeline(RHI::PipelineHandle handle) override
         {
             if (!handle.IsValid()) return;
-            m_Pipelines.Free(handle.Index, handle.Generation);
+            m_Pipelines.Remove(handle, m_FrameIndex);
         }
 
-        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
-                                                      const void*,
-                                                      std::uint64_t,
-                                                      std::uint64_t) override
-        {
-            m_LastCompletedTransferValue = ++m_NextTransferValue;
-            return RHI::TransferToken{m_NextTransferValue};
-        }
-
-        [[nodiscard]] RHI::TransferToken UploadTexture(RHI::TextureHandle,
-                                                       const void*,
-                                                       std::uint64_t,
-                                                       std::uint32_t,
-                                                       std::uint32_t) override
-        {
-            m_LastCompletedTransferValue = ++m_NextTransferValue;
-            return RHI::TransferToken{m_NextTransferValue};
-        }
-
-        [[nodiscard]] bool IsTransferComplete(RHI::TransferToken token) const override
-        {
-            return token.Value <= m_LastCompletedTransferValue;
-        }
-
-        void CollectCompletedTransfers() override
-        {
-            m_LastCompletedTransferValue = m_NextTransferValue;
-        }
+        [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override { return m_TransferQueue; }
 
         [[nodiscard]] RHI::IBindlessHeap& GetBindlessHeap() override { return m_BindlessHeap; }
         [[nodiscard]] RHI::IProfiler* GetProfiler() override { return &m_Profiler; }
@@ -487,18 +468,18 @@ namespace Extrinsic::Backends::Null
     private:
         static constexpr std::uint32_t kFramesInFlight = 2;
 
-        std::uint32_t m_FrameIndex{0};
-        std::uint64_t m_NextTransferValue{0};
-        std::uint64_t m_LastCompletedTransferValue{0};
+        std::uint32_t      m_FrameIndex{0};
+        RHI::PresentMode   m_PresentMode{RHI::PresentMode::VSync};
         Platform::Extent2D m_BackbufferExtent{};
         NullCommandContext m_CommandContext{};
-        NullBindlessHeap m_BindlessHeap{};
-        NullProfiler m_Profiler{};
+        NullTransferQueue  m_TransferQueue{};
+        NullBindlessHeap   m_BindlessHeap{};
+        NullProfiler       m_Profiler{};
 
-        ResourcePool<BufferEntry> m_Buffers;
-        ResourcePool<TextureEntry> m_Textures;
-        ResourcePool<SamplerEntry> m_Samplers;
-        ResourcePool<PipelineEntry> m_Pipelines;
+        Core::ResourcePool<BufferEntry,   RHI::BufferHandle,   0> m_Buffers;
+        Core::ResourcePool<TextureEntry,  RHI::TextureHandle,  0> m_Textures;
+        Core::ResourcePool<SamplerEntry,  RHI::SamplerHandle,  0> m_Samplers;
+        Core::ResourcePool<PipelineEntry, RHI::PipelineHandle, 0> m_Pipelines;
     };
 
     std::unique_ptr<RHI::IDevice> CreateNullDevice()

@@ -19,6 +19,7 @@ target_sources(${target_name}
         Graphics.DeferredSystem.cppm
         Graphics.PostProcessSystem.cppm
         Graphics.ShadowSystem.cppm
+        Graphics.TransformSyncSystem.cppm
         PRIVATE
         Graphics.Renderer.cpp
         Graphics.MaterialSystem.cpp
@@ -29,6 +30,7 @@ target_sources(${target_name}
         Graphics.DeferredSystem.cpp
         Graphics.PostProcessSystem.cpp
         Graphics.ShadowSystem.cpp
+        Graphics.TransformSyncSystem.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

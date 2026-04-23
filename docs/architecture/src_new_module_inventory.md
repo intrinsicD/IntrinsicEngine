@@ -1,6 +1,6 @@
 # src_new Module Inventory (auto-generated)
 
-_Generated on 2026-04-22 by `tools/generate_src_new_module_inventory.py`._
+_Generated on 2026-04-23 by `tools/generate_src_new_module_inventory.py`._
 
 | Module | File | Library |
 |---|---|---|
@@ -77,21 +77,21 @@ _Generated on 2026-04-22 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Graphics.Renderer` | `src_new/Graphics/Graphics.Renderer.cppm` | `Graphics` |
 | `Extrinsic.Graphics.SelectionSystem` | `src_new/Graphics/Graphics.SelectionSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.ShadowSystem` | `src_new/Graphics/Graphics.ShadowSystem.cppm` | `Graphics` |
-| `Graphics.TransformSyncSystem` | `src_new/Graphics/Graphics.TransformSyncSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.TransformSyncSystem` | `src_new/Graphics/Graphics.TransformSyncSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Culling` | `src_new/Graphics/Passes/Pass.Culling.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `src_new/Graphics/Passes/Pass.Deferred.GBuffers.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `src_new/Graphics/Passes/Pass.Deferred.Lighting.cppm` | `Graphics` |
-| `Pass.PreDepth` | `src_new/Graphics/Passes/Pass.DepthPrepass.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.DepthPrepass` | `src_new/Graphics/Passes/Pass.DepthPrepass.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Forward.Line` | `src_new/Graphics/Passes/Pass.Forward.Line.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Forward.Point` | `src_new/Graphics/Passes/Pass.Forward.Point.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Forward.Surface` | `src_new/Graphics/Passes/Pass.Forward.Surface.cppm` | `Graphics` |
-| `Pass.ImGui` | `src_new/Graphics/Passes/Pass.ImGui.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.ImGui` | `src_new/Graphics/Passes/Pass.ImGui.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.Bloom` | `src_new/Graphics/Passes/Pass.PostProcess.Bloom.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.FXAA` | `src_new/Graphics/Passes/Pass.PostProcess.FXAA.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.Histogram` | `src_new/Graphics/Passes/Pass.PostProcess.Histogram.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.SMAA` | `src_new/Graphics/Passes/Pass.PostProcess.SMAA.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.PostProcess.ToneMap` | `src_new/Graphics/Passes/Pass.PostProcess.ToneMap.cppm` | `Graphics` |
-| `Pass.Present` | `src_new/Graphics/Passes/Pass.Present.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Pass.Present` | `src_new/Graphics/Passes/Pass.Present.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Selection.EdgeId` | `src_new/Graphics/Passes/Pass.Selection.EdgeId.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Selection.EntityId` | `src_new/Graphics/Passes/Pass.Selection.EntityId.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Selection.FaceId` | `src_new/Graphics/Passes/Pass.Selection.FaceId.cppm` | `Graphics` |

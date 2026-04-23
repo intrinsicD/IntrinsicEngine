@@ -1,24 +1,24 @@
-export module Sandbox;
+export module Extrinsic.Sandbox;
 
 import Extrinsic.Runtime.Engine;
 
-namespace Sandbox
+namespace Extrinsic::Sandbox
 {
-    export class App final : public Extrinsic::Runtime::IApplication
+    export class App final : public Runtime::IApplication
     {
     public:
-        void OnInitialize(Extrinsic::Runtime::Engine& engine) override
+        void OnInitialize(Runtime::Engine& engine) override
         {
             (void)engine;
         }
 
-        void OnSimTick(Extrinsic::Runtime::Engine& engine, double fixedDt) override
+        void OnSimTick(Runtime::Engine& engine, double fixedDt) override
         {
             (void)engine;
             (void)fixedDt;
         }
 
-        void OnVariableTick(Extrinsic::Runtime::Engine& engine,
+        void OnVariableTick(Runtime::Engine& engine,
                             double alpha, double dt) override
         {
             (void)engine;
@@ -26,7 +26,7 @@ namespace Sandbox
             (void)dt;
         }
 
-        void OnShutdown(Extrinsic::Runtime::Engine& engine) override
+        void OnShutdown(Runtime::Engine& engine) override
         {
             (void)engine;
         }

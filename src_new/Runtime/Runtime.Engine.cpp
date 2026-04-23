@@ -15,6 +15,7 @@ import Extrinsic.Core.Tasks;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -52,7 +53,7 @@ namespace Extrinsic::Runtime
 
             if (auto r = graph.Compile(); !r.has_value())
             {
-                Log::Error("[Runtime] StreamingGraph Compile() failed: error={}",
+                Core::Log::Error("[Runtime] StreamingGraph Compile() failed: error={}",
                            static_cast<int>(r.error()));
                 graph.Reset();
                 return;
@@ -61,7 +62,7 @@ namespace Extrinsic::Runtime
             auto plan = graph.BuildPlan();
             if (!plan.has_value())
             {
-                Log::Error("[Runtime] StreamingGraph BuildPlan() failed: error={}",
+                Core::Log::Error("[Runtime] StreamingGraph BuildPlan() failed: error={}",
                            static_cast<int>(plan.error()));
                 graph.Reset();
                 return;
@@ -231,13 +232,13 @@ namespace Extrinsic::Runtime
                 {
                     if (auto exec = m_FrameGraph->Execute(); !exec.has_value())
                     {
-                        Log::Error("[Runtime] FrameGraph Execute() failed: error={}",
+                        Core::Log::Error("[Runtime] FrameGraph Execute() failed: error={}",
                                    static_cast<int>(exec.error()));
                     }
                 }
                 else
                 {
-                    Log::Error("[Runtime] FrameGraph Compile() failed: error={}",
+                    Core::Log::Error("[Runtime] FrameGraph Compile() failed: error={}",
                                static_cast<int>(r.error()));
                 }
                 m_FrameGraph->Reset();
@@ -285,7 +286,7 @@ namespace Extrinsic::Runtime
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
         // GPU-side resource retirement, staging GC, readback processing.
-        m_Device->CollectCompletedTransfers();
+        m_Device->GetTransferQueue().CollectCompleted();
         (void)completedGpuValue; // placeholder until GpuAssetCache / deferred-delete lands
 
         // Streaming task graph: dispatch background IO / geometry-processing

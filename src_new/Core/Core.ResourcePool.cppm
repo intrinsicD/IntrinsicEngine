@@ -159,6 +159,32 @@ export namespace Extrinsic::Core
             return m_Slots.size();
         }
 
+        // Iterate all live entries. Fn receives (Handle, T&).
+        // Acquires the write lock for the duration — do not call Add/Remove from Fn.
+        template <typename Fn>
+        void ForEach(Fn&& fn)
+        {
+            std::unique_lock lock(m_Mutex);
+            for (uint32_t i = 0; i < static_cast<uint32_t>(m_Slots.size()); ++i)
+            {
+                Slot& slot = m_Slots[i];
+                if (slot.IsActive && slot.Data)
+                    fn(Handle{i, slot.Generation}, *slot.Data);
+            }
+        }
+
+        template <typename Fn>
+        void ForEach(Fn&& fn) const
+        {
+            std::shared_lock lock(m_Mutex);
+            for (uint32_t i = 0; i < static_cast<uint32_t>(m_Slots.size()); ++i)
+            {
+                const Slot& slot = m_Slots[i];
+                if (slot.IsActive && slot.Data)
+                    fn(Handle{i, slot.Generation}, *slot.Data);
+            }
+        }
+
     private:
         uint32_t AllocSlot()
         {

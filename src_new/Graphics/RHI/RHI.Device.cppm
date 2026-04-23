@@ -12,6 +12,7 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.Core.Config.Render;
@@ -53,7 +54,18 @@ namespace Extrinsic::RHI
         virtual void Present(const FrameHandle& frame)    = 0;
 
         virtual void Resize(std::uint32_t width, std::uint32_t height) = 0;
-        virtual Platform::Extent2D GetBackbufferExtent() const = 0;
+        [[nodiscard]] virtual Platform::Extent2D GetBackbufferExtent() const = 0;
+
+        /// Change swapchain present mode.  Takes effect on the next Resize()
+        /// or the next swapchain recreation — no immediate GPU stall.
+        virtual void SetPresentMode(PresentMode mode) = 0;
+        [[nodiscard]] virtual PresentMode GetPresentMode() const = 0;
+
+        /// Return a TextureHandle for the swapchain image corresponding to this frame.
+        /// The handle is valid only for the duration of the frame (between BeginFrame and Present).
+        /// Use it in TextureBarrier() and RenderPassDesc::ColorAttachment to target the backbuffer.
+        /// The handle is NOT managed by TextureManager — do not call DestroyTexture on it.
+        [[nodiscard]] virtual TextureHandle GetBackbufferHandle(const FrameHandle& frame) const = 0;
 
         // ---- Command context -----------------------------------------
         virtual ICommandContext& GetGraphicsContext(std::uint32_t frameIndex) = 0;
@@ -90,26 +102,10 @@ namespace Extrinsic::RHI
         virtual void                          DestroyPipeline(PipelineHandle handle)   = 0;
 
         // ---- Async transfer ------------------------------------------
-        // Non-blocking: data is copied into a staging buffer on the host and
-        // queued for GPU upload.  Returns a token the caller can poll.
-        // Contract: no loader/caller thread ever waits on a GPU fence here —
-        // that happens inside CollectCompletedTransfers() on the render thread.
-        [[nodiscard]] virtual TransferToken UploadBuffer(BufferHandle dst,
-                                                         const void*  data,
-                                                         std::uint64_t size,
-                                                         std::uint64_t offset = 0)  = 0;
-
-        [[nodiscard]] virtual TransferToken UploadTexture(TextureHandle dst,
-                                                          const void*   data,
-                                                          std::uint64_t dataSizeBytes,
-                                                          std::uint32_t mipLevel   = 0,
-                                                          std::uint32_t arrayLayer = 0) = 0;
-
-        // Poll whether a specific transfer has completed on the GPU.
-        [[nodiscard]] virtual bool IsTransferComplete(TransferToken token) const = 0;
-
-        // Retire completed staging allocations.  Call once per frame on the render thread.
-        virtual void CollectCompletedTransfers() = 0;
+        // All upload/poll/collect operations are on ITransferQueue.
+        // GpuAssetCache and other streaming consumers inject ITransferQueue&
+        // directly — they never need the full IDevice interface.
+        [[nodiscard]] virtual ITransferQueue& GetTransferQueue() = 0;
 
         // ---- Bindless heap -------------------------------------------
         // Returns the global bindless heap for this device.
