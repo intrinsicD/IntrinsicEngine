@@ -10,6 +10,7 @@ target_sources(${target_name}
         Graphics.Renderer.cppm
         Graphics.RenderFrameInput.cppm
         Graphics.RenderWorld.cppm
+        Graphics.GpuWorld.cppm
         Graphics.Material.cppm
         Graphics.MaterialSystem.cppm
         Graphics.ColormapSystem.cppm
@@ -25,6 +26,7 @@ target_sources(${target_name}
         Graphics.TransformSyncSystem.cppm
         PRIVATE
         Graphics.Renderer.cpp
+        Graphics.GpuWorld.cpp
         Graphics.MaterialSystem.cpp
         Graphics.ColormapSystem.cpp
         Graphics.VisualizationSyncSystem.cpp
