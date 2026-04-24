@@ -1019,7 +1019,9 @@ static_assert(sizeof(GpuScenePushConstants) <= 128);
 
 The architecture doc already names `GpuWorld` as the GPU-side counterpart of the CPU scene and says it should own managed geometry, instance buffer, entity config buffer, bounds, material registry, and BVH/culling buffers. ([GitHub][3])
 
-### TODO 3.1 — Add module to CMake
+### TODO 3.1 — **Done**
+
+ Add module to CMake
 
 In `src_new/Graphics/CMakeLists.txt`, add:
 
@@ -1035,7 +1037,9 @@ Graphics.GpuWorld.cpp
 
 to private sources.
 
-### TODO 3.2 — Add public `GpuWorld` interface
+### TODO 3.2 — **Done**
+
+ Add public `GpuWorld` interface
 
 In `Graphics.GpuWorld.cppm`, export:
 
@@ -1128,7 +1132,9 @@ private:
 }
 ```
 
-### TODO 3.3 — Implement fixed-size slot allocators
+### TODO 3.3 — **Done**
+
+ Implement fixed-size slot allocators
 
 In `Graphics.GpuWorld.cpp`, implement a small internal slot allocator:
 
@@ -1152,7 +1158,9 @@ struct SlotAllocator {
 
 Use one allocator for instances and one for geometry records.
 
-### TODO 3.4 — Allocate persistent GPU buffers
+### TODO 3.4 — **Done**
+
+ Allocate persistent GPU buffers
 
 In `GpuWorld::Initialize`, allocate these buffers through `RHI::BufferManager`:
 
@@ -1170,7 +1178,9 @@ In `GpuWorld::Initialize`, allocate these buffers through `RHI::BufferManager`:
 
 For now, one managed vertex buffer and one managed index buffer are enough. Add comments saying multiple buffers and compaction are future work.
 
-### TODO 3.5 — Implement dirty range upload
+### TODO 3.5 — **Done**
+
+ Implement dirty range upload
 
 Keep CPU mirrors:
 
@@ -1209,7 +1219,9 @@ void FlushDirtyRuns(
 
 It should coalesce contiguous dirty slots into one `WriteBuffer` call per run.
 
-### TODO 3.6 — Implement scene table refresh
+### TODO 3.6 — **Done**
+
+ Implement scene table refresh
 
 Whenever any buffer is allocated or material buffer/lights change, update `SceneTableCpu`:
 
@@ -1229,7 +1241,9 @@ SceneTableCpu.LightCount         = LightCount;
 
 Upload one `GpuSceneTable` in `SyncFrame()`.
 
-### TODO 3.7 — Implement simple managed geometry allocator
+### TODO 3.7 — **Done**
+
+ Implement simple managed geometry allocator
 
 For first implementation:
 
