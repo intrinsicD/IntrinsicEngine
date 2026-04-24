@@ -62,6 +62,7 @@ namespace Extrinsic::Backends::Null
         void SetViewport(float, float, float, float, float, float) override {}
         void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
         void BindPipeline(RHI::PipelineHandle) override {}
+        void BindIndexBuffer(RHI::BufferHandle, std::uint64_t, RHI::IndexType) override {}
         void PushConstants(const void*, std::uint32_t, std::uint32_t) override {}
         void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
@@ -70,10 +71,14 @@ namespace Extrinsic::Backends::Null
         void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t,
                                       RHI::BufferHandle, std::uint64_t,
                                       std::uint32_t) override {}
+        void DrawIndirectCount(RHI::BufferHandle, std::uint64_t,
+                               RHI::BufferHandle, std::uint64_t,
+                               std::uint32_t) override {}
         void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
         void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
         void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
+        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle,
                         std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,

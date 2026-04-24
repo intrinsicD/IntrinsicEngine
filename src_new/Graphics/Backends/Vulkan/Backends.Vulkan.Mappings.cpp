@@ -208,6 +208,17 @@ VkImageAspectFlags AspectFromFormat(VkFormat f)
     }
 }
 
+
+VkIndexType ToVkIndexType(RHI::IndexType t)
+{
+    switch (t)
+    {
+    case RHI::IndexType::Uint16: return VK_INDEX_TYPE_UINT16;
+    case RHI::IndexType::Uint32: return VK_INDEX_TYPE_UINT32;
+    }
+    return VK_INDEX_TYPE_UINT32;
+}
+
 VkBufferUsageFlags ToVkBufferUsage(RHI::BufferUsage u)
 {
     VkBufferUsageFlags flags = 0;

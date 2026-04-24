@@ -7,6 +7,7 @@ export module Extrinsic.RHI.CommandContext;
 
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Types;
 
 // ============================================================
 // ICommandContext — API-agnostic command recording interface.
@@ -108,9 +109,13 @@ namespace Extrinsic::RHI
         virtual void BindPipeline(PipelineHandle pipeline) = 0;
 
         // ---- Push constants ------------------------------------------
-        // NOTE: BDA-only architecture — BindVertexBuffer / BindIndexBuffer are
-        // intentionally absent.  All geometry pointers are pushed as push constants
-        // via PushConstants().  The backend never calls vkCmdBindVertexBuffers.
+        virtual void BindIndexBuffer(BufferHandle  buffer,
+                                     std::uint64_t offset,
+                                     IndexType     indexType) = 0;
+
+        // NOTE: Vertex fetch remains BDA/manual in shaders; there is intentionally
+        // no BindVertexBuffer API in this abstraction. Indexed GPU-driven draws
+        // still require an index-buffer bind (BindIndexBuffer).
         /// data must point to at least `size` bytes; size <= 128 bytes (Vulkan guarantee).
         virtual void PushConstants(const void*   data,
                                    std::uint32_t size,
@@ -145,6 +150,12 @@ namespace Extrinsic::RHI
                                               std::uint64_t countOffset,
                                               std::uint32_t maxDrawCount) = 0;
 
+        virtual void DrawIndirectCount(BufferHandle  argBuffer,
+                                       std::uint64_t argOffset,
+                                       BufferHandle  countBuffer,
+                                       std::uint64_t countOffset,
+                                       std::uint32_t maxDrawCount) = 0;
+
         // ---- Compute dispatch ----------------------------------------
         virtual void Dispatch(std::uint32_t groupX,
                               std::uint32_t groupY,
@@ -167,6 +178,11 @@ namespace Extrinsic::RHI
                                    MemoryAccess  after) = 0;
 
         // ---- Copy operations -----------------------------------------
+        virtual void FillBuffer(BufferHandle  buffer,
+                                std::uint64_t offset,
+                                std::uint64_t size,
+                                std::uint32_t value) = 0;
+
         virtual void CopyBuffer(BufferHandle  src,
                                 BufferHandle  dst,
                                 std::uint64_t srcOffset,
