@@ -56,11 +56,9 @@ export namespace Extrinsic::Graphics
     //     [3] binCount                -- uint32 via bit_cast (0 = continuous)
     //
     //   CustomData[2]:
-    //     [0] scalarBDA_lo            -- low  32 bits of GPU buffer address
-    //     [1] scalarBDA_hi            -- high 32 bits of GPU buffer address
-    //     [2] elementCount            -- uint32 via bit_cast
-    //     [3] colorSourceMode         -- 0=ScalarField,1=UniformColor,
-    //                                    2=PerElementRgba via bit_cast
+    //     Reserved for non-address visual constants.
+    //     Per-entity attribute pointers and mode selection live in
+    //     RHI::GpuEntityConfig (GpuWorld-owned), not in material slots.
     //
     //   CustomData[3]:             -- reserved
     //
@@ -163,4 +161,3 @@ export namespace Extrinsic::Graphics
         glm::vec4 CustomData[4]{};
     };
 }
-

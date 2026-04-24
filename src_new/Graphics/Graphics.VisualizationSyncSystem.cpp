@@ -4,6 +4,7 @@ module;
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 #include <unordered_map>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -16,6 +17,7 @@ import Extrinsic.RHI.Bindless;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.VisualizationConfig;
@@ -27,12 +29,12 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 namespace Extrinsic::Graphics
 {
     // ----------------------------------------------------------------
-    // ColorSourceMode constants — packed into CustomData[2].w (as uint via bit_cast)
-    // The surface shader branches on this to select the fetch path.
+    // ColorSourceMode constants — stored in RHI::GpuEntityConfig.
     // ----------------------------------------------------------------
-    static constexpr std::uint32_t kMode_ScalarField    = 0u;
+    static constexpr std::uint32_t kMode_Material       = 0u;
     static constexpr std::uint32_t kMode_UniformColor   = 1u;
-    static constexpr std::uint32_t kMode_PerElementRgba = 2u;
+    static constexpr std::uint32_t kMode_ScalarField    = 2u;
+    static constexpr std::uint32_t kMode_PerElementRgba = 3u;
 
     // ----------------------------------------------------------------
     // Helper: pack normalised float RGBA into uint32_t RGBA8
@@ -78,10 +80,21 @@ namespace Extrinsic::Graphics
             OverrideLeases.erase(static_cast<EntityInt>(entity));
         }
 
+        static std::uint32_t ToVisDomain(Components::VisualizationConfig::Domain d) noexcept
+        {
+            using Domain = Components::VisualizationConfig::Domain;
+            switch (d)
+            {
+            case Domain::Vertex: return 0u;
+            case Domain::Face:   return 1u;
+            case Domain::Edge:   return 2u;
+            }
+            return 0u;
+        }
+
         /// Build MaterialParams for the ScalarField override.
         MaterialParams BuildScalarFieldParams(
             const Components::VisualizationConfig& cfg,
-            const Components::GpuSceneSlot&        gpuSlot,
             ColormapSystem&                        colormapSys)
         {
             MaterialParams p{};
@@ -90,24 +103,10 @@ namespace Extrinsic::Graphics
             const RHI::BindlessIndex colormapIdx =
                 colormapSys.GetBindlessIndex(cfg.Scalar.Map);
 
-            // Resolve the scalar buffer BDA
-            const RHI::BufferHandle scalarBuf = gpuSlot.Find(cfg.ScalarFieldName);
-            std::uint64_t bda = 0u;
-            std::uint32_t elementCount = 0u;
-            if (scalarBuf.IsValid() && Device)
-            {
-                bda = Device->GetBufferDeviceAddress(scalarBuf);
-                if (const auto* entry = gpuSlot.FindEntry(cfg.ScalarFieldName))
-                    elementCount = entry->ElementCount;
-            }
-
-            const auto lo = static_cast<std::uint32_t>(bda & 0xFFFF'FFFFu);
-            const auto hi = static_cast<std::uint32_t>(bda >> 32u);
-
             // CustomData[0]: colourmap index, domain, range
             p.CustomData[0] = {
                 std::bit_cast<float>(colormapIdx),
-                std::bit_cast<float>(static_cast<std::uint32_t>(cfg.ScalarDomain)),
+                std::bit_cast<float>(ToVisDomain(cfg.ScalarDomain)),
                 cfg.Scalar.RangeMin,
                 cfg.Scalar.RangeMax,
             };
@@ -122,12 +121,12 @@ namespace Extrinsic::Graphics
                 std::bit_cast<float>(cfg.Scalar.BinCount),
             };
 
-            // CustomData[2]: scalar BDA + element count + mode
+            // CustomData[2]: reserved for non-BDA constants.
             p.CustomData[2] = {
-                std::bit_cast<float>(lo),
-                std::bit_cast<float>(hi),
-                std::bit_cast<float>(elementCount),
-                std::bit_cast<float>(kMode_ScalarField),
+                1.f,
+                0.f,
+                0.f,
+                0.f,
             };
 
             return p;
@@ -140,39 +139,81 @@ namespace Extrinsic::Graphics
             p.BaseColorFactor = color;
             p.Flags           = MaterialFlags::Unlit;
             p.CustomData[2]   = {
-                0.f, 0.f, 0.f,
-                std::bit_cast<float>(kMode_UniformColor),
+                color.a, 0.f, 0.f, 0.f,
             };
             return p;
         }
 
         /// Build MaterialParams for a per-element RGBA buffer override.
-        MaterialParams BuildPerElementParams(
-            const std::string&            bufferName,
-            const Components::GpuSceneSlot& gpuSlot)
+        static MaterialParams BuildPerElementParams()
         {
             MaterialParams p{};
             p.Flags = MaterialFlags::Unlit;
-
-            const RHI::BufferHandle buf = gpuSlot.Find(bufferName);
-            std::uint64_t bda = 0u;
-            std::uint32_t elementCount = 0u;
-            if (buf.IsValid() && Device)
-            {
-                bda = Device->GetBufferDeviceAddress(buf);
-                if (auto* entry = gpuSlot.FindEntry(bufferName))
-                    elementCount = entry->ElementCount;
-            }
-            const auto lo = static_cast<std::uint32_t>(bda & 0xFFFF'FFFFu);
-            const auto hi = static_cast<std::uint32_t>(bda >> 32u);
-
             p.CustomData[2] = {
-                std::bit_cast<float>(lo),
-                std::bit_cast<float>(hi),
-                std::bit_cast<float>(elementCount),
-                std::bit_cast<float>(kMode_PerElementRgba),
+                1.f, 0.f, 0.f, 0.f,
             };
             return p;
+        }
+
+        RHI::GpuEntityConfig BuildEntityConfig(
+            const Components::VisualizationConfig* visCfg,
+            const Components::GpuSceneSlot&        gpuSlot,
+            ColormapSystem&                        colormapSys) const
+        {
+            RHI::GpuEntityConfig cfg{};
+            cfg.ColorSourceMode = kMode_Material;
+            cfg.VisualizationAlpha = 1.f;
+            cfg.UniformColor = {1.f, 1.f, 1.f, 1.f};
+
+            if (!visCfg)
+                return cfg;
+
+            cfg.ColormapID = colormapSys.GetBindlessIndex(visCfg->Scalar.Map);
+            cfg.ScalarRangeMin = visCfg->Scalar.RangeMin;
+            cfg.ScalarRangeMax = visCfg->Scalar.RangeMax;
+            cfg.BinCount = visCfg->Scalar.BinCount;
+            cfg.IsolineCount = static_cast<float>(visCfg->Scalar.Isolines.Num);
+            cfg.IsolineWidth = visCfg->Scalar.Isolines.Width;
+            cfg.IsolineColor = visCfg->Scalar.Isolines.Color;
+            cfg.VisualizationAlpha = 1.f;
+            cfg.VisDomain = ToVisDomain(visCfg->ScalarDomain);
+
+            if (!Device)
+                return cfg;
+
+            auto setBdaAndCount = [&](std::string_view name, std::uint64_t& outBda)
+            {
+                const RHI::BufferHandle handle = gpuSlot.Find(name);
+                if (handle.IsValid())
+                {
+                    outBda = Device->GetBufferDeviceAddress(handle);
+                    if (const auto* entry = gpuSlot.FindEntry(name))
+                        cfg.ElementCount = entry->ElementCount;
+                }
+            };
+
+            const auto source = visCfg->Source;
+            if (source == Components::VisualizationConfig::ColorSource::UniformColor)
+            {
+                cfg.ColorSourceMode = kMode_UniformColor;
+                cfg.UniformColor = visCfg->Color;
+            }
+            else if (source == Components::VisualizationConfig::ColorSource::ScalarField)
+            {
+                cfg.ColorSourceMode = kMode_ScalarField;
+                setBdaAndCount(visCfg->ScalarFieldName, cfg.ScalarBDA);
+            }
+            else if (source == Components::VisualizationConfig::ColorSource::PerVertexBuffer ||
+                     source == Components::VisualizationConfig::ColorSource::PerEdgeBuffer ||
+                     source == Components::VisualizationConfig::ColorSource::PerFaceBuffer)
+            {
+                cfg.ColorSourceMode = kMode_PerElementRgba;
+                setBdaAndCount(visCfg->ColorBufferName, cfg.ColorBDA);
+            }
+
+            setBdaAndCount("normals", cfg.VertexNormalBDA);
+            setBdaAndCount("sizes", cfg.PointSizeBDA);
+            return cfg;
         }
     };
 
@@ -228,7 +269,8 @@ namespace Extrinsic::Graphics
     // ----------------------------------------------------------------
     void VisualizationSyncSystem::Sync(entt::registry& registry,
                                        MaterialSystem& matSys,
-                                       ColormapSystem& colormapSys)
+                                       ColormapSystem& colormapSys,
+                                       GpuWorld&       gpuWorld)
     {
         using namespace Components;
         using ColorSource = VisualizationConfig::ColorSource;
@@ -250,6 +292,13 @@ namespace Extrinsic::Graphics
 
             const auto* visCfg = registry.try_get<VisualizationConfig>(entity);
 
+            if (gpuSlot.HasInstance())
+            {
+                gpuWorld.SetEntityConfig(
+                    gpuSlot.ToInstanceHandle(),
+                    m_Impl->BuildEntityConfig(visCfg, gpuSlot, colormapSys));
+            }
+
             if (!visCfg || visCfg->Source == ColorSource::Material)
             {
                 // No sci-vis override — use the base material slot directly.
@@ -268,13 +317,13 @@ namespace Extrinsic::Graphics
                 break;
 
             case ColorSource::ScalarField:
-                overrideParams = m_Impl->BuildScalarFieldParams(*visCfg, gpuSlot, colormapSys);
+                overrideParams = m_Impl->BuildScalarFieldParams(*visCfg, colormapSys);
                 break;
 
             case ColorSource::PerVertexBuffer:
             case ColorSource::PerEdgeBuffer:
             case ColorSource::PerFaceBuffer:
-                overrideParams = m_Impl->BuildPerElementParams(visCfg->ColorBufferName, gpuSlot);
+                overrideParams = Impl::BuildPerElementParams();
                 break;
 
             default:
@@ -310,4 +359,3 @@ namespace Extrinsic::Graphics
     }
 
 } // namespace Extrinsic::Graphics
-

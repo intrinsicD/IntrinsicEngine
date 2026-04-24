@@ -9,6 +9,7 @@ export module Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.RHI.Device;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
+import Extrinsic.Graphics.GpuWorld;
 
 // ============================================================
 // VisualizationSyncSystem — visualization-config → material sync.
@@ -21,7 +22,8 @@ import Extrinsic.Graphics.ColormapSystem;
 //        a. No VisualizationConfig → EffectiveSlot = base material.
 //        b. VisualizationConfig present → allocate/reuse an override
 //           material lease (kMaterialTypeID_SciVis), patch it with
-//           colourmap BDA + range + isoline params, set EffectiveSlot
+//           shading-mode constants, then write per-entity BDA/config
+//           into GpuWorld::GpuEntityConfig and set EffectiveSlot
 //           to the override slot.
 //      Additionally applies TintOverride to the base material when set.
 //
@@ -86,7 +88,8 @@ export namespace Extrinsic::Graphics
         /// GetBindlessIndex() returns valid slot indices.
         void Sync(entt::registry& registry,
                   MaterialSystem& matSys,
-                  ColormapSystem& colormapSys);
+                  ColormapSystem& colormapSys,
+                  GpuWorld& gpuWorld);
 
         // -----------------------------------------------------------------
         // Diagnostics
@@ -98,4 +101,3 @@ export namespace Extrinsic::Graphics
         std::unique_ptr<Impl> m_Impl;
     };
 }
-
