@@ -84,6 +84,7 @@ constexpr uint64_t kStagingBeltCapacity = 64ull * 1024 * 1024; // 64 MiB
 [[nodiscard]] VkPipelineStageFlags2 ToVkStage(RHI::MemoryAccess a);
 [[nodiscard]] VkPresentModeKHR      ToVkPresentMode(RHI::PresentMode m,
                                                      const std::vector<VkPresentModeKHR>& available);
+[[nodiscard]] VkIndexType           ToVkIndexType(RHI::IndexType t);
 
 // =============================================================================
 // §4  Internal GPU resource types
@@ -364,6 +365,8 @@ public:
     void SetScissor(int32_t x, int32_t y, uint32_t w, uint32_t h) override;
 
     void BindPipeline(RHI::PipelineHandle pipeline) override;
+    void BindIndexBuffer(RHI::BufferHandle buffer, uint64_t offset,
+                         RHI::IndexType indexType) override;
     void PushConstants(const void* data, uint32_t size, uint32_t offset) override;
 
     void Draw(uint32_t vertexCount, uint32_t instanceCount,
@@ -376,6 +379,9 @@ public:
     void DrawIndexedIndirectCount(RHI::BufferHandle argBuf, uint64_t argOffset,
                                    RHI::BufferHandle cntBuf, uint64_t cntOffset,
                                    uint32_t maxDraw) override;
+    void DrawIndirectCount(RHI::BufferHandle argBuf, uint64_t argOffset,
+                           RHI::BufferHandle cntBuf, uint64_t cntOffset,
+                           uint32_t maxDraw) override;
     void Dispatch(uint32_t gx, uint32_t gy, uint32_t gz) override;
     void DispatchIndirect(RHI::BufferHandle argBuf, uint64_t offset) override;
 
@@ -383,6 +389,9 @@ public:
                          RHI::TextureLayout after) override;
     void BufferBarrier(RHI::BufferHandle buf, RHI::MemoryAccess before,
                         RHI::MemoryAccess after) override;
+
+    void FillBuffer(RHI::BufferHandle buffer, uint64_t offset, uint64_t size,
+                    uint32_t value) override;
 
     void CopyBuffer(RHI::BufferHandle src, RHI::BufferHandle dst,
                     uint64_t srcOff, uint64_t dstOff, uint64_t size) override;

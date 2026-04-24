@@ -7,7 +7,16 @@ module;
 
 export module Extrinsic.Graphics.Component.GpuSceneSlot;
 
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
+
+export namespace Extrinsic::Graphics
+{
+    struct GpuInstanceTag;
+    struct GpuGeometryTag;
+    using GpuInstanceHandle = Core::StrongHandle<GpuInstanceTag>;
+    using GpuGeometryHandle = Core::StrongHandle<GpuGeometryTag>;
+}
 
 export namespace Extrinsic::Graphics::Components
 {
@@ -22,7 +31,7 @@ export namespace Extrinsic::Graphics::Components
     //   "colors"      — vec4 per-vertex or per-edge colors
     //   "scalars"     — float per-element scalar field values
     //   "sizes"       — float per-point world-space radii
-    struct NamedBuffer
+    struct BufferEntry
     {
         std::string    Name;
         RHI::BufferHandle Handle;
@@ -47,27 +56,41 @@ export namespace Extrinsic::Graphics::Components
     //   required buffer here; the render pass resolves name → handle at extraction time.
     struct GpuSceneSlot
     {
-        uint32_t CullingSlotIndex = UINT32_MAX;
+        std::uint32_t InstanceSlot = UINT32_MAX;
+        std::uint32_t InstanceGeneration = 0;
+        std::uint32_t GeometrySlot = UINT32_MAX;
+        std::uint32_t GeometryGeneration = 0;
 
-        std::unordered_map<std::string, NamedBuffer> Buffers;
+        std::unordered_map<std::string, RHI::BufferHandle> NamedBuffers;
+        std::unordered_map<std::string, BufferEntry> NamedBufferEntries;
+
+        [[nodiscard]] bool HasInstance() const noexcept
+        {
+            return InstanceSlot != UINT32_MAX;
+        }
+
+        [[nodiscard]] bool HasGeometry() const noexcept
+        {
+            return GeometrySlot != UINT32_MAX;
+        }
 
         [[nodiscard]] bool IsRegistered() const noexcept
         {
-            return CullingSlotIndex != UINT32_MAX;
+            return HasInstance();
         }
 
         // Returns the handle for the named buffer, or a null handle if not found.
         [[nodiscard]] RHI::BufferHandle Find(std::string_view name) const noexcept
         {
-            if (auto it = Buffers.find(std::string{name}); it != Buffers.end())
-                return it->second.Handle;
+            if (auto it = NamedBuffers.find(std::string{name}); it != NamedBuffers.end())
+                return it->second;
             return {};
         }
 
         // Returns the full NamedBuffer entry, or nullptr if not found.
-        [[nodiscard]] const NamedBuffer* FindEntry(std::string_view name) const noexcept
+        [[nodiscard]] const BufferEntry* FindEntry(std::string_view name) const noexcept
         {
-            if (auto it = Buffers.find(std::string{name}); it != Buffers.end())
+            if (auto it = NamedBufferEntries.find(std::string{name}); it != NamedBufferEntries.end())
                 return &it->second;
             return nullptr;
         }
@@ -76,16 +99,39 @@ export namespace Extrinsic::Graphics::Components
         void Upsert(std::string name, RHI::BufferHandle handle,
                     uint32_t elementCount, uint32_t stride)
         {
-            Buffers.insert_or_assign(name,
-                NamedBuffer{name, handle, elementCount, stride});
+            NamedBuffers.insert_or_assign(name, handle);
+            NamedBufferEntries.insert_or_assign(name,
+                BufferEntry{name, handle, elementCount, stride});
         }
 
         void Remove(std::string_view name)
         {
-            Buffers.erase(std::string{name});
+            NamedBuffers.erase(std::string{name});
+            NamedBufferEntries.erase(std::string{name});
+        }
+
+        [[nodiscard]] GpuInstanceHandle ToInstanceHandle() const noexcept
+        {
+            return {InstanceSlot, InstanceGeneration};
+        }
+
+        [[nodiscard]] GpuGeometryHandle ToGeometryHandle() const noexcept
+        {
+            return {GeometrySlot, GeometryGeneration};
+        }
+
+        void SetInstanceHandle(GpuInstanceHandle h) noexcept
+        {
+            InstanceSlot = h.Index;
+            InstanceGeneration = h.Generation;
+        }
+
+        void SetGeometryHandle(GpuGeometryHandle h) noexcept
+        {
+            GeometrySlot = h.Index;
+            GeometryGeneration = h.Generation;
         }
     };
 }
-
 
 

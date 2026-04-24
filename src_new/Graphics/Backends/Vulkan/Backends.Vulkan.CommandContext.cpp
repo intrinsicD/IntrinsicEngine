@@ -152,6 +152,15 @@ void VulkanCommandContext::PushConstants(const void* data, uint32_t size, uint32
                        VK_SHADER_STAGE_ALL, offset, size, data);
 }
 
+void VulkanCommandContext::BindIndexBuffer(RHI::BufferHandle handle,
+                                           uint64_t offset,
+                                           RHI::IndexType indexType)
+{
+    const auto* buf = m_Buffers->GetIfValid(handle);
+    if (!buf) return;
+    vkCmdBindIndexBuffer(m_Cmd, buf->Buffer, offset, ToVkIndexType(indexType));
+}
+
 void VulkanCommandContext::Draw(uint32_t vertexCount, uint32_t instanceCount,
                                  uint32_t firstVertex, uint32_t firstInstance)
 {
@@ -193,6 +202,18 @@ void VulkanCommandContext::DrawIndexedIndirectCount(RHI::BufferHandle argBuf, ui
     vkCmdDrawIndexedIndirectCount(m_Cmd, abuf->Buffer, argOffset,
                                   cbuf->Buffer, cntOffset, maxDraw,
                                   sizeof(VkDrawIndexedIndirectCommand));
+}
+
+void VulkanCommandContext::DrawIndirectCount(RHI::BufferHandle argBuf, uint64_t argOffset,
+                                              RHI::BufferHandle cntBuf, uint64_t cntOffset,
+                                              uint32_t maxDraw)
+{
+    const auto* abuf = m_Buffers->GetIfValid(argBuf);
+    const auto* cbuf = m_Buffers->GetIfValid(cntBuf);
+    if (!abuf || !cbuf) return;
+    vkCmdDrawIndirectCount(m_Cmd, abuf->Buffer, argOffset,
+                           cbuf->Buffer, cntOffset, maxDraw,
+                           sizeof(VkDrawIndirectCommand));
 }
 
 void VulkanCommandContext::Dispatch(uint32_t gx, uint32_t gy, uint32_t gz)
@@ -256,6 +277,16 @@ void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
     dep.bufferMemoryBarrierCount = 1;
     dep.pBufferMemoryBarriers    = &barrier;
     vkCmdPipelineBarrier2(m_Cmd, &dep);
+}
+
+void VulkanCommandContext::FillBuffer(RHI::BufferHandle handle,
+                                    uint64_t offset,
+                                    uint64_t size,
+                                    uint32_t value)
+{
+    const auto* buf = m_Buffers->GetIfValid(handle);
+    if (!buf) return;
+    vkCmdFillBuffer(m_Cmd, buf->Buffer, offset, size, value);
 }
 
 void VulkanCommandContext::CopyBuffer(RHI::BufferHandle src, RHI::BufferHandle dst,
