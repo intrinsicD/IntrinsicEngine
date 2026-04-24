@@ -11,6 +11,7 @@ import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.FrameHandle;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
@@ -79,6 +80,7 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::TextureManager&  GetTextureManager()  = 0;
         [[nodiscard]] virtual RHI::SamplerManager&  GetSamplerManager()  = 0;
         [[nodiscard]] virtual RHI::PipelineManager& GetPipelineManager() = 0;
+        [[nodiscard]] virtual GpuWorld&              GetGpuWorld()       = 0;
         [[nodiscard]] virtual MaterialSystem&        GetMaterialSystem()  = 0;
         [[nodiscard]] virtual CullingSystem&         GetCullingSystem()   = 0;
         [[nodiscard]] virtual LightSystem&           GetLightSystem()     = 0;

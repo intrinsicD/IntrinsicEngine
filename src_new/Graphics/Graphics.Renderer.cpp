@@ -11,6 +11,7 @@ import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
@@ -33,8 +34,13 @@ namespace Extrinsic::Graphics
             m_SamplerManager .emplace(device);
             m_TextureManager .emplace(device, device.GetBindlessHeap());
             m_PipelineManager.emplace(device);
+            m_GpuWorld.emplace();
+            m_GpuWorld->Initialize(device, *m_BufferManager);
             m_MaterialSystem .emplace();
             m_MaterialSystem->Initialize(device, *m_BufferManager);
+            m_GpuWorld->SetMaterialBuffer(
+                m_MaterialSystem->GetBuffer(),
+                m_MaterialSystem->GetCapacity());
             m_CullingSystem  .emplace();
             m_LightSystem    .emplace();
             m_LightSystem->Initialize();
@@ -61,6 +67,7 @@ namespace Extrinsic::Graphics
             if (m_PostProcessSystem) m_PostProcessSystem->Shutdown();
             if (m_ShadowSystem)    m_ShadowSystem->Shutdown();
             if (m_CullingSystem)   m_CullingSystem->Shutdown();
+            if (m_GpuWorld)        m_GpuWorld->Shutdown();
             if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
 
             m_SelectionSystem.reset();
@@ -70,6 +77,7 @@ namespace Extrinsic::Graphics
             m_PostProcessSystem.reset();
             m_ShadowSystem   .reset();
             m_CullingSystem  .reset();
+            m_GpuWorld       .reset();
             m_MaterialSystem .reset();
             m_PipelineManager.reset();
             m_TextureManager .reset();
@@ -103,6 +111,10 @@ namespace Extrinsic::Graphics
             // GPU scene SSBO).  No actual culling without a camera UBO.
             m_PipelineManager->CommitPending();
             m_MaterialSystem->SyncGpuBuffer();
+            m_GpuWorld->SetMaterialBuffer(
+                m_MaterialSystem->GetBuffer(),
+                m_MaterialSystem->GetCapacity());
+            m_GpuWorld->SyncFrame();
             m_CullingSystem->SyncGpuBuffer();
         }
 
@@ -125,6 +137,7 @@ namespace Extrinsic::Graphics
         RHI::TextureManager&  GetTextureManager()  override { return *m_TextureManager;  }
         RHI::SamplerManager&  GetSamplerManager()  override { return *m_SamplerManager;  }
         RHI::PipelineManager& GetPipelineManager() override { return *m_PipelineManager; }
+        GpuWorld&             GetGpuWorld()        override { return *m_GpuWorld;        }
         MaterialSystem&        GetMaterialSystem()  override { return *m_MaterialSystem;  }
         CullingSystem&         GetCullingSystem()   override { return *m_CullingSystem;   }
         LightSystem&           GetLightSystem()     override { return *m_LightSystem;     }
@@ -139,6 +152,7 @@ namespace Extrinsic::Graphics
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
         std::optional<RHI::PipelineManager> m_PipelineManager;
+        std::optional<GpuWorld>              m_GpuWorld;
         std::optional<MaterialSystem>        m_MaterialSystem;
         std::optional<CullingSystem>         m_CullingSystem;
         std::optional<LightSystem>           m_LightSystem;

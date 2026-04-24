@@ -1278,7 +1278,7 @@ Use bump allocation only. No free-list yet.
 
 ---
 
-## Phase 4 — Expose `GpuWorld` through renderer
+## Phase 4 — Expose `GpuWorld` through renderer — **Complete**
 
 ### Files
 
@@ -1286,7 +1286,7 @@ Use bump allocation only. No free-list yet.
 * `src_new/Graphics/Graphics.Renderer.cpp`
 * `src_new/Graphics/CMakeLists.txt`
 
-### TODO 4.1 — Import `GpuWorld`
+### TODO 4.1 — Import `GpuWorld` — **Done**
 
 In `Graphics.Renderer.cppm`, import:
 
@@ -1300,7 +1300,7 @@ Add to `IRenderer`:
 [[nodiscard]] virtual GpuWorld& GetGpuWorld() = 0;
 ```
 
-### TODO 4.2 — Add `GpuWorld` member to renderer implementation
+### TODO 4.2 — Add `GpuWorld` member to renderer implementation — **Done**
 
 In `Graphics.Renderer.cpp`, add:
 
@@ -1336,7 +1336,7 @@ m_GpuWorld->SetMaterialBuffer(
 m_GpuWorld->SyncFrame();
 ```
 
-### TODO 4.3 — Shutdown order
+### TODO 4.3 — Shutdown order — **Done**
 
 Shutdown in this order:
 
@@ -2461,5 +2461,4 @@ EntityConfig -> scalar/color/normal/point-size BDA pointers
 [7]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/Graphics.TransformSyncSystem.cppm "raw.githubusercontent.com"
 [8]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/Graphics.CullingSystem.cpp "raw.githubusercontent.com"
 [9]: https://github.com/intrinsicD/IntrinsicEngine/tree/main/src_new/Graphics/Backends/Vulkan "IntrinsicEngine/src_new/Graphics/Backends/Vulkan at main · intrinsicD/IntrinsicEngine · GitHub"
-
 
