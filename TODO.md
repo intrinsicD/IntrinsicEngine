@@ -1536,7 +1536,7 @@ But the material override now only selects SciVis shading mode. It does not own 
 
 ---
 
-## Phase 7 — Implement transform and instance sync
+## Phase 7 — Implement transform and instance sync — **Complete**
 
 ### Files
 
@@ -1545,7 +1545,7 @@ But the material override now only selects SciVis shading mode. It does not own 
 
 Current `TransformSyncSystem` is only a stub. ([GitHub][7])
 
-### TODO 7.1 — Change API
+### TODO 7.1 — Change API — **Done**
 
 Change:
 
@@ -1569,7 +1569,7 @@ import Extrinsic.Graphics.Component.Material;
 
 Also import the transform component module used by the repo.
 
-### TODO 7.2 — Write dynamic transforms
+### TODO 7.2 — Write dynamic transforms — **Done**
 
 For each entity with `Transform::Component + GpuSceneSlot`:
 
@@ -1582,7 +1582,7 @@ gpuWorld.SetInstanceTransform(
 
 If previous matrix is unavailable, use current matrix.
 
-### TODO 7.3 — Write material slot and render flags
+### TODO 7.3 — Write material slot and render flags — **Done**
 
 For each entity with `MaterialInstance + GpuSceneSlot`:
 
@@ -1604,7 +1604,7 @@ alpha masked material -> GpuRender_AlphaMask
 unlit material        -> GpuRender_Unlit
 ```
 
-### TODO 7.4 — Bounds update
+### TODO 7.4 — Bounds update — **Done**
 
 If transform or geometry changed, compute world bounds on CPU for now:
 
