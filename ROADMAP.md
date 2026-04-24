@@ -365,3 +365,41 @@ Runtime feature flag `RenderApproachV2` gates the full path for one-click rollba
 - Concrete types for hot-path subsystems (FrameGraph, scheduler, render graph, ECS update).
 - Ports/adapters (pure virtual or type-erased) for boundary dependencies: filesystem, windowing, time, telemetry sinks.
 - Testing model: instantiate concrete subsystems with fake ports (test doubles).
+
+
+## My own ideas
+How Rendering should work:
+- Core rule:
+   - keep topology and attributes separate.
+   - topology lives in shared BDA-backed geometry buffers.
+   - large per-element attributes live in buffer-backed SoA tables indexed by element id (`vertex`, `edge`, `face`, `vector`).
+   - use textures for sampled image data, UV/material lookups, or explicitly atlas-backed tooling; do not treat 2D textures as the default storage for arbitrary geometry attributes.
+- Pass ownership:
+   - `SurfacePass` renders filled mesh triangles.
+   - `LinePass` renders mesh edges, graph edges, and vector-field overlays.
+   - `PointPass` renders graph nodes, point clouds, and other point-domain markers.
+- Meshes:
+   - require vertex positions plus triangle indices.
+   - vertex-domain mode: smooth lighting with interpolated normals; use vertex attributes for normals, colors, and UV lookup chains.
+   - face-domain mode: flat lighting; use face attributes for normals, colors, and other per-face data.
+   - render-time choice is a shading/attribute selection, not a separate geometry ownership model.
+- Graphs:
+   - require vertex positions plus edge indices.
+   - node-domain data is rendered as points when the visual form is node-centered.
+   - edge-domain data is rendered as lines when the visual form is edge-centered.
+   - keep edge attributes and node attributes in separate indexed tables; do not collapse them into a mesh-style texture atlas.
+   - use flat lighting for graph lines; any "normal" or "tangent" contribution is a line-shading convention, not a surface model.
+- Point clouds:
+   - require vertex positions; all other attributes are vertex-indexed.
+   - render modes stay inside `PointPass`: flat points, surfels, sphere impostors, and Gaussian/EWA splats.
+   - surfels and impostors use point normals when available; if normals are missing, fall back to the simplest stable point mode.
+   - Gaussian splats require covariance data and should degrade safely when the data is absent or ill-conditioned.
+- Vector fields:
+   - represent each vector as a base position plus a target position (`target = base + vector`).
+   - store vector attributes in indexed buffer-backed tables, not in a separate geometry pipeline.
+   - normalize/scalar-scale in the shader when needed for consistent length controls.
+   - render vector fields as line overlays, with either uniform color or per-vector color.
+- Practical rule of thumb:
+   - if a datum changes per vertex/edge/face/vector, give it a dedicated indexed attribute buffer.
+   - if a datum is sampled like an image, use a texture.
+   - if the visual primitive is a triangle, line, or point, route it through the matching primitive pass instead of adding a new render lane.

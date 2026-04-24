@@ -593,3 +593,1859 @@ Fast mesh self-intersection detection using BVH-accelerated triangle-triangle ov
 - [ ] Publish `f:self_intersecting` boolean property and visualize via face highlight overlay.
 - [ ] Wire to Mesh Analysis panel (extends existing defect-marker UI).
 
+### D
+
+Below is a **Codex-ready TODO list**. It is intentionally ordered so each phase can compile before moving to the next.
+
+I verified the current repo state: `src_new/Graphics` already documents the target direction as BufferManager-managed geometry, GPU-driven execution, deferred rendering, component-presence routing, and visualization as a separate concern. The architecture doc also explicitly wants a `GpuWorld` ownership boundary with `GlobalGeometryStore`, instance/config/bounds/material buffers, and BVH/culling buffers rather than one giant monolithic buffer. ([GitHub][1])
+
+One important implementation correction: the current RHI comments say `BindVertexBuffer` / `BindIndexBuffer` are intentionally absent, while the RHI already exposes `DrawIndexedIndirectCount`. Standard Vulkan indexed indirect drawing uses a bound index buffer, and Vulkan’s reference page defines `vkCmdBindIndexBuffer` as the API that binds the index buffer range; `vkCmdDrawIndexedIndirectCount` is the indexed indirect-count draw command. ([GitHub][2])
+
+---
+
+# Codex TODOs: GPU-driven renderer implementation for `src_new/Graphics`
+
+## Non-negotiable design constraints
+
+Implement the renderer with these invariants:
+
+1. **One `GpuWorld` owns GPU scene state.**
+2. **One renderable entity has one stable `InstanceSlot`.**
+3. `InstanceSlot` indexes parallel GPU arrays:
+
+  * `GpuInstanceStatic[]`
+  * `GpuInstanceDynamic[]`
+  * `GpuEntityConfig[]`
+  * `GpuBounds[]`
+4. `GpuInstanceStatic.GeometrySlot` points into `GpuGeometryRecord[]`.
+5. `GpuInstanceStatic.MaterialSlot` points into `GpuMaterialSlot[]`.
+6. Geometry data lives in large managed GPU buffers, never one vertex/index buffer per entity.
+7. Materials do **not** store per-entity scalar/color/normal BDA pointers. Those belong in `GpuEntityConfig`.
+8. GPU culling writes indirect draw commands. Draw calls use `firstInstance = InstanceSlot`.
+9. No per-entity descriptor sets.
+10. Do **not** implement LBVH first. Start with linear GPU frustum culling, then leave LBVH as a later phase.
+
+The repo architecture already says geometry should not be per-entity vertex/index buffers and that per-entity parameters should live in instance/config SSBOs with no per-entity descriptor sets. ([GitHub][3])
+
+---
+
+## Phase 1 — Fix RHI command API for real GPU-driven drawing — **Complete**
+
+### Files
+
+* `src_new/Graphics/RHI/RHI.Types.cppm`
+* `src_new/Graphics/RHI/RHI.CommandContext.cppm`
+* `src_new/Graphics/Backends/Null/Backends.Null.cpp`
+* `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.Internal.cppm`
+* `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.CommandContext.cpp`
+* `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.Mappings.cpp`
+
+### TODO 1.1 — Add index type enum — **Done**
+
+In `RHI.Types.cppm` or `RHI.CommandContext.cppm`, add:
+
+```cpp
+export enum class IndexType : std::uint8_t {
+    Uint16,
+    Uint32,
+};
+```
+
+Add a Vulkan mapping:
+
+```cpp
+VkIndexType ToVkIndexType(RHI::IndexType t);
+```
+
+Expected mapping:
+
+```cpp
+Uint16 -> VK_INDEX_TYPE_UINT16
+Uint32 -> VK_INDEX_TYPE_UINT32
+```
+
+### TODO 1.2 — Add index-buffer binding to `ICommandContext` — **Done**
+
+In `RHI.CommandContext.cppm`, add:
+
+```cpp
+virtual void BindIndexBuffer(
+    BufferHandle buffer,
+    std::uint64_t offset,
+    IndexType indexType) = 0;
+```
+
+Place it near `BindPipeline`.
+
+Do **not** add `BindVertexBuffer`. Vertex fetch remains BDA/manual in shaders.
+
+### TODO 1.3 — Add non-indexed indirect-count draw — **Done**
+
+In `RHI.CommandContext.cppm`, add:
+
+```cpp
+virtual void DrawIndirectCount(
+    BufferHandle argBuffer,
+    std::uint64_t argOffset,
+    BufferHandle countBuffer,
+    std::uint64_t countOffset,
+    std::uint32_t maxDrawCount) = 0;
+```
+
+This is needed for point rendering. Vulkan has `vkCmdDrawIndirectCount` for non-indexed indirect-count draws. ([docs.vulkan.org][4])
+
+### TODO 1.4 — Implement Null backend no-ops — **Done**
+
+In `Backends.Null.cpp`, add no-op overrides:
+
+```cpp
+void BindIndexBuffer(RHI::BufferHandle, std::uint64_t, RHI::IndexType) override {}
+void DrawIndirectCount(
+    RHI::BufferHandle,
+    std::uint64_t,
+    RHI::BufferHandle,
+    std::uint64_t,
+    std::uint32_t) override {}
+```
+
+### TODO 1.5 — Implement Vulkan backend methods — **Done**
+
+In `Backends.Vulkan.Internal.cppm`, add declarations to `VulkanCommandContext`.
+
+In `Backends.Vulkan.CommandContext.cpp`, implement:
+
+```cpp
+void VulkanCommandContext::BindIndexBuffer(
+    RHI::BufferHandle handle,
+    std::uint64_t offset,
+    RHI::IndexType indexType)
+{
+    const auto* buf = m_Buffers->GetIfValid(handle);
+    if (!buf) return;
+
+    vkCmdBindIndexBuffer(
+        m_Cmd,
+        buf->Buffer,
+        offset,
+        ToVkIndexType(indexType));
+}
+```
+
+And:
+
+```cpp
+void VulkanCommandContext::DrawIndirectCount(
+    RHI::BufferHandle argBuf,
+    std::uint64_t argOffset,
+    RHI::BufferHandle cntBuf,
+    std::uint64_t cntOffset,
+    std::uint32_t maxDraw)
+{
+    const auto* abuf = m_Buffers->GetIfValid(argBuf);
+    const auto* cbuf = m_Buffers->GetIfValid(cntBuf);
+    if (!abuf || !cbuf) return;
+
+    vkCmdDrawIndirectCount(
+        m_Cmd,
+        abuf->Buffer,
+        argOffset,
+        cbuf->Buffer,
+        cntOffset,
+        maxDraw,
+        sizeof(VkDrawIndirectCommand));
+}
+```
+
+### TODO 1.6 — Add GPU-side buffer fill command — **Done**
+
+Add this to `ICommandContext`:
+
+```cpp
+virtual void FillBuffer(
+    BufferHandle buffer,
+    std::uint64_t offset,
+    std::uint64_t size,
+    std::uint32_t value) = 0;
+```
+
+Null backend: no-op.
+
+Vulkan backend:
+
+```cpp
+void VulkanCommandContext::FillBuffer(
+    RHI::BufferHandle handle,
+    std::uint64_t offset,
+    std::uint64_t size,
+    std::uint32_t value)
+{
+    const auto* buf = m_Buffers->GetIfValid(handle);
+    if (!buf) return;
+    vkCmdFillBuffer(m_Cmd, buf->Buffer, offset, size, value);
+}
+```
+
+Use this later to reset indirect draw counters on the GPU.
+
+### Acceptance
+
+* Project compiles.
+* Null backend compiles.
+* Vulkan backend compiles.
+* `ICommandContext` exposes:
+
+  * `BindIndexBuffer`
+  * `DrawIndexedIndirectCount`
+  * `DrawIndirectCount`
+  * `FillBuffer`
+
+---
+
+## Phase 2 — Replace old GPU structs with renderer-grade layouts — **Complete**
+
+### File
+
+* `src_new/Graphics/RHI/RHI.Types.cppm`
+
+The current `GpuInstanceData` only contains model matrix, material slot, entity id, geometry id, and flags. It is not enough for a true GPU-driven renderer. ([GitHub][5])
+
+### TODO 2.1 — Add render flag bits — **Done**
+
+Add:
+
+```cpp
+export enum GpuRenderFlags : std::uint32_t {
+    GpuRender_None        = 0,
+    GpuRender_Surface     = 1u << 0,
+    GpuRender_Line        = 1u << 1,
+    GpuRender_Point       = 1u << 2,
+    GpuRender_CastShadow  = 1u << 3,
+    GpuRender_Opaque      = 1u << 4,
+    GpuRender_AlphaMask   = 1u << 5,
+    GpuRender_Transparent = 1u << 6,
+    GpuRender_Unlit       = 1u << 7,
+    GpuRender_FlatShading = 1u << 8,
+    GpuRender_Visible     = 1u << 31,
+};
+```
+
+### TODO 2.2 — Add draw bucket enum — **Done**
+
+Add:
+
+```cpp
+export enum class GpuDrawBucketKind : std::uint32_t {
+    SurfaceOpaque = 0,
+    SurfaceAlphaMask,
+    Lines,
+    Points,
+    ShadowOpaque,
+    Count
+};
+```
+
+### TODO 2.3 — Add geometry record — **Done**
+
+Add:
+
+```cpp
+export struct alignas(16) GpuGeometryRecord {
+    std::uint64_t VertexBufferBDA = 0;   // packed position/uv buffer base
+    std::uint64_t IndexBufferBDA  = 0;   // optional/debug/manual fetch path
+
+    std::uint32_t VertexOffset = 0;
+    std::uint32_t VertexCount  = 0;
+
+    std::uint32_t SurfaceFirstIndex = 0;
+    std::uint32_t SurfaceIndexCount = 0;
+
+    std::uint32_t LineFirstIndex = 0;
+    std::uint32_t LineIndexCount = 0;
+
+    std::uint32_t PointFirstVertex = 0;
+    std::uint32_t PointVertexCount = 0;
+
+    std::uint32_t BufferID = 0;
+    std::uint32_t Flags = 0;
+};
+static_assert(sizeof(GpuGeometryRecord) == 64);
+```
+
+### TODO 2.4 — Add split instance data — **Done**
+
+Add:
+
+```cpp
+export struct alignas(16) GpuInstanceStatic {
+    std::uint32_t GeometrySlot = 0;
+    std::uint32_t MaterialSlot = 0;
+    std::uint32_t EntityID     = 0;
+    std::uint32_t RenderFlags  = 0;
+
+    std::uint32_t VisibilityMask = 0xFFFF'FFFFu;
+    std::uint32_t Layer          = 0;
+    std::uint32_t ConfigSlot     = 0;
+    std::uint32_t _pad0          = 0;
+};
+static_assert(sizeof(GpuInstanceStatic) == 32);
+
+export struct alignas(16) GpuInstanceDynamic {
+    alignas(16) glm::mat4 Model{1.f};
+    alignas(16) glm::mat4 PrevModel{1.f};
+};
+static_assert(sizeof(GpuInstanceDynamic) == 128);
+```
+
+### TODO 2.5 — Add entity config — **Done**
+
+Add:
+
+```cpp
+export struct alignas(16) GpuEntityConfig {
+    std::uint64_t VertexNormalBDA = 0;
+    std::uint64_t ScalarBDA       = 0;
+    std::uint64_t ColorBDA        = 0;
+    std::uint64_t PointSizeBDA    = 0;
+
+    float ScalarRangeMin = 0.f;
+    float ScalarRangeMax = 1.f;
+    std::uint32_t ColormapID = 0;
+    std::uint32_t BinCount = 0;
+
+    float IsolineCount = 0.f;
+    float IsolineWidth = 0.f;
+    float VisualizationAlpha = 1.f;
+    std::uint32_t VisDomain = 0;       // 0 vertex, 1 face, 2 edge
+
+    alignas(16) glm::vec4 IsolineColor{0.f, 0.f, 0.f, 1.f};
+
+    float PointSize = 1.f;
+    std::uint32_t PointMode = 0;
+    std::uint32_t ColorSourceMode = 0; // 0 material, 1 uniform, 2 scalar, 3 rgba buffer
+    std::uint32_t ElementCount = 0;
+
+    alignas(16) glm::vec4 UniformColor{1.f};
+};
+static_assert(sizeof(GpuEntityConfig) == 128);
+```
+
+### TODO 2.6 — Add bounds buffer struct — **Done**
+
+Add:
+
+```cpp
+export struct alignas(16) GpuBounds {
+    alignas(16) glm::vec4 LocalSphere{0.f}; // xyz center, w radius
+    alignas(16) glm::vec4 WorldSphere{0.f};
+    alignas(16) glm::vec4 WorldAabbMin{0.f};
+    alignas(16) glm::vec4 WorldAabbMax{0.f};
+};
+static_assert(sizeof(GpuBounds) == 64);
+```
+
+### TODO 2.7 — Add light struct — **Done**
+
+Add:
+
+```cpp
+export struct alignas(16) GpuLight {
+    alignas(16) glm::vec4 Position_Range{0.f};
+    alignas(16) glm::vec4 Direction_Type{0.f};
+    alignas(16) glm::vec4 Color_Intensity{1.f};
+    alignas(16) glm::vec4 Params{0.f}; // spot angles, shadow index, flags
+};
+static_assert(sizeof(GpuLight) == 64);
+```
+
+### TODO 2.8 — Add GPU scene root table — **Done**
+
+Because the current backend is BDA-heavy and only binds a global bindless descriptor set, avoid adding a full descriptor-set system right now. Add a root table buffer:
+
+```cpp
+export struct alignas(16) GpuSceneTable {
+    std::uint64_t InstanceStaticBDA  = 0;
+    std::uint64_t InstanceDynamicBDA = 0;
+    std::uint64_t EntityConfigBDA    = 0;
+    std::uint64_t GeometryRecordBDA  = 0;
+
+    std::uint64_t BoundsBDA          = 0;
+    std::uint64_t MaterialBDA        = 0;
+    std::uint64_t LightBDA           = 0;
+    std::uint64_t _padBDA            = 0;
+
+    std::uint32_t InstanceCapacity   = 0;
+    std::uint32_t GeometryCapacity   = 0;
+    std::uint32_t MaterialCapacity   = 0;
+    std::uint32_t LightCount         = 0;
+};
+static_assert(sizeof(GpuSceneTable) == 80);
+```
+
+### TODO 2.9 — Add pass push constants — **Done**
+
+Add:
+
+```cpp
+export struct alignas(16) GpuScenePushConstants {
+    std::uint64_t SceneTableBDA = 0;
+    std::uint32_t FrameIndex = 0;
+    std::uint32_t DrawBucket = 0;
+    std::uint32_t DebugMode = 0;
+    std::uint32_t _pad0 = 0;
+};
+static_assert(sizeof(GpuScenePushConstants) <= 128);
+```
+
+### Acceptance
+
+* All structs are plain data.
+* All structs have `static_assert(sizeof(...))`.
+* Old `GpuInstanceData` may remain temporarily for compatibility, but new systems must use the new structs.
+
+---
+
+## Phase 3 — Create `Graphics.GpuWorld`
+
+### Files to add
+
+* `src_new/Graphics/Graphics.GpuWorld.cppm`
+* `src_new/Graphics/Graphics.GpuWorld.cpp`
+
+### Files to edit
+
+* `src_new/Graphics/CMakeLists.txt`
+* `src_new/Graphics/Graphics.Renderer.cppm`
+* `src_new/Graphics/Graphics.Renderer.cpp`
+
+The architecture doc already names `GpuWorld` as the GPU-side counterpart of the CPU scene and says it should own managed geometry, instance buffer, entity config buffer, bounds, material registry, and BVH/culling buffers. ([GitHub][3])
+
+### TODO 3.1 — Add module to CMake
+
+In `src_new/Graphics/CMakeLists.txt`, add:
+
+```cmake
+Graphics.GpuWorld.cppm
+```
+
+to the public module files and:
+
+```cmake
+Graphics.GpuWorld.cpp
+```
+
+to private sources.
+
+### TODO 3.2 — Add public `GpuWorld` interface
+
+In `Graphics.GpuWorld.cppm`, export:
+
+```cpp
+export module Extrinsic.Graphics.GpuWorld;
+
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Types;
+import Extrinsic.Core.StrongHandle;
+
+export namespace Extrinsic::Graphics {
+
+struct GpuInstanceTag;
+struct GpuGeometryTag;
+
+using GpuInstanceHandle = Core::StrongHandle<GpuInstanceTag>;
+using GpuGeometryHandle = Core::StrongHandle<GpuGeometryTag>;
+
+class GpuWorld {
+public:
+    struct InitDesc {
+        std::uint32_t MaxInstances = 100'000;
+        std::uint32_t MaxGeometryRecords = 65'536;
+        std::uint32_t MaxLights = 4096;
+        std::uint64_t VertexBufferBytes = 256ull * 1024ull * 1024ull;
+        std::uint64_t IndexBufferBytes  = 512ull * 1024ull * 1024ull;
+    };
+
+    struct GeometryUploadDesc {
+        std::span<const std::byte> PackedVertexBytes;
+        std::span<const std::uint32_t> SurfaceIndices;
+        std::span<const std::uint32_t> LineIndices;
+        std::uint32_t VertexCount = 0;
+        RHI::GpuBounds LocalBounds{};
+        const char* DebugName = nullptr;
+    };
+
+    GpuWorld();
+    ~GpuWorld();
+
+    GpuWorld(const GpuWorld&) = delete;
+    GpuWorld& operator=(const GpuWorld&) = delete;
+
+    bool Initialize(RHI::IDevice& device, RHI::BufferManager& buffers, const InitDesc& desc = {});
+    void Shutdown();
+
+    [[nodiscard]] bool IsInitialized() const noexcept;
+
+    [[nodiscard]] GpuInstanceHandle AllocateInstance(std::uint32_t entityId);
+    void FreeInstance(GpuInstanceHandle instance);
+
+    [[nodiscard]] GpuGeometryHandle UploadGeometry(const GeometryUploadDesc& desc);
+    void FreeGeometry(GpuGeometryHandle geometry);
+
+    void SetInstanceGeometry(GpuInstanceHandle instance, GpuGeometryHandle geometry);
+    void SetInstanceMaterialSlot(GpuInstanceHandle instance, std::uint32_t materialSlot);
+    void SetInstanceRenderFlags(GpuInstanceHandle instance, std::uint32_t flags);
+    void SetInstanceTransform(GpuInstanceHandle instance, const glm::mat4& model, const glm::mat4& prevModel);
+    void SetEntityConfig(GpuInstanceHandle instance, const RHI::GpuEntityConfig& config);
+    void SetBounds(GpuInstanceHandle instance, const RHI::GpuBounds& bounds);
+
+    void SetMaterialBuffer(RHI::BufferHandle materialBuffer, std::uint32_t materialCapacity);
+    void SetLights(std::span<const RHI::GpuLight> lights);
+
+    void SyncFrame();
+
+    [[nodiscard]] RHI::BufferHandle GetSceneTableBuffer() const noexcept;
+    [[nodiscard]] std::uint64_t GetSceneTableBDA() const noexcept;
+
+    [[nodiscard]] RHI::BufferHandle GetInstanceStaticBuffer() const noexcept;
+    [[nodiscard]] RHI::BufferHandle GetInstanceDynamicBuffer() const noexcept;
+    [[nodiscard]] RHI::BufferHandle GetEntityConfigBuffer() const noexcept;
+    [[nodiscard]] RHI::BufferHandle GetGeometryRecordBuffer() const noexcept;
+    [[nodiscard]] RHI::BufferHandle GetBoundsBuffer() const noexcept;
+    [[nodiscard]] RHI::BufferHandle GetLightBuffer() const noexcept;
+
+    [[nodiscard]] RHI::BufferHandle GetManagedVertexBuffer() const noexcept;
+    [[nodiscard]] RHI::BufferHandle GetManagedIndexBuffer() const noexcept;
+
+    [[nodiscard]] std::uint32_t GetLiveInstanceCount() const noexcept;
+    [[nodiscard]] std::uint32_t GetInstanceCapacity() const noexcept;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> m_Impl;
+};
+
+}
+```
+
+### TODO 3.3 — Implement fixed-size slot allocators
+
+In `Graphics.GpuWorld.cpp`, implement a small internal slot allocator:
+
+```cpp
+struct SlotMeta {
+    std::uint32_t Generation = 0;
+    bool Live = false;
+};
+
+struct SlotAllocator {
+    std::vector<SlotMeta> Meta;
+    std::vector<std::uint32_t> FreeList;
+    std::uint32_t NextFresh = 0;
+    std::uint32_t LiveCount = 0;
+
+    Core::StrongHandle<T> Allocate();
+    bool Resolve(Core::StrongHandle<T> h) const;
+    void Free(Core::StrongHandle<T> h);
+};
+```
+
+Use one allocator for instances and one for geometry records.
+
+### TODO 3.4 — Allocate persistent GPU buffers
+
+In `GpuWorld::Initialize`, allocate these buffers through `RHI::BufferManager`:
+
+| Buffer                          | Type                   | Usage    |              |              |
+| ------------------------------- | ---------------------- | -------- | ------------ | ------------ |
+| `GpuWorld.InstanceStatic`       | `GpuInstanceStatic[]`  | `Storage | TransferDst` |              |
+| `GpuWorld.InstanceDynamic`      | `GpuInstanceDynamic[]` | `Storage | TransferDst` |              |
+| `GpuWorld.EntityConfig`         | `GpuEntityConfig[]`    | `Storage | TransferDst` |              |
+| `GpuWorld.GeometryRecords`      | `GpuGeometryRecord[]`  | `Storage | TransferDst` |              |
+| `GpuWorld.Bounds`               | `GpuBounds[]`          | `Storage | TransferDst` |              |
+| `GpuWorld.Lights`               | `GpuLight[]`           | `Storage | TransferDst` |              |
+| `GpuWorld.SceneTable`           | one `GpuSceneTable`    | `Storage | TransferDst` |              |
+| `GpuWorld.ManagedVertexBuffer0` | packed vertex bytes    | `Storage | TransferDst` |              |
+| `GpuWorld.ManagedIndexBuffer0`  | `uint32_t` indices     | `Index   | Storage      | TransferDst` |
+
+For now, one managed vertex buffer and one managed index buffer are enough. Add comments saying multiple buffers and compaction are future work.
+
+### TODO 3.5 — Implement dirty range upload
+
+Keep CPU mirrors:
+
+```cpp
+std::vector<RHI::GpuInstanceStatic>  InstanceStaticCpu;
+std::vector<RHI::GpuInstanceDynamic> InstanceDynamicCpu;
+std::vector<RHI::GpuEntityConfig>    EntityConfigCpu;
+std::vector<RHI::GpuGeometryRecord>  GeometryRecordsCpu;
+std::vector<RHI::GpuBounds>          BoundsCpu;
+std::vector<RHI::GpuLight>           LightsCpu;
+RHI::GpuSceneTable                   SceneTableCpu;
+```
+
+Keep dirty bit arrays:
+
+```cpp
+std::vector<bool> DirtyInstanceStatic;
+std::vector<bool> DirtyInstanceDynamic;
+std::vector<bool> DirtyEntityConfig;
+std::vector<bool> DirtyGeometryRecord;
+std::vector<bool> DirtyBounds;
+bool DirtyLights = false;
+bool DirtySceneTable = true;
+```
+
+Implement helper:
+
+```cpp
+template<class T>
+void FlushDirtyRuns(
+    RHI::IDevice& device,
+    RHI::BufferHandle dst,
+    std::vector<T>& cpu,
+    std::vector<bool>& dirty);
+```
+
+It should coalesce contiguous dirty slots into one `WriteBuffer` call per run.
+
+### TODO 3.6 — Implement scene table refresh
+
+Whenever any buffer is allocated or material buffer/lights change, update `SceneTableCpu`:
+
+```cpp
+SceneTableCpu.InstanceStaticBDA  = Device->GetBufferDeviceAddress(InstanceStaticBuffer);
+SceneTableCpu.InstanceDynamicBDA = Device->GetBufferDeviceAddress(InstanceDynamicBuffer);
+SceneTableCpu.EntityConfigBDA    = Device->GetBufferDeviceAddress(EntityConfigBuffer);
+SceneTableCpu.GeometryRecordBDA  = Device->GetBufferDeviceAddress(GeometryRecordBuffer);
+SceneTableCpu.BoundsBDA          = Device->GetBufferDeviceAddress(BoundsBuffer);
+SceneTableCpu.MaterialBDA        = Device->GetBufferDeviceAddress(MaterialBuffer);
+SceneTableCpu.LightBDA           = Device->GetBufferDeviceAddress(LightBuffer);
+SceneTableCpu.InstanceCapacity   = MaxInstances;
+SceneTableCpu.GeometryCapacity   = MaxGeometryRecords;
+SceneTableCpu.MaterialCapacity   = MaterialCapacity;
+SceneTableCpu.LightCount         = LightCount;
+```
+
+Upload one `GpuSceneTable` in `SyncFrame()`.
+
+### TODO 3.7 — Implement simple managed geometry allocator
+
+For first implementation:
+
+```cpp
+std::uint64_t VertexBumpOffset = 0;
+std::uint64_t IndexBumpOffset = 0;
+```
+
+Use bump allocation only. No free-list yet.
+
+`UploadGeometry()` should:
+
+1. Allocate vertex byte range.
+2. Allocate surface index range.
+3. Allocate line index range.
+4. Upload vertex bytes to managed vertex buffer.
+5. Upload surface indices and line indices to managed index buffer.
+6. Allocate geometry record slot.
+7. Fill `GpuGeometryRecord`.
+8. Mark geometry record dirty.
+9. Return `GpuGeometryHandle`.
+
+`FreeGeometry()` should mark record empty but does not reclaim byte ranges yet. Add TODO comment for free-list/compaction.
+
+### Acceptance
+
+* `GpuWorld` compiles.
+* `GpuWorld::Initialize()` allocates all persistent buffers.
+* `GpuWorld::SyncFrame()` uploads dirty runs.
+* Null backend still works.
+* No ECS imports inside `GpuWorld`.
+
+---
+
+## Phase 4 — Expose `GpuWorld` through renderer
+
+### Files
+
+* `src_new/Graphics/Graphics.Renderer.cppm`
+* `src_new/Graphics/Graphics.Renderer.cpp`
+* `src_new/Graphics/CMakeLists.txt`
+
+### TODO 4.1 — Import `GpuWorld`
+
+In `Graphics.Renderer.cppm`, import:
+
+```cpp
+import Extrinsic.Graphics.GpuWorld;
+```
+
+Add to `IRenderer`:
+
+```cpp
+[[nodiscard]] virtual GpuWorld& GetGpuWorld() = 0;
+```
+
+### TODO 4.2 — Add `GpuWorld` member to renderer implementation
+
+In `Graphics.Renderer.cpp`, add:
+
+```cpp
+std::optional<GpuWorld> m_GpuWorld;
+```
+
+Initialize after `BufferManager` exists and before systems that need scene buffers:
+
+```cpp
+m_GpuWorld.emplace();
+m_GpuWorld->Initialize(device, *m_BufferManager);
+```
+
+After `MaterialSystem::Initialize`, call:
+
+```cpp
+m_GpuWorld->SetMaterialBuffer(
+    m_MaterialSystem->GetBuffer(),
+    m_MaterialSystem->GetCapacity());
+```
+
+In `PrepareFrame`, call:
+
+```cpp
+m_PipelineManager->CommitPending();
+m_MaterialSystem->SyncGpuBuffer();
+
+m_GpuWorld->SetMaterialBuffer(
+    m_MaterialSystem->GetBuffer(),
+    m_MaterialSystem->GetCapacity());
+
+m_GpuWorld->SyncFrame();
+```
+
+### TODO 4.3 — Shutdown order
+
+Shutdown in this order:
+
+1. pass systems
+2. culling
+3. `GpuWorld`
+4. material system
+5. resource managers
+
+### Acceptance
+
+* `IRenderer::GetGpuWorld()` exists.
+* Renderer initializes and shuts down `GpuWorld`.
+* Renderer still works with Null backend.
+
+---
+
+## Phase 5 — Update GPU scene component — **Complete**
+
+### File
+
+* `src_new/Graphics/Components/Graphics.Component.GpuSceneSlot.cppm`
+
+Current repo has a `GpuSceneSlot` component. Keep the name for now to avoid churn, but change its meaning from old culling-slot ownership to new `GpuWorld` slot ownership.
+
+### TODO 5.1 — Replace/add fields — **Done**
+
+Make the component hold:
+
+```cpp
+export struct GpuSceneSlot {
+    std::uint32_t InstanceSlot = UINT32_MAX;
+    std::uint32_t InstanceGeneration = 0;
+
+    std::uint32_t GeometrySlot = UINT32_MAX;
+    std::uint32_t GeometryGeneration = 0;
+
+    std::unordered_map<std::string, RHI::BufferHandle> NamedBuffers;
+    std::unordered_map<std::string, BufferEntry> NamedBufferEntries;
+
+    bool HasInstance() const noexcept { return InstanceSlot != UINT32_MAX; }
+    bool HasGeometry() const noexcept { return GeometrySlot != UINT32_MAX; }
+
+    RHI::BufferHandle Find(std::string_view name) const;
+    const BufferEntry* FindEntry(std::string_view name) const;
+};
+```
+
+Preserve existing helper names if possible so `VisualizationSyncSystem` still compiles.
+
+### TODO 5.2 — Add conversion helpers — **Done**
+
+Add:
+
+```cpp
+GpuInstanceHandle ToInstanceHandle() const noexcept;
+GpuGeometryHandle ToGeometryHandle() const noexcept;
+void SetInstanceHandle(GpuInstanceHandle h) noexcept;
+void SetGeometryHandle(GpuGeometryHandle h) noexcept;
+```
+
+### Acceptance
+
+* Existing code that calls `Find()` / `FindEntry()` still compiles.
+* Component now stores instance and geometry handles compatible with `GpuWorld`.
+
+---
+
+## Phase 6 — Refactor visualization sync into `GpuEntityConfig`
+
+### Files
+
+* `src_new/Graphics/Graphics.VisualizationSyncSystem.cppm`
+* `src_new/Graphics/Graphics.VisualizationSyncSystem.cpp`
+* `src_new/Graphics/Graphics.MaterialSystem.cppm`
+* `src_new/Graphics/Graphics.MaterialSystem.cpp`
+
+The current `VisualizationSyncSystem` packs scalar BDA and element count into `GpuMaterialSlot::CustomData[2]`. That should be moved out of material data and into `GpuEntityConfig`. ([GitHub][6])
+
+### TODO 6.1 — Change `VisualizationSyncSystem::Sync` signature
+
+Change from:
+
+```cpp
+void Sync(entt::registry& registry, MaterialSystem& matSys, ColormapSystem& colormapSys);
+```
+
+to:
+
+```cpp
+void Sync(
+    entt::registry& registry,
+    MaterialSystem& matSys,
+    ColormapSystem& colormapSys,
+    GpuWorld& gpuWorld);
+```
+
+### TODO 6.2 — Keep SciVis material type but stop storing BDAs in material
+
+Keep override material leases for now so shaders can branch on `MaterialTypeID == SciVis`.
+
+But change custom data usage:
+
+```text
+GpuMaterialSlot:
+  CustomData[0] may hold uniform visual constants.
+  CustomData[1] may hold isoline/bin style constants.
+  CustomData[2] must NOT hold ScalarBDA, ColorBDA, ElementCount, or ColorSourceMode anymore.
+```
+
+### TODO 6.3 — Build `GpuEntityConfig`
+
+For every entity with `VisualizationConfig + GpuSceneSlot`, build:
+
+```cpp
+RHI::GpuEntityConfig cfg{};
+```
+
+Set:
+
+```cpp
+cfg.ColormapID = colormapSys.GetBindlessIndex(...).Value;
+cfg.ScalarRangeMin = ...
+cfg.ScalarRangeMax = ...
+cfg.BinCount = ...
+cfg.IsolineCount = ...
+cfg.IsolineWidth = ...
+cfg.IsolineColor = ...
+cfg.VisualizationAlpha = ...
+cfg.VisDomain = ...
+cfg.ColorSourceMode = ...
+cfg.ElementCount = ...
+```
+
+Resolve BDA pointers:
+
+```cpp
+cfg.ScalarBDA = device.GetBufferDeviceAddress(scalarBuffer);
+cfg.ColorBDA = device.GetBufferDeviceAddress(colorBuffer);
+cfg.VertexNormalBDA = device.GetBufferDeviceAddress(normalBuffer);
+cfg.PointSizeBDA = device.GetBufferDeviceAddress(pointSizeBuffer);
+```
+
+Then call:
+
+```cpp
+gpuWorld.SetEntityConfig(gpuSlot.ToInstanceHandle(), cfg);
+```
+
+### TODO 6.4 — Uniform color path
+
+For uniform color visualization:
+
+```cpp
+cfg.ColorSourceMode = 1;
+cfg.UniformColor = visCfg->Color;
+```
+
+No BDA required.
+
+### TODO 6.5 — Scalar field path
+
+For scalar fields:
+
+```cpp
+cfg.ColorSourceMode = 2;
+cfg.ScalarBDA = scalarBda;
+cfg.ElementCount = elementCount;
+```
+
+### TODO 6.6 — Per-element RGBA path
+
+For per-vertex/per-edge/per-face color buffers:
+
+```cpp
+cfg.ColorSourceMode = 3;
+cfg.ColorBDA = colorBda;
+cfg.ElementCount = elementCount;
+```
+
+### TODO 6.7 — Material effective slot
+
+Still set:
+
+```cpp
+matInst.EffectiveSlot = matSys.GetMaterialSlot(lease.GetHandle());
+```
+
+But the material override now only selects SciVis shading mode. It does not own entity-specific attribute pointers.
+
+### Acceptance
+
+* No BDA packing remains in `GpuMaterialSlot::CustomData[2]`.
+* `VisualizationSyncSystem` writes `GpuEntityConfig`.
+* SciVis still works through material type ID.
+* Material slots remain independent from geometry/attribute data.
+
+---
+
+## Phase 7 — Implement transform and instance sync
+
+### Files
+
+* `src_new/Graphics/Graphics.TransformSyncSystem.cppm`
+* `src_new/Graphics/Graphics.TransformSyncSystem.cpp`
+
+Current `TransformSyncSystem` is only a stub. ([GitHub][7])
+
+### TODO 7.1 — Change API
+
+Change:
+
+```cpp
+void SyncGpuBuffer();
+```
+
+to:
+
+```cpp
+void SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld);
+```
+
+Import:
+
+```cpp
+import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.Component.Material;
+```
+
+Also import the transform component module used by the repo.
+
+### TODO 7.2 — Write dynamic transforms
+
+For each entity with `Transform::Component + GpuSceneSlot`:
+
+```cpp
+gpuWorld.SetInstanceTransform(
+    gpuSlot.ToInstanceHandle(),
+    currentWorldMatrix,
+    previousWorldMatrix);
+```
+
+If previous matrix is unavailable, use current matrix.
+
+### TODO 7.3 — Write material slot and render flags
+
+For each entity with `MaterialInstance + GpuSceneSlot`:
+
+```cpp
+gpuWorld.SetInstanceMaterialSlot(
+    gpuSlot.ToInstanceHandle(),
+    matInst.EffectiveSlot);
+```
+
+For render flags, derive from render components:
+
+```text
+RenderSurface present -> GpuRender_Surface
+RenderLines present   -> GpuRender_Line
+RenderPoints present  -> GpuRender_Point
+visible               -> GpuRender_Visible
+opaque material       -> GpuRender_Opaque
+alpha masked material -> GpuRender_AlphaMask
+unlit material        -> GpuRender_Unlit
+```
+
+### TODO 7.4 — Bounds update
+
+If transform or geometry changed, compute world bounds on CPU for now:
+
+```cpp
+RHI::GpuBounds bounds{};
+bounds.LocalSphere = ...
+bounds.WorldSphere = ...
+bounds.WorldAabbMin = ...
+bounds.WorldAabbMax = ...
+gpuWorld.SetBounds(instance, bounds);
+```
+
+Do not implement GPU bounds update yet.
+
+### Acceptance
+
+* `TransformSyncSystem` writes `GpuInstanceDynamic`.
+* `TransformSyncSystem` writes material slot/render flags into `GpuInstanceStatic`.
+* `TransformSyncSystem` writes `GpuBounds`.
+* Moving an entity updates only dynamic instance/bounds data, not material/config buffers.
+
+---
+
+## Phase 8 — Replace `GpuScene` usage with `GpuWorld`
+
+### Files
+
+* `src_new/Graphics/Graphics.GpuScene.cppm`
+* `src_new/Graphics/Graphics.GpuScene.cpp`
+* all call sites of `GpuScene`
+
+### TODO 8.1 — Keep `GpuScene` temporarily as compatibility wrapper
+
+Do **not** delete `GpuScene` immediately.
+
+Change its comments to:
+
+```cpp
+// Legacy compatibility wrapper. New rendering code must use GpuWorld.
+```
+
+### TODO 8.2 — Redirect slot allocation
+
+Where old code calls:
+
+```cpp
+GpuScene::AllocateSlot()
+```
+
+replace with:
+
+```cpp
+GpuWorld::AllocateInstance(entityId)
+```
+
+and store handle in `GpuSceneSlot`.
+
+### TODO 8.3 — Redirect static geometry upload
+
+Where old code calls:
+
+```cpp
+UploadStaticVertices()
+UploadStaticIndices()
+```
+
+replace with:
+
+```cpp
+GpuWorld::UploadGeometry()
+```
+
+### TODO 8.4 — Remove per-entity dynamic geometry buffers from rendering path
+
+Do not allocate one host-visible storage buffer per entity for positions/scalars/colors unless it is an attribute buffer referenced from `GpuEntityConfig`.
+
+### Acceptance
+
+* New render path does not use `GpuScene.StaticVertexBuffer()` / `StaticIndexBuffer()` directly.
+* `GpuScene` can remain for old tests, but renderer uses `GpuWorld`.
+
+---
+
+## Phase 9 — Redesign culling system around draw buckets
+
+### Files
+
+* `src_new/Graphics/Graphics.CullingSystem.cppm`
+* `src_new/Graphics/Graphics.CullingSystem.cpp`
+* `src_new/Graphics/Passes/Pass.Culling.cppm`
+* `src_new/Graphics/Passes/Pass.Culling.cpp`
+
+The current culling system owns one cull input buffer, one draw-command buffer, and one visibility counter. That is only a scaffold. It should become bucketed: surface, line, point, shadow, etc. The current implementation already writes `DrawCommandBuffer` and `VisibilityCountBuffer`, but the count-buffer barrier after dispatch uses `ShaderRead`; indirect drawing needs `IndirectRead`. ([GitHub][8])
+
+### TODO 9.1 — Add draw bucket resource struct
+
+In `Graphics.CullingSystem.cppm`, add:
+
+```cpp
+struct GpuDrawBucket {
+    RHI::BufferHandle IndexedArgsBuffer;
+    RHI::BufferHandle NonIndexedArgsBuffer;
+    RHI::BufferHandle CountBuffer;
+    std::uint32_t Capacity = 0;
+    bool Indexed = true;
+};
+```
+
+### TODO 9.2 — CullingSystem owns one bucket per kind
+
+In implementation, store:
+
+```cpp
+std::array<GpuDrawBucket, static_cast<size_t>(RHI::GpuDrawBucketKind::Count)> Buckets;
+```
+
+Allocate:
+
+```text
+SurfaceOpaque   -> indexed commands
+SurfaceAlphaMask -> indexed commands
+Lines           -> indexed commands
+Points          -> non-indexed commands
+ShadowOpaque    -> indexed commands
+```
+
+Use buffer usages:
+
+```cpp
+RHI::BufferUsage::Storage |
+RHI::BufferUsage::Indirect |
+RHI::BufferUsage::TransferDst
+```
+
+for command buffers and count buffers.
+
+### TODO 9.3 — Replace old `GpuCullData`
+
+Stop using a separate CPU-written `GpuCullData[]`.
+
+The cull shader should read directly from `GpuWorld`:
+
+```text
+GpuSceneTable
+  -> InstanceStatic[]
+  -> InstanceDynamic[]
+  -> GeometryRecord[]
+  -> Bounds[]
+```
+
+### TODO 9.4 — New culling push constants
+
+Add in `RHI.Types.cppm`:
+
+```cpp
+export struct alignas(16) GpuCullPushConstants {
+    alignas(16) glm::vec4 FrustumPlanes[6];
+
+    std::uint64_t SceneTableBDA = 0;
+
+    std::uint64_t SurfaceOpaqueArgsBDA = 0;
+    std::uint64_t SurfaceOpaqueCountBDA = 0;
+
+    std::uint64_t SurfaceAlphaMaskArgsBDA = 0;
+    std::uint64_t SurfaceAlphaMaskCountBDA = 0;
+
+    std::uint64_t LineArgsBDA = 0;
+    std::uint64_t LineCountBDA = 0;
+
+    std::uint64_t PointArgsBDA = 0;
+    std::uint64_t PointCountBDA = 0;
+
+    std::uint64_t ShadowArgsBDA = 0;
+    std::uint64_t ShadowCountBDA = 0;
+
+    std::uint32_t InstanceCapacity = 0;
+    std::uint32_t _pad0 = 0;
+};
+```
+
+If this exceeds 128 bytes, do **not** push all bucket BDAs directly. Instead create one `GpuCullOutputTable` buffer and push only:
+
+```cpp
+std::uint64_t SceneTableBDA;
+std::uint64_t CullOutputTableBDA;
+```
+
+Prefer the output-table solution if push constant size becomes an issue.
+
+### TODO 9.5 — Reset counters using `FillBuffer`
+
+Replace current host `WriteBuffer` reset with:
+
+```cpp
+cmd.FillBuffer(bucket.CountBuffer, 0, sizeof(std::uint32_t), 0);
+cmd.BufferBarrier(bucket.CountBuffer, RHI::MemoryAccess::TransferWrite, RHI::MemoryAccess::ShaderWrite);
+```
+
+Do this for every bucket.
+
+### TODO 9.6 — Dispatch linear culling
+
+Culling dispatch:
+
+```cpp
+groups = (gpuWorld.GetInstanceCapacity() + 63) / 64;
+cmd.Dispatch(groups, 1, 1);
+```
+
+Do not dispatch by live count unless you have a compact live-instance list. Linear pass can skip non-live/invisible instances using flags.
+
+### TODO 9.7 — Correct post-cull barriers
+
+After dispatch:
+
+```cpp
+cmd.BufferBarrier(argsBuffer, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::IndirectRead);
+cmd.BufferBarrier(countBuffer, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess::IndirectRead);
+```
+
+For all buckets.
+
+### TODO 9.8 — Accessors
+
+Add:
+
+```cpp
+const GpuDrawBucket& GetBucket(RHI::GpuDrawBucketKind kind) const;
+```
+
+### Acceptance
+
+* Culling system has multiple buckets.
+* Counter reset is GPU-side.
+* Count buffers transition to `IndirectRead`.
+* No old `GpuCullData[]` input buffer is required.
+
+---
+
+## Phase 10 — Write linear culling compute shader
+
+### Files to add
+
+Exact shader path depends on your shader directory. Add:
+
+* `shaders/src_new/common/gpu_scene.glsl`
+* `shaders/src_new/culling/instance_cull.comp`
+
+If shader paths are elsewhere, keep names but place them in the existing shader tree.
+
+### TODO 10.1 — Add shared shader structs
+
+In `gpu_scene.glsl`, mirror:
+
+```glsl
+GpuSceneTable
+GpuInstanceStatic
+GpuInstanceDynamic
+GpuGeometryRecord
+GpuEntityConfig
+GpuBounds
+GpuDrawIndexedCommand
+GpuDrawCommand
+```
+
+Use `GL_EXT_buffer_reference2` and `GL_EXT_scalar_block_layout` if the existing shader toolchain supports it.
+
+### TODO 10.2 — Implement frustum sphere test
+
+In `instance_cull.comp`:
+
+```glsl
+bool sphereVisible(vec4 worldSphere, vec4 planes[6]) {
+    for (int i = 0; i < 6; ++i) {
+        float d = dot(planes[i].xyz, worldSphere.xyz) + planes[i].w;
+        if (d < -worldSphere.w) return false;
+    }
+    return true;
+}
+```
+
+### TODO 10.3 — One thread per instance slot
+
+```glsl
+uint slot = gl_GlobalInvocationID.x;
+if (slot >= pc.InstanceCapacity) return;
+
+GpuInstanceStatic inst = InstanceStatic[slot];
+if ((inst.RenderFlags & GpuRender_Visible) == 0) return;
+```
+
+### TODO 10.4 — Read bounds and geometry
+
+```glsl
+GpuBounds bounds = Bounds[slot];
+if (!sphereVisible(bounds.WorldSphere, pc.FrustumPlanes)) return;
+
+GpuGeometryRecord geo = GeometryRecords[inst.GeometrySlot];
+```
+
+### TODO 10.5 — Emit surface command
+
+If flags include surface:
+
+```glsl
+uint outIndex = atomicAdd(surfaceCount[0], 1);
+
+SurfaceArgs[outIndex].indexCount = geo.SurfaceIndexCount;
+SurfaceArgs[outIndex].instanceCount = 1;
+SurfaceArgs[outIndex].firstIndex = geo.SurfaceFirstIndex;
+SurfaceArgs[outIndex].vertexOffset = int(geo.VertexOffset);
+SurfaceArgs[outIndex].firstInstance = slot;
+```
+
+### TODO 10.6 — Emit line command
+
+If flags include line:
+
+```glsl
+uint outIndex = atomicAdd(lineCount[0], 1);
+
+LineArgs[outIndex].indexCount = geo.LineIndexCount;
+LineArgs[outIndex].instanceCount = 1;
+LineArgs[outIndex].firstIndex = geo.LineFirstIndex;
+LineArgs[outIndex].vertexOffset = int(geo.VertexOffset);
+LineArgs[outIndex].firstInstance = slot;
+```
+
+### TODO 10.7 — Emit point command
+
+If flags include point:
+
+```glsl
+uint outIndex = atomicAdd(pointCount[0], 1);
+
+PointArgs[outIndex].vertexCount = geo.PointVertexCount;
+PointArgs[outIndex].instanceCount = 1;
+PointArgs[outIndex].firstVertex = geo.PointFirstVertex;
+PointArgs[outIndex].firstInstance = slot;
+```
+
+### Acceptance
+
+* Compute shader compiles to SPIR-V.
+* Culling writes bucket-specific commands and counters.
+* `firstInstance` is always the `InstanceSlot`.
+
+---
+
+## Phase 11 — Update draw passes to consume buckets
+
+### Files
+
+* `src_new/Graphics/Passes/Pass.Deferred.GBuffers.cppm`
+* `src_new/Graphics/Passes/Pass.Deferred.GBuffers.cpp`
+* `src_new/Graphics/Passes/Pass.Forward.Line.cppm`
+* `src_new/Graphics/Passes/Pass.Forward.Line.cpp`
+* `src_new/Graphics/Passes/Pass.Forward.Point.cppm`
+* `src_new/Graphics/Passes/Pass.Forward.Point.cpp`
+* `src_new/Graphics/Passes/Pass.Shadows.cppm`
+* `src_new/Graphics/Passes/Pass.Shadows.cpp`
+
+### TODO 11.1 — GBuffer pass uses surface bucket
+
+In GBuffer pass:
+
+```cpp
+const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
+
+cmd.BindPipeline(gbufferPipeline);
+cmd.BindIndexBuffer(
+    gpuWorld.GetManagedIndexBuffer(),
+    0,
+    RHI::IndexType::Uint32);
+
+RHI::GpuScenePushConstants pc{};
+pc.SceneTableBDA = gpuWorld.GetSceneTableBDA();
+pc.FrameIndex = frame.FrameIndex;
+pc.DrawBucket = static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::SurfaceOpaque);
+
+cmd.PushConstants(&pc, sizeof(pc));
+
+cmd.DrawIndexedIndirectCount(
+    bucket.IndexedArgsBuffer,
+    0,
+    bucket.CountBuffer,
+    0,
+    bucket.Capacity);
+```
+
+### TODO 11.2 — Line pass uses line bucket
+
+```cpp
+const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Lines);
+
+cmd.BindPipeline(linePipeline);
+cmd.BindIndexBuffer(
+    gpuWorld.GetManagedIndexBuffer(),
+    0,
+    RHI::IndexType::Uint32);
+
+cmd.DrawIndexedIndirectCount(
+    bucket.IndexedArgsBuffer,
+    0,
+    bucket.CountBuffer,
+    0,
+    bucket.Capacity);
+```
+
+### TODO 11.3 — Point pass uses non-indexed point bucket
+
+```cpp
+const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Points);
+
+cmd.BindPipeline(pointPipeline);
+
+cmd.DrawIndirectCount(
+    bucket.NonIndexedArgsBuffer,
+    0,
+    bucket.CountBuffer,
+    0,
+    bucket.Capacity);
+```
+
+### TODO 11.4 — Shadow pass uses shadow bucket
+
+```cpp
+const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::ShadowOpaque);
+
+cmd.BindPipeline(shadowPipeline);
+cmd.BindIndexBuffer(gpuWorld.GetManagedIndexBuffer(), 0, RHI::IndexType::Uint32);
+
+cmd.DrawIndexedIndirectCount(
+    bucket.IndexedArgsBuffer,
+    0,
+    bucket.CountBuffer,
+    0,
+    bucket.Capacity);
+```
+
+### Acceptance
+
+* No per-entity draw loop in passes.
+* Draw passes consume only indirect command buffers.
+* Indexed passes call `BindIndexBuffer` first.
+* Point pass uses `DrawIndirectCount`.
+
+---
+
+## Phase 12 — Add BDA-driven vertex shaders
+
+### Files to add/edit
+
+* `shaders/src_new/common/gpu_scene.glsl`
+* `shaders/src_new/deferred/gbuffer.vert`
+* `shaders/src_new/deferred/gbuffer.frag`
+* `shaders/src_new/forward/line.vert`
+* `shaders/src_new/forward/line.frag`
+* `shaders/src_new/forward/point.vert`
+* `shaders/src_new/forward/point.frag`
+
+### TODO 12.1 — Vertex fetch contract
+
+For indexed draws, the shader must use:
+
+```glsl
+uint instanceSlot = gl_InstanceIndex;
+GpuInstanceStatic inst = InstanceStatic[instanceSlot];
+GpuInstanceDynamic dyn = InstanceDynamic[instanceSlot];
+GpuGeometryRecord geo = GeometryRecords[inst.GeometrySlot];
+
+uint vertexId = uint(gl_VertexIndex);
+```
+
+Then fetch packed vertex data from:
+
+```glsl
+geo.VertexBufferBDA + vertexId * sizeof(PackedVertex)
+```
+
+`PackedVertex` layout:
+
+```text
+float px, py, pz, u, v
+20 bytes
+```
+
+If scalar layout cannot safely express 20-byte stride in your shader compiler, change the GPU vertex layout to 32 bytes:
+
+```text
+vec4 position_pad
+vec4 uv_pad
+```
+
+Do this only if required by compiler/validation.
+
+### TODO 12.2 — Transform
+
+```glsl
+vec4 worldPos = dyn.Model * vec4(localPos, 1.0);
+gl_Position = Camera.ViewProj * worldPos;
+```
+
+### TODO 12.3 — Material fetch
+
+Fragment shader:
+
+```glsl
+GpuInstanceStatic inst = InstanceStatic[instanceSlot];
+GpuMaterialSlot mat = Materials[inst.MaterialSlot];
+GpuEntityConfig cfg = EntityConfigs[inst.ConfigSlot];
+```
+
+### TODO 12.4 — Sci-vis fetch
+
+If material type is SciVis or `cfg.ColorSourceMode != 0`:
+
+```text
+ColorSourceMode 1 -> cfg.UniformColor
+ColorSourceMode 2 -> cfg.ScalarBDA + cfg.ColormapID
+ColorSourceMode 3 -> cfg.ColorBDA
+```
+
+### TODO 12.5 — Entity ID output
+
+GBuffer pass writes:
+
+```glsl
+GBuf_EntityId = inst.EntityID;
+```
+
+### Acceptance
+
+* Shaders do not require per-entity descriptor sets.
+* Shaders recover all state from `SceneTableBDA` and `gl_InstanceIndex`.
+* `GpuMaterialSlot` only contains material data.
+* Attribute/scalar/color pointers are read from `GpuEntityConfig`.
+
+---
+
+## Phase 13 — Light buffer
+
+### Files
+
+* `src_new/Graphics/Graphics.LightSystem.cppm`
+* `src_new/Graphics/Graphics.LightSystem.cpp`
+* `src_new/Graphics/Graphics.GpuWorld.cppm`
+* `src_new/Graphics/Graphics.GpuWorld.cpp`
+* deferred lighting shader/pass files
+
+Current `LightSystem` mainly populates frame-global directional/ambient data in the camera UBO. Keep that for baseline directional/ambient light, but add a real `GpuLight[]` buffer for point/spot/area lights. ([GitHub][3])
+
+### TODO 13.1 — Add light sync API
+
+Change or add:
+
+```cpp
+void LightSystem::SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld);
+```
+
+### TODO 13.2 — Populate `GpuLight[]`
+
+For each point/spot/area light component:
+
+```cpp
+RHI::GpuLight light{};
+light.Position_Range = {pos.x, pos.y, pos.z, range};
+light.Direction_Type = {dir.x, dir.y, dir.z, type};
+light.Color_Intensity = {color.r, color.g, color.b, intensity};
+light.Params = {...};
+```
+
+Call:
+
+```cpp
+gpuWorld.SetLights(lights);
+```
+
+### TODO 13.3 — Deferred lighting shader reads light buffer
+
+Deferred lighting pass receives `SceneTableBDA`, reads:
+
+```glsl
+GpuSceneTable scene = ...
+for (uint i = 0; i < scene.LightCount; ++i) {
+    GpuLight light = Lights[i];
+    ...
+}
+```
+
+### Acceptance
+
+* Directional/ambient light still works.
+* Point/spot lights are in `GpuLight[]`.
+* Light data is not mixed into instance/material buffers.
+
+---
+
+## Phase 14 — Renderer frame order
+
+### File
+
+* `src_new/Graphics/Graphics.Renderer.cpp`
+
+### TODO 14.1 — Enforce sync order
+
+Use this order in `PrepareFrame` or equivalent render preparation:
+
+```cpp
+m_PipelineManager->CommitPending();
+
+m_MaterialSystem->SyncGpuBuffer();
+
+m_VisualizationSyncSystem->Sync(
+    registry,
+    *m_MaterialSystem,
+    *m_ColormapSystem,
+    *m_GpuWorld);
+
+m_MaterialSystem->SyncGpuBuffer();
+
+m_TransformSyncSystem->SyncGpuBuffer(
+    registry,
+    *m_GpuWorld);
+
+m_LightSystem->SyncGpuBuffer(
+    registry,
+    *m_GpuWorld);
+
+m_GpuWorld->SetMaterialBuffer(
+    m_MaterialSystem->GetBuffer(),
+    m_MaterialSystem->GetCapacity());
+
+m_GpuWorld->SyncFrame();
+```
+
+Adapt for the actual place where `registry` is available.
+
+### TODO 14.2 — GPU command order
+
+In `ExecuteFrame`:
+
+```text
+1. Reset culling counters
+2. Dispatch culling
+3. Optional depth prepass
+4. GBuffer pass
+5. Shadow pass
+6. Deferred lighting pass
+7. Forward line pass
+8. Forward point pass
+9. Selection/outline
+10. Postprocess/present
+```
+
+### Acceptance
+
+* Materials are uploaded before `GpuWorld` scene table points to material buffer.
+* Visualization config is uploaded before transform/instance sync finalizes material slot.
+* Culling runs before all indirect draw passes.
+
+---
+
+## Phase 15 — Tests and validation
+
+### TODO 15.1 — Compile tests
+
+Add or update tests so these compile:
+
+```cpp
+static_assert(sizeof(RHI::GpuGeometryRecord) == 64);
+static_assert(sizeof(RHI::GpuInstanceStatic) == 32);
+static_assert(sizeof(RHI::GpuInstanceDynamic) == 128);
+static_assert(sizeof(RHI::GpuEntityConfig) == 128);
+static_assert(sizeof(RHI::GpuBounds) == 64);
+static_assert(sizeof(RHI::GpuLight) == 64);
+```
+
+### TODO 15.2 — Null backend test
+
+Create a test that:
+
+1. Creates Null device.
+2. Creates renderer.
+3. Initializes renderer.
+4. Gets `GpuWorld`.
+5. Allocates one instance.
+6. Uploads tiny triangle geometry.
+7. Sets material slot 0.
+8. Sets transform.
+9. Calls `SyncFrame()`.
+10. Shuts down cleanly.
+
+### TODO 15.3 — Culling CPU-side smoke test
+
+With Null backend, ensure:
+
+```cpp
+GpuWorld::AllocateInstance()
+GpuWorld::SetBounds()
+GpuWorld::SetInstanceRenderFlags()
+CullingSystem::Initialize()
+CullingSystem::GetBucket(...)
+```
+
+all work without GPU execution.
+
+### TODO 15.4 — Vulkan validation target
+
+With Vulkan backend:
+
+1. Render one triangle.
+2. Render one line.
+3. Render one point cloud.
+4. Enable validation layers.
+5. Confirm no errors for:
+
+  * missing index buffer
+  * indirect buffer usage
+  * count buffer usage
+  * buffer device address usage
+  * descriptor indexing
+
+The Vulkan backend already documents that it requires Vulkan 1.3, descriptor indexing, dynamic rendering, and timeline semaphores. ([GitHub][9])
+
+---
+
+## Phase 16 — Cleanup after first working GPU-driven path
+
+### TODO 16.1 — Deprecate old culling API
+
+Remove or mark legacy:
+
+```cpp
+CullingSystem::Register()
+CullingSystem::Unregister()
+CullingSystem::UpdateBounds()
+CullingSystem::SetDrawTemplate()
+```
+
+The new culling input is `GpuWorld`, not a separate culling registration table.
+
+### TODO 16.2 — Deprecate old `GpuScene`
+
+After all call sites use `GpuWorld`, either delete:
+
+```text
+Graphics.GpuScene.cppm
+Graphics.GpuScene.cpp
+```
+
+or keep them as a thin compatibility wrapper only.
+
+### TODO 16.3 — Update README
+
+Update:
+
+```text
+src_new/Graphics/README.md
+```
+
+Change the current SciVis custom data layout section because BDA pointers no longer live in `GpuMaterialSlot::CustomData[2]`.
+
+New rule:
+
+```text
+Material slots own material constants and material type.
+GpuEntityConfig owns visualization source pointers, scalar ranges, domains, and per-entity attribute state.
+```
+
+### TODO 16.4 — Add architecture note
+
+Update:
+
+```text
+docs/architecture/src_new-rendering-architecture.md
+```
+
+Add:
+
+```text
+Implementation note:
+The first production implementation uses a BDA root table (`GpuSceneTable`) rather than descriptor bindings for every scene SSBO. The buffers remain separate GPU storage buffers; only their addresses are gathered into a one-entry scene table.
+```
+
+---
+
+## Phase 17 — Defer these until after the renderer works
+
+Do **not** ask Codex to implement these in the first pass:
+
+1. LBVH.
+2. Hi-Z occlusion culling.
+3. Multi-buffer geometry compaction.
+4. Async transfer state machine for all geometry uploads.
+5. Clustered/tiled lighting.
+6. GPU picking refinement.
+7. Mesh shaders.
+8. GPU-driven material sorting.
+9. Bindless meshlet system.
+
+Add these as future TODOs only.
+
+---
+
+## Minimal acceptance target for the first implementation
+
+Codex is done with the first milestone when this works:
+
+```text
+One triangle entity:
+  CPU creates entity
+  GpuWorld uploads geometry
+  entity gets InstanceSlot
+  TransformSync writes model matrix
+  VisualizationSync writes GpuEntityConfig
+  MaterialSystem uploads material
+  GpuWorld uploads scene table
+  cull compute writes one SurfaceOpaque indirect command
+  GBuffer pass calls BindIndexBuffer + DrawIndexedIndirectCount
+  shader uses firstInstance -> InstanceSlot -> geometry/material/config
+  triangle appears
+```
+
+Then test:
+
+```text
+One mesh with:
+  surface rendering
+  wireframe line rendering
+  point rendering
+  scalar visualization
+  material-only rendering
+  moving transform
+```
+
+The critical invariant to preserve everywhere:
+
+```text
+firstInstance == InstanceSlot
+InstanceSlot -> InstanceStatic + InstanceDynamic + EntityConfig + Bounds
+InstanceStatic.GeometrySlot -> GeometryRecord
+InstanceStatic.MaterialSlot -> MaterialSlot
+GeometryRecord -> managed vertex/index buffer ranges
+EntityConfig -> scalar/color/normal/point-size BDA pointers
+```
+
+[1]: https://github.com/intrinsicD/IntrinsicEngine/tree/main/src_new/Graphics "IntrinsicEngine/src_new/Graphics at main · intrinsicD/IntrinsicEngine · GitHub"
+[2]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/RHI/RHI.CommandContext.cppm "raw.githubusercontent.com"
+[3]: https://github.com/intrinsicD/IntrinsicEngine/blob/main/docs/architecture/src_new-rendering-architecture.md "IntrinsicEngine/docs/architecture/src_new-rendering-architecture.md at main · intrinsicD/IntrinsicEngine · GitHub"
+[4]: https://docs.vulkan.org/refpages/latest/refpages/source/vkCmdDrawIndirectCount.html "vkCmdDrawIndirectCount(3) :: Vulkan Documentation Project"
+[5]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/RHI/RHI.Types.cppm "raw.githubusercontent.com"
+[6]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/Graphics.VisualizationSyncSystem.cpp "raw.githubusercontent.com"
+[7]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/Graphics.TransformSyncSystem.cppm "raw.githubusercontent.com"
+[8]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/Graphics.CullingSystem.cpp "raw.githubusercontent.com"
+[9]: https://github.com/intrinsicD/IntrinsicEngine/tree/main/src_new/Graphics/Backends/Vulkan "IntrinsicEngine/src_new/Graphics/Backends/Vulkan at main · intrinsicD/IntrinsicEngine · GitHub"
+
+
