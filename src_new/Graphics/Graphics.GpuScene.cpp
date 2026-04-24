@@ -16,7 +16,11 @@ import Extrinsic.RHI.BufferManager;
 import Extrinsic.Core.StrongHandle;
 
 // ============================================================
-// GpuScene — implementation notes
+// GpuScene — legacy compatibility wrapper (implementation notes)
+//
+// New renderer code must use GpuWorld for instance/geometry ownership.
+// This implementation is retained for compatibility tests and transition
+// plumbing only.
 //
 // Slot pool
 //   A plain free-list (deque-style vector) of recycled uint32_t indices.
@@ -361,4 +365,3 @@ namespace Extrinsic::Graphics
     }
 
 } // namespace Extrinsic::Graphics
-

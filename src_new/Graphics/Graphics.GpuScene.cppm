@@ -11,7 +11,10 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.BufferManager;
 
 // ============================================================
-// GpuScene — geometry suballocator and shared slot-index authority.
+// GpuScene — legacy compatibility wrapper.
+//
+// New renderer code must use GpuWorld for instance/geometry ownership.
+// This module remains only to preserve older tests and migration callsites.
 //
 // Responsibility (narrow):
 //   - Owns one large static vertex buffer + one static index buffer;

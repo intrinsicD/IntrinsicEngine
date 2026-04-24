@@ -1628,7 +1628,7 @@ Do not implement GPU bounds update yet.
 
 ---
 
-## Phase 8 — Replace `GpuScene` usage with `GpuWorld`
+## Phase 8 — Replace `GpuScene` usage with `GpuWorld` — **Complete**
 
 ### Files
 
@@ -1636,7 +1636,9 @@ Do not implement GPU bounds update yet.
 * `src_new/Graphics/Graphics.GpuScene.cpp`
 * all call sites of `GpuScene`
 
-### TODO 8.1 — Keep `GpuScene` temporarily as compatibility wrapper
+### TODO 8.1 — **Done**
+
+Keep `GpuScene` temporarily as compatibility wrapper
 
 Do **not** delete `GpuScene` immediately.
 
@@ -1646,7 +1648,9 @@ Change its comments to:
 // Legacy compatibility wrapper. New rendering code must use GpuWorld.
 ```
 
-### TODO 8.2 — Redirect slot allocation
+### TODO 8.2 — **Done**
+
+Redirect slot allocation
 
 Where old code calls:
 
@@ -1662,7 +1666,9 @@ GpuWorld::AllocateInstance(entityId)
 
 and store handle in `GpuSceneSlot`.
 
-### TODO 8.3 — Redirect static geometry upload
+### TODO 8.3 — **Done**
+
+Redirect static geometry upload
 
 Where old code calls:
 
@@ -1677,7 +1683,9 @@ replace with:
 GpuWorld::UploadGeometry()
 ```
 
-### TODO 8.4 — Remove per-entity dynamic geometry buffers from rendering path
+### TODO 8.4 — **Done**
+
+Remove per-entity dynamic geometry buffers from rendering path
 
 Do not allocate one host-visible storage buffer per entity for positions/scalars/colors unless it is an attribute buffer referenced from `GpuEntityConfig`.
 
