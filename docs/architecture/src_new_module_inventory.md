@@ -1,10 +1,10 @@
 # src_new Module Inventory (auto-generated)
 
-_Generated on 2026-04-23 by `tools/generate_src_new_module_inventory.py`._
+_Generated on 2026-04-24 by `tools/generate_src_new_module_inventory.py`._
 
 | Module | File | Library |
 |---|---|---|
-| `Sandbox` | `src_new/App/Sandbox/Sandbox.cppm` | `App` |
+| `Extrinsic.Sandbox` | `src_new/App/Sandbox/Sandbox.cppm` | `App` |
 | `Extrinsic.Asset.EventBus` | `src_new/Assets/Asset.EventBus.cppm` | `Assets` |
 | `Extrinsic.Asset.LoadPipeline` | `src_new/Assets/Asset.LoadPipeline.cppm` | `Assets` |
 | `Extrinsic.Asset.PathIndex` | `src_new/Assets/Asset.PathIndex.cppm` | `Assets` |
@@ -60,10 +60,14 @@ _Generated on 2026-04-23 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.ECS.System.RenderSync` | `src_new/ECS/Systems/ECS.System.RenderSync.cppm` | `ECS` |
 | `Extrinsic.ECS.System.TransformHierarchy` | `src_new/ECS/Systems/ECS.System.TransformHierarchy.cppm` | `ECS` |
 | `Extrinsic.Backends.Null` | `src_new/Graphics/Backends/Null/Backends.Null.cppm` | `Graphics` |
+| `Extrinsic.Backends.Vulkan:Internal` | `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.Internal.cppm` | `Graphics` |
+| `Extrinsic.Backends.Vulkan` | `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Component.GpuSceneSlot` | `src_new/Graphics/Components/Graphics.Component.GpuSceneSlot.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Component.Material` | `src_new/Graphics/Components/Graphics.Component.Material.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Component.RenderGeometry` | `src_new/Graphics/Components/Graphics.Component.RenderGeometry.cppm` | `Graphics` |
+| `Extrinsic.Graphics.Component.VisualizationConfig` | `src_new/Graphics/Components/Graphics.Component.VisualizationConfig.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Colormap` | `src_new/Graphics/Graphics.Colormap.cppm` | `Graphics` |
+| `Extrinsic.Graphics.ColormapSystem` | `src_new/Graphics/Graphics.ColormapSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.CullingSystem` | `src_new/Graphics/Graphics.CullingSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.DeferredSystem` | `src_new/Graphics/Graphics.DeferredSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.ForwardSystem` | `src_new/Graphics/Graphics.ForwardSystem.cppm` | `Graphics` |
@@ -78,6 +82,7 @@ _Generated on 2026-04-23 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Graphics.SelectionSystem` | `src_new/Graphics/Graphics.SelectionSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.ShadowSystem` | `src_new/Graphics/Graphics.ShadowSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.TransformSyncSystem` | `src_new/Graphics/Graphics.TransformSyncSystem.cppm` | `Graphics` |
+| `Extrinsic.Graphics.VisualizationSyncSystem` | `src_new/Graphics/Graphics.VisualizationSyncSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Culling` | `src_new/Graphics/Passes/Pass.Culling.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `src_new/Graphics/Passes/Pass.Deferred.GBuffers.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `src_new/Graphics/Passes/Pass.Deferred.Lighting.cppm` | `Graphics` |
@@ -111,10 +116,11 @@ _Generated on 2026-04-23 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.RHI.SamplerManager` | `src_new/Graphics/RHI/RHI.SamplerManager.cppm` | `Graphics` |
 | `Extrinsic.RHI.TextureManager` | `src_new/Graphics/RHI/RHI.TextureManager.cppm` | `Graphics` |
 | `Extrinsic.RHI.Transfer` | `src_new/Graphics/RHI/RHI.Transfer.cppm` | `Graphics` |
+| `Extrinsic.RHI.TransferQueue` | `src_new/Graphics/RHI/RHI.TransferQueue.cppm` | `Graphics` |
 | `Extrinsic.RHI.Types` | `src_new/Graphics/RHI/RHI.Types.cppm` | `Graphics` |
 | `Extrinsic.Platform.Window` | `src_new/Platform/Platform.IWindow.cppm` | `Platform` |
 | `Extrinsic.Platform.Input` | `src_new/Platform/Platform.Input.cppm` | `Platform` |
 | `Extrinsic.Runtime.Engine` | `src_new/Runtime/Runtime.Engine.cppm` | `Runtime` |
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `Runtime` |
 
-Total modules: **112**
+Total modules: **118**

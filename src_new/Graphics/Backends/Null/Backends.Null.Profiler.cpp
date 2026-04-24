@@ -7,6 +7,7 @@ module;
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+#include <expected>
 
 module Extrinsic.Backends.Null;
 

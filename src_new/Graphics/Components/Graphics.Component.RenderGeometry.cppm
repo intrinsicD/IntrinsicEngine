@@ -1,97 +1,101 @@
 module;
 
+#include <cstdint>
 #include <glm/glm.hpp>
-#include <optional>
 #include <string>
 #include <variant>
 
 export module Extrinsic.Graphics.Component.RenderGeometry;
 
 import Extrinsic.Graphics.Colormap;
-import Extrinsic.RHI.Handles;
+
+// ============================================================
+// Render-geometry hint components.
+//
+// These describe *how* to render an entity's geometry (topology,
+// primitive mode, size/width sources) but say nothing about colour.
+// Colour is governed by:
+//   1. VisualizationConfig  — scientific-visualisation overrides
+//                             (scalar fields, colormaps, isolation lines)
+//   2. MaterialInstance     — baseline PBR / custom material appearance
+//
+// One of the three render components is present on each renderable
+// entity; its presence is the toggle — no boolean flags.
+// ============================================================
 
 export namespace Extrinsic::Graphics::Components
 {
-    // Visualization config — describes HOW to display a scalar field.
-    // Does not own any GPU resource; the actual buffer is looked up at
-    // render extraction time via GpuSceneSlot::Find(BufferName).
+    // ----------------------------------------------------------------
+    // ScalarFieldConfig — colourmap + range + isolines + binning.
+    //
+    // Pure CPU metadata; no GPU resource owned.
+    // Consumed by VisualizationConfig to configure GPU rendering.
+    // ----------------------------------------------------------------
     struct ScalarFieldConfig
     {
-        Colormap::Type Map     = Colormap::Type::Viridis;
-        float RangeMin         = 0.0f;
-        float RangeMax         = 1.0f;
-        bool  AutoRange        = true;
+        Colormap::Type Map      = Colormap::Type::Viridis;
+        float          RangeMin = 0.f;
+        float          RangeMax = 1.f;
 
-        struct Bins     { uint32_t Num = 0; } CachedBins;
+        /// When true, VisualizationSyncSystem derives RangeMin/Max from the
+        /// scalar buffer's actual data range on each dirty frame.
+        bool AutoRange = true;
+
+        /// Discretise the scalar range into N equal-width bands.
+        /// 0 = continuous (smooth gradient).
+        std::uint32_t BinCount = 0;
+
         struct Isolines
         {
-            uint32_t  Num   = 0;
-            glm::vec4 Color = {0.0f, 0.0f, 0.0f, 1.0f};
-            float     Width = 1.5f;
-        } CachedIsolines;
-
-        std::optional<std::variant<Bins, Isolines>> ActiveBinsOrIsolines;
+            /// Number of evenly-spaced isocontour lines.  0 = none.
+            std::uint32_t Num   = 0;
+            glm::vec4     Color = {0.f, 0.f, 0.f, 1.f};
+            float         Width = 1.5f;  ///< Screen-space pixels.
+        } Isolines;
     };
 
-    // References a scalar field buffer uploaded by the lifecycle system.
-    // BufferName is looked up in GpuSceneSlot::Find() at extraction time.
-    struct ScalarFieldDataSource
-    {
-        std::string     BufferName;   // e.g. "scalars", "curvature", "geodesic"
-        ScalarFieldConfig Config;
-    };
-
-    // Either a uniform colour or the name of a per-element colour buffer
-    // uploaded to GpuSceneSlot (e.g. "colors").
-    struct ColorDataSource
-    {
-        std::variant<glm::vec4, std::string> UniformOrBufferName =
-            glm::vec4{1.0f, 0.6f, 0.0f, 1.0f};
-    };
-
-    // Render points as flat discs, impostor spheres, or surface-aligned surfels.
-    struct RenderPoints
-    {
-        enum class RenderType : uint8_t
-        {
-            Flat,
-            Sphere,  // impostor sphere — correct depth, occludes surfaces
-            Surfel   // requires vertex normals
-        } Type = RenderType::Sphere;
-
-        std::variant<ColorDataSource, ScalarFieldDataSource> VertexColorOrScalarField;
-
-        // Uniform float radius (world-space) or name of a per-point size buffer.
-        std::variant<float, std::string> VertexSizeDataSource = 0.008f;
-    };
-
-    // Render lines as thick anti-aliased edges.
-    // Color can be vertex-interpolated or edge-discrete; width uniform or varying.
-    struct RenderLines
-    {
-        enum class SourceDomain : uint8_t
-        {
-            Vertex,  // colour interpolated across edge from per-vertex values
-            Edge     // colour constant per edge from per-edge values
-        } Domain = SourceDomain::Vertex;
-
-        std::variant<ColorDataSource, ScalarFieldDataSource> VertexColorOrScalarField;
-        std::variant<ColorDataSource, ScalarFieldDataSource> EdgeColorOrScalarField;
-
-        // Uniform float width or name of a per-edge width buffer.
-        std::variant<float, std::string> EdgeWidthDataSource = 0.008f;
-    };
-
-    // Render filled triangles / quads.
+    // ----------------------------------------------------------------
+    // RenderSurface — filled triangle / quad rendering hint.
+    // ----------------------------------------------------------------
     struct RenderSurface
     {
-        enum class SourceDomain : uint8_t
+        enum class SourceDomain : std::uint8_t
         {
-            Vertex,
-            Face
+            Vertex,  ///< Interpolate colour / normals from per-vertex data.
+            Face     ///< Constant colour / flat-shaded per face.
+        } Domain = SourceDomain::Vertex;
+    };
+
+    // ----------------------------------------------------------------
+    // RenderLines — thick anti-aliased edge rendering hint.
+    // ----------------------------------------------------------------
+    struct RenderLines
+    {
+        enum class SourceDomain : std::uint8_t
+        {
+            Vertex,  ///< Colour interpolated across edge endpoints.
+            Edge     ///< Colour constant per edge.
         } Domain = SourceDomain::Vertex;
 
-        std::variant<ColorDataSource, ScalarFieldDataSource> VertexColorOrScalarField;
-        std::variant<ColorDataSource, ScalarFieldDataSource> FaceColorOrScalarField;
+        /// Uniform line width (world-space) or name of a per-edge
+        /// width buffer in GpuSceneSlot::Buffers.
+        std::variant<float, std::string> WidthSource = 1.0f;
+    };
+
+    // ----------------------------------------------------------------
+    // RenderPoints — point sprite / impostor sphere rendering hint.
+    // ----------------------------------------------------------------
+    struct RenderPoints
+    {
+        enum class RenderType : std::uint8_t
+        {
+            Flat,    ///< Screen-aligned flat disc.
+            Sphere,  ///< Impostor sphere — correct depth, occludes surfaces.
+            Surfel   ///< Surface-aligned disc; requires vertex normals.
+        } Type = RenderType::Sphere;
+
+        /// Uniform world-space radius or name of a per-point size buffer
+        /// in GpuSceneSlot::Buffers.
+        std::variant<float, std::string> SizeSource = 0.008f;
     };
 }

@@ -26,6 +26,47 @@ import Extrinsic.RHI.Types;
 export namespace Extrinsic::Graphics
 {
     // -----------------------------------------------------------------
+    // Well-known material type IDs
+    // -----------------------------------------------------------------
+    // These are the registration order of built-in types; registered by
+    // MaterialSystem::Initialize() (StandardPBR) and
+    // VisualizationSyncSystem::Initialize() (SciVis).
+    // Shaders branch on GpuMaterialSlot::MaterialTypeID.
+    // -----------------------------------------------------------------
+    inline constexpr std::uint32_t kMaterialTypeID_StandardPBR = 0u;
+    inline constexpr std::uint32_t kMaterialTypeID_SciVis      = 1u;
+
+    // -----------------------------------------------------------------
+    // SciVis material — CustomData layout documentation
+    // -----------------------------------------------------------------
+    // When MaterialTypeID == kMaterialTypeID_SciVis, the four CustomData
+    // vec4 slots are used as follows (values stored via std::bit_cast<float>
+    // from uint32_t where noted):
+    //
+    //   CustomData[0]:
+    //     [0] colormapBindlessIndex  -- uint32 via bit_cast
+    //     [1] domain                  -- 0=vertex,1=edge,2=face via bit_cast
+    //     [2] rangeMin                -- float
+    //     [3] rangeMax                -- float
+    //
+    //   CustomData[1]:
+    //     [0] isolineCount            -- uint32 via bit_cast (0 = none)
+    //     [1] packedIsolineColor      -- RGBA8 uint32 via bit_cast
+    //     [2] isolineWidth            -- float (screen-space pixels)
+    //     [3] binCount                -- uint32 via bit_cast (0 = continuous)
+    //
+    //   CustomData[2]:
+    //     [0] scalarBDA_lo            -- low  32 bits of GPU buffer address
+    //     [1] scalarBDA_hi            -- high 32 bits of GPU buffer address
+    //     [2] elementCount            -- uint32 via bit_cast
+    //     [3] colorSourceMode         -- 0=ScalarField,1=UniformColor,
+    //                                    2=PerElementRgba via bit_cast
+    //
+    //   CustomData[3]:             -- reserved
+    //
+    // -----------------------------------------------------------------
+
+    // -----------------------------------------------------------------
     // Typed handles
     // -----------------------------------------------------------------
     struct MaterialTypeTag;
