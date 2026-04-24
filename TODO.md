@@ -1405,7 +1405,7 @@ void SetGeometryHandle(GpuGeometryHandle h) noexcept;
 
 ---
 
-## Phase 6 — Refactor visualization sync into `GpuEntityConfig`
+## Phase 6 — Refactor visualization sync into `GpuEntityConfig` — **Complete**
 
 ### Files
 
@@ -1416,7 +1416,7 @@ void SetGeometryHandle(GpuGeometryHandle h) noexcept;
 
 The current `VisualizationSyncSystem` packs scalar BDA and element count into `GpuMaterialSlot::CustomData[2]`. That should be moved out of material data and into `GpuEntityConfig`. ([GitHub][6])
 
-### TODO 6.1 — Change `VisualizationSyncSystem::Sync` signature
+### TODO 6.1 — Change `VisualizationSyncSystem::Sync` signature — **Done**
 
 Change from:
 
@@ -1434,7 +1434,7 @@ void Sync(
     GpuWorld& gpuWorld);
 ```
 
-### TODO 6.2 — Keep SciVis material type but stop storing BDAs in material
+### TODO 6.2 — Keep SciVis material type but stop storing BDAs in material — **Done**
 
 Keep override material leases for now so shaders can branch on `MaterialTypeID == SciVis`.
 
@@ -1447,7 +1447,7 @@ GpuMaterialSlot:
   CustomData[2] must NOT hold ScalarBDA, ColorBDA, ElementCount, or ColorSourceMode anymore.
 ```
 
-### TODO 6.3 — Build `GpuEntityConfig`
+### TODO 6.3 — Build `GpuEntityConfig` — **Done**
 
 For every entity with `VisualizationConfig + GpuSceneSlot`, build:
 
@@ -1486,7 +1486,7 @@ Then call:
 gpuWorld.SetEntityConfig(gpuSlot.ToInstanceHandle(), cfg);
 ```
 
-### TODO 6.4 — Uniform color path
+### TODO 6.4 — Uniform color path — **Done**
 
 For uniform color visualization:
 
@@ -1497,7 +1497,7 @@ cfg.UniformColor = visCfg->Color;
 
 No BDA required.
 
-### TODO 6.5 — Scalar field path
+### TODO 6.5 — Scalar field path — **Done**
 
 For scalar fields:
 
@@ -1507,7 +1507,7 @@ cfg.ScalarBDA = scalarBda;
 cfg.ElementCount = elementCount;
 ```
 
-### TODO 6.6 — Per-element RGBA path
+### TODO 6.6 — Per-element RGBA path — **Done**
 
 For per-vertex/per-edge/per-face color buffers:
 
@@ -1517,7 +1517,7 @@ cfg.ColorBDA = colorBda;
 cfg.ElementCount = elementCount;
 ```
 
-### TODO 6.7 — Material effective slot
+### TODO 6.7 — Material effective slot — **Done**
 
 Still set:
 
@@ -2461,4 +2461,3 @@ EntityConfig -> scalar/color/normal/point-size BDA pointers
 [7]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/Graphics.TransformSyncSystem.cppm "raw.githubusercontent.com"
 [8]: https://raw.githubusercontent.com/intrinsicD/IntrinsicEngine/main/src_new/Graphics/Graphics.CullingSystem.cpp "raw.githubusercontent.com"
 [9]: https://github.com/intrinsicD/IntrinsicEngine/tree/main/src_new/Graphics/Backends/Vulkan "IntrinsicEngine/src_new/Graphics/Backends/Vulkan at main · intrinsicD/IntrinsicEngine · GitHub"
-

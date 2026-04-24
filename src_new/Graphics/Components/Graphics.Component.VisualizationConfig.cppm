@@ -37,11 +37,10 @@ import Extrinsic.Graphics.Component.RenderGeometry;  // ScalarFieldConfig
 //
 // ScalarField GPU path:
 //   VisualizationSyncSystem patches the entity's override material
-//   with MaterialTypeID = kMaterialTypeID_SciVis and packs the
-//   colourmap BDA + range + isoline parameters into CustomData[0..2].
+//   with MaterialTypeID = kMaterialTypeID_SciVis and writes per-entity
+//   attribute pointers/metadata to GpuWorld::GpuEntityConfig.
 //   The surface shader branches on MaterialTypeID to apply the
-//   colourmap at fragment level.  Line/Point passes receive CPU-baked
-//   RGBA colours uploaded to "vis_colors_baked" in GpuSceneSlot.
+//   colourmap at fragment level.
 //
 // Usage — geodesic distance on a mesh:
 //   auto& vis          = registry.emplace<VisualizationConfig>(entity);
@@ -96,4 +95,3 @@ export namespace Extrinsic::Graphics::Components
         std::string ColorBufferName;
     };
 }
-
