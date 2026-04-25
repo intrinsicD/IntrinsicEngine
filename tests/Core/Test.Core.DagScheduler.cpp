@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <array>
+#include <string>
 #include <span>
 
 import Extrinsic.Core.Dag.Scheduler;
@@ -74,6 +75,63 @@ namespace
 
         PendingTaskDesc t1{.id = ctx->ids[0], .domain = QueueDomain::Gpu, .estimatedCost = 1};
         if (!emit(emitCtx, t1))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+
+        return Extrinsic::Core::Ok();
+    }
+
+    Extrinsic::Core::Result EmitExplicitCycle(void*, void* emitCtx, EmitPendingTaskFn emit)
+    {
+        const TaskId taskA{200, 1};
+        const TaskId taskB{201, 1};
+        const std::array<TaskId, 1> depsA{taskB};
+        const std::array<TaskId, 1> depsB{taskA};
+
+        PendingTaskDesc a{
+            .id = taskA,
+            .debugName = "CycleA",
+            .domain = QueueDomain::Cpu,
+            .dependsOn = std::span<const TaskId>(depsA),
+        };
+        if (!emit(emitCtx, a))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+
+        PendingTaskDesc b{
+            .id = taskB,
+            .debugName = "CycleB",
+            .domain = QueueDomain::Cpu,
+            .dependsOn = std::span<const TaskId>(depsB),
+        };
+        if (!emit(emitCtx, b))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+
+        return Extrinsic::Core::Ok();
+    }
+
+    Extrinsic::Core::Result EmitMixedExplicitAndHazardCycle(void* producerCtx, void* emitCtx, EmitPendingTaskFn emit)
+    {
+        auto* ctx = static_cast<ProducerCtx*>(producerCtx);
+        const std::array<TaskId, 1> depA{ctx->ids[1]};
+        const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = ctx->resources[0], .mode = ResourceAccessMode::Write}};
+        const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = ctx->resources[0], .mode = ResourceAccessMode::Read}};
+
+        PendingTaskDesc a{
+            .id = ctx->ids[0],
+            .debugName = "WriterA",
+            .domain = QueueDomain::Cpu,
+            .dependsOn = std::span<const TaskId>(depA),
+            .resources = std::span<const ResourceAccess>(writeAccess),
+        };
+        if (!emit(emitCtx, a))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+
+        PendingTaskDesc b{
+            .id = ctx->ids[1],
+            .debugName = "ReaderB",
+            .domain = QueueDomain::Cpu,
+            .resources = std::span<const ResourceAccess>(readAccess),
+        };
+        if (!emit(emitCtx, b))
             return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
 
         return Extrinsic::Core::Ok();
@@ -216,6 +274,56 @@ TEST(CoreDagScheduler, ResetEpochClearsCachedTasks)
 
     const auto stats = scheduler->GetLastStats();
     EXPECT_EQ(stats.taskCount, 0u);
+}
+
+TEST(CoreDagScheduler, CycleDiagnosticIncludesTaskNamesForExplicitCycle)
+{
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+
+    auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "unit_cycle_explicit", .subsystemId = 9, .preferredDomain = QueueDomain::Cpu},
+        nullptr,
+        &EmitExplicitCycle);
+    ASSERT_TRUE(producer.has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+
+    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
+
+    const auto stats = scheduler->GetLastStats();
+    EXPECT_NE(stats.lastDiagnostic.find("CycleA"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("CycleB"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("explicit"), std::string::npos);
+}
+
+TEST(CoreDagScheduler, CycleDiagnosticIncludesHazardReason)
+{
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+
+    ProducerCtx ctx{
+        .ids = {TaskId{210, 1}, TaskId{211, 1}, TaskId{212, 1}},
+        .resources = {ResourceId{31, 1}},
+    };
+
+    auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "unit_cycle_mixed", .subsystemId = 10, .preferredDomain = QueueDomain::Cpu},
+        &ctx,
+        &EmitMixedExplicitAndHazardCycle);
+    ASSERT_TRUE(producer.has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+
+    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
+
+    const auto stats = scheduler->GetLastStats();
+    EXPECT_NE(stats.lastDiagnostic.find("WriterA"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("ReaderB"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("RAW"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("explicit"), std::string::npos);
 }
 
 // -----------------------------------------------------------------------------

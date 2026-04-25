@@ -2771,20 +2771,20 @@ Hazard rules:
 
 **Required behavior:**
 
-- [ ] When topological compilation fails, find at least one cycle.
-- [ ] Emit pass/task names in the diagnostic.
+- [x] When topological compilation fails, find at least one cycle.
+- [x] Emit pass/task names in the diagnostic.
 - [ ] Include edge reason when available:
-  - [ ] explicit dependency;
-  - [ ] RAW/WAW/WAR resource hazard;
+  - [x] explicit dependency;
+  - [x] RAW/WAW/WAR resource hazard;
   - [ ] label wait/signal;
   - [ ] domain-specific reason reserved for GPU render graph.
-- [ ] Return the existing error convention, typically `ErrorCode::InvalidState`.
-- [ ] Keep diagnostics available in logs and optionally in `ScheduleStats`/debug info.
+- [x] Return the existing error convention, typically `ErrorCode::InvalidState`.
+- [x] Keep diagnostics available in logs and optionally in `ScheduleStats`/debug info.
 
 **Tests:**
 
-- [ ] Explicit A -> B -> A cycle returns invalid state.
-- [ ] Resource-derived cycle, if constructible through explicit plus hazard edges, includes both pass names.
+- [x] Explicit A -> B -> A cycle returns invalid state.
+- [x] Resource-derived cycle, if constructible through explicit plus hazard edges, includes both pass names.
 - [ ] Label-derived cycle includes label name or label ID.
 - [ ] Cycle diagnostic does not allocate unbounded memory on large graphs.
 
