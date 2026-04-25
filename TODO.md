@@ -2368,7 +2368,7 @@ The Vulkan backend already documents that it requires Vulkan 1.3, descriptor ind
 
 ## Phase 16 — Cleanup after first working GPU-driven path
 
-### TODO 16.1 — Deprecate old culling API
+### TODO 16.1 — Deprecate old culling API — **Done**
 
 Remove or mark legacy:
 
@@ -2381,7 +2381,7 @@ CullingSystem::SetDrawTemplate()
 
 The new culling input is `GpuWorld`, not a separate culling registration table.
 
-### TODO 16.2 — Deprecate old `GpuScene`
+### TODO 16.2 — Deprecate old `GpuScene` — **Done**
 
 After all call sites use `GpuWorld`, either delete:
 
@@ -2392,7 +2392,7 @@ Graphics.GpuScene.cpp
 
 or keep them as a thin compatibility wrapper only.
 
-### TODO 16.3 — Update README
+### TODO 16.3 — Update README — **Done**
 
 Update:
 
@@ -2409,7 +2409,7 @@ Material slots own material constants and material type.
 GpuEntityConfig owns visualization source pointers, scalar ranges, domains, and per-entity attribute state.
 ```
 
-### TODO 16.4 — Add architecture note
+### TODO 16.4 — Add architecture note — **Done**
 
 Update:
 
