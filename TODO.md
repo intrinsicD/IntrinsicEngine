@@ -2191,7 +2191,7 @@ GBuf_EntityId = inst.EntityID;
 
 Current `LightSystem` mainly populates frame-global directional/ambient data in the camera UBO. Keep that for baseline directional/ambient light, but add a real `GpuLight[]` buffer for point/spot/area lights. ([GitHub][3])
 
-### TODO 13.1 — Add light sync API
+### TODO 13.1 — Add light sync API — **Done**
 
 Change or add:
 
@@ -2199,7 +2199,7 @@ Change or add:
 void LightSystem::SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld);
 ```
 
-### TODO 13.2 — Populate `GpuLight[]`
+### TODO 13.2 — Populate `GpuLight[]` — **Done**
 
 For each point/spot/area light component:
 

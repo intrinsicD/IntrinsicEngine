@@ -1,12 +1,14 @@
 module;
 
 #include <memory>
+#include <entt/entity/registry.hpp>
 
 #include <glm/glm.hpp>
 
 export module Extrinsic.Graphics.LightSystem;
 
 import Extrinsic.RHI.Types;
+import Extrinsic.Graphics.GpuWorld;
 
 export namespace Extrinsic::Graphics
 {
@@ -44,6 +46,7 @@ export namespace Extrinsic::Graphics
 		void SetAmbientLight(glm::vec3 color, float intensity) noexcept;
 
 		void ApplyTo(RHI::CameraUBO& camera) const noexcept;
+		void SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld);
 
 		[[nodiscard]] bool IsInitialized() const noexcept;
 
@@ -52,4 +55,3 @@ export namespace Extrinsic::Graphics
 		std::unique_ptr<Impl> m_Impl;
 	};
 }
-
