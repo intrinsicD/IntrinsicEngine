@@ -3,6 +3,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
+#include <string_view>
 
 export module Extrinsic.Core.Dag.Scheduler:Types;
 
@@ -64,6 +66,7 @@ export namespace Extrinsic::Core::Dag
     struct PendingTaskDesc
     {
         TaskId id{};
+        std::string_view debugName{};
         QueueDomain domain = QueueDomain::Cpu;
         TaskKind kind = TaskKind::Generic;
         TaskPriority priority = TaskPriority::Normal;
@@ -98,5 +101,6 @@ export namespace Extrinsic::Core::Dag
         uint32_t edgeCount = 0;
         uint32_t criticalPathCost = 0;
         uint32_t maxReadyQueueDepth = 0;
+        std::string lastDiagnostic{};
     };
 }

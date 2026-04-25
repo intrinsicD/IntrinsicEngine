@@ -1,8 +1,11 @@
 module;
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <queue>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -17,6 +20,7 @@ namespace Extrinsic::Core::Dag
         struct CachedTask
         {
             PendingTaskDesc desc{};
+            std::string debugNameStorage{};
             std::vector<TaskId> dependsOn{};
             std::vector<ResourceAccess> resources{};
         };
@@ -41,6 +45,7 @@ namespace Extrinsic::Core::Dag
             const BuildConfig& config,
             ScheduleStats& outStats)
         {
+            outStats.lastDiagnostic.clear();
             outStats.taskCount = static_cast<uint32_t>(tasks.size());
             if (tasks.empty())
                 return std::vector<PlanTask>{};
@@ -50,23 +55,44 @@ namespace Extrinsic::Core::Dag
             // Pass 1: index and adjacency.
             std::unordered_map<TaskId, std::size_t, StrongHandleHash<TaskTag>> idToIndex;
             idToIndex.reserve(N);
+            const auto taskLabel = [&](std::size_t index) -> std::string
+            {
+                const auto& task = tasks[index];
+                if (!task.desc.debugName.empty())
+                    return std::string(task.desc.debugName);
+                std::ostringstream oss;
+                oss << "Task(" << task.desc.id.Index << ":" << task.desc.id.Generation << ")";
+                return oss.str();
+            };
             for (std::size_t i = 0; i < N; ++i)
             {
                 const auto [_, inserted] = idToIndex.emplace(tasks[i].desc.id, i);
                 if (!inserted)
+                {
+                    outStats.lastDiagnostic = "Duplicate TaskId detected at " + taskLabel(i);
                     return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
+                }
             }
 
             std::vector<uint32_t> inDegree(N, 0);
             std::vector<std::vector<std::size_t>> successors(N);
             std::vector<std::vector<std::size_t>> predecessors(N);
+            enum class EdgeReason : uint8_t
+            {
+                ExplicitDependency = 0,
+                HazardRaw,
+                HazardWaw,
+                HazardWar,
+            };
             std::unordered_set<uint64_t> seenEdges{};
             seenEdges.reserve(N * 2);
+            std::unordered_map<uint64_t, EdgeReason> edgeReasons{};
+            edgeReasons.reserve(N * 2);
             const auto encodeEdge = [](std::size_t from, std::size_t to) noexcept -> uint64_t
             {
                 return (static_cast<uint64_t>(from) << 32) | static_cast<uint64_t>(to);
             };
-            const auto addEdge = [&](std::size_t from, std::size_t to)
+            const auto addEdge = [&](std::size_t from, std::size_t to, const EdgeReason reason)
             {
                 if (from == to)
                     return;
@@ -77,6 +103,7 @@ namespace Extrinsic::Core::Dag
                 predecessors[to].push_back(from);
                 inDegree[to] += 1;
                 outStats.edgeCount += 1;
+                edgeReasons.emplace(key, reason);
             };
             for (std::size_t i = 0; i < N; ++i)
             {
@@ -84,8 +111,14 @@ namespace Extrinsic::Core::Dag
                 {
                     const auto depIt = idToIndex.find(dep);
                     if (depIt == idToIndex.end())
+                    {
+                        std::ostringstream oss;
+                        oss << "Missing dependency for " << taskLabel(i)
+                            << " -> Task(" << dep.Index << ":" << dep.Generation << ")";
+                        outStats.lastDiagnostic = oss.str();
                         return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
-                    addEdge(depIt->second, i);
+                    }
+                    addEdge(depIt->second, i, EdgeReason::ExplicitDependency);
                 }
             }
 
@@ -97,7 +130,20 @@ namespace Extrinsic::Core::Dag
             const ResourceHazardBuilder hazardBuilder{};
             const auto hazardEdges = hazardBuilder.Build(hazardTaskView);
             for (const auto& edge : hazardEdges)
-                addEdge(edge.from, edge.to);
+            {
+                const auto reason = [&]() -> EdgeReason
+                {
+                    switch (edge.kind)
+                    {
+                    case HazardKind::Raw: return EdgeReason::HazardRaw;
+                    case HazardKind::Waw: return EdgeReason::HazardWaw;
+                    case HazardKind::War: return EdgeReason::HazardWar;
+                    case HazardKind::None: return EdgeReason::HazardRaw;
+                    }
+                    return EdgeReason::HazardRaw;
+                }();
+                addEdge(edge.from, edge.to, reason);
+            }
 
             // Pass 2: topological pre-pass. Also detects cycles.
             std::vector<std::size_t> topo;
@@ -118,7 +164,75 @@ namespace Extrinsic::Core::Dag
                             q.push(v);
                 }
                 if (topo.size() != N)
+                {
+                    std::vector<uint8_t> color(N, 0);
+                    std::vector<std::size_t> stack{};
+                    std::vector<std::size_t> cycle{};
+                    std::function<bool(std::size_t)> dfs = [&](std::size_t node) -> bool
+                    {
+                        color[node] = 1;
+                        stack.push_back(node);
+                        for (const auto next : successors[node])
+                        {
+                            if (color[next] == 0)
+                            {
+                                if (dfs(next))
+                                    return true;
+                            }
+                            else if (color[next] == 1)
+                            {
+                                const auto it = std::find(stack.begin(), stack.end(), next);
+                                if (it != stack.end())
+                                {
+                                    cycle.assign(it, stack.end());
+                                    cycle.push_back(next);
+                                }
+                                return true;
+                            }
+                        }
+                        stack.pop_back();
+                        color[node] = 2;
+                        return false;
+                    };
+                    for (std::size_t i = 0; i < N; ++i)
+                    {
+                        if (color[i] == 0 && dfs(i))
+                            break;
+                    }
+
+                    std::ostringstream oss;
+                    oss << "Cycle detected";
+                    if (!cycle.empty())
+                    {
+                        oss << ": ";
+                        for (std::size_t i = 0; i + 1 < cycle.size(); ++i)
+                        {
+                            const auto from = cycle[i];
+                            const auto to = cycle[i + 1];
+                            oss << taskLabel(from);
+                            const auto key = encodeEdge(from, to);
+                            if (const auto reasonIt = edgeReasons.find(key); reasonIt != edgeReasons.end())
+                            {
+                                oss << " --";
+                                switch (reasonIt->second)
+                                {
+                                case EdgeReason::ExplicitDependency: oss << "explicit"; break;
+                                case EdgeReason::HazardRaw: oss << "RAW"; break;
+                                case EdgeReason::HazardWaw: oss << "WAW"; break;
+                                case EdgeReason::HazardWar: oss << "WAR"; break;
+                                }
+                                oss << "--> ";
+                            }
+                            else
+                            {
+                                oss << " --> ";
+                            }
+                        }
+                        oss << taskLabel(cycle.back());
+                    }
+                    outStats.lastDiagnostic = oss.str();
                     return Err<std::vector<PlanTask>>(ErrorCode::InvalidState);
+                }
             }
 
             // Pass 3: reverse DP for the longest remaining path (a.k.a. level).
@@ -311,8 +425,10 @@ namespace Extrinsic::Core::Dag
 
                 CachedTask cached{};
                 cached.desc = pending;
+                cached.debugNameStorage = std::string(pending.debugName);
                 cached.dependsOn.assign(pending.dependsOn.begin(), pending.dependsOn.end());
                 cached.resources.assign(pending.resources.begin(), pending.resources.end());
+                cached.desc.debugName = cached.debugNameStorage;
                 cached.desc.dependsOn = std::span<const TaskId>(cached.dependsOn.data(), cached.dependsOn.size());
                 cached.desc.resources = std::span<const ResourceAccess>(cached.resources.data(), cached.resources.size());
                 m_CachedTasks.push_back(std::move(cached));
@@ -348,8 +464,10 @@ namespace Extrinsic::Core::Dag
                     return Err(ErrorCode::InvalidArgument);
                 CachedTask cached{};
                 cached.desc = task;
+                cached.debugNameStorage = std::string(task.debugName);
                 cached.dependsOn.assign(task.dependsOn.begin(), task.dependsOn.end());
                 cached.resources.assign(task.resources.begin(), task.resources.end());
+                cached.desc.debugName = cached.debugNameStorage;
                 cached.desc.dependsOn = std::span<const TaskId>(
                     cached.dependsOn.data(), cached.dependsOn.size());
                 cached.desc.resources = std::span<const ResourceAccess>(
