@@ -1,6 +1,6 @@
 # src_new Module Inventory (auto-generated)
 
-_Generated on 2026-04-24 by `tools/generate_src_new_module_inventory.py`._
+_Generated on 2026-04-25 by `tools/generate_src_new_module_inventory.py`._
 
 | Module | File | Library |
 |---|---|---|
@@ -17,6 +17,11 @@ _Generated on 2026-04-24 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Core.Config.Render` | `src_new/Core/Core.Config.Render.cppm` | `Core` |
 | `Extrinsic.Core.Config.Simulation` | `src_new/Core/Core.Config.Simulation.cppm` | `Core` |
 | `Extrinsic.Core.Config.Window` | `src_new/Core/Core.Config.Window.cppm` | `Core` |
+| `Extrinsic.Core.Dag.Scheduler:Compiler` | `src_new/Core/Core.Dag.Scheduler.Compiler.cppm` | `Core` |
+| `Extrinsic.Core.Dag.Scheduler:DomainGraph` | `src_new/Core/Core.Dag.Scheduler.DomainGraph.cppm` | `Core` |
+| `Extrinsic.Core.Dag.Scheduler:Hazards` | `src_new/Core/Core.Dag.Scheduler.Hazards.cppm` | `Core` |
+| `Extrinsic.Core.Dag.Scheduler:Policy` | `src_new/Core/Core.Dag.Scheduler.Policy.cppm` | `Core` |
+| `Extrinsic.Core.Dag.Scheduler:Types` | `src_new/Core/Core.Dag.Scheduler.Types.cppm` | `Core` |
 | `Extrinsic.Core.Dag.Scheduler` | `src_new/Core/Core.Dag.Scheduler.cppm` | `Core` |
 | `Extrinsic.Core.Dag.TaskGraph` | `src_new/Core/Core.Dag.TaskGraph.cppm` | `Core` |
 | `Extrinsic.Core.Error` | `src_new/Core/Core.Error.cppm` | `Core` |
@@ -72,6 +77,7 @@ _Generated on 2026-04-24 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Graphics.DeferredSystem` | `src_new/Graphics/Graphics.DeferredSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.ForwardSystem` | `src_new/Graphics/Graphics.ForwardSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.GpuScene` | `src_new/Graphics/Graphics.GpuScene.cppm` | `Graphics` |
+| `Extrinsic.Graphics.GpuWorld` | `src_new/Graphics/Graphics.GpuWorld.cppm` | `Graphics` |
 | `Extrinsic.Graphics.LightSystem` | `src_new/Graphics/Graphics.LightSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Material` | `src_new/Graphics/Graphics.Material.cppm` | `Graphics` |
 | `Extrinsic.Graphics.MaterialSystem` | `src_new/Graphics/Graphics.MaterialSystem.cppm` | `Graphics` |
@@ -123,4 +129,4 @@ _Generated on 2026-04-24 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Runtime.Engine` | `src_new/Runtime/Runtime.Engine.cppm` | `Runtime` |
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `Runtime` |
 
-Total modules: **118**
+Total modules: **124**

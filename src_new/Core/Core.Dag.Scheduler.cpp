@@ -58,6 +58,7 @@ namespace Extrinsic::Core::Dag
 
             std::vector<uint32_t> inDegree(N, 0);
             std::vector<std::vector<std::size_t>> successors(N);
+            std::vector<std::vector<std::size_t>> predecessors(N);
             for (std::size_t i = 0; i < N; ++i)
             {
                 for (const auto dep : tasks[i].dependsOn)
@@ -66,6 +67,7 @@ namespace Extrinsic::Core::Dag
                     if (depIt == idToIndex.end())
                         return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
                     successors[depIt->second].push_back(i);
+                    predecessors[i].push_back(depIt->second);
                     inDegree[i] += 1;
                     outStats.edgeCount += 1;
                 }
@@ -102,6 +104,16 @@ namespace Extrinsic::Core::Dag
                 for (const auto v : successors[u])
                     maxSucc = std::max(maxSucc, level[v]);
                 level[u] = tasks[u].desc.estimatedCost + maxSucc;
+            }
+
+
+            std::vector<uint32_t> topoLayer(N, 0);
+            for (const auto nodeIndex : topo)
+            {
+                uint32_t nodeLayer = 0;
+                for (const auto predIndex : predecessors[nodeIndex])
+                    nodeLayer = std::max(nodeLayer, topoLayer[predIndex] + 1);
+                topoLayer[nodeIndex] = nodeLayer;
             }
 
             outStats.criticalPathCost = 0;
@@ -173,7 +185,7 @@ namespace Extrinsic::Core::Dag
                     .domain = task.domain,
                     .lane = lane,
                     .topoOrder = order++,
-                    .batch = static_cast<uint32_t>(task.priority),
+                    .batch = topoLayer[entry.index],
                 });
 
                 for (const auto v : successors[entry.index])

@@ -5,6 +5,7 @@ intrinsic_test_object_lib(ExtrinsicCoreTestObjs
         Test.Core.Filesystem.cpp
         Test.Core.CallbackRegistry.cpp
         Test.Core.DagScheduler.cpp
+        Test.Core.GraphCompiler.cpp
         Test.Core.GraphInterfaces.cpp
         Test.Core.Config.cpp
         Test.Core.Error.cpp
