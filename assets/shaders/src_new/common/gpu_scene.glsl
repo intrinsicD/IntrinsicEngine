@@ -97,6 +97,31 @@ struct GpuEntityConfig {
     vec4 UniformColor;
 };
 
+
+struct GpuMaterialSlot {
+    vec4 BaseColorFactor;
+    float MetallicFactor;
+    float RoughnessFactor;
+    uint AlbedoID;
+    uint NormalID;
+    uint MetallicRoughnessID;
+    uint EmissiveID;
+    uint MaterialTypeID;
+    uint Flags;
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
+    uint _pad3;
+    vec4 CustomData[4];
+};
+
+struct GpuLight {
+    vec4 Position_Range;
+    vec4 Direction_Type;
+    vec4 Color_Intensity;
+    vec4 Params;
+};
+
 struct GpuBounds {
     vec4 LocalSphere;
     vec4 WorldSphere;
@@ -141,6 +166,15 @@ layout(buffer_reference, scalar) readonly buffer GpuEntityConfigRef {
 
 layout(buffer_reference, scalar) readonly buffer GpuBoundsRef {
     GpuBounds Data[];
+};
+
+
+layout(buffer_reference, scalar) readonly buffer GpuMaterialSlotRef {
+    GpuMaterialSlot Data[];
+};
+
+layout(buffer_reference, scalar) readonly buffer GpuLightRef {
+    GpuLight Data[];
 };
 
 layout(buffer_reference, scalar) buffer GpuDrawIndexedCommandRef {
