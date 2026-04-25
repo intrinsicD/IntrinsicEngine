@@ -402,3 +402,72 @@ TEST(CoreGraphCompiler, ResourceHazardsContributeToEdgeStats)
     ASSERT_TRUE(plan.has_value());
     EXPECT_GE(scheduler->GetLastStats().edgeCount, 1u);
 }
+
+TEST(CoreGraphCompiler, DomainTaskGraphReportsExplicitAndHazardEdgeStats)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId a{200, 1};
+    const TaskId b{201, 1};
+    const TaskId c{202, 1};
+    const ResourceId resource{20, 1};
+    const std::array<TaskId, 1> depB{a};
+    const std::array<ResourceAccess, 1> writeAccess{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+    const std::array<ResourceAccess, 1> readAccess{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = a, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+        .id = b,
+        .domain = QueueDomain::Cpu,
+        .dependsOn = std::span<const TaskId>(depB),
+    }).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = c, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+
+    const auto plan = graph->BuildPlan(BuildConfig{});
+    ASSERT_TRUE(plan.has_value());
+
+    const auto stats = graph->GetLastStats();
+    EXPECT_EQ(stats.taskCount, 3u);
+    EXPECT_EQ(stats.explicitEdgeCount, 1u);
+    EXPECT_EQ(stats.hazardEdgeCount, 1u);
+    EXPECT_EQ(stats.edgeCount, stats.explicitEdgeCount + stats.hazardEdgeCount);
+    EXPECT_GE(stats.layerCount, 2u);
+}
+
+TEST(CoreGraphCompiler, DomainTaskGraphLaneAssignmentRespectsQueueBudgets)
+{
+    constexpr uint32_t kTaskCount = 6;
+    const BuildConfig config{
+        .queueBudgetCpu = 2,
+        .queueBudgetGpu = 3,
+        .queueBudgetStreaming = 4,
+    };
+
+    auto assertLaneCycling = [&](const QueueDomain domain, const uint32_t expectedLaneModulus)
+    {
+        auto graph = CreateDomainTaskGraph(domain);
+        ASSERT_NE(graph, nullptr);
+
+        for (uint32_t i = 0; i < kTaskCount; ++i)
+        {
+            ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+                .id = TaskId{1000u + static_cast<uint32_t>(domain) * 100u + i, 1},
+                .domain = domain,
+            }).has_value());
+        }
+
+        const auto plan = graph->BuildPlan(config);
+        ASSERT_TRUE(plan.has_value());
+        ASSERT_EQ(plan->size(), kTaskCount);
+
+        for (uint32_t i = 0; i < kTaskCount; ++i)
+            EXPECT_LT((*plan)[i].lane, expectedLaneModulus);
+    };
+
+    assertLaneCycling(QueueDomain::Cpu, config.queueBudgetCpu);
+    assertLaneCycling(QueueDomain::Gpu, config.queueBudgetGpu);
+    assertLaneCycling(QueueDomain::Streaming, config.queueBudgetStreaming);
+}
