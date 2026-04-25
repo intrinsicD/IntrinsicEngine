@@ -2304,7 +2304,7 @@ In `ExecuteFrame`:
 
 ## Phase 15 — Tests and validation
 
-### TODO 15.1 — Compile tests
+### TODO 15.1 — Compile tests — **Done**
 
 Add or update tests so these compile:
 
@@ -2317,7 +2317,7 @@ static_assert(sizeof(RHI::GpuBounds) == 64);
 static_assert(sizeof(RHI::GpuLight) == 64);
 ```
 
-### TODO 15.2 — Null backend test
+### TODO 15.2 — Null backend test — **Done**
 
 Create a test that:
 
@@ -2332,7 +2332,7 @@ Create a test that:
 9. Calls `SyncFrame()`.
 10. Shuts down cleanly.
 
-### TODO 15.3 — Culling CPU-side smoke test
+### TODO 15.3 — Culling CPU-side smoke test — **Done**
 
 With Null backend, ensure:
 
