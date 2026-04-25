@@ -98,7 +98,10 @@ export namespace Extrinsic::Core::Dag
     {
         uint32_t producerCount = 0;
         uint32_t taskCount = 0;
+        uint32_t explicitEdgeCount = 0;
+        uint32_t hazardEdgeCount = 0;
         uint32_t edgeCount = 0;
+        uint32_t layerCount = 0;
         uint32_t criticalPathCost = 0;
         uint32_t maxReadyQueueDepth = 0;
         std::string lastDiagnostic{};

@@ -2794,25 +2794,25 @@ Hazard rules:
 
 **Tasks:**
 
-- [ ] Route explicit dependencies into compiler edges.
-- [ ] Route `PendingTaskDesc::resources` into `ResourceHazardBuilder`.
-- [ ] Preserve priority and queue-budget lane assignment.
-- [ ] Preserve stable deterministic ready-set ordering.
+- [x] Route explicit dependencies into compiler edges.
+- [x] Route `PendingTaskDesc::resources` into `ResourceHazardBuilder`.
+- [x] Preserve priority and queue-budget lane assignment.
+- [x] Preserve stable deterministic ready-set ordering.
 - [ ] Report accurate `ScheduleStats`:
-  - [ ] task count;
-  - [ ] explicit edge count;
-  - [ ] hazard edge count;
-  - [ ] total edge count;
-  - [ ] topological layer count;
-  - [ ] critical path cost;
-  - [ ] max ready queue width.
+  - [x] task count;
+  - [x] explicit edge count;
+  - [x] hazard edge count;
+  - [x] total edge count;
+  - [x] topological layer count;
+  - [x] critical path cost;
+  - [x] max ready queue width.
 
 **Tests:**
 
 - [ ] Existing `Test.Core.DagScheduler.cpp` still passes.
-- [ ] Add raw `DomainTaskGraph` tests for resource hazards.
-- [ ] Add stats tests checking edge counts and layer counts.
-- [ ] Add lane assignment tests for CPU, GPU, and Streaming budgets.
+- [x] Add raw `DomainTaskGraph` tests for resource hazards.
+- [x] Add stats tests checking edge counts and layer counts.
+- [x] Add lane assignment tests for CPU, GPU, and Streaming budgets.
 
 ## T015 — Refactor `TaskGraph` through shared compiler
 

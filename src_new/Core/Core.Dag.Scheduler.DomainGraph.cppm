@@ -17,6 +17,7 @@ export namespace Extrinsic::Core::Dag
         virtual ~DomainTaskGraph() = default;
         virtual Result Submit(const PendingTaskDesc& task) = 0;
         [[nodiscard]] virtual Expected<std::vector<PlanTask>> BuildPlan(const BuildConfig& config) = 0;
+        [[nodiscard]] virtual ScheduleStats GetLastStats() const = 0;
         [[nodiscard]] virtual QueueDomain Domain() const noexcept = 0;
         virtual void Reset() = 0;
     };

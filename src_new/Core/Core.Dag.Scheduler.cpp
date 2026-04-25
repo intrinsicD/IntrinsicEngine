@@ -103,6 +103,10 @@ namespace Extrinsic::Core::Dag
                 predecessors[to].push_back(from);
                 inDegree[to] += 1;
                 outStats.edgeCount += 1;
+                if (reason == EdgeReason::ExplicitDependency)
+                    outStats.explicitEdgeCount += 1;
+                else
+                    outStats.hazardEdgeCount += 1;
                 edgeReasons.emplace(key, reason);
             };
             for (std::size_t i = 0; i < N; ++i)
@@ -248,13 +252,16 @@ namespace Extrinsic::Core::Dag
 
 
             std::vector<uint32_t> topoLayer(N, 0);
+            uint32_t maxLayer = 0;
             for (const auto nodeIndex : topo)
             {
                 uint32_t nodeLayer = 0;
                 for (const auto predIndex : predecessors[nodeIndex])
                     nodeLayer = std::max(nodeLayer, topoLayer[predIndex] + 1);
                 topoLayer[nodeIndex] = nodeLayer;
+                maxLayer = std::max(maxLayer, nodeLayer);
             }
+            outStats.layerCount = maxLayer + 1;
 
             outStats.criticalPathCost = 0;
             for (std::size_t i = 0; i < N; ++i)
@@ -481,6 +488,8 @@ namespace Extrinsic::Core::Dag
                 m_LastStats = {};
                 return BuildPlanFromTasks(m_Tasks, config, m_LastStats);
             }
+
+            ScheduleStats GetLastStats() const override { return m_LastStats; }
 
             QueueDomain Domain() const noexcept override { return m_Domain; }
 
