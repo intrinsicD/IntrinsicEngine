@@ -23,6 +23,16 @@ endif()
 
 include(FetchContent)
 
+if(UNIX AND NOT APPLE AND NOT EXISTS "/usr/include/X11/extensions/Xrandr.h")
+    if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+        message(WARNING
+            "X11 RandR headers were not found at /usr/include/X11/extensions/Xrandr.h. "
+            "Enabling INTRINSIC_HEADLESS_NO_GLFW to keep non-windowing modules buildable."
+        )
+    endif()
+    set(INTRINSIC_HEADLESS_NO_GLFW ON CACHE BOOL "" FORCE)
+endif()
+
 if(INTRINSIC_OFFLINE_DEPS)
     set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "Disable all FetchContent network updates" FORCE)
     message(STATUS "INTRINSIC_OFFLINE_DEPS=ON: using only local dependency sources")
@@ -101,33 +111,39 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/glfw/glfw.git
         GIT_TAG 3.3.9
 )
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-intrinsic_make_available(glfw)
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    intrinsic_make_available(glfw)
+else()
+    add_library(glfw INTERFACE)
+endif()
 
-# --- Volk (Vulkan Meta Loader) ---
-# Pin to stable commit instead of master
-FetchContent_Declare(
-        volk
-        GIT_REPOSITORY https://github.com/zeux/volk.git
-        GIT_TAG vulkan-sdk-1.3.268.0
-)
-intrinsic_make_available(volk)
-find_package(Vulkan REQUIRED)
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    # --- Volk (Vulkan Meta Loader) ---
+    # Pin to stable commit instead of master
+    FetchContent_Declare(
+            volk
+            GIT_REPOSITORY https://github.com/zeux/volk.git
+            GIT_TAG vulkan-sdk-1.3.268.0
+    )
+    intrinsic_make_available(volk)
+    find_package(Vulkan REQUIRED)
 
-# VulkanMemoryAllocator is header-only for engine usage.
-# Disable its sample targets to avoid toolchain-specific libc header issues.
-set(VMA_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
-set(VMA_STATIC_VULKAN_FUNCTIONS ON CACHE BOOL "" FORCE)
+    # VulkanMemoryAllocator is header-only for engine usage.
+    # Disable its sample targets to avoid toolchain-specific libc header issues.
+    set(VMA_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(VMA_STATIC_VULKAN_FUNCTIONS ON CACHE BOOL "" FORCE)
 
-FetchContent_Declare(
-        vma
-        GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-        GIT_TAG v3.1.0
-)
+    FetchContent_Declare(
+            vma
+            GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+            GIT_TAG v3.1.0
+    )
 
-intrinsic_make_available(vma)
+    intrinsic_make_available(vma)
+endif()
 
 
 # Pin STB to specific commit for reproducible builds
@@ -200,12 +216,14 @@ if(NOT imgui_POPULATED)
     FetchContent_Populate(imgui)
 endif()
 
-FetchContent_Declare(
-        imguizmo
-        GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
-)
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    FetchContent_Declare(
+            imguizmo
+            GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
+    )
 
-intrinsic_make_available(imguizmo)
+    intrinsic_make_available(imguizmo)
+endif()
 
 # Prefer the path returned by FetchContent_Populate; fall back to our offline cache layout.
 set(IMGUI_SOURCE_DIR "${imgui_SOURCE_DIR}")
@@ -223,12 +241,14 @@ if(NOT IS_DIRECTORY "${IMGUI_SOURCE_DIR}" OR NOT EXISTS "${IMGUI_SOURCE_DIR}/img
     )
 endif()
 
-if("${IMGUIZMO_SOURCE_DIR}" STREQUAL "")
-    set(IMGUIZMO_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/imguizmo-src")
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    if("${IMGUIZMO_SOURCE_DIR}" STREQUAL "")
+        set(IMGUIZMO_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/imguizmo-src")
+    endif()
 endif()
 
 
-if(NOT IS_DIRECTORY "${IMGUIZMO_SOURCE_DIR}" OR NOT EXISTS "${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp")
+if(NOT INTRINSIC_HEADLESS_NO_GLFW AND (NOT IS_DIRECTORY "${IMGUIZMO_SOURCE_DIR}" OR NOT EXISTS "${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp"))
     message(FATAL_ERROR
         "ImGuizmo sources not found. Expected at: ${IMGUIZMO_SOURCE_DIR}\n"
         "Missing file: ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp\n"
@@ -238,22 +258,24 @@ endif()
 
 # Create a library for ImGui to make linking easier
 # We also include the backend sources for GLFW and Vulkan
-add_library(imgui_lib STATIC
-        ${IMGUI_SOURCE_DIR}/imgui.cpp
-        ${IMGUI_SOURCE_DIR}/imgui_demo.cpp
-        ${IMGUI_SOURCE_DIR}/imgui_draw.cpp
-        ${IMGUI_SOURCE_DIR}/imgui_tables.cpp
-        ${IMGUI_SOURCE_DIR}/imgui_widgets.cpp
-        ${IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-        ${IMGUI_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
-)
-target_include_directories(imgui_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
-target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
-target_link_libraries(imgui_lib PUBLIC glfw volk)
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    add_library(imgui_lib STATIC
+            ${IMGUI_SOURCE_DIR}/imgui.cpp
+            ${IMGUI_SOURCE_DIR}/imgui_demo.cpp
+            ${IMGUI_SOURCE_DIR}/imgui_draw.cpp
+            ${IMGUI_SOURCE_DIR}/imgui_tables.cpp
+            ${IMGUI_SOURCE_DIR}/imgui_widgets.cpp
+            ${IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+            ${IMGUI_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+    )
+    target_include_directories(imgui_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
+    target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
+    target_link_libraries(imgui_lib PUBLIC glfw volk)
 
-add_library(imguizmo_lib STATIC
-        ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp
-)
-target_include_directories(imguizmo_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends ${IMGUIZMO_SOURCE_DIR})
-target_compile_definitions(imguizmo_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
-target_link_libraries(imguizmo_lib PUBLIC imgui_lib)
+    add_library(imguizmo_lib STATIC
+            ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp
+    )
+    target_include_directories(imguizmo_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends ${IMGUIZMO_SOURCE_DIR})
+    target_compile_definitions(imguizmo_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
+    target_link_libraries(imguizmo_lib PUBLIC imgui_lib)
+endif()
