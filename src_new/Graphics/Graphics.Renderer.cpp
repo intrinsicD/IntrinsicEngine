@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <entt/entity/registry.hpp>
 
 module Extrinsic.Graphics.Renderer;
 
@@ -13,6 +14,8 @@ import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
+import Extrinsic.Graphics.ColormapSystem;
+import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.SelectionSystem;
@@ -20,6 +23,7 @@ import Extrinsic.Graphics.ForwardSystem;
 import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
+import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 
@@ -38,6 +42,12 @@ namespace Extrinsic::Graphics
             m_GpuWorld->Initialize(device, *m_BufferManager);
             m_MaterialSystem .emplace();
             m_MaterialSystem->Initialize(device, *m_BufferManager);
+            m_ColormapSystem.emplace();
+            m_ColormapSystem->Initialize(device, *m_TextureManager);
+            m_VisualizationSyncSystem.emplace();
+            m_VisualizationSyncSystem->Initialize(*m_MaterialSystem, device);
+            m_TransformSyncSystem.emplace();
+            m_TransformSyncSystem->Initialize();
             m_GpuWorld->SetMaterialBuffer(
                 m_MaterialSystem->GetBuffer(),
                 m_MaterialSystem->GetCapacity());
@@ -67,6 +77,9 @@ namespace Extrinsic::Graphics
             if (m_PostProcessSystem) m_PostProcessSystem->Shutdown();
             if (m_ShadowSystem)    m_ShadowSystem->Shutdown();
             if (m_CullingSystem)   m_CullingSystem->Shutdown();
+            if (m_TransformSyncSystem) m_TransformSyncSystem->Shutdown();
+            if (m_VisualizationSyncSystem) m_VisualizationSyncSystem->Shutdown();
+            if (m_ColormapSystem)  m_ColormapSystem->Shutdown();
             if (m_GpuWorld)        m_GpuWorld->Shutdown();
             if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
 
@@ -77,6 +90,9 @@ namespace Extrinsic::Graphics
             m_PostProcessSystem.reset();
             m_ShadowSystem   .reset();
             m_CullingSystem  .reset();
+            m_TransformSyncSystem.reset();
+            m_VisualizationSyncSystem.reset();
+            m_ColormapSystem .reset();
             m_GpuWorld       .reset();
             m_MaterialSystem .reset();
             m_PipelineManager.reset();
@@ -107,10 +123,25 @@ namespace Extrinsic::Graphics
 
         void PrepareFrame(RenderWorld&) override
         {
-            // Sync CPU-side GPU resources (pipeline cache, material SSBO,
-            // GPU scene SSBO).  No actual culling without a camera UBO.
+            // Phase 14.1 sync order contract:
+            //  1) commit pipelines
+            //  2) flush base materials
+            //  3) resolve visualization overrides + write GpuEntityConfig
+            //  4) flush override material deltas
+            //  5) write instance transforms/material slots/flags/bounds
+            //  6) write lights
+            //  7) refresh scene table material binding
+            //  8) upload GpuWorld dirty ranges
             m_PipelineManager->CommitPending();
             m_MaterialSystem->SyncGpuBuffer();
+            m_VisualizationSyncSystem->Sync(
+                m_SyncRegistry,
+                *m_MaterialSystem,
+                *m_ColormapSystem,
+                *m_GpuWorld);
+            m_MaterialSystem->SyncGpuBuffer();
+            m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
+            m_LightSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
             m_GpuWorld->SetMaterialBuffer(
                 m_MaterialSystem->GetBuffer(),
                 m_MaterialSystem->GetCapacity());
@@ -121,7 +152,20 @@ namespace Extrinsic::Graphics
         void ExecuteFrame(const RHI::FrameHandle&,
                           const RenderWorld&) override
         {
-            // No command recording in the null backend.
+            // Phase 14.2 GPU order is intentionally fixed for concrete
+            // backends:
+            //   1) culling counter reset
+            //   2) culling dispatch
+            //   3) depth prepass (optional)
+            //   4) gbuffer
+            //   5) shadows
+            //   6) deferred lighting
+            //   7) forward lines
+            //   8) forward points
+            //   9) selection/outline
+            //  10) postprocess/present
+            //
+            // Null backend records no commands.
         }
 
         std::uint64_t EndFrame(const RHI::FrameHandle&) override
@@ -139,7 +183,10 @@ namespace Extrinsic::Graphics
         RHI::PipelineManager& GetPipelineManager() override { return *m_PipelineManager; }
         GpuWorld&             GetGpuWorld()        override { return *m_GpuWorld;        }
         MaterialSystem&        GetMaterialSystem()  override { return *m_MaterialSystem;  }
+        ColormapSystem&        GetColormapSystem()  override { return *m_ColormapSystem;  }
+        VisualizationSyncSystem& GetVisualizationSyncSystem() override { return *m_VisualizationSyncSystem; }
         CullingSystem&         GetCullingSystem()   override { return *m_CullingSystem;   }
+        TransformSyncSystem&   GetTransformSyncSystem() override { return *m_TransformSyncSystem; }
         LightSystem&           GetLightSystem()     override { return *m_LightSystem;     }
         SelectionSystem&       GetSelectionSystem() override { return *m_SelectionSystem; }
         ForwardSystem&         GetForwardSystem()   override { return *m_ForwardSystem;   }
@@ -154,13 +201,17 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager> m_PipelineManager;
         std::optional<GpuWorld>              m_GpuWorld;
         std::optional<MaterialSystem>        m_MaterialSystem;
+        std::optional<ColormapSystem>        m_ColormapSystem;
+        std::optional<VisualizationSyncSystem> m_VisualizationSyncSystem;
         std::optional<CullingSystem>         m_CullingSystem;
+        std::optional<TransformSyncSystem>   m_TransformSyncSystem;
         std::optional<LightSystem>           m_LightSystem;
         std::optional<SelectionSystem>       m_SelectionSystem;
         std::optional<ForwardSystem>         m_ForwardSystem;
         std::optional<DeferredSystem>        m_DeferredSystem;
         std::optional<PostProcessSystem>     m_PostProcessSystem;
         std::optional<ShadowSystem>          m_ShadowSystem;
+        entt::registry                       m_SyncRegistry;
     };
 
     std::unique_ptr<IRenderer> CreateRenderer()

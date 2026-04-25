@@ -2237,13 +2237,13 @@ for (uint i = 0; i < scene.LightCount; ++i) {
 
 ---
 
-## Phase 14 — Renderer frame order
+## Phase 14 — Renderer frame order — **Complete**
 
 ### File
 
 * `src_new/Graphics/Graphics.Renderer.cpp`
 
-### TODO 14.1 — Enforce sync order
+### TODO 14.1 — Enforce sync order — **Done**
 
 Use this order in `PrepareFrame` or equivalent render preparation:
 
@@ -2277,7 +2277,7 @@ m_GpuWorld->SyncFrame();
 
 Adapt for the actual place where `registry` is available.
 
-### TODO 14.2 — GPU command order
+### TODO 14.2 — GPU command order — **Done**
 
 In `ExecuteFrame`:
 
