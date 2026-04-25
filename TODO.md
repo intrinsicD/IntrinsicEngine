@@ -1978,7 +1978,7 @@ PointArgs[outIndex].firstInstance = slot;
 
 ---
 
-## Phase 11 — Update draw passes to consume buckets
+## Phase 11 — Update draw passes to consume buckets — **Complete**
 
 ### Files
 
@@ -1991,7 +1991,7 @@ PointArgs[outIndex].firstInstance = slot;
 * `src_new/Graphics/Passes/Pass.Shadows.cppm`
 * `src_new/Graphics/Passes/Pass.Shadows.cpp`
 
-### TODO 11.1 — GBuffer pass uses surface bucket
+### TODO 11.1 — GBuffer pass uses surface bucket — **Done**
 
 In GBuffer pass:
 
@@ -2019,7 +2019,7 @@ cmd.DrawIndexedIndirectCount(
     bucket.Capacity);
 ```
 
-### TODO 11.2 — Line pass uses line bucket
+### TODO 11.2 — Line pass uses line bucket — **Done**
 
 ```cpp
 const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Lines);
@@ -2038,7 +2038,7 @@ cmd.DrawIndexedIndirectCount(
     bucket.Capacity);
 ```
 
-### TODO 11.3 — Point pass uses non-indexed point bucket
+### TODO 11.3 — Point pass uses non-indexed point bucket — **Done**
 
 ```cpp
 const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Points);
@@ -2053,7 +2053,7 @@ cmd.DrawIndirectCount(
     bucket.Capacity);
 ```
 
-### TODO 11.4 — Shadow pass uses shadow bucket
+### TODO 11.4 — Shadow pass uses shadow bucket — **Done**
 
 ```cpp
 const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::ShadowOpaque);
