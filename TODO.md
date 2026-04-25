@@ -2704,37 +2704,37 @@ struct ResourceState {
 
 Hazard rules:
 
-- [ ] `Read(node, R)`:
-  - [ ] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
-  - [ ] Add `node` to `CurrentReaders(R)`.
+- [x] `Read(node, R)`:
+  - [x] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
+  - [x] Add `node` to `CurrentReaders(R)`.
 - [ ] `WeakRead(node, R)`:
   - [ ] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
   - [ ] Do not add `node` to `CurrentReaders(R)`.
-- [ ] `Write(node, R)`:
-  - [ ] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
-  - [ ] For each reader in `CurrentReaders(R)`, emit `reader -> node`.
-  - [ ] Clear `CurrentReaders(R)`.
-  - [ ] Set `LastWriter(R) = node`.
-- [ ] Deduplicate emitted edges.
-- [ ] Keep RAR parallelism: two pure readers of the same resource must not create an edge.
+- [x] `Write(node, R)`:
+  - [x] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
+  - [x] For each reader in `CurrentReaders(R)`, emit `reader -> node`.
+  - [x] Clear `CurrentReaders(R)`.
+  - [x] Set `LastWriter(R) = node`.
+- [x] Deduplicate emitted edges.
+- [x] Keep RAR parallelism: two pure readers of the same resource must not create an edge.
 
 **Tests to add in `Test.Core.ResourceHazards.cpp` or `Test.Core.GraphCompiler.cpp`:**
 
-- [ ] RAW: write then read serializes writer before reader.
-- [ ] WAW: write then write serializes first writer before second writer.
-- [ ] WAR: read then write serializes reader before writer.
-- [ ] RAR: read then read remains parallel/same layer.
+- [x] RAW: write then read serializes writer before reader.
+- [x] WAW: write then write serializes first writer before second writer.
+- [x] WAR: read then write serializes reader before writer.
+- [x] RAR: read then read remains parallel/same layer.
 - [ ] WeakRead then Write does not force writer to wait for weak reader.
 - [ ] Write then WeakRead forces weak reader after writer.
-- [ ] Multiple readers then writer emits all reader edges.
+- [x] Multiple readers then writer emits all reader edges.
 - [ ] Duplicate accesses do not duplicate edge count.
 - [ ] 10,000-node hazard stress test completes deterministically.
 
 **Acceptance criteria:**
 
-- [ ] `PendingTaskDesc::resources` affects scheduling.
-- [ ] `DomainTaskGraph` no longer ignores resource declarations.
-- [ ] Edge count in `ScheduleStats` includes hazard edges.
+- [x] `PendingTaskDesc::resources` affects scheduling.
+- [x] `DomainTaskGraph` no longer ignores resource declarations.
+- [x] Edge count in `ScheduleStats` includes hazard edges.
 
 ## T012 — Implement real label signal/wait handling
 

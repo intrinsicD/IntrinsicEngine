@@ -4,6 +4,7 @@ module;
 #include <memory>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <span>
 
@@ -59,6 +60,24 @@ namespace Extrinsic::Core::Dag
             std::vector<uint32_t> inDegree(N, 0);
             std::vector<std::vector<std::size_t>> successors(N);
             std::vector<std::vector<std::size_t>> predecessors(N);
+            std::unordered_set<uint64_t> seenEdges{};
+            seenEdges.reserve(N * 2);
+            const auto encodeEdge = [](std::size_t from, std::size_t to) noexcept -> uint64_t
+            {
+                return (static_cast<uint64_t>(from) << 32) | static_cast<uint64_t>(to);
+            };
+            const auto addEdge = [&](std::size_t from, std::size_t to)
+            {
+                if (from == to)
+                    return;
+                const uint64_t key = encodeEdge(from, to);
+                if (!seenEdges.insert(key).second)
+                    return;
+                successors[from].push_back(to);
+                predecessors[to].push_back(from);
+                inDegree[to] += 1;
+                outStats.edgeCount += 1;
+            };
             for (std::size_t i = 0; i < N; ++i)
             {
                 for (const auto dep : tasks[i].dependsOn)
@@ -66,12 +85,19 @@ namespace Extrinsic::Core::Dag
                     const auto depIt = idToIndex.find(dep);
                     if (depIt == idToIndex.end())
                         return Err<std::vector<PlanTask>>(ErrorCode::InvalidArgument);
-                    successors[depIt->second].push_back(i);
-                    predecessors[i].push_back(depIt->second);
-                    inDegree[i] += 1;
-                    outStats.edgeCount += 1;
+                    addEdge(depIt->second, i);
                 }
             }
+
+            std::vector<PendingTaskDesc> hazardTaskView{};
+            hazardTaskView.reserve(N);
+            for (const auto& task : tasks)
+                hazardTaskView.push_back(task.desc);
+
+            const ResourceHazardBuilder hazardBuilder{};
+            const auto hazardEdges = hazardBuilder.Build(hazardTaskView);
+            for (const auto& edge : hazardEdges)
+                addEdge(edge.from, edge.to);
 
             // Pass 2: topological pre-pass. Also detects cycles.
             std::vector<std::size_t> topo;
