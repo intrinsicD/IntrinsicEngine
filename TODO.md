@@ -2078,7 +2078,7 @@ cmd.DrawIndexedIndirectCount(
 
 ---
 
-## Phase 12 — Add BDA-driven vertex shaders
+## Phase 12 — Add BDA-driven vertex shaders — **Complete**
 
 ### Files to add/edit
 
@@ -2090,7 +2090,9 @@ cmd.DrawIndexedIndirectCount(
 * `shaders/src_new/forward/point.vert`
 * `shaders/src_new/forward/point.frag`
 
-### TODO 12.1 — Vertex fetch contract
+### TODO 12.1 — **Done**
+
+Vertex fetch contract
 
 For indexed draws, the shader must use:
 
@@ -2125,14 +2127,18 @@ vec4 uv_pad
 
 Do this only if required by compiler/validation.
 
-### TODO 12.2 — Transform
+### TODO 12.2 — **Done**
+
+Transform
 
 ```glsl
 vec4 worldPos = dyn.Model * vec4(localPos, 1.0);
 gl_Position = Camera.ViewProj * worldPos;
 ```
 
-### TODO 12.3 — Material fetch
+### TODO 12.3 — **Done**
+
+Material fetch
 
 Fragment shader:
 
@@ -2142,7 +2148,9 @@ GpuMaterialSlot mat = Materials[inst.MaterialSlot];
 GpuEntityConfig cfg = EntityConfigs[inst.ConfigSlot];
 ```
 
-### TODO 12.4 — Sci-vis fetch
+### TODO 12.4 — **Done**
+
+Sci-vis fetch
 
 If material type is SciVis or `cfg.ColorSourceMode != 0`:
 
@@ -2152,7 +2160,9 @@ ColorSourceMode 2 -> cfg.ScalarBDA + cfg.ColormapID
 ColorSourceMode 3 -> cfg.ColorBDA
 ```
 
-### TODO 12.5 — Entity ID output
+### TODO 12.5 — **Done**
+
+Entity ID output
 
 GBuffer pass writes:
 
