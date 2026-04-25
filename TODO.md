@@ -2556,19 +2556,29 @@ Where a target name differs in the local checkout, update the commands in the PR
 
 **Tasks:**
 
-- [ ] Inspect `src_new/Core/Core.Dag.Scheduler.*`.
-- [ ] Inspect `src_new/Core/Core.Dag.TaskGraph.*`.
-- [ ] Inspect `src_new/Core/Core.FrameGraph.*`.
-- [ ] Inspect `src_new/Runtime/Runtime.Engine.*`.
-- [ ] Inspect `src_new/Graphics/Graphics.Renderer.*`.
-- [ ] Inspect `src_new/Graphics/RHI/*CommandContext*`, `RHI.Types`, `RHI.Device`, and backend command APIs.
-- [ ] Inspect `tests/Core/CMakeLists.txt`, `tests/Graphics/CMakeLists.txt`, and whether `tests/Runtime` exists.
-- [ ] Record in the PR description which tasks are missing, partial, or already complete.
+- [x] Inspect `src_new/Core/Core.Dag.Scheduler.*`.
+- [x] Inspect `src_new/Core/Core.Dag.TaskGraph.*`.
+- [x] Inspect `src_new/Core/Core.FrameGraph.*`.
+- [x] Inspect `src_new/Runtime/Runtime.Engine.*`.
+- [x] Inspect `src_new/Graphics/Graphics.Renderer.*`.
+- [x] Inspect `src_new/Graphics/RHI/*CommandContext*`, `RHI.Types`, `RHI.Device`, and backend command APIs.
+- [x] Inspect `tests/Core/CMakeLists.txt`, `tests/Graphics/CMakeLists.txt`, and whether `tests/Runtime` exists.
+- [x] Record in the PR description which tasks are missing, partial, or already complete.
 
 **Acceptance criteria:**
 
-- [ ] The PR notes include a concise current-state matrix for Core scheduler, TaskGraph, FrameGraph, Runtime streaming, and Graphics renderer.
-- [ ] No behavior changes are made in this task.
+- [x] The PR notes include a concise current-state matrix for Core scheduler, TaskGraph, FrameGraph, Runtime streaming, and Graphics renderer.
+- [x] No behavior changes are made in this task.
+
+Current-state matrix (T000 audit):
+
+| Area | Current state | Status |
+|---|---|---|
+| Core scheduler (`Core.Dag.Scheduler`) | Has producer registration/query, topological build, priority/critical-path heuristics, lane assignment; resource hazards currently cached but not integrated into edge building. | Partial |
+| Core `TaskGraph` | Supports pass setup + resource declarations + label wait/signal + compile/execute/reset; execute is layer-sequential fallback; compiler path is independent from scheduler substrate. | Partial |
+| Core `FrameGraph` | Thin CPU-domain wrapper over `TaskGraph` with typed read/write forwarding; no structural ECS tokens yet. | Partial |
+| Runtime streaming | Uses frame-local `TaskGraph(Streaming)` tick that compiles/builds/dispatches and resets each frame; shutdown currently drains via global `Scheduler::WaitForAll()`. | Missing persistent executor |
+| Graphics renderer | Has renderer lifecycle and RHI integration; does not yet expose a dedicated `Graphics.RenderGraph` module partition set. | Partial |
 
 **Validation:**
 
@@ -2582,35 +2592,35 @@ Where a target name differs in the local checkout, update the commands in the PR
 
 **Files:**
 
-- [ ] Add `docs/architecture/src_new-task-graphs.md`.
+- [x] Add `docs/architecture/src_new-task-graphs.md`.
 - [ ] Update `src_new/Core/README.md` if public Core graph APIs change.
 - [ ] Update `src_new/Graphics/README.md` when `Graphics.RenderGraph` is added.
 - [ ] Update `src_new/Runtime/README.md` when runtime integration changes.
 
 **Document must define:**
 
-- [ ] CPU task graph vs GPU render graph vs async streaming graph.
-- [ ] Shared graph compiler substrate.
-- [ ] Why `Graphics.RenderGraph` is not just `Core.TaskGraph` with `QueueDomain::Gpu`.
-- [ ] Graph lifecycle states: `Recording -> Compiled -> Executing/Consumed -> Reset`.
-- [ ] Resource hazard semantics: RAW, WAW, WAR, RAR.
-- [ ] Label signal/wait semantics.
-- [ ] CPU execution contract and graph-local completion.
-- [ ] Streaming persistence/cancellation contract.
-- [ ] GPU render graph resource, barrier, and aliasing contract.
-- [ ] Phase boundaries in `Engine::RunFrame`.
-- [ ] Test strategy and review gates.
+- [x] CPU task graph vs GPU render graph vs async streaming graph.
+- [x] Shared graph compiler substrate.
+- [x] Why `Graphics.RenderGraph` is not just `Core.TaskGraph` with `QueueDomain::Gpu`.
+- [x] Graph lifecycle states: `Recording -> Compiled -> Executing/Consumed -> Reset`.
+- [x] Resource hazard semantics: RAW, WAW, WAR, RAR.
+- [x] Label signal/wait semantics.
+- [x] CPU execution contract and graph-local completion.
+- [x] Streaming persistence/cancellation contract.
+- [x] GPU render graph resource, barrier, and aliasing contract.
+- [x] Phase boundaries in `Engine::RunFrame`.
+- [x] Test strategy and review gates.
 
 **Acceptance criteria:**
 
-- [ ] The document is specific enough that a contributor can implement the APIs without reading legacy `src` internals.
-- [ ] The document explicitly forbids runtime pass-level render branching and GPU-resource manipulation in `Runtime`.
-- [ ] The document lists required tests for Core, Runtime/Streaming, and Graphics.
+- [x] The document is specific enough that a contributor can implement the APIs without reading legacy `src` internals.
+- [x] The document explicitly forbids runtime pass-level render branching and GPU-resource manipulation in `Runtime`.
+- [x] The document lists required tests for Core, Runtime/Streaming, and Graphics.
 
 **Review gate RG-00:**
 
-- [ ] Docs reviewed for layering correctness.
-- [ ] No code behavior changed.
+- [x] Docs reviewed for layering correctness.
+- [x] No code behavior changed.
 - [ ] Full test suite still passes.
 
 ---
