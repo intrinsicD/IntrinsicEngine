@@ -44,6 +44,7 @@ static_assert(sizeof(RHI::GpuInstanceDynamic) == 128);
 static_assert(sizeof(RHI::GpuEntityConfig) == 128);
 static_assert(sizeof(RHI::GpuBounds) == 64);
 static_assert(sizeof(RHI::GpuLight) == 64);
+static_assert(sizeof(RHI::GpuCullPushConstants) <= 128);
 
 TEST(GraphicsGpuWorld, Smoke_AllocateUploadSyncShutdown)
 {
@@ -144,4 +145,68 @@ TEST(GraphicsCullingSystem, Smoke_InitializeBucketsAndDispatchPath)
 
     culling.Shutdown();
     world.Shutdown();
+}
+
+TEST(GraphicsGpuWorld, GeometryUpload_UsesVertexUnitsForOffsets)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    Graphics::GpuWorld world;
+
+    Graphics::GpuWorld::InitDesc init{};
+    init.MaxInstances = 8;
+    init.MaxGeometryRecords = 8;
+    init.MaxLights = 1;
+    init.VertexBufferBytes = 1ull << 20;
+    init.IndexBufferBytes = 1ull << 20;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, init));
+
+    const auto tri0 = world.UploadGeometry({
+        .PackedVertexBytes = VertexBytes(),
+        .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
+        .LineIndices = {},
+        .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
+        .LocalBounds = {},
+        .DebugName = "tri0"
+    });
+    ASSERT_TRUE(tri0.IsValid());
+
+    const auto tri1 = world.UploadGeometry({
+        .PackedVertexBytes = VertexBytes(),
+        .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
+        .LineIndices = {},
+        .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
+        .LocalBounds = {},
+        .DebugName = "tri1"
+    });
+    ASSERT_TRUE(tri1.IsValid());
+
+    world.SyncFrame();
+
+    const RHI::BufferHandle geometryBuffer = world.GetGeometryRecordBuffer();
+    bool found0 = false;
+    bool found1 = false;
+    for (const auto& write : device.BufferWrites)
+    {
+        if (write.Handle != geometryBuffer || write.Data.size() != sizeof(RHI::GpuGeometryRecord))
+        {
+            continue;
+        }
+        const auto* rec = reinterpret_cast<const RHI::GpuGeometryRecord*>(write.Data.data());
+        const std::uint64_t slot = write.Offset / sizeof(RHI::GpuGeometryRecord);
+        if (slot == tri0.Index)
+        {
+            found0 = true;
+            EXPECT_EQ(rec->VertexOffset, 0u);
+            EXPECT_EQ(rec->PointFirstVertex, 0u);
+        }
+        else if (slot == tri1.Index)
+        {
+            found1 = true;
+            EXPECT_EQ(rec->VertexOffset, static_cast<std::uint32_t>(kTriangleVerts.size()));
+            EXPECT_EQ(rec->PointFirstVertex, static_cast<std::uint32_t>(kTriangleVerts.size()));
+        }
+    }
+    EXPECT_TRUE(found0);
+    EXPECT_TRUE(found1);
 }

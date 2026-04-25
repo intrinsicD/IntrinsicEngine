@@ -68,7 +68,8 @@ export namespace Extrinsic::RHI
 
     struct alignas(16) GpuInstanceStatic
     {
-        std::uint32_t GeometrySlot = 0;
+        static constexpr std::uint32_t InvalidGeometrySlot = 0xFFFF'FFFFu;
+        std::uint32_t GeometrySlot = InvalidGeometrySlot;
         std::uint32_t MaterialSlot = 0;
         std::uint32_t EntityID     = 0;
         std::uint32_t RenderFlags  = 0;
@@ -158,19 +159,30 @@ export namespace Extrinsic::RHI
     {
         alignas(16) glm::vec4 FrustumPlanes[6];
         std::uint64_t SceneTableBDA = 0;
-        std::uint64_t SurfaceOpaqueArgsBDA = 0;
-        std::uint64_t SurfaceOpaqueCountBDA = 0;
-        std::uint64_t SurfaceAlphaMaskArgsBDA = 0;
-        std::uint64_t SurfaceAlphaMaskCountBDA = 0;
-        std::uint64_t LineArgsBDA = 0;
-        std::uint64_t LineCountBDA = 0;
-        std::uint64_t PointArgsBDA = 0;
-        std::uint64_t PointCountBDA = 0;
-        std::uint64_t ShadowArgsBDA = 0;
-        std::uint64_t ShadowCountBDA = 0;
+        std::uint64_t CullBucketTableBDA = 0;
         std::uint32_t InstanceCapacity = 0;
         std::uint32_t _pad0 = 0;
     };
+    static_assert(sizeof(GpuCullPushConstants) <= 128);
+
+    struct alignas(16) GpuCullBucketOutput
+    {
+        std::uint64_t ArgsBDA = 0;
+        std::uint64_t CountBDA = 0;
+        std::uint32_t Capacity = 0;
+        std::uint32_t _pad0 = 0;
+    };
+    static_assert(sizeof(GpuCullBucketOutput) == 24);
+
+    struct alignas(16) GpuCullBucketTable
+    {
+        GpuCullBucketOutput SurfaceOpaque{};
+        GpuCullBucketOutput SurfaceAlphaMask{};
+        GpuCullBucketOutput Lines{};
+        GpuCullBucketOutput Points{};
+        GpuCullBucketOutput ShadowOpaque{};
+    };
+    static_assert(sizeof(GpuCullBucketTable) == 120);
     // -------------------------------------------------------
     // Per-frame camera + lighting UBO  (set 0, binding 0)
     // Matches the global descriptor set consumed by every lit pass.
@@ -330,4 +342,3 @@ export namespace Extrinsic::RHI
         std::uint32_t _pad0 = 0, _pad1 = 0;
     };
 }
-

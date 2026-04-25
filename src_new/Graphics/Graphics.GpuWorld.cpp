@@ -455,13 +455,19 @@ namespace Extrinsic::Graphics
         rec = {};
         rec.VertexBufferBDA = m_Impl->Device->GetBufferDeviceAddress(GetManagedVertexBuffer());
         rec.IndexBufferBDA = m_Impl->Device->GetBufferDeviceAddress(GetManagedIndexBuffer());
-        rec.VertexOffset = static_cast<std::uint32_t>(vbOffset);
+        const std::uint32_t vertexStride =
+            (desc.VertexCount > 0u) ? static_cast<std::uint32_t>(vbSize / desc.VertexCount) : 0u;
+        assert(desc.VertexCount == 0u || (vbSize % desc.VertexCount) == 0u);
+        assert(vertexStride == 0u || (vbOffset % vertexStride) == 0u);
+        const std::uint32_t vertexOffset =
+            (vertexStride > 0u) ? static_cast<std::uint32_t>(vbOffset / vertexStride) : 0u;
+        rec.VertexOffset = vertexOffset;
         rec.VertexCount = desc.VertexCount;
         rec.SurfaceFirstIndex = static_cast<std::uint32_t>(surfOffset / sizeof(std::uint32_t));
         rec.SurfaceIndexCount = static_cast<std::uint32_t>(desc.SurfaceIndices.size());
         rec.LineFirstIndex = static_cast<std::uint32_t>(lineOffset / sizeof(std::uint32_t));
         rec.LineIndexCount = static_cast<std::uint32_t>(desc.LineIndices.size());
-        rec.PointFirstVertex = static_cast<std::uint32_t>(vbOffset);
+        rec.PointFirstVertex = vertexOffset;
         rec.PointVertexCount = desc.VertexCount;
 
         m_Impl->VertexBumpOffset += vbSize;
@@ -495,7 +501,8 @@ namespace Extrinsic::Graphics
             return;
         }
 
-        m_Impl->InstanceStaticCpu[instance.Index].GeometrySlot = geometry.IsValid() ? geometry.Index : 0;
+        m_Impl->InstanceStaticCpu[instance.Index].GeometrySlot =
+            geometry.IsValid() ? geometry.Index : RHI::GpuInstanceStatic::InvalidGeometrySlot;
         m_Impl->DirtyInstanceStatic[instance.Index] = true;
     }
 

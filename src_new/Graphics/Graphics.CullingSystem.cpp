@@ -74,6 +74,8 @@ namespace Extrinsic::Graphics
         RHI::BufferManager*   BufferMgr   = nullptr;
         RHI::PipelineManager* PipelineMgr = nullptr;
         RHI::PipelineManager::PipelineLease CullPipeline;
+        RHI::BufferManager::BufferLease CullBucketTableLease{};
+        std::uint64_t CullBucketTableBDA = 0;
 
         std::array<BucketStorage, static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count)> Buckets{};
 
@@ -139,6 +141,19 @@ namespace Extrinsic::Graphics
                 return false;
             }
 
+            auto bucketTableOr = BufferMgr->Create({
+                .SizeBytes   = sizeof(RHI::GpuCullBucketTable),
+                .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                .HostVisible = false,
+                .DebugName   = "CullBucketTable",
+            });
+            if (!bucketTableOr.has_value())
+            {
+                return false;
+            }
+
+            CullBucketTableLease = std::move(*bucketTableOr);
+            CullBucketTableBDA = Device->GetBufferDeviceAddress(CullBucketTableLease.GetHandle());
             Capacity = capacity;
             Slots.assign(capacity, CullSlot{});
             return true;
@@ -194,6 +209,8 @@ namespace Extrinsic::Graphics
             bucket.NonIndexedArgsBDA = 0;
             bucket.CountBDA = 0;
         }
+        m_Impl->CullBucketTableLease = {};
+        m_Impl->CullBucketTableBDA = 0;
         m_Impl->Slots.clear();
         m_Impl->FreeList.clear();
         m_Impl->Capacity = 0;
@@ -282,9 +299,20 @@ namespace Extrinsic::Graphics
         const auto pipe = m_Impl->PipelineMgr->GetDeviceHandle(m_Impl->CullPipeline.GetHandle());
         if (!pipe.IsValid()) return;
 
+        if (gpuWorld.GetInstanceCapacity() > m_Impl->Capacity)
+        {
+            [[maybe_unused]] const bool resized = m_Impl->AllocateGpuBuffers(gpuWorld.GetInstanceCapacity());
+            assert(resized && "CullingSystem: failed to resize cull buckets to instance capacity");
+            if (!resized)
+            {
+                return;
+            }
+        }
+
         RHI::GpuCullPushConstants pc{};
         ExtractFrustumPlanes(camera.ViewProj, pc.FrustumPlanes);
         pc.SceneTableBDA = gpuWorld.GetSceneTableBDA();
+        pc.CullBucketTableBDA = m_Impl->CullBucketTableBDA;
 
         const auto& surface = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceOpaque)];
         const auto& alpha   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceAlphaMask)];
@@ -292,17 +320,28 @@ namespace Extrinsic::Graphics
         const auto& points  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Points)];
         const auto& shadow  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::ShadowOpaque)];
 
-        pc.SurfaceOpaqueArgsBDA = surface.IndexedArgsBDA;
-        pc.SurfaceOpaqueCountBDA = surface.CountBDA;
-        pc.SurfaceAlphaMaskArgsBDA = alpha.IndexedArgsBDA;
-        pc.SurfaceAlphaMaskCountBDA = alpha.CountBDA;
-        pc.LineArgsBDA = lines.IndexedArgsBDA;
-        pc.LineCountBDA = lines.CountBDA;
-        pc.PointArgsBDA = points.NonIndexedArgsBDA;
-        pc.PointCountBDA = points.CountBDA;
-        pc.ShadowArgsBDA = shadow.IndexedArgsBDA;
-        pc.ShadowCountBDA = shadow.CountBDA;
         pc.InstanceCapacity = gpuWorld.GetInstanceCapacity();
+
+        RHI::GpuCullBucketTable bucketTable{};
+        bucketTable.SurfaceOpaque.ArgsBDA = surface.IndexedArgsBDA;
+        bucketTable.SurfaceOpaque.CountBDA = surface.CountBDA;
+        bucketTable.SurfaceOpaque.Capacity = surface.Bucket.Capacity;
+        bucketTable.SurfaceAlphaMask.ArgsBDA = alpha.IndexedArgsBDA;
+        bucketTable.SurfaceAlphaMask.CountBDA = alpha.CountBDA;
+        bucketTable.SurfaceAlphaMask.Capacity = alpha.Bucket.Capacity;
+        bucketTable.Lines.ArgsBDA = lines.IndexedArgsBDA;
+        bucketTable.Lines.CountBDA = lines.CountBDA;
+        bucketTable.Lines.Capacity = lines.Bucket.Capacity;
+        bucketTable.Points.ArgsBDA = points.NonIndexedArgsBDA;
+        bucketTable.Points.CountBDA = points.CountBDA;
+        bucketTable.Points.Capacity = points.Bucket.Capacity;
+        bucketTable.ShadowOpaque.ArgsBDA = shadow.IndexedArgsBDA;
+        bucketTable.ShadowOpaque.CountBDA = shadow.CountBDA;
+        bucketTable.ShadowOpaque.Capacity = shadow.Bucket.Capacity;
+        m_Impl->Device->WriteBuffer(m_Impl->CullBucketTableLease.GetHandle(), &bucketTable, sizeof(bucketTable), 0);
+        cmd.BufferBarrier(m_Impl->CullBucketTableLease.GetHandle(),
+                          RHI::MemoryAccess::TransferWrite,
+                          RHI::MemoryAccess::ShaderRead);
 
         cmd.BindPipeline(pipe);
         cmd.PushConstants(&pc, sizeof(pc));
