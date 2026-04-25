@@ -2707,9 +2707,9 @@ Hazard rules:
 - [x] `Read(node, R)`:
   - [x] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
   - [x] Add `node` to `CurrentReaders(R)`.
-- [ ] `WeakRead(node, R)`:
-  - [ ] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
-  - [ ] Do not add `node` to `CurrentReaders(R)`.
+- [x] `WeakRead(node, R)`:
+  - [x] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
+  - [x] Do not add `node` to `CurrentReaders(R)`.
 - [x] `Write(node, R)`:
   - [x] If `LastWriter(R)` exists, emit `LastWriter(R) -> node`.
   - [x] For each reader in `CurrentReaders(R)`, emit `reader -> node`.
@@ -2724,10 +2724,10 @@ Hazard rules:
 - [x] WAW: write then write serializes first writer before second writer.
 - [x] WAR: read then write serializes reader before writer.
 - [x] RAR: read then read remains parallel/same layer.
-- [ ] WeakRead then Write does not force writer to wait for weak reader.
-- [ ] Write then WeakRead forces weak reader after writer.
+- [x] WeakRead then Write does not force writer to wait for weak reader.
+- [x] Write then WeakRead forces weak reader after writer.
 - [x] Multiple readers then writer emits all reader edges.
-- [ ] Duplicate accesses do not duplicate edge count.
+- [x] Duplicate accesses do not duplicate edge count.
 - [ ] 10,000-node hazard stress test completes deterministically.
 
 **Acceptance criteria:**
@@ -2742,15 +2742,15 @@ Hazard rules:
 
 **Required API/behavior:**
 
-- [ ] Add or preserve `Signal(LabelId/StringID)`.
-- [ ] Add or preserve `WaitFor(LabelId/StringID)`.
-- [ ] A wait must depend on all earlier signalers of the same label.
-- [ ] Multiple signalers are allowed as fan-in, but diagnostics must make this visible when useful.
-- [ ] A wait with no known signaler must not crash. Choose and document one behavior:
-  - [ ] either compile error; or
+- [x] Add or preserve `Signal(LabelId/StringID)`.
+- [x] Add or preserve `WaitFor(LabelId/StringID)`.
+- [x] A wait must depend on all earlier signalers of the same label.
+- [x] Multiple signalers are allowed as fan-in, but diagnostics must make this visible when useful.
+- [x] A wait with no known signaler must not crash. Choose and document one behavior:
+  - [x] either compile error; or
   - [ ] unresolved wait is ignored with a warning; or
   - [ ] wait is bound when a later signal appears.
-- [ ] The chosen behavior must be covered by tests.
+- [x] The chosen behavior must be covered by tests.
 
 **Recommended behavior:**
 
@@ -2759,10 +2759,10 @@ Hazard rules:
 
 **Tests:**
 
-- [ ] Signal before wait orders signaler before waiter.
-- [ ] Multiple signalers before wait produce fan-in.
-- [ ] Independent labels do not interfere.
-- [ ] Signal after wait follows documented behavior.
+- [x] Signal before wait orders signaler before waiter.
+- [x] Multiple signalers before wait produce fan-in.
+- [x] Independent labels do not interfere.
+- [x] Signal after wait follows documented behavior.
 - [ ] Label cycle reports `InvalidState` and includes pass names in diagnostics.
 
 ## T013 — Add cycle diagnostics with pass/resource context

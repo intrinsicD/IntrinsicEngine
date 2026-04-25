@@ -109,28 +109,36 @@ namespace Extrinsic::Core::Dag
                 {
                     for (std::size_t b = a + 1; b < entries.size(); ++b)
                     {
-                        const bool aWrites = entries[a].Mode != ResourceAccessMode::Read;
-                        const bool bWrites = entries[b].Mode != ResourceAccessMode::Read;
+                        const bool aWrites = entries[a].Mode == ResourceAccessMode::Write
+                                          || entries[a].Mode == ResourceAccessMode::ReadWrite;
+                        const bool bWrites = entries[b].Mode == ResourceAccessMode::Write
+                                          || entries[b].Mode == ResourceAccessMode::ReadWrite;
                         if (aWrites || bWrites)
                             AddEdge(entries[a].PassIndex, entries[b].PassIndex);
                     }
                 }
             }
 
-            // Label deps: WaitLabel pseudo-resource RAW edges
+            // Label deps: waiters depend on signalers that were already
+            // registered before the waiter in recording order.
             for (uint32_t i = 0; i < N; ++i)
             {
                 for (const ResourceId& waitLabel : Passes[i].WaitLabels)
                 {
-                    // Find all passes that signal this label
-                    for (uint32_t j = 0; j < N; ++j)
+                    bool matchedSignaler = false;
+                    for (uint32_t j = 0; j < i; ++j)
                     {
                         for (const ResourceId& sig : Passes[j].SignalLabels)
                         {
                             if (sig.Index == waitLabel.Index)
+                            {
                                 AddEdge(j, i);
+                                matchedSignaler = true;
+                            }
                         }
                     }
+                    if (!matchedSignaler)
+                        return std::unexpected(Core::ErrorCode::InvalidState);
                 }
             }
 

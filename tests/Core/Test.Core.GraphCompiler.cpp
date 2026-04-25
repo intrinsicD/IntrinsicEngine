@@ -267,6 +267,97 @@ TEST(CoreGraphCompiler, MultipleReadersSerializeBeforeWriter)
     EXPECT_LT(FindBatchFor(plan, readerB), writerBatch);
 }
 
+TEST(CoreGraphCompiler, WeakReadDoesNotDelayFollowingWriter)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId weakReader{127, 1};
+    const TaskId writer{128, 1};
+    const ResourceId resource{12, 1};
+    const std::array<ResourceAccess, 1> weakReadAccess{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::WeakRead}};
+    const std::array<ResourceAccess, 1> writeAccess{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = weakReader, .domain = QueueDomain::Cpu, .resources = weakReadAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+
+    const auto plan = BuildOrFail(*graph);
+    EXPECT_EQ(FindBatchFor(plan, weakReader), FindBatchFor(plan, writer));
+}
+
+TEST(CoreGraphCompiler, WriteThenWeakReadSerializesWriterBeforeReader)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId writer{129, 1};
+    const TaskId weakReader{130, 1};
+    const ResourceId resource{13, 1};
+    const std::array<ResourceAccess, 1> writeAccess{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+    const std::array<ResourceAccess, 1> weakReadAccess{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::WeakRead}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = weakReader, .domain = QueueDomain::Cpu, .resources = weakReadAccess}).has_value());
+
+    const auto plan = BuildOrFail(*graph);
+    EXPECT_LT(FindBatchFor(plan, writer), FindBatchFor(plan, weakReader));
+}
+
+TEST(CoreGraphCompiler, DuplicateResourceAccessesDoNotDuplicateEdges)
+{
+    const TaskId writer{131, 1};
+    const TaskId reader{132, 1};
+    const ResourceId resource{14, 1};
+    const std::array<ResourceAccess, 2> duplicateWrites{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write},
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write},
+    };
+    const std::array<ResourceAccess, 2> duplicateReads{
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read},
+        ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read},
+    };
+
+    struct DuplicateAccessProducerCtx
+    {
+        TaskId writer{};
+        TaskId reader{};
+        std::array<ResourceAccess, 2> writes{};
+        std::array<ResourceAccess, 2> reads{};
+    } ctx{
+        .writer = writer,
+        .reader = reader,
+        .writes = duplicateWrites,
+        .reads = duplicateReads,
+    };
+
+    const auto emitDuplicateAccesses = [](void* producerCtx, void* emitCtx, EmitPendingTaskFn emit) -> Extrinsic::Core::Result
+    {
+        auto* localCtx = static_cast<DuplicateAccessProducerCtx*>(producerCtx);
+        PendingTaskDesc a{.id = localCtx->writer, .domain = QueueDomain::Cpu, .resources = localCtx->writes};
+        PendingTaskDesc b{.id = localCtx->reader, .domain = QueueDomain::Cpu, .resources = localCtx->reads};
+        if (!emit(emitCtx, a) || !emit(emitCtx, b))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+        return Extrinsic::Core::Ok();
+    };
+
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+    const auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "duplicate_access_hazards", .subsystemId = 1, .preferredDomain = QueueDomain::Cpu},
+        &ctx,
+        emitDuplicateAccesses);
+    ASSERT_TRUE(producer.has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+
+    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    ASSERT_TRUE(plan.has_value());
+    EXPECT_EQ(scheduler->GetLastStats().edgeCount, 1u);
+}
+
 TEST(CoreGraphCompiler, ResourceHazardsContributeToEdgeStats)
 {
     const TaskId writer{130, 1};
