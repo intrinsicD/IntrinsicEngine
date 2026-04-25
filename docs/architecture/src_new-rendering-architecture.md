@@ -81,6 +81,9 @@ GpuWorld
 
 They share the same ownership story (GPU-resident, scene-lifetime) but differ in allocation semantics. They live under one roof (`GpuWorld`) but are not merged into one buffer.
 
+> **Implementation note (first production implementation):**
+> The runtime uses a BDA root table (`GpuSceneTable`) instead of binding each scene SSBO separately in descriptor sets. Buffers remain independent storage buffers; only their GPU addresses are gathered into a single scene-table record.
+
 **Key contract:** `Renderer` has no knowledge of ECS internals. It receives an immutable `RenderWorld` snapshot extracted from `SceneManager` each frame. ECS mutation never occurs after extraction.
 
 ---
@@ -1628,4 +1631,3 @@ This section is a checklist of breaking changes implied by §15. Nothing in §15
 ---
 
 *All architectural decisions resolved. §13 deferred items and §15.11 migration items are the implementation backlog. The ::Data components (Mesh::Data, Graph::Data, PointCloud::Data) are superseded by the GeometrySources + render component + algorithm component model.*
-

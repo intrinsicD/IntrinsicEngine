@@ -55,16 +55,19 @@ Two well-known type IDs defined in `Extrinsic.Graphics.Material`:
 | `kMaterialTypeID_StandardPBR` | 0 | `MaterialSystem::Initialize()` | PBR lighting |
 | `kMaterialTypeID_SciVis` | 1 | `VisualizationSyncSystem::Initialize()` | Colourmap/scivis shading mode |
 
-**SciVis CustomData layout** (`GpuMaterialSlot::CustomData[0..3]` when `MaterialTypeID == 1`):
+**SciVis material constants layout** (`GpuMaterialSlot::CustomData[0..3]` when `MaterialTypeID == 1`):
 
 ```
 CustomData[0]: { colormapBindlessIdx(uint), domain(uint), rangeMin(f), rangeMax(f) }
 CustomData[1]: { isolineCount(uint), packedIsolineColor(uint), isolineWidth(f), binCount(uint) }
-CustomData[2]: { reserved visual constants }
+CustomData[2]: { reserved material constants (no BDA pointers) }
 CustomData[3]: reserved
 ```
-Per-entity BDA pointers, element count, and color source mode are written to
-`GpuEntityConfig` via `GpuWorld`, not packed into `GpuMaterialSlot`.
+
+**Ownership rule (current implementation):**
+- `GpuMaterialSlot` owns material constants + material type only.
+- `GpuEntityConfig` owns per-entity visualization state: BDA source pointers,
+  scalar ranges, domain selectors, color source mode, and related attribute metadata.
 
 ### Colourmap types (`Extrinsic.Graphics.Colormap`)
 
