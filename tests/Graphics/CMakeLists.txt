@@ -5,6 +5,7 @@ intrinsic_test_object_lib(ExtrinsicGraphicsTestObjs
         Test.RHI.SamplerManager.cpp
         Test.RHI.PipelineManager.cpp
         Test.Graphics.GpuWorldAndCulling.cpp
+        Test.Graphics.MinimalTriangleAcceptance.cpp
         DEPS ExtrinsicCore ExtrinsicGraphics
 )
 
