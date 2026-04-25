@@ -16,6 +16,7 @@ const uint GpuRender_Transparent = 1u << 6;
 const uint GpuRender_Unlit       = 1u << 7;
 const uint GpuRender_FlatShading = 1u << 8;
 const uint GpuRender_Visible     = 1u << 31;
+const uint GpuInvalidGeometrySlot = 0xFFFFFFFFu;
 
 struct GpuSceneTable {
     uint64_t InstanceStaticBDA;
@@ -144,6 +145,21 @@ struct GpuDrawCommand {
     uint firstInstance;
 };
 
+struct GpuCullBucketOutput {
+    uint64_t ArgsBDA;
+    uint64_t CountBDA;
+    uint Capacity;
+    uint _pad0;
+};
+
+struct GpuCullBucketTable {
+    GpuCullBucketOutput SurfaceOpaque;
+    GpuCullBucketOutput SurfaceAlphaMask;
+    GpuCullBucketOutput Lines;
+    GpuCullBucketOutput Points;
+    GpuCullBucketOutput ShadowOpaque;
+};
+
 layout(buffer_reference, scalar) readonly buffer GpuSceneTableRef {
     GpuSceneTable Value;
 };
@@ -187,6 +203,10 @@ layout(buffer_reference, scalar) buffer GpuDrawCommandRef {
 
 layout(buffer_reference, scalar) buffer GpuCounterRef {
     uint Value[];
+};
+
+layout(buffer_reference, scalar) readonly buffer GpuCullBucketTableRef {
+    GpuCullBucketTable Value;
 };
 
 #endif // INTRINSIC_SRC_NEW_GPU_SCENE_GLSL
