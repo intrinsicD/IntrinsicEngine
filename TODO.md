@@ -1868,7 +1868,7 @@ const GpuDrawBucket& GetBucket(RHI::GpuDrawBucketKind kind) const;
 
 ---
 
-## Phase 10 — Write linear culling compute shader
+## Phase 10 — Write linear culling compute shader — **Complete**
 
 ### Files to add
 
@@ -1879,7 +1879,7 @@ Exact shader path depends on your shader directory. Add:
 
 If shader paths are elsewhere, keep names but place them in the existing shader tree.
 
-### TODO 10.1 — Add shared shader structs
+### TODO 10.1 — Add shared shader structs — **Done**
 
 In `gpu_scene.glsl`, mirror:
 
@@ -1896,7 +1896,7 @@ GpuDrawCommand
 
 Use `GL_EXT_buffer_reference2` and `GL_EXT_scalar_block_layout` if the existing shader toolchain supports it.
 
-### TODO 10.2 — Implement frustum sphere test
+### TODO 10.2 — Implement frustum sphere test — **Done**
 
 In `instance_cull.comp`:
 
@@ -1910,7 +1910,7 @@ bool sphereVisible(vec4 worldSphere, vec4 planes[6]) {
 }
 ```
 
-### TODO 10.3 — One thread per instance slot
+### TODO 10.3 — One thread per instance slot — **Done**
 
 ```glsl
 uint slot = gl_GlobalInvocationID.x;
@@ -1920,7 +1920,7 @@ GpuInstanceStatic inst = InstanceStatic[slot];
 if ((inst.RenderFlags & GpuRender_Visible) == 0) return;
 ```
 
-### TODO 10.4 — Read bounds and geometry
+### TODO 10.4 — Read bounds and geometry — **Done**
 
 ```glsl
 GpuBounds bounds = Bounds[slot];
@@ -1929,7 +1929,7 @@ if (!sphereVisible(bounds.WorldSphere, pc.FrustumPlanes)) return;
 GpuGeometryRecord geo = GeometryRecords[inst.GeometrySlot];
 ```
 
-### TODO 10.5 — Emit surface command
+### TODO 10.5 — Emit surface command — **Done**
 
 If flags include surface:
 
@@ -1943,7 +1943,7 @@ SurfaceArgs[outIndex].vertexOffset = int(geo.VertexOffset);
 SurfaceArgs[outIndex].firstInstance = slot;
 ```
 
-### TODO 10.6 — Emit line command
+### TODO 10.6 — Emit line command — **Done**
 
 If flags include line:
 
@@ -1957,7 +1957,7 @@ LineArgs[outIndex].vertexOffset = int(geo.VertexOffset);
 LineArgs[outIndex].firstInstance = slot;
 ```
 
-### TODO 10.7 — Emit point command
+### TODO 10.7 — Emit point command — **Done**
 
 If flags include point:
 
