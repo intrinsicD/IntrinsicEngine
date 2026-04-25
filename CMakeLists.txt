@@ -105,6 +105,10 @@ option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling bu
 option(INTRINSIC_ENABLE_CUDA "Enable CUDA compute backend for GPU-accelerated geometry processing" OFF)
 option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
 option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
+option(INTRINSIC_HEADLESS_NO_GLFW
+    "Headless build mode that skips GLFW-dependent modules when X11 RandR headers are unavailable"
+    OFF
+)
 option(INTRINSIC_OFFLINE_DEPS
     "Disable network dependency fetches and require pre-populated external/cache/<name>-src trees"
     OFF
@@ -164,17 +168,24 @@ endif()
 # Subdirectories
 # ------------------------------------------------------------------------------
 add_subdirectory(src/Core)
-add_subdirectory(src/RHI)
-add_subdirectory(src/Asset)       # needs Core + RHI
 add_subdirectory(src/Geometry)
 add_subdirectory(src/ECS)
-add_subdirectory(src/Graphics)    # needs Asset
-add_subdirectory(src/Interface)
-add_subdirectory(src/EditorUI)
-add_subdirectory(src/Runtime)     # needs Asset
-add_subdirectory(src_new)     # needs Asset
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    add_subdirectory(src/RHI)
+    add_subdirectory(src/Asset)       # needs Core + RHI
+    add_subdirectory(src/Graphics)    # needs Asset
+    add_subdirectory(src/Interface)
+    add_subdirectory(src/EditorUI)
+    add_subdirectory(src/Runtime)     # needs Asset
+    add_subdirectory(src_new)         # needs Asset
+else()
+    message(WARNING
+        "INTRINSIC_HEADLESS_NO_GLFW=ON: skipping GLFW-dependent modules "
+        "(RHI/Asset/Graphics/Interface/EditorUI/Runtime/src_new/Sandbox)."
+    )
+endif()
 
-if(INTRINSIC_BUILD_SANDBOX)
+if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     add_subdirectory(src/Apps/Sandbox)
 endif()
 if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)

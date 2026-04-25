@@ -148,8 +148,9 @@ intrinsic_test_object_lib(GeometryTestObjs
     DEPS IntrinsicCore IntrinsicGeometry
 )
 
-# --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
-intrinsic_test_object_lib(RuntimeTestObjs
+if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
+    # --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
+    intrinsic_test_object_lib(RuntimeTestObjs
     SOURCES
         Test_CoreAssets.cpp
         Test_CoreAssetSafety.cpp
@@ -208,8 +209,9 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_MaintenanceLane.cpp
         Test_ShaderHotReload.cpp
 
-    DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI nlohmann_json::nlohmann_json
-)
+        DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI nlohmann_json::nlohmann_json
+    )
+endif()
 
 # Shared support for all test executables (sanitizer defaults, shared test hooks).
 intrinsic_test_object_lib(TestSupportObjs
@@ -222,11 +224,13 @@ intrinsic_test_object_lib(TestSupportObjs
 # Executable targets — link pre-compiled objects, no recompilation
 # =============================================================================
 
-# --- Full suite (all tests) ---
-intrinsic_test_executable(IntrinsicTests
-    OBJECTS  CoreTestObjs ECSTestObjs GeometryTestObjs RuntimeTestObjs
-    LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
-)
+if(TARGET RuntimeTestObjs)
+    # --- Full suite (all tests) ---
+    intrinsic_test_executable(IntrinsicTests
+        OBJECTS  CoreTestObjs ECSTestObjs GeometryTestObjs RuntimeTestObjs
+        LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
+    )
+endif()
 
 # --- Core-only (no Runtime, no ECS, no GPU) ---
 intrinsic_test_executable(IntrinsicCoreTests
@@ -246,7 +250,11 @@ intrinsic_test_executable(IntrinsicGeometryTests
     LINK_LIBS IntrinsicCore IntrinsicGeometry
 )
 
-add_subdirectory(Asset)
+if(TARGET IntrinsicAsset)
+    add_subdirectory(Asset)
+endif()
 add_subdirectory(Core)
 add_subdirectory(ECS)
-add_subdirectory(Graphics)
+if(TARGET IntrinsicGraphics)
+    add_subdirectory(Graphics)
+endif()

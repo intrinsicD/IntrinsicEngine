@@ -48,6 +48,15 @@ target_sources(${target_name}
         Core.Process.cpp
 )
 
+if(INTRINSIC_HEADLESS_NO_GLFW)
+    set_source_files_properties(
+            Core.Window.cpp
+            Core.Input.cpp
+            PROPERTIES
+            HEADER_FILE_ONLY TRUE
+    )
+endif()
+
 target_include_directories(${target_name} PUBLIC .)
 
 set_target_properties(EnTT PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
@@ -59,12 +68,18 @@ target_link_libraries(${target_name}
         IntrinsicConfig
         glm::glm
         PRIVATE
-        glfw
-        imgui_lib
-        volk::volk
         EnTT::EnTT
         # Telemetry libs will go here
 )
+
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    target_link_libraries(${target_name}
+            PRIVATE
+            glfw
+            imgui_lib
+            volk::volk
+    )
+endif()
 
 # Note: Since we disabled exceptions globally, if any external lib needs them,
 # we might need to wrap includes, but GLM is fine.
