@@ -128,5 +128,6 @@ _Generated on 2026-04-25 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Platform.Input` | `src_new/Platform/Platform.Input.cppm` | `Platform` |
 | `Extrinsic.Runtime.Engine` | `src_new/Runtime/Runtime.Engine.cppm` | `Runtime` |
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `Runtime` |
+| `Extrinsic.Runtime.StreamingExecutor` | `src_new/Runtime/Runtime.StreamingExecutor.cppm` | `Runtime` |
 
-Total modules: **124**
+Total modules: **125**

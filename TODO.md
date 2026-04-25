@@ -3050,8 +3050,8 @@ struct ExecutionState {
 
 **Preferred module:**
 
-- [ ] `src_new/Runtime/Runtime.StreamingExecutor.cppm`
-- [ ] `src_new/Runtime/Runtime.StreamingExecutor.cpp`
+- [x] `src_new/Runtime/Runtime.StreamingExecutor.cppm`
+- [x] `src_new/Runtime/Runtime.StreamingExecutor.cpp`
 
 **Alternative if asset-specific:**
 
@@ -3059,14 +3059,14 @@ struct ExecutionState {
 
 **Decision rule:**
 
-- [ ] Put generic continuous executor mechanics in `Runtime`.
-- [ ] Put asset-specific decode/load pipeline construction in `Assets`.
-- [ ] Do not put asset-specific state machines inside `Core`.
+- [x] Put generic continuous executor mechanics in `Runtime`.
+- [x] Put asset-specific decode/load pipeline construction in `Assets`.
+- [x] Do not put asset-specific state machines inside `Core`.
 
 **Acceptance criteria:**
 
-- [ ] The module depends only on allowed lower layers.
-- [ ] The location is documented in the relevant README.
+- [x] The module depends only on allowed lower layers.
+- [x] The location is documented in the relevant README.
 
 ## T031 — Implement persistent streaming task table
 
@@ -3116,24 +3116,24 @@ public:
 
 **Tasks:**
 
-- [ ] Implement stable handles with generation validation.
-- [ ] Implement persistent storage with state transitions.
-- [ ] Implement dependency counters.
-- [ ] Implement priority-ready queues.
+- [x] Implement stable handles with generation validation.
+- [x] Implement persistent storage with state transitions.
+- [x] Implement dependency counters.
+- [x] Implement priority-ready queues.
 - [ ] Implement cancellation generation checks.
-- [ ] Implement worker completion queue.
-- [ ] Implement main-thread apply queue.
-- [ ] Implement shutdown drain/cancel semantics.
+- [x] Implement worker completion queue.
+- [x] Implement main-thread apply queue.
+- [x] Implement shutdown drain/cancel semantics.
 
 **Tests:**
 
-- [ ] Submitted task remains pending across frames until pumped.
-- [ ] Dependency chain spans frames.
-- [ ] Higher-priority ready task launches before lower-priority ready task.
-- [ ] Cancelling a pending task prevents execution.
+- [x] Submitted task remains pending across frames until pumped.
+- [x] Dependency chain spans frames.
+- [x] Higher-priority ready task launches before lower-priority ready task.
+- [x] Cancelling a pending task prevents execution.
 - [ ] Cancelling a running task suppresses stale apply.
 - [ ] Generation mismatch prevents stale result publication.
-- [ ] `ApplyOnMainThread` runs on caller thread of `ApplyMainThreadResults()`.
+- [x] `ApplyOnMainThread` runs on caller thread of `ApplyMainThreadResults()`.
 - [ ] Shutdown drains or cancels all running work deterministically.
 
 ## T032 — Replace frame-local streaming graph tick
