@@ -48,13 +48,13 @@ export namespace Extrinsic::Graphics
 
         [[deprecated("Legacy path: use GpuWorld instance/bounds/render-flags + DispatchCull().")]]
         [[nodiscard]] CullingHandle Register(const RHI::BoundingSphere& sphere,
-                                             const RHI::GpuDrawCommand&  drawTemplate);
+                                             const RHI::GpuDrawIndexedCommand&  drawTemplate);
         [[deprecated("Legacy path: use GpuWorld instance/bounds/render-flags + DispatchCull().")]]
         void Unregister(CullingHandle handle);
         [[deprecated("Legacy path: use GpuWorld::SetBounds() + DispatchCull().")]]
         void UpdateBounds(CullingHandle handle, const RHI::BoundingSphere& sphere);
         [[deprecated("Legacy path: draw templates are now generated from GpuWorld geometry records.")]]
-        void SetDrawTemplate(CullingHandle handle, const RHI::GpuDrawCommand& cmd);
+        void SetDrawTemplate(CullingHandle handle, const RHI::GpuDrawIndexedCommand& cmd);
 
         void SyncGpuBuffer();
         void ResetCounters(RHI::ICommandContext& cmd);

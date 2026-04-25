@@ -52,7 +52,7 @@ namespace Extrinsic::Graphics
     struct CullSlot
     {
         RHI::BoundingSphere Sphere{};
-        RHI::GpuDrawCommand DrawTemplate{};
+        RHI::GpuDrawIndexedCommand DrawTemplate{};
         std::uint32_t       Generation = 0;
         bool                Live       = false;
     };
@@ -221,7 +221,7 @@ namespace Extrinsic::Graphics
     }
 
     CullingHandle CullingSystem::Register(const RHI::BoundingSphere& sphere,
-                                          const RHI::GpuDrawCommand& drawTemplate)
+                                          const RHI::GpuDrawIndexedCommand& drawTemplate)
     {
         assert(m_Impl->Device && "Register called before Initialize()");
 
@@ -266,7 +266,7 @@ namespace Extrinsic::Graphics
         slot->Sphere = sphere;
     }
 
-    void CullingSystem::SetDrawTemplate(const CullingHandle handle, const RHI::GpuDrawCommand& cmd)
+    void CullingSystem::SetDrawTemplate(const CullingHandle handle, const RHI::GpuDrawIndexedCommand& cmd)
     {
         auto* slot = m_Impl->Resolve(handle);
         if (!slot) return;
