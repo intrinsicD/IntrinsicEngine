@@ -4,6 +4,7 @@ module;
 #include <limits>
 #include <unordered_map>
 #include <vector>
+#include <cstdint>
 
 export module Extrinsic.Core.Dag.Scheduler:Hazards;
 

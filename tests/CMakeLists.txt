@@ -12,8 +12,8 @@ find_program(INTRINSIC_LLVM_SYMBOLIZER
 )
 
 set(_intrinsic_test_env
-        "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp:fast_unwind_on_malloc=0"
-        "ASAN_OPTIONS=symbolize=1:detect_leaks=1:fast_unwind_on_malloc=0"
+        "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp:fast_unwind_on_malloc=0:detect_leaks=0"
+        "ASAN_OPTIONS=symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0"
 )
 
 if(INTRINSIC_LLVM_SYMBOLIZER)

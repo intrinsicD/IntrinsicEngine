@@ -16,6 +16,12 @@ export module Core.Commands;
 
 export namespace Core
 {
+    #if __cpp_lib_move_only_function >= 202110L
+    using TaskGraphCallback = std::move_only_function<void()>;
+    #else
+    using TaskGraphCallback = std::function<void()>;
+    #endif
+
     template <typename T>
     struct CmdComponentChange
     {
@@ -41,8 +47,8 @@ export namespace Core
     struct EditorCommand
     {
         std::string name;
-        std::move_only_function<void()> redo;
-        std::move_only_function<void()> undo;
+        TaskGraphCallback redo;
+        TaskGraphCallback undo;
 
         [[nodiscard]] bool IsValid() const noexcept
         {

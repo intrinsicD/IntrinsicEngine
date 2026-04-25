@@ -313,6 +313,11 @@ namespace Extrinsic::Graphics
         return true;
     }
 
+    bool GpuWorld::Initialize(RHI::IDevice& device, RHI::BufferManager& buffers)
+    {
+        return Initialize(device, buffers, InitDesc{});
+    }
+
     void GpuWorld::Shutdown()
     {
         if (!m_Impl->Initialized)

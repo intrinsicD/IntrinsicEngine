@@ -12,6 +12,7 @@ module;
 module Extrinsic.Graphics.VisualizationSyncSystem;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Types;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.Graphics.Material;

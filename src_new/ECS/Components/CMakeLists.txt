@@ -6,13 +6,14 @@ target_sources(${target_name}
         ECS.Component.Culling.Local.cppm
         ECS.Component.Culling.World.cppm
         ECS.Component.Culling.Proxy.cppm
+        ECS.Component.GeometrySources.cppm
         ECS.Component.Hierarchy.cppm
+        ECS.Component.Light.cppm
         ECS.Component.MetaData.cppm
-        ECS.Component.Transform.Local.cppm
-        ECS.Component.Transform.World.cppm
         ECS.Component.Selection.cppm
         ECS.Component.ShadowCaster.cppm
-        ECS.Component.GeometrySources.cppm
+        ECS.Component.Transform.Local.cppm
+        ECS.Component.Transform.World.cppm
         PRIVATE
         ECS.Component.Transform.Local.cpp
 )

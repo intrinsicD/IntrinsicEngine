@@ -40,6 +40,7 @@ export import Extrinsic.Core.Telemetry;
 export import Extrinsic.RHI.Bindless;
 export import Extrinsic.RHI.CommandContext;
 export import Extrinsic.RHI.Descriptors;
+export import Extrinsic.RHI.Types;
 export import Extrinsic.RHI.Device;
 export import Extrinsic.RHI.FrameHandle;
 export import Extrinsic.RHI.Handles;
@@ -50,6 +51,12 @@ export import Extrinsic.Platform.Window;
 
 namespace Extrinsic::Backends::Vulkan
 {
+    #if __cpp_lib_move_only_function >= 202110L
+    using VulkanDeferredDelete = std::move_only_function<void()>;
+    #else
+    using VulkanDeferredDelete = std::function<void()>;
+    #endif
+
 
 // =============================================================================
 // §1  Constants  (module linkage — not visible outside Extrinsic.Backends.Vulkan)
@@ -423,7 +430,7 @@ struct PerFrame
     VkSemaphore     ImageAcquired = VK_NULL_HANDLE;  // binary
     VkSemaphore     RenderDone    = VK_NULL_HANDLE;  // binary
     // Deferred-deletion lambdas executed when this slot is next reused.
-    std::vector<std::move_only_function<void()>> DeletionQueue;
+    std::vector<VulkanDeferredDelete> DeletionQueue;
 };
 
 // =============================================================================
@@ -514,7 +521,7 @@ private:
     void EndOneShot(VkCommandBuffer cmd);
 
     // Deferred deletion — safe to call from any thread.
-    void DeferDelete(std::move_only_function<void()> fn);
+    void DeferDelete(VulkanDeferredDelete fn);
     void FlushDeletionQueue(uint32_t frameSlot);
 
     // ---- Vulkan core objects --------------------------------------------
@@ -575,4 +582,3 @@ private:
 };
 
 } // namespace Extrinsic::Backends::Vulkan
-

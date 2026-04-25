@@ -289,8 +289,8 @@ namespace Core::Process
                         result.TimedOut = true;
                         TerminateAndReap(pid);
                         // Final drain after child is dead.
-                        DrainFd(stdoutPipe.ReadEnd, result.StdOut);
-                        DrainFd(stderrPipe.ReadEnd, result.StdErr);
+                        (void)DrainFd(stdoutPipe.ReadEnd, result.StdOut);
+                        (void)DrainFd(stderrPipe.ReadEnd, result.StdErr);
                         return result;
                     }
                     timeoutMs = static_cast<int>(remaining.count());

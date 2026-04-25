@@ -81,6 +81,36 @@ export namespace Extrinsic::Core
     }
 
     // -----------------------------------------------------------------------
+    // FrameGraph pass options — scheduling metadata for the TaskGraph backend.
+    // -----------------------------------------------------------------------
+    struct FrameGraphPassOptions
+    {
+        Dag::TaskPriority Priority = Dag::TaskPriority::Normal;
+        uint32_t EstimatedCost = 1;
+        bool MainThreadOnly = false;
+        bool AllowParallel = true;
+        std::string_view DebugCategory = {};
+    };
+
+    [[nodiscard]] constexpr Dag::TaskGraphPassOptions ToTaskGraphPassOptions(const FrameGraphPassOptions& options) noexcept
+    {
+        return {
+            .Priority = options.Priority,
+            .EstimatedCost = options.EstimatedCost,
+            .MainThreadOnly = options.MainThreadOnly,
+            .AllowParallel = options.AllowParallel,
+            .DebugCategory = options.DebugCategory,
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // Built-in structural and phase tokens.
+    // -----------------------------------------------------------------------
+    inline constexpr Hash::StringID RegistryStructureToken = Hash::StringID{"FrameGraph.RegistryStructure"};
+    inline constexpr Hash::StringID SceneCommitToken = Hash::StringID{"FrameGraph.SceneCommit"};
+    inline constexpr Hash::StringID RenderExtractionToken = Hash::StringID{"FrameGraph.RenderExtraction"};
+
+    // -----------------------------------------------------------------------
     // FrameGraphBuilder — passed to user setup lambdas in AddPass().
     // Thin adapter: translates TypeToken → TaskGraph::Read/WriteResource.
     // -----------------------------------------------------------------------
@@ -101,6 +131,20 @@ export namespace Extrinsic::Core
         // Named ordering constraints (stage labels).
         void WaitFor(Hash::StringID label) { m_Inner.WaitFor(label); }
         void Signal (Hash::StringID label) { m_Inner.Signal(label);  }
+
+        // Structural safety declarations.
+        void StructuralRead() { m_Inner.ReadResource(RegistryStructureToken); }
+        void StructuralWrite() { m_Inner.WriteResource(RegistryStructureToken); }
+
+        // Frame-pipeline phase barriers.
+        void CommitWorld() { m_Inner.WriteResource(SceneCommitToken); }
+        void CommitTick() { CommitWorld(); }
+
+        // Resource declarations at framegraph level.
+        void ReadResource(Dag::ResourceId resource) { m_Inner.ReadResource(resource); }
+        void WriteResource(Dag::ResourceId resource) { m_Inner.WriteResource(resource); }
+        void ReadResource(Hash::StringID label) { m_Inner.ReadResource(label); }
+        void WriteResource(Hash::StringID label) { m_Inner.WriteResource(label); }
 
     private:
         Dag::TaskGraphBuilder m_Inner;
@@ -127,7 +171,20 @@ export namespace Extrinsic::Core
         template <typename SetupFn, typename ExecuteFn>
         void AddPass(std::string_view name, SetupFn&& setup, ExecuteFn&& execute)
         {
+            AddPass(name,
+                    FrameGraphPassOptions{},
+                    std::forward<SetupFn>(setup),
+                    std::forward<ExecuteFn>(execute));
+        }
+
+        template <typename SetupFn, typename ExecuteFn>
+        void AddPass(std::string_view name,
+                     const FrameGraphPassOptions& options,
+                     SetupFn&& setup,
+                     ExecuteFn&& execute)
+        {
             m_Graph->AddPass(name,
+                ToTaskGraphPassOptions(options),
                 [setupFn = std::forward<SetupFn>(setup)](Dag::TaskGraphBuilder& b) mutable
                 {
                     FrameGraphBuilder fgb(std::move(b));
@@ -138,11 +195,33 @@ export namespace Extrinsic::Core
                 std::forward<ExecuteFn>(execute));
         }
 
+        template <typename ExecuteFn>
+        void AddPass(std::string_view name, ExecuteFn&& execute)
+        {
+            AddPass(name,
+                    FrameGraphPassOptions{},
+                    [](FrameGraphBuilder&) {},
+                    std::forward<ExecuteFn>(execute));
+        }
+
+        template <typename ExecuteFn>
+        void AddPass(std::string_view name,
+                     const FrameGraphPassOptions& options,
+                     ExecuteFn&& execute)
+        {
+            AddPass(name,
+                   options,
+                   [](FrameGraphBuilder&) {},
+                   std::forward<ExecuteFn>(execute));
+        }
+
         // ----- Phase 2: Compile -----
         [[nodiscard]] Core::Result Compile();
 
         // ----- Phase 3: Execute -----
         [[nodiscard]] Core::Result Execute();
+        [[nodiscard]] Core::Expected<std::vector<Dag::PlanTask>> BuildPlan(
+            const Dag::BuildConfig& config = {});
 
         // ----- Reset -----
         void Reset();
@@ -150,6 +229,8 @@ export namespace Extrinsic::Core
         // ----- Introspection -----
         [[nodiscard]] uint32_t PassCount()            const noexcept;
         [[nodiscard]] std::string_view PassName(uint32_t i) const noexcept;
+        [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const noexcept;
+        [[nodiscard]] Dag::ScheduleStats GetScheduleStats() const noexcept;
         [[nodiscard]] uint64_t LastCompileTimeNs()    const noexcept;
         [[nodiscard]] uint64_t LastExecuteTimeNs()    const noexcept;
         [[nodiscard]] uint64_t LastCriticalPathTimeNs() const noexcept;
@@ -158,4 +239,3 @@ export namespace Extrinsic::Core
         std::unique_ptr<Dag::TaskGraph> m_Graph;
     };
 }
-

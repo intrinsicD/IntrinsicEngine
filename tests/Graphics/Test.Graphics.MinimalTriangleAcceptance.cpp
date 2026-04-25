@@ -1,6 +1,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <span>
 
 #include <entt/entity/registry.hpp>
@@ -17,6 +18,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Pass.Culling;
 import Extrinsic.Graphics.Pass.Deferred.GBuffers;
@@ -177,7 +179,13 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     materialParams.BaseColorFactor = {0.8f, 0.7f, 0.6f, 1.0f};
     auto baseLease = matSys.CreateInstance(baseType, materialParams);
     ASSERT_TRUE(baseLease.IsValid());
-    registry.emplace<Graphics::Components::MaterialInstance>(e, Graphics::Components::MaterialInstance{.Lease = std::move(baseLease)});
+    registry.emplace<Graphics::Components::MaterialInstance>(
+        e,
+        Graphics::Components::MaterialInstance{
+            .Lease = std::move(baseLease),
+            .TintOverride = std::nullopt,
+            .EffectiveSlot = 0u,
+        });
 
     registry.emplace<Graphics::Components::RenderSurface>(e);
     registry.emplace<Graphics::Components::VisualizationConfig>(
@@ -185,6 +193,10 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
         Graphics::Components::VisualizationConfig{
             .Source = Graphics::Components::VisualizationConfig::ColorSource::UniformColor,
             .Color = {1.0f, 0.1f, 0.1f, 1.0f},
+            .ScalarFieldName = std::string{},
+            .Scalar = {},
+            .ScalarDomain = Graphics::Components::VisualizationConfig::Domain::Vertex,
+            .ColorBufferName = std::string{},
         });
 
     registry.emplace<ECS::Components::Transform::WorldMatrix>(e, ECS::Components::Transform::WorldMatrix{.Matrix = glm::mat4{1.0f}});
@@ -196,7 +208,7 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
 
     visSync.Sync(registry, matSys, colorSys, world);
     matSys.SyncGpuBuffer();
-    transformSync.SyncGpuBuffer(registry, world);
+    transformSync.SyncGpuBuffer(registry, world, matSys);
     world.SetMaterialBuffer(matSys.GetBuffer(), matSys.GetCapacity());
     world.SyncFrame();
 
@@ -231,6 +243,7 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     culling.Shutdown();
     transformSync.Shutdown();
     visSync.Shutdown();
+    registry.clear();
     matSys.Shutdown();
     world.Shutdown();
 }

@@ -15,6 +15,7 @@ import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Types;

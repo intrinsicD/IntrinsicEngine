@@ -1,9 +1,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <span>
 
 #include <gtest/gtest.h>
+#include <glm/glm.hpp>
 
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.GpuWorld;
@@ -41,7 +43,7 @@ namespace
 static_assert(sizeof(RHI::GpuGeometryRecord) == 64);
 static_assert(sizeof(RHI::GpuInstanceStatic) == 32);
 static_assert(sizeof(RHI::GpuInstanceDynamic) == 128);
-static_assert(sizeof(RHI::GpuEntityConfig) == 128);
+static_assert(sizeof(RHI::GpuEntityConfig) == 112);
 static_assert(sizeof(RHI::GpuBounds) == 64);
 static_assert(sizeof(RHI::GpuLight) == 64);
 static_assert(sizeof(RHI::GpuCullPushConstants) <= 128);
@@ -192,25 +194,40 @@ TEST(GraphicsGpuWorld, GeometryUpload_UsesVertexUnitsForOffsets)
     const RHI::BufferHandle geometryBuffer = world.GetGeometryRecordBuffer();
     bool found0 = false;
     bool found1 = false;
+    std::fprintf(stderr, "geometryBuffer=%u:%u writes=%zu tri0=%u tri1=%u\n",
+                 geometryBuffer.Index,
+                 geometryBuffer.Generation,
+                 device.BufferWrites.size(),
+                 tri0.Index,
+                 tri1.Index);
     for (const auto& write : device.BufferWrites)
     {
-        if (write.Handle != geometryBuffer || write.Data.size() != sizeof(RHI::GpuGeometryRecord))
+        if (write.Handle != geometryBuffer ||
+            write.Data.size() % sizeof(RHI::GpuGeometryRecord) != 0u)
         {
             continue;
         }
-        const auto* rec = reinterpret_cast<const RHI::GpuGeometryRecord*>(write.Data.data());
-        const std::uint64_t slot = write.Offset / sizeof(RHI::GpuGeometryRecord);
-        if (slot == tri0.Index)
+
+        const auto span = std::span<const RHI::GpuGeometryRecord>{
+            reinterpret_cast<const RHI::GpuGeometryRecord*>(write.Data.data()),
+            write.Data.size() / sizeof(RHI::GpuGeometryRecord),
+        };
+        const std::uint64_t firstSlot = write.Offset / sizeof(RHI::GpuGeometryRecord);
+        for (std::size_t i = 0; i < span.size(); ++i)
         {
-            found0 = true;
-            EXPECT_EQ(rec->VertexOffset, 0u);
-            EXPECT_EQ(rec->PointFirstVertex, 0u);
-        }
-        else if (slot == tri1.Index)
-        {
-            found1 = true;
-            EXPECT_EQ(rec->VertexOffset, static_cast<std::uint32_t>(kTriangleVerts.size()));
-            EXPECT_EQ(rec->PointFirstVertex, static_cast<std::uint32_t>(kTriangleVerts.size()));
+            const std::uint64_t slot = firstSlot + i;
+            if (slot == tri0.Index)
+            {
+                found0 = true;
+                EXPECT_EQ(span[i].VertexOffset, 0u);
+                EXPECT_EQ(span[i].PointFirstVertex, 0u);
+            }
+            else if (slot == tri1.Index)
+            {
+                found1 = true;
+                EXPECT_EQ(span[i].VertexOffset, static_cast<std::uint32_t>(kTriangleVerts.size()));
+                EXPECT_EQ(span[i].PointFirstVertex, static_cast<std::uint32_t>(kTriangleVerts.size()));
+            }
         }
     }
     EXPECT_TRUE(found0);

@@ -10,6 +10,7 @@ module;
 export module Extrinsic.Graphics.GpuWorld;
 
 import Extrinsic.Core.StrongHandle;
+import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
@@ -17,9 +18,6 @@ import Extrinsic.RHI.Types;
 
 export namespace Extrinsic::Graphics
 {
-    struct GpuInstanceTag;
-    struct GpuGeometryTag;
-
     using GpuInstanceHandle = Core::StrongHandle<GpuInstanceTag>;
     using GpuGeometryHandle = Core::StrongHandle<GpuGeometryTag>;
 
@@ -51,7 +49,8 @@ export namespace Extrinsic::Graphics
         GpuWorld(const GpuWorld&) = delete;
         GpuWorld& operator=(const GpuWorld&) = delete;
 
-        bool Initialize(RHI::IDevice& device, RHI::BufferManager& buffers, const InitDesc& desc = {});
+        bool Initialize(RHI::IDevice& device, RHI::BufferManager& buffers, const InitDesc& desc);
+        bool Initialize(RHI::IDevice& device, RHI::BufferManager& buffers);
         void Shutdown();
 
         [[nodiscard]] bool IsInitialized() const noexcept;
@@ -95,4 +94,3 @@ export namespace Extrinsic::Graphics
         std::unique_ptr<Impl> m_Impl;
     };
 }
-

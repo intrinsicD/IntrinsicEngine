@@ -1,5 +1,7 @@
 module;
 
+#include <cstdint>
+
 module Extrinsic.Graphics.Pass.Shadows;
 
 namespace Extrinsic::Graphics

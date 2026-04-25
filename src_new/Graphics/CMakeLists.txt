@@ -47,6 +47,7 @@ target_link_libraries(${target_name}
         PUBLIC
         ExtrinsicRHI
         ExtrinsicCore
+        ExtrinsicECS
         PRIVATE
         EnTT::EnTT
         glm::glm

@@ -19,7 +19,7 @@ TEST(ECSSceneRegistry, CreatedEntityIsValid)
 {
     Registry registry;
     const auto e = registry.Create();
-    EXPECT_NE(e, InvalidEntityHandle);
+    EXPECT_NE(e, Extrinsic::ECS::InvalidEntityHandle);
     EXPECT_TRUE(registry.IsValid(e));
 }
 
@@ -94,5 +94,5 @@ TEST(ECSSceneRegistry, RawConstAccessorIsReadOnly)
 TEST(ECSSceneRegistry, InvalidHandleIsNotValid)
 {
     const Registry registry;
-    EXPECT_FALSE(registry.IsValid(InvalidEntityHandle));
+    EXPECT_FALSE(registry.IsValid(Extrinsic::ECS::InvalidEntityHandle));
 }

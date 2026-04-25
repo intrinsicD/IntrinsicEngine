@@ -10,6 +10,7 @@ module;
 export module Extrinsic.Graphics.TransformSyncSystem;
 
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.MaterialSystem;
 
 export namespace Extrinsic::Graphics
 {
@@ -24,7 +25,7 @@ export namespace Extrinsic::Graphics
 
         void Initialize();
         void Shutdown();
-        void SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld);
+        void SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld, MaterialSystem& materialSystem);
 
         [[nodiscard]] bool IsInitialized() const noexcept;
 

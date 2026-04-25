@@ -19,10 +19,10 @@ import Extrinsic.Core.Hash;
 // A TaskGraph is bound to exactly one QueueDomain at construction time and
 // serves as the execution primitive for all three scheduled work domains:
 //
-//   QueueDomain::Cpu       — ECS system scheduling, fiber-dispatched.
-//                            Execute() fires registered closures in
-//                            topological layer order; parallel within each
-//                            layer is a planned follow-up (currently sequential).
+//   QueueDomain::Cpu       — ECS system scheduling.
+//                            Execute() schedules ready passes by dependency
+//                            and supports worker-parallel execution with
+//                            graph-local completion.
 //
 //   QueueDomain::Gpu       — GPU render-pass ordering. Virtual resources
 //                            (images, buffers) are declared per pass; the
@@ -47,6 +47,12 @@ import Extrinsic.Core.Hash;
 
 export namespace Extrinsic::Core::Dag
 {
+    #if __cpp_lib_move_only_function >= 202110L
+    using GraphExecuteCallback = std::move_only_function<void()>;
+    #else
+    using GraphExecuteCallback = std::function<void()>;
+    #endif
+
     class TaskGraph;
 
     namespace Detail
@@ -75,6 +81,15 @@ export namespace Extrinsic::Core::Dag
     // TaskGraphBuilder — passed to the user's setup lambda in AddPass().
     // Accumulates per-pass resource accesses and ordering constraints.
     // -----------------------------------------------------------------------
+    struct TaskGraphPassOptions
+    {
+        TaskPriority Priority = TaskPriority::Normal;
+        uint32_t EstimatedCost = 1;
+        bool MainThreadOnly = false;
+        bool AllowParallel = true;
+        std::string_view DebugCategory = {};
+    };
+
     class TaskGraphBuilder
     {
     public:
@@ -96,6 +111,8 @@ export namespace Extrinsic::Core::Dag
         // a single epoch (i.e., same ID → same logical resource each frame).
         void ReadResource(ResourceId resource);
         void WriteResource(ResourceId resource);
+        void ReadResource(Hash::StringID label);
+        void WriteResource(Hash::StringID label);
 
         // --- Ordering constraints (label-based) ---
         // WaitFor: this pass may not start until all passes that Signal(label)
@@ -128,8 +145,8 @@ export namespace Extrinsic::Core::Dag
         // ----- Phase 1: Setup -----
 
         // Register a pass. setup_fn receives a TaskGraphBuilder to declare
-        // dependencies. execute_fn is the work closure (stored as
-        // std::move_only_function — no heap SBO if closure fits in 64 bytes).
+        // dependencies. execute_fn is the work closure (stored as a lightweight
+        // move-only wrapper where supported; otherwise falls back to std::function).
         //
         // Returns a PassHandle that can be used to query pass metadata.
         // For GPU/Streaming domains the execute_fn is stored but never called
@@ -137,8 +154,21 @@ export namespace Extrinsic::Core::Dag
         template <typename SetupFn, typename ExecuteFn>
         void AddPass(std::string_view name, SetupFn&& setup, ExecuteFn&& execute)
         {
+            AddPass(name,
+                    TaskGraphPassOptions{},
+                    std::forward<SetupFn>(setup),
+                    std::forward<ExecuteFn>(execute));
+        }
+
+        template <typename SetupFn, typename ExecuteFn>
+        void AddPass(std::string_view name,
+                     const TaskGraphPassOptions& options,
+                     SetupFn&& setup,
+                     ExecuteFn&& execute)
+        {
             const uint32_t idx = AddPassInternal(name,
-                std::move_only_function<void()>(std::forward<ExecuteFn>(execute)));
+                options,
+                GraphExecuteCallback(std::forward<ExecuteFn>(execute)));
             TaskGraphBuilder builder(*this, idx);
             setup(builder);
         }
@@ -147,7 +177,20 @@ export namespace Extrinsic::Core::Dag
         template <typename ExecuteFn>
         void AddPass(std::string_view name, ExecuteFn&& execute)
         {
-            AddPass(name, [](TaskGraphBuilder&){}, std::forward<ExecuteFn>(execute));
+            AddPass(name,
+                   [](TaskGraphBuilder&){},
+                   std::forward<ExecuteFn>(execute));
+        }
+
+        template <typename ExecuteFn>
+        void AddPass(std::string_view name,
+                     const TaskGraphPassOptions& options,
+                     ExecuteFn&& execute)
+        {
+            AddPass(name,
+                   options,
+                   [](TaskGraphBuilder&){},
+                   std::forward<ExecuteFn>(execute));
         }
 
         // ----- Phase 2: Compile -----
@@ -157,12 +200,10 @@ export namespace Extrinsic::Core::Dag
         // Returns Err on cycle detection.
         [[nodiscard]] Core::Result Compile();
 
-        // ----- Phase 3a: Execute (CPU domain) -----
+    // ----- Phase 3a: Execute (CPU domain) -----
 
-        // Fire all pass closures in topological layer order.
-        // Passes within the same layer have no mutual dependencies and may be
-        // dispatched in parallel (currently sequential; Tasks::Scheduler
-        // integration is a planned follow-up — see TODO.md).
+        // Fire all pass closures in dependency-ready order, with optional worker
+        // dispatch for non-main-thread passes.
         //
         // Asserts (Debug) or returns Err (Release) if called on GPU/Streaming domain.
         [[nodiscard]] Core::Result Execute();
@@ -185,13 +226,14 @@ export namespace Extrinsic::Core::Dag
         // Move the execute closure out of the pass node so it can be dispatched
         // to a worker thread that outlives the next Reset() call.
         // After this call the pass's stored closure is null (no double-fire).
-        [[nodiscard]] std::move_only_function<void()> TakePassExecute(uint32_t passIndex);
+        [[nodiscard]] GraphExecuteCallback TakePassExecute(uint32_t passIndex);
 
         // ----- Reset -----
         void Reset();
 
         // ----- Introspection -----
         [[nodiscard]] uint32_t PassCount() const noexcept;
+        [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const noexcept;
         [[nodiscard]] std::string_view PassName(uint32_t index) const noexcept;
         [[nodiscard]] uint64_t LastCompileTimeNs()     const noexcept;
         [[nodiscard]] uint64_t LastExecuteTimeNs()     const noexcept;
@@ -203,14 +245,13 @@ export namespace Extrinsic::Core::Dag
 
         // Called by the typed AddPass template above.
         uint32_t AddPassInternal(std::string_view name,
-                                 std::move_only_function<void()> execute);
-
-        // Label resource-key helpers (tag bit distinguishes labels from TypeTokens).
-        static constexpr std::size_t kLabelTag =
-            std::size_t{1} << (sizeof(std::size_t) * 8 - 1);
+                                 const TaskGraphPassOptions& options,
+                                 GraphExecuteCallback execute);
 
         // TypeToken → ResourceId translation (stable within an epoch; reset on Reset()).
         ResourceId TokenToResource(std::size_t token);
+        ResourceId StringIdToResource(Hash::StringID stringId);
+        void NormalizeOptions(TaskGraphPassOptions& options) const;
 
         struct Impl;
         std::unique_ptr<Impl> m_Impl;

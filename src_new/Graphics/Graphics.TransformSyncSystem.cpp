@@ -15,6 +15,7 @@ module;
 
 module Extrinsic.Graphics.TransformSyncSystem;
 
+import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
@@ -59,8 +60,9 @@ namespace Extrinsic::Graphics
         m_Impl->Initialized = false;
     }
 
-    void TransformSyncSystem::SyncGpuBuffer(entt::registry& registry,
-                                            GpuWorld&       gpuWorld)
+    void TransformSyncSystem::SyncGpuBuffer(entt::registry&   registry,
+                                            GpuWorld&         gpuWorld,
+                                            MaterialSystem&   materialSystem)
     {
         using namespace Components;
         using namespace ECS::Components;
@@ -115,7 +117,7 @@ namespace Extrinsic::Graphics
 
                 if (matInst->Lease.IsValid())
                 {
-                    const auto params = matInst->Lease.GetParams();
+                    const MaterialParams params = materialSystem.GetParams(matInst->Lease.GetHandle());
                     if (HasFlag(params.Flags, MaterialFlags::AlphaMask))
                         renderFlags |= RHI::GpuRender_AlphaMask;
                     else if (HasFlag(params.Flags, MaterialFlags::AlphaBlend))

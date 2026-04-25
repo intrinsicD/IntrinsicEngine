@@ -54,7 +54,7 @@ TEST(CoreGraphCompiler, SingleNodeGraphCompiles)
     ASSERT_TRUE(graph->Submit(MakeCpuTask(TaskId{1, 1})).has_value());
     const auto plan = BuildOrFail(*graph);
     ASSERT_EQ(plan.size(), 1u);
-    EXPECT_EQ(plan[0].id, TaskId{1, 1});
+    EXPECT_EQ(plan[0].id, (TaskId{1, 1}));
     EXPECT_EQ(plan[0].batch, 0u);
 }
 

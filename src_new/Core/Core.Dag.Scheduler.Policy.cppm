@@ -1,3 +1,7 @@
+module;
+
+#include <cstdint>
+
 export module Extrinsic.Core.Dag.Scheduler:Policy;
 
 import :Types;

@@ -17,7 +17,7 @@ export namespace RHI {
     public:
         // usage: VertexBuffer, IndexBuffer, TransferSrc, etc.
         // properties: DeviceLocal (GPU only) or HostVisible (CPU writable)
-        // Note: HostVisible buffers are persistently mapped at creation.
+        // Map/Unmap manage host mapping on demand for host-visible buffers.
         VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
         ~VulkanBuffer();
 
@@ -32,11 +32,12 @@ export namespace RHI {
         [[nodiscard]] VkBuffer GetHandle() const { return m_Buffer; }
         [[nodiscard]] bool IsValid() const { return m_Buffer != VK_NULL_HANDLE; }
 
-        // Returns the persistent pointer for host-visible buffers.
-        // Thread-safe: can be called concurrently. Pointer is valid until destruction.
+        // Returns a mapped pointer for host-visible buffers.
+        // Thread-safe: can be called concurrently. Pointer is valid until
+        // caller unmaps or buffer destruction.
         // Returns nullptr if memory is DeviceLocal.
         void* Map();
-        // No-op for persistent buffers. Kept for compatibility.
+        // Releases host mapping for this buffer.
         void Unmap();
 
         [[nodiscard]] void* GetMappedData() const { return m_MappedData; }
@@ -98,6 +99,7 @@ export namespace RHI {
 
         // The persistent pointer. nullptr if memory is GPU-only.
         void* m_MappedData = nullptr;
+        bool m_IsMapped = false;
 
         size_t m_SizeBytes = 0;
         bool m_IsHostVisible = false;

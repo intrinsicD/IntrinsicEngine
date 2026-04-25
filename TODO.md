@@ -2880,17 +2880,17 @@ struct FrameGraphPassOptions {
 
 **Tasks:**
 
-- [ ] Add options overloads without breaking old overloads.
-- [ ] Thread options into `PendingTaskDesc`/compiler metadata.
-- [ ] Include options in schedule stats/debug dumps.
-- [ ] Validate `EstimatedCost >= 1` or clamp to 1.
+- [x] Add options overloads without breaking old overloads.
+- [x] Thread options into `PendingTaskDesc`/compiler metadata.
+- [x] Include options in schedule stats/debug dumps.
+- [x] Validate `EstimatedCost >= 1` or clamp to 1.
 
 **Tests:**
 
-- [ ] Default overload compiles and behaves as before.
-- [ ] Explicit priority affects ready-node ordering.
-- [ ] Estimated cost affects critical-path ordering.
-- [ ] MainThreadOnly flag is preserved in compiled plan.
+- [x] Default overload compiles and behaves as before.
+- [x] Explicit priority affects ready-node ordering.
+- [x] Estimated cost affects critical-path ordering.
+- [x] MainThreadOnly flag is preserved in compiled plan.
 
 ## T021 — Add ECS/frame structural safety declarations
 
@@ -2898,16 +2898,16 @@ struct FrameGraphPassOptions {
 
 **FrameGraph builder additions:**
 
-- [ ] `StructuralRead()`
-- [ ] `StructuralWrite()`
-- [ ] `CommitWorld()` or `CommitTick()` dependency token
-- [ ] `ReadResource(ResourceId/StringID)` and `WriteResource(ResourceId/StringID)` if not already present at FrameGraph level
+- [x] `StructuralRead()`
+- [x] `StructuralWrite()`
+- [x] `CommitWorld()` or `CommitTick()` dependency token
+- [x] `ReadResource(ResourceId/StringID)` and `WriteResource(ResourceId/StringID)` if not already present at FrameGraph level
 
 **Required built-in resource tokens:**
 
-- [ ] `RegistryStructureToken`
-- [ ] `SceneCommitToken`
-- [ ] `RenderExtractionToken`
+- [x] `RegistryStructureToken`
+- [x] `SceneCommitToken`
+- [x] `RenderExtractionToken`
 
 **Rules:**
 
@@ -2918,11 +2918,11 @@ struct FrameGraphPassOptions {
 
 **Tests:**
 
-- [ ] Two structural reads can share a layer.
-- [ ] Structural write serializes after prior structural reads.
-- [ ] Structural write serializes before later structural reads.
-- [ ] Typed component writes do not unnecessarily serialize unrelated typed component reads.
-- [ ] Commit token creates required phase boundary.
+- [x] Two structural reads can share a layer.
+- [x] Structural write serializes after prior structural reads.
+- [x] Structural write serializes before later structural reads.
+- [x] Typed component writes do not unnecessarily serialize unrelated typed component reads.
+- [x] Commit token creates required phase boundary.
 
 ## T022 — Implement graph-local dependency-ready CPU executor
 
@@ -2930,14 +2930,14 @@ struct FrameGraphPassOptions {
 
 **Execution model:**
 
-- [ ] Compile graph if needed.
-- [ ] Copy initial indegrees into per-execution atomic counters.
-- [ ] Dispatch all root nodes that are eligible for worker execution.
-- [ ] On pass completion, decrement successors.
-- [ ] When a successor reaches zero, dispatch it.
-- [ ] Signal a graph-local `CounterEvent` or equivalent only when this graph is complete.
-- [ ] Wait on the graph-local completion primitive.
-- [ ] Do not wait for unrelated global work.
+- [x] Compile graph if needed.
+- [x] Copy initial indegrees into per-execution atomic counters.
+- [x] Dispatch all root nodes that are eligible for worker execution.
+- [x] On pass completion, decrement successors.
+- [x] When a successor reaches zero, dispatch it.
+- [x] Signal a graph-local `CounterEvent` or equivalent only when this graph is complete.
+- [x] Wait on the graph-local completion primitive.
+- [x] Do not wait for unrelated global work.
 
 **Suggested execution state:**
 
@@ -2953,21 +2953,21 @@ struct ExecutionState {
 
 **Tasks:**
 
-- [ ] Add `TaskGraphExecutionToken` or internal execution guard.
-- [ ] Add deterministic sequential fallback when scheduler unavailable or worker count is one.
-- [ ] Add fail-safe if a pass closure is missing.
-- [ ] Ensure closures are value-captured/moved safely and not referenced after reset.
-- [ ] Prevent recursive lambda lifetime hazards.
-- [ ] Add pass-level telemetry timings if existing telemetry supports it.
+- [x] Add `TaskGraphExecutionToken` or internal execution guard.
+- [x] Add deterministic sequential fallback when scheduler unavailable or worker count is one.
+- [x] Add fail-safe if a pass closure is missing.
+- [x] Ensure closures are value-captured/moved safely and not referenced after reset.
+- [x] Prevent recursive lambda lifetime hazards.
+- [x] Add pass-level telemetry timings if existing telemetry supports it.
 
 **Tests:**
 
-- [ ] Independent passes run concurrently. Use atomics/barriers to prove overlap.
-- [ ] Dependent passes never overlap incorrectly.
-- [ ] Graph-local wait returns after graph work, while an unrelated long worker job continues running.
-- [ ] Sequential fallback produces identical side-effect order for dependent passes.
-- [ ] Missing closure either no-ops or returns documented error; test chosen behavior.
-- [ ] Repeated execute/reset loops do not leak or use-after-free.
+- [x] Independent passes run concurrently. Use atomics/barriers to prove overlap.
+- [x] Dependent passes never overlap incorrectly.
+- [x] Graph-local wait returns after graph work, while an unrelated long worker job continues running.
+- [x] Sequential fallback produces identical side-effect order for dependent passes.
+- [x] Missing closure either no-ops or returns documented error; test chosen behavior.
+- [x] Repeated execute/reset loops do not leak or use-after-free.
 
 ## T023 — Main-thread-only pass support
 
@@ -2975,7 +2975,7 @@ struct ExecutionState {
 
 **First implementation:**
 
-- [ ] Layer fallback: for each layer, dispatch worker-eligible passes; execute main-thread-only passes on main thread; wait for that layer before advancing.
+- [x] Layer fallback: for each layer, dispatch worker-eligible passes; execute main-thread-only passes on main thread; wait for that layer before advancing.
 
 **Better optional follow-up:**
 
@@ -2983,15 +2983,15 @@ struct ExecutionState {
 
 **Required behavior:**
 
-- [ ] A `MainThreadOnly` pass must execute on the thread that called `Execute()`.
-- [ ] Other passes in the same independent layer may run on workers if safe.
-- [ ] Main-thread pass dependencies are respected.
+- [x] A `MainThreadOnly` pass must execute on the thread that called `Execute()`.
+- [x] Other passes in the same independent layer may run on workers if safe.
+- [x] Main-thread pass dependencies are respected.
 
 **Tests:**
 
-- [ ] Capture caller thread ID and assert main-thread-only pass runs there.
-- [ ] Independent worker pass can overlap with main-thread pass if executor supports that mode, or document layer-conservative behavior.
-- [ ] Dependent pass waits for main-thread-only predecessor.
+- [x] Capture caller thread ID and assert main-thread-only pass runs there.
+- [x] Independent worker pass can overlap with main-thread pass if executor supports that mode, or document layer-conservative behavior.
+- [x] Dependent pass waits for main-thread-only predecessor.
 
 ## T024 — Route `FrameGraph::Execute()` through the new executor
 
@@ -2999,24 +2999,24 @@ struct ExecutionState {
 
 **Tasks:**
 
-- [ ] Add FrameGraph pass options overloads.
-- [ ] Thread typed component access through shared resource tokens.
-- [ ] Implement structural tokens.
-- [ ] Ensure `FrameGraph::Compile()`, `Execute()`, and `Reset()` preserve lifecycle invariants.
-- [ ] Expose schedule stats via `FrameGraph`.
+- [x] Add FrameGraph pass options overloads.
+- [x] Thread typed component access through shared resource tokens.
+- [x] Implement structural tokens.
+- [x] Ensure `FrameGraph::Compile()`, `Execute()`, and `Reset()` preserve lifecycle invariants.
+- [x] Expose schedule stats via `FrameGraph`.
 
 **Tests:**
 
-- [ ] Existing `Test.Core.GraphInterfaces.cpp` still passes.
-- [ ] Existing FrameGraph tests still pass.
-- [ ] Add `tests/Core/Test.Core.FrameGraphParallel.cpp`:
-  - [ ] typed read/read parallelism;
-  - [ ] typed write/read serialization;
-  - [ ] typed read/write serialization;
-  - [ ] structural write global serialization;
-  - [ ] commit/extraction barrier ordering;
-  - [ ] main-thread-only pass behavior;
-  - [ ] graph-local wait behavior.
+- [x] Existing `Test.Core.GraphInterfaces.cpp` still passes.
+- [x] Existing FrameGraph tests still pass.
+- [x] Add `tests/Core/Test.Core.FrameGraphParallel.cpp`:
+  - [x] typed read/read parallelism;
+  - [x] typed write/read serialization;
+  - [x] typed read/write serialization;
+  - [x] structural write global serialization;
+  - [x] commit/extraction barrier ordering;
+  - [x] main-thread-only pass behavior;
+  - [x] graph-local wait behavior.
 
 ## T025 — CPU graph stress and performance tests
 
@@ -3024,11 +3024,11 @@ struct ExecutionState {
 
 **Tests:**
 
-- [ ] 1,000-pass mixed hazard graph compiles under a reasonable threshold.
-- [ ] 10,000 independent pass graph compiles deterministically.
-- [ ] Wide graph execution completes and uses more than one worker when available.
-- [ ] Deep graph execution follows exact dependency chain.
-- [ ] Reusing a graph for 1,000 epochs does not grow retained memory beyond expected high-water marks.
+- [x] 1,000-pass mixed hazard graph compiles under a reasonable threshold.
+- [x] 10,000 independent pass graph compiles deterministically.
+- [x] Wide graph execution completes and uses more than one worker when available.
+- [x] Deep graph execution follows exact dependency chain.
+- [x] Reusing a graph for 1,000 epochs does not grow retained memory beyond expected high-water marks.
 
 **Review gate RG-02 — CPU FrameGraph execution:**
 

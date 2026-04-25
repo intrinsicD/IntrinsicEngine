@@ -70,6 +70,7 @@ namespace RHI
             if (resultInfo.pMappedData != nullptr)
             {
                 m_MappedData = resultInfo.pMappedData;
+                m_IsMapped = true;
             }
             else
             {
@@ -79,6 +80,11 @@ namespace RHI
                     Core::Log::Error("Failed to persistently map host-visible buffer (VkResult={}).",
                                     static_cast<int>(mapRes));
                     m_MappedData = nullptr;
+                    m_IsMapped = false;
+                }
+                else
+                {
+                    m_IsMapped = true;
                 }
             }
         }
@@ -90,6 +96,12 @@ namespace RHI
 
     VulkanBuffer::~VulkanBuffer()
     {
+        if (m_IsMapped && m_Allocation)
+        {
+            vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
+            m_MappedData = nullptr;
+            m_IsMapped = false;
+        }
         DestructionUtils::SafeDestroyVma(m_Device, m_Buffer, m_Allocation, vmaDestroyBuffer);
     }
 
@@ -100,6 +112,7 @@ namespace RHI
           , m_MappedData(std::exchange(other.m_MappedData, nullptr))
           , m_SizeBytes(other.m_SizeBytes)
           , m_IsHostVisible(other.m_IsHostVisible)
+          , m_IsMapped(std::exchange(other.m_IsMapped, false))
     {
     }
 
@@ -116,6 +129,7 @@ namespace RHI
             m_MappedData = std::exchange(other.m_MappedData, nullptr);
             m_SizeBytes = other.m_SizeBytes;
             m_IsHostVisible = other.m_IsHostVisible;
+            m_IsMapped = std::exchange(other.m_IsMapped, false);
         }
         return *this;
     }
@@ -131,12 +145,31 @@ namespace RHI
             return nullptr;
         }
 
+        if (!m_IsMapped)
+        {
+            VkResult mapRes = vmaMapMemory(m_Device.GetAllocator(), m_Allocation, &m_MappedData);
+            if (mapRes != VK_SUCCESS)
+            {
+                Core::Log::Error("VulkanBuffer::Map(): failed to map allocation (VkResult={}).", static_cast<int>(mapRes));
+                m_MappedData = nullptr;
+            }
+            else
+            {
+                m_IsMapped = true;
+            }
+        }
+
         return m_MappedData;
     }
 
     void VulkanBuffer::Unmap()
     {
-        // No-op for persistent mapping. Kept for API compatibility.
+        if (m_IsMapped && m_Allocation)
+        {
+            vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
+            m_MappedData = nullptr;
+            m_IsMapped = false;
+        }
     }
 
     uint64_t VulkanBuffer::GetDeviceAddress() const

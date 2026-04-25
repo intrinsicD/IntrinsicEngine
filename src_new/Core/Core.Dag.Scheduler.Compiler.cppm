@@ -1,6 +1,7 @@
 module;
 
 #include <vector>
+#include <cstdint>
 
 export module Extrinsic.Core.Dag.Scheduler:Compiler;
 

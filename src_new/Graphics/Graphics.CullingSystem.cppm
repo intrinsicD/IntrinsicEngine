@@ -21,7 +21,7 @@ export namespace Extrinsic::Graphics
     struct CullingTag;
     using CullingHandle = Core::StrongHandle<CullingTag>;
 
-    export struct GpuDrawBucket
+    struct GpuDrawBucket
     {
         RHI::BufferHandle IndexedArgsBuffer{};
         RHI::BufferHandle NonIndexedArgsBuffer{};

@@ -17,6 +17,7 @@ import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Types;
 import Extrinsic.Platform.Window;
 
 namespace Extrinsic::Backends::Null

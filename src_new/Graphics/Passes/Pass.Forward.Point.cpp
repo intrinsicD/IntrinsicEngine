@@ -1,5 +1,7 @@
 module;
 
+#include <cstdint>
+
 module Extrinsic.Graphics.Pass.Forward.Point;
 
 namespace Extrinsic::Graphics

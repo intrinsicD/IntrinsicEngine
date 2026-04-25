@@ -21,10 +21,63 @@
 #include <expected>
 #include <string_view>
 #include <utility>
+#include <span>
 #include <vector>
+
+import Extrinsic.Core.Config.Render;
+import Extrinsic.Platform.Window;
+import Extrinsic.RHI.Bindless;
+import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.FrameHandle;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.Types;
+import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
 
 namespace Extrinsic::Tests
 {
+    // -----------------------------------------------------------------------
+    // Minimal no-op ITransferQueue used by MockDevice.
+    // -----------------------------------------------------------------------
+    class MockTransferQueue final : public RHI::ITransferQueue
+    {
+    public:
+        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
+                                                     const void*,
+                                                     std::uint64_t,
+                                                     std::uint64_t = 0) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
+                                                     std::span<const std::byte> src,
+                                                     std::uint64_t = 0) override
+        {
+            return {std::uint64_t(src.size())};
+        }
+
+        [[nodiscard]] RHI::TransferToken UploadTexture(RHI::TextureHandle,
+                                                      const void*,
+                                                      std::uint64_t,
+                                                      std::uint32_t = 0,
+                                                      std::uint32_t = 0) override
+        {
+            return {};
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
+        {
+            (void)token;
+            return true;
+        }
+
+        void CollectCompleted() override {}
+    };
+
     // -----------------------------------------------------------------------
     // Minimal no-op IBindlessHeap. TextureManager asks for one in its
     // constructor; Retain/Release paths call AllocateTextureSlot / FreeSlot.
@@ -135,6 +188,7 @@ namespace Extrinsic::Tests
 
         MockBindlessHeap   Bindless;
         MockCommandContext CommandContext;
+        MockTransferQueue  TransferQueue;
 
         // ---- IDevice -------------------------------------------------------
         [[nodiscard]] bool IsOperational() const noexcept override { return Operational; }
@@ -147,9 +201,13 @@ namespace Extrinsic::Tests
         void EndFrame(const RHI::FrameHandle&) override {}
         void Present(const RHI::FrameHandle&) override {}
         void Resize(std::uint32_t, std::uint32_t) override {}
+        void SetPresentMode(RHI::PresentMode) override {}
+        [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return RHI::PresentMode::VSync; }
+        [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle&) const override { return {}; }
         Platform::Extent2D GetBackbufferExtent() const override { return {}; }
 
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override { return CommandContext; }
+        RHI::ITransferQueue& GetTransferQueue() override { return TransferQueue; }
 
         RHI::BufferHandle CreateBuffer(const RHI::BufferDesc&) override
         {
@@ -197,13 +255,6 @@ namespace Extrinsic::Tests
             return RHI::PipelineHandle{m_NextPipeline++, 1u};
         }
         void DestroyPipeline(RHI::PipelineHandle) override { ++DestroyPipelineCount; }
-
-        RHI::TransferToken UploadBuffer(RHI::BufferHandle, const void*,
-                                        std::uint64_t, std::uint64_t) override { return RHI::TransferToken{0}; }
-        RHI::TransferToken UploadTexture(RHI::TextureHandle, const void*, std::uint64_t,
-                                         std::uint32_t, std::uint32_t) override { return RHI::TransferToken{0}; }
-        [[nodiscard]] bool IsTransferComplete(RHI::TransferToken) const override { return true; }
-        void CollectCompletedTransfers() override {}
 
         RHI::IBindlessHeap& GetBindlessHeap() override { return Bindless; }
         RHI::IProfiler* GetProfiler() override { return nullptr; }

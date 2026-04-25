@@ -43,7 +43,7 @@ namespace Extrinsic::Graphics
             m_MaterialSystem .emplace();
             m_MaterialSystem->Initialize(device, *m_BufferManager);
             m_ColormapSystem.emplace();
-            m_ColormapSystem->Initialize(device, *m_TextureManager);
+            m_ColormapSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
             m_VisualizationSyncSystem.emplace();
             m_VisualizationSyncSystem->Initialize(*m_MaterialSystem, device);
             m_TransformSyncSystem.emplace();
@@ -140,7 +140,7 @@ namespace Extrinsic::Graphics
                 *m_ColormapSystem,
                 *m_GpuWorld);
             m_MaterialSystem->SyncGpuBuffer();
-            m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
+            m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld, *m_MaterialSystem);
             m_LightSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
             m_GpuWorld->SetMaterialBuffer(
                 m_MaterialSystem->GetBuffer(),

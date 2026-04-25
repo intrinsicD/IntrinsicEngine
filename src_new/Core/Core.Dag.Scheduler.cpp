@@ -15,15 +15,26 @@ module Extrinsic.Core.Dag.Scheduler;
 
 namespace Extrinsic::Core::Dag
 {
-    namespace
-    {
-        struct CachedTask
+        namespace
         {
-            PendingTaskDesc desc{};
-            std::string debugNameStorage{};
-            std::vector<TaskId> dependsOn{};
-            std::vector<ResourceAccess> resources{};
-        };
+            struct CachedTask
+            {
+                PendingTaskDesc desc{};
+                std::string debugNameStorage{};
+                std::vector<TaskId> dependsOn{};
+                std::vector<ResourceAccess> resources{};
+            };
+
+            void InitializeCachedTask(CachedTask& cached, const PendingTaskDesc& pending)
+            {
+                cached.desc = pending;
+                cached.debugNameStorage = std::string(pending.debugName);
+                cached.dependsOn.assign(pending.dependsOn.begin(), pending.dependsOn.end());
+                cached.resources.assign(pending.resources.begin(), pending.resources.end());
+                cached.desc.debugName = cached.debugNameStorage;
+                cached.desc.dependsOn = std::span<const TaskId>(cached.dependsOn.data(), cached.dependsOn.size());
+                cached.desc.resources = std::span<const ResourceAccess>(cached.resources.data(), cached.resources.size());
+            }
 
         using TaskList = std::vector<CachedTask>;
 
@@ -41,7 +52,7 @@ namespace Extrinsic::Core::Dag
         //      keyed by (priority, -level, insertion) to guarantee a stable
         //      total ordering.
         [[nodiscard]] Expected<std::vector<PlanTask>> BuildPlanFromTasks(
-            const TaskList& tasks,
+            TaskList& tasks,
             const BuildConfig& config,
             ScheduleStats& outStats)
         {
@@ -49,6 +60,13 @@ namespace Extrinsic::Core::Dag
             outStats.taskCount = static_cast<uint32_t>(tasks.size());
             if (tasks.empty())
                 return std::vector<PlanTask>{};
+
+            for (auto& task : tasks)
+            {
+                task.desc.debugName = task.debugNameStorage;
+                task.desc.dependsOn = std::span<const TaskId>(task.dependsOn.data(), task.dependsOn.size());
+                task.desc.resources = std::span<const ResourceAccess>(task.resources.data(), task.resources.size());
+            }
 
             const auto N = tasks.size();
 
@@ -430,15 +448,8 @@ namespace Extrinsic::Core::Dag
                 if (!pending.id.IsValid())
                     return false;
 
-                CachedTask cached{};
-                cached.desc = pending;
-                cached.debugNameStorage = std::string(pending.debugName);
-                cached.dependsOn.assign(pending.dependsOn.begin(), pending.dependsOn.end());
-                cached.resources.assign(pending.resources.begin(), pending.resources.end());
-                cached.desc.debugName = cached.debugNameStorage;
-                cached.desc.dependsOn = std::span<const TaskId>(cached.dependsOn.data(), cached.dependsOn.size());
-                cached.desc.resources = std::span<const ResourceAccess>(cached.resources.data(), cached.resources.size());
-                m_CachedTasks.push_back(std::move(cached));
+                m_CachedTasks.emplace_back();
+                InitializeCachedTask(m_CachedTasks.back(), pending);
                 return true;
             }
 
@@ -469,17 +480,9 @@ namespace Extrinsic::Core::Dag
             {
                 if (!task.id.IsValid() || task.domain != m_Domain)
                     return Err(ErrorCode::InvalidArgument);
-                CachedTask cached{};
-                cached.desc = task;
-                cached.debugNameStorage = std::string(task.debugName);
-                cached.dependsOn.assign(task.dependsOn.begin(), task.dependsOn.end());
-                cached.resources.assign(task.resources.begin(), task.resources.end());
-                cached.desc.debugName = cached.debugNameStorage;
-                cached.desc.dependsOn = std::span<const TaskId>(
-                    cached.dependsOn.data(), cached.dependsOn.size());
-                cached.desc.resources = std::span<const ResourceAccess>(
-                    cached.resources.data(), cached.resources.size());
-                m_Tasks.push_back(std::move(cached));
+
+                m_Tasks.emplace_back();
+                InitializeCachedTask(m_Tasks.back(), task);
                 return Ok();
             }
 
