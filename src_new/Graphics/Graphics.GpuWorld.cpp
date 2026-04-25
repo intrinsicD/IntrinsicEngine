@@ -484,6 +484,21 @@ namespace Extrinsic::Graphics
             return;
         }
 
+        for (std::uint32_t i = 0; i < m_Impl->Desc.MaxInstances; ++i)
+        {
+            const auto& instanceMeta = m_Impl->InstanceSlots.Meta[i];
+            if (!instanceMeta.Live)
+            {
+                continue;
+            }
+            auto& instanceStatic = m_Impl->InstanceStaticCpu[i];
+            if (instanceStatic.GeometrySlot == geometry.Index)
+            {
+                instanceStatic.GeometrySlot = RHI::GpuInstanceStatic::InvalidGeometrySlot;
+                m_Impl->DirtyInstanceStatic[i] = true;
+            }
+        }
+
         m_Impl->GeometryRecordsCpu[geometry.Index] = {};
         m_Impl->DirtyGeometryRecord[geometry.Index] = true;
         m_Impl->GeometrySlots.Free(geometry);

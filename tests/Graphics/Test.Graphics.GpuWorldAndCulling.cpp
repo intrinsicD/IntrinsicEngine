@@ -210,3 +210,59 @@ TEST(GraphicsGpuWorld, GeometryUpload_UsesVertexUnitsForOffsets)
     EXPECT_TRUE(found0);
     EXPECT_TRUE(found1);
 }
+
+TEST(GraphicsGpuWorld, FreeGeometry_InvalidatesLiveInstanceGeometrySlots)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    Graphics::GpuWorld world;
+
+    Graphics::GpuWorld::InitDesc init{};
+    init.MaxInstances = 8;
+    init.MaxGeometryRecords = 8;
+    init.MaxLights = 1;
+    init.VertexBufferBytes = 1ull << 20;
+    init.IndexBufferBytes = 1ull << 20;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, init));
+
+    const auto instance = world.AllocateInstance(101u);
+    ASSERT_TRUE(instance.IsValid());
+
+    const auto geometry = world.UploadGeometry({
+        .PackedVertexBytes = VertexBytes(),
+        .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
+        .LineIndices = {},
+        .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
+        .LocalBounds = {},
+        .DebugName = "tri-free"
+    });
+    ASSERT_TRUE(geometry.IsValid());
+
+    world.SetInstanceGeometry(instance, geometry);
+    world.SetInstanceRenderFlags(instance, RHI::GpuRender_Surface | RHI::GpuRender_Visible);
+    world.SyncFrame();
+
+    device.BufferWrites.clear();
+    world.FreeGeometry(geometry);
+    world.SyncFrame();
+
+    bool invalidated = false;
+    const RHI::BufferHandle instanceStaticBuffer = world.GetInstanceStaticBuffer();
+    for (const auto& write : device.BufferWrites)
+    {
+        if (write.Handle != instanceStaticBuffer || write.Data.size() != sizeof(RHI::GpuInstanceStatic))
+        {
+            continue;
+        }
+        const std::uint64_t slot = write.Offset / sizeof(RHI::GpuInstanceStatic);
+        if (slot != instance.Index)
+        {
+            continue;
+        }
+        const auto* st = reinterpret_cast<const RHI::GpuInstanceStatic*>(write.Data.data());
+        EXPECT_EQ(st->GeometrySlot, RHI::GpuInstanceStatic::InvalidGeometrySlot);
+        invalidated = true;
+    }
+
+    EXPECT_TRUE(invalidated);
+}

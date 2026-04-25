@@ -88,7 +88,7 @@ namespace Extrinsic::Graphics
         {
             auto& bucket = Buckets[ToIndex(kind)];
 
-            const std::uint64_t indexedArgsBytes = capacity * sizeof(RHI::GpuDrawCommand);
+            const std::uint64_t indexedArgsBytes = capacity * sizeof(RHI::GpuDrawIndexedCommand);
             const std::uint64_t pointArgsBytes   = capacity * sizeof(RHI::GpuDrawCommand);
             const std::uint64_t countBytes       = sizeof(std::uint32_t);
 
@@ -299,6 +299,7 @@ namespace Extrinsic::Graphics
         const auto pipe = m_Impl->PipelineMgr->GetDeviceHandle(m_Impl->CullPipeline.GetHandle());
         if (!pipe.IsValid()) return;
 
+        bool resizedBuckets = false;
         if (gpuWorld.GetInstanceCapacity() > m_Impl->Capacity)
         {
             [[maybe_unused]] const bool resized = m_Impl->AllocateGpuBuffers(gpuWorld.GetInstanceCapacity());
@@ -307,6 +308,12 @@ namespace Extrinsic::Graphics
             {
                 return;
             }
+            resizedBuckets = true;
+        }
+
+        if (resizedBuckets)
+        {
+            ResetCounters(cmd);
         }
 
         RHI::GpuCullPushConstants pc{};
