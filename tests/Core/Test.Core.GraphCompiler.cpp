@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -23,6 +24,16 @@ namespace
         if (!plan.has_value())
             return {};
         return *plan;
+    }
+
+    [[nodiscard]] uint32_t FindBatchFor(const std::vector<PlanTask>& plan, TaskId id)
+    {
+        for (const auto& task : plan)
+        {
+            if (task.id == id)
+                return task.batch;
+        }
+        return std::numeric_limits<uint32_t>::max();
     }
 }
 
@@ -162,4 +173,141 @@ TEST(CoreGraphCompiler, DeterministicOverRepeatedCompiles)
             EXPECT_EQ(current[k].topoOrder, baseline[k].topoOrder);
         }
     }
+}
+
+TEST(CoreGraphCompiler, ResourceHazardRawOrdersWriterBeforeReader)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId writer{100, 1};
+    const TaskId reader{101, 1};
+    const ResourceId resource{7, 1};
+    const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+    const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = reader, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+
+    const auto plan = BuildOrFail(*graph);
+    EXPECT_LT(FindBatchFor(plan, writer), FindBatchFor(plan, reader));
+}
+
+TEST(CoreGraphCompiler, ResourceHazardWarOrdersReaderBeforeWriter)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId reader{110, 1};
+    const TaskId writer{111, 1};
+    const ResourceId resource{8, 1};
+    const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
+    const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = reader, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+
+    const auto plan = BuildOrFail(*graph);
+    EXPECT_LT(FindBatchFor(plan, reader), FindBatchFor(plan, writer));
+}
+
+TEST(CoreGraphCompiler, ResourceHazardRarKeepsReadersParallel)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId readerA{120, 1};
+    const TaskId readerB{121, 1};
+    const ResourceId resource{9, 1};
+    const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerA, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerB, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+
+    const auto plan = BuildOrFail(*graph);
+    EXPECT_EQ(FindBatchFor(plan, readerA), FindBatchFor(plan, readerB));
+}
+
+TEST(CoreGraphCompiler, ResourceHazardWawOrdersWriters)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId writerA{122, 1};
+    const TaskId writerB{123, 1};
+    const ResourceId resource{10, 1};
+    const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writerA, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writerB, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+
+    const auto plan = BuildOrFail(*graph);
+    EXPECT_LT(FindBatchFor(plan, writerA), FindBatchFor(plan, writerB));
+}
+
+TEST(CoreGraphCompiler, MultipleReadersSerializeBeforeWriter)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId readerA{124, 1};
+    const TaskId readerB{125, 1};
+    const TaskId writer{126, 1};
+    const ResourceId resource{11, 1};
+    const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
+    const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerA, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = readerB, .domain = QueueDomain::Cpu, .resources = readAccess}).has_value());
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{.id = writer, .domain = QueueDomain::Cpu, .resources = writeAccess}).has_value());
+
+    const auto plan = BuildOrFail(*graph);
+    const auto writerBatch = FindBatchFor(plan, writer);
+    EXPECT_LT(FindBatchFor(plan, readerA), writerBatch);
+    EXPECT_LT(FindBatchFor(plan, readerB), writerBatch);
+}
+
+TEST(CoreGraphCompiler, ResourceHazardsContributeToEdgeStats)
+{
+    const TaskId writer{130, 1};
+    const TaskId reader{131, 1};
+    const ResourceId resource{10, 1};
+    const std::array<ResourceAccess, 1> writeAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Write}};
+    const std::array<ResourceAccess, 1> readAccess{ResourceAccess{.resource = resource, .mode = ResourceAccessMode::Read}};
+
+    struct HazardProducerCtx
+    {
+        TaskId writer{};
+        TaskId reader{};
+        std::array<ResourceAccess, 1> write{};
+        std::array<ResourceAccess, 1> read{};
+    } ctx{
+        .writer = writer,
+        .reader = reader,
+        .write = writeAccess,
+        .read = readAccess,
+    };
+
+    const auto emitHazard = [](void* producerCtx, void* emitCtx, EmitPendingTaskFn emit) -> Extrinsic::Core::Result
+    {
+        auto* localCtx = static_cast<HazardProducerCtx*>(producerCtx);
+        PendingTaskDesc a{.id = localCtx->writer, .domain = QueueDomain::Cpu, .resources = localCtx->write};
+        PendingTaskDesc b{.id = localCtx->reader, .domain = QueueDomain::Cpu, .resources = localCtx->read};
+        if (!emit(emitCtx, a) || !emit(emitCtx, b))
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidState);
+        return Extrinsic::Core::Ok();
+    };
+
+    auto scheduler = CreateDagScheduler();
+    ASSERT_NE(scheduler, nullptr);
+    const auto producer = scheduler->RegisterProducer(
+        ProducerInfo{.name = "hazard_stats", .subsystemId = 1, .preferredDomain = QueueDomain::Cpu},
+        &ctx,
+        emitHazard);
+    ASSERT_TRUE(producer.has_value());
+    ASSERT_TRUE(scheduler->QueryAllPending().has_value());
+
+    const auto plan = scheduler->BuildSchedule(BuildConfig{});
+    ASSERT_TRUE(plan.has_value());
+    EXPECT_GE(scheduler->GetLastStats().edgeCount, 1u);
 }
