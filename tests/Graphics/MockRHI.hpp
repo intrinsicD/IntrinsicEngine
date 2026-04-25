@@ -16,8 +16,12 @@
 //   #include "MockRHI.hpp"
 
 #include <cstdint>
+#include <cstddef>
+#include <cstring>
 #include <expected>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace Extrinsic::Tests
 {
@@ -104,6 +108,13 @@ namespace Extrinsic::Tests
     class MockDevice final : public RHI::IDevice
     {
     public:
+        struct BufferWriteRecord
+        {
+            RHI::BufferHandle Handle{};
+            std::uint64_t Offset = 0;
+            std::vector<std::byte> Data{};
+        };
+
         // ---- Knobs ---------------------------------------------------------
         bool Operational            = true;
         bool FailNextBufferCreate   = false;
@@ -120,6 +131,7 @@ namespace Extrinsic::Tests
         int DestroySamplerCount  = 0;
         int CreatePipelineCount  = 0;
         int DestroyPipelineCount = 0;
+        std::vector<BufferWriteRecord> BufferWrites;
 
         MockBindlessHeap   Bindless;
         MockCommandContext CommandContext;
@@ -146,7 +158,18 @@ namespace Extrinsic::Tests
             return RHI::BufferHandle{m_NextBuffer++, 1u};
         }
         void DestroyBuffer(RHI::BufferHandle) override { ++DestroyBufferCount; }
-        void WriteBuffer(RHI::BufferHandle, const void*, std::uint64_t, std::uint64_t) override {}
+        void WriteBuffer(RHI::BufferHandle handle, const void* src, std::uint64_t size, std::uint64_t offset) override
+        {
+            BufferWriteRecord rec;
+            rec.Handle = handle;
+            rec.Offset = offset;
+            rec.Data.resize(static_cast<std::size_t>(size));
+            if (size > 0 && src != nullptr)
+            {
+                std::memcpy(rec.Data.data(), src, static_cast<std::size_t>(size));
+            }
+            BufferWrites.push_back(std::move(rec));
+        }
         [[nodiscard]] std::uint64_t GetBufferDeviceAddress(RHI::BufferHandle) const override { return 0; }
 
         RHI::TextureHandle CreateTexture(const RHI::TextureDesc&) override
