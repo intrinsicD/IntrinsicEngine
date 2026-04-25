@@ -2179,7 +2179,7 @@ GBuf_EntityId = inst.EntityID;
 
 ---
 
-## Phase 13 — Light buffer
+## Phase 13 — Light buffer — **Complete**
 
 ### Files
 
@@ -2217,7 +2217,7 @@ Call:
 gpuWorld.SetLights(lights);
 ```
 
-### TODO 13.3 — Deferred lighting shader reads light buffer
+### TODO 13.3 — Deferred lighting shader reads light buffer — **Done**
 
 Deferred lighting pass receives `SceneTableBDA`, reads:
 
