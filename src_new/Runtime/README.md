@@ -10,6 +10,7 @@ deterministic startup/shutdown.
 |---|---|
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring |
 | `Extrinsic.Runtime.FrameClock` | Per-frame wall-clock management (clamped delta, resample after sleep) |
+| `Extrinsic.Runtime.StreamingExecutor` | Persistent background task table for async streaming jobs |
 
 ## File inventory
 
@@ -17,6 +18,8 @@ deterministic startup/shutdown.
 Runtime.Engine.cppm          — Engine + IApplication interface
 Runtime.Engine.cpp           — implementation (RunFrame canonical loop)
 Runtime.FrameClock.cppm      — FrameClock (header-only, no .cpp)
+Runtime.StreamingExecutor.cppm — Streaming task API + state machine contract
+Runtime.StreamingExecutor.cpp  — Streaming executor implementation
 ```
 
 ## Application contract
