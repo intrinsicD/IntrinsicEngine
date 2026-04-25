@@ -74,10 +74,14 @@ Per-entity BDA pointers, element count, and color source mode are written to
 ### Frame sync call order
 
 ```
-1. MaterialSystem::SyncGpuBuffer()          — flush dirty base materials
-2. VisualizationSyncSystem::Sync(reg, …)    — resolve EffectiveSlot, patch overrides
-3. MaterialSystem::SyncGpuBuffer()          — flush dirty override materials
-4. TransformSyncSystem::SyncGpuBuffer(…)    — write EffectiveSlot → GpuInstanceData
+1. PipelineManager::CommitPending()                                  — finalize pending PSO objects
+2. MaterialSystem::SyncGpuBuffer()                                   — flush dirty base materials
+3. VisualizationSyncSystem::Sync(reg, mat, cmap, gpuWorld)          — resolve EffectiveSlot, write GpuEntityConfig
+4. MaterialSystem::SyncGpuBuffer()                                   — flush dirty override materials
+5. TransformSyncSystem::SyncGpuBuffer(reg, gpuWorld)                — write transforms/flags/material slots/bounds
+6. LightSystem::SyncGpuBuffer(reg, gpuWorld)                        — write GpuLight[] payload
+7. GpuWorld::SetMaterialBuffer(matSys.GetBuffer(), GetCapacity())   — refresh scene-table material binding
+8. GpuWorld::SyncFrame()                                             — upload dirty runs + scene table
 ```
 
 ### Data contracts
