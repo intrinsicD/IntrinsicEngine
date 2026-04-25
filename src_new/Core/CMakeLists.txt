@@ -9,6 +9,11 @@ target_sources(${target_name}
         Core.Config.Simulation.cppm
         Core.Config.Engine.cppm
         Core.Dag.Scheduler.cppm
+        Core.Dag.Scheduler.Types.cppm
+        Core.Dag.Scheduler.Hazards.cppm
+        Core.Dag.Scheduler.Policy.cppm
+        Core.Dag.Scheduler.Compiler.cppm
+        Core.Dag.Scheduler.DomainGraph.cppm
         Core.Dag.TaskGraph.cppm
         Core.FrameGraph.cppm
         Core.IOBackend.cppm

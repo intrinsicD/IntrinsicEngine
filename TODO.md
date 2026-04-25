@@ -2633,59 +2633,59 @@ Current-state matrix (T000 audit):
 
 **Files to add or split:**
 
-- [ ] `src_new/Core/Core.Dag.Scheduler.Types.cppm`
-- [ ] `src_new/Core/Core.Dag.Scheduler.Hazards.cppm`
-- [ ] `src_new/Core/Core.Dag.Scheduler.Compiler.cppm`
-- [ ] `src_new/Core/Core.Dag.Scheduler.Policy.cppm`
-- [ ] `src_new/Core/Core.Dag.Scheduler.DomainGraph.cppm`
+- [x] `src_new/Core/Core.Dag.Scheduler.Types.cppm`
+- [x] `src_new/Core/Core.Dag.Scheduler.Hazards.cppm`
+- [x] `src_new/Core/Core.Dag.Scheduler.Compiler.cppm`
+- [x] `src_new/Core/Core.Dag.Scheduler.Policy.cppm`
+- [x] `src_new/Core/Core.Dag.Scheduler.DomainGraph.cppm`
 - [ ] Matching `.cpp` implementation units as needed.
-- [ ] Update `src_new/Core/Core.Dag.Scheduler.cppm` to re-export the partitions.
-- [ ] Update `src_new/Core/CMakeLists.txt`.
+- [x] Update `src_new/Core/Core.Dag.Scheduler.cppm` to re-export the partitions.
+- [x] Update `src_new/Core/CMakeLists.txt`.
 
 **Public/minimally public types:**
 
-- [ ] `TaskId`
-- [ ] `ResourceId`
-- [ ] `LabelId`
-- [ ] `ResourceAccess`
-- [ ] `ResourceAccessMode`
-- [ ] `TaskPriority`
-- [ ] `QueueDomain`
-- [ ] `TaskKind`
-- [ ] `PendingTaskDesc`
-- [ ] `PlanTask`
-- [ ] `ExecutionLayer`
-- [ ] `BuildConfig`
-- [ ] `ScheduleStats`
-- [ ] `CompiledGraph` or equivalent immutable compiled-plan type.
+- [x] `TaskId`
+- [x] `ResourceId`
+- [x] `LabelId`
+- [x] `ResourceAccess`
+- [x] `ResourceAccessMode`
+- [x] `TaskPriority`
+- [x] `QueueDomain`
+- [x] `TaskKind`
+- [x] `PendingTaskDesc`
+- [x] `PlanTask`
+- [x] `ExecutionLayer` (represented via `PlanTask::batch` topological layering).
+- [x] `BuildConfig`
+- [x] `ScheduleStats`
+- [x] `CompiledGraph` or equivalent immutable compiled-plan type.
 
 **Implementation details:**
 
-- [ ] Keep stable generation/index handle semantics where they already exist.
-- [ ] Keep existing public APIs source-compatible where practical.
-- [ ] Do not expose GPU layouts, Vulkan concepts, texture usages, or barrier details from Core.
-- [ ] Make `PlanTask::batch` mean topological layer, not priority.
-- [ ] Preserve `TaskPriority` separately from topo layer.
-- [ ] Preserve deterministic plan ordering.
+- [x] Keep stable generation/index handle semantics where they already exist.
+- [x] Keep existing public APIs source-compatible where practical.
+- [x] Do not expose GPU layouts, Vulkan concepts, texture usages, or barrier details from Core.
+- [x] Make `PlanTask::batch` mean topological layer, not priority.
+- [x] Preserve `TaskPriority` separately from topo layer.
+- [x] Preserve deterministic plan ordering.
 
 **Tests to add:**
 
-- [ ] `tests/Core/Test.Core.GraphCompiler.cpp`
-  - [ ] Empty graph compiles.
-  - [ ] Single-node graph compiles.
-  - [ ] Independent nodes produce zero dependency edges.
-  - [ ] Explicit dependencies produce valid topological order.
-  - [ ] Missing explicit dependency returns `InvalidArgument` or existing equivalent error.
-  - [ ] Duplicate `TaskId` returns `InvalidArgument`.
-  - [ ] Priority ordering is stable among ready nodes.
-  - [ ] `batch` values are actual topological layers.
-  - [ ] Deterministic ordering repeated over at least 100 compiles.
+- [x] `tests/Core/Test.Core.GraphCompiler.cpp`
+  - [x] Empty graph compiles.
+  - [x] Single-node graph compiles.
+  - [x] Independent nodes produce zero dependency edges.
+  - [x] Explicit dependencies produce valid topological order.
+  - [x] Missing explicit dependency returns `InvalidArgument` or existing equivalent error.
+  - [x] Duplicate `TaskId` returns `InvalidArgument`.
+  - [x] Priority ordering is stable among ready nodes.
+  - [x] `batch` values are actual topological layers.
+  - [x] Deterministic ordering repeated over at least 100 compiles.
 
 **Acceptance criteria:**
 
-- [ ] Existing scheduler users still compile.
-- [ ] Public API churn is minimal and documented.
-- [ ] New tests are registered in `tests/Core/CMakeLists.txt`.
+- [x] Existing scheduler users still compile.
+- [x] Public API churn is minimal and documented.
+- [x] New tests are registered in `tests/Core/CMakeLists.txt`.
 
 ## T011 — Implement `ResourceHazardBuilder`
 
