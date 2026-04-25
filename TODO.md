@@ -1696,7 +1696,7 @@ Do not allocate one host-visible storage buffer per entity for positions/scalars
 
 ---
 
-## Phase 9 — Redesign culling system around draw buckets
+## Phase 9 — Redesign culling system around draw buckets — **Complete**
 
 ### Files
 
@@ -1707,7 +1707,9 @@ Do not allocate one host-visible storage buffer per entity for positions/scalars
 
 The current culling system owns one cull input buffer, one draw-command buffer, and one visibility counter. That is only a scaffold. It should become bucketed: surface, line, point, shadow, etc. The current implementation already writes `DrawCommandBuffer` and `VisibilityCountBuffer`, but the count-buffer barrier after dispatch uses `ShaderRead`; indirect drawing needs `IndirectRead`. ([GitHub][8])
 
-### TODO 9.1 — Add draw bucket resource struct
+### TODO 9.1 — **Done**
+
+— Add draw bucket resource struct
 
 In `Graphics.CullingSystem.cppm`, add:
 
@@ -1721,7 +1723,9 @@ struct GpuDrawBucket {
 };
 ```
 
-### TODO 9.2 — CullingSystem owns one bucket per kind
+### TODO 9.2 — **Done**
+
+— CullingSystem owns one bucket per kind
 
 In implementation, store:
 
@@ -1749,7 +1753,9 @@ RHI::BufferUsage::TransferDst
 
 for command buffers and count buffers.
 
-### TODO 9.3 — Replace old `GpuCullData`
+### TODO 9.3 — **Done**
+
+— Replace old `GpuCullData`
 
 Stop using a separate CPU-written `GpuCullData[]`.
 
@@ -1763,7 +1769,9 @@ GpuSceneTable
   -> Bounds[]
 ```
 
-### TODO 9.4 — New culling push constants
+### TODO 9.4 — **Done**
+
+— New culling push constants
 
 Add in `RHI.Types.cppm`:
 
@@ -1802,7 +1810,9 @@ std::uint64_t CullOutputTableBDA;
 
 Prefer the output-table solution if push constant size becomes an issue.
 
-### TODO 9.5 — Reset counters using `FillBuffer`
+### TODO 9.5 — **Done**
+
+— Reset counters using `FillBuffer`
 
 Replace current host `WriteBuffer` reset with:
 
@@ -1813,7 +1823,9 @@ cmd.BufferBarrier(bucket.CountBuffer, RHI::MemoryAccess::TransferWrite, RHI::Mem
 
 Do this for every bucket.
 
-### TODO 9.6 — Dispatch linear culling
+### TODO 9.6 — **Done**
+
+— Dispatch linear culling
 
 Culling dispatch:
 
@@ -1824,7 +1836,9 @@ cmd.Dispatch(groups, 1, 1);
 
 Do not dispatch by live count unless you have a compact live-instance list. Linear pass can skip non-live/invisible instances using flags.
 
-### TODO 9.7 — Correct post-cull barriers
+### TODO 9.7 — **Done**
+
+— Correct post-cull barriers
 
 After dispatch:
 
@@ -1835,7 +1849,9 @@ cmd.BufferBarrier(countBuffer, RHI::MemoryAccess::ShaderWrite, RHI::MemoryAccess
 
 For all buckets.
 
-### TODO 9.8 — Accessors
+### TODO 9.8 — **Done**
+
+— Accessors
 
 Add:
 
