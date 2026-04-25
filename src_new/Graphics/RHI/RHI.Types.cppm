@@ -165,7 +165,7 @@ export namespace Extrinsic::RHI
     };
     static_assert(sizeof(GpuCullPushConstants) <= 128);
 
-    struct alignas(16) GpuCullBucketOutput
+    struct alignas(8) GpuCullBucketOutput
     {
         std::uint64_t ArgsBDA = 0;
         std::uint64_t CountBDA = 0;
@@ -174,7 +174,9 @@ export namespace Extrinsic::RHI
     };
     static_assert(sizeof(GpuCullBucketOutput) == 24);
 
-    struct alignas(16) GpuCullBucketTable
+    static_assert(alignof(GpuCullBucketOutput) == 8);
+
+    struct alignas(8) GpuCullBucketTable
     {
         GpuCullBucketOutput SurfaceOpaque{};
         GpuCullBucketOutput SurfaceAlphaMask{};
@@ -183,6 +185,7 @@ export namespace Extrinsic::RHI
         GpuCullBucketOutput ShadowOpaque{};
     };
     static_assert(sizeof(GpuCullBucketTable) == 120);
+    static_assert(alignof(GpuCullBucketTable) == 8);
     // -------------------------------------------------------
     // Per-frame camera + lighting UBO  (set 0, binding 0)
     // Matches the global descriptor set consumed by every lit pass.
@@ -294,11 +297,11 @@ export namespace Extrinsic::RHI
     };
 
     // -------------------------------------------------------
-    // Indirect draw command  (VkDrawIndexedIndirectCommand)
-    // Written by the cull compute shader into the draw-command
+    // Indirect indexed draw command  (VkDrawIndexedIndirectCommand)
+    // Written by the cull compute shader into indexed draw-command
     // SSBO; consumed by DrawIndexedIndirectCount.
     // -------------------------------------------------------
-    struct GpuDrawCommand
+    struct GpuDrawIndexedCommand
     {
         std::uint32_t IndexCount    = 0;
         std::uint32_t InstanceCount = 0;
@@ -306,7 +309,20 @@ export namespace Extrinsic::RHI
         std::int32_t  VertexOffset  = 0;
         std::uint32_t FirstInstance = 0;
     };
-    static_assert(sizeof(GpuDrawCommand) == 20);
+    static_assert(sizeof(GpuDrawIndexedCommand) == 20);
+
+    // -------------------------------------------------------
+    // Indirect non-indexed draw command  (VkDrawIndirectCommand)
+    // Used for point visualization buckets consumed via DrawIndirectCount.
+    // -------------------------------------------------------
+    struct GpuDrawCommand
+    {
+        std::uint32_t VertexCount   = 0;
+        std::uint32_t InstanceCount = 0;
+        std::uint32_t FirstVertex   = 0;
+        std::uint32_t FirstInstance = 0;
+    };
+    static_assert(sizeof(GpuDrawCommand) == 16);
 
     // -------------------------------------------------------
     // Culling compute push constants
