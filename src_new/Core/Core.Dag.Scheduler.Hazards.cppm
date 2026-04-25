@@ -82,6 +82,10 @@ export namespace Extrinsic::Core::Dag
                         emitEdge(state.lastWriter, node, HazardKind::Raw);
                     state.currentReaders.push_back(node);
                     break;
+                case ResourceAccessMode::WeakRead:
+                    if (hasWriter)
+                        emitEdge(state.lastWriter, node, HazardKind::Raw);
+                    break;
                 case ResourceAccessMode::Write:
                 case ResourceAccessMode::ReadWrite:
                     if (hasWriter)

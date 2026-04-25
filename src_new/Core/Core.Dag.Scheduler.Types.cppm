@@ -50,6 +50,7 @@ export namespace Extrinsic::Core::Dag
     enum class ResourceAccessMode : uint8_t
     {
         Read = 0,
+        WeakRead,
         Write,
         ReadWrite,
     };

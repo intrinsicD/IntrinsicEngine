@@ -119,6 +119,75 @@ TEST(CoreTaskGraph, CpuIndependentPassesStayInInsertionOrder)
         EXPECT_EQ(visits[i], i) << "Execution order drifted at index " << i;
 }
 
+TEST(CoreTaskGraph, WaitDependsOnAllPriorSignalers)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+    std::vector<std::string> log;
+
+    graph.AddPass("SignalA",
+        [](TaskGraphBuilder& b) { b.Signal("Gate"_id); },
+        [&]() { log.emplace_back("SignalA"); });
+
+    graph.AddPass("SignalB",
+        [](TaskGraphBuilder& b) { b.Signal("Gate"_id); },
+        [&]() { log.emplace_back("SignalB"); });
+
+    graph.AddPass("Waiter",
+        [](TaskGraphBuilder& b) { b.WaitFor("Gate"_id); },
+        [&]() { log.emplace_back("Waiter"); });
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
+    ASSERT_TRUE(graph.Execute().has_value()) << "Execute failed";
+    ASSERT_EQ(log.size(), 3u);
+    ExpectOrder(log, "SignalA", "Waiter");
+    ExpectOrder(log, "SignalB", "Waiter");
+}
+
+TEST(CoreTaskGraph, WaitWithoutPriorSignalFailsCompile)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+
+    graph.AddPass("Waiter",
+        [](TaskGraphBuilder& b) { b.WaitFor("NeverSignaled"_id); },
+        []() {});
+
+    graph.AddPass("LateSignal",
+        [](TaskGraphBuilder& b) { b.Signal("NeverSignaled"_id); },
+        []() {});
+
+    const auto compile = graph.Compile();
+    ASSERT_FALSE(compile.has_value());
+    EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+}
+
+TEST(CoreTaskGraph, IndependentLabelsDoNotInterfere)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+    std::vector<std::string> log;
+
+    graph.AddPass("SignalAlpha",
+        [](TaskGraphBuilder& b) { b.Signal("Alpha"_id); },
+        [&]() { log.emplace_back("SignalAlpha"); });
+
+    graph.AddPass("SignalBeta",
+        [](TaskGraphBuilder& b) { b.Signal("Beta"_id); },
+        [&]() { log.emplace_back("SignalBeta"); });
+
+    graph.AddPass("WaitAlpha",
+        [](TaskGraphBuilder& b) { b.WaitFor("Alpha"_id); },
+        [&]() { log.emplace_back("WaitAlpha"); });
+
+    graph.AddPass("WaitBeta",
+        [](TaskGraphBuilder& b) { b.WaitFor("Beta"_id); },
+        [&]() { log.emplace_back("WaitBeta"); });
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
+    ASSERT_TRUE(graph.Execute().has_value()) << "Execute failed";
+    ASSERT_EQ(log.size(), 4u);
+    ExpectOrder(log, "SignalAlpha", "WaitAlpha");
+    ExpectOrder(log, "SignalBeta", "WaitBeta");
+}
+
 TEST(CoreTaskGraph, GpuDomainBuildPlanIsStableAndExecuteIsRejected)
 {
     TaskGraph graph(QueueDomain::Gpu);
@@ -221,5 +290,4 @@ TEST(CoreFrameGraph, ResetRebuildsTheCpuGraphCleanly)
     ASSERT_EQ(log.size(), 2u);
     ExpectOrder(log, "First", "Second");
 }
-
 
