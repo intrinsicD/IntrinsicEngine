@@ -12,6 +12,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.FrameClock;
+import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
 
@@ -134,6 +135,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
+        [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
         [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
 
     private:
@@ -149,6 +151,8 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
         // Streaming task graph — async asset IO / geometry processing
         std::unique_ptr<Core::Dag::TaskGraph>  m_StreamingGraph;
+        // Persistent streaming executor — cross-frame background work
+        std::unique_ptr<StreamingExecutor>      m_StreamingExecutor;
         // Asset service — CPU payload authority
         std::unique_ptr<Assets::AssetService>  m_AssetService;
         // ECS scene registry

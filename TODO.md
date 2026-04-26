@@ -3131,10 +3131,10 @@ public:
 - [x] Dependency chain spans frames.
 - [x] Higher-priority ready task launches before lower-priority ready task.
 - [x] Cancelling a pending task prevents execution.
-- [ ] Cancelling a running task suppresses stale apply.
+- [x] Cancelling a running task suppresses stale apply.
 - [ ] Generation mismatch prevents stale result publication.
 - [x] `ApplyOnMainThread` runs on caller thread of `ApplyMainThreadResults()`.
-- [ ] Shutdown drains or cancels all running work deterministically.
+- [x] Shutdown drains or cancels all running work deterministically.
 
 ## T032 — Replace frame-local streaming graph tick
 
@@ -3142,20 +3142,20 @@ public:
 
 **Tasks:**
 
-- [ ] Locate current `Engine::TickStreamingGraph()` or equivalent.
-- [ ] Replace frame-local streaming graph execution with `StreamingExecutor` calls.
-- [ ] Phase 10 should call:
-  - [ ] collect completed transfers;
-  - [ ] drain streaming completions;
-  - [ ] apply main-thread results;
-  - [ ] tick asset service/state machines;
-  - [ ] pump a bounded number of background launches.
-- [ ] Keep old `GetStreamingGraph()` only as a temporary compatibility shim if required, and mark it deprecated.
-- [ ] Ensure shutdown calls `StreamingExecutor::ShutdownAndDrain()` before `Core.Tasks::Scheduler::Shutdown()`.
+- [x] Locate current `Engine::TickStreamingGraph()` or equivalent.
+- [x] Replace frame-local streaming graph execution with `StreamingExecutor` calls.
+- [x] Phase 10 should call:
+  - [x] collect completed transfers;
+  - [x] drain streaming completions;
+  - [x] apply main-thread results;
+  - [x] tick asset service/state machines;
+  - [x] pump a bounded number of background launches.
+- [x] Keep old `GetStreamingGraph()` only as a temporary compatibility shim if required, and mark it deprecated.
+- [x] Ensure shutdown calls `StreamingExecutor::ShutdownAndDrain()` before `Core.Tasks::Scheduler::Shutdown()`.
 
 **Tests:**
 
-- [ ] Add or create `tests/Runtime/Test.Runtime.StreamingExecutor.cpp`.
+- [x] Add or create `tests/Runtime/Test.Runtime.StreamingExecutor.cpp`.
 - [ ] Runtime maintenance phase applies completed streaming result once.
 - [ ] Streaming job cannot publish after engine shutdown begins.
 - [ ] Long streaming job does not block render extraction.

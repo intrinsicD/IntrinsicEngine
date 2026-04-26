@@ -1,7 +1,9 @@
 module;
 
 #include <memory>
+#include <limits>
 #include <utility>
+#include <vector>
 
 module Extrinsic.Runtime.Engine;
 
@@ -20,6 +22,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.FrameClock;
+import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
 
@@ -43,10 +46,9 @@ namespace Extrinsic::Runtime
             std::terminate();
         }
 
-        // Drain and dispatch all tasks produced by the streaming graph's plan.
-        // Called once per frame in the maintenance lane (Phase 10).
-        // No-op if the graph has no passes registered this frame.
-        void TickStreamingGraph(Core::Dag::TaskGraph& graph)
+        // Converts frame-recorded streaming passes into persistent executor tasks.
+        // Kept as compatibility bridge while call sites still populate GetStreamingGraph().
+        void SubmitStreamingGraphToExecutor(Core::Dag::TaskGraph& graph, StreamingExecutor& executor)
         {
             if (graph.PassCount() == 0)
                 return;
@@ -68,16 +70,39 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            // Move each pass's closure out of the graph before Reset() so the
-            // worker thread's capture outlives the graph's internal storage.
-            // After TakePassExecute the graph slot is null — no double-fire.
+            // Convert layer order into coarse dependencies:
+            // every task in batch N depends on all submitted tasks from batches < N.
+            // This preserves correctness and determinism with possible over-serialization.
+            std::vector<StreamingTaskHandle> priorBatches{};
+            std::vector<StreamingTaskHandle> currentBatch{};
+            std::uint32_t activeBatch = std::numeric_limits<std::uint32_t>::max();
+
             for (const auto& task : *plan)
             {
+                if (task.batch != activeBatch)
+                {
+                    priorBatches.insert(priorBatches.end(), currentBatch.begin(), currentBatch.end());
+                    currentBatch.clear();
+                    activeBatch = task.batch;
+                }
+
                 auto fn = graph.TakePassExecute(task.id.Index);
                 if (fn)
                 {
-                    Core::Tasks::Scheduler::Dispatch(
-                        [f = std::move(fn)]() mutable { f(); });
+                    auto handle = executor.Submit(StreamingTaskDesc{
+                        .Name = "StreamingPass",
+                        .DependsOn = priorBatches,
+                        .Execute = [f = std::move(fn)]() mutable
+                        {
+                            f();
+                            return StreamingResult{};
+                        },
+                    });
+
+                    if (handle.IsValid())
+                    {
+                        currentBatch.push_back(handle);
+                    }
                 }
             }
 
@@ -122,6 +147,7 @@ namespace Extrinsic::Runtime
 
         // ── 4. Streaming task graph (asset IO / geometry processing) ──────
         m_StreamingGraph = Core::Dag::CreateTaskGraph(Core::Dag::QueueDomain::Streaming);
+        m_StreamingExecutor = std::make_unique<StreamingExecutor>();
 
         // ── 5. Asset service ──────────────────────────────────────────────
         m_AssetService = std::make_unique<Assets::AssetService>();
@@ -146,11 +172,14 @@ namespace Extrinsic::Runtime
         if (m_Application)
             m_Application->OnShutdown(*this);
 
-        // Drain any in-flight streaming tasks before tearing down the scheduler.
-        Core::Tasks::Scheduler::WaitForAll();
+        if (m_StreamingExecutor)
+        {
+            m_StreamingExecutor->ShutdownAndDrain();
+        }
 
         m_Scene.reset();
         m_AssetService.reset();
+        m_StreamingExecutor.reset();
         m_StreamingGraph.reset();
         m_FrameGraph.reset();
 
@@ -289,14 +318,15 @@ namespace Extrinsic::Runtime
         m_Device->GetTransferQueue().CollectCompleted();
         (void)completedGpuValue; // placeholder until GpuAssetCache / deferred-delete lands
 
-        // Streaming task graph: dispatch background IO / geometry-processing
-        // tasks registered this frame.  TickStreamingGraph compiles the DAG,
-        // hands leaf tasks to Tasks::Scheduler, and resets for next frame.
-        TickStreamingGraph(*m_StreamingGraph);
+        m_StreamingExecutor->DrainCompletions();
+        m_StreamingExecutor->ApplyMainThreadResults();
 
         // Asset service main-thread tick: advances state machines, fires
         // AssetEventBus::Ready / Reloaded / Destroyed callbacks.
         m_AssetService->Tick();
+
+        SubmitStreamingGraphToExecutor(*m_StreamingGraph, *m_StreamingExecutor);
+        m_StreamingExecutor->PumpBackground(8);
 
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();
