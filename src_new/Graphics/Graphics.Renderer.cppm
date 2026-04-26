@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 export module Extrinsic.Graphics.Renderer;
 
@@ -29,6 +30,20 @@ import Extrinsic.Graphics.RenderGraph;
 
 namespace Extrinsic::Graphics
 {
+    export struct RenderGraphFrameStats
+    {
+        bool CompileSucceeded = false;
+        bool ExecuteSucceeded = false;
+        std::uint32_t PassCount = 0;
+        std::uint32_t CulledPassCount = 0;
+        std::uint32_t ResourceCount = 0;
+        std::uint32_t BarrierCount = 0;
+        std::uint64_t CompileTimeMicros = 0;
+        std::uint64_t ExecuteTimeMicros = 0;
+        std::string DebugDump{};
+        std::string Diagnostic{};
+    };
+
     export class IRenderer
     {
     public:
@@ -96,6 +111,7 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual DeferredSystem&        GetDeferredSystem()  = 0;
         [[nodiscard]] virtual PostProcessSystem&     GetPostProcessSystem() = 0;
         [[nodiscard]] virtual ShadowSystem&          GetShadowSystem()    = 0;
+        [[nodiscard]] virtual const RenderGraphFrameStats& GetLastRenderGraphStats() const = 0;
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();

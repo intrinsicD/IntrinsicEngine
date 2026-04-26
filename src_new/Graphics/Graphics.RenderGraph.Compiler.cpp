@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cstdint>
 #include <expected>
+#include <sstream>
 #include <stack>
 #include <ranges>
 #include <string>
@@ -487,5 +488,57 @@ namespace Extrinsic::Graphics
             .BufferImported = std::move(bufferImported),
             .BarrierPackets = std::move(barrierPackets),
         };
+    }
+
+    std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled)
+    {
+        std::ostringstream out;
+        out << "RenderGraph\n";
+        out << "  pass_count=" << compiled.PassCount
+            << " culled_pass_count=" << compiled.CulledPassCount
+            << " resource_count=" << compiled.ResourceCount
+            << " edge_count=" << compiled.EdgeCount
+            << " barrier_packet_count=" << compiled.BarrierPackets.size() << '\n';
+
+        out << "  passes:\n";
+        for (std::size_t orderIndex = 0; orderIndex < compiled.TopologicalOrder.size(); ++orderIndex)
+        {
+            const auto passIndex = compiled.TopologicalOrder[orderIndex];
+            out << "    [" << orderIndex << "] pass=" << passIndex;
+            if (orderIndex < compiled.PassNames.size())
+            {
+                out << " name=\"" << compiled.PassNames[orderIndex] << '"';
+            }
+            if (passIndex < compiled.TopologicalLayerByPass.size())
+            {
+                out << " layer=" << compiled.TopologicalLayerByPass[passIndex];
+            }
+            out << '\n';
+        }
+
+        out << "  textures:\n";
+        for (std::size_t index = 0; index < compiled.TextureLifetimes.size(); ++index)
+        {
+            const auto& lifetime = compiled.TextureLifetimes[index];
+            out << "    texture[" << index << "] used=" << (lifetime.HasUse ? "true" : "false");
+            if (lifetime.HasUse)
+            {
+                out << " first=" << lifetime.FirstUsePass << " last=" << lifetime.LastUsePass;
+            }
+            out << '\n';
+        }
+
+        out << "  buffers:\n";
+        for (std::size_t index = 0; index < compiled.BufferLifetimes.size(); ++index)
+        {
+            const auto& lifetime = compiled.BufferLifetimes[index];
+            out << "    buffer[" << index << "] used=" << (lifetime.HasUse ? "true" : "false");
+            if (lifetime.HasUse)
+            {
+                out << " first=" << lifetime.FirstUsePass << " last=" << lifetime.LastUsePass;
+            }
+            out << '\n';
+        }
+        return out.str();
     }
 }
