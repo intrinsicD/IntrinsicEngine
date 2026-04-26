@@ -3457,7 +3457,7 @@ public:
 **Passes to register, feature-gated where appropriate:**
 
 - [x] Compute prologue / scene update / culling.
-- [ ] Picking pass, conditional on pending pick.
+- [x] Picking pass, conditional on pending pick.
 - [x] Optional depth prepass.
 - [x] G-buffer pass.
 - [x] Deferred lighting pass.
@@ -3483,7 +3483,7 @@ public:
 **Tests:**
 
 - [x] Expected pass names appear in compiled graph when features enabled.
-- [ ] Conditional picking pass absent when no pick request.
+- [x] Conditional picking pass absent when no pick request.
 - [x] G-buffer outputs feed deferred lighting.
 - [x] Deferred lighting feeds postprocess.
 - [x] Postprocess feeds present.

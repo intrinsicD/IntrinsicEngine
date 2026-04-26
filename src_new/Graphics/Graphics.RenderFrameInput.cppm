@@ -27,10 +27,14 @@ namespace Extrinsic::Graphics
         /// May differ from window client area on HiDPI displays.
         Platform::Extent2D Viewport{};
 
+        /// True when a pick query is pending for this frame.
+        /// Renderer pass registration may include the picking pass only
+        /// when this is set.
+        bool HasPendingPick{false};
+
         // Future expansion slots (zero-cost when unused):
         //   WorldSnapshot  World{};        — authoritative ECS snapshot
         //   InputSnapshot  Input{};        — input state at extraction time
         //   CameraParams   Camera{};       — interpolated camera
     };
 }
-

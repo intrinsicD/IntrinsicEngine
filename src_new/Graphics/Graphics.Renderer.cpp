@@ -124,8 +124,9 @@ namespace Extrinsic::Graphics
         RenderWorld ExtractRenderWorld(const RenderFrameInput& input) override
         {
             return RenderWorld{
-                .Viewport = input.Viewport,
-                .Alpha    = input.Alpha,
+                .Viewport       = input.Viewport,
+                .Alpha          = input.Alpha,
+                .HasPendingPick = input.HasPendingPick,
             };
         }
 
@@ -158,7 +159,7 @@ namespace Extrinsic::Graphics
         }
 
         void ExecuteFrame(const RHI::FrameHandle&,
-                          const RenderWorld&) override
+                          const RenderWorld& renderWorld) override
         {
             m_LastRenderGraphStats = {};
             m_RenderGraph.Reset();
@@ -270,9 +271,12 @@ namespace Extrinsic::Graphics
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Read(picking, BufferUsage::ShaderRead);
             });
-            [[maybe_unused]] const auto passPicking = m_RenderGraph.AddPass("Null.Picking", [picking](RenderGraphBuilder& builder) {
-                builder.Write(picking, BufferUsage::ShaderWrite);
-            });
+            if (renderWorld.HasPendingPick)
+            {
+                [[maybe_unused]] const auto passPicking = m_RenderGraph.AddPass("Null.Picking", [picking](RenderGraphBuilder& builder) {
+                    builder.Write(picking, BufferUsage::ShaderWrite);
+                });
+            }
             [[maybe_unused]] const auto passDepth = m_RenderGraph.AddPass("Null.DepthPrepass", [depth](RenderGraphBuilder& builder) {
                 builder.Write(depth, TextureUsage::DepthWrite);
             });
