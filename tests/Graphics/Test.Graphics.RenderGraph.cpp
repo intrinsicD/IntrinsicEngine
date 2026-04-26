@@ -222,6 +222,43 @@ TEST(GraphicsRenderGraph, WriteThenWriteCreatesDependency)
     EXPECT_LT(FindOrder(*compiled, first.Index), FindOrder(*compiled, second.Index));
 }
 
+TEST(GraphicsRenderGraph, ExplicitDependencyOrdersIndependentPasses)
+{
+    RenderGraph graph;
+    const auto producer = graph.AddPass("Producer",
+                                        [](RenderGraphBuilder& builder) {
+                                            builder.SideEffect();
+                                        });
+    const auto consumer = graph.AddPass("Consumer",
+                                        [producer](RenderGraphBuilder& builder) {
+                                            builder.DependsOn(producer);
+                                            builder.SideEffect();
+                                        });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_LT(FindOrder(*compiled, producer.Index), FindOrder(*compiled, consumer.Index));
+    EXPECT_EQ(compiled->EdgeCount, 1u);
+}
+
+TEST(GraphicsRenderGraph, InvalidExplicitDependencyFailsCompile)
+{
+    RenderGraph graph;
+    constexpr PassRef missingDependency{.Index = 42u, .Generation = 1u};
+    graph.AddPass("Consumer",
+                  [](RenderGraphBuilder& builder) {
+                      builder.SideEffect();
+                  });
+    graph.AddPass("Dependent",
+                  [missingDependency](RenderGraphBuilder& builder) {
+                      builder.DependsOn(missingDependency);
+                      builder.SideEffect();
+                  });
+
+    auto compiled = graph.Compile();
+    EXPECT_FALSE(compiled.has_value());
+}
+
 TEST(GraphicsRenderGraph, InvalidPresentTargetFailsValidation)
 {
     RenderGraph graph;

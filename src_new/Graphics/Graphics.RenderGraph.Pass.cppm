@@ -79,6 +79,7 @@ namespace Extrinsic::Graphics
         RenderQueue Queue = RenderQueue::Graphics;
         std::vector<TextureAccess> TextureAccesses{};
         std::vector<BufferAccess> BufferAccesses{};
+        std::vector<PassRef> ExplicitDependencies{};
         bool HasRenderPassDesc = false;
         RHI::RenderPassDesc RenderPass{};
         bool HasValidationError = false;
@@ -91,6 +92,7 @@ namespace Extrinsic::Graphics
         TextureRef Write(TextureRef ref, TextureUsage usage);
         BufferRef Read(BufferRef ref, BufferUsage usage);
         BufferRef Write(BufferRef ref, BufferUsage usage);
+        void DependsOn(PassRef dependency);
 
         void SetQueue(RenderQueue queue);
         void SetRenderPass(const RHI::RenderPassDesc& desc);

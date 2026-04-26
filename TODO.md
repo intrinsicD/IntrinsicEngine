@@ -3322,7 +3322,7 @@ public:
   - [x] write -> read;
   - [x] write -> write;
   - [x] read -> write;
-  - [ ] explicit pass dependency, if API supports it;
+  - [x] explicit pass dependency, if API supports it;
   - [ ] queue handoff placeholder edge, even if only one queue exists initially.
 - [x] Topologically sort passes using shared compiler substrate or a Graphics-specific wrapper around it.
 - [ ] Detect cycles with pass/resource names.
