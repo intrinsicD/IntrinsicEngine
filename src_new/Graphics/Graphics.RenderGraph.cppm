@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -32,6 +33,9 @@ namespace Extrinsic::Graphics
         RenderGraph& operator=(const RenderGraph&) = delete;
 
         [[nodiscard]] PassRef AddPass(std::string name, bool sideEffect = false);
+        [[nodiscard]] PassRef AddPass(std::string name,
+                                      std::move_only_function<void(RenderGraphBuilder&)> setup,
+                                      bool sideEffect = false);
         [[nodiscard]] TextureRef ImportBackbuffer(std::string name, RHI::TextureHandle handle);
         [[nodiscard]] TextureRef ImportTexture(std::string name,
                                                RHI::TextureHandle handle,

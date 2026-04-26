@@ -3283,31 +3283,31 @@ public:
 
 **Usage enums:**
 
-- [ ] `TextureUsage::ColorAttachmentRead`
-- [ ] `TextureUsage::ColorAttachmentWrite`
-- [ ] `TextureUsage::DepthRead`
-- [ ] `TextureUsage::DepthWrite`
-- [ ] `TextureUsage::ShaderRead`
-- [ ] `TextureUsage::ShaderWrite`
-- [ ] `TextureUsage::TransferSrc`
-- [ ] `TextureUsage::TransferDst`
-- [ ] `TextureUsage::Present`
-- [ ] `BufferUsage::IndirectRead`
-- [ ] `BufferUsage::IndexRead`
-- [ ] `BufferUsage::VertexRead` if needed
-- [ ] `BufferUsage::ShaderRead`
-- [ ] `BufferUsage::ShaderWrite`
-- [ ] `BufferUsage::TransferSrc`
-- [ ] `BufferUsage::TransferDst`
-- [ ] `BufferUsage::HostReadback`
+- [x] `TextureUsage::ColorAttachmentRead`
+- [x] `TextureUsage::ColorAttachmentWrite`
+- [x] `TextureUsage::DepthRead`
+- [x] `TextureUsage::DepthWrite`
+- [x] `TextureUsage::ShaderRead`
+- [x] `TextureUsage::ShaderWrite`
+- [x] `TextureUsage::TransferSrc`
+- [x] `TextureUsage::TransferDst`
+- [x] `TextureUsage::Present`
+- [x] `BufferUsage::IndirectRead`
+- [x] `BufferUsage::IndexRead`
+- [x] `BufferUsage::VertexRead` if needed
+- [x] `BufferUsage::ShaderRead`
+- [x] `BufferUsage::ShaderWrite`
+- [x] `BufferUsage::TransferSrc`
+- [x] `BufferUsage::TransferDst`
+- [x] `BufferUsage::HostReadback`
 
 **Tests:**
 
-- [ ] Pass with declared read compiles.
-- [ ] Pass with declared write compiles.
-- [ ] Pass cannot use invalid resource ref.
-- [ ] Pass cannot write an imported read-only/present-only resource unless imported as writable.
-- [ ] Side-effect pass is not culled.
+- [x] Pass with declared read compiles.
+- [x] Pass with declared write compiles.
+- [x] Pass cannot use invalid resource ref.
+- [x] Pass cannot write an imported read-only/present-only resource unless imported as writable.
+- [x] Side-effect pass is not culled.
 
 ## T043 — Implement RenderGraph compile validation and pass DAG
 

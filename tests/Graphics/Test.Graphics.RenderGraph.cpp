@@ -88,3 +88,75 @@ TEST(GraphicsRenderGraph, DuplicateDebugNamesAreAllowed)
     EXPECT_TRUE(graph.ValidateBufferRef(b).has_value());
     EXPECT_NE(a.Index, b.Index);
 }
+
+TEST(GraphicsRenderGraph, PassWithDeclaredReadCompiles)
+{
+    RenderGraph graph;
+    const auto tex = graph.CreateTexture("GBufferA", Extrinsic::RHI::TextureDesc{});
+
+    graph.AddPass("ReadPass",
+                  [tex](RenderGraphBuilder& builder) {
+                      const auto read = builder.Read(tex, TextureUsage::ShaderRead);
+                      EXPECT_TRUE(read.IsValid());
+                  });
+
+    auto compiled = graph.Compile();
+    EXPECT_TRUE(compiled.has_value());
+}
+
+TEST(GraphicsRenderGraph, PassWithDeclaredWriteCompiles)
+{
+    RenderGraph graph;
+    const auto tex = graph.CreateTexture("Lighting", Extrinsic::RHI::TextureDesc{});
+
+    graph.AddPass("WritePass",
+                  [tex](RenderGraphBuilder& builder) {
+                      const auto written = builder.Write(tex, TextureUsage::ColorAttachmentWrite);
+                      EXPECT_TRUE(written.IsValid());
+                  });
+
+    auto compiled = graph.Compile();
+    EXPECT_TRUE(compiled.has_value());
+}
+
+TEST(GraphicsRenderGraph, InvalidResourceRefFailsCompile)
+{
+    RenderGraph graph;
+    TextureRef invalid{.Index = 404u, .Generation = 7u};
+
+    graph.AddPass("InvalidRef",
+                  [invalid](RenderGraphBuilder& builder) {
+                      const auto result = builder.Read(invalid, TextureUsage::ShaderRead);
+                      EXPECT_FALSE(result.IsValid());
+                  });
+
+    auto compiled = graph.Compile();
+    EXPECT_FALSE(compiled.has_value());
+}
+
+TEST(GraphicsRenderGraph, CannotWriteReadOnlyImportedTexture)
+{
+    RenderGraph graph;
+    const auto imported = graph.ImportTexture(
+        "ReadOnlyHistory", Extrinsic::RHI::TextureHandle{3u, 1u}, TextureState::ShaderRead, TextureState::ShaderRead);
+
+    graph.AddPass("WriteImported",
+                  [imported](RenderGraphBuilder& builder) {
+                      const auto result = builder.Write(imported, TextureUsage::ShaderWrite);
+                      EXPECT_FALSE(result.IsValid());
+                  });
+
+    auto compiled = graph.Compile();
+    EXPECT_FALSE(compiled.has_value());
+}
+
+TEST(GraphicsRenderGraph, SideEffectPassIsNotCulled)
+{
+    RenderGraph graph;
+    const auto pass = graph.AddPass("DebugBlit", [](RenderGraphBuilder& builder) { builder.SideEffect(); }, false);
+
+    ASSERT_TRUE(pass.IsValid());
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->PassCount, 1u);
+}
