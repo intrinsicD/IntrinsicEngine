@@ -279,6 +279,82 @@ void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
     vkCmdPipelineBarrier2(m_Cmd, &dep);
 }
 
+void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
+{
+    std::vector<VkImageMemoryBarrier2> imageBarriers{};
+    std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
+    std::vector<VkMemoryBarrier2> memoryBarriers{};
+
+    imageBarriers.reserve(batch.TextureBarriers.size());
+    bufferBarriers.reserve(batch.BufferBarriers.size());
+    memoryBarriers.reserve(batch.MemoryBarriers.size());
+
+    for (const RHI::TextureBarrierDesc& desc : batch.TextureBarriers)
+    {
+        const auto* image = m_Images->GetIfValid(desc.Texture);
+        if (!image) continue;
+
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = ToVkStage(desc.BeforeAccess);
+        barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
+        barrier.dstStageMask = ToVkStage(desc.AfterAccess);
+        barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
+        barrier.oldLayout = ToVkImageLayout(desc.BeforeLayout);
+        barrier.newLayout = ToVkImageLayout(desc.AfterLayout);
+        barrier.srcQueueFamilyIndex = desc.SrcQueueFamily;
+        barrier.dstQueueFamilyIndex = desc.DstQueueFamily;
+        barrier.image = image->Image;
+        barrier.subresourceRange = {AspectFromFormat(image->Format), 0, image->MipLevels, 0, image->ArrayLayers};
+        imageBarriers.push_back(barrier);
+    }
+
+    for (const RHI::BufferBarrierDesc& desc : batch.BufferBarriers)
+    {
+        const auto* buffer = m_Buffers->GetIfValid(desc.Buffer);
+        if (!buffer) continue;
+
+        VkBufferMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        barrier.srcStageMask = ToVkStage(desc.BeforeAccess);
+        barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
+        barrier.dstStageMask = ToVkStage(desc.AfterAccess);
+        barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
+        barrier.srcQueueFamilyIndex = desc.SrcQueueFamily;
+        barrier.dstQueueFamilyIndex = desc.DstQueueFamily;
+        barrier.buffer = buffer->Buffer;
+        barrier.offset = desc.Offset;
+        barrier.size = desc.Size;
+        bufferBarriers.push_back(barrier);
+    }
+
+    for (const RHI::MemoryBarrierDesc& desc : batch.MemoryBarriers)
+    {
+        VkMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = ToVkStage(desc.BeforeAccess);
+        barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
+        barrier.dstStageMask = ToVkStage(desc.AfterAccess);
+        barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
+        memoryBarriers.push_back(barrier);
+    }
+
+    if (imageBarriers.empty() && bufferBarriers.empty() && memoryBarriers.empty())
+    {
+        return;
+    }
+
+    VkDependencyInfo dep{};
+    dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dep.memoryBarrierCount = static_cast<uint32_t>(memoryBarriers.size());
+    dep.pMemoryBarriers = memoryBarriers.data();
+    dep.bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size());
+    dep.pBufferMemoryBarriers = bufferBarriers.data();
+    dep.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
+    dep.pImageMemoryBarriers = imageBarriers.data();
+    vkCmdPipelineBarrier2(m_Cmd, &dep);
+}
+
 void VulkanCommandContext::FillBuffer(RHI::BufferHandle handle,
                                     uint64_t offset,
                                     uint64_t size,
@@ -316,4 +392,3 @@ void VulkanCommandContext::CopyBufferToTexture(RHI::BufferHandle src, uint64_t s
 }
 
 } // namespace Extrinsic::Backends::Vulkan
-

@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <limits>
 #include <span>
 
 export module Extrinsic.RHI.CommandContext;
@@ -83,6 +84,48 @@ namespace Extrinsic::RHI
         return static_cast<MemoryAccess>(
             static_cast<std::uint8_t>(a) | static_cast<std::uint8_t>(b));
     }
+
+    // ----------------------------------------------------------
+    // Barrier packet structs for explicit synchronization.
+    //
+    // These are backend-agnostic and map to Sync2-style barriers
+    // in Vulkan backends. Queue family ownership transfer is optional
+    // and represented as explicit queue-family indices.
+    // ----------------------------------------------------------
+    export struct TextureBarrierDesc
+    {
+        TextureHandle Texture{};
+        TextureLayout BeforeLayout = TextureLayout::Undefined;
+        TextureLayout AfterLayout = TextureLayout::Undefined;
+        MemoryAccess BeforeAccess = MemoryAccess::None;
+        MemoryAccess AfterAccess = MemoryAccess::None;
+        std::uint32_t SrcQueueFamily = std::numeric_limits<std::uint32_t>::max();
+        std::uint32_t DstQueueFamily = std::numeric_limits<std::uint32_t>::max();
+    };
+
+    export struct BufferBarrierDesc
+    {
+        BufferHandle Buffer{};
+        MemoryAccess BeforeAccess = MemoryAccess::None;
+        MemoryAccess AfterAccess = MemoryAccess::None;
+        std::uint64_t Offset = 0;
+        std::uint64_t Size = ~0ull;
+        std::uint32_t SrcQueueFamily = std::numeric_limits<std::uint32_t>::max();
+        std::uint32_t DstQueueFamily = std::numeric_limits<std::uint32_t>::max();
+    };
+
+    export struct MemoryBarrierDesc
+    {
+        MemoryAccess BeforeAccess = MemoryAccess::None;
+        MemoryAccess AfterAccess = MemoryAccess::None;
+    };
+
+    export struct BarrierBatchDesc
+    {
+        std::span<const TextureBarrierDesc> TextureBarriers{};
+        std::span<const BufferBarrierDesc> BufferBarriers{};
+        std::span<const MemoryBarrierDesc> MemoryBarriers{};
+    };
 
     export class ICommandContext
     {
@@ -176,6 +219,23 @@ namespace Extrinsic::RHI
         virtual void BufferBarrier(BufferHandle  buffer,
                                    MemoryAccess  before,
                                    MemoryAccess  after) = 0;
+
+        /// Explicit barrier-batch API. Backends that do not support
+        /// fine-grained barrier packets can rely on the default fallback,
+        /// which maps each entry through TextureBarrier/BufferBarrier.
+        /// Memory barriers are ignored by the fallback.
+        virtual void SubmitBarriers(const BarrierBatchDesc& batch)
+        {
+            for (const TextureBarrierDesc& barrier : batch.TextureBarriers)
+            {
+                TextureBarrier(barrier.Texture, barrier.BeforeLayout, barrier.AfterLayout);
+            }
+
+            for (const BufferBarrierDesc& barrier : batch.BufferBarriers)
+            {
+                BufferBarrier(barrier.Buffer, barrier.BeforeAccess, barrier.AfterAccess);
+            }
+        }
 
         // ---- Copy operations -----------------------------------------
         virtual void FillBuffer(BufferHandle  buffer,

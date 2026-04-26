@@ -396,6 +396,7 @@ public:
                          RHI::TextureLayout after) override;
     void BufferBarrier(RHI::BufferHandle buf, RHI::MemoryAccess before,
                         RHI::MemoryAccess after) override;
+    void SubmitBarriers(const RHI::BarrierBatchDesc& batch) override;
 
     void FillBuffer(RHI::BufferHandle buffer, uint64_t offset, uint64_t size,
                     uint32_t value) override;

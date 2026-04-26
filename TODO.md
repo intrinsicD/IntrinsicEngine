@@ -3553,17 +3553,17 @@ public:
 **Tasks:**
 
 - [ ] Define backend-agnostic barrier packet structs in RHI or Graphics/RHI-facing layer:
-  - [ ] texture/image barrier;
-  - [ ] buffer barrier;
-  - [ ] memory barrier if needed.
-- [ ] Include source/destination stages, access masks, old/new layouts, queue ownership if supported.
-- [ ] Add command-context method to submit a batch of barriers.
-- [ ] Keep fallback mapping to existing coarse API for null/unsupported backends.
-- [ ] Implement Vulkan backend mapping.
+  - [x] texture/image barrier;
+  - [x] buffer barrier;
+  - [x] memory barrier if needed.
+- [x] Include source/destination stages, access masks, old/new layouts, queue ownership if supported.
+- [x] Add command-context method to submit a batch of barriers.
+- [x] Keep fallback mapping to existing coarse API for null/unsupported backends.
+- [x] Implement Vulkan backend mapping.
 
 **Tests:**
 
-- [ ] RHI unit tests verify packet fields survive to mock command context.
+- [x] RHI unit tests verify packet fields survive to mock command context.
 - [ ] Vulkan mapping unit tests if backend test hooks exist.
 - [ ] Existing coarse barrier tests still pass.
 
