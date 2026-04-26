@@ -308,3 +308,59 @@ TEST(RuntimeStreamingExecutor, FailedWorkerResultSkipsUploadApplyAndMarksFailed)
     EXPECT_FALSE(uploadApplied.load(std::memory_order_acquire));
     EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Failed);
 }
+
+TEST(RuntimeStreamingExecutor, CancellationGenerationMismatchSuppressesStalePublication)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> started = false;
+    std::atomic<bool> applyCalled = false;
+    std::atomic<bool> dependentRan = false;
+
+    const auto cancelled = executor.Submit(StreamingTaskDesc{
+        .Name = "CancelledWithGeneration",
+        .CancellationGeneration = 10,
+        .Execute = [&started]()
+        {
+            started.store(true, std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            return StreamingResult{StreamingGpuUploadRequest{
+                .PayloadToken = 99,
+                .ByteSize = 512,
+            }};
+        },
+        .ApplyOnMainThread = [&applyCalled](StreamingResult&&)
+        {
+            applyCalled.store(true, std::memory_order_release);
+        },
+    });
+
+    const auto dependent = executor.Submit(StreamingTaskDesc{
+        .Name = "DependentAfterCancel",
+        .DependsOn = {cancelled},
+        .Execute = [&dependentRan]() -> StreamingResult
+        {
+            dependentRan.store(true, std::memory_order_release);
+            return StreamingResult{};
+        },
+    });
+
+    executor.PumpBackground(1);
+    while (!started.load(std::memory_order_acquire))
+    {
+        std::this_thread::yield();
+    }
+
+    executor.Cancel(cancelled);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+
+    EXPECT_FALSE(applyCalled.load(std::memory_order_acquire));
+    EXPECT_TRUE(dependentRan.load(std::memory_order_acquire));
+    EXPECT_EQ(executor.GetState(cancelled), StreamingTaskState::Cancelled);
+    EXPECT_EQ(executor.GetState(dependent), StreamingTaskState::Complete);
+}
