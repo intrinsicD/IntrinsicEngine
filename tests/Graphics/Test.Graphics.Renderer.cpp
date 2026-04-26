@@ -78,6 +78,7 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     EXPECT_NE(dump.find("name=\"Null.FXAA\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"Null.SelectionOutline\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"Null.Present\""), std::string::npos);
+    EXPECT_EQ(dump.find("name=\"Null.Picking\""), std::string::npos);
 
     const std::size_t gbufferPos = dump.find("name=\"Null.GBuffer\"");
     const std::size_t deferredPos = dump.find("name=\"Null.DeferredLighting\"");
@@ -94,6 +95,35 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     EXPECT_LT(deferredPos, bloomPos);
     EXPECT_LT(bloomPos, toneMapPos);
     EXPECT_LT(toneMapPos, presentPos);
+
+    EXPECT_EQ(renderer->EndFrame(frame), 0u);
+    renderer->Shutdown();
+}
+
+TEST(GraphicsRenderer, NullRendererAddsPickingPassWhenPickIsPending)
+{
+    MockDevice device;
+    auto renderer = Graphics::CreateRenderer();
+    ASSERT_NE(renderer, nullptr);
+
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Graphics::RenderFrameInput input{
+        .Alpha = 0.5,
+        .Viewport = {.Width = 1920u, .Height = 1080u},
+        .HasPendingPick = true,
+    };
+    auto world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const auto& stats = renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.CompileSucceeded);
+    ASSERT_FALSE(stats.DebugDump.empty());
+    EXPECT_NE(stats.DebugDump.find("name=\"Null.Picking\""), std::string::npos);
 
     EXPECT_EQ(renderer->EndFrame(frame), 0u);
     renderer->Shutdown();

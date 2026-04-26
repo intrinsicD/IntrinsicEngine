@@ -30,6 +30,9 @@ namespace Extrinsic::Graphics
         /// Interpolation alpha forwarded for motion-vector / TAA use.
         double Alpha{0.0};
 
+        /// Extracted pick request state for this frame.
+        bool HasPendingPick{false};
+
         /// Timeline value of the most recently completed GPU frame.
         /// Populated by EndFrame and made available here for downstream
         /// maintenance queries (deferred deletion, transfer GC).
@@ -42,4 +45,3 @@ namespace Extrinsic::Graphics
         //   DebugViewSnapshot            DebugView{};
     };
 }
-
