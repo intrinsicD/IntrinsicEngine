@@ -15,6 +15,8 @@ namespace Extrinsic::Graphics
     public:
         [[nodiscard]] RHI::TextureHandle AcquireTexture(const RHI::TextureDesc& desc);
         [[nodiscard]] RHI::BufferHandle AcquireBuffer(const RHI::BufferDesc& desc);
+        void ReleaseTexture(RHI::TextureHandle handle);
+        void ReleaseBuffer(RHI::BufferHandle handle);
         void ResetFrame();
 
     private:

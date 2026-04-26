@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <functional>
@@ -9,6 +10,7 @@ module;
 #include <string>
 #include <utility>
 #include <vector>
+#include <tuple>
 
 module Extrinsic.Graphics.RenderGraph;
 
@@ -54,6 +56,7 @@ namespace Extrinsic::Graphics
         std::vector<TextureResourceDesc> Textures{};
         std::vector<BufferResourceDesc> Buffers{};
         TransientAllocator Transients{};
+        bool TransientAliasingEnabled = true;
         std::uint32_t Generation = 1;
     };
 
@@ -381,14 +384,132 @@ namespace Extrinsic::Graphics
 
         m_Impl->Transients.ResetFrame();
 
+        struct TextureAllocItem
+        {
+            std::uint32_t ResourceIndex = 0u;
+            std::uint32_t FirstUsePass = 0u;
+            std::uint32_t LastUsePass = 0u;
+        };
+        struct BufferAllocItem
+        {
+            std::uint32_t ResourceIndex = 0u;
+            std::uint32_t FirstUsePass = 0u;
+            std::uint32_t LastUsePass = 0u;
+        };
+        std::vector<TextureAllocItem> texturesToAllocate{};
+        std::vector<BufferAllocItem> buffersToAllocate{};
+        texturesToAllocate.reserve(m_Impl->Textures.size());
+        buffersToAllocate.reserve(m_Impl->Buffers.size());
+
         for (std::uint32_t i = 0; i < m_Impl->Textures.size(); ++i)
         {
             if (m_Impl->Textures[i].Imported || !compiled->TextureLifetimes[i].HasUse)
             {
                 continue;
             }
-            compiled->TextureHandles[i] = m_Impl->Transients.AcquireTexture(m_Impl->Textures[i].Desc);
-            ++compiled->TransientTextureCount;
+            texturesToAllocate.push_back(TextureAllocItem{
+                .ResourceIndex = i,
+                .FirstUsePass = compiled->TextureLifetimes[i].FirstUsePass,
+                .LastUsePass = compiled->TextureLifetimes[i].LastUsePass,
+            });
+        }
+        for (std::uint32_t i = 0; i < m_Impl->Buffers.size(); ++i)
+        {
+            if (m_Impl->Buffers[i].Imported || !compiled->BufferLifetimes[i].HasUse)
+            {
+                continue;
+            }
+            buffersToAllocate.push_back(BufferAllocItem{
+                .ResourceIndex = i,
+                .FirstUsePass = compiled->BufferLifetimes[i].FirstUsePass,
+                .LastUsePass = compiled->BufferLifetimes[i].LastUsePass,
+            });
+        }
+
+        auto byFirstThenIndex = [](const auto& lhs, const auto& rhs) {
+            return std::tie(lhs.FirstUsePass, lhs.ResourceIndex) < std::tie(rhs.FirstUsePass, rhs.ResourceIndex);
+        };
+        std::ranges::sort(texturesToAllocate, byFirstThenIndex);
+        std::ranges::sort(buffersToAllocate, byFirstThenIndex);
+
+        if (m_Impl->TransientAliasingEnabled)
+        {
+            struct ActiveTextureAllocation
+            {
+                std::uint32_t LastUsePass = 0u;
+                RHI::TextureHandle Handle{};
+            };
+            std::vector<ActiveTextureAllocation> activeTextures{};
+            for (const TextureAllocItem& item : texturesToAllocate)
+            {
+                for (std::size_t activeIndex = 0; activeIndex < activeTextures.size();)
+                {
+                    if (activeTextures[activeIndex].LastUsePass < item.FirstUsePass)
+                    {
+                        m_Impl->Transients.ReleaseTexture(activeTextures[activeIndex].Handle);
+                        activeTextures.erase(activeTextures.begin() + static_cast<std::ptrdiff_t>(activeIndex));
+                        continue;
+                    }
+                    ++activeIndex;
+                }
+
+                const auto handle = m_Impl->Transients.AcquireTexture(m_Impl->Textures[item.ResourceIndex].Desc);
+                compiled->TextureHandles[item.ResourceIndex] = handle;
+                ++compiled->TransientTextureCount;
+                activeTextures.push_back(ActiveTextureAllocation{
+                    .LastUsePass = item.LastUsePass,
+                    .Handle = handle,
+                });
+            }
+
+            struct ActiveBufferAllocation
+            {
+                std::uint32_t LastUsePass = 0u;
+                RHI::BufferHandle Handle{};
+            };
+            std::vector<ActiveBufferAllocation> activeBuffers{};
+            for (const BufferAllocItem& item : buffersToAllocate)
+            {
+                for (std::size_t activeIndex = 0; activeIndex < activeBuffers.size();)
+                {
+                    if (activeBuffers[activeIndex].LastUsePass < item.FirstUsePass)
+                    {
+                        m_Impl->Transients.ReleaseBuffer(activeBuffers[activeIndex].Handle);
+                        activeBuffers.erase(activeBuffers.begin() + static_cast<std::ptrdiff_t>(activeIndex));
+                        continue;
+                    }
+                    ++activeIndex;
+                }
+
+                const auto handle = m_Impl->Transients.AcquireBuffer(m_Impl->Buffers[item.ResourceIndex].Desc);
+                compiled->BufferHandles[item.ResourceIndex] = handle;
+                ++compiled->TransientBufferCount;
+                activeBuffers.push_back(ActiveBufferAllocation{
+                    .LastUsePass = item.LastUsePass,
+                    .Handle = handle,
+                });
+            }
+        }
+        else
+        {
+            for (const TextureAllocItem& item : texturesToAllocate)
+            {
+                compiled->TextureHandles[item.ResourceIndex] = m_Impl->Transients.AcquireTexture(m_Impl->Textures[item.ResourceIndex].Desc);
+                ++compiled->TransientTextureCount;
+            }
+            for (const BufferAllocItem& item : buffersToAllocate)
+            {
+                compiled->BufferHandles[item.ResourceIndex] = m_Impl->Transients.AcquireBuffer(m_Impl->Buffers[item.ResourceIndex].Desc);
+                ++compiled->TransientBufferCount;
+            }
+        }
+
+        for (std::uint32_t i = 0; i < m_Impl->Textures.size(); ++i)
+        {
+            if (m_Impl->Textures[i].Imported || !compiled->TextureLifetimes[i].HasUse)
+            {
+                continue;
+            }
             const auto& desc = m_Impl->Textures[i].Desc;
             compiled->TransientMemoryEstimateBytes += static_cast<std::uint64_t>(desc.Width) *
                                                       static_cast<std::uint64_t>(desc.Height) *
@@ -404,8 +525,6 @@ namespace Extrinsic::Graphics
             {
                 continue;
             }
-            compiled->BufferHandles[i] = m_Impl->Transients.AcquireBuffer(m_Impl->Buffers[i].Desc);
-            ++compiled->TransientBufferCount;
             compiled->TransientMemoryEstimateBytes += m_Impl->Buffers[i].Desc.SizeBytes;
         }
 
@@ -489,5 +608,19 @@ namespace Extrinsic::Graphics
         }
 
         return static_cast<std::uint32_t>(m_Impl->Passes.size());
+    }
+
+    void RenderGraph::SetTransientAliasingEnabled(const bool enabled)
+    {
+        if (!m_Impl)
+        {
+            m_Impl = std::make_unique<Impl>();
+        }
+        m_Impl->TransientAliasingEnabled = enabled;
+    }
+
+    bool RenderGraph::IsTransientAliasingEnabled() const
+    {
+        return !m_Impl || m_Impl->TransientAliasingEnabled;
     }
 }

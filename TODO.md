@@ -3593,19 +3593,19 @@ public:
 
 **Rules:**
 
-- [ ] Resources may alias only when lifetimes do not overlap.
-- [ ] Descriptors must be compatible.
-- [ ] Imported resources never alias.
+- [x] Resources may alias only when lifetimes do not overlap.
+- [x] Descriptors must be compatible.
+- [x] Imported resources never alias.
 - [ ] Aliasing boundaries must emit required discard/transition barriers.
-- [ ] Aliasing must be optional behind a config flag for debugging.
+- [x] Aliasing must be optional behind a config flag for debugging.
 
 **Tests:**
 
-- [ ] Non-overlapping compatible textures alias.
-- [ ] Overlapping compatible textures do not alias.
-- [ ] Non-compatible descriptors do not alias.
-- [ ] Imported resource does not alias.
-- [ ] Alias on/off produces same logical pass output order and barrier correctness.
+- [x] Non-overlapping compatible textures alias.
+- [x] Overlapping compatible textures do not alias.
+- [x] Non-compatible descriptors do not alias.
+- [x] Imported resource does not alias.
+- [x] Alias on/off produces same logical pass output order and barrier correctness.
 
 ## T063 — Vulkan validation and GPU integration tests
 

@@ -770,3 +770,137 @@ TEST(GraphicsRenderGraph, IncompatibleTransientDescriptorAllocatesNewHandle)
     ASSERT_TRUE(secondHandle.IsValid());
     EXPECT_NE(firstHandle.Index, secondHandle.Index);
 }
+
+TEST(GraphicsRenderGraph, NonOverlappingCompatibleTransientTexturesAliasWithinFrame)
+{
+    RenderGraph graph;
+    Extrinsic::RHI::TextureDesc desc{};
+    desc.Width = 256;
+    desc.Height = 256;
+    const auto first = graph.CreateTexture("First", desc);
+    const auto second = graph.CreateTexture("Second", desc);
+    graph.AddPass("WriteFirst",
+                  [first](RenderGraphBuilder& builder) { builder.Write(first, TextureUsage::ColorAttachmentWrite); },
+                  true);
+    graph.AddPass("WriteSecond",
+                  [second](RenderGraphBuilder& builder) { builder.Write(second, TextureUsage::ColorAttachmentWrite); },
+                  true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const auto firstHandle = compiled->TextureHandles[first.Index];
+    const auto secondHandle = compiled->TextureHandles[second.Index];
+    ASSERT_TRUE(firstHandle.IsValid());
+    ASSERT_TRUE(secondHandle.IsValid());
+    EXPECT_EQ(firstHandle.Index, secondHandle.Index);
+}
+
+TEST(GraphicsRenderGraph, OverlappingCompatibleTransientTexturesDoNotAlias)
+{
+    RenderGraph graph;
+    Extrinsic::RHI::TextureDesc desc{};
+    desc.Width = 256;
+    desc.Height = 256;
+    const auto producer = graph.CreateTexture("Producer", desc);
+    const auto consumer = graph.CreateTexture("Consumer", desc);
+    graph.AddPass("WriteProducer",
+                  [producer](RenderGraphBuilder& builder) { builder.Write(producer, TextureUsage::ColorAttachmentWrite); },
+                  false);
+    graph.AddPass("UseBoth", [producer, consumer](RenderGraphBuilder& builder) {
+        builder.Read(producer, TextureUsage::ShaderRead);
+        builder.Write(consumer, TextureUsage::ColorAttachmentWrite);
+        builder.SideEffect();
+    });
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const auto producerHandle = compiled->TextureHandles[producer.Index];
+    const auto consumerHandle = compiled->TextureHandles[consumer.Index];
+    ASSERT_TRUE(producerHandle.IsValid());
+    ASSERT_TRUE(consumerHandle.IsValid());
+    EXPECT_NE(producerHandle.Index, consumerHandle.Index);
+}
+
+TEST(GraphicsRenderGraph, NonCompatibleTransientTexturesDoNotAliasEvenWhenNonOverlapping)
+{
+    RenderGraph graph;
+    Extrinsic::RHI::TextureDesc small{};
+    small.Width = 128;
+    small.Height = 128;
+    Extrinsic::RHI::TextureDesc large{};
+    large.Width = 1920;
+    large.Height = 1080;
+    const auto first = graph.CreateTexture("Small", small);
+    const auto second = graph.CreateTexture("Large", large);
+    graph.AddPass("WriteSmall",
+                  [first](RenderGraphBuilder& builder) { builder.Write(first, TextureUsage::ColorAttachmentWrite); },
+                  true);
+    graph.AddPass("WriteLarge",
+                  [second](RenderGraphBuilder& builder) { builder.Write(second, TextureUsage::ColorAttachmentWrite); },
+                  true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const auto firstHandle = compiled->TextureHandles[first.Index];
+    const auto secondHandle = compiled->TextureHandles[second.Index];
+    ASSERT_TRUE(firstHandle.IsValid());
+    ASSERT_TRUE(secondHandle.IsValid());
+    EXPECT_NE(firstHandle.Index, secondHandle.Index);
+}
+
+TEST(GraphicsRenderGraph, ImportedTextureNeverAliasesTransientTexture)
+{
+    RenderGraph graph;
+    const auto imported = graph.ImportTexture(
+        "History", Extrinsic::RHI::TextureHandle{41u, 3u}, TextureState::ShaderRead, TextureState::ShaderRead);
+    Extrinsic::RHI::TextureDesc transientDesc{};
+    transientDesc.Width = 64;
+    transientDesc.Height = 64;
+    const auto transient = graph.CreateTexture("Transient", transientDesc);
+    graph.AddPass("UseImported", [imported](RenderGraphBuilder& builder) {
+        builder.Read(imported, TextureUsage::ShaderRead);
+        builder.SideEffect();
+    });
+    graph.AddPass("UseTransient", [transient](RenderGraphBuilder& builder) {
+        builder.Write(transient, TextureUsage::ColorAttachmentWrite);
+        builder.SideEffect();
+    });
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const auto importedHandle = compiled->TextureHandles[imported.Index];
+    const auto transientHandle = compiled->TextureHandles[transient.Index];
+    ASSERT_TRUE(importedHandle.IsValid());
+    ASSERT_TRUE(transientHandle.IsValid());
+    EXPECT_NE(importedHandle.Index, transientHandle.Index);
+}
+
+TEST(GraphicsRenderGraph, TransientAliasingTogglePreservesLogicalPassOrderAndBarriers)
+{
+    auto buildGraph = [](const bool aliasingEnabled) {
+        RenderGraph graph;
+        graph.SetTransientAliasingEnabled(aliasingEnabled);
+        Extrinsic::RHI::TextureDesc desc{};
+        desc.Width = 320;
+        desc.Height = 180;
+        const auto a = graph.CreateTexture("A", desc);
+        const auto b = graph.CreateTexture("B", desc);
+        graph.AddPass("WriteA", [a](RenderGraphBuilder& builder) {
+            builder.Write(a, TextureUsage::ColorAttachmentWrite);
+            builder.SideEffect();
+        });
+        graph.AddPass("ReadAWriteB", [a, b](RenderGraphBuilder& builder) {
+            builder.Read(a, TextureUsage::ShaderRead);
+            builder.Write(b, TextureUsage::ColorAttachmentWrite);
+            builder.SideEffect();
+        });
+        return graph.Compile();
+    };
+
+    const auto withAliasing = buildGraph(true);
+    const auto withoutAliasing = buildGraph(false);
+    ASSERT_TRUE(withAliasing.has_value());
+    ASSERT_TRUE(withoutAliasing.has_value());
+    EXPECT_EQ(withAliasing->TopologicalOrder, withoutAliasing->TopologicalOrder);
+    EXPECT_EQ(withAliasing->BarrierPackets.size(), withoutAliasing->BarrierPackets.size());
+}
