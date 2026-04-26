@@ -10,6 +10,7 @@ export module Extrinsic.Graphics.RenderGraph:Compiler;
 import Extrinsic.Core.Error;
 import :Pass;
 import :Resources;
+import :Barriers;
 
 namespace Extrinsic::Graphics
 {
@@ -30,6 +31,7 @@ namespace Extrinsic::Graphics
         std::vector<std::uint32_t> TopologicalLayerByPass{};
         std::vector<ResourceLifetime> TextureLifetimes{};
         std::vector<ResourceLifetime> BufferLifetimes{};
+        std::vector<BarrierPacket> BarrierPackets{};
         std::string Diagnostic{};
     };
 
