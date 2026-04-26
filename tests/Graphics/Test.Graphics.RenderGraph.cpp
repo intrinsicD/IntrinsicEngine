@@ -1,10 +1,22 @@
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
 
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 
 using namespace Extrinsic::Graphics;
+
+namespace
+{
+    std::size_t FindOrder(const CompiledRenderGraph& compiled, const std::uint32_t passIndex)
+    {
+        auto it = std::find(compiled.TopologicalOrder.begin(), compiled.TopologicalOrder.end(), passIndex);
+        return static_cast<std::size_t>(std::distance(compiled.TopologicalOrder.begin(), it));
+    }
+}
 
 TEST(GraphicsRenderGraph, EmptyGraphCompiles)
 {
@@ -156,6 +168,79 @@ TEST(GraphicsRenderGraph, SideEffectPassIsNotCulled)
     const auto pass = graph.AddPass("DebugBlit", [](RenderGraphBuilder& builder) { builder.SideEffect(); }, false);
 
     ASSERT_TRUE(pass.IsValid());
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->PassCount, 1u);
+}
+
+TEST(GraphicsRenderGraph, WriteThenReadCreatesDependency)
+{
+    RenderGraph graph;
+    const auto tex = graph.CreateTexture("Lighting", Extrinsic::RHI::TextureDesc{});
+    const auto writer = graph.AddPass("Writer", [tex](RenderGraphBuilder& builder) {
+        builder.Write(tex, TextureUsage::ColorAttachmentWrite);
+    });
+    const auto reader = graph.AddPass("Reader", [tex](RenderGraphBuilder& builder) {
+        builder.Read(tex, TextureUsage::ShaderRead);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_LT(FindOrder(*compiled, writer.Index), FindOrder(*compiled, reader.Index));
+}
+
+TEST(GraphicsRenderGraph, ReadThenWriteCreatesDependency)
+{
+    RenderGraph graph;
+    const auto tex = graph.CreateTexture("Depth", Extrinsic::RHI::TextureDesc{});
+    const auto reader = graph.AddPass("Reader", [tex](RenderGraphBuilder& builder) {
+        builder.Read(tex, TextureUsage::DepthRead);
+    });
+    const auto writer = graph.AddPass("Writer", [tex](RenderGraphBuilder& builder) {
+        builder.Write(tex, TextureUsage::DepthWrite);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_LT(FindOrder(*compiled, reader.Index), FindOrder(*compiled, writer.Index));
+}
+
+TEST(GraphicsRenderGraph, WriteThenWriteCreatesDependency)
+{
+    RenderGraph graph;
+    const auto buf = graph.CreateBuffer("Indirect", Extrinsic::RHI::BufferDesc{.SizeBytes = 128u});
+    const auto first = graph.AddPass("First", [buf](RenderGraphBuilder& builder) {
+        builder.Write(buf, BufferUsage::ShaderWrite);
+    });
+    const auto second = graph.AddPass("Second", [buf](RenderGraphBuilder& builder) {
+        builder.Write(buf, BufferUsage::TransferDst);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_LT(FindOrder(*compiled, first.Index), FindOrder(*compiled, second.Index));
+}
+
+TEST(GraphicsRenderGraph, InvalidPresentTargetFailsValidation)
+{
+    RenderGraph graph;
+    const auto transient = graph.CreateTexture("NotBackbuffer", Extrinsic::RHI::TextureDesc{});
+    graph.AddPass("Present", [transient](RenderGraphBuilder& builder) {
+        builder.Read(transient, TextureUsage::Present);
+    });
+
+    auto compiled = graph.Compile();
+    EXPECT_FALSE(compiled.has_value());
+}
+
+TEST(GraphicsRenderGraph, PresentOnImportedBackbufferCompiles)
+{
+    RenderGraph graph;
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{2u, 1u});
+    graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(backbuffer, TextureUsage::Present);
+    });
+
     auto compiled = graph.Compile();
     ASSERT_TRUE(compiled.has_value());
     EXPECT_EQ(compiled->PassCount, 1u);

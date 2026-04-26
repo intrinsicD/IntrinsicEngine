@@ -3315,26 +3315,26 @@ public:
 
 **Compile phases:**
 
-- [ ] Validate all resource refs.
-- [ ] Validate pass render attachment declarations match declared writes.
-- [ ] Validate present pass targets imported backbuffer.
+- [x] Validate all resource refs.
+- [x] Validate pass render attachment declarations match declared writes.
+- [x] Validate present pass targets imported backbuffer.
 - [ ] Build producer/consumer dependency edges:
-  - [ ] write -> read;
-  - [ ] write -> write;
-  - [ ] read -> write;
+  - [x] write -> read;
+  - [x] write -> write;
+  - [x] read -> write;
   - [ ] explicit pass dependency, if API supports it;
   - [ ] queue handoff placeholder edge, even if only one queue exists initially.
-- [ ] Topologically sort passes using shared compiler substrate or a Graphics-specific wrapper around it.
+- [x] Topologically sort passes using shared compiler substrate or a Graphics-specific wrapper around it.
 - [ ] Detect cycles with pass/resource names.
-- [ ] Build immutable compiled plan.
+- [x] Build immutable compiled plan.
 
 **Tests:**
 
 - [ ] Two independent passes can remain same layer or adjacent deterministic order.
-- [ ] Write color then shader-read creates dependency.
-- [ ] Read then write creates dependency.
-- [ ] Write then write creates dependency.
-- [ ] Invalid present target fails validation.
+- [x] Write color then shader-read creates dependency.
+- [x] Read then write creates dependency.
+- [x] Write then write creates dependency.
+- [x] Invalid present target fails validation.
 - [ ] Missing resource declaration fails if execution tries to resolve it.
 - [ ] Cycle reports pass names.
 
