@@ -61,6 +61,7 @@ namespace Extrinsic::Graphics
     {
         std::string Name{};
         bool Imported = false;
+        bool IsBackbuffer = false;
         bool AliasEligible = true;
         TextureState InitialState = TextureState::Undefined;
         TextureState FinalState = TextureState::Undefined;

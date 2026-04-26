@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <memory>
 #include <ranges>
@@ -220,7 +221,12 @@ namespace Extrinsic::Graphics
 
     TextureRef RenderGraph::ImportBackbuffer(std::string name, const RHI::TextureHandle handle)
     {
-        return ImportTexture(std::move(name), handle, TextureState::Undefined, TextureState::Present);
+        const TextureRef ref = ImportTexture(std::move(name), handle, TextureState::Undefined, TextureState::Present);
+        if (m_Impl && ref.Index < m_Impl->Textures.size())
+        {
+            m_Impl->Textures[ref.Index].IsBackbuffer = true;
+        }
+        return ref;
     }
 
     TextureRef RenderGraph::ImportTexture(std::string name,
@@ -237,6 +243,7 @@ namespace Extrinsic::Graphics
         TextureResourceDesc& texture = m_Impl->Textures.emplace_back();
         texture.Name = std::move(name);
         texture.Imported = true;
+        texture.IsBackbuffer = false;
         texture.AliasEligible = false;
         texture.InitialState = initial;
         texture.FinalState = finalState;
@@ -278,6 +285,7 @@ namespace Extrinsic::Graphics
         TextureResourceDesc& texture = m_Impl->Textures.emplace_back();
         texture.Name = std::move(name);
         texture.Imported = false;
+        texture.IsBackbuffer = false;
         texture.AliasEligible = true;
         texture.InitialState = TextureState::Undefined;
         texture.FinalState = TextureState::Undefined;
@@ -309,18 +317,32 @@ namespace Extrinsic::Graphics
     {
         if (!m_Impl)
         {
-            return RenderGraphCompiler::Compile(0u, 0u);
+            return RenderGraphCompiler::Compile({}, {}, {});
         }
 
         const auto hasValidationFailure = std::ranges::any_of(
             m_Impl->Passes, [](const RenderPassRecord& pass) { return pass.HasValidationError; });
         if (hasValidationFailure)
         {
-            return Core::Unexpected(Core::ErrorCode::InvalidArgument);
+            return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
-        return RenderGraphCompiler::Compile(static_cast<std::uint32_t>(m_Impl->Passes.size()),
-                                            static_cast<std::uint32_t>(m_Impl->Textures.size() + m_Impl->Buffers.size()));
+        const bool invalidPresentTarget = std::ranges::any_of(m_Impl->Passes, [this](const RenderPassRecord& pass) {
+            return std::ranges::any_of(pass.TextureAccesses, [this](const TextureAccess& access) {
+                if (access.Usage != TextureUsage::Present)
+                {
+                    return false;
+                }
+                const TextureResourceDesc* desc = GetTextureDesc(access.Ref);
+                return (desc == nullptr) || !desc->Imported || !desc->IsBackbuffer;
+            });
+        });
+        if (invalidPresentTarget)
+        {
+            return std::unexpected(Core::ErrorCode::InvalidArgument);
+        }
+
+        return RenderGraphCompiler::Compile(m_Impl->Passes, m_Impl->Textures, m_Impl->Buffers);
     }
 
     Core::Result RenderGraph::ValidateTextureRef(const TextureRef ref) const
