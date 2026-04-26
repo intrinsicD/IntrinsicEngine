@@ -413,3 +413,68 @@ TEST(GraphicsRenderGraph, ImportedBufferUsesInitialStateForFirstBarrier)
 
     EXPECT_TRUE(sawImportedInitialTransition);
 }
+
+TEST(GraphicsRenderGraph, ExecuteEmptyGraphSucceeds)
+{
+    RenderGraph graph;
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    RenderGraphExecutor executor;
+    auto result = executor.Execute(*compiled);
+    EXPECT_TRUE(result.has_value());
+}
+
+TEST(GraphicsRenderGraph, ExecutePresentChainRecordsPassOrderAndBarriers)
+{
+    RenderGraph graph;
+    const auto lighting = graph.CreateTexture("Lighting", Extrinsic::RHI::TextureDesc{});
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{20u, 2u});
+    const auto lightingPass = graph.AddPass("Lighting", [lighting](RenderGraphBuilder& builder) {
+        builder.Write(lighting, TextureUsage::ColorAttachmentWrite);
+    });
+    const auto postPass = graph.AddPass("Post", [lighting, backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(lighting, TextureUsage::ShaderRead);
+        builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+    });
+    const auto presentPass = graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(backbuffer, TextureUsage::Present);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    std::vector<std::uint32_t> executed{};
+    std::vector<std::uint32_t> barrierPasses{};
+    RenderGraphExecutor executor;
+    auto result = executor.Execute(
+        *compiled,
+        [&executed](const std::uint32_t passIndex) { executed.push_back(passIndex); },
+        [&barrierPasses](const BarrierPacket& packet) { barrierPasses.push_back(packet.PassIndex); });
+
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(executed, compiled->TopologicalOrder);
+    EXPECT_EQ(executed.size(), 3u);
+    EXPECT_EQ(executed[0], lightingPass.Index);
+    EXPECT_EQ(executed[1], postPass.Index);
+    EXPECT_EQ(executed[2], presentPass.Index);
+    EXPECT_FALSE(barrierPasses.empty());
+}
+
+TEST(GraphicsRenderGraph, ExecuteFailsWhenBarrierReferencesInvalidResource)
+{
+    CompiledRenderGraph compiled{};
+    compiled.TopologicalOrder = {0u};
+    compiled.TextureHandles = {};
+    compiled.BufferHandles = {};
+    compiled.BarrierPackets = {
+        BarrierPacket{
+            .PassIndex = 0u,
+            .TextureBarriers = {TextureBarrierPacket{.TextureIndex = 4u, .Before = TextureBarrierState::Undefined, .After = TextureBarrierState::ShaderRead}},
+        }
+    };
+
+    RenderGraphExecutor executor;
+    auto result = executor.Execute(compiled);
+    EXPECT_FALSE(result.has_value());
+}

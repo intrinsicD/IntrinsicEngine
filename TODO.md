@@ -3404,19 +3404,19 @@ public:
 
 **Tasks:**
 
-- [ ] Allocate/resolve imported resources.
-- [ ] For first scaffold, transient resources may be logical-only or allocated through existing texture/buffer managers if available.
-- [ ] Execute passes in compiled order.
-- [ ] Emit barrier calls before each pass.
-- [ ] Null backend should record/observe calls enough for tests without requiring a real GPU.
-- [ ] Failed compile prevents execute.
+- [x] Allocate/resolve imported resources.
+- [x] For first scaffold, transient resources may be logical-only or allocated through existing texture/buffer managers if available.
+- [x] Execute passes in compiled order.
+- [x] Emit barrier calls before each pass.
+- [x] Null backend should record/observe calls enough for tests without requiring a real GPU.
+- [x] Failed compile prevents execute.
 
 **Tests:**
 
-- [ ] Execute empty graph succeeds.
-- [ ] Execute simple present chain in mock/null backend records expected pass order.
-- [ ] Barrier packets are visible to tests.
-- [ ] Resource resolution fails for invalid ref.
+- [x] Execute empty graph succeeds.
+- [x] Execute simple present chain in mock/null backend records expected pass order.
+- [x] Barrier packets are visible to tests.
+- [x] Resource resolution fails for invalid ref.
 
 **Review gate RG-04 — RenderGraph scaffold:**
 
