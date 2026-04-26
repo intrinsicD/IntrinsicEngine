@@ -1,7 +1,10 @@
 module;
 
+#include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,6 +20,31 @@ import Extrinsic.RHI.Descriptors;
 
 namespace Extrinsic::Graphics
 {
+    namespace
+    {
+        [[nodiscard]] constexpr bool TextureUsageIsWrite(const TextureUsage usage)
+        {
+            return usage == TextureUsage::ColorAttachmentWrite || usage == TextureUsage::DepthWrite ||
+                   usage == TextureUsage::ShaderWrite || usage == TextureUsage::TransferDst;
+        }
+
+        [[nodiscard]] constexpr bool TextureStateAllowsWrite(const TextureState state)
+        {
+            return state == TextureState::ColorAttachmentWrite || state == TextureState::DepthWrite ||
+                   state == TextureState::ShaderWrite || state == TextureState::TransferDst;
+        }
+
+        [[nodiscard]] constexpr bool BufferUsageIsWrite(const BufferUsage usage)
+        {
+            return usage == BufferUsage::ShaderWrite || usage == BufferUsage::TransferDst;
+        }
+
+        [[nodiscard]] constexpr bool BufferStateAllowsWrite(const BufferState state)
+        {
+            return state == BufferState::ShaderWrite || state == BufferState::TransferDst;
+        }
+    }
+
     struct RenderGraph::Impl
     {
         std::vector<RenderPassRecord> Passes{};
@@ -24,6 +52,78 @@ namespace Extrinsic::Graphics
         std::vector<BufferResourceDesc> Buffers{};
         std::uint32_t Generation = 1;
     };
+
+    RenderGraphBuilder::RenderGraphBuilder(
+        RenderPassRecord& record,
+        std::move_only_function<bool(TextureRef, TextureUsage, bool)>&& textureValidator,
+        std::move_only_function<bool(BufferRef, BufferUsage, bool)>&& bufferValidator)
+        : m_Record(&record), m_TextureValidator(std::move(textureValidator)), m_BufferValidator(std::move(bufferValidator))
+    {
+    }
+
+    TextureRef RenderGraphBuilder::Read(const TextureRef ref, const TextureUsage usage)
+    {
+        const bool ok = m_TextureValidator && m_TextureValidator(ref, usage, false);
+        if (!ok)
+        {
+            m_Record->HasValidationError = true;
+            return {};
+        }
+        m_Record->TextureAccesses.push_back(TextureAccess{.Ref = ref, .Usage = usage, .Write = false});
+        return ref;
+    }
+
+    TextureRef RenderGraphBuilder::Write(const TextureRef ref, const TextureUsage usage)
+    {
+        const bool ok = m_TextureValidator && m_TextureValidator(ref, usage, true);
+        if (!ok)
+        {
+            m_Record->HasValidationError = true;
+            return {};
+        }
+        m_Record->TextureAccesses.push_back(TextureAccess{.Ref = ref, .Usage = usage, .Write = true});
+        return ref;
+    }
+
+    BufferRef RenderGraphBuilder::Read(const BufferRef ref, const BufferUsage usage)
+    {
+        const bool ok = m_BufferValidator && m_BufferValidator(ref, usage, false);
+        if (!ok)
+        {
+            m_Record->HasValidationError = true;
+            return {};
+        }
+        m_Record->BufferAccesses.push_back(BufferAccess{.Ref = ref, .Usage = usage, .Write = false});
+        return ref;
+    }
+
+    BufferRef RenderGraphBuilder::Write(const BufferRef ref, const BufferUsage usage)
+    {
+        const bool ok = m_BufferValidator && m_BufferValidator(ref, usage, true);
+        if (!ok)
+        {
+            m_Record->HasValidationError = true;
+            return {};
+        }
+        m_Record->BufferAccesses.push_back(BufferAccess{.Ref = ref, .Usage = usage, .Write = true});
+        return ref;
+    }
+
+    void RenderGraphBuilder::SetQueue(const RenderQueue queue)
+    {
+        m_Record->Queue = queue;
+    }
+
+    void RenderGraphBuilder::SetRenderPass(const RHI::RenderPassDesc& desc)
+    {
+        m_Record->RenderPass = desc;
+        m_Record->HasRenderPassDesc = true;
+    }
+
+    void RenderGraphBuilder::SideEffect()
+    {
+        m_Record->SideEffect = true;
+    }
 
     RenderGraph::RenderGraph() = default;
     RenderGraph::~RenderGraph() = default;
@@ -40,6 +140,82 @@ namespace Extrinsic::Graphics
         const auto index = static_cast<std::uint32_t>(m_Impl->Passes.size());
         m_Impl->Passes.push_back(RenderPassRecord{.Name = std::move(name), .SideEffect = sideEffect});
         return PassRef{.Index = index, .Generation = m_Impl->Generation};
+    }
+
+    PassRef RenderGraph::AddPass(std::string name,
+                                 std::move_only_function<void(RenderGraphBuilder&)> setup,
+                                 const bool sideEffect)
+    {
+        const PassRef pass = AddPass(std::move(name), sideEffect);
+        RenderPassRecord& record = m_Impl->Passes[pass.Index];
+        RenderGraphBuilder builder(
+            record,
+            [this](const TextureRef ref, const TextureUsage usage, const bool write) {
+                if (!ValidateTextureRef(ref).has_value())
+                {
+                    return false;
+                }
+
+                if (usage == TextureUsage::Present && write)
+                {
+                    return false;
+                }
+
+                if (write && !TextureUsageIsWrite(usage))
+                {
+                    return false;
+                }
+
+                const TextureResourceDesc* desc = GetTextureDesc(ref);
+                if (!desc)
+                {
+                    return false;
+                }
+
+                if (desc->Imported && write)
+                {
+                    const bool writableContract = TextureStateAllowsWrite(desc->InitialState) ||
+                                                  TextureStateAllowsWrite(desc->FinalState);
+                    if (!writableContract)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            },
+            [this](const BufferRef ref, const BufferUsage usage, const bool write) {
+                if (!ValidateBufferRef(ref).has_value())
+                {
+                    return false;
+                }
+
+                if (write && !BufferUsageIsWrite(usage))
+                {
+                    return false;
+                }
+
+                const BufferResourceDesc* desc = GetBufferDesc(ref);
+                if (!desc)
+                {
+                    return false;
+                }
+
+                if (desc->Imported && write)
+                {
+                    const bool writableContract = BufferStateAllowsWrite(desc->InitialState) ||
+                                                  BufferStateAllowsWrite(desc->FinalState);
+                    if (!writableContract)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+        setup(builder);
+        return pass;
     }
 
     TextureRef RenderGraph::ImportBackbuffer(std::string name, const RHI::TextureHandle handle)
@@ -134,6 +310,13 @@ namespace Extrinsic::Graphics
         if (!m_Impl)
         {
             return RenderGraphCompiler::Compile(0u, 0u);
+        }
+
+        const auto hasValidationFailure = std::ranges::any_of(
+            m_Impl->Passes, [](const RenderPassRecord& pass) { return pass.HasValidationError; });
+        if (hasValidationFailure)
+        {
+            return Core::Unexpected(Core::ErrorCode::InvalidArgument);
         }
 
         return RenderGraphCompiler::Compile(static_cast<std::uint32_t>(m_Impl->Passes.size()),
