@@ -3199,17 +3199,17 @@ public:
 
 **Files to add:**
 
-- [ ] `src_new/Graphics/Graphics.RenderGraph.cppm`
-- [ ] `src_new/Graphics/Graphics.RenderGraph.Resources.cppm`
-- [ ] `src_new/Graphics/Graphics.RenderGraph.Pass.cppm`
-- [ ] `src_new/Graphics/Graphics.RenderGraph.Compiler.cppm`
-- [ ] `src_new/Graphics/Graphics.RenderGraph.Barriers.cppm`
-- [ ] `src_new/Graphics/Graphics.RenderGraph.TransientAllocator.cppm`
-- [ ] `src_new/Graphics/Graphics.RenderGraph.Executor.cppm`
-- [ ] Matching `.cpp` implementation units.
-- [ ] Update `src_new/Graphics/CMakeLists.txt`.
-- [ ] Update `src_new/Graphics/README.md`.
-- [ ] Add tests to `tests/Graphics/CMakeLists.txt`.
+- [x] `src_new/Graphics/Graphics.RenderGraph.cppm`
+- [x] `src_new/Graphics/Graphics.RenderGraph.Resources.cppm`
+- [x] `src_new/Graphics/Graphics.RenderGraph.Pass.cppm`
+- [x] `src_new/Graphics/Graphics.RenderGraph.Compiler.cppm`
+- [x] `src_new/Graphics/Graphics.RenderGraph.Barriers.cppm`
+- [x] `src_new/Graphics/Graphics.RenderGraph.TransientAllocator.cppm`
+- [x] `src_new/Graphics/Graphics.RenderGraph.Executor.cppm`
+- [x] Matching `.cpp` implementation units.
+- [x] Update `src_new/Graphics/CMakeLists.txt`.
+- [x] Update `src_new/Graphics/README.md`.
+- [x] Add tests to `tests/Graphics/CMakeLists.txt`.
 
 **Layering:**
 
@@ -3221,8 +3221,8 @@ public:
 
 **Acceptance criteria:**
 
-- [ ] Empty render graph compiles and resets.
-- [ ] Module inventory regeneration succeeds.
+- [x] Empty render graph compiles and resets.
+- [x] Module inventory regeneration succeeds.
 
 ## T041 — Implement virtual resource model
 

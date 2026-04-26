@@ -1,6 +1,6 @@
 # src_new Module Inventory (auto-generated)
 
-_Generated on 2026-04-25 by `tools/generate_src_new_module_inventory.py`._
+_Generated on 2026-04-26 by `tools/generate_src_new_module_inventory.py`._
 
 | Module | File | Library |
 |---|---|---|
@@ -83,6 +83,13 @@ _Generated on 2026-04-25 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Graphics.MaterialSystem` | `src_new/Graphics/Graphics.MaterialSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src_new/Graphics/Graphics.PostProcessSystem.cppm` | `Graphics` |
 | `Extrinsic.Graphics.RenderFrameInput` | `src_new/Graphics/Graphics.RenderFrameInput.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderGraph:Barriers` | `src_new/Graphics/Graphics.RenderGraph.Barriers.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderGraph:Compiler` | `src_new/Graphics/Graphics.RenderGraph.Compiler.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderGraph:Executor` | `src_new/Graphics/Graphics.RenderGraph.Executor.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderGraph:Pass` | `src_new/Graphics/Graphics.RenderGraph.Pass.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderGraph:Resources` | `src_new/Graphics/Graphics.RenderGraph.Resources.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderGraph:TransientAllocator` | `src_new/Graphics/Graphics.RenderGraph.TransientAllocator.cppm` | `Graphics` |
+| `Extrinsic.Graphics.RenderGraph` | `src_new/Graphics/Graphics.RenderGraph.cppm` | `Graphics` |
 | `Extrinsic.Graphics.RenderWorld` | `src_new/Graphics/Graphics.RenderWorld.cppm` | `Graphics` |
 | `Extrinsic.Graphics.Renderer` | `src_new/Graphics/Graphics.Renderer.cppm` | `Graphics` |
 | `Extrinsic.Graphics.SelectionSystem` | `src_new/Graphics/Graphics.SelectionSystem.cppm` | `Graphics` |
@@ -130,4 +137,4 @@ _Generated on 2026-04-25 by `tools/generate_src_new_module_inventory.py`._
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `Runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src_new/Runtime/Runtime.StreamingExecutor.cppm` | `Runtime` |
 
-Total modules: **125**
+Total modules: **132**
