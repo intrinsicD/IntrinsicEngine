@@ -472,6 +472,57 @@ namespace Extrinsic::Graphics
             }
         }
 
+        BarrierPacket importedFinalPacket{};
+        importedFinalPacket.PassIndex = passCount;
+        for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
+        {
+            if (!textures[textureIndex].Imported)
+            {
+                continue;
+            }
+
+            const auto targetState = ToTextureBarrierState(textures[textureIndex].FinalState);
+            const auto currentState = textureStateByRef[textureIndex];
+            if (currentState == targetState)
+            {
+                continue;
+            }
+
+            importedFinalPacket.TextureBarriers.push_back(TextureBarrierPacket{
+                .TextureIndex = textureIndex,
+                .Before = currentState,
+                .After = targetState,
+            });
+            textureStateByRef[textureIndex] = targetState;
+        }
+
+        for (std::uint32_t bufferIndex = 0; bufferIndex < buffers.size(); ++bufferIndex)
+        {
+            if (!buffers[bufferIndex].Imported)
+            {
+                continue;
+            }
+
+            const auto targetState = ToBufferBarrierState(buffers[bufferIndex].FinalState);
+            const auto currentState = bufferStateByRef[bufferIndex];
+            if (currentState == targetState)
+            {
+                continue;
+            }
+
+            importedFinalPacket.BufferBarriers.push_back(BufferBarrierPacket{
+                .BufferIndex = bufferIndex,
+                .Before = currentState,
+                .After = targetState,
+            });
+            bufferStateByRef[bufferIndex] = targetState;
+        }
+
+        if (!importedFinalPacket.TextureBarriers.empty() || !importedFinalPacket.BufferBarriers.empty())
+        {
+            barrierPackets.push_back(std::move(importedFinalPacket));
+        }
+
         return CompiledRenderGraph{
             .PassCount = livePassCount,
             .CulledPassCount = passCount - livePassCount,

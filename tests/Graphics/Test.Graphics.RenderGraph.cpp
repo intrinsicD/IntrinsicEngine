@@ -450,6 +450,130 @@ TEST(GraphicsRenderGraph, ImportedIndirectBufferTransitionsFromShaderWriteToIndi
     EXPECT_TRUE(sawWriteToIndirect);
 }
 
+TEST(GraphicsRenderGraph, DepthWriteThenDepthReadEmitsTransition)
+{
+    RenderGraph graph;
+    const auto depth = graph.CreateTexture("Depth", Extrinsic::RHI::TextureDesc{});
+
+    graph.AddPass("DepthPrepass", [depth](RenderGraphBuilder& builder) {
+        builder.Write(depth, TextureUsage::DepthWrite);
+    });
+    graph.AddPass("Shading", [depth](RenderGraphBuilder& builder) {
+        builder.Read(depth, TextureUsage::DepthRead);
+    }, true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    bool sawDepthTransition = false;
+    for (const auto& packet : compiled->BarrierPackets)
+    {
+        for (const auto& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex == depth.Index &&
+                barrier.Before == TextureBarrierState::DepthWrite &&
+                barrier.After == TextureBarrierState::DepthRead)
+            {
+                sawDepthTransition = true;
+            }
+        }
+    }
+
+    EXPECT_TRUE(sawDepthTransition);
+}
+
+TEST(GraphicsRenderGraph, TransferDstThenShaderReadEmitsTransition)
+{
+    RenderGraph graph;
+    const auto texture = graph.CreateTexture("Upload", Extrinsic::RHI::TextureDesc{});
+
+    graph.AddPass("Upload", [texture](RenderGraphBuilder& builder) {
+        builder.Write(texture, TextureUsage::TransferDst);
+    });
+    graph.AddPass("Sample", [texture](RenderGraphBuilder& builder) {
+        builder.Read(texture, TextureUsage::ShaderRead);
+    }, true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    bool sawTransition = false;
+    for (const auto& packet : compiled->BarrierPackets)
+    {
+        for (const auto& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex == texture.Index &&
+                barrier.Before == TextureBarrierState::TransferDst &&
+                barrier.After == TextureBarrierState::ShaderRead)
+            {
+                sawTransition = true;
+            }
+        }
+    }
+
+    EXPECT_TRUE(sawTransition);
+}
+
+TEST(GraphicsRenderGraph, ImportedBackbufferFinalStateTransitionsToPresent)
+{
+    RenderGraph graph;
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{33u, 2u});
+
+    graph.AddPass("ToneMap", [backbuffer](RenderGraphBuilder& builder) {
+        builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+    }, true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    bool sawPresentTransition = false;
+    for (const auto& packet : compiled->BarrierPackets)
+    {
+        for (const auto& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex == backbuffer.Index &&
+                barrier.Before == TextureBarrierState::ColorAttachmentWrite &&
+                barrier.After == TextureBarrierState::Present)
+            {
+                sawPresentTransition = true;
+            }
+        }
+    }
+
+    EXPECT_TRUE(sawPresentTransition);
+}
+
+TEST(GraphicsRenderGraph, RepeatedShaderReadsDoNotEmitRedundantBarrier)
+{
+    RenderGraph graph;
+    const auto texture = graph.CreateTexture("History", Extrinsic::RHI::TextureDesc{});
+
+    graph.AddPass("ReadA", [texture](RenderGraphBuilder& builder) {
+        builder.Read(texture, TextureUsage::ShaderRead);
+    }, true);
+    graph.AddPass("ReadB", [texture](RenderGraphBuilder& builder) {
+        builder.Read(texture, TextureUsage::ShaderRead);
+    }, true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    std::uint32_t shaderReadTransitions = 0;
+    for (const auto& packet : compiled->BarrierPackets)
+    {
+        for (const auto& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex == texture.Index &&
+                barrier.After == TextureBarrierState::ShaderRead)
+            {
+                ++shaderReadTransitions;
+            }
+        }
+    }
+
+    EXPECT_EQ(shaderReadTransitions, 1u);
+}
+
 TEST(GraphicsRenderGraph, ExecuteEmptyGraphSucceeds)
 {
     RenderGraph graph;
