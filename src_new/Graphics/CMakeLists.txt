@@ -8,6 +8,13 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Graphics.Colormap.cppm
         Graphics.Renderer.cppm
+        Graphics.RenderGraph.cppm
+        Graphics.RenderGraph.Resources.cppm
+        Graphics.RenderGraph.Pass.cppm
+        Graphics.RenderGraph.Compiler.cppm
+        Graphics.RenderGraph.Barriers.cppm
+        Graphics.RenderGraph.TransientAllocator.cppm
+        Graphics.RenderGraph.Executor.cppm
         Graphics.RenderFrameInput.cppm
         Graphics.RenderWorld.cppm
         Graphics.GpuWorld.cppm
@@ -26,6 +33,10 @@ target_sources(${target_name}
         Graphics.TransformSyncSystem.cppm
         PRIVATE
         Graphics.Renderer.cpp
+        Graphics.RenderGraph.cpp
+        Graphics.RenderGraph.Compiler.cpp
+        Graphics.RenderGraph.TransientAllocator.cpp
+        Graphics.RenderGraph.Executor.cpp
         Graphics.GpuWorld.cpp
         Graphics.MaterialSystem.cpp
         Graphics.ColormapSystem.cpp

@@ -9,6 +9,7 @@ production on top of RHI.
 ### Renderer
 
 - `Extrinsic.Graphics.Renderer`
+- `Extrinsic.Graphics.RenderGraph`
 
 ### Systems
 
@@ -198,6 +199,7 @@ does not know which backend created it.
 ### Renderer
 
 - `Extrinsic.Graphics.Renderer`
+- `Extrinsic.Graphics.RenderGraph`
 
 ### Systems
 
