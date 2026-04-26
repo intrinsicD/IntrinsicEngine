@@ -2826,8 +2826,8 @@ Hazard rules:
 - [ ] Store pass metadata needed by compiler.
 - [ ] `Compile()` builds immutable compiled graph/layers.
 - [ ] `BuildPlan()` returns plan in compiler order.
-- [ ] `ExecutePass(uint32_t)` validates compiled state and index.
-- [ ] `TakePassExecute(uint32_t)` remains safe for streaming handoff until streaming executor replaces this pattern.
+- [x] `ExecutePass(uint32_t)` validates compiled state and index.
+- [x] `TakePassExecute(uint32_t)` remains safe for streaming handoff until streaming executor replaces this pattern.
 - [ ] `Reset()` is illegal or debug-asserted while execution token is live.
 - [ ] `GetScheduleStats()` returns meaningful stats, not only task count.
 
@@ -2835,10 +2835,10 @@ Hazard rules:
 
 - [ ] Existing `Test.Core.TaskGraph.cpp` still passes.
 - [ ] Closure execution order follows resource hazards.
-- [ ] `BuildPlan()` batches match topological layers.
-- [ ] `Reset()` clears resources, labels, stats, and pass closures.
-- [ ] `TakePassExecute()` moves only the target pass closure and leaves other passes valid.
-- [ ] Reusing graph across epochs does not leak labels/resources from prior epoch.
+- [x] `BuildPlan()` batches match topological layers.
+- [x] `Reset()` clears resources, labels, stats, and pass closures.
+- [x] `TakePassExecute()` moves only the target pass closure and leaves other passes valid.
+- [x] Reusing graph across epochs does not leak labels/resources from prior epoch.
 
 **Review gate RG-01 — Core compiler substrate:**
 

@@ -260,6 +260,91 @@ TEST(CoreTaskGraph, StreamingDomainBuildPlanAndResetReuse)
     EXPECT_EQ((*secondPlan)[0].domain, QueueDomain::Streaming);
 }
 
+TEST(CoreTaskGraph, BuildPlanBatchesMatchExecutionLayers)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+
+    graph.AddPass("WritePos",
+        [](TaskGraphBuilder& b) { b.Write<Position>(); },
+        []() {});
+    graph.AddPass("ReadPosWriteVel",
+        [](TaskGraphBuilder& b) { b.Read<Position>(); b.Write<Velocity>(); },
+        []() {});
+    graph.AddPass("ReadVel",
+        [](TaskGraphBuilder& b) { b.Read<Velocity>(); },
+        []() {});
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
+    const auto plan = graph.BuildPlan();
+    ASSERT_TRUE(plan.has_value()) << "BuildPlan failed";
+
+    const auto& layers = graph.GetExecutionLayers();
+    ASSERT_FALSE(layers.empty());
+
+    for (const auto& task : *plan)
+    {
+        ASSERT_LT(task.batch, layers.size());
+        const auto& layer = layers[task.batch];
+        EXPECT_NE(std::find(layer.begin(), layer.end(), task.id.Index), layer.end());
+    }
+}
+
+TEST(CoreTaskGraph, TakePassExecuteMovesOnlyTargetClosure)
+{
+    TaskGraph graph(QueueDomain::Streaming);
+    std::vector<std::string> log;
+
+    graph.AddPass("PassA", []([[maybe_unused]] TaskGraphBuilder& b) {}, [&]() { log.emplace_back("A"); });
+    graph.AddPass("PassB", []([[maybe_unused]] TaskGraphBuilder& b) {}, [&]() { log.emplace_back("B"); });
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
+
+    auto moved = graph.TakePassExecute(0u);
+    ASSERT_TRUE(static_cast<bool>(moved));
+    moved();
+
+    graph.ExecutePass(0u);
+    graph.ExecutePass(1u);
+
+    ASSERT_EQ(log.size(), 2u);
+    EXPECT_EQ(log[0], "A");
+    EXPECT_EQ(log[1], "B");
+}
+
+TEST(CoreTaskGraph, ResetClearsStatsResourcesAndLabelsAcrossEpochs)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+    std::vector<std::string> log;
+
+    graph.AddPass("Writer",
+        [](TaskGraphBuilder& b) { b.WriteResource("Shared"_id); b.Signal("Done"_id); },
+        [&]() { log.emplace_back("Writer"); });
+    graph.AddPass("Reader",
+        [](TaskGraphBuilder& b) { b.ReadResource("Shared"_id); b.WaitFor("Done"_id); },
+        [&]() { log.emplace_back("Reader"); });
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
+    ASSERT_TRUE(graph.Execute().has_value()) << "Execute failed";
+    const auto firstStats = graph.GetScheduleStats();
+    EXPECT_GT(firstStats.edgeCount, 0u);
+
+    graph.Reset();
+    EXPECT_EQ(graph.PassCount(), 0u);
+    EXPECT_EQ(graph.GetScheduleStats().edgeCount, 0u);
+
+    graph.AddPass("OnlyPass",
+        []([[maybe_unused]] TaskGraphBuilder& b) {},
+        [&]() { log.emplace_back("OnlyPass"); });
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile after reset failed";
+    ASSERT_TRUE(graph.Execute().has_value()) << "Execute after reset failed";
+
+    EXPECT_EQ(graph.PassCount(), 1u);
+    EXPECT_EQ(graph.GetScheduleStats().taskCount, 1u);
+    ASSERT_EQ(log.size(), 3u);
+    EXPECT_EQ(log[2], "OnlyPass");
+}
+
 TEST(CoreFrameGraph, ResetRebuildsTheCpuGraphCleanly)
 {
     FrameGraph graph;
@@ -290,4 +375,3 @@ TEST(CoreFrameGraph, ResetRebuildsTheCpuGraphCleanly)
     ASSERT_EQ(log.size(), 2u);
     ExpectOrder(log, "First", "Second");
 }
-
