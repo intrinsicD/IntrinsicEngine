@@ -62,6 +62,24 @@ namespace Extrinsic::Graphics
         return entry.Handle;
     }
 
+    void TransientAllocator::ReleaseTexture(const RHI::TextureHandle handle)
+    {
+        auto it = std::ranges::find_if(m_Textures, [handle](const TextureEntry& entry) { return entry.Handle == handle; });
+        if (it != m_Textures.end())
+        {
+            it->InUse = false;
+        }
+    }
+
+    void TransientAllocator::ReleaseBuffer(const RHI::BufferHandle handle)
+    {
+        auto it = std::ranges::find_if(m_Buffers, [handle](const BufferEntry& entry) { return entry.Handle == handle; });
+        if (it != m_Buffers.end())
+        {
+            it->InUse = false;
+        }
+    }
+
     void TransientAllocator::ResetFrame()
     {
         for (TextureEntry& entry : m_Textures)
