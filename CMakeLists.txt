@@ -177,13 +177,14 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     add_subdirectory(src/Interface)
     add_subdirectory(src/EditorUI)
     add_subdirectory(src/Runtime)     # needs Asset
-    add_subdirectory(src_new)         # needs Asset
 else()
     message(WARNING
-        "INTRINSIC_HEADLESS_NO_GLFW=ON: skipping GLFW-dependent modules "
-        "(RHI/Asset/Graphics/Interface/EditorUI/Runtime/src_new/Sandbox)."
+        "INTRINSIC_HEADLESS_NO_GLFW=ON: skipping legacy GLFW-dependent modules "
+        "(RHI/Asset/Graphics/Interface/EditorUI/Runtime)."
     )
 endif()
+
+add_subdirectory(src_new)
 
 if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     add_subdirectory(src/Apps/Sandbox)

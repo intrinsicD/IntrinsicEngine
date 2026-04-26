@@ -13,6 +13,8 @@ module;
 
 module Extrinsic.Core.Dag.Scheduler;
 
+import Extrinsic.Core.StrongHandle;
+
 namespace Extrinsic::Core::Dag
 {
         namespace

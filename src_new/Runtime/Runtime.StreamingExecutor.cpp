@@ -5,6 +5,8 @@ module;
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <functional>
+#include <expected>
 #include <limits>
 #include <mutex>
 #include <optional>
@@ -16,7 +18,7 @@ module;
 module Extrinsic.Runtime.StreamingExecutor;
 
 import Extrinsic.Core.Tasks;
-import Extrinsic.Core.Dag.Scheduler:Types;
+import Extrinsic.Core.Dag.Scheduler;
 
 namespace Extrinsic::Runtime
 {

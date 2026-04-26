@@ -18,6 +18,7 @@ import :Compiler;
 import :Resources;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.CommandContext;
 
 namespace Extrinsic::Graphics
 {

@@ -1,4 +1,11 @@
-module Extrinsic.Graphics.RenderGraph:Executor;
+module;
+
+#include <cstdint>
+#include <vector>
+
+module Extrinsic.Graphics.RenderGraph;
+
+import :Executor;
 
 import Extrinsic.Core.Error;
 import :Compiler;

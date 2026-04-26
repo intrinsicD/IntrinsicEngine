@@ -1,7 +1,14 @@
-set(EXTRINSIC_BACKEND "Vulkan" CACHE STRING "Graphics backend to use (Vulkan, DirectX12, Metal)")
+set(EXTRINSIC_BACKEND "Vulkan" CACHE STRING "Graphics backend to use (Vulkan, DirectX12, Metal, Null)")
 set(EXTRINSIC_PLATFORM "Linux" CACHE STRING "Platform to build for (Windows, Linux, macOS)")
 
-add_subdirectory(App)
+if(INTRINSIC_HEADLESS_NO_GLFW AND EXTRINSIC_BACKEND STREQUAL "Vulkan")
+    message(STATUS "INTRINSIC_HEADLESS_NO_GLFW=ON: forcing EXTRINSIC_BACKEND=Null for src_new")
+    set(EXTRINSIC_BACKEND "Null" CACHE STRING "Graphics backend to use (Vulkan, DirectX12, Metal, Null)" FORCE)
+endif()
+
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    add_subdirectory(App)
+endif()
 add_subdirectory(Assets)
 add_subdirectory(Core)
 add_subdirectory(ECS)
