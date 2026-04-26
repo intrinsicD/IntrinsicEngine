@@ -16,6 +16,7 @@ import Extrinsic.Core.Error;
 import :Pass;
 import :Compiler;
 import :Resources;
+import :TransientAllocator;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.CommandContext;
@@ -52,6 +53,7 @@ namespace Extrinsic::Graphics
         std::vector<RenderPassRecord> Passes{};
         std::vector<TextureResourceDesc> Textures{};
         std::vector<BufferResourceDesc> Buffers{};
+        TransientAllocator Transients{};
         std::uint32_t Generation = 1;
     };
 
@@ -343,7 +345,71 @@ namespace Extrinsic::Graphics
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
-        return RenderGraphCompiler::Compile(m_Impl->Passes, m_Impl->Textures, m_Impl->Buffers);
+        auto compiled = RenderGraphCompiler::Compile(m_Impl->Passes, m_Impl->Textures, m_Impl->Buffers);
+        if (!compiled.has_value())
+        {
+            return compiled;
+        }
+
+        auto BytesPerPixel = [](const RHI::Format fmt) -> std::uint64_t {
+            switch (fmt)
+            {
+            case RHI::Format::R8_UNORM: return 1u;
+            case RHI::Format::RG8_UNORM: return 2u;
+            case RHI::Format::RGBA8_UNORM:
+            case RHI::Format::RGBA8_SRGB:
+            case RHI::Format::BGRA8_UNORM:
+            case RHI::Format::BGRA8_SRGB:
+            case RHI::Format::R32_FLOAT:
+            case RHI::Format::R32_UINT:
+            case RHI::Format::R32_SINT:
+            case RHI::Format::D32_FLOAT: return 4u;
+            case RHI::Format::RG16_FLOAT:
+            case RHI::Format::R16_FLOAT:
+            case RHI::Format::R16_UINT:
+            case RHI::Format::R16_UNORM:
+            case RHI::Format::D16_UNORM: return 2u;
+            case RHI::Format::RGBA16_FLOAT:
+            case RHI::Format::RG32_FLOAT:
+            case RHI::Format::D24_UNORM_S8_UINT: return 8u;
+            case RHI::Format::RGB32_FLOAT:
+            case RHI::Format::D32_FLOAT_S8_UINT: return 12u;
+            case RHI::Format::RGBA32_FLOAT: return 16u;
+            default: return 4u;
+            }
+        };
+
+        m_Impl->Transients.ResetFrame();
+
+        for (std::uint32_t i = 0; i < m_Impl->Textures.size(); ++i)
+        {
+            if (m_Impl->Textures[i].Imported || !compiled->TextureLifetimes[i].HasUse)
+            {
+                continue;
+            }
+            compiled->TextureHandles[i] = m_Impl->Transients.AcquireTexture(m_Impl->Textures[i].Desc);
+            ++compiled->TransientTextureCount;
+            const auto& desc = m_Impl->Textures[i].Desc;
+            compiled->TransientMemoryEstimateBytes += static_cast<std::uint64_t>(desc.Width) *
+                                                      static_cast<std::uint64_t>(desc.Height) *
+                                                      static_cast<std::uint64_t>(desc.DepthOrArrayLayers) *
+                                                      static_cast<std::uint64_t>(desc.MipLevels) *
+                                                      static_cast<std::uint64_t>(std::max(desc.SampleCount, 1u)) *
+                                                      BytesPerPixel(desc.Fmt);
+        }
+
+        for (std::uint32_t i = 0; i < m_Impl->Buffers.size(); ++i)
+        {
+            if (m_Impl->Buffers[i].Imported || !compiled->BufferLifetimes[i].HasUse)
+            {
+                continue;
+            }
+            compiled->BufferHandles[i] = m_Impl->Transients.AcquireBuffer(m_Impl->Buffers[i].Desc);
+            ++compiled->TransientBufferCount;
+            compiled->TransientMemoryEstimateBytes += m_Impl->Buffers[i].Desc.SizeBytes;
+        }
+
+        return compiled;
     }
 
     Core::Result RenderGraph::ValidateTextureRef(const TextureRef ref) const

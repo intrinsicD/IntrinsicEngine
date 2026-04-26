@@ -667,3 +667,106 @@ TEST(GraphicsRenderGraph, DebugDumpContainsPassOrderAndResourceSections)
     EXPECT_NE(dump.find("textures:"), std::string::npos);
     EXPECT_NE(dump.find("buffers:"), std::string::npos);
 }
+
+TEST(GraphicsRenderGraph, TransientResourcesAllocateHandlesForUsedVirtualResources)
+{
+    RenderGraph graph;
+    Extrinsic::RHI::TextureDesc textureDesc{};
+    textureDesc.Width = 320;
+    textureDesc.Height = 180;
+    textureDesc.Fmt = Extrinsic::RHI::Format::RGBA8_UNORM;
+    const auto texture = graph.CreateTexture("TransientColor", textureDesc);
+    const auto buffer = graph.CreateBuffer("TransientArgs", Extrinsic::RHI::BufferDesc{.SizeBytes = 256u});
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{91u, 1u});
+
+    graph.AddPass("WriteTransient", [texture, buffer](RenderGraphBuilder& builder) {
+        builder.Write(texture, TextureUsage::ColorAttachmentWrite);
+        builder.Write(buffer, BufferUsage::ShaderWrite);
+    });
+    graph.AddPass("Present", [texture, backbuffer, buffer](RenderGraphBuilder& builder) {
+        builder.Read(texture, TextureUsage::ShaderRead);
+        builder.Read(buffer, BufferUsage::IndirectRead);
+        builder.Read(backbuffer, TextureUsage::Present);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_TRUE(compiled->TextureHandles[texture.Index].IsValid());
+    EXPECT_TRUE(compiled->BufferHandles[buffer.Index].IsValid());
+    EXPECT_EQ(compiled->TransientTextureCount, 1u);
+    EXPECT_EQ(compiled->TransientBufferCount, 1u);
+    EXPECT_GT(compiled->TransientMemoryEstimateBytes, 0u);
+}
+
+TEST(GraphicsRenderGraph, TransientAllocatorReusesCompatibleHandlesAcrossFrames)
+{
+    RenderGraph graph;
+    Extrinsic::RHI::TextureDesc desc{};
+    desc.Width = 128;
+    desc.Height = 128;
+    const auto a = graph.CreateTexture("A", desc);
+    graph.AddPass("UseA", [a](RenderGraphBuilder& builder) { builder.Write(a, TextureUsage::ColorAttachmentWrite); }, true);
+
+    auto first = graph.Compile();
+    ASSERT_TRUE(first.has_value());
+    const auto firstHandle = first->TextureHandles[a.Index];
+    ASSERT_TRUE(firstHandle.IsValid());
+
+    graph.Reset();
+    const auto b = graph.CreateTexture("B", desc);
+    graph.AddPass("UseB", [b](RenderGraphBuilder& builder) { builder.Write(b, TextureUsage::ColorAttachmentWrite); }, true);
+    auto second = graph.Compile();
+    ASSERT_TRUE(second.has_value());
+    const auto secondHandle = second->TextureHandles[b.Index];
+    EXPECT_EQ(firstHandle.Index, secondHandle.Index);
+    EXPECT_EQ(firstHandle.Generation, secondHandle.Generation);
+}
+
+TEST(GraphicsRenderGraph, ImportedResourcesNeverCountAsTransientAllocations)
+{
+    RenderGraph graph;
+    const auto importedTexture = graph.ImportTexture(
+        "History", Extrinsic::RHI::TextureHandle{5u, 1u}, TextureState::ShaderRead, TextureState::ShaderRead);
+    const auto importedBuffer =
+        graph.ImportBuffer("Readback", Extrinsic::RHI::BufferHandle{7u, 1u}, BufferState::TransferDst, BufferState::HostReadback);
+    graph.AddPass("UseImported", [importedTexture, importedBuffer](RenderGraphBuilder& builder) {
+        builder.Read(importedTexture, TextureUsage::ShaderRead);
+        builder.Read(importedBuffer, BufferUsage::HostReadback);
+        builder.SideEffect();
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->TransientTextureCount, 0u);
+    EXPECT_EQ(compiled->TransientBufferCount, 0u);
+}
+
+TEST(GraphicsRenderGraph, IncompatibleTransientDescriptorAllocatesNewHandle)
+{
+    RenderGraph graph;
+    Extrinsic::RHI::TextureDesc small{};
+    small.Width = 64;
+    small.Height = 64;
+    const auto firstTexture = graph.CreateTexture("Small", small);
+    graph.AddPass("UseSmall",
+                  [firstTexture](RenderGraphBuilder& builder) { builder.Write(firstTexture, TextureUsage::ColorAttachmentWrite); },
+                  true);
+    auto first = graph.Compile();
+    ASSERT_TRUE(first.has_value());
+    const auto firstHandle = first->TextureHandles[firstTexture.Index];
+    ASSERT_TRUE(firstHandle.IsValid());
+
+    graph.Reset();
+    Extrinsic::RHI::TextureDesc large{};
+    large.Width = 1920;
+    large.Height = 1080;
+    const auto secondTexture = graph.CreateTexture("Large", large);
+    graph.AddPass("UseLarge",
+                  [secondTexture](RenderGraphBuilder& builder) { builder.Write(secondTexture, TextureUsage::ColorAttachmentWrite); },
+                  true);
+    auto second = graph.Compile();
+    ASSERT_TRUE(second.has_value());
+    const auto secondHandle = second->TextureHandles[secondTexture.Index];
+    ASSERT_TRUE(secondHandle.IsValid());
+    EXPECT_NE(firstHandle.Index, secondHandle.Index);
+}
