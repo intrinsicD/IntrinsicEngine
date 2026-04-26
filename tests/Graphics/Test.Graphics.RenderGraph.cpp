@@ -245,3 +245,91 @@ TEST(GraphicsRenderGraph, PresentOnImportedBackbufferCompiles)
     ASSERT_TRUE(compiled.has_value());
     EXPECT_EQ(compiled->PassCount, 1u);
 }
+
+TEST(GraphicsRenderGraph, UnusedTransientProducerIsCulled)
+{
+    RenderGraph graph;
+    const auto scratch = graph.CreateTexture("Scratch", Extrinsic::RHI::TextureDesc{});
+    graph.AddPass("UnusedProducer", [scratch](RenderGraphBuilder& builder) {
+        builder.Write(scratch, TextureUsage::ColorAttachmentWrite);
+    });
+
+    const auto debug = graph.AddPass("Debug", [](RenderGraphBuilder& builder) { builder.SideEffect(); }, false);
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->PassCount, 1u);
+    EXPECT_EQ(compiled->CulledPassCount, 1u);
+    ASSERT_EQ(compiled->TopologicalOrder.size(), 1u);
+    EXPECT_EQ(compiled->TopologicalOrder.front(), debug.Index);
+}
+
+TEST(GraphicsRenderGraph, PresentChainKeepsProducerPasses)
+{
+    RenderGraph graph;
+    const auto lighting = graph.CreateTexture("Lighting", Extrinsic::RHI::TextureDesc{});
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{4u, 1u});
+
+    const auto lightingPass = graph.AddPass("Lighting", [lighting](RenderGraphBuilder& builder) {
+        builder.Write(lighting, TextureUsage::ColorAttachmentWrite);
+    });
+    const auto tonemapPass = graph.AddPass("Tonemap", [lighting, backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(lighting, TextureUsage::ShaderRead);
+        builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+    });
+    const auto presentPass = graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(backbuffer, TextureUsage::Present);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->PassCount, 3u);
+    EXPECT_EQ(compiled->CulledPassCount, 0u);
+    EXPECT_LT(FindOrder(*compiled, lightingPass.Index), FindOrder(*compiled, tonemapPass.Index));
+    EXPECT_LT(FindOrder(*compiled, tonemapPass.Index), FindOrder(*compiled, presentPass.Index));
+}
+
+TEST(GraphicsRenderGraph, ImportedResourceWriterIsNotCulled)
+{
+    RenderGraph graph;
+    const auto imported = graph.ImportBuffer("Readback", Extrinsic::RHI::BufferHandle{9u, 1u}, BufferState::TransferDst, BufferState::HostReadback);
+    const auto writer = graph.AddPass("WriteReadback", [imported](RenderGraphBuilder& builder) {
+        builder.Write(imported, BufferUsage::TransferDst);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->PassCount, 1u);
+    EXPECT_EQ(compiled->CulledPassCount, 0u);
+    ASSERT_EQ(compiled->TopologicalOrder.size(), 1u);
+    EXPECT_EQ(compiled->TopologicalOrder.front(), writer.Index);
+}
+
+TEST(GraphicsRenderGraph, LifetimeFirstAndLastUseTracksPassIndices)
+{
+    RenderGraph graph;
+    const auto history = graph.CreateTexture("History", Extrinsic::RHI::TextureDesc{});
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{8u, 2u});
+
+    graph.AddPass("HistoryWrite", [history](RenderGraphBuilder& builder) {
+        builder.Write(history, TextureUsage::ColorAttachmentWrite);
+    });
+    graph.AddPass("HistoryRead", [history](RenderGraphBuilder& builder) {
+        builder.Read(history, TextureUsage::ShaderRead);
+    });
+    graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(backbuffer, TextureUsage::Present);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_GE(compiled->TextureLifetimes.size(), 2u);
+    const auto& historyLifetime = compiled->TextureLifetimes[history.Index];
+    EXPECT_TRUE(historyLifetime.HasUse);
+    EXPECT_EQ(historyLifetime.FirstUsePass, 0u);
+    EXPECT_EQ(historyLifetime.LastUsePass, 1u);
+    const auto& backbufferLifetime = compiled->TextureLifetimes[backbuffer.Index];
+    EXPECT_TRUE(backbufferLifetime.HasUse);
+    EXPECT_EQ(backbufferLifetime.FirstUsePass, 2u);
+    EXPECT_EQ(backbufferLifetime.LastUsePass, 2u);
+}

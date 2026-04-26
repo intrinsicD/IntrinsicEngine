@@ -3344,20 +3344,20 @@ public:
 
 **Tasks:**
 
-- [ ] Compute first use and last use for every virtual resource.
-- [ ] Mark imported resources as external lifetime.
-- [ ] Mark side-effect passes as roots for reachability.
-- [ ] Mark present/backbuffer final use as side-effect root.
-- [ ] Cull passes whose outputs are never consumed and which have no side effects.
-- [ ] Do not cull passes that write imported resources.
+- [x] Compute first use and last use for every virtual resource.
+- [x] Mark imported resources as external lifetime.
+- [x] Mark side-effect passes as roots for reachability.
+- [x] Mark present/backbuffer final use as side-effect root.
+- [x] Cull passes whose outputs are never consumed and which have no side effects.
+- [x] Do not cull passes that write imported resources.
 
 **Tests:**
 
-- [ ] Unused transient-producing pass is culled.
-- [ ] Side-effect pass remains.
-- [ ] Present chain keeps all producer passes.
-- [ ] Imported-resource writer remains.
-- [ ] Lifetime first/last pass indices are correct.
+- [x] Unused transient-producing pass is culled.
+- [x] Side-effect pass remains.
+- [x] Present chain keeps all producer passes.
+- [x] Imported-resource writer remains.
+- [x] Lifetime first/last pass indices are correct.
 
 ## T045 — Implement coarse barrier packet generation
 
