@@ -5,6 +5,7 @@ module;
 #include <expected>
 #include <stack>
 #include <ranges>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
@@ -172,11 +173,19 @@ namespace Extrinsic::Graphics
             return CompiledRenderGraph{
                 .PassCount = passCount,
                 .ResourceCount = resourceCount,
+                .TextureHandles = std::vector<RHI::TextureHandle>(textures.size()),
+                .BufferHandles = std::vector<RHI::BufferHandle>(buffers.size()),
+                .TextureImported = std::vector<bool>(textures.size(), false),
+                .BufferImported = std::vector<bool>(buffers.size(), false),
             };
         }
 
         std::vector<ResourceState> textureStates(textures.size());
         std::vector<ResourceState> bufferStates(buffers.size());
+        std::vector<RHI::TextureHandle> textureHandles(textures.size());
+        std::vector<RHI::BufferHandle> bufferHandles(buffers.size());
+        std::vector<bool> textureImported(textures.size(), false);
+        std::vector<bool> bufferImported(buffers.size(), false);
         std::vector<ResourceLifetime> textureLifetimes(textures.size());
         std::vector<ResourceLifetime> bufferLifetimes(buffers.size());
         std::vector<std::vector<std::uint32_t>> adjacency(passCount);
@@ -184,6 +193,23 @@ namespace Extrinsic::Graphics
         std::vector<std::uint32_t> indegree(passCount, 0u);
         std::unordered_set<std::uint64_t> dedup{};
         dedup.reserve(static_cast<std::size_t>(passCount) * 4u);
+
+        for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
+        {
+            if (textures[textureIndex].Imported)
+            {
+                textureHandles[textureIndex] = textures[textureIndex].ImportedHandle;
+                textureImported[textureIndex] = true;
+            }
+        }
+        for (std::uint32_t bufferIndex = 0; bufferIndex < buffers.size(); ++bufferIndex)
+        {
+            if (buffers[bufferIndex].Imported)
+            {
+                bufferHandles[bufferIndex] = buffers[bufferIndex].ImportedHandle;
+                bufferImported[bufferIndex] = true;
+            }
+        }
 
         for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
         {
@@ -380,6 +406,8 @@ namespace Extrinsic::Graphics
 
         std::vector<BarrierPacket> barrierPackets{};
         barrierPackets.reserve(order.size());
+        std::vector<std::string> passNames{};
+        passNames.reserve(order.size());
         std::vector<TextureBarrierState> textureStateByRef(textures.size(), TextureBarrierState::Undefined);
         std::vector<BufferBarrierState> bufferStateByRef(buffers.size(), BufferBarrierState::Undefined);
 
@@ -401,6 +429,7 @@ namespace Extrinsic::Graphics
         for (const std::uint32_t passIndex : order)
         {
             const auto& pass = passes[passIndex];
+            passNames.push_back(pass.Name);
             BarrierPacket packet{};
             packet.PassIndex = passIndex;
 
@@ -447,8 +476,13 @@ namespace Extrinsic::Graphics
             .EdgeCount = activeEdgeCount,
             .TopologicalOrder = std::move(order),
             .TopologicalLayerByPass = std::move(layerByPass),
+            .PassNames = std::move(passNames),
             .TextureLifetimes = std::move(textureLifetimes),
             .BufferLifetimes = std::move(bufferLifetimes),
+            .TextureHandles = std::move(textureHandles),
+            .BufferHandles = std::move(bufferHandles),
+            .TextureImported = std::move(textureImported),
+            .BufferImported = std::move(bufferImported),
             .BarrierPackets = std::move(barrierPackets),
         };
     }

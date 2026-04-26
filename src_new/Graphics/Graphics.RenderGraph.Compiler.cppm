@@ -8,6 +8,7 @@ module;
 export module Extrinsic.Graphics.RenderGraph:Compiler;
 
 import Extrinsic.Core.Error;
+import Extrinsic.RHI.Handles;
 import :Pass;
 import :Resources;
 import :Barriers;
@@ -29,8 +30,13 @@ namespace Extrinsic::Graphics
         std::uint32_t EdgeCount = 0;
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
+        std::vector<std::string> PassNames{};
         std::vector<ResourceLifetime> TextureLifetimes{};
         std::vector<ResourceLifetime> BufferLifetimes{};
+        std::vector<RHI::TextureHandle> TextureHandles{};
+        std::vector<RHI::BufferHandle> BufferHandles{};
+        std::vector<bool> TextureImported{};
+        std::vector<bool> BufferImported{};
         std::vector<BarrierPacket> BarrierPackets{};
         std::string Diagnostic{};
     };
