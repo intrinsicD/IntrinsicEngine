@@ -3496,19 +3496,19 @@ public:
 
 **Tasks:**
 
-- [ ] Import scene/instance/entity/material/light buffers as read resources.
-- [ ] Import indirect draw buffers as read/write as appropriate.
+- [x] Import scene/instance/entity/material/light buffers as read resources.
+- [x] Import indirect draw buffers as read/write as appropriate.
 - [ ] Import shadow atlas if present.
 - [ ] Import selection readback buffers if present.
-- [ ] Ensure imported resource states are specified.
-- [ ] Ensure graph does not own imported lifetimes.
+- [x] Ensure imported resource states are specified.
+- [x] Ensure graph does not own imported lifetimes.
 
 **Tests:**
 
 - [ ] Imported buffers are not destroyed by graph reset.
 - [ ] Imported buffers cannot alias transient buffers.
-- [ ] Culling write -> draw indirect read barrier is generated.
-- [ ] Lighting pass reads light buffer.
+- [x] Culling write -> draw indirect read barrier is generated.
+- [x] Lighting pass reads light buffer.
 
 ## T053 — Renderer integration telemetry and diagnostics
 
