@@ -3156,10 +3156,10 @@ public:
 **Tests:**
 
 - [x] Add or create `tests/Runtime/Test.Runtime.StreamingExecutor.cpp`.
-- [ ] Runtime maintenance phase applies completed streaming result once.
-- [ ] Streaming job cannot publish after engine shutdown begins.
-- [ ] Long streaming job does not block render extraction.
-- [ ] Frame-local reset cannot invalidate running streaming closures.
+- [x] Runtime maintenance phase applies completed streaming result once.
+- [x] Streaming job cannot publish after engine shutdown begins.
+- [x] Long streaming job does not block render extraction.
+- [x] Frame-local reset cannot invalidate running streaming closures.
 
 ## T033 — Add asset/GPU upload handoff hooks without overreaching
 
