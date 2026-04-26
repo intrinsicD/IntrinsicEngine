@@ -27,7 +27,10 @@ namespace Extrinsic::Graphics
         std::uint32_t PassCount = 0;
         std::uint32_t CulledPassCount = 0;
         std::uint32_t ResourceCount = 0;
+        std::uint32_t TransientTextureCount = 0;
+        std::uint32_t TransientBufferCount = 0;
         std::uint32_t EdgeCount = 0;
+        std::uint64_t TransientMemoryEstimateBytes = 0;
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
         std::vector<std::string> PassNames{};

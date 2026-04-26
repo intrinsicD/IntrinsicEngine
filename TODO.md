@@ -3573,19 +3573,19 @@ public:
 
 **Tasks:**
 
-- [ ] Build transient resource allocation requests from descriptors and first/last use.
-- [ ] Allocate actual RHI resources before execution.
-- [ ] Free/return transient resources after frame or keep in a reusable cache.
-- [ ] Handle resize by invalidating incompatible cached resources.
-- [ ] Never allocate imported resources.
-- [ ] Add memory estimate/statistics.
+- [x] Build transient resource allocation requests from descriptors and first/last use.
+- [x] Allocate actual RHI resources before execution.
+- [x] Free/return transient resources after frame or keep in a reusable cache.
+- [x] Handle resize by invalidating incompatible cached resources.
+- [x] Never allocate imported resources.
+- [x] Add memory estimate/statistics.
 
 **Tests:**
 
-- [ ] Transient resources are allocated before first use.
-- [ ] Transient resources are released/recycled after graph reset/frame completion.
-- [ ] Resize invalidates resources with old extent.
-- [ ] Imported resources are never allocated or freed by transient allocator.
+- [x] Transient resources are allocated before first use.
+- [x] Transient resources are released/recycled after graph reset/frame completion.
+- [x] Resize invalidates resources with old extent.
+- [x] Imported resources are never allocated or freed by transient allocator.
 
 ## T062 — Implement aliasing of compatible transient resources
 
