@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 #include <vector>
 
@@ -149,5 +150,64 @@ TEST(RuntimeStreamingExecutor, ApplyRunsOnCallerThread)
     executor.ApplyMainThreadResults();
 
     EXPECT_EQ(applyThread, callerId);
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, CancelRunningTaskSuppressesApply)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> started = false;
+    std::atomic<bool> applyCalled = false;
+
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "CancelableRunning",
+        .Execute = [&started]()
+        {
+            started.store(true, std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            return StreamingResult{};
+        },
+        .ApplyOnMainThread = [&applyCalled](StreamingResult&&)
+        {
+            applyCalled.store(true, std::memory_order_release);
+        },
+    });
+
+    executor.PumpBackground(1);
+    while (!started.load(std::memory_order_acquire))
+    {
+        std::this_thread::yield();
+    }
+
+    executor.Cancel(handle);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+
+    EXPECT_FALSE(applyCalled.load(std::memory_order_acquire));
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Cancelled);
+}
+
+TEST(RuntimeStreamingExecutor, ShutdownDrainsRunningWorkDeterministically)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> ran = false;
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "ShutdownDrain",
+        .Execute = [&ran]()
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            ran.store(true, std::memory_order_release);
+            return StreamingResult{};
+        },
+    });
+
+    executor.PumpBackground(1);
+    executor.ShutdownAndDrain();
+
+    EXPECT_TRUE(ran.load(std::memory_order_acquire));
     EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
 }

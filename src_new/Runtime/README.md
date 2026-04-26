@@ -63,6 +63,11 @@ Phase 9   EndFrame+Present  Renderer::EndFrame(frame) → completedGpuValue
                             Device::Present(frame)
 
 Phase 10  Maintenance       Device::CollectCompletedTransfers()
+                            StreamingExecutor::DrainCompletions()
+                            StreamingExecutor::ApplyMainThreadResults()
+                            AssetService::Tick()
+                            Streaming compatibility bridge submit/reset
+                            StreamingExecutor::PumpBackground(budget)
                             [future: MaintenanceService::CollectGarbage(completedGpuValue)]
 
 Phase 11  Clock             FrameClock::EndFrame()
