@@ -3230,8 +3230,8 @@ public:
 
 **Public handles:**
 
-- [ ] `TextureRef`
-- [ ] `BufferRef`
+- [x] `TextureRef`
+- [x] `BufferRef`
 
 **Resource APIs:**
 
@@ -3246,20 +3246,20 @@ BufferRef  CreateBuffer(std::string_view name, const BufferDesc& desc);
 
 **Tasks:**
 
-- [ ] Implement stable resource handles with generation.
-- [ ] Track imported vs transient resources.
-- [ ] Track initial/final states for imported resources.
-- [ ] Store texture/buffer descriptors.
-- [ ] Validate resource ref generation on every access.
-- [ ] Keep debug names for diagnostics.
+- [x] Implement stable resource handles with generation.
+- [x] Track imported vs transient resources.
+- [x] Track initial/final states for imported resources.
+- [x] Store texture/buffer descriptors.
+- [x] Validate resource ref generation on every access.
+- [x] Keep debug names for diagnostics.
 
 **Tests:**
 
-- [ ] Import backbuffer returns valid texture ref.
-- [ ] Imported texture cannot be alias-allocated.
-- [ ] Transient texture lifetime is empty before use.
-- [ ] Invalid generation fails validation.
-- [ ] Duplicate debug names are allowed or rejected according to documented behavior.
+- [x] Import backbuffer returns valid texture ref.
+- [x] Imported texture cannot be alias-allocated.
+- [x] Transient texture lifetime is empty before use.
+- [x] Invalid generation fails validation.
+- [x] Duplicate debug names are allowed or rejected according to documented behavior.
 
 ## T042 — Implement render pass builder and access declarations
 
