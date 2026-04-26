@@ -2,12 +2,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <expected>
 #include <thread>
-#include <vector>
 #include <variant>
+#include <vector>
 
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Error;
 
 using namespace Extrinsic::Runtime;
 
@@ -62,12 +64,15 @@ TEST(RuntimeStreamingExecutor, DependencyChainSpansPumps)
 
     executor.PumpBackground(1);
     executor.DrainCompletions();
-    EXPECT_THAT(order, ::testing::ElementsAre(1));
+    ASSERT_EQ(order.size(), 1u);
+    EXPECT_EQ(order[0], 1);
     EXPECT_EQ(executor.GetState(second), StreamingTaskState::Pending);
 
     executor.PumpBackground(1);
     executor.DrainCompletions();
-    EXPECT_THAT(order, ::testing::ElementsAre(1, 2));
+    ASSERT_EQ(order.size(), 2u);
+    EXPECT_EQ(order[0], 1);
+    EXPECT_EQ(order[1], 2);
     EXPECT_EQ(executor.GetState(second), StreamingTaskState::Complete);
 }
 
@@ -98,11 +103,14 @@ TEST(RuntimeStreamingExecutor, HigherPriorityTaskLaunchesFirst)
 
     executor.PumpBackground(1);
     executor.DrainCompletions();
-    EXPECT_THAT(order, ::testing::ElementsAre(2));
+    ASSERT_EQ(order.size(), 1u);
+    EXPECT_EQ(order[0], 2);
 
     executor.PumpBackground(1);
     executor.DrainCompletions();
-    EXPECT_THAT(order, ::testing::ElementsAre(2, 1));
+    ASSERT_EQ(order.size(), 2u);
+    EXPECT_EQ(order[0], 2);
+    EXPECT_EQ(order[1], 1);
 
     EXPECT_EQ(executor.GetState(low), StreamingTaskState::Complete);
     EXPECT_EQ(executor.GetState(high), StreamingTaskState::Complete);
@@ -139,7 +147,13 @@ TEST(RuntimeStreamingExecutor, ApplyRunsOnCallerThread)
 
     const auto handle = executor.Submit(StreamingTaskDesc{
         .Name = "Apply",
-        .Execute = []() { return StreamingResult{}; },
+        .Execute = []()
+        {
+            return StreamingResult{StreamingGpuUploadRequest{
+                .PayloadToken = 123,
+                .ByteSize = 64,
+            }};
+        },
         .ApplyOnMainThread = [&applyThread](StreamingResult&&)
         {
             applyThread = std::this_thread::get_id();
@@ -148,6 +162,7 @@ TEST(RuntimeStreamingExecutor, ApplyRunsOnCallerThread)
 
     executor.PumpBackground(1);
     executor.DrainCompletions();
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::WaitingForGpuUpload);
     executor.ApplyMainThreadResults();
 
     EXPECT_EQ(applyThread, callerId);
