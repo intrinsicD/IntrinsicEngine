@@ -4,6 +4,7 @@ intrinsic_test_object_lib(ExtrinsicGraphicsTestObjs
         Test.RHI.TextureManager.cpp
         Test.RHI.SamplerManager.cpp
         Test.RHI.PipelineManager.cpp
+        Test.RHI.CommandContextBarriers.cpp
         Test.Graphics.GpuWorldAndCulling.cpp
         Test.Graphics.MinimalTriangleAcceptance.cpp
         Test.Graphics.RenderGraph.cpp
