@@ -3456,26 +3456,26 @@ public:
 
 **Passes to register, feature-gated where appropriate:**
 
-- [ ] Compute prologue / scene update / culling.
+- [x] Compute prologue / scene update / culling.
 - [ ] Picking pass, conditional on pending pick.
-- [ ] Optional depth prepass.
-- [ ] G-buffer pass.
-- [ ] Deferred lighting pass.
-- [ ] Forward surface pass.
-- [ ] Forward line pass.
-- [ ] Forward point pass.
+- [x] Optional depth prepass.
+- [x] G-buffer pass.
+- [x] Deferred lighting pass.
+- [x] Forward surface pass.
+- [x] Forward line pass.
+- [x] Forward point pass.
 - [ ] Overlay surface/debug pass if present.
-- [ ] Bloom pass.
-- [ ] Tone-map pass.
-- [ ] FXAA/SMAA pass.
-- [ ] Selection outline pass.
+- [x] Bloom pass.
+- [x] Tone-map pass.
+- [x] FXAA/SMAA pass.
+- [x] Selection outline pass.
 - [ ] Debug view pass.
-- [ ] ImGui pass.
-- [ ] Present pass.
+- [x] ImGui pass.
+- [x] Present pass.
 
 **Rules:**
 
-- [ ] Every pass declares all texture/buffer reads/writes.
+- [x] Every pass declares all texture/buffer reads/writes.
 - [ ] No pass relies on registration order for required correctness.
 - [ ] Registration order is only a stable tie-break.
 - [ ] Fixed sequence may remain as builder call order, but dependencies/barriers must come from resource declarations.
