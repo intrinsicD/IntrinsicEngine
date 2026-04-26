@@ -3639,22 +3639,22 @@ public:
 
 **Tasks:**
 
-- [ ] Verify `RunFrame` consists only of broad phases:
-  - [ ] platform/event handling;
-  - [ ] fixed-step simulation;
-  - [ ] variable tick;
-  - [ ] render input/snapshot;
-  - [ ] renderer begin;
-  - [ ] render extraction;
-  - [ ] render prepare;
-  - [ ] render execute;
-  - [ ] end/present;
-  - [ ] maintenance/streaming rendezvous;
-  - [ ] clock end.
-- [ ] Remove or avoid any pass-level renderer logic from Runtime.
-- [ ] Ensure streaming rendezvous happens in maintenance.
-- [ ] Ensure GPU transfers are collected before asset state flips to ready.
-- [ ] Update Runtime README if phase ordering changes.
+- [x] Verify `RunFrame` consists only of broad phases:
+  - [x] platform/event handling;
+  - [x] fixed-step simulation;
+  - [x] variable tick;
+  - [x] render input/snapshot;
+  - [x] renderer begin;
+  - [x] render extraction;
+  - [x] render prepare;
+  - [x] render execute;
+  - [x] end/present;
+  - [x] maintenance/streaming rendezvous;
+  - [x] clock end.
+- [x] Remove or avoid any pass-level renderer logic from Runtime.
+- [x] Ensure streaming rendezvous happens in maintenance.
+- [x] Ensure GPU transfers are collected before asset state flips to ready.
+- [x] Update Runtime README if phase ordering changes.
 
 **Tests:**
 
