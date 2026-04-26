@@ -128,3 +128,52 @@ TEST(GraphicsRenderer, NullRendererAddsPickingPassWhenPickIsPending)
     EXPECT_EQ(renderer->EndFrame(frame), 0u);
     renderer->Shutdown();
 }
+
+TEST(GraphicsRenderer, NullRendererExecuteFrameRequiresPreparePhase)
+{
+    MockDevice device;
+    auto renderer = Graphics::CreateRenderer();
+    ASSERT_NE(renderer, nullptr);
+
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Graphics::RenderFrameInput input{
+        .Alpha = 0.5,
+        .Viewport = {.Width = 800u, .Height = 600u},
+    };
+    auto world = renderer->ExtractRenderWorld(input);
+    renderer->ExecuteFrame(frame, world);
+
+    const auto& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_FALSE(stats.CompileSucceeded);
+    EXPECT_FALSE(stats.ExecuteSucceeded);
+    EXPECT_FALSE(stats.Diagnostic.empty());
+
+    renderer->Shutdown();
+}
+
+TEST(GraphicsRenderer, NullRendererPrepareBeforeExtractPreventsExecute)
+{
+    MockDevice device;
+    auto renderer = Graphics::CreateRenderer();
+    ASSERT_NE(renderer, nullptr);
+
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    Graphics::RenderWorld world{};
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const auto& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_FALSE(stats.CompileSucceeded);
+    EXPECT_FALSE(stats.ExecuteSucceeded);
+    EXPECT_FALSE(stats.Diagnostic.empty());
+
+    renderer->Shutdown();
+}

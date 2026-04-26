@@ -3678,16 +3678,16 @@ public:
 
 **Tasks:**
 
-- [ ] Add a render-prep `TaskGraph` owned by renderer or frame context.
-- [ ] Render-prep graph reads immutable `RenderWorld`.
-- [ ] Render-prep graph writes renderer-owned transient prep packets only.
-- [ ] Execute and await render-prep graph before GPU RenderGraph execution.
-- [ ] Keep render-prep graph optional/sequential for small scenes.
+- [x] Add a render-prep `TaskGraph` owned by renderer or frame context.
+- [x] Render-prep graph reads immutable `RenderWorld`.
+- [x] Render-prep graph writes renderer-owned transient prep packets only.
+- [x] Execute and await render-prep graph before GPU RenderGraph execution.
+- [x] Keep render-prep graph optional/sequential for small scenes.
 
 **Tests:**
 
-- [ ] Render-prep job cannot run before extraction has produced `RenderWorld`.
-- [ ] GPU graph cannot execute before render-prep graph completes.
+- [x] Render-prep job cannot run before extraction has produced `RenderWorld`.
+- [x] GPU graph cannot execute before render-prep graph completes.
 - [ ] Independent render-prep jobs can run in parallel.
 - [ ] Render-prep graph does not mutate ECS.
 
