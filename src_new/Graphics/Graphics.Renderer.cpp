@@ -14,6 +14,7 @@ import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
+import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
@@ -310,7 +311,7 @@ namespace Extrinsic::Graphics
                 return;
             }
             m_RenderGraph.Reset();
-            const auto backbuffer = m_RenderGraph.ImportBackbuffer("Null.Backbuffer", {});
+            const auto backbuffer = m_RenderGraph.ImportBackbuffer("Null.Backbuffer", RHI::TextureHandle{0u, 1u});
             const auto sceneTable = m_RenderGraph.ImportBuffer(
                 "GpuWorld.SceneTable",
                 m_GpuWorld->GetSceneTableBuffer(),
@@ -417,11 +418,13 @@ namespace Extrinsic::Graphics
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Read(picking, BufferUsage::ShaderRead);
+                builder.SideEffect();
             });
             if (renderWorld.HasPendingPick)
             {
                 [[maybe_unused]] const auto passPicking = m_RenderGraph.AddPass("Null.Picking", [picking](RenderGraphBuilder& builder) {
                     builder.Write(picking, BufferUsage::ShaderWrite);
+                    builder.SideEffect();
                 });
             }
             [[maybe_unused]] const auto passDepth = m_RenderGraph.AddPass("Null.DepthPrepass", [depth](RenderGraphBuilder& builder) {

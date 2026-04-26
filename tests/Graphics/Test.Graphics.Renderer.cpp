@@ -4,6 +4,7 @@
 
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.RHI.FrameHandle;
 
 #include "MockRHI.hpp"

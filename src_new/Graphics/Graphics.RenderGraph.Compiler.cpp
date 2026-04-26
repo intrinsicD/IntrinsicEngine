@@ -307,6 +307,24 @@ namespace Extrinsic::Graphics
             }
         }
 
+        if (rootStack.empty())
+        {
+            for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
+            {
+                if (adjacency[passIndex].empty() && !reverseAdjacency[passIndex].empty())
+                {
+                    rootStack.push(passIndex);
+                }
+            }
+            if (rootStack.empty())
+            {
+                for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
+                {
+                    rootStack.push(passIndex);
+                }
+            }
+        }
+
         while (!rootStack.empty())
         {
             const std::uint32_t node = rootStack.top();

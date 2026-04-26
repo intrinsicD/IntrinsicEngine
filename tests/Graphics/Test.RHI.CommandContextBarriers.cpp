@@ -1,11 +1,12 @@
+#include <gtest/gtest.h>
+
+#include <vector>
+#include <array>
+
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
-
-#include <gtest/gtest.h>
-
-#include <array>
-#include <vector>
+import Extrinsic.RHI.Descriptors;
 
 namespace
 {

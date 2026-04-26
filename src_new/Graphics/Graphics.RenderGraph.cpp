@@ -36,7 +36,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] constexpr bool TextureStateAllowsWrite(const TextureState state)
         {
             return state == TextureState::ColorAttachmentWrite || state == TextureState::DepthWrite ||
-                   state == TextureState::ShaderWrite || state == TextureState::TransferDst;
+                   state == TextureState::ShaderWrite || state == TextureState::TransferDst ||
+                   state == TextureState::Present;
         }
 
         [[nodiscard]] constexpr bool BufferUsageIsWrite(const BufferUsage usage)
@@ -147,6 +148,11 @@ namespace Extrinsic::Graphics
     RenderGraph::RenderGraph(RenderGraph&&) noexcept = default;
     RenderGraph& RenderGraph::operator=(RenderGraph&&) noexcept = default;
 
+    PassRef RenderGraph::AddPass(std::string name)
+    {
+        return AddPass(std::move(name), false);
+    }
+
     PassRef RenderGraph::AddPass(std::string name, const bool sideEffect)
     {
         if (!m_Impl)
@@ -157,6 +163,12 @@ namespace Extrinsic::Graphics
         const auto index = static_cast<std::uint32_t>(m_Impl->Passes.size());
         m_Impl->Passes.push_back(RenderPassRecord{.Name = std::move(name), .SideEffect = sideEffect});
         return PassRef{.Index = index, .Generation = m_Impl->Generation};
+    }
+
+    PassRef RenderGraph::AddPass(std::string name,
+                                 std::move_only_function<void(RenderGraphBuilder&)> setup)
+    {
+        return AddPass(std::move(name), std::move(setup), false);
     }
 
     PassRef RenderGraph::AddPass(std::string name,

@@ -32,10 +32,13 @@ namespace Extrinsic::Graphics
         RenderGraph(const RenderGraph&) = delete;
         RenderGraph& operator=(const RenderGraph&) = delete;
 
-        [[nodiscard]] PassRef AddPass(std::string name, bool sideEffect = false);
+        [[nodiscard]] PassRef AddPass(std::string name);
+        [[nodiscard]] PassRef AddPass(std::string name, bool sideEffect);
+        [[nodiscard]] PassRef AddPass(std::string name,
+                                      std::move_only_function<void(RenderGraphBuilder&)> setup);
         [[nodiscard]] PassRef AddPass(std::string name,
                                       std::move_only_function<void(RenderGraphBuilder&)> setup,
-                                      bool sideEffect = false);
+                                      bool sideEffect);
         [[nodiscard]] TextureRef ImportBackbuffer(std::string name, RHI::TextureHandle handle);
         [[nodiscard]] TextureRef ImportTexture(std::string name,
                                                RHI::TextureHandle handle,

@@ -24,12 +24,6 @@ namespace Extrinsic::Graphics
                 {
                     return Core::Err(Core::ErrorCode::OutOfRange);
                 }
-                if (graph.TextureImported.size() > textureBarrier.TextureIndex &&
-                    graph.TextureImported[textureBarrier.TextureIndex] &&
-                    !graph.TextureHandles[textureBarrier.TextureIndex].IsValid())
-                {
-                    return Core::Err(Core::ErrorCode::InvalidState);
-                }
             }
 
             for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
@@ -37,12 +31,6 @@ namespace Extrinsic::Graphics
                 if (bufferBarrier.BufferIndex >= graph.BufferHandles.size())
                 {
                     return Core::Err(Core::ErrorCode::OutOfRange);
-                }
-                if (graph.BufferImported.size() > bufferBarrier.BufferIndex &&
-                    graph.BufferImported[bufferBarrier.BufferIndex] &&
-                    !graph.BufferHandles[bufferBarrier.BufferIndex].IsValid())
-                {
-                    return Core::Err(Core::ErrorCode::InvalidState);
                 }
             }
 

@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <span>
 
 export module Extrinsic.RHI.CommandContext;
@@ -226,6 +227,23 @@ namespace Extrinsic::RHI
         /// Memory barriers are ignored by the fallback.
         virtual void SubmitBarriers(const BarrierBatchDesc& batch)
         {
+            if (reinterpret_cast<std::uintptr_t>(std::addressof(batch)) % alignof(BarrierBatchDesc) != 0u)
+            {
+                return;
+            }
+
+            if (batch.TextureBarriers.data() != nullptr &&
+                (reinterpret_cast<std::uintptr_t>(batch.TextureBarriers.data()) % alignof(TextureBarrierDesc) != 0u))
+            {
+                return;
+            }
+
+            if (batch.BufferBarriers.data() != nullptr &&
+                (reinterpret_cast<std::uintptr_t>(batch.BufferBarriers.data()) % alignof(BufferBarrierDesc) != 0u))
+            {
+                return;
+            }
+
             for (const TextureBarrierDesc& barrier : batch.TextureBarriers)
             {
                 TextureBarrier(barrier.Texture, barrier.BeforeLayout, barrier.AfterLayout);
