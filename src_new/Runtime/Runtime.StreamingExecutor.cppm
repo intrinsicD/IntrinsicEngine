@@ -5,6 +5,7 @@ module;
 #include <functional>
 #include <string>
 #include <vector>
+#include <variant>
 
 export module Extrinsic.Runtime.StreamingExecutor;
 
@@ -29,7 +30,19 @@ export namespace Extrinsic::Runtime
         Cancelled
     };
 
-    using StreamingResult = std::expected<Core::Unit, Core::ErrorCode>;
+    struct StreamingCpuPayloadReady
+    {
+        std::uint64_t PayloadToken = 0;
+    };
+
+    struct StreamingGpuUploadRequest
+    {
+        std::uint64_t PayloadToken = 0;
+        std::uint64_t ByteSize = 0;
+    };
+
+    using StreamingTaskValue = std::variant<Core::Unit, StreamingCpuPayloadReady, StreamingGpuUploadRequest>;
+    using StreamingResult = std::expected<StreamingTaskValue, Core::ErrorCode>;
 
     struct StreamingTaskDesc
     {

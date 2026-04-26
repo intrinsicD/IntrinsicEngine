@@ -4,6 +4,7 @@
 #include <chrono>
 #include <thread>
 #include <vector>
+#include <variant>
 
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Core.Dag.Scheduler;
@@ -210,4 +211,100 @@ TEST(RuntimeStreamingExecutor, ShutdownDrainsRunningWorkDeterministically)
 
     EXPECT_TRUE(ran.load(std::memory_order_acquire));
     EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, UploadRequestResultEnqueuesMainThreadUploadCallback)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> uploadApplied = false;
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "UploadRequest",
+        .Execute = []()
+        {
+            return StreamingResult{StreamingGpuUploadRequest{
+                .PayloadToken = 42,
+                .ByteSize = 4096,
+            }};
+        },
+        .ApplyOnMainThread = [&uploadApplied](StreamingResult&& result)
+        {
+            if (result.has_value() && std::holds_alternative<StreamingGpuUploadRequest>(*result))
+            {
+                uploadApplied.store(true, std::memory_order_release);
+            }
+        },
+    });
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::WaitingForGpuUpload);
+
+    executor.ApplyMainThreadResults();
+    EXPECT_TRUE(uploadApplied.load(std::memory_order_acquire));
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, CancelledUploadRequestSkipsUploadApplyCallback)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> started = false;
+    std::atomic<bool> uploadApplied = false;
+
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "CancelledUpload",
+        .Execute = [&started]()
+        {
+            started.store(true, std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            return StreamingResult{StreamingGpuUploadRequest{
+                .PayloadToken = 7,
+                .ByteSize = 256,
+            }};
+        },
+        .ApplyOnMainThread = [&uploadApplied](StreamingResult&&)
+        {
+            uploadApplied.store(true, std::memory_order_release);
+        },
+    });
+
+    executor.PumpBackground(1);
+    while (!started.load(std::memory_order_acquire))
+    {
+        std::this_thread::yield();
+    }
+
+    executor.Cancel(handle);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+
+    EXPECT_FALSE(uploadApplied.load(std::memory_order_acquire));
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Cancelled);
+}
+
+TEST(RuntimeStreamingExecutor, FailedWorkerResultSkipsUploadApplyAndMarksFailed)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> uploadApplied = false;
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "FailedUpload",
+        .Execute = []()
+        {
+            return StreamingResult{std::unexpected(Extrinsic::Core::ErrorCode::InvalidArgument)};
+        },
+        .ApplyOnMainThread = [&uploadApplied](StreamingResult&&)
+        {
+            uploadApplied.store(true, std::memory_order_release);
+        },
+    });
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+
+    EXPECT_FALSE(uploadApplied.load(std::memory_order_acquire));
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Failed);
 }

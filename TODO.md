@@ -3167,17 +3167,17 @@ public:
 
 **Tasks:**
 
-- [ ] Define a result type that can represent CPU payload ready, failed load, or upload request.
-- [ ] Ensure worker thread does not create/destroy GPU resources directly.
-- [ ] Provide main-thread handoff API that a future `GpuAssetCache` can consume.
-- [ ] Do not invent a second transfer queue or staging manager.
-- [ ] If `GpuAssetCache` already exists, wire non-blocking request/result behavior through it; otherwise add TODO stubs and tests for executor behavior only.
+- [x] Define a result type that can represent CPU payload ready, failed load, or upload request.
+- [x] Ensure worker thread does not create/destroy GPU resources directly.
+- [x] Provide main-thread handoff API that a future `GpuAssetCache` can consume.
+- [x] Do not invent a second transfer queue or staging manager.
+- [x] If `GpuAssetCache` already exists, wire non-blocking request/result behavior through it; otherwise add TODO stubs and tests for executor behavior only.
 
 **Tests:**
 
-- [ ] Worker result enqueues main-thread upload request callback.
-- [ ] Upload request callback can be skipped safely if task was cancelled.
-- [ ] Failed worker result moves task to `Failed` and does not call upload callback.
+- [x] Worker result enqueues main-thread upload request callback.
+- [x] Upload request callback can be skipped safely if task was cancelled.
+- [x] Failed worker result moves task to `Failed` and does not call upload callback.
 
 **Review gate RG-03 — Streaming executor:**
 
