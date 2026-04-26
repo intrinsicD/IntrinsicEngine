@@ -11,6 +11,7 @@ module;
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <variant>
 
 module Extrinsic.Runtime.StreamingExecutor;
 
@@ -31,6 +32,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] StreamingResult CancelledResult()
         {
             return std::unexpected(Core::ErrorCode::InvalidState);
+        }
+
+        [[nodiscard]] bool IsUploadRequest(const StreamingResult& result)
+        {
+            return result.has_value() && std::holds_alternative<StreamingGpuUploadRequest>(*result);
         }
     }
 
@@ -314,9 +320,15 @@ namespace Extrinsic::Runtime
             }
 
             task.Result = std::move(completion.Result);
-            if (task.Desc.ApplyOnMainThread)
+            if (!task.Result->has_value())
             {
-                task.State = StreamingTaskState::WaitingForMainThreadApply;
+                m_Impl->FinalizeTaskLocked(completion.Index);
+                continue;
+            }
+
+            if (task.Desc.ApplyOnMainThread && IsUploadRequest(*task.Result))
+            {
+                task.State = StreamingTaskState::WaitingForGpuUpload;
                 m_Impl->ReadyForApply.push_back(completion.Index);
             }
             else
