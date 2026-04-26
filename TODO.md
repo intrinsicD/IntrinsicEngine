@@ -3482,11 +3482,11 @@ public:
 
 **Tests:**
 
-- [ ] Expected pass names appear in compiled graph when features enabled.
+- [x] Expected pass names appear in compiled graph when features enabled.
 - [ ] Conditional picking pass absent when no pick request.
-- [ ] G-buffer outputs feed deferred lighting.
-- [ ] Deferred lighting feeds postprocess.
-- [ ] Postprocess feeds present.
+- [x] G-buffer outputs feed deferred lighting.
+- [x] Deferred lighting feeds postprocess.
+- [x] Postprocess feeds present.
 - [ ] Selection outline reads entity ID/depth resources.
 - [ ] Pass culling removes disabled/unused optional passes.
 
