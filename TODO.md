@@ -3518,20 +3518,20 @@ public:
 
 - [ ] Log compile failures with pass/resource names.
 - [ ] Expose per-frame graph stats:
-  - [ ] pass count;
-  - [ ] culled pass count;
-  - [ ] resource count;
-  - [ ] barrier count;
+  - [x] pass count;
+  - [x] culled pass count;
+  - [x] resource count;
+  - [x] barrier count;
   - [ ] transient memory estimate;
-  - [ ] compile time;
-  - [ ] execute/record time.
-- [ ] Add debug dump function for compiled render graph.
+  - [x] compile time;
+  - [x] execute/record time.
+- [x] Add debug dump function for compiled render graph.
 
 **Tests:**
 
 - [ ] Compile failure log contains failing pass name.
-- [ ] Stats are nonzero for nonempty graph.
-- [ ] Debug dump contains pass order and resources.
+- [x] Stats are nonzero for nonempty graph.
+- [x] Debug dump contains pass order and resources.
 
 **Review gate RG-05 — Renderer integration:**
 

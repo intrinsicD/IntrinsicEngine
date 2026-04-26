@@ -49,4 +49,6 @@ namespace Extrinsic::Graphics
             std::span<const TextureResourceDesc> textures,
             std::span<const BufferResourceDesc> buffers);
     };
+
+    export [[nodiscard]] std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled);
 }

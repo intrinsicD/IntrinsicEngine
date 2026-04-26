@@ -28,6 +28,14 @@ TEST(GraphicsRenderer, NullRendererExecutesRenderGraphPath)
     renderer->PrepareFrame(world);
 
     renderer->ExecuteFrame(frame, world);
+    const auto& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.CompileSucceeded);
+    EXPECT_TRUE(stats.ExecuteSucceeded);
+    EXPECT_GT(stats.PassCount, 0u);
+    EXPECT_GT(stats.ResourceCount, 0u);
+    EXPECT_GT(stats.BarrierCount, 0u);
+    EXPECT_FALSE(stats.DebugDump.empty());
+
     renderer->Resize(1920u, 1080u);
     renderer->ExecuteFrame(frame, world);
 

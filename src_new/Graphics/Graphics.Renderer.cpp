@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <entt/entity/registry.hpp>
@@ -8,6 +9,7 @@ module;
 module Extrinsic.Graphics.Renderer;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Types;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
@@ -28,6 +30,7 @@ import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Graphics
 {
@@ -157,6 +160,7 @@ namespace Extrinsic::Graphics
         void ExecuteFrame(const RHI::FrameHandle&,
                           const RenderWorld&) override
         {
+            m_LastRenderGraphStats = {};
             m_RenderGraph.Reset();
             const auto backbuffer = m_RenderGraph.ImportBackbuffer("Null.Backbuffer", {});
             const auto sceneTable = m_RenderGraph.ImportBuffer(
@@ -314,12 +318,38 @@ namespace Extrinsic::Graphics
                 builder.SideEffect();
             });
 
+            const auto compileBegin = std::chrono::steady_clock::now();
             auto compiled = m_RenderGraph.Compile();
+            const auto compileEnd = std::chrono::steady_clock::now();
+            m_LastRenderGraphStats.CompileTimeMicros = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(compileEnd - compileBegin).count());
             if (!compiled.has_value())
             {
+                m_LastRenderGraphStats.Diagnostic = "RenderGraph compile failed.";
+                Core::Log::Error("[Graphics] RenderGraph Compile() failed: error={}",
+                                 static_cast<int>(compiled.error()));
                 return;
             }
-            (void)m_RenderGraphExecutor.Execute(*compiled);
+            m_LastRenderGraphStats.CompileSucceeded = true;
+            m_LastRenderGraphStats.PassCount = compiled->PassCount;
+            m_LastRenderGraphStats.CulledPassCount = compiled->CulledPassCount;
+            m_LastRenderGraphStats.ResourceCount = compiled->ResourceCount;
+            m_LastRenderGraphStats.BarrierCount = static_cast<std::uint32_t>(compiled->BarrierPackets.size());
+            m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
+
+            const auto executeBegin = std::chrono::steady_clock::now();
+            const auto executeResult = m_RenderGraphExecutor.Execute(*compiled);
+            const auto executeEnd = std::chrono::steady_clock::now();
+            m_LastRenderGraphStats.ExecuteTimeMicros = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
+            if (!executeResult.has_value())
+            {
+                m_LastRenderGraphStats.Diagnostic = "RenderGraph execute failed.";
+                Core::Log::Error("[Graphics] RenderGraph Execute() failed: error={}",
+                                 static_cast<int>(executeResult.error()));
+                return;
+            }
+            m_LastRenderGraphStats.ExecuteSucceeded = true;
 
             // Phase 14.2 GPU order is intentionally fixed for concrete
             // backends:
@@ -362,6 +392,7 @@ namespace Extrinsic::Graphics
         DeferredSystem&        GetDeferredSystem()  override { return *m_DeferredSystem;  }
         PostProcessSystem&     GetPostProcessSystem() override { return *m_PostProcessSystem; }
         ShadowSystem&          GetShadowSystem()    override { return *m_ShadowSystem;    }
+        const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
 
     private:
         std::optional<RHI::BufferManager>   m_BufferManager;
@@ -383,6 +414,7 @@ namespace Extrinsic::Graphics
         entt::registry                       m_SyncRegistry;
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
+        RenderGraphFrameStats                m_LastRenderGraphStats;
     };
 
     std::unique_ptr<IRenderer> CreateRenderer()

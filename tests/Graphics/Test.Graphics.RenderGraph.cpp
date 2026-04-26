@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <iterator>
+#include <string>
 
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.Handles;
@@ -512,4 +513,33 @@ TEST(GraphicsRenderGraph, ExecuteFailsWhenBarrierReferencesInvalidResource)
     RenderGraphExecutor executor;
     auto result = executor.Execute(compiled);
     EXPECT_FALSE(result.has_value());
+}
+
+TEST(GraphicsRenderGraph, DebugDumpContainsPassOrderAndResourceSections)
+{
+    RenderGraph graph;
+    const auto texture = graph.CreateTexture("Lighting", Extrinsic::RHI::TextureDesc{});
+    const auto buffer = graph.CreateBuffer("Args", Extrinsic::RHI::BufferDesc{.SizeBytes = 64u});
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{91u, 1u});
+
+    graph.AddPass("Lighting", [texture, buffer](RenderGraphBuilder& builder) {
+        builder.Write(texture, TextureUsage::ColorAttachmentWrite);
+        builder.Write(buffer, BufferUsage::ShaderWrite);
+    });
+    graph.AddPass("Present", [texture, backbuffer, buffer](RenderGraphBuilder& builder) {
+        builder.Read(texture, TextureUsage::ShaderRead);
+        builder.Read(buffer, BufferUsage::IndirectRead);
+        builder.Read(backbuffer, TextureUsage::Present);
+        builder.SideEffect();
+    });
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::string dump = BuildRenderGraphDebugDump(*compiled);
+    EXPECT_NE(dump.find("passes:"), std::string::npos);
+    EXPECT_NE(dump.find("name=\"Lighting\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"Present\""), std::string::npos);
+    EXPECT_NE(dump.find("textures:"), std::string::npos);
+    EXPECT_NE(dump.find("buffers:"), std::string::npos);
 }
