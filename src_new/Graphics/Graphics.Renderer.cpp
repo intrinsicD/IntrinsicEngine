@@ -26,6 +26,7 @@ import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.RenderGraph;
 
 namespace Extrinsic::Graphics
 {
@@ -101,7 +102,10 @@ namespace Extrinsic::Graphics
             m_BufferManager  .reset();
         }
 
-        void Resize(std::uint32_t, std::uint32_t) override {}
+        void Resize(std::uint32_t, std::uint32_t) override
+        {
+            m_RenderGraph.Reset();
+        }
 
         // ── Per-frame phases ──────────────────────────────────────────────
 
@@ -152,6 +156,20 @@ namespace Extrinsic::Graphics
         void ExecuteFrame(const RHI::FrameHandle&,
                           const RenderWorld&) override
         {
+            m_RenderGraph.Reset();
+            m_RenderGraph.AddPass(
+                "Null.Backend.Present",
+                [](RenderGraphBuilder& builder) {
+                    builder.SideEffect();
+                });
+
+            auto compiled = m_RenderGraph.Compile();
+            if (!compiled.has_value())
+            {
+                return;
+            }
+            (void)m_RenderGraphExecutor.Execute(*compiled);
+
             // Phase 14.2 GPU order is intentionally fixed for concrete
             // backends:
             //   1) culling counter reset
@@ -212,6 +230,8 @@ namespace Extrinsic::Graphics
         std::optional<PostProcessSystem>     m_PostProcessSystem;
         std::optional<ShadowSystem>          m_ShadowSystem;
         entt::registry                       m_SyncRegistry;
+        RenderGraph                          m_RenderGraph;
+        RenderGraphExecutor                  m_RenderGraphExecutor;
     };
 
     std::unique_ptr<IRenderer> CreateRenderer()

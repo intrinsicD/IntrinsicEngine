@@ -7,6 +7,7 @@ intrinsic_test_object_lib(ExtrinsicGraphicsTestObjs
         Test.Graphics.GpuWorldAndCulling.cpp
         Test.Graphics.MinimalTriangleAcceptance.cpp
         Test.Graphics.RenderGraph.cpp
+        Test.Graphics.Renderer.cpp
         DEPS ExtrinsicCore ExtrinsicGraphics EnTT::EnTT glm::glm
 )
 
