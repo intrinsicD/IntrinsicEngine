@@ -157,11 +157,12 @@ namespace Extrinsic::Graphics
                           const RenderWorld&) override
         {
             m_RenderGraph.Reset();
-            m_RenderGraph.AddPass(
-                "Null.Backend.Present",
-                [](RenderGraphBuilder& builder) {
+            std::move_only_function<void(RenderGraphBuilder&)> setupPass =
+                [](RenderGraphBuilder& builder)
+                {
                     builder.SideEffect();
-                });
+                };
+            m_RenderGraph.AddPass("Null.Backend.Present", std::move(setupPass), false);
 
             auto compiled = m_RenderGraph.Compile();
             if (!compiled.has_value())

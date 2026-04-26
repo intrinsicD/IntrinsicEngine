@@ -1,4 +1,10 @@
-module Extrinsic.Graphics.RenderGraph:TransientAllocator;
+module;
+
+#include <cstdint>
+
+module Extrinsic.Graphics.RenderGraph;
+
+import :TransientAllocator;
 
 namespace Extrinsic::Graphics
 {

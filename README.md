@@ -39,6 +39,7 @@ Runtime code in the legacy tree follows a subsystem-first access policy: `Engine
 ## Build & Test Entry Points
 
 - **Supported toolchain:** Ninja + Clang 20+ + CMake 3.28+.
+- **Container troubleshooting:** if configure fails with C++ module import-graph scanning errors, see `docs/build-troubleshooting.md`.
 - **Preset policy:** the repository now codifies CUDA selection with explicit configure presets so the default developer path stays stable:
   - `dev` — Debug + tests + Sandbox, **CUDA OFF**
   - `dev-cuda` — Debug + tests + Sandbox, **CUDA ON**

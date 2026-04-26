@@ -10,7 +10,7 @@ module;
 export module Extrinsic.Runtime.StreamingExecutor;
 
 import Extrinsic.Core.Error;
-import Extrinsic.Core.Dag.Scheduler:Types;
+import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.StrongHandle;
 
 export namespace Extrinsic::Runtime
@@ -56,7 +56,7 @@ export namespace Extrinsic::Runtime
         std::move_only_function<void(StreamingResult&&)> ApplyOnMainThread{};
     };
 
-    export class StreamingExecutor
+    class StreamingExecutor
     {
     public:
         StreamingExecutor();

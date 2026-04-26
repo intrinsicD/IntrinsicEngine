@@ -9,9 +9,12 @@ target_sources(${target_name}
 )
 
 target_include_directories(${target_name} PUBLIC .)
+target_link_libraries(${target_name} PUBLIC ExtrinsicCore)
 
 if (EXTRINSIC_PLATFORM STREQUAL "Linux")
-    if (EXTRINSIC_BACKEND STREQUAL "Vulkan")
+    if (EXTRINSIC_BACKEND STREQUAL "Vulkan" AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         add_subdirectory(LinuxGlfwVulkan)
+    else()
+        message(STATUS "ExtrinsicPlatform: building interface-only platform layer (${EXTRINSIC_PLATFORM}/${EXTRINSIC_BACKEND})")
     endif ()
 endif ()

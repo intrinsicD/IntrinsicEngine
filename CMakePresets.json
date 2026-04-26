@@ -15,7 +15,9 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "INTRINSIC_BUILD_SANDBOX": "ON",
         "INTRINSIC_BUILD_TESTS": "ON",
-        "INTRINSIC_ENABLE_SANITIZERS": "ON"
+        "INTRINSIC_ENABLE_SANITIZERS": "ON",
+        "CMAKE_C_COMPILER": "clang-20",
+        "CMAKE_CXX_COMPILER": "clang++-20"
       }
     },
     {

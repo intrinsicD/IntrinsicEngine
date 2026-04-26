@@ -9,7 +9,9 @@ module;
 #include <unordered_set>
 #include <vector>
 
-module Extrinsic.Graphics.RenderGraph:Compiler;
+module Extrinsic.Graphics.RenderGraph;
+
+import :Compiler;
 
 import Extrinsic.RHI.Handles;
 import Extrinsic.Core.Error;
