@@ -414,6 +414,41 @@ TEST(GraphicsRenderGraph, ImportedBufferUsesInitialStateForFirstBarrier)
     EXPECT_TRUE(sawImportedInitialTransition);
 }
 
+TEST(GraphicsRenderGraph, ImportedIndirectBufferTransitionsFromShaderWriteToIndirectRead)
+{
+    RenderGraph graph;
+    const auto drawArgs = graph.ImportBuffer("DrawArgs",
+        Extrinsic::RHI::BufferHandle{21u, 1u},
+        BufferState::ShaderWrite,
+        BufferState::IndirectRead);
+
+    graph.AddPass("CullWrite", [drawArgs](RenderGraphBuilder& builder) {
+        builder.Write(drawArgs, BufferUsage::ShaderWrite);
+    });
+    graph.AddPass("DrawRead", [drawArgs](RenderGraphBuilder& builder) {
+        builder.Read(drawArgs, BufferUsage::IndirectRead);
+    }, true);
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    bool sawWriteToIndirect = false;
+    for (const auto& packet : compiled->BarrierPackets)
+    {
+        for (const auto& barrier : packet.BufferBarriers)
+        {
+            if (barrier.BufferIndex == drawArgs.Index &&
+                barrier.Before == BufferBarrierState::ShaderWrite &&
+                barrier.After == BufferBarrierState::IndirectRead)
+            {
+                sawWriteToIndirect = true;
+            }
+        }
+    }
+
+    EXPECT_TRUE(sawWriteToIndirect);
+}
+
 TEST(GraphicsRenderGraph, ExecuteEmptyGraphSucceeds)
 {
     RenderGraph graph;

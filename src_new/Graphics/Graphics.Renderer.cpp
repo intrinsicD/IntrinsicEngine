@@ -159,6 +159,56 @@ namespace Extrinsic::Graphics
         {
             m_RenderGraph.Reset();
             const auto backbuffer = m_RenderGraph.ImportBackbuffer("Null.Backbuffer", {});
+            const auto sceneTable = m_RenderGraph.ImportBuffer(
+                "GpuWorld.SceneTable",
+                m_GpuWorld->GetSceneTableBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto instanceStatic = m_RenderGraph.ImportBuffer(
+                "GpuWorld.InstanceStatic",
+                m_GpuWorld->GetInstanceStaticBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto instanceDynamic = m_RenderGraph.ImportBuffer(
+                "GpuWorld.InstanceDynamic",
+                m_GpuWorld->GetInstanceDynamicBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto entityConfig = m_RenderGraph.ImportBuffer(
+                "GpuWorld.EntityConfig",
+                m_GpuWorld->GetEntityConfigBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto geometryRecords = m_RenderGraph.ImportBuffer(
+                "GpuWorld.GeometryRecords",
+                m_GpuWorld->GetGeometryRecordBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto bounds = m_RenderGraph.ImportBuffer(
+                "GpuWorld.Bounds",
+                m_GpuWorld->GetBoundsBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto lights = m_RenderGraph.ImportBuffer(
+                "GpuWorld.Lights",
+                m_GpuWorld->GetLightBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto materialBuffer = m_RenderGraph.ImportBuffer(
+                "Material.Buffer",
+                m_MaterialSystem->GetBuffer(),
+                BufferState::ShaderRead,
+                BufferState::ShaderRead);
+            const auto drawIndirect = m_RenderGraph.ImportBuffer(
+                "Cull.SurfaceOpaque.IndexedArgs",
+                m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque).IndexedArgsBuffer,
+                BufferState::ShaderWrite,
+                BufferState::IndirectRead);
+            const auto drawCount = m_RenderGraph.ImportBuffer(
+                "Cull.SurfaceOpaque.Count",
+                m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque).CountBuffer,
+                BufferState::ShaderWrite,
+                BufferState::IndirectRead);
             const auto depth = m_RenderGraph.CreateTexture("Null.Depth",
                                                            RHI::TextureDesc{
                                                                .Width = 1u,
@@ -198,10 +248,22 @@ namespace Extrinsic::Graphics
                     .DebugName = "Null.Picking",
                 });
 
-            [[maybe_unused]] const auto passCompute = m_RenderGraph.AddPass("Null.Compute.Prologue", [picking](RenderGraphBuilder& builder) {
+            [[maybe_unused]] const auto passCompute = m_RenderGraph.AddPass("Null.Compute.Prologue", [sceneTable, instanceStatic, instanceDynamic, entityConfig, geometryRecords, bounds, materialBuffer, lights, drawIndirect, drawCount, picking](RenderGraphBuilder& builder) {
+                builder.Read(sceneTable, BufferUsage::ShaderRead);
+                builder.Read(instanceStatic, BufferUsage::ShaderRead);
+                builder.Read(instanceDynamic, BufferUsage::ShaderRead);
+                builder.Read(entityConfig, BufferUsage::ShaderRead);
+                builder.Read(geometryRecords, BufferUsage::ShaderRead);
+                builder.Read(bounds, BufferUsage::ShaderRead);
+                builder.Read(materialBuffer, BufferUsage::ShaderRead);
+                builder.Read(lights, BufferUsage::ShaderRead);
+                builder.Write(drawIndirect, BufferUsage::ShaderWrite);
+                builder.Write(drawCount, BufferUsage::ShaderWrite);
                 builder.Write(picking, BufferUsage::TransferDst);
             });
-            [[maybe_unused]] const auto passCulling = m_RenderGraph.AddPass("Null.Culling", [picking](RenderGraphBuilder& builder) {
+            [[maybe_unused]] const auto passCulling = m_RenderGraph.AddPass("Null.Culling", [drawIndirect, drawCount, picking](RenderGraphBuilder& builder) {
+                builder.Read(drawIndirect, BufferUsage::IndirectRead);
+                builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Read(picking, BufferUsage::ShaderRead);
             });
             [[maybe_unused]] const auto passPicking = m_RenderGraph.AddPass("Null.Picking", [picking](RenderGraphBuilder& builder) {
@@ -214,8 +276,9 @@ namespace Extrinsic::Graphics
                 builder.Write(gbuffer, TextureUsage::ColorAttachmentWrite);
                 builder.Read(depth, TextureUsage::DepthRead);
             });
-            [[maybe_unused]] const auto passDeferred = m_RenderGraph.AddPass("Null.DeferredLighting", [gbuffer, lit](RenderGraphBuilder& builder) {
+            [[maybe_unused]] const auto passDeferred = m_RenderGraph.AddPass("Null.DeferredLighting", [gbuffer, lit, lights](RenderGraphBuilder& builder) {
                 builder.Read(gbuffer, TextureUsage::ShaderRead);
+                builder.Read(lights, BufferUsage::ShaderRead);
                 builder.Write(lit, TextureUsage::ColorAttachmentWrite);
             });
             [[maybe_unused]] const auto passForwardSurface = m_RenderGraph.AddPass("Null.ForwardSurface", [lit, depth](RenderGraphBuilder& builder) {
