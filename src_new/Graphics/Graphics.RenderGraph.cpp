@@ -116,6 +116,16 @@ namespace Extrinsic::Graphics
         return ref;
     }
 
+    void RenderGraphBuilder::DependsOn(const PassRef dependency)
+    {
+        if (!dependency.IsValid())
+        {
+            m_Record->HasValidationError = true;
+            return;
+        }
+        m_Record->ExplicitDependencies.push_back(dependency);
+    }
+
     void RenderGraphBuilder::SetQueue(const RenderQueue queue)
     {
         m_Record->Queue = queue;

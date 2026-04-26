@@ -217,6 +217,15 @@ namespace Extrinsic::Graphics
         for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
         {
             const RenderPassRecord& pass = passes[passIndex];
+            for (const PassRef dependency : pass.ExplicitDependencies)
+            {
+                if (!dependency.IsValid() || dependency.Index >= passCount)
+                {
+                    return std::unexpected(Core::ErrorCode::InvalidArgument);
+                }
+                AddEdge(dependency.Index, passIndex, adjacency, indegree, dedup);
+            }
+
             for (const TextureAccess& access : pass.TextureAccesses)
             {
                 if (access.Ref.Index >= textureStates.size())
