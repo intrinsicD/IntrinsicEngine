@@ -3438,16 +3438,16 @@ public:
 
 **Tasks:**
 
-- [ ] Add `RenderGraph` member to renderer implementation.
-- [ ] In `ExecuteFrame`, reset graph, import frame/backbuffer resources, add passes, compile, execute.
+- [x] Add `RenderGraph` member to renderer implementation.
+- [x] In `ExecuteFrame`, reset graph, import frame/backbuffer resources, add passes, compile, execute.
 - [ ] Keep `Runtime::Engine` unaware of pass-level details.
-- [ ] Renderer `BeginFrame`/`EndFrame` lifecycle remains unchanged unless documented.
-- [ ] Resize invalidates/recreates graph-owned transient resources as needed.
+- [x] Renderer `BeginFrame`/`EndFrame` lifecycle remains unchanged unless documented.
+- [x] Resize invalidates/recreates graph-owned transient resources as needed.
 
 **Tests:**
 
-- [ ] Null renderer/frame path compiles and executes graph.
-- [ ] Resize causes transient resource invalidation without stale handle use.
+- [x] Null renderer/frame path compiles and executes graph.
+- [x] Resize causes transient resource invalidation without stale handle use.
 - [ ] Runtime smoke test confirms `RunFrame` does not inspect graph resources.
 
 ## T051 — Register initial fixed pass sequence through graph builders
