@@ -715,6 +715,12 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
 
     void TaskGraph::ExecutePass(uint32_t passIndex)
     {
+        if (!m_Impl->Compiled)
+        {
+            Log::Warn("[TaskGraph] ExecutePass requires a compiled graph");
+            return;
+        }
+
         if (passIndex >= static_cast<std::uint32_t>(m_Impl->Passes.size()))
         {
             Log::Warn("[TaskGraph] ExecutePass out-of-range index {}", passIndex);
@@ -732,6 +738,12 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
 
 GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
     {
+        if (!m_Impl->Compiled)
+        {
+            Log::Warn("[TaskGraph] TakePassExecute requires a compiled graph");
+            return {};
+        }
+
         if (passIndex >= static_cast<std::uint32_t>(m_Impl->Passes.size()))
             return {};
 
