@@ -3370,7 +3370,7 @@ public:
 - [x] For every resource use transition, emit barrier packet before consuming pass.
 - [x] Collapse redundant no-op transitions.
 - [x] Support imported initial state.
-- [ ] Support imported final/present state.
+- [x] Support imported final/present state.
 - [ ] Implement conversion to current RHI coarse `TextureBarrier` / `BufferBarrier` calls where possible.
 - [ ] Keep exact Sync2-style barrier API as a later phase if RHI does not yet expose it.
 
@@ -3378,11 +3378,11 @@ public:
 
 - [x] Undefined/imported -> color attachment write barrier.
 - [x] Color attachment write -> shader read barrier.
-- [ ] Depth write -> depth read/shader read barrier.
-- [ ] Compute shader write -> indirect read barrier.
-- [ ] Transfer dst -> shader read barrier.
-- [ ] Color/shader read -> present barrier for backbuffer.
-- [ ] Redundant read -> read transition emits no barrier.
+- [x] Depth write -> depth read/shader read barrier.
+- [x] Compute shader write -> indirect read barrier.
+- [x] Transfer dst -> shader read barrier.
+- [x] Color/shader read -> present barrier for backbuffer.
+- [x] Redundant read -> read transition emits no barrier.
 
 ## T046 — Implement RenderGraph execution context and null backend behavior
 
