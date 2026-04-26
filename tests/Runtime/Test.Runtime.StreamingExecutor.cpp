@@ -379,3 +379,117 @@ TEST(RuntimeStreamingExecutor, CancellationGenerationMismatchSuppressesStalePubl
     EXPECT_EQ(executor.GetState(cancelled), StreamingTaskState::Cancelled);
     EXPECT_EQ(executor.GetState(dependent), StreamingTaskState::Complete);
 }
+
+TEST(RuntimeStreamingExecutor, ApplyMainThreadResultsPublishesCompletionExactlyOnce)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<int> applyCount = 0;
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "ApplyOnce",
+        .Execute = []() -> StreamingResult
+        {
+            return StreamingResult{StreamingGpuUploadRequest{
+                .PayloadToken = 314,
+                .ByteSize = 2048,
+            }};
+        },
+        .ApplyOnMainThread = [&applyCount](StreamingResult&&)
+        {
+            applyCount.fetch_add(1, std::memory_order_relaxed);
+        },
+    });
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+
+    EXPECT_EQ(applyCount.load(std::memory_order_relaxed), 1);
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, LongRunningTaskDoesNotBlockPumpOrApplyTick)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> started = false;
+    std::atomic<bool> finished = false;
+
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "LongRunning",
+        .Execute = [&started, &finished]() -> StreamingResult
+        {
+            started.store(true, std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(40));
+            finished.store(true, std::memory_order_release);
+            return StreamingResult{};
+        },
+    });
+
+    executor.PumpBackground(1);
+    while (!started.load(std::memory_order_acquire))
+    {
+        std::this_thread::yield();
+    }
+
+    const auto before = std::chrono::steady_clock::now();
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+    const auto after = std::chrono::steady_clock::now();
+    const auto tickMicros = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+
+    EXPECT_LT(tickMicros, 10'000);
+
+    while (!finished.load(std::memory_order_acquire))
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    executor.DrainCompletions();
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+}
+
+TEST(RuntimeStreamingExecutor, ShutdownPreventsPostShutdownLatePublication)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> started = false;
+    std::atomic<int> applyCount = 0;
+
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "ShutdownNoLateApply",
+        .Execute = [&started]() -> StreamingResult
+        {
+            started.store(true, std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            return StreamingResult{StreamingGpuUploadRequest{
+                .PayloadToken = 777,
+                .ByteSize = 64,
+            }};
+        },
+        .ApplyOnMainThread = [&applyCount](StreamingResult&&)
+        {
+            applyCount.fetch_add(1, std::memory_order_relaxed);
+        },
+    });
+
+    executor.PumpBackground(1);
+    while (!started.load(std::memory_order_acquire))
+    {
+        std::this_thread::yield();
+    }
+
+    executor.ShutdownAndDrain();
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+    const int afterFirstApply = applyCount.load(std::memory_order_relaxed);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    executor.DrainCompletions();
+    executor.ApplyMainThreadResults();
+
+    EXPECT_EQ(applyCount.load(std::memory_order_relaxed), afterFirstApply);
+    EXPECT_TRUE(handle.IsValid());
+}
