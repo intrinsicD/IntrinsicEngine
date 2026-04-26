@@ -30,10 +30,23 @@ import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Core.Dag.TaskGraph;
+import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Graphics
 {
+    namespace
+    {
+        struct PrepPipelineCommitTag {};
+        struct PrepMaterialBaseSyncTag {};
+        struct PrepVisualizationSyncTag {};
+        struct PrepMaterialOverrideSyncTag {};
+        struct PrepTransformSyncTag {};
+        struct PrepLightSyncTag {};
+        struct PrepGpuWorldSyncTag {};
+    }
+
     class NullRenderer final : public IRenderer
     {
     public:
@@ -118,11 +131,15 @@ namespace Extrinsic::Graphics
             // NullRenderer has no swapchain; always reports "frame available"
             // so the rest of the loop exercises the extraction/prepare/execute
             // seams even without a real GPU backend.
+            m_HasExtractedRenderWorld = false;
+            m_HasPreparedFrame = false;
             return true;
         }
 
         RenderWorld ExtractRenderWorld(const RenderFrameInput& input) override
         {
+            m_HasExtractedRenderWorld = true;
+            m_HasPreparedFrame = false;
             return RenderWorld{
                 .Viewport       = input.Viewport,
                 .Alpha          = input.Alpha,
@@ -132,6 +149,13 @@ namespace Extrinsic::Graphics
 
         void PrepareFrame(RenderWorld&) override
         {
+            if (!m_HasExtractedRenderWorld)
+            {
+                Core::Log::Warn("[Graphics] PrepareFrame called before ExtractRenderWorld");
+                m_HasPreparedFrame = false;
+                return;
+            }
+
             // Phase 14.1 sync order contract:
             //  1) commit pipelines
             //  2) flush base materials
@@ -141,27 +165,150 @@ namespace Extrinsic::Graphics
             //  6) write lights
             //  7) refresh scene table material binding
             //  8) upload GpuWorld dirty ranges
-            m_PipelineManager->CommitPending();
-            m_MaterialSystem->SyncGpuBuffer();
-            m_VisualizationSyncSystem->Sync(
-                m_SyncRegistry,
-                *m_MaterialSystem,
-                *m_ColormapSystem,
-                *m_GpuWorld);
-            m_MaterialSystem->SyncGpuBuffer();
-            m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld, *m_MaterialSystem);
-            m_LightSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
-            m_GpuWorld->SetMaterialBuffer(
-                m_MaterialSystem->GetBuffer(),
-                m_MaterialSystem->GetCapacity());
-            m_GpuWorld->SyncFrame();
-            m_CullingSystem->SyncGpuBuffer();
+            if (m_EnableRenderPrepTaskGraph)
+            {
+                m_RenderPrepGraph.Reset();
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.PipelineCommit",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Write<PrepPipelineCommitTag>();
+                    },
+                    [this]
+                    {
+                        m_PipelineManager->CommitPending();
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.MaterialBaseSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepPipelineCommitTag>();
+                        b.Write<PrepMaterialBaseSyncTag>();
+                    },
+                    [this]
+                    {
+                        m_MaterialSystem->SyncGpuBuffer();
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.VisualizationSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepMaterialBaseSyncTag>();
+                        b.Write<PrepVisualizationSyncTag>();
+                    },
+                    [this]
+                    {
+                        m_VisualizationSyncSystem->Sync(
+                            m_SyncRegistry,
+                            *m_MaterialSystem,
+                            *m_ColormapSystem,
+                            *m_GpuWorld);
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.MaterialOverrideSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepVisualizationSyncTag>();
+                        b.Write<PrepMaterialOverrideSyncTag>();
+                    },
+                    [this]
+                    {
+                        m_MaterialSystem->SyncGpuBuffer();
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.TransformSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepMaterialOverrideSyncTag>();
+                        b.Write<PrepTransformSyncTag>();
+                    },
+                    [this]
+                    {
+                        m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld, *m_MaterialSystem);
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.LightSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepTransformSyncTag>();
+                        b.Write<PrepLightSyncTag>();
+                    },
+                    [this]
+                    {
+                        m_LightSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.GpuWorldSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepLightSyncTag>();
+                        b.Write<PrepGpuWorldSyncTag>();
+                    },
+                    [this]
+                    {
+                        m_GpuWorld->SetMaterialBuffer(
+                            m_MaterialSystem->GetBuffer(),
+                            m_MaterialSystem->GetCapacity());
+                        m_GpuWorld->SyncFrame();
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.CullingSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepGpuWorldSyncTag>();
+                    },
+                    [this]
+                    {
+                        m_CullingSystem->SyncGpuBuffer();
+                    });
+                const auto compile = m_RenderPrepGraph.Compile();
+                if (!compile.has_value())
+                {
+                    Core::Log::Error("[Graphics] Render prep TaskGraph compile failed: error={}",
+                                     static_cast<int>(compile.error()));
+                    m_HasPreparedFrame = false;
+                    return;
+                }
+                const auto execute = m_RenderPrepGraph.Execute();
+                if (!execute.has_value())
+                {
+                    Core::Log::Error("[Graphics] Render prep TaskGraph execute failed: error={}",
+                                     static_cast<int>(execute.error()));
+                    m_HasPreparedFrame = false;
+                    return;
+                }
+            }
+            else
+            {
+                m_PipelineManager->CommitPending();
+                m_MaterialSystem->SyncGpuBuffer();
+                m_VisualizationSyncSystem->Sync(
+                    m_SyncRegistry,
+                    *m_MaterialSystem,
+                    *m_ColormapSystem,
+                    *m_GpuWorld);
+                m_MaterialSystem->SyncGpuBuffer();
+                m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld, *m_MaterialSystem);
+                m_LightSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
+                m_GpuWorld->SetMaterialBuffer(
+                    m_MaterialSystem->GetBuffer(),
+                    m_MaterialSystem->GetCapacity());
+                m_GpuWorld->SyncFrame();
+                m_CullingSystem->SyncGpuBuffer();
+            }
+            m_HasPreparedFrame = true;
         }
 
         void ExecuteFrame(const RHI::FrameHandle&,
                           const RenderWorld& renderWorld) override
         {
             m_LastRenderGraphStats = {};
+            if (!m_HasPreparedFrame)
+            {
+                m_LastRenderGraphStats.Diagnostic = "ExecuteFrame requires successful PrepareFrame.";
+                Core::Log::Warn("[Graphics] ExecuteFrame called before successful PrepareFrame");
+                return;
+            }
             m_RenderGraph.Reset();
             const auto backbuffer = m_RenderGraph.ImportBackbuffer("Null.Backbuffer", {});
             const auto sceneTable = m_RenderGraph.ImportBuffer(
@@ -418,6 +565,10 @@ namespace Extrinsic::Graphics
         entt::registry                       m_SyncRegistry;
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
+        Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
+        bool                                 m_EnableRenderPrepTaskGraph{true};
+        bool                                 m_HasExtractedRenderWorld{false};
+        bool                                 m_HasPreparedFrame{false};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };
 
