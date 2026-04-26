@@ -3365,19 +3365,19 @@ public:
 
 **Tasks:**
 
-- [ ] Map `TextureUsage` to abstract texture state/layout/access.
-- [ ] Map `BufferUsage` to abstract buffer access/stage.
-- [ ] For every resource use transition, emit barrier packet before consuming pass.
-- [ ] Collapse redundant no-op transitions.
-- [ ] Support imported initial state.
+- [x] Map `TextureUsage` to abstract texture state/layout/access.
+- [x] Map `BufferUsage` to abstract buffer access/stage.
+- [x] For every resource use transition, emit barrier packet before consuming pass.
+- [x] Collapse redundant no-op transitions.
+- [x] Support imported initial state.
 - [ ] Support imported final/present state.
 - [ ] Implement conversion to current RHI coarse `TextureBarrier` / `BufferBarrier` calls where possible.
 - [ ] Keep exact Sync2-style barrier API as a later phase if RHI does not yet expose it.
 
 **Tests:**
 
-- [ ] Undefined/imported -> color attachment write barrier.
-- [ ] Color attachment write -> shader read barrier.
+- [x] Undefined/imported -> color attachment write barrier.
+- [x] Color attachment write -> shader read barrier.
 - [ ] Depth write -> depth read/shader read barrier.
 - [ ] Compute shader write -> indirect read barrier.
 - [ ] Transfer dst -> shader read barrier.

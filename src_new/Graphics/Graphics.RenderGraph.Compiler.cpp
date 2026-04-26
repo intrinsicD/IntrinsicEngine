@@ -17,6 +17,72 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
+        [[nodiscard]] constexpr TextureBarrierState ToTextureBarrierState(const TextureUsage usage)
+        {
+            switch (usage)
+            {
+            case TextureUsage::ColorAttachmentRead:
+            case TextureUsage::ColorAttachmentWrite: return TextureBarrierState::ColorAttachmentWrite;
+            case TextureUsage::DepthRead: return TextureBarrierState::DepthRead;
+            case TextureUsage::DepthWrite: return TextureBarrierState::DepthWrite;
+            case TextureUsage::ShaderRead: return TextureBarrierState::ShaderRead;
+            case TextureUsage::ShaderWrite: return TextureBarrierState::ShaderWrite;
+            case TextureUsage::TransferSrc: return TextureBarrierState::TransferSrc;
+            case TextureUsage::TransferDst: return TextureBarrierState::TransferDst;
+            case TextureUsage::Present: return TextureBarrierState::Present;
+            }
+            return TextureBarrierState::Undefined;
+        }
+
+        [[nodiscard]] constexpr TextureBarrierState ToTextureBarrierState(const TextureState state)
+        {
+            switch (state)
+            {
+            case TextureState::Undefined: return TextureBarrierState::Undefined;
+            case TextureState::ShaderRead: return TextureBarrierState::ShaderRead;
+            case TextureState::ShaderWrite: return TextureBarrierState::ShaderWrite;
+            case TextureState::ColorAttachmentWrite: return TextureBarrierState::ColorAttachmentWrite;
+            case TextureState::DepthWrite: return TextureBarrierState::DepthWrite;
+            case TextureState::TransferSrc: return TextureBarrierState::TransferSrc;
+            case TextureState::TransferDst: return TextureBarrierState::TransferDst;
+            case TextureState::Present: return TextureBarrierState::Present;
+            }
+            return TextureBarrierState::Undefined;
+        }
+
+        [[nodiscard]] constexpr BufferBarrierState ToBufferBarrierState(const BufferUsage usage)
+        {
+            switch (usage)
+            {
+            case BufferUsage::IndirectRead: return BufferBarrierState::IndirectRead;
+            case BufferUsage::IndexRead: return BufferBarrierState::IndexRead;
+            case BufferUsage::VertexRead: return BufferBarrierState::VertexRead;
+            case BufferUsage::ShaderRead: return BufferBarrierState::ShaderRead;
+            case BufferUsage::ShaderWrite: return BufferBarrierState::ShaderWrite;
+            case BufferUsage::TransferSrc: return BufferBarrierState::TransferSrc;
+            case BufferUsage::TransferDst: return BufferBarrierState::TransferDst;
+            case BufferUsage::HostReadback: return BufferBarrierState::HostReadback;
+            }
+            return BufferBarrierState::Undefined;
+        }
+
+        [[nodiscard]] constexpr BufferBarrierState ToBufferBarrierState(const BufferState state)
+        {
+            switch (state)
+            {
+            case BufferState::Undefined: return BufferBarrierState::Undefined;
+            case BufferState::ShaderRead: return BufferBarrierState::ShaderRead;
+            case BufferState::ShaderWrite: return BufferBarrierState::ShaderWrite;
+            case BufferState::VertexRead: return BufferBarrierState::VertexRead;
+            case BufferState::IndexRead: return BufferBarrierState::IndexRead;
+            case BufferState::IndirectRead: return BufferBarrierState::IndirectRead;
+            case BufferState::TransferSrc: return BufferBarrierState::TransferSrc;
+            case BufferState::TransferDst: return BufferBarrierState::TransferDst;
+            case BufferState::HostReadback: return BufferBarrierState::HostReadback;
+            }
+            return BufferBarrierState::Undefined;
+        }
+
         struct ResourceState
         {
             std::int32_t LastWriter = -1;
@@ -312,6 +378,68 @@ namespace Extrinsic::Graphics
             }
         }
 
+        std::vector<BarrierPacket> barrierPackets{};
+        barrierPackets.reserve(order.size());
+        std::vector<TextureBarrierState> textureStateByRef(textures.size(), TextureBarrierState::Undefined);
+        std::vector<BufferBarrierState> bufferStateByRef(buffers.size(), BufferBarrierState::Undefined);
+
+        for (std::uint32_t i = 0; i < textures.size(); ++i)
+        {
+            if (textures[i].Imported)
+            {
+                textureStateByRef[i] = ToTextureBarrierState(textures[i].InitialState);
+            }
+        }
+        for (std::uint32_t i = 0; i < buffers.size(); ++i)
+        {
+            if (buffers[i].Imported)
+            {
+                bufferStateByRef[i] = ToBufferBarrierState(buffers[i].InitialState);
+            }
+        }
+
+        for (const std::uint32_t passIndex : order)
+        {
+            const auto& pass = passes[passIndex];
+            BarrierPacket packet{};
+            packet.PassIndex = passIndex;
+
+            for (const auto& access : pass.TextureAccesses)
+            {
+                const auto next = ToTextureBarrierState(access.Usage);
+                const auto prev = textureStateByRef[access.Ref.Index];
+                if (prev != next)
+                {
+                    packet.TextureBarriers.push_back(TextureBarrierPacket{
+                        .TextureIndex = access.Ref.Index,
+                        .Before = prev,
+                        .After = next,
+                    });
+                    textureStateByRef[access.Ref.Index] = next;
+                }
+            }
+
+            for (const auto& access : pass.BufferAccesses)
+            {
+                const auto next = ToBufferBarrierState(access.Usage);
+                const auto prev = bufferStateByRef[access.Ref.Index];
+                if (prev != next)
+                {
+                    packet.BufferBarriers.push_back(BufferBarrierPacket{
+                        .BufferIndex = access.Ref.Index,
+                        .Before = prev,
+                        .After = next,
+                    });
+                    bufferStateByRef[access.Ref.Index] = next;
+                }
+            }
+
+            if (!packet.TextureBarriers.empty() || !packet.BufferBarriers.empty())
+            {
+                barrierPackets.push_back(std::move(packet));
+            }
+        }
+
         return CompiledRenderGraph{
             .PassCount = livePassCount,
             .CulledPassCount = passCount - livePassCount,
@@ -321,6 +449,7 @@ namespace Extrinsic::Graphics
             .TopologicalLayerByPass = std::move(layerByPass),
             .TextureLifetimes = std::move(textureLifetimes),
             .BufferLifetimes = std::move(bufferLifetimes),
+            .BarrierPackets = std::move(barrierPackets),
         };
     }
 }

@@ -333,3 +333,83 @@ TEST(GraphicsRenderGraph, LifetimeFirstAndLastUseTracksPassIndices)
     EXPECT_EQ(backbufferLifetime.FirstUsePass, 2u);
     EXPECT_EQ(backbufferLifetime.LastUsePass, 2u);
 }
+
+TEST(GraphicsRenderGraph, BarriersTransitionFromUndefinedToColorWriteThenShaderRead)
+{
+    RenderGraph graph;
+    const auto lighting = graph.CreateTexture("Lighting", Extrinsic::RHI::TextureDesc{});
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{12u, 1u});
+
+    graph.AddPass("Lighting", [lighting](RenderGraphBuilder& builder) {
+        builder.Write(lighting, TextureUsage::ColorAttachmentWrite);
+    });
+    graph.AddPass("Post", [lighting, backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(lighting, TextureUsage::ShaderRead);
+        builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+    });
+    graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
+        builder.Read(backbuffer, TextureUsage::Present);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_FALSE(compiled->BarrierPackets.empty());
+
+    bool sawColorWriteBarrier = false;
+    bool sawShaderReadBarrier = false;
+    for (const auto& packet : compiled->BarrierPackets)
+    {
+        for (const auto& barrier : packet.TextureBarriers)
+        {
+            if (barrier.TextureIndex != lighting.Index)
+            {
+                continue;
+            }
+            if (barrier.Before == TextureBarrierState::Undefined &&
+                barrier.After == TextureBarrierState::ColorAttachmentWrite)
+            {
+                sawColorWriteBarrier = true;
+            }
+            if (barrier.Before == TextureBarrierState::ColorAttachmentWrite &&
+                barrier.After == TextureBarrierState::ShaderRead)
+            {
+                sawShaderReadBarrier = true;
+            }
+        }
+    }
+
+    EXPECT_TRUE(sawColorWriteBarrier);
+    EXPECT_TRUE(sawShaderReadBarrier);
+}
+
+TEST(GraphicsRenderGraph, ImportedBufferUsesInitialStateForFirstBarrier)
+{
+    RenderGraph graph;
+    const auto readback = graph.ImportBuffer("Readback",
+        Extrinsic::RHI::BufferHandle{11u, 1u},
+        BufferState::TransferDst,
+        BufferState::HostReadback);
+    graph.AddPass("MapReadback", [readback](RenderGraphBuilder& builder) {
+        builder.Read(readback, BufferUsage::HostReadback);
+    }, true);
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_FALSE(compiled->BarrierPackets.empty());
+
+    bool sawImportedInitialTransition = false;
+    for (const auto& packet : compiled->BarrierPackets)
+    {
+        for (const auto& barrier : packet.BufferBarriers)
+        {
+            if (barrier.BufferIndex == readback.Index &&
+                barrier.Before == BufferBarrierState::TransferDst &&
+                barrier.After == BufferBarrierState::HostReadback)
+            {
+                sawImportedInitialTransition = true;
+            }
+        }
+    }
+
+    EXPECT_TRUE(sawImportedInitialTransition);
+}
