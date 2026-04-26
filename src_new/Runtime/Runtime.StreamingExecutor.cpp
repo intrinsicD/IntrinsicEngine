@@ -46,6 +46,7 @@ namespace Extrinsic::Runtime
         {
             std::uint32_t Generation = 1;
             std::uint32_t RemainingDeps = 0;
+            std::uint64_t CancellationGeneration = 0;
             StreamingTaskState State = StreamingTaskState::Pending;
             StreamingTaskDesc Desc{};
             std::vector<std::uint32_t> Dependents{};
@@ -57,6 +58,7 @@ namespace Extrinsic::Runtime
         {
             std::uint32_t Index = kInvalidIndex;
             std::uint32_t Generation = 0;
+            std::uint64_t CancellationGeneration = 0;
             StreamingResult Result{};
         };
 
@@ -170,6 +172,7 @@ namespace Extrinsic::Runtime
         Impl::TaskRecord record{};
         record.Desc = std::move(desc);
         record.Desc.EstimatedCost = std::max<std::uint32_t>(1u, record.Desc.EstimatedCost);
+        record.CancellationGeneration = record.Desc.CancellationGeneration;
 
         for (const auto dependency : record.Desc.DependsOn)
         {
@@ -211,10 +214,8 @@ namespace Extrinsic::Runtime
 
         task.State = StreamingTaskState::Cancelled;
         task.Result = CancelledResult();
-        if (!task.Launched)
-        {
-            m_Impl->FinalizeTaskLocked(*index);
-        }
+        ++task.CancellationGeneration;
+        m_Impl->FinalizeTaskLocked(*index);
     }
 
     void StreamingExecutor::PumpBackground(const std::uint32_t maxLaunches)
@@ -225,6 +226,7 @@ namespace Extrinsic::Runtime
         {
             std::uint32_t launchIndex = kInvalidIndex;
             std::uint32_t launchGeneration = 0;
+            std::uint64_t launchCancellationGeneration = 0;
             std::move_only_function<StreamingResult()> executeFn{};
 
             {
@@ -243,6 +245,7 @@ namespace Extrinsic::Runtime
                 auto& task = m_Impl->Tasks[*next];
                 launchIndex = *next;
                 launchGeneration = task.Generation;
+                launchCancellationGeneration = task.CancellationGeneration;
                 task.Launched = true;
                 task.State = StreamingTaskState::Running;
                 executeFn = std::move(task.Desc.Execute);
@@ -250,6 +253,7 @@ namespace Extrinsic::Runtime
             }
 
             auto runTask = [impl = m_Impl, index = launchIndex, generation = launchGeneration,
+                            cancellationGeneration = launchCancellationGeneration,
                             fn = std::move(executeFn)]() mutable
             {
                 StreamingResult result = std::unexpected(Core::ErrorCode::Unknown);
@@ -263,6 +267,7 @@ namespace Extrinsic::Runtime
                     impl->Completions.push_back(Impl::Completion{
                         .Index = index,
                         .Generation = generation,
+                        .CancellationGeneration = cancellationGeneration,
                         .Result = std::move(result),
                     });
                 }
@@ -307,6 +312,11 @@ namespace Extrinsic::Runtime
             if (m_Impl->RunningCount > 0)
             {
                 --m_Impl->RunningCount;
+            }
+
+            if (task.CancellationGeneration != completion.CancellationGeneration)
+            {
+                continue;
             }
 
             if (task.State == StreamingTaskState::Cancelled)

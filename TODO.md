@@ -3120,7 +3120,7 @@ public:
 - [x] Implement persistent storage with state transitions.
 - [x] Implement dependency counters.
 - [x] Implement priority-ready queues.
-- [ ] Implement cancellation generation checks.
+- [x] Implement cancellation generation checks.
 - [x] Implement worker completion queue.
 - [x] Implement main-thread apply queue.
 - [x] Implement shutdown drain/cancel semantics.
@@ -3132,7 +3132,7 @@ public:
 - [x] Higher-priority ready task launches before lower-priority ready task.
 - [x] Cancelling a pending task prevents execution.
 - [x] Cancelling a running task suppresses stale apply.
-- [ ] Generation mismatch prevents stale result publication.
+- [x] Generation mismatch prevents stale result publication.
 - [x] `ApplyOnMainThread` runs on caller thread of `ApplyMainThreadResults()`.
 - [x] Shutdown drains or cancels all running work deterministically.
 

@@ -50,6 +50,7 @@ export namespace Extrinsic::Runtime
         Core::Dag::TaskKind Kind = Core::Dag::TaskKind::Generic;
         Core::Dag::TaskPriority Priority = Core::Dag::TaskPriority::Normal;
         std::uint32_t EstimatedCost = 1;
+        std::uint64_t CancellationGeneration = 0;
         std::vector<StreamingTaskHandle> DependsOn{};
         std::move_only_function<StreamingResult()> Execute{};
         std::move_only_function<void(StreamingResult&&)> ApplyOnMainThread{};
