@@ -2593,9 +2593,9 @@ Current-state matrix (T000 audit):
 **Files:**
 
 - [x] Add `docs/architecture/src_new-task-graphs.md`.
-- [ ] Update `src_new/Core/README.md` if public Core graph APIs change.
-- [ ] Update `src_new/Graphics/README.md` when `Graphics.RenderGraph` is added.
-- [ ] Update `src_new/Runtime/README.md` when runtime integration changes.
+- [x] Update `src_new/Core/README.md` if public Core graph APIs change.
+- [x] Update `src_new/Graphics/README.md` when `Graphics.RenderGraph` is added.
+- [x] Update `src_new/Runtime/README.md` when runtime integration changes.
 
 **Document must define:**
 
@@ -3708,12 +3708,12 @@ public:
 
 **Tasks:**
 
-- [ ] Run `python3 tools/generate_src_new_module_inventory.py`.
-- [ ] Update `docs/architecture/src_new_module_inventory.md`.
-- [ ] Update `src_new/Core/README.md` with new graph partitions and public surface.
-- [ ] Update `src_new/Graphics/README.md` with `Graphics.RenderGraph` public surface.
-- [ ] Update `src_new/Runtime/README.md` with streaming executor/frame phases.
-- [ ] Update top-level `TODO.md` if milestones are completed or replaced.
+- [x] Run `python3 tools/generate_src_new_module_inventory.py`.
+- [x] Update `docs/architecture/src_new_module_inventory.md`.
+- [x] Update `src_new/Core/README.md` with new graph partitions and public surface.
+- [x] Update `src_new/Graphics/README.md` with `Graphics.RenderGraph` public surface.
+- [x] Update `src_new/Runtime/README.md` with streaming executor/frame phases.
+- [x] Update top-level `TODO.md` if milestones are completed or replaced.
 
 **Acceptance criteria:**
 
