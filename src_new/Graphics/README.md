@@ -20,7 +20,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.RenderGraph:TransientAllocator`
 - `Extrinsic.Graphics.RenderGraph:Executor`
 
-`Extrinsic.Graphics.RenderGraph` executes barrier packets in pass order: for each pass, any packets tagged with that pass index are emitted immediately before the pass callback, and imported-resource final-state packets (the compiler's end-of-graph sentinel) are emitted after the last pass.
+`Extrinsic.Graphics.RenderGraph` executes barrier packets in pass order: for each pass, any packets tagged with that pass index are emitted immediately before the pass callback, and imported-resource final-state packets (the compiler's end-of-graph sentinel) are emitted after the last pass. The concrete renderer lowers those packets through `RHI::ICommandContext::SubmitBarriers` when recording a frame.
 
 ### Scene and sync systems
 

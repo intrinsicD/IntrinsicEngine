@@ -3372,7 +3372,7 @@ public:
 - [x] Collapse redundant no-op transitions.
 - [x] Support imported initial state.
 - [x] Support imported final/present state.
-- [ ] Implement conversion to current RHI coarse `TextureBarrier` / `BufferBarrier` calls where possible.
+- [x] Implement conversion to current RHI coarse `TextureBarrier` / `BufferBarrier` calls where possible.
 - [ ] Keep exact Sync2-style barrier API as a later phase if RHI does not yet expose it.
 
 **Tests:**
@@ -3877,7 +3877,7 @@ Constraints:
 - Update CMake, README, and module inventory when modules change.
 - Stop at the review gate for this PR and ensure all required tests pass.
 
-Implement the next unchecked TODOs from `codex_task_graph_todos.md` and include the exact validation commands and results in the PR notes.
+Implement the next unchecked TODOs from `TODO.md` and include the exact validation commands and results in the PR notes.
 ```
 
 # User-provided custom instructions

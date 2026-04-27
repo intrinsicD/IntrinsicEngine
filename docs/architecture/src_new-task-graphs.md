@@ -107,6 +107,7 @@ Streaming graph semantics differ from frame-local CPU/GPU graphs:
 ### Barriers
 For each pass use, compiler resolves previous state to next required state and emits barrier packets immediately before the consuming pass executes.
 Imported resources append a final packet with `PassIndex = the original declared pass count` (the compiler's end-of-graph sentinel); those final-state transitions are emitted after the last pass so present/layout handoff cannot overtake the work that writes the resource.
+Graphics lowers the resulting packets through `RHI::ICommandContext::SubmitBarriers` where the coarse API is available, preserving deterministic ordering while keeping barrier semantics out of `Core`.
 
 ### Transient lifetime and aliasing
 For virtual resource $v_i$, define live interval $I_i = [f_i, l_i]$ from first/last use pass indices.

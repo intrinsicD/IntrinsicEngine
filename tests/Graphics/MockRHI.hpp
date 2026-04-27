@@ -114,6 +114,20 @@ namespace Extrinsic::Tests
     class MockCommandContext final : public RHI::ICommandContext
     {
     public:
+        struct TextureBarrierRecord
+        {
+            RHI::TextureHandle Texture{};
+            RHI::TextureLayout Before = RHI::TextureLayout::Undefined;
+            RHI::TextureLayout After = RHI::TextureLayout::Undefined;
+        };
+
+        struct BufferBarrierRecord
+        {
+            RHI::BufferHandle Buffer{};
+            RHI::MemoryAccess Before = RHI::MemoryAccess::None;
+            RHI::MemoryAccess After = RHI::MemoryAccess::None;
+        };
+
         void Begin() override {}
         void End()   override {}
         void BeginRenderPass(const RHI::RenderPassDesc&) override {}
@@ -133,13 +147,23 @@ namespace Extrinsic::Tests
                                std::uint64_t, std::uint32_t) override {}
         void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
-        void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
-        void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
+        void TextureBarrier(RHI::TextureHandle texture, RHI::TextureLayout before, RHI::TextureLayout after) override
+        {
+            TextureBarrierCalls.push_back({texture, before, after});
+        }
+
+        void BufferBarrier(RHI::BufferHandle buffer, RHI::MemoryAccess before, RHI::MemoryAccess after) override
+        {
+            BufferBarrierCalls.push_back({buffer, before, after});
+        }
         void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle,
                         std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,
                                  RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
+
+        std::vector<TextureBarrierRecord> TextureBarrierCalls{};
+        std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
     };
 
     // -----------------------------------------------------------------------

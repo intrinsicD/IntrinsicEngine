@@ -4,6 +4,7 @@ module;
 #include <chrono>
 #include <memory>
 #include <optional>
+#include <vector>
 #include <entt/entity/registry.hpp>
 
 module Extrinsic.Graphics.Renderer;
@@ -16,6 +17,7 @@ import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
@@ -39,6 +41,77 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
+        [[nodiscard]] RHI::TextureLayout ToTextureLayout(const TextureBarrierState state)
+        {
+            switch (state)
+            {
+            case TextureBarrierState::Undefined:           return RHI::TextureLayout::Undefined;
+            case TextureBarrierState::ColorAttachmentWrite: return RHI::TextureLayout::ColorAttachment;
+            case TextureBarrierState::DepthWrite:           return RHI::TextureLayout::DepthAttachment;
+            case TextureBarrierState::DepthRead:            return RHI::TextureLayout::DepthReadOnly;
+            case TextureBarrierState::ShaderRead:           return RHI::TextureLayout::ShaderReadOnly;
+            case TextureBarrierState::ShaderWrite:          return RHI::TextureLayout::General;
+            case TextureBarrierState::TransferSrc:          return RHI::TextureLayout::TransferSrc;
+            case TextureBarrierState::TransferDst:          return RHI::TextureLayout::TransferDst;
+            case TextureBarrierState::Present:              return RHI::TextureLayout::Present;
+            }
+            return RHI::TextureLayout::Undefined;
+        }
+
+        [[nodiscard]] RHI::MemoryAccess ToMemoryAccess(const BufferBarrierState state)
+        {
+            switch (state)
+            {
+            case BufferBarrierState::Undefined:     return RHI::MemoryAccess::None;
+            case BufferBarrierState::IndirectRead:  return RHI::MemoryAccess::IndirectRead;
+            case BufferBarrierState::IndexRead:     return RHI::MemoryAccess::IndexRead;
+            case BufferBarrierState::VertexRead:    return RHI::MemoryAccess::ShaderRead;
+            case BufferBarrierState::ShaderRead:    return RHI::MemoryAccess::ShaderRead;
+            case BufferBarrierState::ShaderWrite:   return RHI::MemoryAccess::ShaderWrite;
+            case BufferBarrierState::TransferSrc:    return RHI::MemoryAccess::TransferRead;
+            case BufferBarrierState::TransferDst:    return RHI::MemoryAccess::TransferWrite;
+            case BufferBarrierState::HostReadback:   return RHI::MemoryAccess::HostRead;
+            }
+            return RHI::MemoryAccess::None;
+        }
+
+        void SubmitBarrierPacket(RHI::ICommandContext& cmd,
+                                 const CompiledRenderGraph& graph,
+                                 const BarrierPacket& packet)
+        {
+            std::vector<RHI::TextureBarrierDesc> textureBarriers;
+            textureBarriers.reserve(packet.TextureBarriers.size());
+            for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+            {
+                textureBarriers.push_back(RHI::TextureBarrierDesc{
+                    .Texture = graph.TextureHandles[barrier.TextureIndex],
+                    .BeforeLayout = ToTextureLayout(barrier.Before),
+                    .AfterLayout = ToTextureLayout(barrier.After),
+                });
+            }
+
+            std::vector<RHI::BufferBarrierDesc> bufferBarriers;
+            bufferBarriers.reserve(packet.BufferBarriers.size());
+            for (const BufferBarrierPacket& barrier : packet.BufferBarriers)
+            {
+                bufferBarriers.push_back(RHI::BufferBarrierDesc{
+                    .Buffer = graph.BufferHandles[barrier.BufferIndex],
+                    .BeforeAccess = ToMemoryAccess(barrier.Before),
+                    .AfterAccess = ToMemoryAccess(barrier.After),
+                });
+            }
+
+            if (textureBarriers.empty() && bufferBarriers.empty())
+            {
+                return;
+            }
+
+            cmd.SubmitBarriers(RHI::BarrierBatchDesc{
+                .TextureBarriers = textureBarriers,
+                .BufferBarriers = bufferBarriers,
+            });
+        }
+
         struct PrepPipelineCommitTag {};
         struct PrepMaterialBaseSyncTag {};
         struct PrepVisualizationSyncTag {};
@@ -53,6 +126,7 @@ namespace Extrinsic::Graphics
     public:
         void Initialize(RHI::IDevice& device) override
         {
+            m_Device = &device;
             m_BufferManager  .emplace(device);
             m_SamplerManager .emplace(device);
             m_TextureManager .emplace(device, device.GetBindlessHeap());
@@ -89,6 +163,7 @@ namespace Extrinsic::Graphics
 
         void Shutdown() override
         {
+            m_Device = nullptr;
             if (m_SelectionSystem) m_SelectionSystem->Shutdown();
             if (m_LightSystem)     m_LightSystem->Shutdown();
             if (m_ForwardSystem)   m_ForwardSystem->Shutdown();
@@ -300,7 +375,7 @@ namespace Extrinsic::Graphics
             m_HasPreparedFrame = true;
         }
 
-        void ExecuteFrame(const RHI::FrameHandle&,
+        void ExecuteFrame(const RHI::FrameHandle& frame,
                           const RenderWorld& renderWorld) override
         {
             m_LastRenderGraphStats = {};
@@ -493,7 +568,22 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
 
             const auto executeBegin = std::chrono::steady_clock::now();
-            const auto executeResult = m_RenderGraphExecutor.Execute(*compiled);
+            if (m_Device == nullptr)
+            {
+                m_LastRenderGraphStats.Diagnostic = "RenderGraph execute requires a live device.";
+                Core::Log::Error("[Graphics] RenderGraph Execute() failed: device missing");
+                return;
+            }
+
+            auto& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
+            const auto executeResult = m_RenderGraphExecutor.Execute(
+                *compiled,
+                {},
+                {},
+                [&graphicsContext, &compiled](const BarrierPacket& packet)
+                {
+                    SubmitBarrierPacket(graphicsContext, *compiled, packet);
+                });
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.ExecuteTimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
@@ -566,6 +656,7 @@ namespace Extrinsic::Graphics
         std::optional<DeferredSystem>        m_DeferredSystem;
         std::optional<PostProcessSystem>     m_PostProcessSystem;
         std::optional<ShadowSystem>          m_ShadowSystem;
+        RHI::IDevice*                        m_Device{nullptr};
         entt::registry                       m_SyncRegistry;
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
