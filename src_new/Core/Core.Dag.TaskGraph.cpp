@@ -72,6 +72,9 @@ namespace Extrinsic::Core::Dag
             HazardWaw,
             HazardWar,
             LabelDependency,
+            // Reserved for GPU render-graph callers that want pass-level
+            // semantic reasons beyond generic task/resource edges.
+            DomainSpecific,
         };
 
         struct EdgeReasonInfo
@@ -113,6 +116,7 @@ namespace Extrinsic::Core::Dag
                     case EdgeReason::HazardWaw: oss << "WAW"; break;
                     case EdgeReason::HazardWar: oss << "WAR"; break;
                     case EdgeReason::LabelDependency: oss << "label(" << reason.LabelValue << ")"; break;
+                    case EdgeReason::DomainSpecific: oss << "domain-specific"; break;
                     }
                     oss << "--> ";
                 }
@@ -637,6 +641,16 @@ namespace Extrinsic::Core::Dag
         // The compiled state should not be read/modified while Execute is active.
         // Keep the raw task payload alive for the life of execution.
         bool CanUsePlan() const noexcept { return Compiled && !ExecutionOrder.empty(); }
+
+        void ClearCompiledState() noexcept
+        {
+            ExecutionOrder.clear();
+            PassBatch.clear();
+            Layers.clear();
+            Successors.clear();
+            InitialInDegree.clear();
+            Compiled = false;
+        }
     };
 
     // -----------------------------------------------------------------------
@@ -711,9 +725,10 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
         auto compiled = CompileGraph(m_Impl->Passes, passCount, &diagnostic, m_Impl->LabelValues);
         if (!compiled.has_value())
         {
-            m_Impl->Compiled = false;
+            m_Impl->ClearCompiledState();
             m_Impl->LastStats = ScheduleStats{};
             m_Impl->LastStats.lastDiagnostic = diagnostic;
+            m_Impl->LastCriticalPathNs = 0u;
             return Err(compiled.error());
         }
 
@@ -968,12 +983,7 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         }
 
         m_Impl->Passes.clear();
-        m_Impl->ExecutionOrder.clear();
-        m_Impl->PassBatch.clear();
-        m_Impl->Layers.clear();
-        m_Impl->Successors.clear();
-        m_Impl->InitialInDegree.clear();
-        m_Impl->Compiled = false;
+        m_Impl->ClearCompiledState();
         m_Impl->TokenMap.clear();
         m_Impl->StringResourceMap.clear();
         m_Impl->LabelMap.clear();
@@ -982,6 +992,7 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         m_Impl->NextLabelIdx = 0u;
         m_Impl->LastCompileNs = 0u;
         m_Impl->LastExecuteNs = 0u;
+        m_Impl->LastCriticalPathNs = 0u;
         m_Impl->LastStats = ScheduleStats{};
     }
 

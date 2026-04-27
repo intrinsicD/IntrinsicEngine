@@ -2773,11 +2773,11 @@ Hazard rules:
 
 - [x] When topological compilation fails, find at least one cycle.
 - [x] Emit pass/task names in the diagnostic.
-- [ ] Include edge reason when available:
+- [x] Include edge reason when available:
   - [x] explicit dependency;
   - [x] RAW/WAW/WAR resource hazard;
   - [x] label wait/signal;
-  - [ ] domain-specific reason reserved for GPU render graph.
+  - [x] domain-specific reason reserved for GPU render graph.
 - [x] Return the existing error convention, typically `ErrorCode::InvalidState`.
 - [x] Keep diagnostics available in logs and optionally in `ScheduleStats`/debug info.
 
@@ -2820,15 +2820,15 @@ Hazard rules:
 
 **Tasks:**
 
-- [ ] Preserve `AddPass(name, setup_fn, execute_fn)` API.
-- [ ] Preserve builder functions for typed reads/writes.
-- [ ] Preserve `ReadResource`, `WriteResource`, `WaitFor`, and `Signal`.
-- [ ] Store pass metadata needed by compiler.
-- [ ] `Compile()` builds immutable compiled graph/layers.
-- [ ] `BuildPlan()` returns plan in compiler order.
+- [x] Preserve `AddPass(name, setup_fn, execute_fn)` API.
+- [x] Preserve builder functions for typed reads/writes.
+- [x] Preserve `ReadResource`, `WriteResource`, `WaitFor`, and `Signal`.
+- [x] Store pass metadata needed by compiler.
+- [x] `Compile()` builds immutable compiled graph/layers.
+- [x] `BuildPlan()` returns plan in compiler order.
 - [x] `ExecutePass(uint32_t)` validates compiled state and index.
 - [x] `TakePassExecute(uint32_t)` remains safe for streaming handoff until streaming executor replaces this pattern.
-- [ ] `Reset()` is illegal or debug-asserted while execution token is live.
+- [x] `Reset()` is illegal or debug-asserted while execution token is live.
 - [x] `GetScheduleStats()` returns meaningful stats, not only task count.
 
 **Tests:**
@@ -2842,13 +2842,13 @@ Hazard rules:
 
 **Review gate RG-01 — Core compiler substrate:**
 
-- [ ] `ExtrinsicCoreTests` passes.
-- [ ] `IntrinsicTests` passes.
-- [ ] No public Core API change is undocumented.
-- [ ] No GPU-specific type has entered `Core.Dag.*`.
-- [ ] `PendingTaskDesc::resources` is verified by tests to affect scheduling.
-- [ ] Cycle diagnostics include names.
-- [ ] Determinism test passes under repeated runs.
+- [x] `ExtrinsicCoreTests` passes.
+- [x] `IntrinsicTests` passes.
+- [x] No public Core API change is undocumented.
+- [x] No GPU-specific type has entered `Core.Dag.*`.
+- [x] `PendingTaskDesc::resources` is verified by tests to affect scheduling.
+- [x] Cycle diagnostics include names.
+- [x] Determinism test passes under repeated runs.
 
 ---
 

@@ -481,6 +481,39 @@ TEST(CoreTaskGraph, ResetClearsStatsResourcesAndLabelsAcrossEpochs)
     EXPECT_EQ(log[2], "OnlyPass");
 }
 
+TEST(CoreTaskGraph, FailedCompileClearsCompiledState)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+
+    graph.AddPass("First", [](TaskGraphBuilder&) {}, []() {});
+    graph.AddPass("Second", [](TaskGraphBuilder&) {}, []() {});
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile should succeed first time";
+    auto initialPlan = graph.BuildPlan();
+    ASSERT_TRUE(initialPlan.has_value()) << "Initial BuildPlan should succeed";
+    EXPECT_EQ(initialPlan->size(), 2u);
+
+    graph.AddPass("Broken",
+        [](TaskGraphBuilder& b)
+        {
+            b.DependsOn(42u);
+        },
+        []() {});
+
+    const auto failedCompile = graph.Compile();
+    ASSERT_FALSE(failedCompile.has_value());
+    EXPECT_EQ(failedCompile.error(), ErrorCode::InvalidState);
+
+    const auto failedPlan = graph.BuildPlan();
+    ASSERT_FALSE(failedPlan.has_value());
+    EXPECT_EQ(failedPlan.error(), ErrorCode::InvalidState);
+
+    EXPECT_TRUE(graph.GetExecutionLayers().empty());
+    EXPECT_TRUE(graph.GetScheduleStats().lastDiagnostic.find("out of range") != std::string::npos);
+    EXPECT_EQ(graph.GetScheduleStats().edgeCount, 0u);
+    EXPECT_EQ(graph.GetScheduleStats().taskCount, 0u);
+}
+
 TEST(CoreFrameGraph, ResetRebuildsTheCpuGraphCleanly)
 {
     FrameGraph graph;
