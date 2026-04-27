@@ -82,25 +82,38 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     EXPECT_NE(dump.find("name=\"Null.ToneMap\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"Null.FXAA\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"Null.SelectionOutline\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"Null.OverlaySurface\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"Null.DebugView\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"Null.Present\""), std::string::npos);
-    EXPECT_EQ(dump.find("name=\"Null.OptionalDebugView\""), std::string::npos);
     EXPECT_EQ(dump.find("name=\"Null.Picking\""), std::string::npos);
 
     const std::size_t gbufferPos = dump.find("name=\"Null.GBuffer\"");
     const std::size_t deferredPos = dump.find("name=\"Null.DeferredLighting\"");
     const std::size_t bloomPos = dump.find("name=\"Null.Bloom\"");
     const std::size_t toneMapPos = dump.find("name=\"Null.ToneMap\"");
+    const std::size_t fxaaPos = dump.find("name=\"Null.FXAA\"");
+    const std::size_t selectionPos = dump.find("name=\"Null.SelectionOutline\"");
+    const std::size_t overlayPos = dump.find("name=\"Null.OverlaySurface\"");
+    const std::size_t debugPos = dump.find("name=\"Null.DebugView\"");
     const std::size_t presentPos = dump.find("name=\"Null.Present\"");
     ASSERT_NE(gbufferPos, std::string::npos);
     ASSERT_NE(deferredPos, std::string::npos);
     ASSERT_NE(bloomPos, std::string::npos);
     ASSERT_NE(toneMapPos, std::string::npos);
+    ASSERT_NE(fxaaPos, std::string::npos);
+    ASSERT_NE(selectionPos, std::string::npos);
+    ASSERT_NE(overlayPos, std::string::npos);
+    ASSERT_NE(debugPos, std::string::npos);
     ASSERT_NE(presentPos, std::string::npos);
 
     EXPECT_LT(gbufferPos, deferredPos);
     EXPECT_LT(deferredPos, bloomPos);
     EXPECT_LT(bloomPos, toneMapPos);
-    EXPECT_LT(toneMapPos, presentPos);
+    EXPECT_LT(toneMapPos, fxaaPos);
+    EXPECT_LT(fxaaPos, selectionPos);
+    EXPECT_LT(selectionPos, overlayPos);
+    EXPECT_LT(overlayPos, debugPos);
+    EXPECT_LT(debugPos, presentPos);
 
     EXPECT_EQ(renderer->EndFrame(frame), 0u);
     renderer->Shutdown();

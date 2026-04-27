@@ -468,7 +468,7 @@ namespace Extrinsic::Graphics
                                                              .Usage = RHI::TextureUsage::ColorTarget |
                                                                       RHI::TextureUsage::Sampled,
                                                          });
-            const auto post = m_RenderGraph.CreateTexture("Null.Post",
+            const auto postBloom = m_RenderGraph.CreateTexture("Null.PostBloom",
                                                           RHI::TextureDesc{
                                                               .Width = 1u,
                                                               .Height = 1u,
@@ -476,7 +476,39 @@ namespace Extrinsic::Graphics
                                                               .Usage = RHI::TextureUsage::ColorTarget |
                                                                        RHI::TextureUsage::Sampled,
                                                           });
-            const auto optionalDebug = m_RenderGraph.CreateTexture("Null.OptionalDebug",
+            const auto postTonemap = m_RenderGraph.CreateTexture("Null.PostTonemap",
+                                                                  RHI::TextureDesc{
+                                                                      .Width = 1u,
+                                                                      .Height = 1u,
+                                                                      .Fmt = RHI::Format::RGBA16_FLOAT,
+                                                                      .Usage = RHI::TextureUsage::ColorTarget |
+                                                                               RHI::TextureUsage::Sampled,
+                                                                  });
+            const auto postFxaa = m_RenderGraph.CreateTexture("Null.PostFxaa",
+                                                               RHI::TextureDesc{
+                                                                   .Width = 1u,
+                                                                   .Height = 1u,
+                                                                   .Fmt = RHI::Format::RGBA16_FLOAT,
+                                                                   .Usage = RHI::TextureUsage::ColorTarget |
+                                                                            RHI::TextureUsage::Sampled,
+                                                               });
+            const auto postSelection = m_RenderGraph.CreateTexture("Null.PostSelection",
+                                                                    RHI::TextureDesc{
+                                                                        .Width = 1u,
+                                                                        .Height = 1u,
+                                                                        .Fmt = RHI::Format::RGBA16_FLOAT,
+                                                                        .Usage = RHI::TextureUsage::ColorTarget |
+                                                                                 RHI::TextureUsage::Sampled,
+                                                                    });
+            const auto postOverlay = m_RenderGraph.CreateTexture("Null.PostOverlay",
+                                                                  RHI::TextureDesc{
+                                                                      .Width = 1u,
+                                                                      .Height = 1u,
+                                                                      .Fmt = RHI::Format::RGBA16_FLOAT,
+                                                                      .Usage = RHI::TextureUsage::ColorTarget |
+                                                                               RHI::TextureUsage::Sampled,
+                                                                  });
+            const auto postDebug = m_RenderGraph.CreateTexture("Null.PostDebug",
                                                                    RHI::TextureDesc{
                                                                        .Width = 1u,
                                                                        .Height = 1u,
@@ -541,30 +573,38 @@ namespace Extrinsic::Graphics
             [[maybe_unused]] const auto passForwardPoint = m_RenderGraph.AddPass("Null.ForwardPoint", [lit](RenderGraphBuilder& builder) {
                 builder.Write(lit, TextureUsage::ColorAttachmentWrite);
             });
-            [[maybe_unused]] const auto passBloom = m_RenderGraph.AddPass("Null.Bloom", [lit, post](RenderGraphBuilder& builder) {
+            [[maybe_unused]] const auto passBloom = m_RenderGraph.AddPass("Null.Bloom", [lit, postBloom](RenderGraphBuilder& builder) {
                 builder.Read(lit, TextureUsage::ShaderRead);
-                builder.Write(post, TextureUsage::ColorAttachmentWrite);
+                builder.Write(postBloom, TextureUsage::ColorAttachmentWrite);
             });
-            [[maybe_unused]] const auto passToneMap = m_RenderGraph.AddPass("Null.ToneMap", [post](RenderGraphBuilder& builder) {
-                builder.Write(post, TextureUsage::ColorAttachmentWrite);
+            [[maybe_unused]] const auto passToneMap = m_RenderGraph.AddPass("Null.ToneMap", [postBloom, postTonemap](RenderGraphBuilder& builder) {
+                builder.Read(postBloom, TextureUsage::ShaderRead);
+                builder.Write(postTonemap, TextureUsage::ColorAttachmentWrite);
             });
-            [[maybe_unused]] const auto passFxaa = m_RenderGraph.AddPass("Null.FXAA", [post](RenderGraphBuilder& builder) {
-                builder.Read(post, TextureUsage::ShaderRead);
+            [[maybe_unused]] const auto passFxaa = m_RenderGraph.AddPass("Null.FXAA", [postTonemap, postFxaa](RenderGraphBuilder& builder) {
+                builder.Read(postTonemap, TextureUsage::ShaderRead);
+                builder.Write(postFxaa, TextureUsage::ColorAttachmentWrite);
             });
-            [[maybe_unused]] const auto passSelection = m_RenderGraph.AddPass("Null.SelectionOutline", [post, entityId, depth](RenderGraphBuilder& builder) {
+            [[maybe_unused]] const auto passSelection = m_RenderGraph.AddPass("Null.SelectionOutline", [postFxaa, postSelection, entityId, depth](RenderGraphBuilder& builder) {
+                builder.Read(postFxaa, TextureUsage::ShaderRead);
                 builder.Read(entityId, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::DepthRead);
-                builder.Write(post, TextureUsage::ColorAttachmentWrite);
+                builder.Write(postSelection, TextureUsage::ColorAttachmentWrite);
             });
-            [[maybe_unused]] const auto passOptionalDebug = m_RenderGraph.AddPass("Null.OptionalDebugView", [optionalDebug](RenderGraphBuilder& builder) {
-                builder.Write(optionalDebug, TextureUsage::ColorAttachmentWrite);
+            [[maybe_unused]] const auto passOverlay = m_RenderGraph.AddPass("Null.OverlaySurface", [postSelection, postOverlay](RenderGraphBuilder& builder) {
+                builder.Read(postSelection, TextureUsage::ShaderRead);
+                builder.Write(postOverlay, TextureUsage::ColorAttachmentWrite);
             });
-            [[maybe_unused]] const auto passImGui = m_RenderGraph.AddPass("Null.ImGui", [post](RenderGraphBuilder& builder) {
-                builder.Read(post, TextureUsage::ShaderRead);
+            [[maybe_unused]] const auto passDebug = m_RenderGraph.AddPass("Null.DebugView", [postOverlay, postDebug](RenderGraphBuilder& builder) {
+                builder.Read(postOverlay, TextureUsage::ShaderRead);
+                builder.Write(postDebug, TextureUsage::ColorAttachmentWrite);
+            });
+            [[maybe_unused]] const auto passImGui = m_RenderGraph.AddPass("Null.ImGui", [postDebug](RenderGraphBuilder& builder) {
+                builder.Read(postDebug, TextureUsage::ShaderRead);
                 builder.SideEffect();
             });
-            [[maybe_unused]] const auto passPresent = m_RenderGraph.AddPass("Null.Present", [backbuffer, post](RenderGraphBuilder& builder) {
-                builder.Read(post, TextureUsage::ShaderRead);
+            [[maybe_unused]] const auto passPresent = m_RenderGraph.AddPass("Null.Present", [backbuffer, postDebug](RenderGraphBuilder& builder) {
+                builder.Read(postDebug, TextureUsage::ShaderRead);
                 builder.Read(backbuffer, TextureUsage::Present);
                 builder.SideEffect();
             });

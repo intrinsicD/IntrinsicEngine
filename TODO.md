@@ -3465,21 +3465,21 @@ public:
 - [x] Forward surface pass.
 - [x] Forward line pass.
 - [x] Forward point pass.
-- [ ] Overlay surface/debug pass if present.
+- [x] Overlay surface/debug pass if present.
 - [x] Bloom pass.
 - [x] Tone-map pass.
 - [x] FXAA/SMAA pass.
 - [x] Selection outline pass.
-- [ ] Debug view pass.
+- [x] Debug view pass.
 - [x] ImGui pass.
 - [x] Present pass.
 
 **Rules:**
 
 - [x] Every pass declares all texture/buffer reads/writes.
-- [ ] No pass relies on registration order for required correctness.
-- [ ] Registration order is only a stable tie-break.
-- [ ] Fixed sequence may remain as builder call order, but dependencies/barriers must come from resource declarations.
+- [x] No pass relies on registration order for required correctness.
+- [x] Registration order is only a stable tie-break.
+- [x] Fixed sequence may remain as builder call order, but dependencies/barriers must come from resource declarations.
 
 **Tests:**
 
