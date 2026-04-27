@@ -122,6 +122,10 @@ export namespace Extrinsic::Core::Dag
         // Signal: this pass "produces" the named label (other passes may WaitFor it).
         void Signal(Hash::StringID label);
 
+        // --- Ordering constraints (explicit) ---
+        // Adds a dependency edge from `predecessorPassIndex` to this pass.
+        void DependsOn(std::uint32_t predecessorPassIndex);
+
     private:
         TaskGraph& m_Graph;
         uint32_t   m_PassIndex;

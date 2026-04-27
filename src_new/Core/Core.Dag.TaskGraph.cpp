@@ -8,11 +8,13 @@ module;
 #include <cstdint>
 #include <expected>
 #include <limits>
+#include <sstream>
 #include <memory>
 #include <functional>
 #include <queue>
 #include <string>
 #include <string_view>
+#include <span>
 #include <thread>
 #include <tuple>
 #include <unordered_map>
@@ -62,11 +64,78 @@ namespace Extrinsic::Core::Dag
             return mode == ResourceAccessMode::Read || mode == ResourceAccessMode::ReadWrite;
         }
 
+        enum class EdgeReason : uint8_t
+        {
+            ExplicitDependency = 0,
+            HazardRaw,
+            HazardWaw,
+            HazardWar,
+            LabelDependency,
+        };
+
+        struct EdgeReasonInfo
+        {
+            EdgeReason Kind = EdgeReason::ExplicitDependency;
+            std::uint32_t LabelValue = 0;
+        };
+
+        void AppendCycleDiagnostic(
+            const std::vector<std::uint32_t>& cycle,
+            const std::vector<std::string>& passNames,
+            const std::vector<std::uint32_t>& taskIds,
+            const std::unordered_map<std::uint64_t, EdgeReasonInfo>& edgeReasons,
+            std::string* outDiagnostic)
+        {
+            if (!outDiagnostic)
+                return;
+
+            auto taskLabel = [&](const std::uint32_t index) -> std::string
+            {
+                if (index < passNames.size())
+                    return passNames[index];
+                return std::to_string(taskIds[index]);
+            };
+
+            std::ostringstream oss;
+            oss << "Cycle detected: ";
+            for (std::size_t i = 0; i < cycle.size(); ++i)
+            {
+                const auto from = cycle[i];
+                const auto next = cycle[(i + 1u) % cycle.size()];
+                oss << taskLabel(from);
+                const auto key = (static_cast<std::uint64_t>(from) << 32) | static_cast<std::uint64_t>(next);
+                if (const auto reasonIt = edgeReasons.find(key); reasonIt != edgeReasons.end())
+                {
+                    const auto& reason = reasonIt->second;
+                    oss << " --";
+                    switch (reason.Kind)
+                    {
+                    case EdgeReason::ExplicitDependency: oss << "explicit"; break;
+                    case EdgeReason::HazardRaw: oss << "RAW"; break;
+                    case EdgeReason::HazardWaw: oss << "WAW"; break;
+                    case EdgeReason::HazardWar: oss << "WAR"; break;
+                    case EdgeReason::LabelDependency: oss << "label(" << reason.LabelValue << ")"; break;
+                    }
+                    oss << "--> ";
+                }
+                else
+                {
+                    oss << " --> ";
+                }
+            }
+            if (!cycle.empty())
+            {
+                oss << taskLabel(cycle.front());
+            }
+            *outDiagnostic = oss.str();
+        }
+
         template <typename PassContainer>
         [[nodiscard]] Core::Expected<CompiledPlanState> CompileGraph(
             const PassContainer& passes,
             const std::uint32_t nodeCount,
-            std::string* outDiagnostic = nullptr)
+            std::string* outDiagnostic = nullptr,
+            std::span<const std::uint32_t> labelValues = {})
         {
             CompiledPlanState compiled{};
             compiled.Stats.lastDiagnostic.clear();
@@ -96,11 +165,13 @@ namespace Extrinsic::Core::Dag
 
             auto addEdge = [&](const std::uint32_t from,
                                const std::uint32_t to,
-                               const bool explicitDependency,
+                               const EdgeReason reason,
+                               const std::uint32_t labelValue,
                                auto& seenEdges,
                                auto& successors,
                                auto& predecessors,
                                auto& inDegree,
+                               auto& edgeReasons,
                                ScheduleStats& stats) -> void
             {
                 if (from == to)
@@ -115,10 +186,11 @@ namespace Extrinsic::Core::Dag
                 predecessors[to].push_back(from);
                 ++inDegree[to];
                 ++stats.edgeCount;
-                if (explicitDependency)
+                if (reason == EdgeReason::ExplicitDependency || reason == EdgeReason::LabelDependency)
                     ++stats.explicitEdgeCount;
                 else
                     ++stats.hazardEdgeCount;
+                edgeReasons.emplace(key, EdgeReasonInfo{reason, labelValue});
             };
 
             std::vector<std::vector<std::uint32_t>> successors(nodeCount);
@@ -127,6 +199,8 @@ namespace Extrinsic::Core::Dag
             compiled.InitialInDegree = inDegree;
             std::unordered_set<std::uint64_t> seenEdges{};
             seenEdges.reserve(nodeCount * 4u + 16u);
+            std::unordered_map<std::uint64_t, EdgeReasonInfo> edgeReasons{};
+            edgeReasons.reserve(nodeCount * 4u + 16u);
 
             std::unordered_map<std::uint32_t, std::vector<std::uint32_t>> labelSignals{};
             labelSignals.reserve(nodeCount * 2u + 16u);
@@ -137,6 +211,30 @@ namespace Extrinsic::Core::Dag
             for (std::uint32_t i = 0; i < nodeCount; ++i)
             {
                 const auto& pass = passes[i];
+                for (const auto dependency : pass.Dependencies)
+                {
+                    if (dependency >= nodeCount)
+                    {
+                        const auto msg = "Invalid explicit dependency in pass '" + std::string(passes[i].Name) +
+                            "': predecessor index " + std::to_string(dependency) + " is out of range";
+                        compiled.Stats.lastDiagnostic = msg;
+                        if (outDiagnostic)
+                            *outDiagnostic = msg;
+                        return Err<CompiledPlanState>(ErrorCode::InvalidState);
+                    }
+                    addEdge(
+                        dependency,
+                        i,
+                        EdgeReason::ExplicitDependency,
+                        0u,
+                        seenEdges,
+                        successors,
+                        predecessors,
+                        inDegree,
+                        edgeReasons,
+                        compiled.Stats);
+                }
+
                 for (const auto& access : pass.Resources)
                 {
                     auto& state = resourceStates[PackResource(access.resource)];
@@ -144,14 +242,17 @@ namespace Extrinsic::Core::Dag
                     const bool isWriter = IsWriteMode(access.mode);
                     if (state.LastWriter != -1)
                     {
+                        const auto reason = isWriter ? EdgeReason::HazardWaw : EdgeReason::HazardRaw;
                         addEdge(
                             static_cast<std::uint32_t>(state.LastWriter),
                             i,
-                            false,
+                            reason,
+                            0u,
                             seenEdges,
                             successors,
                             predecessors,
                             inDegree,
+                            edgeReasons,
                             compiled.Stats);
                     }
 
@@ -162,11 +263,13 @@ namespace Extrinsic::Core::Dag
                             addEdge(
                                 reader,
                                 i,
-                                false,
+                                EdgeReason::HazardWar,
+                                0u,
                                 seenEdges,
                                 successors,
                                 predecessors,
                                 inDegree,
+                                edgeReasons,
                                 compiled.Stats);
                         }
 
@@ -188,15 +291,21 @@ namespace Extrinsic::Core::Dag
                     auto signalIt = labelSignals.find(waitLabel);
                     if (signalIt == labelSignals.end())
                     {
+                        const auto labelValue = (waitLabel < labelValues.size()) ? labelValues[waitLabel] : 0u;
                         compiled.Stats.lastDiagnostic =
-                            "No prior signaler for wait label in pass '" + std::string(pass.Name) + "'";
+                            "No prior signaler for wait label (" + std::to_string(labelValue) +
+                            ") in pass '" + std::string(pass.Name) + "'";
                         if (outDiagnostic)
                             *outDiagnostic = compiled.Stats.lastDiagnostic;
                         return Err<CompiledPlanState>(ErrorCode::InvalidState);
                     }
 
                     for (const auto signaler : signalIt->second)
-                        addEdge(signaler, i, true, seenEdges, successors, predecessors, inDegree, compiled.Stats);
+                    {
+                        const auto labelValue = (waitLabel < labelValues.size()) ? labelValues[waitLabel] : 0u;
+                        addEdge(signaler, i, EdgeReason::LabelDependency, labelValue, seenEdges,
+                                successors, predecessors, inDegree, edgeReasons, compiled.Stats);
+                    }
                 }
 
                 for (const auto& signalLabel : pass.SignalLabels)
@@ -235,15 +344,74 @@ namespace Extrinsic::Core::Dag
 
                 if (topo.size() != nodeCount)
                 {
-                    std::string unresolved;
+                    std::vector<std::uint8_t> color(nodeCount, 0);
+                    std::vector<std::uint32_t> cycle{};
+                    std::vector<std::uint32_t> stack{};
+
+                    std::vector<std::string> passNames{};
+                    passNames.reserve(nodeCount);
+                    std::vector<std::uint32_t> taskIds{};
+                    taskIds.reserve(nodeCount);
                     for (std::uint32_t i = 0; i < nodeCount; ++i)
                     {
-                        if (std::find(topo.begin(), topo.end(), i) != topo.end())
-                            continue;
-                        unresolved += passes[i].Name;
-                        unresolved += ", ";
+                        passNames.push_back(passes[i].Name);
+                        taskIds.push_back(i);
                     }
-                    compiled.Stats.lastDiagnostic = "Cycle detected in task graph. Unresolved nodes: " + unresolved;
+
+                    std::function<bool(std::uint32_t)> dfs = [&](const std::uint32_t node) -> bool
+                    {
+                        if (color[node] == 1u)
+                            return false;
+
+                        color[node] = 1u;
+                        stack.push_back(node);
+                        for (const auto next : successors[node])
+                        {
+                            if (color[next] == 0u)
+                            {
+                                if (dfs(next))
+                                    return true;
+                            }
+                            else if (color[next] == 1u)
+                            {
+                                const auto it = std::find(stack.begin(), stack.end(), next);
+                                if (it != stack.end())
+                                {
+                                    cycle.assign(it, stack.end());
+                                    cycle.push_back(next);
+                                }
+                                return true;
+                            }
+                        }
+
+                        stack.pop_back();
+                        color[node] = 2u;
+                        return false;
+                    };
+
+                    for (std::uint32_t i = 0; i < nodeCount; ++i)
+                    {
+                        if (color[i] == 0u && dfs(i))
+                            break;
+                    }
+
+                    if (!cycle.empty())
+                    {
+                        AppendCycleDiagnostic(cycle, passNames, taskIds, edgeReasons, &compiled.Stats.lastDiagnostic);
+                    }
+                    else
+                    {
+                        std::string unresolved;
+                        for (std::uint32_t i = 0; i < nodeCount; ++i)
+                        {
+                            if (std::find(topo.begin(), topo.end(), i) != topo.end())
+                                continue;
+                            unresolved += passes[i].Name;
+                            unresolved += ", ";
+                        }
+                        compiled.Stats.lastDiagnostic = "Cycle detected in task graph. Unresolved nodes: " + unresolved;
+                    }
+
                     if (outDiagnostic)
                         *outDiagnostic = compiled.Stats.lastDiagnostic;
                     return Err<CompiledPlanState>(ErrorCode::InvalidState);
@@ -394,6 +562,7 @@ namespace Extrinsic::Core::Dag
             std::string Name;
             GraphExecuteCallback Execute;
             std::vector<ResourceAccess> Resources{};
+            std::vector<std::uint32_t> Dependencies{};
             std::vector<std::uint32_t> WaitLabels{};
             std::vector<std::uint32_t> SignalLabels{};
             TaskGraphPassOptions Options{};
@@ -419,6 +588,7 @@ namespace Extrinsic::Core::Dag
 
         // Label map keeps signal labels separate from normal resources.
         std::unordered_map<std::uint64_t, std::uint32_t> LabelMap{};
+        std::vector<std::uint32_t> LabelValues{};
         std::uint32_t NextLabelIdx = 0u;
 
         // Schedule stats and timings.
@@ -501,7 +671,7 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
         const auto passCount = static_cast<std::uint32_t>(m_Impl->Passes.size());
         std::string diagnostic;
 
-        auto compiled = CompileGraph(m_Impl->Passes, passCount, &diagnostic);
+        auto compiled = CompileGraph(m_Impl->Passes, passCount, &diagnostic, m_Impl->LabelValues);
         if (!compiled.has_value())
         {
             m_Impl->Compiled = false;
@@ -770,6 +940,7 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         m_Impl->TokenMap.clear();
         m_Impl->StringResourceMap.clear();
         m_Impl->LabelMap.clear();
+        m_Impl->LabelValues.clear();
         m_Impl->NextResourceIdx = 0u;
         m_Impl->NextLabelIdx = 0u;
         m_Impl->LastCompileNs = 0u;
@@ -846,6 +1017,7 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         {
             idx = m_Graph.m_Impl->NextLabelIdx++;
             lm.emplace(static_cast<std::uint64_t>(label.Value), idx);
+            m_Graph.m_Impl->LabelValues.push_back(label.Value);
         }
 
         m_Graph.m_Impl->Passes[m_PassIndex].WaitLabels.push_back(
@@ -863,9 +1035,15 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
         {
             idx = m_Graph.m_Impl->NextLabelIdx++;
             lm.emplace(static_cast<std::uint64_t>(label.Value), idx);
+            m_Graph.m_Impl->LabelValues.push_back(label.Value);
         }
 
         m_Graph.m_Impl->Passes[m_PassIndex].SignalLabels.push_back(
             idx);
+    }
+
+    void TaskGraphBuilder::DependsOn(std::uint32_t predecessorPassIndex)
+    {
+        m_Graph.m_Impl->Passes[m_PassIndex].Dependencies.push_back(predecessorPassIndex);
     }
 }

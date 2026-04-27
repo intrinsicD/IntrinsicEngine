@@ -2776,7 +2776,7 @@ Hazard rules:
 - [ ] Include edge reason when available:
   - [x] explicit dependency;
   - [x] RAW/WAW/WAR resource hazard;
-  - [ ] label wait/signal;
+  - [x] label wait/signal;
   - [ ] domain-specific reason reserved for GPU render graph.
 - [x] Return the existing error convention, typically `ErrorCode::InvalidState`.
 - [x] Keep diagnostics available in logs and optionally in `ScheduleStats`/debug info.
@@ -2785,7 +2785,7 @@ Hazard rules:
 
 - [x] Explicit A -> B -> A cycle returns invalid state.
 - [x] Resource-derived cycle, if constructible through explicit plus hazard edges, includes both pass names.
-- [ ] Label-derived cycle includes label name or label ID.
+- [x] Label-derived cycle includes label name or label ID.
 - [ ] Cycle diagnostic does not allocate unbounded memory on large graphs.
 
 ## T014 — Refactor `DomainTaskGraph` through shared compiler
@@ -2833,7 +2833,7 @@ Hazard rules:
 
 **Tests:**
 
-- [ ] Existing `Test.Core.TaskGraph.cpp` still passes.
+- [x] Existing `Test.Core.TaskGraph.cpp` still passes.
 - [ ] Closure execution order follows resource hazards.
 - [x] `BuildPlan()` batches match topological layers.
 - [x] `Reset()` clears resources, labels, stats, and pass closures.

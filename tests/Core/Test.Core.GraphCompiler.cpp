@@ -471,3 +471,53 @@ TEST(CoreGraphCompiler, DomainTaskGraphLaneAssignmentRespectsQueueBudgets)
     assertLaneCycling(QueueDomain::Gpu, config.queueBudgetGpu);
     assertLaneCycling(QueueDomain::Streaming, config.queueBudgetStreaming);
 }
+
+TEST(CoreGraphCompiler, ResourceHazardStress_10000_NodesCompilesDeterministically)
+{
+    constexpr std::uint32_t kTaskCount = 10'000u;
+    constexpr ResourceId kResource{7, 1};
+
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    std::vector<ResourceAccess> accesses{};
+    accesses.reserve(kTaskCount);
+    for (std::uint32_t i = 0; i < kTaskCount; ++i)
+    {
+        accesses.push_back(ResourceAccess{
+            .resource = kResource,
+            .mode = (i % 2u == 0u) ? ResourceAccessMode::Write : ResourceAccessMode::Read,
+        });
+
+        ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+            .id = TaskId{i, 1},
+            .domain = QueueDomain::Cpu,
+            .resources = std::span<const ResourceAccess>(accesses.data() + i, 1u),
+        }).has_value());
+    }
+
+    const auto firstPlan = BuildOrFail(*graph);
+    EXPECT_EQ(firstPlan.size(), kTaskCount);
+    EXPECT_GT(firstPlan.back().batch, 0u);
+
+    std::vector<uint32_t> expectedOrder;
+    expectedOrder.reserve(kTaskCount);
+    for (const auto& task : firstPlan)
+        expectedOrder.push_back(task.id.Index);
+
+    std::vector<uint32_t> expectedBatches;
+    expectedBatches.reserve(kTaskCount);
+    for (const auto& task : firstPlan)
+        expectedBatches.push_back(task.batch);
+
+    for (int repeat = 0; repeat < 10; ++repeat)
+    {
+        const auto plan = BuildOrFail(*graph);
+        ASSERT_EQ(plan.size(), kTaskCount);
+        for (std::size_t i = 0; i < kTaskCount; ++i)
+        {
+            EXPECT_EQ(plan[i].id.Index, expectedOrder[i]);
+            EXPECT_EQ(plan[i].batch, expectedBatches[i]);
+        }
+    }
+}

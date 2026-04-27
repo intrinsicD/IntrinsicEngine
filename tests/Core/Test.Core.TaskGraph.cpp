@@ -147,17 +147,90 @@ TEST(CoreTaskGraph, WaitWithoutPriorSignalFailsCompile)
 {
     TaskGraph graph(QueueDomain::Cpu);
 
+    const auto kLabel = "NeverSignaled"_id;
+
     graph.AddPass("Waiter",
-        [](TaskGraphBuilder& b) { b.WaitFor("NeverSignaled"_id); },
+        [kLabel](TaskGraphBuilder& b) { b.WaitFor(kLabel); },
         []() {});
 
     graph.AddPass("LateSignal",
-        [](TaskGraphBuilder& b) { b.Signal("NeverSignaled"_id); },
+        [kLabel](TaskGraphBuilder& b) { b.Signal(kLabel); },
         []() {});
 
     const auto compile = graph.Compile();
     ASSERT_FALSE(compile.has_value());
     EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+
+    const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
+    EXPECT_NE(diagnostic.find("No prior signaler"), std::string::npos);
+    EXPECT_NE(diagnostic.find(std::to_string(kLabel.Value)), std::string::npos);
+}
+
+TEST(CoreTaskGraph, ExplicitDependencyCanCreateCycleDiagnostic)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+
+    graph.AddPass("PassA",
+        [](TaskGraphBuilder& b)
+        {
+            b.DependsOn(1u);
+        },
+        []() {});
+
+    graph.AddPass("PassB",
+        [](TaskGraphBuilder& b)
+        {
+            b.DependsOn(0u);
+        },
+        []() {});
+
+    const auto compile = graph.Compile();
+    ASSERT_FALSE(compile.has_value());
+    EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+
+    const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
+    EXPECT_NE(diagnostic.find("PassA"), std::string::npos);
+    EXPECT_NE(diagnostic.find("PassB"), std::string::npos);
+    EXPECT_NE(diagnostic.find("explicit"), std::string::npos);
+}
+
+TEST(CoreTaskGraph, LabelDependencyCycleIncludesLabelId)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+    const auto kLabel = "Gate"_id;
+
+    graph.AddPass("SignalGate",
+        [kLabel](TaskGraphBuilder& b)
+        {
+            b.Signal(kLabel);
+            b.DependsOn(2u);
+        },
+        []() {});
+
+    graph.AddPass("WaitGate",
+        [kLabel](TaskGraphBuilder& b)
+        {
+            b.WaitFor(kLabel);
+        },
+        []() {});
+
+    graph.AddPass("SignalTail",
+        [](TaskGraphBuilder& b)
+        {
+            b.DependsOn(1u);
+        },
+        []() {});
+
+    const auto compile = graph.Compile();
+    ASSERT_FALSE(compile.has_value());
+    EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+
+    const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
+    EXPECT_NE(diagnostic.find("SignalGate"), std::string::npos);
+    EXPECT_NE(diagnostic.find("WaitGate"), std::string::npos);
+    EXPECT_NE(diagnostic.find("SignalTail"), std::string::npos);
+    EXPECT_NE(diagnostic.find("label"), std::string::npos);
+    EXPECT_NE(diagnostic.find(std::to_string(kLabel.Value)), std::string::npos);
 }
 
 TEST(CoreTaskGraph, IndependentLabelsDoNotInterfere)
@@ -287,6 +360,38 @@ TEST(CoreTaskGraph, BuildPlanBatchesMatchExecutionLayers)
         const auto& layer = layers[task.batch];
         EXPECT_NE(std::find(layer.begin(), layer.end(), task.id.Index), layer.end());
     }
+}
+
+TEST(CoreTaskGraph, ScheduleStatsIncludeExplicitAndHazardEdges)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+
+    graph.AddPass("Signal",
+        [](TaskGraphBuilder& b) { b.Signal("Gate"_id); },
+        []() {});
+
+    graph.AddPass("ReadPos",
+        [](TaskGraphBuilder& b)
+        {
+            b.WaitFor("Gate"_id);
+            b.ReadResource("Pos"_id);
+        },
+        []() {});
+
+    graph.AddPass("WritePos",
+        [](TaskGraphBuilder& b) { b.WriteResource("Pos"_id); },
+        []() {});
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
+
+    const auto stats = graph.GetScheduleStats();
+    EXPECT_EQ(stats.taskCount, 3u);
+    EXPECT_EQ(stats.explicitEdgeCount, 1u);
+    EXPECT_EQ(stats.hazardEdgeCount, 1u);
+    EXPECT_EQ(stats.edgeCount, 2u);
+    EXPECT_GE(stats.layerCount, 3u);
+    EXPECT_GE(stats.criticalPathCost, 3u);
+    EXPECT_GE(stats.maxReadyQueueDepth, 1u);
 }
 
 TEST(CoreTaskGraph, TakePassExecuteMovesOnlyTargetClosure)

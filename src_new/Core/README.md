@@ -36,8 +36,9 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   `ResourceId`, hazard analysis, deterministic topological layering, schedule
   stats, cycle diagnostics).
 - **`Extrinsic.Core.Dag.TaskGraph`**: closure-based CPU/streaming task graph API
-  with `AddPass`, resource/label declarations, `Compile`, `BuildPlan`,
-  `Execute`, `Reset`, `ExecutePass`, and `TakePassExecute`.
+  with `AddPass`, resource/label declarations, explicit pass dependencies via
+  `TaskGraphBuilder::DependsOn`, `Compile`, `BuildPlan`, `Execute`,
+  `Reset`, `ExecutePass`, and `TakePassExecute`.
 - **`Extrinsic.Core.FrameGraph`**: ECS-oriented facade over `TaskGraph` with
   typed read/write access declarations plus structural and commit tokens.
 
