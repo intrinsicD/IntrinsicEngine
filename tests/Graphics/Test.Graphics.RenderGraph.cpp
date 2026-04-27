@@ -442,6 +442,69 @@ TEST(GraphicsRenderGraph, ImportedResourceWriterIsNotCulled)
     EXPECT_EQ(compiled->TopologicalOrder.front(), writer.Index);
 }
 
+TEST(GraphicsRenderGraph, ImportedBufferHandleIsPreservedAcrossCompileAndReset)
+{
+    RenderGraph graph;
+    constexpr Extrinsic::RHI::BufferHandle importedHandle{9001u, 77u};
+    const auto imported = graph.ImportBuffer("PersistentImported",
+        importedHandle,
+        BufferState::TransferDst,
+        BufferState::HostReadback);
+
+    (void)graph.AddPass("ReadImported", [imported](RenderGraphBuilder& builder) {
+        (void)builder.Read(imported, BufferUsage::HostReadback);
+        builder.SideEffect();
+    }, true);
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_LT(imported.Index, compiled->BufferHandles.size());
+    EXPECT_EQ(compiled->BufferHandles[imported.Index], importedHandle);
+
+    graph.Reset();
+
+    const auto importedAgain = graph.ImportBuffer("PersistentImported",
+        importedHandle,
+        BufferState::TransferDst,
+        BufferState::HostReadback);
+    (void)graph.AddPass("ReadImportedAgain", [importedAgain](RenderGraphBuilder& builder) {
+        (void)builder.Read(importedAgain, BufferUsage::HostReadback);
+        builder.SideEffect();
+    }, true);
+
+    compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_LT(importedAgain.Index, compiled->BufferHandles.size());
+    EXPECT_EQ(compiled->BufferHandles[importedAgain.Index], importedHandle);
+}
+
+TEST(GraphicsRenderGraph, ImportedBuffersNeverAliasTransientBuffers)
+{
+    RenderGraph graph;
+    constexpr Extrinsic::RHI::BufferHandle importedHandle{123456u, 5u};
+    const auto imported = graph.ImportBuffer("ImportedIndirect",
+        importedHandle,
+        BufferState::ShaderWrite,
+        BufferState::IndirectRead);
+    const auto transient = graph.CreateBuffer("TransientScratch", Extrinsic::RHI::BufferDesc{.SizeBytes = 256u});
+
+    (void)graph.AddPass("Producer", [transient](RenderGraphBuilder& builder) {
+        (void)builder.Write(transient, BufferUsage::TransferDst);
+    });
+    (void)graph.AddPass("Consumer", [transient, imported](RenderGraphBuilder& builder) {
+        (void)builder.Read(transient, BufferUsage::ShaderRead);
+        (void)builder.Read(imported, BufferUsage::IndirectRead);
+        builder.SideEffect();
+    }, true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    ASSERT_LT(imported.Index, compiled->BufferHandles.size());
+    ASSERT_LT(transient.Index, compiled->BufferHandles.size());
+    EXPECT_EQ(compiled->BufferHandles[imported.Index], importedHandle);
+    EXPECT_NE(compiled->BufferHandles[transient.Index], importedHandle);
+}
+
 TEST(GraphicsRenderGraph, LifetimeFirstAndLastUseTracksPassIndices)
 {
     RenderGraph graph;
