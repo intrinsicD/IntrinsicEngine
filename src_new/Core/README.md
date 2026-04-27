@@ -39,8 +39,26 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
   with `AddPass`, resource/label declarations, explicit pass dependencies via
   `TaskGraphBuilder::DependsOn`, `Compile`, `BuildPlan`, `Execute`,
   `Reset`, `ExecutePass`, and `TakePassExecute`.
+  - Pass options (`TaskGraphPassOptions` / `FrameGraphPassOptions`) provide
+    `Priority`, `EstimatedCost`, `MainThreadOnly`, `AllowParallel`, and
+    `DebugCategory`.
+  - `Execute()` uses graph-local completion (no global scheduler drain), with a
+    deterministic single-thread fallback when workers are unavailable.
+  - Main-thread-only passes are queued in deterministic ready order (priority,
+    then estimated cost, then insertion order) while worker-ready passes keep
+    running on scheduler workers.
 - **`Extrinsic.Core.FrameGraph`**: ECS-oriented facade over `TaskGraph` with
   typed read/write access declarations plus structural and commit tokens.
+
+### Graph stats and diagnostics
+
+`TaskGraph::GetScheduleStats()` / `FrameGraph::GetScheduleStats()` expose:
+
+- task/edge counts split by explicit vs hazard edges;
+- topological layer count and max ready-queue depth;
+- critical-path cost estimate;
+- compile/execute timing; and
+- last diagnostic text (including cycle details).
 
 ### Scheduler partition exports
 

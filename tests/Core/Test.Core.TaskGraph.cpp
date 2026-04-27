@@ -2,9 +2,12 @@
 
 #include <cstddef>
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 import Extrinsic.Core.Dag.TaskGraph;
@@ -12,6 +15,7 @@ import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Hash;
+import Extrinsic.Core.Tasks;
 
 using namespace Extrinsic::Core;
 using namespace Extrinsic::Core::Dag;
@@ -532,6 +536,83 @@ TEST(CoreTaskGraph, ResetClearsStatsResourcesAndLabelsAcrossEpochs)
     EXPECT_EQ(graph.GetScheduleStats().taskCount, 1u);
     ASSERT_EQ(log.size(), 3u);
     EXPECT_EQ(log[2], "OnlyPass");
+}
+
+TEST(CoreTaskGraph, MainThreadReadyQueueUsesPriorityAndCostOrdering)
+{
+    using namespace std::chrono_literals;
+
+    TaskGraph graph(QueueDomain::Cpu);
+    Tasks::Scheduler::Initialize(4);
+
+    std::vector<std::string> order;
+    std::mutex orderMutex;
+
+    TaskGraphPassOptions blockerOptions{};
+    blockerOptions.AllowParallel = true;
+
+    graph.AddPass("WorkerBlocker",
+        blockerOptions,
+        []([[maybe_unused]] TaskGraphBuilder& b) {},
+        []()
+        {
+            std::this_thread::sleep_for(40ms);
+        });
+
+    TaskGraphPassOptions lowMain{};
+    lowMain.MainThreadOnly = true;
+    lowMain.AllowParallel = false;
+    lowMain.Priority = TaskPriority::Low;
+    lowMain.EstimatedCost = 1u;
+
+    TaskGraphPassOptions highMain{};
+    highMain.MainThreadOnly = true;
+    highMain.AllowParallel = false;
+    highMain.Priority = TaskPriority::High;
+    highMain.EstimatedCost = 1u;
+
+    TaskGraphPassOptions highHeavyMain{};
+    highHeavyMain.MainThreadOnly = true;
+    highHeavyMain.AllowParallel = false;
+    highHeavyMain.Priority = TaskPriority::High;
+    highHeavyMain.EstimatedCost = 8u;
+
+    graph.AddPass("LowMain",
+        lowMain,
+        [](TaskGraphBuilder& b) { b.DependsOn(0u); },
+        [&]()
+        {
+            std::scoped_lock lock(orderMutex);
+            order.emplace_back("LowMain");
+        });
+
+    graph.AddPass("HighMain",
+        highMain,
+        [](TaskGraphBuilder& b) { b.DependsOn(0u); },
+        [&]()
+        {
+            std::scoped_lock lock(orderMutex);
+            order.emplace_back("HighMain");
+        });
+
+    graph.AddPass("HighHeavyMain",
+        highHeavyMain,
+        [](TaskGraphBuilder& b) { b.DependsOn(0u); },
+        [&]()
+        {
+            std::scoped_lock lock(orderMutex);
+            order.emplace_back("HighHeavyMain");
+        });
+
+    ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed";
+    ASSERT_TRUE(graph.Execute().has_value()) << "Execute failed";
+
+    ASSERT_EQ(order.size(), 3u);
+    EXPECT_EQ(order[0], "HighHeavyMain");
+    EXPECT_EQ(order[1], "HighMain");
+    EXPECT_EQ(order[2], "LowMain");
+
+    Tasks::Scheduler::Shutdown();
 }
 
 TEST(CoreTaskGraph, FailedCompileClearsCompiledState)
