@@ -377,6 +377,14 @@ namespace Extrinsic::Graphics
                                                                  .Usage = RHI::TextureUsage::ColorTarget |
                                                                           RHI::TextureUsage::Sampled,
                                                              });
+            const auto entityId = m_RenderGraph.CreateTexture("Null.EntityId",
+                                                              RHI::TextureDesc{
+                                                                  .Width = 1u,
+                                                                  .Height = 1u,
+                                                                  .Fmt = RHI::Format::R32_UINT,
+                                                                  .Usage = RHI::TextureUsage::ColorTarget |
+                                                                           RHI::TextureUsage::Sampled,
+                                                              });
             const auto lit = m_RenderGraph.CreateTexture("Null.Lit",
                                                          RHI::TextureDesc{
                                                              .Width = 1u,
@@ -430,8 +438,9 @@ namespace Extrinsic::Graphics
             [[maybe_unused]] const auto passDepth = m_RenderGraph.AddPass("Null.DepthPrepass", [depth](RenderGraphBuilder& builder) {
                 builder.Write(depth, TextureUsage::DepthWrite);
             });
-            [[maybe_unused]] const auto passGBuffer = m_RenderGraph.AddPass("Null.GBuffer", [gbuffer, depth](RenderGraphBuilder& builder) {
+            [[maybe_unused]] const auto passGBuffer = m_RenderGraph.AddPass("Null.GBuffer", [gbuffer, entityId, depth](RenderGraphBuilder& builder) {
                 builder.Write(gbuffer, TextureUsage::ColorAttachmentWrite);
+                builder.Write(entityId, TextureUsage::ColorAttachmentWrite);
                 builder.Read(depth, TextureUsage::DepthRead);
             });
             [[maybe_unused]] const auto passDeferred = m_RenderGraph.AddPass("Null.DeferredLighting", [gbuffer, lit, lights](RenderGraphBuilder& builder) {
@@ -459,7 +468,9 @@ namespace Extrinsic::Graphics
             [[maybe_unused]] const auto passFxaa = m_RenderGraph.AddPass("Null.FXAA", [post](RenderGraphBuilder& builder) {
                 builder.Read(post, TextureUsage::ShaderRead);
             });
-            [[maybe_unused]] const auto passSelection = m_RenderGraph.AddPass("Null.SelectionOutline", [post](RenderGraphBuilder& builder) {
+            [[maybe_unused]] const auto passSelection = m_RenderGraph.AddPass("Null.SelectionOutline", [post, entityId, depth](RenderGraphBuilder& builder) {
+                builder.Read(entityId, TextureUsage::ShaderRead);
+                builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(post, TextureUsage::ColorAttachmentWrite);
             });
             [[maybe_unused]] const auto passImGui = m_RenderGraph.AddPass("Null.ImGui", [post](RenderGraphBuilder& builder) {
@@ -490,6 +501,7 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.CulledPassCount = compiled->CulledPassCount;
             m_LastRenderGraphStats.ResourceCount = compiled->ResourceCount;
             m_LastRenderGraphStats.BarrierCount = static_cast<std::uint32_t>(compiled->BarrierPackets.size());
+            m_LastRenderGraphStats.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
             m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
 
             const auto executeBegin = std::chrono::steady_clock::now();
