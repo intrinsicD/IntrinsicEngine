@@ -38,6 +38,7 @@ namespace Extrinsic::Graphics
         std::uint32_t CulledPassCount = 0;
         std::uint32_t ResourceCount = 0;
         std::uint32_t BarrierCount = 0;
+        std::uint64_t TransientMemoryEstimateBytes = 0;
         std::uint64_t CompileTimeMicros = 0;
         std::uint64_t ExecuteTimeMicros = 0;
         std::string DebugDump{};

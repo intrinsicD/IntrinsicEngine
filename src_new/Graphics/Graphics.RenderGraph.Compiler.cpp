@@ -326,7 +326,8 @@ namespace Extrinsic::Graphics
             {
                 if (!dependency.IsValid() || dependency.Index >= passCount)
                 {
-                    g_LastCompileDiagnostic = "RenderGraph explicit dependency references an invalid pass.";
+                    g_LastCompileDiagnostic = "RenderGraph explicit dependency references an invalid pass: pass=\"" +
+                                              pass.Name + "\" depends_on=" + std::to_string(dependency.Index) + ".";
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
                 AddEdge(dependency.Index, passIndex, adjacency, indegree, dedup);
@@ -336,7 +337,8 @@ namespace Extrinsic::Graphics
             {
                 if (access.Ref.Index >= textureStates.size())
                 {
-                    g_LastCompileDiagnostic = "RenderGraph texture access references an invalid texture resource.";
+                    g_LastCompileDiagnostic = "RenderGraph texture access references an invalid texture resource: pass=\"" +
+                                              pass.Name + "\" texture_index=" + std::to_string(access.Ref.Index) + ".";
                     return std::unexpected(Core::ErrorCode::OutOfRange);
                 }
                 if (access.Write)
@@ -356,7 +358,8 @@ namespace Extrinsic::Graphics
             {
                 if (access.Ref.Index >= bufferStates.size())
                 {
-                    g_LastCompileDiagnostic = "RenderGraph buffer access references an invalid buffer resource.";
+                    g_LastCompileDiagnostic = "RenderGraph buffer access references an invalid buffer resource: pass=\"" +
+                                              pass.Name + "\" buffer_index=" + std::to_string(access.Ref.Index) + ".";
                     return std::unexpected(Core::ErrorCode::OutOfRange);
                 }
                 if (access.Write)
@@ -382,12 +385,14 @@ namespace Extrinsic::Graphics
             {
                 if (!pass.RenderPass.ColorTargets.empty() && !hasColorAttachmentWrite)
                 {
-                    g_LastCompileDiagnostic = "RenderGraph render-pass color attachment declaration is missing a color write usage.";
+                    g_LastCompileDiagnostic = "RenderGraph render-pass color attachment declaration is missing a color write usage: pass=\"" +
+                                              pass.Name + "\".";
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
                 if (pass.RenderPass.Depth.Target.IsValid() && !hasDepthAccess)
                 {
-                    g_LastCompileDiagnostic = "RenderGraph render-pass depth attachment declaration is missing depth usage.";
+                    g_LastCompileDiagnostic = "RenderGraph render-pass depth attachment declaration is missing depth usage: pass=\"" +
+                                              pass.Name + "\".";
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
             }

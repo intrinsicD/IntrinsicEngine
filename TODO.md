@@ -3488,7 +3488,7 @@ public:
 - [x] G-buffer outputs feed deferred lighting.
 - [x] Deferred lighting feeds postprocess.
 - [x] Postprocess feeds present.
-- [ ] Selection outline reads entity ID/depth resources.
+- [x] Selection outline reads entity ID/depth resources.
 - [ ] Pass culling removes disabled/unused optional passes.
 
 ## T052 — Import persistent GPU world resources into RenderGraph
@@ -3523,14 +3523,14 @@ public:
   - [x] culled pass count;
   - [x] resource count;
   - [x] barrier count;
-  - [ ] transient memory estimate;
+  - [x] transient memory estimate;
   - [x] compile time;
   - [x] execute/record time.
 - [x] Add debug dump function for compiled render graph.
 
 **Tests:**
 
-- [ ] Compile failure log contains failing pass name.
+- [x] Compile failure log contains failing pass name.
 - [x] Stats are nonzero for nonempty graph.
 - [x] Debug dump contains pass order and resources.
 

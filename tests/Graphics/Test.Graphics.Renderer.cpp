@@ -37,6 +37,7 @@ TEST(GraphicsRenderer, NullRendererExecutesRenderGraphPath)
     EXPECT_GT(stats.PassCount, 0u);
     EXPECT_GT(stats.ResourceCount, 0u);
     EXPECT_GT(stats.BarrierCount, 0u);
+    EXPECT_GT(stats.TransientMemoryEstimateBytes, 0u);
     EXPECT_FALSE(stats.DebugDump.empty());
 
     renderer->Resize(1920u, 1080u);
