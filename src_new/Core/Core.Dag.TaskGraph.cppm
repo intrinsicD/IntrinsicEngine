@@ -115,8 +115,11 @@ export namespace Extrinsic::Core::Dag
         void WriteResource(Hash::StringID label);
 
         // --- Ordering constraints (label-based) ---
-        // WaitFor: this pass may not start until all passes that Signal(label)
-        //          in the same graph have completed.
+        // WaitFor: this pass may not start until all prior passes that
+        // Signal(label) in the same graph have completed.
+        //
+        // If no prior Signal(label) exists, compilation fails with
+        // ErrorCode::InvalidState.
         void WaitFor(Hash::StringID label);
 
         // Signal: this pass "produces" the named label (other passes may WaitFor it).
@@ -125,6 +128,11 @@ export namespace Extrinsic::Core::Dag
         // --- Ordering constraints (explicit) ---
         // Adds a dependency edge from `predecessorPassIndex` to this pass.
         void DependsOn(std::uint32_t predecessorPassIndex);
+
+        // Adds a domain-reasoned dependency edge from `predecessorPassIndex` to
+        // this pass. Use when a consumer should be aware of the dependency
+        // semantics (e.g., resource state transitions in GPU render graphs).
+        void DependsOn(std::uint32_t predecessorPassIndex, std::string_view reason);
 
     private:
         TaskGraph& m_Graph;

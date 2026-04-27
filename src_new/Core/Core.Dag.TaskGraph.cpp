@@ -65,6 +65,19 @@ namespace Extrinsic::Core::Dag
             return mode == ResourceAccessMode::Read || mode == ResourceAccessMode::ReadWrite;
         }
 
+        enum class PassDependencyKind : uint8_t
+        {
+            Default = 0,
+            DomainSpecific,
+        };
+
+        struct PassDependency
+        {
+            std::uint32_t Predecessor = 0u;
+            PassDependencyKind Kind = PassDependencyKind::Default;
+            std::string Reason{};
+        };
+
         enum class EdgeReason : uint8_t
         {
             ExplicitDependency = 0,
@@ -80,6 +93,7 @@ namespace Extrinsic::Core::Dag
         struct EdgeReasonInfo
         {
             EdgeReason Kind = EdgeReason::ExplicitDependency;
+            std::string DomainReason{};
             std::uint32_t LabelValue = 0;
         };
 
@@ -116,7 +130,12 @@ namespace Extrinsic::Core::Dag
                     case EdgeReason::HazardWaw: oss << "WAW"; break;
                     case EdgeReason::HazardWar: oss << "WAR"; break;
                     case EdgeReason::LabelDependency: oss << "label(" << reason.LabelValue << ")"; break;
-                    case EdgeReason::DomainSpecific: oss << "domain-specific"; break;
+                    case EdgeReason::DomainSpecific:
+                        if (!reason.DomainReason.empty())
+                            oss << "domain(" << reason.DomainReason << ")";
+                        else
+                            oss << "domain-specific";
+                        break;
                     }
                     oss << "--> ";
                 }
@@ -172,6 +191,7 @@ namespace Extrinsic::Core::Dag
             auto addEdge = [&](const std::uint32_t from,
                                const std::uint32_t to,
                                const EdgeReason reason,
+                               std::string_view domainReason,
                                const std::uint32_t labelValue,
                                auto& seenEdges,
                                auto& successors,
@@ -192,11 +212,19 @@ namespace Extrinsic::Core::Dag
                 predecessors[to].push_back(from);
                 ++inDegree[to];
                 ++stats.edgeCount;
-                if (reason == EdgeReason::ExplicitDependency || reason == EdgeReason::LabelDependency)
+                if (reason == EdgeReason::ExplicitDependency ||
+                    reason == EdgeReason::LabelDependency ||
+                    reason == EdgeReason::DomainSpecific)
                     ++stats.explicitEdgeCount;
                 else
                     ++stats.hazardEdgeCount;
-                edgeReasons.emplace(key, EdgeReasonInfo{reason, labelValue});
+                edgeReasons.emplace(
+                    key,
+                    EdgeReasonInfo{
+                        .Kind = reason,
+                        .DomainReason = std::string(domainReason),
+                        .LabelValue = labelValue,
+                    });
             };
 
             std::vector<std::vector<std::uint32_t>> successors(nodeCount);
@@ -217,21 +245,23 @@ namespace Extrinsic::Core::Dag
             for (std::uint32_t i = 0; i < nodeCount; ++i)
             {
                 const auto& pass = passes[i];
-                for (const auto dependency : pass.Dependencies)
+                for (const auto& dependency : pass.Dependencies)
                 {
-                    if (dependency >= nodeCount)
+                    if (dependency.Predecessor >= nodeCount)
                     {
                         const auto msg = "Invalid explicit dependency in pass '" + std::string(passes[i].Name) +
-                            "': predecessor index " + std::to_string(dependency) + " is out of range";
+                            "': predecessor index " + std::to_string(dependency.Predecessor) + " is out of range";
                         compiled.Stats.lastDiagnostic = msg;
                         if (outDiagnostic)
                             *outDiagnostic = msg;
                         return Err<CompiledPlanState>(ErrorCode::InvalidState);
                     }
+                    const bool hasDomainReason = dependency.Kind != PassDependencyKind::Default;
                     addEdge(
-                        dependency,
+                        dependency.Predecessor,
                         i,
-                        EdgeReason::ExplicitDependency,
+                        hasDomainReason ? EdgeReason::DomainSpecific : EdgeReason::ExplicitDependency,
+                        dependency.Reason,
                         0u,
                         seenEdges,
                         successors,
@@ -253,6 +283,7 @@ namespace Extrinsic::Core::Dag
                             static_cast<std::uint32_t>(state.LastWriter),
                             i,
                             reason,
+                            {},
                             0u,
                             seenEdges,
                             successors,
@@ -270,6 +301,7 @@ namespace Extrinsic::Core::Dag
                                 reader,
                                 i,
                                 EdgeReason::HazardWar,
+                                {},
                                 0u,
                                 seenEdges,
                                 successors,
@@ -309,8 +341,17 @@ namespace Extrinsic::Core::Dag
                     for (const auto signaler : signalIt->second)
                     {
                         const auto labelValue = (waitLabel < labelValues.size()) ? labelValues[waitLabel] : 0u;
-                        addEdge(signaler, i, EdgeReason::LabelDependency, labelValue, seenEdges,
-                                successors, predecessors, inDegree, edgeReasons, compiled.Stats);
+                        addEdge(signaler,
+                                i,
+                                EdgeReason::LabelDependency,
+                                {},
+                                labelValue,
+                                seenEdges,
+                                successors,
+                                predecessors,
+                                inDegree,
+                                edgeReasons,
+                                compiled.Stats);
                     }
                 }
 
@@ -603,7 +644,7 @@ namespace Extrinsic::Core::Dag
             std::string Name;
             GraphExecuteCallback Execute;
             std::vector<ResourceAccess> Resources{};
-            std::vector<std::uint32_t> Dependencies{};
+            std::vector<PassDependency> Dependencies{};
             std::vector<std::uint32_t> WaitLabels{};
             std::vector<std::uint32_t> SignalLabels{};
             TaskGraphPassOptions Options{};
@@ -1092,6 +1133,20 @@ GraphExecuteCallback TaskGraph::TakePassExecute(uint32_t passIndex)
 
     void TaskGraphBuilder::DependsOn(std::uint32_t predecessorPassIndex)
     {
-        m_Graph.m_Impl->Passes[m_PassIndex].Dependencies.push_back(predecessorPassIndex);
+        m_Graph.m_Impl->Passes[m_PassIndex].Dependencies.push_back(
+            PassDependency{
+                .Predecessor = predecessorPassIndex,
+                .Kind = PassDependencyKind::Default,
+            });
+    }
+
+    void TaskGraphBuilder::DependsOn(std::uint32_t predecessorPassIndex, std::string_view reason)
+    {
+        m_Graph.m_Impl->Passes[m_PassIndex].Dependencies.push_back(
+            PassDependency{
+                .Predecessor = predecessorPassIndex,
+                .Kind = PassDependencyKind::DomainSpecific,
+                .Reason = std::string(reason),
+            });
     }
 }

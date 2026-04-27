@@ -164,6 +164,31 @@ TEST(CoreTaskGraph, WaitWithoutPriorSignalFailsCompile)
     const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
     EXPECT_NE(diagnostic.find("No prior signaler"), std::string::npos);
     EXPECT_NE(diagnostic.find(std::to_string(kLabel.Value)), std::string::npos);
+    EXPECT_NE(diagnostic.find("Waiter"), std::string::npos);
+}
+
+TEST(CoreTaskGraph, WaitAfterLaterSignalStillFailsCompile)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+
+    const auto kLabel = "LateSignal"_id;
+
+    graph.AddPass("Waiter",
+        [kLabel](TaskGraphBuilder& b) { b.WaitFor(kLabel); },
+        []() {});
+
+    graph.AddPass("Signaler",
+        [kLabel](TaskGraphBuilder& b) { b.Signal(kLabel); },
+        []() {});
+
+    const auto compile = graph.Compile();
+    ASSERT_FALSE(compile.has_value());
+    EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+
+    const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
+    EXPECT_NE(diagnostic.find("No prior signaler"), std::string::npos);
+    EXPECT_NE(diagnostic.find(std::to_string(kLabel.Value)), std::string::npos);
+    EXPECT_NE(diagnostic.find("Waiter"), std::string::npos);
 }
 
 TEST(CoreTaskGraph, ExplicitDependencyCanCreateCycleDiagnostic)
@@ -192,6 +217,34 @@ TEST(CoreTaskGraph, ExplicitDependencyCanCreateCycleDiagnostic)
     EXPECT_NE(diagnostic.find("PassA"), std::string::npos);
     EXPECT_NE(diagnostic.find("PassB"), std::string::npos);
     EXPECT_NE(diagnostic.find("explicit"), std::string::npos);
+}
+
+TEST(CoreTaskGraph, DomainSpecificDependencyReasonAppearsInCycleDiagnostic)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+
+    graph.AddPass("Producer",
+        [](TaskGraphBuilder& b)
+        {
+            b.DependsOn(1u, "transition");
+        },
+        []() {});
+
+    graph.AddPass("Consumer",
+        [](TaskGraphBuilder& b)
+        {
+            b.DependsOn(0u);
+        },
+        []() {});
+
+    const auto compile = graph.Compile();
+    ASSERT_FALSE(compile.has_value());
+    EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+
+    const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
+    EXPECT_NE(diagnostic.find("Producer"), std::string::npos);
+    EXPECT_NE(diagnostic.find("Consumer"), std::string::npos);
+    EXPECT_NE(diagnostic.find("domain(transition)"), std::string::npos);
 }
 
 TEST(CoreTaskGraph, LabelDependencyCycleIncludesLabelId)

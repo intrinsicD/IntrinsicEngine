@@ -2747,10 +2747,11 @@ Hazard rules:
 - [x] A wait must depend on all earlier signalers of the same label.
 - [x] Multiple signalers are allowed as fan-in, but diagnostics must make this visible when useful.
 - [x] A wait with no known signaler must not crash. Choose and document one behavior:
-  - [x] either compile error; or
-  - [ ] unresolved wait is ignored with a warning; or
-  - [ ] wait is bound when a later signal appears.
-- [x] The chosen behavior must be covered by tests.
+  - [x] Compile error.
+  - [ ] Unresolved wait is ignored with a warning.
+  - [ ] Wait is bound when a later signal appears.
+  - [x] Chosen behavior is compile-time `InvalidState` (no automatic late binding).
+  - [x] The chosen behavior must be covered by tests.
 
 **Recommended behavior:**
 

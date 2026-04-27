@@ -212,6 +212,42 @@ TEST(CoreGraphCompiler, LargeCycleDiagnosticIsBounded)
     EXPECT_LT(stats.lastDiagnostic.size(), 4096u);
 }
 
+TEST(CoreGraphCompiler, CycleDiagnosticIncludesEdgeReason)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    const TaskId a{300, 1};
+    const TaskId b{301, 1};
+
+    const std::array<TaskId, 1> depA{b};
+    const std::array<TaskId, 1> depB{a};
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+        .id = a,
+        .debugName = "A",
+        .domain = QueueDomain::Cpu,
+        .dependsOn = std::span<const TaskId>(depA),
+    }).has_value());
+
+    ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+        .id = b,
+        .debugName = "B",
+        .domain = QueueDomain::Cpu,
+        .dependsOn = std::span<const TaskId>(depB),
+    }).has_value());
+
+    const auto plan = graph->BuildPlan(BuildConfig{});
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
+
+    const auto stats = graph->GetLastStats();
+    EXPECT_NE(stats.lastDiagnostic.find("Cycle detected"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("A"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("B"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("explicit"), std::string::npos);
+}
+
 TEST(CoreGraphCompiler, ResourceHazardRawOrdersWriterBeforeReader)
 {
     auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
