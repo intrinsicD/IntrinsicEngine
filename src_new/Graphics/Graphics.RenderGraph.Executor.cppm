@@ -15,9 +15,14 @@ namespace Extrinsic::Graphics
     public:
         using BarrierObserver = std::function<void(const BarrierPacket&)>;
         using PassObserver = std::function<void(std::uint32_t passIndex)>;
+        using ResolveObserver = std::function<Core::Result(const CompiledPassDeclarations& declarations)>;
 
         [[nodiscard]] Core::Result Execute(const CompiledRenderGraph& graph,
                                            PassObserver onPass = {},
                                            BarrierObserver onBarriers = {}) const;
+        [[nodiscard]] Core::Result Execute(const CompiledRenderGraph& graph,
+                                           ResolveObserver onResolve,
+                                           PassObserver onPass,
+                                           BarrierObserver onBarriers) const;
     };
 }

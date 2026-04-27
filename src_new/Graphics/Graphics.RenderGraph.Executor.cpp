@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 module Extrinsic.Graphics.RenderGraph;
@@ -13,6 +14,14 @@ import :Compiler;
 namespace Extrinsic::Graphics
 {
     Core::Result RenderGraphExecutor::Execute(const CompiledRenderGraph& graph,
+                                              PassObserver onPass,
+                                              BarrierObserver onBarriers) const
+    {
+        return Execute(graph, {}, std::move(onPass), std::move(onBarriers));
+    }
+
+    Core::Result RenderGraphExecutor::Execute(const CompiledRenderGraph& graph,
+                                              ResolveObserver onResolve,
                                               PassObserver onPass,
                                               BarrierObserver onBarriers) const
     {
@@ -42,6 +51,26 @@ namespace Extrinsic::Graphics
 
         for (const std::uint32_t passIndex : graph.TopologicalOrder)
         {
+            if (passIndex >= graph.PassDeclarations.size())
+            {
+                return Core::Err(Core::ErrorCode::OutOfRange);
+            }
+
+            const CompiledPassDeclarations& declarations = graph.PassDeclarations[passIndex];
+            if (declarations.PassIndex != passIndex)
+            {
+                return Core::Err(Core::ErrorCode::InvalidState);
+            }
+
+            if (onResolve)
+            {
+                Core::Result resolveResult = onResolve(declarations);
+                if (!resolveResult.has_value())
+                {
+                    return resolveResult;
+                }
+            }
+
             if (onPass)
             {
                 onPass(passIndex);

@@ -6,6 +6,7 @@
 #include <vector>
 
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Core.Error;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 
@@ -221,6 +222,29 @@ TEST(GraphicsRenderGraph, WriteThenWriteCreatesDependency)
     auto compiled = graph.Compile();
     ASSERT_TRUE(compiled.has_value());
     EXPECT_LT(FindOrder(*compiled, first.Index), FindOrder(*compiled, second.Index));
+}
+
+TEST(GraphicsRenderGraph, CrossQueueReadReadAddsQueueHandoffPlaceholderEdge)
+{
+    RenderGraph graph;
+    const auto texture = graph.CreateTexture("SharedRead", Extrinsic::RHI::TextureDesc{});
+
+    const auto graphicsReader = graph.AddPass("GraphicsRead", [texture](RenderGraphBuilder& builder) {
+        builder.SetQueue(RenderQueue::Graphics);
+        (void)builder.Read(texture, TextureUsage::ShaderRead);
+        builder.SideEffect();
+    });
+    const auto computeReader = graph.AddPass("ComputeRead", [texture](RenderGraphBuilder& builder) {
+        builder.SetQueue(RenderQueue::AsyncCompute);
+        (void)builder.Read(texture, TextureUsage::ShaderRead);
+        builder.SideEffect();
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_EQ(compiled->QueueHandoffEdgeCount, 1u);
+    EXPECT_EQ(compiled->EdgeCount, 1u);
+    EXPECT_LT(FindOrder(*compiled, graphicsReader.Index), FindOrder(*compiled, computeReader.Index));
 }
 
 TEST(GraphicsRenderGraph, ExplicitDependencyOrdersIndependentPasses)
@@ -719,6 +743,30 @@ TEST(GraphicsRenderGraph, ExecuteFailsWhenBarrierReferencesInvalidResource)
     RenderGraphExecutor executor;
     auto result = executor.Execute(compiled);
     EXPECT_FALSE(result.has_value());
+}
+
+TEST(GraphicsRenderGraph, ExecuteFailsWhenResolveRequestsUndeclaredTexture)
+{
+    RenderGraph graph;
+    const auto declared = graph.CreateTexture("Declared", Extrinsic::RHI::TextureDesc{});
+    const auto undeclared = graph.CreateTexture("Undeclared", Extrinsic::RHI::TextureDesc{});
+    (void)graph.AddPass("DeclaredOnly", [declared](RenderGraphBuilder& builder) {
+        (void)builder.Read(declared, TextureUsage::ShaderRead);
+        builder.SideEffect();
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    RenderGraphExecutor executor;
+    const auto result = executor.Execute(
+        *compiled,
+        [undeclared](const CompiledPassDeclarations& declarations) { return declarations.RequireTextureRead(undeclared); },
+        {},
+        {});
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
 }
 
 TEST(GraphicsRenderGraph, DebugDumpContainsPassOrderAndResourceSections)

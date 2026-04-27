@@ -93,7 +93,34 @@ namespace Extrinsic::Graphics
         {
             std::int32_t LastWriter = -1;
             std::vector<std::uint32_t> Readers{};
+            std::int32_t LastAccessor = -1;
+            RenderQueue LastAccessorQueue = RenderQueue::Graphics;
         };
+
+        [[nodiscard]] bool ContainsSorted(const std::vector<std::uint32_t>& values, const std::uint32_t needle)
+        {
+            return std::binary_search(values.begin(), values.end(), needle);
+        }
+
+        bool AddEdge(const std::uint32_t from,
+                     const std::uint32_t to,
+                     std::vector<std::vector<std::uint32_t>>& adjacency,
+                     std::vector<std::uint32_t>& indegree,
+                     std::unordered_set<std::uint64_t>& dedup);
+
+        [[nodiscard]] bool MaybeAddQueueHandoffEdge(const std::uint32_t passIndex,
+                                                    const RenderQueue queue,
+                                                    const ResourceState& state,
+                                                    std::vector<std::vector<std::uint32_t>>& adjacency,
+                                                    std::vector<std::uint32_t>& indegree,
+                                                    std::unordered_set<std::uint64_t>& dedup)
+        {
+            if (state.LastAccessor < 0 || state.LastAccessorQueue == queue)
+            {
+                return false;
+            }
+            return AddEdge(static_cast<std::uint32_t>(state.LastAccessor), passIndex, adjacency, indegree, dedup);
+        }
 
         constexpr std::uint64_t EncodeEdge(const std::uint32_t from, const std::uint32_t to)
         {
@@ -121,24 +148,38 @@ namespace Extrinsic::Graphics
         }
 
         void ProcessRead(const std::uint32_t passIndex,
+                         const RenderQueue queue,
+                         std::uint32_t& queueHandoffEdgeCount,
                          ResourceState& state,
                          std::vector<std::vector<std::uint32_t>>& adjacency,
                          std::vector<std::uint32_t>& indegree,
                          std::unordered_set<std::uint64_t>& dedup)
         {
+            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup))
+            {
+                ++queueHandoffEdgeCount;
+            }
             if (state.LastWriter >= 0)
             {
                 AddEdge(static_cast<std::uint32_t>(state.LastWriter), passIndex, adjacency, indegree, dedup);
             }
             state.Readers.push_back(passIndex);
+            state.LastAccessor = static_cast<std::int32_t>(passIndex);
+            state.LastAccessorQueue = queue;
         }
 
         void ProcessWrite(const std::uint32_t passIndex,
+                          const RenderQueue queue,
+                          std::uint32_t& queueHandoffEdgeCount,
                           ResourceState& state,
                           std::vector<std::vector<std::uint32_t>>& adjacency,
                           std::vector<std::uint32_t>& indegree,
                           std::unordered_set<std::uint64_t>& dedup)
         {
+            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup))
+            {
+                ++queueHandoffEdgeCount;
+            }
             if (state.LastWriter >= 0)
             {
                 AddEdge(static_cast<std::uint32_t>(state.LastWriter), passIndex, adjacency, indegree, dedup);
@@ -149,6 +190,8 @@ namespace Extrinsic::Graphics
             }
             state.Readers.clear();
             state.LastWriter = static_cast<std::int32_t>(passIndex);
+            state.LastAccessor = static_cast<std::int32_t>(passIndex);
+            state.LastAccessorQueue = queue;
         }
 
         void UpdateLifetime(ResourceLifetime& lifetime, const std::uint32_t passIndex)
@@ -164,6 +207,62 @@ namespace Extrinsic::Graphics
             lifetime.FirstUsePass = std::min(lifetime.FirstUsePass, passIndex);
             lifetime.LastUsePass = std::max(lifetime.LastUsePass, passIndex);
         }
+    }
+
+    bool CompiledPassDeclarations::DeclaresTextureRead(const TextureRef ref) const
+    {
+        if (!ref.IsValid())
+        {
+            return false;
+        }
+        return ContainsSorted(ReadTextures, ref.Index);
+    }
+
+    bool CompiledPassDeclarations::DeclaresTextureWrite(const TextureRef ref) const
+    {
+        if (!ref.IsValid())
+        {
+            return false;
+        }
+        return ContainsSorted(WriteTextures, ref.Index);
+    }
+
+    bool CompiledPassDeclarations::DeclaresBufferRead(const BufferRef ref) const
+    {
+        if (!ref.IsValid())
+        {
+            return false;
+        }
+        return ContainsSorted(ReadBuffers, ref.Index);
+    }
+
+    bool CompiledPassDeclarations::DeclaresBufferWrite(const BufferRef ref) const
+    {
+        if (!ref.IsValid())
+        {
+            return false;
+        }
+        return ContainsSorted(WriteBuffers, ref.Index);
+    }
+
+    Core::Result CompiledPassDeclarations::RequireTextureRead(const TextureRef ref) const
+    {
+        return DeclaresTextureRead(ref) ? Core::Ok() : Core::Err(Core::ErrorCode::InvalidArgument);
+    }
+
+    Core::Result CompiledPassDeclarations::RequireTextureWrite(const TextureRef ref) const
+    {
+        return DeclaresTextureWrite(ref) ? Core::Ok() : Core::Err(Core::ErrorCode::InvalidArgument);
+    }
+
+    Core::Result CompiledPassDeclarations::RequireBufferRead(const BufferRef ref) const
+    {
+        return DeclaresBufferRead(ref) ? Core::Ok() : Core::Err(Core::ErrorCode::InvalidArgument);
+    }
+
+    Core::Result CompiledPassDeclarations::RequireBufferWrite(const BufferRef ref) const
+    {
+        return DeclaresBufferWrite(ref) ? Core::Ok() : Core::Err(Core::ErrorCode::InvalidArgument);
     }
 
     Core::Expected<CompiledRenderGraph> RenderGraphCompiler::Compile(
@@ -197,8 +296,10 @@ namespace Extrinsic::Graphics
         std::vector<std::vector<std::uint32_t>> adjacency(passCount);
         std::vector<std::vector<std::uint32_t>> reverseAdjacency(passCount);
         std::vector<std::uint32_t> indegree(passCount, 0u);
+        std::vector<CompiledPassDeclarations> passDeclarations(passCount);
         std::unordered_set<std::uint64_t> dedup{};
         dedup.reserve(static_cast<std::size_t>(passCount) * 4u);
+        std::uint32_t queueHandoffEdgeCount = 0;
 
         for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
         {
@@ -220,6 +321,7 @@ namespace Extrinsic::Graphics
         for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
         {
             const RenderPassRecord& pass = passes[passIndex];
+            passDeclarations[passIndex].PassIndex = passIndex;
             for (const PassRef dependency : pass.ExplicitDependencies)
             {
                 if (!dependency.IsValid() || dependency.Index >= passCount)
@@ -239,11 +341,13 @@ namespace Extrinsic::Graphics
                 }
                 if (access.Write)
                 {
-                    ProcessWrite(passIndex, textureStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup);
+                    passDeclarations[passIndex].WriteTextures.push_back(access.Ref.Index);
                 }
                 else
                 {
-                    ProcessRead(passIndex, textureStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup);
+                    passDeclarations[passIndex].ReadTextures.push_back(access.Ref.Index);
                 }
                 UpdateLifetime(textureLifetimes[access.Ref.Index], passIndex);
             }
@@ -257,11 +361,13 @@ namespace Extrinsic::Graphics
                 }
                 if (access.Write)
                 {
-                    ProcessWrite(passIndex, bufferStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup);
+                    passDeclarations[passIndex].WriteBuffers.push_back(access.Ref.Index);
                 }
                 else
                 {
-                    ProcessRead(passIndex, bufferStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup);
+                    passDeclarations[passIndex].ReadBuffers.push_back(access.Ref.Index);
                 }
                 UpdateLifetime(bufferLifetimes[access.Ref.Index], passIndex);
             }
@@ -285,6 +391,15 @@ namespace Extrinsic::Graphics
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
             }
+
+            auto sortUnique = [](std::vector<std::uint32_t>& values) {
+                std::ranges::sort(values);
+                values.erase(std::unique(values.begin(), values.end()), values.end());
+            };
+            sortUnique(passDeclarations[passIndex].ReadTextures);
+            sortUnique(passDeclarations[passIndex].WriteTextures);
+            sortUnique(passDeclarations[passIndex].ReadBuffers);
+            sortUnique(passDeclarations[passIndex].WriteBuffers);
         }
 
         for (std::uint32_t from = 0; from < passCount; ++from)
@@ -439,8 +554,10 @@ namespace Extrinsic::Graphics
                 .CulledPassCount = passCount - livePassCount,
                 .ResourceCount = resourceCount,
                 .EdgeCount = static_cast<std::uint32_t>(dedup.size()),
+                .QueueHandoffEdgeCount = queueHandoffEdgeCount,
                 .TopologicalOrder = order,
                 .TopologicalLayerByPass = layerByPass,
+                .PassDeclarations = std::move(passDeclarations),
                 .TextureLifetimes = std::move(textureLifetimes),
                 .BufferLifetimes = std::move(bufferLifetimes),
             };
@@ -584,9 +701,11 @@ namespace Extrinsic::Graphics
             .CulledPassCount = passCount - livePassCount,
             .ResourceCount = resourceCount,
             .EdgeCount = activeEdgeCount,
+            .QueueHandoffEdgeCount = queueHandoffEdgeCount,
             .TopologicalOrder = std::move(order),
             .TopologicalLayerByPass = std::move(layerByPass),
             .PassNames = std::move(passNames),
+            .PassDeclarations = std::move(passDeclarations),
             .TextureLifetimes = std::move(textureLifetimes),
             .BufferLifetimes = std::move(bufferLifetimes),
             .TextureHandles = std::move(textureHandles),
@@ -610,6 +729,7 @@ namespace Extrinsic::Graphics
             << " culled_pass_count=" << compiled.CulledPassCount
             << " resource_count=" << compiled.ResourceCount
             << " edge_count=" << compiled.EdgeCount
+            << " queue_handoff_edges=" << compiled.QueueHandoffEdgeCount
             << " barrier_packet_count=" << compiled.BarrierPackets.size() << '\n';
 
         out << "  passes:\n";

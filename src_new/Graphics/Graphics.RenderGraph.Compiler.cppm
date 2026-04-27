@@ -15,6 +15,25 @@ import :Barriers;
 
 namespace Extrinsic::Graphics
 {
+    export struct CompiledPassDeclarations
+    {
+        std::uint32_t PassIndex = 0;
+        std::vector<std::uint32_t> ReadTextures{};
+        std::vector<std::uint32_t> WriteTextures{};
+        std::vector<std::uint32_t> ReadBuffers{};
+        std::vector<std::uint32_t> WriteBuffers{};
+
+        [[nodiscard]] bool DeclaresTextureRead(TextureRef ref) const;
+        [[nodiscard]] bool DeclaresTextureWrite(TextureRef ref) const;
+        [[nodiscard]] bool DeclaresBufferRead(BufferRef ref) const;
+        [[nodiscard]] bool DeclaresBufferWrite(BufferRef ref) const;
+
+        [[nodiscard]] Core::Result RequireTextureRead(TextureRef ref) const;
+        [[nodiscard]] Core::Result RequireTextureWrite(TextureRef ref) const;
+        [[nodiscard]] Core::Result RequireBufferRead(BufferRef ref) const;
+        [[nodiscard]] Core::Result RequireBufferWrite(BufferRef ref) const;
+    };
+
     export struct ResourceLifetime
     {
         bool HasUse = false;
@@ -30,10 +49,12 @@ namespace Extrinsic::Graphics
         std::uint32_t TransientTextureCount = 0;
         std::uint32_t TransientBufferCount = 0;
         std::uint32_t EdgeCount = 0;
+        std::uint32_t QueueHandoffEdgeCount = 0;
         std::uint64_t TransientMemoryEstimateBytes = 0;
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
         std::vector<std::string> PassNames{};
+        std::vector<CompiledPassDeclarations> PassDeclarations{};
         std::vector<ResourceLifetime> TextureLifetimes{};
         std::vector<ResourceLifetime> BufferLifetimes{};
         std::vector<RHI::TextureHandle> TextureHandles{};

@@ -3319,12 +3319,12 @@ public:
 - [x] Validate all resource refs.
 - [x] Validate pass render attachment declarations match declared writes.
 - [x] Validate present pass targets imported backbuffer.
-- [ ] Build producer/consumer dependency edges:
+- [x] Build producer/consumer dependency edges:
   - [x] write -> read;
   - [x] write -> write;
   - [x] read -> write;
   - [x] explicit pass dependency, if API supports it;
-  - [ ] queue handoff placeholder edge, even if only one queue exists initially.
+  - [x] queue handoff placeholder edge, even if only one queue exists initially.
 - [x] Topologically sort passes using shared compiler substrate or a Graphics-specific wrapper around it.
 - [x] Detect cycles with pass/resource names.
 - [x] Build immutable compiled plan.
@@ -3336,7 +3336,7 @@ public:
 - [x] Read then write creates dependency.
 - [x] Write then write creates dependency.
 - [x] Invalid present target fails validation.
-- [ ] Missing resource declaration fails if execution tries to resolve it.
+- [x] Missing resource declaration fails if execution tries to resolve it.
 - [x] Cycle reports pass names.
 
 ## T044 — Implement basic lifetime analysis and pass culling
