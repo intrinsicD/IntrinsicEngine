@@ -25,29 +25,48 @@ namespace Extrinsic::Graphics
                                               PassObserver onPass,
                                               BarrierObserver onBarriers) const
     {
+        const std::uint32_t finalPassIndex = static_cast<std::uint32_t>(graph.PassDeclarations.size());
+
         for (const BarrierPacket& packet : graph.BarrierPackets)
         {
-            for (const TextureBarrierPacket& textureBarrier : packet.TextureBarriers)
+            if (packet.PassIndex > finalPassIndex)
             {
-                if (textureBarrier.TextureIndex >= graph.TextureHandles.size())
-                {
-                    return Core::Err(Core::ErrorCode::OutOfRange);
-                }
-            }
-
-            for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
-            {
-                if (bufferBarrier.BufferIndex >= graph.BufferHandles.size())
-                {
-                    return Core::Err(Core::ErrorCode::OutOfRange);
-                }
-            }
-
-            if (onBarriers)
-            {
-                onBarriers(packet);
+                return Core::Err(Core::ErrorCode::OutOfRange);
             }
         }
+
+        const auto emitBarriersForPass = [&](const std::uint32_t passIndex) -> Core::Result {
+            for (const BarrierPacket& packet : graph.BarrierPackets)
+            {
+                if (packet.PassIndex != passIndex)
+                {
+                    continue;
+                }
+
+                for (const TextureBarrierPacket& textureBarrier : packet.TextureBarriers)
+                {
+                    if (textureBarrier.TextureIndex >= graph.TextureHandles.size())
+                    {
+                        return Core::Err(Core::ErrorCode::OutOfRange);
+                    }
+                }
+
+                for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
+                {
+                    if (bufferBarrier.BufferIndex >= graph.BufferHandles.size())
+                    {
+                        return Core::Err(Core::ErrorCode::OutOfRange);
+                    }
+                }
+
+                if (onBarriers)
+                {
+                    onBarriers(packet);
+                }
+            }
+
+            return Core::Ok();
+        };
 
         for (const std::uint32_t passIndex : graph.TopologicalOrder)
         {
@@ -71,10 +90,22 @@ namespace Extrinsic::Graphics
                 }
             }
 
+            Core::Result barrierResult = emitBarriersForPass(passIndex);
+            if (!barrierResult.has_value())
+            {
+                return barrierResult;
+            }
+
             if (onPass)
             {
                 onPass(passIndex);
             }
+        }
+
+        Core::Result finalBarrierResult = emitBarriersForPass(finalPassIndex);
+        if (!finalBarrierResult.has_value())
+        {
+            return finalBarrierResult;
         }
 
         return Core::Ok();

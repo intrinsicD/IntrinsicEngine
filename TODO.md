@@ -3408,7 +3408,7 @@ public:
 - [x] Allocate/resolve imported resources.
 - [x] For first scaffold, transient resources may be logical-only or allocated through existing texture/buffer managers if available.
 - [x] Execute passes in compiled order.
-- [x] Emit barrier calls before each pass.
+- [x] Emit barrier calls in pass order: before each pass, with imported final-state transitions after the last pass.
 - [x] Null backend should record/observe calls enough for tests without requiring a real GPU.
 - [x] Failed compile prevents execute.
 

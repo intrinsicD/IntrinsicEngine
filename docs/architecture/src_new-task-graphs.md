@@ -105,7 +105,8 @@ Streaming graph semantics differ from frame-local CPU/GPU graphs:
 - imported initial/final state contracts are explicit.
 
 ### Barriers
-For each pass use, compiler resolves previous state to next required state and emits barrier packets before consumer execution.
+For each pass use, compiler resolves previous state to next required state and emits barrier packets immediately before the consuming pass executes.
+Imported resources append a final packet with `PassIndex = the original declared pass count` (the compiler's end-of-graph sentinel); those final-state transitions are emitted after the last pass so present/layout handoff cannot overtake the work that writes the resource.
 
 ### Transient lifetime and aliasing
 For virtual resource $v_i$, define live interval $I_i = [f_i, l_i]$ from first/last use pass indices.

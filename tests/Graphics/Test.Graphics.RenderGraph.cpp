@@ -727,6 +727,44 @@ TEST(GraphicsRenderGraph, ExecutePresentChainRecordsPassOrderAndBarriers)
     EXPECT_FALSE(barrierPasses.empty());
 }
 
+TEST(GraphicsRenderGraph, ExecuteInterleavesBarriersWithPassesAndEmitsFinalBarrierLast)
+{
+    RenderGraph graph;
+    const auto lighting = graph.CreateTexture("Lighting", Extrinsic::RHI::TextureDesc{});
+    const auto backbuffer = graph.ImportBackbuffer("Backbuffer", Extrinsic::RHI::TextureHandle{21u, 3u});
+    const auto lightingPass = graph.AddPass("Lighting", [lighting](RenderGraphBuilder& builder) {
+        (void)builder.Write(lighting, TextureUsage::ColorAttachmentWrite);
+    });
+    const auto compositePass = graph.AddPass("Composite", [lighting, backbuffer](RenderGraphBuilder& builder) {
+        (void)builder.Read(lighting, TextureUsage::ShaderRead);
+        (void)builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+    });
+
+    auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    std::vector<std::string> events{};
+    RenderGraphExecutor executor;
+    auto result = executor.Execute(
+        *compiled,
+        [&events](const std::uint32_t passIndex) { events.push_back("pass(" + std::to_string(passIndex) + ")"); },
+        [&events](const BarrierPacket& packet) { events.push_back("barrier(" + std::to_string(packet.PassIndex) + ")"); });
+
+    EXPECT_TRUE(result.has_value());
+    EXPECT_EQ(compiled->TopologicalOrder.size(), 2u);
+    EXPECT_EQ(lightingPass.Index, 0u);
+    EXPECT_EQ(compositePass.Index, 1u);
+
+    const std::vector<std::string> expected{
+        "barrier(0)",
+        "pass(0)",
+        "barrier(1)",
+        "pass(1)",
+        "barrier(2)",
+    };
+    EXPECT_EQ(events, expected);
+}
+
 TEST(GraphicsRenderGraph, ExecuteFailsWhenBarrierReferencesInvalidResource)
 {
     CompiledRenderGraph compiled{};
