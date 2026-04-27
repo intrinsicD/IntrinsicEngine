@@ -355,11 +355,15 @@ namespace Extrinsic::Graphics
             m_Impl->Passes, [](const RenderPassRecord& pass) { return pass.HasValidationError; });
         if (hasValidationFailure)
         {
-            m_Impl->LastCompileDiagnostic = "RenderGraph validation failed while recording pass resource usage.";
+            const auto failedIt = std::ranges::find_if(
+                m_Impl->Passes, [](const RenderPassRecord& pass) { return pass.HasValidationError; });
+            const std::string passName = (failedIt != m_Impl->Passes.end()) ? failedIt->Name : "<unknown>";
+            m_Impl->LastCompileDiagnostic = "RenderGraph validation failed while recording pass resource usage: pass=\"" +
+                                            passName + "\".";
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
-        const bool invalidPresentTarget = std::ranges::any_of(m_Impl->Passes, [this](const RenderPassRecord& pass) {
+        const auto invalidPresentPassIt = std::ranges::find_if(m_Impl->Passes, [this](const RenderPassRecord& pass) {
             return std::ranges::any_of(pass.TextureAccesses, [this](const TextureAccess& access) {
                 if (access.Usage != TextureUsage::Present)
                 {
@@ -369,9 +373,10 @@ namespace Extrinsic::Graphics
                 return (desc == nullptr) || !desc->Imported || !desc->IsBackbuffer;
             });
         });
-        if (invalidPresentTarget)
+        if (invalidPresentPassIt != m_Impl->Passes.end())
         {
-            m_Impl->LastCompileDiagnostic = "RenderGraph present pass must target an imported backbuffer texture.";
+            m_Impl->LastCompileDiagnostic = "RenderGraph present pass must target an imported backbuffer texture: pass=\"" +
+                                            invalidPresentPassIt->Name + "\".";
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 

@@ -303,6 +303,8 @@ TEST(GraphicsRenderGraph, InvalidExplicitDependencyFailsCompile)
 
     auto compiled = graph.Compile();
     EXPECT_FALSE(compiled.has_value());
+    const std::string& diagnostic = graph.GetLastCompileDiagnostic();
+    EXPECT_NE(diagnostic.find("Dependent"), std::string::npos);
 }
 
 TEST(GraphicsRenderGraph, DependencyCycleReportsPassNamesInDiagnostic)
@@ -338,6 +340,8 @@ TEST(GraphicsRenderGraph, InvalidPresentTargetFailsValidation)
 
     auto compiled = graph.Compile();
     EXPECT_FALSE(compiled.has_value());
+    const std::string& diagnostic = graph.GetLastCompileDiagnostic();
+    EXPECT_NE(diagnostic.find("Present"), std::string::npos);
 }
 
 TEST(GraphicsRenderGraph, PresentOnImportedBackbufferCompiles)
@@ -394,6 +398,32 @@ TEST(GraphicsRenderGraph, PresentChainKeepsProducerPasses)
     EXPECT_EQ(compiled->CulledPassCount, 0u);
     EXPECT_LT(FindOrder(*compiled, lightingPass.Index), FindOrder(*compiled, tonemapPass.Index));
     EXPECT_LT(FindOrder(*compiled, tonemapPass.Index), FindOrder(*compiled, presentPass.Index));
+}
+
+TEST(GraphicsRenderGraph, SelectionOutlineReadDependenciesOrderAfterDepthAndGBuffer)
+{
+    RenderGraph graph;
+    const auto depth = graph.CreateTexture("Depth", Extrinsic::RHI::TextureDesc{});
+    const auto entityId = graph.CreateTexture("EntityId", Extrinsic::RHI::TextureDesc{});
+    const auto post = graph.CreateTexture("Post", Extrinsic::RHI::TextureDesc{});
+
+    const auto depthPass = graph.AddPass("DepthPrepass", [depth](RenderGraphBuilder& builder) {
+        (void)builder.Write(depth, TextureUsage::DepthWrite);
+    });
+    const auto gbufferPass = graph.AddPass("GBuffer", [entityId, depth](RenderGraphBuilder& builder) {
+        (void)builder.Write(entityId, TextureUsage::ColorAttachmentWrite);
+        (void)builder.Read(depth, TextureUsage::DepthRead);
+    });
+    const auto selectionPass = graph.AddPass("SelectionOutline", [entityId, depth, post](RenderGraphBuilder& builder) {
+        (void)builder.Read(entityId, TextureUsage::ShaderRead);
+        (void)builder.Read(depth, TextureUsage::DepthRead);
+        (void)builder.Write(post, TextureUsage::ColorAttachmentWrite);
+    }, true);
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_LT(FindOrder(*compiled, depthPass.Index), FindOrder(*compiled, gbufferPass.Index));
+    EXPECT_LT(FindOrder(*compiled, gbufferPass.Index), FindOrder(*compiled, selectionPass.Index));
 }
 
 TEST(GraphicsRenderGraph, ImportedResourceWriterIsNotCulled)
