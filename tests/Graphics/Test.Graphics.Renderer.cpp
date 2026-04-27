@@ -71,6 +71,7 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     const auto& stats = renderer->GetLastRenderGraphStats();
     ASSERT_TRUE(stats.CompileSucceeded);
     ASSERT_FALSE(stats.DebugDump.empty());
+    EXPECT_GT(stats.CulledPassCount, 0u);
 
     const auto& dump = stats.DebugDump;
     EXPECT_NE(dump.find("name=\"Null.Compute.Prologue\""), std::string::npos);
@@ -82,6 +83,7 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     EXPECT_NE(dump.find("name=\"Null.FXAA\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"Null.SelectionOutline\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"Null.Present\""), std::string::npos);
+    EXPECT_EQ(dump.find("name=\"Null.OptionalDebugView\""), std::string::npos);
     EXPECT_EQ(dump.find("name=\"Null.Picking\""), std::string::npos);
 
     const std::size_t gbufferPos = dump.find("name=\"Null.GBuffer\"");

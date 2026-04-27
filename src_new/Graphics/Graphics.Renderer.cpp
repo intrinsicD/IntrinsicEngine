@@ -476,6 +476,14 @@ namespace Extrinsic::Graphics
                                                               .Usage = RHI::TextureUsage::ColorTarget |
                                                                        RHI::TextureUsage::Sampled,
                                                           });
+            const auto optionalDebug = m_RenderGraph.CreateTexture("Null.OptionalDebug",
+                                                                   RHI::TextureDesc{
+                                                                       .Width = 1u,
+                                                                       .Height = 1u,
+                                                                       .Fmt = RHI::Format::RGBA8_UNORM,
+                                                                       .Usage = RHI::TextureUsage::ColorTarget |
+                                                                                RHI::TextureUsage::Sampled,
+                                                                   });
             const auto picking = m_RenderGraph.CreateBuffer(
                 "Null.Picking",
                 RHI::BufferDesc{
@@ -547,6 +555,9 @@ namespace Extrinsic::Graphics
                 builder.Read(entityId, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(post, TextureUsage::ColorAttachmentWrite);
+            });
+            [[maybe_unused]] const auto passOptionalDebug = m_RenderGraph.AddPass("Null.OptionalDebugView", [optionalDebug](RenderGraphBuilder& builder) {
+                builder.Write(optionalDebug, TextureUsage::ColorAttachmentWrite);
             });
             [[maybe_unused]] const auto passImGui = m_RenderGraph.AddPass("Null.ImGui", [post](RenderGraphBuilder& builder) {
                 builder.Read(post, TextureUsage::ShaderRead);

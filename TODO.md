@@ -3489,7 +3489,7 @@ public:
 - [x] Deferred lighting feeds postprocess.
 - [x] Postprocess feeds present.
 - [x] Selection outline reads entity ID/depth resources.
-- [ ] Pass culling removes disabled/unused optional passes.
+- [x] Pass culling removes disabled/unused optional passes.
 
 ## T052 — Import persistent GPU world resources into RenderGraph
 
@@ -3506,8 +3506,8 @@ public:
 
 **Tests:**
 
-- [ ] Imported buffers are not destroyed by graph reset.
-- [ ] Imported buffers cannot alias transient buffers.
+- [x] Imported buffers are not destroyed by graph reset.
+- [x] Imported buffers cannot alias transient buffers.
 - [x] Culling write -> draw indirect read barrier is generated.
 - [x] Lighting pass reads light buffer.
 
