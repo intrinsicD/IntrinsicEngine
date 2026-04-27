@@ -51,6 +51,7 @@ namespace Extrinsic::Graphics
             std::span<const RenderPassRecord> passes,
             std::span<const TextureResourceDesc> textures,
             std::span<const BufferResourceDesc> buffers);
+        [[nodiscard]] static const std::string& GetLastCompileDiagnostic();
     };
 
     export [[nodiscard]] std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled);

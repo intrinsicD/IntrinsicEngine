@@ -21,6 +21,8 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
+        thread_local std::string g_LastCompileDiagnostic{};
+
         [[nodiscard]] constexpr TextureBarrierState ToTextureBarrierState(const TextureUsage usage)
         {
             switch (usage)
@@ -169,6 +171,7 @@ namespace Extrinsic::Graphics
         const std::span<const TextureResourceDesc> textures,
         const std::span<const BufferResourceDesc> buffers)
     {
+        g_LastCompileDiagnostic.clear();
         const std::uint32_t passCount = static_cast<std::uint32_t>(passes.size());
         const std::uint32_t resourceCount = static_cast<std::uint32_t>(textures.size() + buffers.size());
         if (passCount == 0)
@@ -221,6 +224,7 @@ namespace Extrinsic::Graphics
             {
                 if (!dependency.IsValid() || dependency.Index >= passCount)
                 {
+                    g_LastCompileDiagnostic = "RenderGraph explicit dependency references an invalid pass.";
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
                 AddEdge(dependency.Index, passIndex, adjacency, indegree, dedup);
@@ -230,6 +234,7 @@ namespace Extrinsic::Graphics
             {
                 if (access.Ref.Index >= textureStates.size())
                 {
+                    g_LastCompileDiagnostic = "RenderGraph texture access references an invalid texture resource.";
                     return std::unexpected(Core::ErrorCode::OutOfRange);
                 }
                 if (access.Write)
@@ -247,6 +252,7 @@ namespace Extrinsic::Graphics
             {
                 if (access.Ref.Index >= bufferStates.size())
                 {
+                    g_LastCompileDiagnostic = "RenderGraph buffer access references an invalid buffer resource.";
                     return std::unexpected(Core::ErrorCode::OutOfRange);
                 }
                 if (access.Write)
@@ -270,10 +276,12 @@ namespace Extrinsic::Graphics
             {
                 if (!pass.RenderPass.ColorTargets.empty() && !hasColorAttachmentWrite)
                 {
+                    g_LastCompileDiagnostic = "RenderGraph render-pass color attachment declaration is missing a color write usage.";
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
                 if (pass.RenderPass.Depth.Target.IsValid() && !hasDepthAccess)
                 {
+                    g_LastCompileDiagnostic = "RenderGraph render-pass depth attachment declaration is missing depth usage.";
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
             }
@@ -404,6 +412,28 @@ namespace Extrinsic::Graphics
 
         if (order.size() != livePassCount)
         {
+            std::ostringstream cycle;
+            cycle << "RenderGraph cycle detected among live passes: ";
+            bool first = true;
+            for (std::uint32_t i = 0; i < passCount; ++i)
+            {
+                if (!live[i] || liveIndegree[i] == 0u)
+                {
+                    continue;
+                }
+                if (!first)
+                {
+                    cycle << ", ";
+                }
+                first = false;
+                cycle << '"' << passes[i].Name << "\"(index=" << i << ")";
+            }
+            if (first)
+            {
+                cycle << "<unknown>";
+            }
+            g_LastCompileDiagnostic = cycle.str();
+
             CompiledRenderGraph failed{
                 .PassCount = livePassCount,
                 .CulledPassCount = passCount - livePassCount,
@@ -414,7 +444,6 @@ namespace Extrinsic::Graphics
                 .TextureLifetimes = std::move(textureLifetimes),
                 .BufferLifetimes = std::move(bufferLifetimes),
             };
-            failed.Diagnostic = "RenderGraph cycle detected.";
             return std::unexpected(Core::ErrorCode::InvalidState);
         }
 
@@ -566,6 +595,11 @@ namespace Extrinsic::Graphics
             .BufferImported = std::move(bufferImported),
             .BarrierPackets = std::move(barrierPackets),
         };
+    }
+
+    const std::string& RenderGraphCompiler::GetLastCompileDiagnostic()
+    {
+        return g_LastCompileDiagnostic;
     }
 
     std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled)

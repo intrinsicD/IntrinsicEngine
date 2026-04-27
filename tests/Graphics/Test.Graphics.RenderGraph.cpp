@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+#include <vector>
 
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.Handles;
@@ -243,6 +244,23 @@ TEST(GraphicsRenderGraph, ExplicitDependencyOrdersIndependentPasses)
     EXPECT_EQ(compiled->EdgeCount, 1u);
 }
 
+TEST(GraphicsRenderGraph, IndependentSideEffectPassesCompileInDeterministicOrder)
+{
+    RenderGraph graph;
+    const auto first = graph.AddPass("First", [](RenderGraphBuilder& builder) { builder.SideEffect(); }, false);
+    const auto second = graph.AddPass("Second", [](RenderGraphBuilder& builder) { builder.SideEffect(); }, false);
+
+    auto compiledA = graph.Compile();
+    ASSERT_TRUE(compiledA.has_value());
+    ASSERT_EQ(compiledA->TopologicalOrder.size(), 2u);
+    EXPECT_EQ(compiledA->TopologicalOrder[0], first.Index);
+    EXPECT_EQ(compiledA->TopologicalOrder[1], second.Index);
+
+    auto compiledB = graph.Compile();
+    ASSERT_TRUE(compiledB.has_value());
+    EXPECT_EQ(compiledA->TopologicalOrder, compiledB->TopologicalOrder);
+}
+
 TEST(GraphicsRenderGraph, InvalidExplicitDependencyFailsCompile)
 {
     RenderGraph graph;
@@ -261,6 +279,29 @@ TEST(GraphicsRenderGraph, InvalidExplicitDependencyFailsCompile)
 
     auto compiled = graph.Compile();
     EXPECT_FALSE(compiled.has_value());
+}
+
+TEST(GraphicsRenderGraph, DependencyCycleReportsPassNamesInDiagnostic)
+{
+    std::vector<RenderPassRecord> passes{};
+    RenderPassRecord passA{};
+    passA.Name = "PassA";
+    passA.SideEffect = true;
+    passA.ExplicitDependencies.push_back(PassRef{.Index = 1u, .Generation = 1u});
+    passes.push_back(passA);
+
+    RenderPassRecord passB{};
+    passB.Name = "PassB";
+    passB.SideEffect = true;
+    passB.ExplicitDependencies.push_back(PassRef{.Index = 0u, .Generation = 1u});
+    passes.push_back(passB);
+
+    auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+    ASSERT_FALSE(compiled.has_value());
+    const std::string& diagnostic = RenderGraphCompiler::GetLastCompileDiagnostic();
+    EXPECT_FALSE(diagnostic.empty());
+    EXPECT_NE(diagnostic.find("PassA"), std::string::npos);
+    EXPECT_NE(diagnostic.find("PassB"), std::string::npos);
 }
 
 TEST(GraphicsRenderGraph, InvalidPresentTargetFailsValidation)

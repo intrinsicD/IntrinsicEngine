@@ -3325,18 +3325,18 @@ public:
   - [x] explicit pass dependency, if API supports it;
   - [ ] queue handoff placeholder edge, even if only one queue exists initially.
 - [x] Topologically sort passes using shared compiler substrate or a Graphics-specific wrapper around it.
-- [ ] Detect cycles with pass/resource names.
+- [x] Detect cycles with pass/resource names.
 - [x] Build immutable compiled plan.
 
 **Tests:**
 
-- [ ] Two independent passes can remain same layer or adjacent deterministic order.
+- [x] Two independent passes can remain same layer or adjacent deterministic order.
 - [x] Write color then shader-read creates dependency.
 - [x] Read then write creates dependency.
 - [x] Write then write creates dependency.
 - [x] Invalid present target fails validation.
 - [ ] Missing resource declaration fails if execution tries to resolve it.
-- [ ] Cycle reports pass names.
+- [x] Cycle reports pass names.
 
 ## T044 — Implement basic lifetime analysis and pass culling
 
@@ -3516,7 +3516,7 @@ public:
 
 **Tasks:**
 
-- [ ] Log compile failures with pass/resource names.
+- [x] Log compile failures with pass/resource names.
 - [ ] Expose per-frame graph stats:
   - [x] pass count;
   - [x] culled pass count;
