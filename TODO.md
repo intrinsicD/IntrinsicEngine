@@ -3717,9 +3717,9 @@ public:
 
 **Acceptance criteria:**
 
-- [ ] Inventory reflects every new `.cppm` module/partition.
-- [ ] README public module surfaces match CMake files.
-- [ ] Architecture docs and implementation names match.
+- [x] Inventory reflects every new `.cppm` module/partition.
+- [x] README public module surfaces match CMake files.
+- [x] Architecture docs and implementation names match.
 
 ## T081 — Add post-merge audit checklist result
 
@@ -3727,16 +3727,16 @@ public:
 
 **Audit items:**
 
-- [ ] No new dependency cycle between `Core`, `Assets`, `ECS`, `Graphics`, `Runtime`, `Platform`.
-- [ ] `Graphics` does not import `ECS` for RenderGraph.
-- [ ] `Runtime` does not inspect GPU resources/barriers.
-- [ ] `Core` does not expose GPU layout/barrier semantics.
-- [ ] Streaming worker closures cannot mutate ECS/GPU directly.
-- [ ] CPU graph uses graph-local wait.
-- [ ] Single-thread fallback works.
-- [ ] Null/headless paths still pass.
-- [ ] Cycle diagnostics include pass/task names.
-- [ ] Build/test commands are listed in PR notes.
+- [x] No new dependency cycle between `Core`, `Assets`, `ECS`, `Graphics`, `Runtime`, `Platform`.
+- [x] `Graphics` does not import `ECS` for RenderGraph.
+- [x] `Runtime` does not inspect GPU resources/barriers.
+- [x] `Core` does not expose GPU layout/barrier semantics.
+- [x] Streaming worker closures cannot mutate ECS/GPU directly.
+- [x] CPU graph uses graph-local wait.
+- [x] Single-thread fallback works.
+- [x] Null/headless paths still pass.
+- [x] Cycle diagnostics include pass/task names.
+- [x] Build/test commands are listed in PR notes.
 
 ## T082 — Final end-to-end acceptance tests
 
