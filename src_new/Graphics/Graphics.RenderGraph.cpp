@@ -59,6 +59,7 @@ namespace Extrinsic::Graphics
         TransientAllocator Transients{};
         bool TransientAliasingEnabled = true;
         std::uint32_t Generation = 1;
+        std::string LastCompileDiagnostic{};
     };
 
     RenderGraphBuilder::RenderGraphBuilder(
@@ -348,10 +349,13 @@ namespace Extrinsic::Graphics
             return RenderGraphCompiler::Compile({}, {}, {});
         }
 
+        m_Impl->LastCompileDiagnostic.clear();
+
         const auto hasValidationFailure = std::ranges::any_of(
             m_Impl->Passes, [](const RenderPassRecord& pass) { return pass.HasValidationError; });
         if (hasValidationFailure)
         {
+            m_Impl->LastCompileDiagnostic = "RenderGraph validation failed while recording pass resource usage.";
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
@@ -367,14 +371,18 @@ namespace Extrinsic::Graphics
         });
         if (invalidPresentTarget)
         {
+            m_Impl->LastCompileDiagnostic = "RenderGraph present pass must target an imported backbuffer texture.";
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
         auto compiled = RenderGraphCompiler::Compile(m_Impl->Passes, m_Impl->Textures, m_Impl->Buffers);
         if (!compiled.has_value())
         {
+            m_Impl->LastCompileDiagnostic = RenderGraphCompiler::GetLastCompileDiagnostic();
             return compiled;
         }
+
+        m_Impl->LastCompileDiagnostic = compiled->Diagnostic;
 
         auto BytesPerPixel = [](const RHI::Format fmt) -> std::uint64_t {
             switch (fmt)
@@ -551,6 +559,16 @@ namespace Extrinsic::Graphics
         }
 
         return compiled;
+    }
+
+    const std::string& RenderGraph::GetLastCompileDiagnostic() const
+    {
+        static const std::string empty{};
+        if (!m_Impl)
+        {
+            return empty;
+        }
+        return m_Impl->LastCompileDiagnostic;
     }
 
     Core::Result RenderGraph::ValidateTextureRef(const TextureRef ref) const

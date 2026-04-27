@@ -52,6 +52,7 @@ namespace Extrinsic::Graphics
         [[nodiscard]] BufferRef CreateBuffer(std::string name, const RHI::BufferDesc& desc);
 
         [[nodiscard]] Core::Expected<CompiledRenderGraph> Compile() const;
+        [[nodiscard]] const std::string& GetLastCompileDiagnostic() const;
         void SetTransientAliasingEnabled(bool enabled);
         [[nodiscard]] bool IsTransientAliasingEnabled() const;
         [[nodiscard]] Core::Result ValidateTextureRef(TextureRef ref) const;
