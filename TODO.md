@@ -2728,7 +2728,7 @@ Hazard rules:
 - [x] Write then WeakRead forces weak reader after writer.
 - [x] Multiple readers then writer emits all reader edges.
 - [x] Duplicate accesses do not duplicate edge count.
-- [ ] 10,000-node hazard stress test completes deterministically.
+- [x] 10,000-node hazard stress test completes deterministically.
 
 **Acceptance criteria:**
 
@@ -2763,7 +2763,7 @@ Hazard rules:
 - [x] Multiple signalers before wait produce fan-in.
 - [x] Independent labels do not interfere.
 - [x] Signal after wait follows documented behavior.
-- [ ] Label cycle reports `InvalidState` and includes pass names in diagnostics.
+- [x] Label cycle reports `InvalidState` and includes pass names in diagnostics.
 
 ## T013 — Add cycle diagnostics with pass/resource context
 
@@ -2786,7 +2786,7 @@ Hazard rules:
 - [x] Explicit A -> B -> A cycle returns invalid state.
 - [x] Resource-derived cycle, if constructible through explicit plus hazard edges, includes both pass names.
 - [x] Label-derived cycle includes label name or label ID.
-- [ ] Cycle diagnostic does not allocate unbounded memory on large graphs.
+- [x] Cycle diagnostic does not allocate unbounded memory on large graphs.
 
 ## T014 — Refactor `DomainTaskGraph` through shared compiler
 
@@ -2798,7 +2798,7 @@ Hazard rules:
 - [x] Route `PendingTaskDesc::resources` into `ResourceHazardBuilder`.
 - [x] Preserve priority and queue-budget lane assignment.
 - [x] Preserve stable deterministic ready-set ordering.
-- [ ] Report accurate `ScheduleStats`:
+- [x] Report accurate `ScheduleStats`:
   - [x] task count;
   - [x] explicit edge count;
   - [x] hazard edge count;
@@ -2809,7 +2809,7 @@ Hazard rules:
 
 **Tests:**
 
-- [ ] Existing `Test.Core.DagScheduler.cpp` still passes.
+- [x] Existing `Test.Core.DagScheduler.cpp` still passes.
 - [x] Add raw `DomainTaskGraph` tests for resource hazards.
 - [x] Add stats tests checking edge counts and layer counts.
 - [x] Add lane assignment tests for CPU, GPU, and Streaming budgets.
@@ -2829,12 +2829,12 @@ Hazard rules:
 - [x] `ExecutePass(uint32_t)` validates compiled state and index.
 - [x] `TakePassExecute(uint32_t)` remains safe for streaming handoff until streaming executor replaces this pattern.
 - [ ] `Reset()` is illegal or debug-asserted while execution token is live.
-- [ ] `GetScheduleStats()` returns meaningful stats, not only task count.
+- [x] `GetScheduleStats()` returns meaningful stats, not only task count.
 
 **Tests:**
 
 - [x] Existing `Test.Core.TaskGraph.cpp` still passes.
-- [ ] Closure execution order follows resource hazards.
+- [x] Closure execution order follows resource hazards.
 - [x] `BuildPlan()` batches match topological layers.
 - [x] `Reset()` clears resources, labels, stats, and pass closures.
 - [x] `TakePassExecute()` moves only the target pass closure and leaves other passes valid.

@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <queue>
 #include <sstream>
@@ -39,6 +40,7 @@ namespace Extrinsic::Core::Dag
             }
 
         using TaskList = std::vector<CachedTask>;
+        constexpr std::size_t kMaxCycleDiagnosticNodes = 32u;
 
         // HLFET (Highest Levels First with Estimated Times): among all
         // ready tasks, emit the one with the most urgent priority, breaking
@@ -129,6 +131,42 @@ namespace Extrinsic::Core::Dag
                     outStats.hazardEdgeCount += 1;
                 edgeReasons.emplace(key, reason);
             };
+            const auto appendCycleDiagnostic = [&](std::ostringstream& oss,
+                                                    const std::vector<std::size_t>& cycle,
+                                                    const bool truncated)
+            {
+                oss << ": ";
+                const std::size_t edgeCount = (cycle.size() > 1u) ? (cycle.size() - 1u) : 0u;
+                for (std::size_t i = 0; i < edgeCount; ++i)
+                {
+                    const auto from = cycle[i];
+                    const auto to = cycle[i + 1u];
+                    oss << taskLabel(from);
+                    const auto key = encodeEdge(from, to);
+                    if (const auto reasonIt = edgeReasons.find(key); reasonIt != edgeReasons.end())
+                    {
+                        oss << " --";
+                        switch (reasonIt->second)
+                        {
+                        case EdgeReason::ExplicitDependency: oss << "explicit"; break;
+                        case EdgeReason::HazardRaw: oss << "RAW"; break;
+                        case EdgeReason::HazardWaw: oss << "WAW"; break;
+                        case EdgeReason::HazardWar: oss << "WAR"; break;
+                        }
+                        oss << "--> ";
+                    }
+                    else
+                    {
+                        oss << " --> ";
+                    }
+                }
+
+                if (!cycle.empty())
+                    oss << taskLabel(cycle.back());
+
+                if (truncated)
+                    oss << " ... (truncated)";
+            };
             for (std::size_t i = 0; i < N; ++i)
             {
                 for (const auto dep : tasks[i].dependsOn)
@@ -192,6 +230,7 @@ namespace Extrinsic::Core::Dag
                     std::vector<uint8_t> color(N, 0);
                     std::vector<std::size_t> stack{};
                     std::vector<std::size_t> cycle{};
+                    bool cycleTruncated = false;
                     std::function<bool(std::size_t)> dfs = [&](std::size_t node) -> bool
                     {
                         color[node] = 1;
@@ -208,8 +247,24 @@ namespace Extrinsic::Core::Dag
                                 const auto it = std::find(stack.begin(), stack.end(), next);
                                 if (it != stack.end())
                                 {
-                                    cycle.assign(it, stack.end());
-                                    cycle.push_back(next);
+                                    const auto cycleStart = static_cast<std::size_t>(std::distance(stack.begin(), it));
+                                    const auto stackNodeCount = stack.size() - cycleStart;
+                                    const auto cycleNodeCount = stackNodeCount + 1u;
+                                    if (cycleNodeCount <= kMaxCycleDiagnosticNodes)
+                                    {
+                                        cycle.reserve(cycleNodeCount);
+                                        for (std::size_t idx = cycleStart; idx < stack.size(); ++idx)
+                                            cycle.push_back(stack[idx]);
+                                        cycle.push_back(next);
+                                    }
+                                    else
+                                    {
+                                        cycle.reserve(kMaxCycleDiagnosticNodes);
+                                        const auto emitCount = std::min<std::size_t>(stackNodeCount, kMaxCycleDiagnosticNodes);
+                                        for (std::size_t idx = 0; idx < emitCount; ++idx)
+                                            cycle.push_back(stack[cycleStart + idx]);
+                                        cycleTruncated = true;
+                                    }
                                 }
                                 return true;
                             }
@@ -227,32 +282,35 @@ namespace Extrinsic::Core::Dag
                     std::ostringstream oss;
                     oss << "Cycle detected";
                     if (!cycle.empty())
+                        appendCycleDiagnostic(oss, cycle, cycleTruncated);
+                    else
                     {
-                        oss << ": ";
-                        for (std::size_t i = 0; i + 1 < cycle.size(); ++i)
+                        constexpr std::size_t kMaxUnresolvedNodes = 16u;
+                        std::vector<bool> inTopo(N, false);
+                        for (const auto node : topo)
+                            inTopo[node] = true;
+
+                        std::size_t unresolvedCount = 0;
+                        for (std::size_t i = 0; i < N; ++i)
                         {
-                            const auto from = cycle[i];
-                            const auto to = cycle[i + 1];
-                            oss << taskLabel(from);
-                            const auto key = encodeEdge(from, to);
-                            if (const auto reasonIt = edgeReasons.find(key); reasonIt != edgeReasons.end())
-                            {
-                                oss << " --";
-                                switch (reasonIt->second)
-                                {
-                                case EdgeReason::ExplicitDependency: oss << "explicit"; break;
-                                case EdgeReason::HazardRaw: oss << "RAW"; break;
-                                case EdgeReason::HazardWaw: oss << "WAW"; break;
-                                case EdgeReason::HazardWar: oss << "WAR"; break;
-                                }
-                                oss << "--> ";
-                            }
-                            else
-                            {
-                                oss << " --> ";
-                            }
+                            if (!inTopo[i])
+                                ++unresolvedCount;
                         }
-                        oss << taskLabel(cycle.back());
+
+                        oss << ": ";
+                        std::size_t emitted = 0;
+                        for (std::size_t i = 0; i < N && emitted < kMaxUnresolvedNodes; ++i)
+                        {
+                            if (inTopo[i])
+                                continue;
+
+                            if (emitted > 0u)
+                                oss << ", ";
+                            oss << taskLabel(i);
+                            ++emitted;
+                        }
+                        if (unresolvedCount > emitted)
+                            oss << " ... (" << (unresolvedCount - emitted) << " more)";
                     }
                     outStats.lastDiagnostic = oss.str();
                     return Err<std::vector<PlanTask>>(ErrorCode::InvalidState);

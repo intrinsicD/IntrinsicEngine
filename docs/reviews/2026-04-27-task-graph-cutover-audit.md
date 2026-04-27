@@ -29,3 +29,14 @@ This audit records the current post-merge status requested by `TODO.md` (T081) f
 
 - This audit is scoped to the `src_new` task-graph migration documents and module boundaries.
 - Remaining TODO validation items requiring broader end-to-end environment coverage (e.g., Vulkan validation path) remain tracked separately in `TODO.md` Phase 6/8 checklists.
+
+## Validation
+
+- `cmake --preset dev`
+  - Result: failed on the host `cmake` 3.22.1 because `CMakePresets.json` uses a newer preset schema.
+- `/home/alex/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/bin/cmake -S . -B build/dev-offline -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang-22 -DCMAKE_CXX_COMPILER=clang++-22 -DINTRINSIC_BUILD_SANDBOX=ON -DINTRINSIC_BUILD_TESTS=ON -DINTRINSIC_ENABLE_SANITIZERS=ON -DINTRINSIC_ENABLE_CUDA=OFF -DINTRINSIC_OFFLINE_DEPS=ON`
+  - Result: succeeded.
+- `/home/alex/.local/share/JetBrains/Toolbox/apps/clion/bin/cmake/linux/x64/bin/cmake --build build/dev-offline --target ExtrinsicCoreTests -j2`
+  - Result: succeeded.
+- `env LSAN_OPTIONS='suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp:fast_unwind_on_malloc=0:detect_leaks=0' ASAN_OPTIONS='symbolize=1:detect_leaks=0:fast_unwind_on_malloc=0' ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer ./build/dev-offline/bin/ExtrinsicCoreTests --gtest_brief=1`
+  - Result: succeeded; `153` tests passed.

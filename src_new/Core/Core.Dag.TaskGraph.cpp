@@ -4,6 +4,7 @@ module;
 #include <atomic>
 #include <chrono>
 #include <cassert>
+#include <iterator>
 #include <mutex>
 #include <cstdint>
 #include <expected>
@@ -79,29 +80,26 @@ namespace Extrinsic::Core::Dag
             std::uint32_t LabelValue = 0;
         };
 
+        constexpr std::size_t kMaxCycleDiagnosticNodes = 32u;
+
+        template <typename LabelFn>
         void AppendCycleDiagnostic(
             const std::vector<std::uint32_t>& cycle,
-            const std::vector<std::string>& passNames,
-            const std::vector<std::uint32_t>& taskIds,
+            const bool truncated,
+            LabelFn&& taskLabel,
             const std::unordered_map<std::uint64_t, EdgeReasonInfo>& edgeReasons,
             std::string* outDiagnostic)
         {
             if (!outDiagnostic)
                 return;
 
-            auto taskLabel = [&](const std::uint32_t index) -> std::string
-            {
-                if (index < passNames.size())
-                    return passNames[index];
-                return std::to_string(taskIds[index]);
-            };
-
             std::ostringstream oss;
             oss << "Cycle detected: ";
-            for (std::size_t i = 0; i < cycle.size(); ++i)
+            const std::size_t edgeCount = (cycle.size() > 1u) ? (cycle.size() - 1u) : 0u;
+            for (std::size_t i = 0; i < edgeCount; ++i)
             {
                 const auto from = cycle[i];
-                const auto next = cycle[(i + 1u) % cycle.size()];
+                const auto next = cycle[i + 1u];
                 oss << taskLabel(from);
                 const auto key = (static_cast<std::uint64_t>(from) << 32) | static_cast<std::uint64_t>(next);
                 if (const auto reasonIt = edgeReasons.find(key); reasonIt != edgeReasons.end())
@@ -125,7 +123,11 @@ namespace Extrinsic::Core::Dag
             }
             if (!cycle.empty())
             {
-                oss << taskLabel(cycle.front());
+                oss << taskLabel(cycle.back());
+            }
+            if (truncated)
+            {
+                oss << " ... (truncated)";
             }
             *outDiagnostic = oss.str();
         }
@@ -347,16 +349,7 @@ namespace Extrinsic::Core::Dag
                     std::vector<std::uint8_t> color(nodeCount, 0);
                     std::vector<std::uint32_t> cycle{};
                     std::vector<std::uint32_t> stack{};
-
-                    std::vector<std::string> passNames{};
-                    passNames.reserve(nodeCount);
-                    std::vector<std::uint32_t> taskIds{};
-                    taskIds.reserve(nodeCount);
-                    for (std::uint32_t i = 0; i < nodeCount; ++i)
-                    {
-                        passNames.push_back(passes[i].Name);
-                        taskIds.push_back(i);
-                    }
+                    bool cycleTruncated = false;
 
                     std::function<bool(std::uint32_t)> dfs = [&](const std::uint32_t node) -> bool
                     {
@@ -377,8 +370,24 @@ namespace Extrinsic::Core::Dag
                                 const auto it = std::find(stack.begin(), stack.end(), next);
                                 if (it != stack.end())
                                 {
-                                    cycle.assign(it, stack.end());
-                                    cycle.push_back(next);
+                                    const auto cycleStart = static_cast<std::size_t>(std::distance(stack.begin(), it));
+                                    const auto stackNodeCount = stack.size() - cycleStart;
+                                    const auto cycleNodeCount = stackNodeCount + 1u;
+                                    if (cycleNodeCount <= kMaxCycleDiagnosticNodes)
+                                    {
+                                        cycle.reserve(cycleNodeCount);
+                                        for (std::size_t idx = cycleStart; idx < stack.size(); ++idx)
+                                            cycle.push_back(stack[idx]);
+                                        cycle.push_back(next);
+                                    }
+                                    else
+                                    {
+                                        cycle.reserve(kMaxCycleDiagnosticNodes);
+                                        const auto emitCount = std::min<std::size_t>(stackNodeCount, kMaxCycleDiagnosticNodes);
+                                        for (std::size_t idx = 0; idx < emitCount; ++idx)
+                                            cycle.push_back(stack[cycleStart + idx]);
+                                        cycleTruncated = true;
+                                    }
                                 }
                                 return true;
                             }
@@ -397,19 +406,47 @@ namespace Extrinsic::Core::Dag
 
                     if (!cycle.empty())
                     {
-                        AppendCycleDiagnostic(cycle, passNames, taskIds, edgeReasons, &compiled.Stats.lastDiagnostic);
+                        auto labelFor = [&](const std::uint32_t index) -> std::string
+                        {
+                            if (index < passes.size() && !passes[index].Name.empty())
+                                return std::string(passes[index].Name);
+                            return std::to_string(index);
+                        };
+                        AppendCycleDiagnostic(cycle, cycleTruncated, labelFor, edgeReasons, &compiled.Stats.lastDiagnostic);
                     }
                     else
                     {
-                        std::string unresolved;
+                        constexpr std::size_t kMaxUnresolvedNodes = 16u;
+                        std::vector<bool> inTopo(nodeCount, false);
+                        for (const auto node : topo)
+                            inTopo[node] = true;
+
+                        std::size_t unresolvedCount = 0;
                         for (std::uint32_t i = 0; i < nodeCount; ++i)
                         {
-                            if (std::find(topo.begin(), topo.end(), i) != topo.end())
-                                continue;
-                            unresolved += passes[i].Name;
-                            unresolved += ", ";
+                            if (!inTopo[i])
+                                ++unresolvedCount;
                         }
-                        compiled.Stats.lastDiagnostic = "Cycle detected in task graph. Unresolved nodes: " + unresolved;
+
+                        std::ostringstream unresolved;
+                        unresolved << "Cycle detected in task graph. Unresolved nodes: ";
+                        std::size_t emitted = 0;
+                        for (std::uint32_t i = 0; i < nodeCount && emitted < kMaxUnresolvedNodes; ++i)
+                        {
+                            if (inTopo[i])
+                                continue;
+
+                            if (emitted > 0u)
+                                unresolved << ", ";
+                            if (!passes[i].Name.empty())
+                                unresolved << passes[i].Name;
+                            else
+                                unresolved << i;
+                            ++emitted;
+                        }
+                        if (unresolvedCount > emitted)
+                            unresolved << " ... (" << (unresolvedCount - emitted) << " more)";
+                        compiled.Stats.lastDiagnostic = unresolved.str();
                     }
 
                     if (outDiagnostic)

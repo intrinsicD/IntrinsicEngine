@@ -233,6 +233,37 @@ TEST(CoreTaskGraph, LabelDependencyCycleIncludesLabelId)
     EXPECT_NE(diagnostic.find(std::to_string(kLabel.Value)), std::string::npos);
 }
 
+TEST(CoreTaskGraph, LargeCycleDiagnosticIsBounded)
+{
+    TaskGraph graph(QueueDomain::Cpu);
+    constexpr std::uint32_t kPassCount = 1024u;
+
+    for (std::uint32_t i = 0; i < kPassCount; ++i)
+    {
+        const std::string name = "Pass_" + std::to_string(i);
+        graph.AddPass(name,
+            [i](TaskGraphBuilder& b)
+            {
+                if (i == 0u)
+                    b.DependsOn(1023u);
+                else
+                    b.DependsOn(i - 1u);
+            },
+            []() {});
+    }
+
+    const auto compile = graph.Compile();
+    ASSERT_FALSE(compile.has_value());
+    EXPECT_EQ(compile.error(), ErrorCode::InvalidState);
+
+    const auto diagnostic = graph.GetScheduleStats().lastDiagnostic;
+    EXPECT_NE(diagnostic.find("Cycle detected"), std::string::npos);
+    EXPECT_NE(diagnostic.find("Pass_0"), std::string::npos);
+    EXPECT_NE(diagnostic.find("Pass_1"), std::string::npos);
+    EXPECT_NE(diagnostic.find("truncated"), std::string::npos);
+    EXPECT_LT(diagnostic.size(), 4096u);
+}
+
 TEST(CoreTaskGraph, IndependentLabelsDoNotInterfere)
 {
     TaskGraph graph(QueueDomain::Cpu);

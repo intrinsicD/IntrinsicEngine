@@ -53,7 +53,7 @@ function(intrinsic_test_executable name)
     gtest_discover_tests(${name}
         PROPERTIES
         ENVIRONMENT "${_intrinsic_test_env}"
-        DISCOVERY_MODE POST_BUILD
+        DISCOVERY_MODE PRE_TEST
     )
 endfunction()
 

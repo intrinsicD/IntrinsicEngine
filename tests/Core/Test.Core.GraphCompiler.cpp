@@ -2,6 +2,7 @@
 
 #include <array>
 #include <limits>
+#include <string>
 #include <span>
 #include <vector>
 
@@ -173,6 +174,42 @@ TEST(CoreGraphCompiler, DeterministicOverRepeatedCompiles)
             EXPECT_EQ(current[k].topoOrder, baseline[k].topoOrder);
         }
     }
+}
+
+TEST(CoreGraphCompiler, LargeCycleDiagnosticIsBounded)
+{
+    auto graph = CreateDomainTaskGraph(QueueDomain::Cpu);
+    ASSERT_NE(graph, nullptr);
+
+    constexpr std::uint32_t kTaskCount = 1024u;
+    std::vector<TaskId> ids;
+    ids.reserve(kTaskCount);
+    for (std::uint32_t i = 0; i < kTaskCount; ++i)
+        ids.push_back(TaskId{i, 1});
+
+    for (std::uint32_t i = 0; i < kTaskCount; ++i)
+    {
+        const TaskId dep = (i == 0u) ? ids.back() : ids[i - 1u];
+        const std::array<TaskId, 1> deps{dep};
+        const std::string name = "Task_" + std::to_string(i);
+        ASSERT_TRUE(graph->Submit(PendingTaskDesc{
+            .id = ids[i],
+            .debugName = name,
+            .domain = QueueDomain::Cpu,
+            .dependsOn = std::span<const TaskId>(deps),
+        }).has_value());
+    }
+
+    const auto plan = graph->BuildPlan(BuildConfig{});
+    ASSERT_FALSE(plan.has_value());
+    EXPECT_EQ(plan.error(), Extrinsic::Core::ErrorCode::InvalidState);
+
+    const auto stats = graph->GetLastStats();
+    EXPECT_NE(stats.lastDiagnostic.find("Cycle detected"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("Task_0"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("Task_1"), std::string::npos);
+    EXPECT_NE(stats.lastDiagnostic.find("truncated"), std::string::npos);
+    EXPECT_LT(stats.lastDiagnostic.size(), 4096u);
 }
 
 TEST(CoreGraphCompiler, ResourceHazardRawOrdersWriterBeforeReader)
