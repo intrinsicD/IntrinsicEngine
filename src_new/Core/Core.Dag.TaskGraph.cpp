@@ -622,8 +622,32 @@ namespace Extrinsic::Core::Dag
         {
             std::vector<std::atomic<uint32_t>> RemainingDeps{};
             std::vector<std::atomic<uint8_t>> Dispatched{};
-            std::vector<std::uint32_t> MainThreadQueue{};
+            struct MainThreadReadyEntry
+            {
+                std::uint8_t Priority = 0u;
+                std::uint32_t EstimatedCost = 1u;
+                std::uint32_t InsertionOrder = 0u;
+                std::uint32_t PassIndex = 0u;
+            };
+
+            struct MainThreadReadyCompare
+            {
+                [[nodiscard]] bool operator()(const MainThreadReadyEntry& a,
+                                              const MainThreadReadyEntry& b) const noexcept
+                {
+                    if (a.Priority != b.Priority)
+                        return a.Priority > b.Priority;
+                    if (a.EstimatedCost != b.EstimatedCost)
+                        return a.EstimatedCost < b.EstimatedCost;
+                    return a.InsertionOrder > b.InsertionOrder;
+                }
+            };
+
+            std::priority_queue<MainThreadReadyEntry,
+                                std::vector<MainThreadReadyEntry>,
+                                MainThreadReadyCompare> MainThreadQueue{};
             std::mutex MainThreadQueueMutex{};
+            std::atomic<std::uint32_t> NextInsertionOrder{0u};
             Core::Tasks::CounterEvent Done{};
 
             explicit ExecutionState(std::uint32_t taskCount)
@@ -934,7 +958,12 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                 {
                     {
                         std::scoped_lock lock(state.MainThreadQueueMutex);
-                        state.MainThreadQueue.push_back(passIndex);
+                        state.MainThreadQueue.push(ExecutionState::MainThreadReadyEntry{
+                            .Priority = static_cast<std::uint8_t>(options.Priority),
+                            .EstimatedCost = options.EstimatedCost,
+                            .InsertionOrder = state.NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
+                            .PassIndex = passIndex,
+                        });
                     }
                 }
             };
@@ -952,8 +981,8 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                     std::scoped_lock lock(state.MainThreadQueueMutex);
                     if (!state.MainThreadQueue.empty())
                     {
-                        passToRun = state.MainThreadQueue.back();
-                        state.MainThreadQueue.pop_back();
+                        passToRun = state.MainThreadQueue.top().PassIndex;
+                        state.MainThreadQueue.pop();
                     }
                 }
 

@@ -2980,7 +2980,7 @@ struct ExecutionState {
 
 **Better optional follow-up:**
 
-- [ ] Main-thread ready queue: workers continue while main thread pumps ready main-thread tasks.
+- [x] Main-thread ready queue: workers continue while main thread pumps ready main-thread tasks.
 
 **Required behavior:**
 
@@ -3033,13 +3033,13 @@ struct ExecutionState {
 
 **Review gate RG-02 — CPU FrameGraph execution:**
 
-- [ ] `ExtrinsicCoreTests` passes.
+- [x] `ExtrinsicCoreTests` passes.
 - [ ] `IntrinsicTests` passes.
 - [ ] CPU graph no longer executes all passes sequentially when workers are available.
 - [ ] There is a deterministic single-thread fallback.
 - [ ] No global scheduler wait is used as the normal graph wait.
 - [ ] Structural ECS mutation hazards are represented by explicit resources.
-- [ ] Pass options and stats are documented.
+- [x] Pass options and stats are documented.
 
 ---
 
