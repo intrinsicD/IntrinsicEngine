@@ -3188,7 +3188,7 @@ public:
 - [x] Streaming jobs persist across frames.
 - [x] Cancellation suppresses stale apply.
 - [x] Shutdown order is deterministic.
-- [ ] Worker code cannot mutate ECS or GPU resources directly through the executor API.
+- [x] Worker code cannot mutate ECS or GPU resources directly through the executor API.
 
 ---
 
@@ -3698,8 +3698,8 @@ public:
 - [ ] Core tests pass.
 - [ ] Graphics tests pass.
 - [ ] Full `IntrinsicTests` pass.
-- [ ] `RunFrame` remains broad-phase-only.
-- [ ] Streaming, CPU graph, and GPU graph each enter the frame at the documented phase.
+- [x] `RunFrame` remains broad-phase-only.
+- [x] Streaming, CPU graph, and GPU graph each enter the frame at the documented phase.
 
 ---
 
