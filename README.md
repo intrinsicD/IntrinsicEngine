@@ -6,6 +6,17 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 
 ---
 
+## Reorganization Migration Documents
+
+Repository reorganization planning and migration state are tracked here:
+
+- `docs/migration/target-repo-layout.md` — canonical final-state directory contract for the ongoing reorganization.
+- `docs/migration/current-repo-inventory.md` — factual migration snapshot of the current repository before major moves.
+
+Future root `AGENTS.md` contract updates should link directly to these migration docs while the move plan is active.
+
+---
+
 ## Active Reimplementation: `src_new/`
 
 The repository hosts **two source trees** in parallel:
