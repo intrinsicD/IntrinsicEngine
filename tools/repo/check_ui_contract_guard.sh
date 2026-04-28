@@ -23,8 +23,8 @@ if ! git rev-parse --verify --quiet "$BASE_REF" >/dev/null; then
   fi
 fi
 
-GUARDED_REGEX='^src/Runtime/EditorUI/Runtime\.EditorUI\.(InspectorController|Widgets|GeometryWorkflowController|SpatialDebugController)\.cpp$'
-GUARDED_AWK_REGEX='^src/Runtime/EditorUI/Runtime[.]EditorUI[.](InspectorController|Widgets|GeometryWorkflowController|SpatialDebugController)[.]cpp$'
+GUARDED_REGEX='^src/legacy/Runtime/EditorUI/Runtime\.EditorUI\.(InspectorController|Widgets|GeometryWorkflowController|SpatialDebugController)\.cpp$'
+GUARDED_AWK_REGEX='^src/legacy/Runtime/EditorUI/Runtime[.]EditorUI[.](InspectorController|Widgets|GeometryWorkflowController|SpatialDebugController)[.]cpp$'
 TEST_FILE='tests/Test_EditorUI.cpp'
 
 mapfile -t changed_files < <(git diff --name-only "$BASE_REF"...HEAD)
