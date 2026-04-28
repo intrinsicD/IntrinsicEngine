@@ -217,7 +217,7 @@ namespace
         // lifecycle systems re-create Line/Point components from the restored
         // Data component's GpuDirty flag. For Mesh entities, the mesh geometry
         // must be re-uploaded via the asset pipeline (e.g. re-import from the
-        // AssetSourceRef path). This is a known limitation matching the TODO.md
+        // AssetSourceRef path). This is a known limitation matching the tasks/backlog/legacy-todo.md
         // note that full geometry-operator undo may require deeper integration.
     }
 } // anonymous namespace

@@ -8,11 +8,11 @@ Target: **< 2 ms CPU frame prep**, GPU-first visibility, immutable frame packets
 
 **Performance target methodology:** "CPU frame prep" covers extraction + culling + packet build (from `ExtractRenderWorld()` entry to `BuildGraph()` entry). Measured via `Core::Profiling` markers as P95 wall-clock across 1 000 frames on a mid-range desktop (8-core, discrete GPU) with a 10 K-entity mixed scene (meshes + graphs + point clouds). The 2 ms budget excludes GPU command recording and submission.
 
-### Cross-reference to TODO.md
+### Cross-reference to tasks/backlog/legacy-todo.md
 
-This plan overlaps with and refines several TODO.md work items. The mapping is:
+This plan overlaps with and refines several tasks/backlog/legacy-todo.md work items. The mapping is:
 
-| TODO.md Item | Plan Phase | Relationship |
+| tasks/backlog/legacy-todo.md Item | Plan Phase | Relationship |
 |---|---|---|
 | **B1** (Render Prep as Job-Scheduled Work) | Phase A (§5.1) | Plan Phase A extracts visibility + packets; B1 schedules them as jobs. Phase A is a prerequisite. |
 | **B2** (GPU Submission Hardening) | Phase C (§5.3) | GPU-driven indirect submission depends on explicit wait→acquire→record→submit rhythm from B2. |
@@ -22,7 +22,7 @@ This plan overlaps with and refines several TODO.md work items. The mapping is:
 | **C4** (Visibility System Improvements) | Phase A + C (§5.1, §5.3) | This plan *is* the concrete implementation plan for C4's design-only items. |
 | **C9** (GPU-Driven Indirect Rendering) | Phase C (§5.3) | C9's description is partially stale — GPU-driven surface culling already runs at runtime via `SurfacePass` Stage 3 (`instance_cull_multigeo.comp`). The remaining C9 gap is extending GPU culling to Line/Point passes, which this plan's Phase C addresses. |
 
-When this plan's phases complete, C4 and C9 should be closed in TODO.md. B1–B5 remain independent frame-pipeline concerns that this plan depends on but does not subsume.
+When this plan's phases complete, C4 and C9 should be closed in tasks/backlog/legacy-todo.md. B1–B5 remain independent frame-pipeline concerns that this plan depends on but does not subsume.
 
 ---
 
@@ -68,7 +68,7 @@ Interaction points: CPU task graph feeds GPU frame graph via `BuildGraphInput`. 
 1. **Retained GPU scene instance state exists**
    - `Graphics::GPUScene` has scene + bounds SSBOs, slot allocator, queued update batching, and compute scatter update (`scene_update.comp`).
 2. **GPU-driven multi-geometry surface culling is live at runtime**
-   - `SurfacePass` Stage 3 (`m_EnableGpuCulling = true` by default) builds dense geometry routing tables, dispatches `instance_cull_multigeo.comp`, and consumes the output via `vkCmdDrawIndexedIndirectCount`. This is **not** dormant infrastructure — it is the active surface draw path. (Note: TODO.md C9 still describes this as unwired; that description is stale and should be updated.)
+   - `SurfacePass` Stage 3 (`m_EnableGpuCulling = true` by default) builds dense geometry routing tables, dispatches `instance_cull_multigeo.comp`, and consumes the output via `vkCmdDrawIndexedIndirectCount`. This is **not** dormant infrastructure — it is the active surface draw path. (Note: tasks/backlog/legacy-todo.md C9 still describes this as unwired; that description is stale and should be updated.)
 3. **Three-pass rendering topology exists**
    - Surface/Line/Point pass separation and packet consumption are real and test-covered.
 4. **Material buffer path exists**
@@ -414,7 +414,7 @@ Every gap item maps to the phase/track that addresses it. Items not covered by a
 
 ## 7) Workstream plan (track decomposition)
 
-Split the effort into independent tracks with strict deliverables. Tracks are numbered T1–T6 to avoid collision with TODO.md section letters (A–F).
+Split the effort into independent tracks with strict deliverables. Tracks are numbered T1–T6 to avoid collision with tasks/backlog/legacy-todo.md section letters (A–F).
 
 ### Track T1 — Visibility & Indirect Authority
 - Introduce `Graphics.Visibility` module as a facade that SurfacePass calls into (not a code move — avoids regression risk).
