@@ -105,6 +105,7 @@ option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling bu
 option(INTRINSIC_ENABLE_CUDA "Enable CUDA compute backend for GPU-accelerated geometry processing" OFF)
 option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
 option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
+option(INTRINSIC_BUILD_BENCHMARKS "Build benchmark scaffold targets" ON)
 option(INTRINSIC_HEADLESS_NO_GLFW
     "Headless build mode that skips GLFW-dependent modules when X11 RandR headers are unavailable"
     OFF
@@ -189,6 +190,10 @@ add_subdirectory(src_new)
 if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     add_subdirectory(src/Apps/Sandbox)
 endif()
+if(INTRINSIC_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
+
 if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)
     add_subdirectory(tests)
 endif()
