@@ -1,0 +1,16 @@
+{
+  "benchmark_id": "geometry.example.smoke",
+  "method": "geometry.example",
+  "backend": "cpu_reference",
+  "dataset": "builtin.triangle_mesh.small",
+  "commit": "baseline",
+  "metrics": {
+    "runtime_ms": 0.10,
+    "quality_error_l2": 0.0
+  },
+  "diagnostics": {
+    "baseline": true,
+    "profile": "smoke"
+  },
+  "status": "passed"
+}
