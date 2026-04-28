@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Compatibility wrapper during task-system migration.
-# TODO(RORG-033): remove wrapper after CI and docs use tools/agents/check_task_policy.py directly.
-exec python3 "$(dirname "$0")/agents/check_task_policy.py" --root . --strict
+# Compatibility wrapper retained during tools path migration (RORG-071).
+exec "$(dirname "$0")/agents/check_todo_active_only.sh" "$@"

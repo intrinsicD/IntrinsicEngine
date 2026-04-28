@@ -61,7 +61,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-030 | Create task directory structure | done | current branch / TBD | Added `tasks/README.md`, status READMEs, and task templates under `tasks/templates/`. |
 | RORG-031 | Split current `TODO.md` into task files | done | work / TBD | Added structured backlog seed tasks under architecture/rendering/runtime/src-new/geometry/ui and converted legacy backlog file to archive index. |
 | RORG-032 | Add task validator | done | work / TBD | Added `tools/agents/validate_tasks.py` with warning/strict modes and required-section checks. |
-| RORG-033 | Replace TODO policy script | done | work / TBD | Added `tools/agents/check_task_policy.py`; kept `tools/check_todo_active_only.sh` as a strict compatibility wrapper; CI now calls the new checker directly. |
+| RORG-033 | Replace TODO policy script | done | work / TBD | Added `tools/agents/check_task_policy.py`; kept `tools/agents/check_todo_active_only.sh` as the canonical wrapper with `tools/check_todo_active_only.sh` retained as a compatibility entrypoint; CI now calls the new checker directly. |
 | RORG-040 | Create `methods/` root and package template | done | work / TBD | Added `methods/` skeleton, template package, and pipeline documentation in `methods/README.md`. |
 | RORG-041 | Add method manifest schema | done | work / TBD | Added `docs/methods/method-manifest-schema.md` and `tools/agents/validate_method_manifests.py` with strict mode and path checks. |
 | RORG-042 | Create method docs package | done | work / TBD | Added `docs/methods/` package and linked it from method workflow/docs index. |
@@ -83,7 +83,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-068 | Move regression and benchmark tests | not-started | - |  |
 | RORG-069 | Delete old root test clutter | not-started | - |  |
 | RORG-070 | Create target tools subdirectories | done | work / TBD | Added `tools/{repo,docs,ci,benchmark,agents,analysis}/README.md` with current ownership and planned migration map. |
-| RORG-071 | Move repo/policy tools | not-started | - |  |
+| RORG-071 | Move repo/policy tools | done | work / TBD | Moved repo/policy scripts to canonical owning paths (`tools/repo/*`, `tools/agents/*`) and retained root-path wrappers for one release cycle compatibility. |
 | RORG-072 | Move analysis/performance tools | not-started | - |  |
 | RORG-073 | Move performance regression script | not-started | - |  |
 | RORG-074 | Add layering checker | not-started | - |  |

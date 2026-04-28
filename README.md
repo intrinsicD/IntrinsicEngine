@@ -31,7 +31,7 @@ The new tree is organized as `Core`, `Assets`, `ECS`, `Graphics` (`RHI` + `Backe
 See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, and:
 
 - `docs/architecture/src_new-rendering-architecture.md` — target rendering architecture for `src_new/Graphics`.
-- `docs/architecture/src_new_module_inventory.md` — auto-generated module list (regenerate via `tools/generate_src_new_module_inventory.py`).
+- `docs/architecture/src_new_module_inventory.md` — auto-generated module list (regenerate via `tools/repo/generate_module_inventory.py`).
 - `src_new/<Subsystem>/README.md` — per-subsystem public surface and file inventory.
 
 ## Canonical Architecture Docs (legacy `src/` tree)
