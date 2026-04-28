@@ -79,7 +79,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-064 | Move Geometry unit tests | done | work / TBD | Moved targeted geometry unit tests from `tests/` root to `tests/unit/geometry/` via `git mv`; migration-aware resolver in `tests/CMakeLists.txt` preserved build wiring and `unit,geometry` labeling. |
 | RORG-065 | Move Asset and ECS unit tests | done | work / TBD | Moved ECS unit tests (`Test_RuntimeECS.cpp`, `Test_EntityCommands.cpp`) to `tests/unit/ecs/` and asset-core boundary tests (`Test_CoreAssets.cpp`, `Test_CoreAssetSafety.cpp`) to `tests/unit/assets/`; updated `tests/CMakeLists.txt` test object wiring and labels. |
 | RORG-066 | Move Graphics tests | done | work / TBD | Moved selected graphics/runtime rendering tests into `tests/unit/graphics`, `tests/integration/graphics`, and `tests/contract/graphics`; updated migration-aware test source resolution + labels. |
-| RORG-067 | Move Runtime and app integration tests | not-started | - |  |
+| RORG-067 | Move Runtime and app integration tests | done | work / TBD | Moved runtime/app integration and contract candidates into `tests/integration/{app,runtime}`, `tests/contract/{runtime,ui}`, and `tests/unit/runtime`; migration-aware test source resolution and labels remain stable via `tests/CMakeLists.txt`. |
 | RORG-068 | Move regression and benchmark tests | not-started | - |  |
 | RORG-069 | Delete old root test clutter | not-started | - |  |
 | RORG-070 | Create target tools subdirectories | done | work / TBD | Added `tools/{repo,docs,ci,benchmark,agents,analysis}/README.md` with current ownership and planned migration map. |
