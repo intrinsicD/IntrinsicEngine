@@ -27,3 +27,11 @@ This document defines how to create and review benchmark work.
 - JSON outputs are machine-readable.
 - Performance claims include baseline comparison.
 - Numerical quality/error metrics are included where relevant.
+
+
+## Related documentation
+
+- [Benchmarking docs index](../benchmarking/index.md)
+- [Benchmark manifest schema](../benchmarking/benchmark-manifest-schema.md)
+- [Benchmark result JSON schema](../benchmarking/result-json-schema.md)
+- [Benchmark report template](../benchmarking/report-template.md)

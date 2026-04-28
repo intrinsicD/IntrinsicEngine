@@ -25,11 +25,16 @@ This page is the canonical entry point for repository documentation.
 
 ## Benchmarking
 
-Benchmark docs are still being consolidated. Current references:
-
+- [Benchmarking docs index](benchmarking/index.md)
+- [Benchmarking overview](benchmarking/overview.md)
+- [Dataset policy](benchmarking/dataset-policy.md)
+- [Metrics](benchmarking/metrics.md)
+- [Baselines](benchmarking/baselines.md)
+- [Benchmark CI policy](benchmarking/ci-policy.md)
+- [Report template](benchmarking/report-template.md)
 - [Benchmark manifest schema](benchmarking/benchmark-manifest-schema.md)
+- [Benchmark result JSON schema](benchmarking/result-json-schema.md)
 - [Agent benchmark workflow](agent/benchmark-workflow.md)
-- [Build & troubleshooting notes](build-troubleshooting.md)
 
 ## Agent workflow
 
