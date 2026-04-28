@@ -76,7 +76,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-061 | Add test classification policy | done | work / TBD | Added `docs/architecture/test-strategy.md` with required categories, naming convention, and CTest label mapping policy. |
 | RORG-062 | Add CMake support for test subdirectories and labels | done | work / TBD | Added migration-aware source resolution in `tests/CMakeLists.txt` that prefers new categorized paths and falls back to legacy root paths; added CTest labels (`unit`, subsystem labels) to test executables. |
 | RORG-063 | Move Core unit tests | done | work / TBD | Moved root core unit tests into `tests/unit/core/` with `git mv`; `tests/CMakeLists.txt` migration resolver already preferred categorized paths, so build wiring stayed stable and labels remain `unit,core`. |
-| RORG-064 | Move Geometry unit tests | not-started | - |  |
+| RORG-064 | Move Geometry unit tests | done | work / TBD | Moved targeted geometry unit tests from `tests/` root to `tests/unit/geometry/` via `git mv`; migration-aware resolver in `tests/CMakeLists.txt` preserved build wiring and `unit,geometry` labeling. |
 | RORG-065 | Move Asset and ECS unit tests | not-started | - |  |
 | RORG-066 | Move Graphics tests | not-started | - |  |
 | RORG-067 | Move Runtime and app integration tests | not-started | - |  |
