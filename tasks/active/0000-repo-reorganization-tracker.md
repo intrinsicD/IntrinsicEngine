@@ -101,7 +101,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-091 | Add CMake path abstraction for source roots | done | work / TBD | Added root-level source path abstraction variables (`INTRINSIC_*_SOURCE_ROOT`) and routed `add_subdirectory(...)` calls through them to make source-root migration repointing mechanical and low-risk. |
 | RORG-092 | Move legacy non-Geometry source into `src/legacy/` | done | work / TBD | Moved legacy source tree under `src/legacy/` with mechanical `git mv`; updated source-root CMake path abstraction and path-sensitive tooling/tests. |
 | RORG-093 | Promote Geometry to `src/geometry/` | done | work / TBD | Moved `src/legacy/Geometry` to `src/geometry` via `git mv`; updated root CMake source-root abstraction to build Geometry from canonical path and refreshed geometry architecture docs. |
-| RORG-094 | Move `src_new/Core` to `src/core` | not-started | - |  |
+| RORG-094 | Move `src_new/Core` to `src/core` | done | work / TBD | Moved `src_new/Core` to `src/core` with `git mv`; updated root/source CMake wiring so `src/core` is built from the canonical path while `src_new` no longer references `Core`. |
 | RORG-095 | Move `src_new/Assets` to `src/assets` | not-started | - |  |
 | RORG-096 | Move `src_new/ECS` to `src/ecs` | not-started | - |  |
 | RORG-097 | Move `src_new/Graphics/RHI` to `src/graphics/rhi` | not-started | - |  |
