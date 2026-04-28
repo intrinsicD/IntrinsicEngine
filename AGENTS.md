@@ -153,4 +153,12 @@ Undocumented exceptions are policy violations.
 
 ## Related expanded docs
 
-Detailed process docs belong under `docs/agent/` and will be expanded there.
+Use the expanded procedure docs under `docs/agent/`:
+
+- `docs/agent/contract.md`
+- `docs/agent/task-format.md`
+- `docs/agent/review-checklist.md`
+- `docs/agent/method-workflow.md`
+- `docs/agent/benchmark-workflow.md`
+- `docs/agent/docs-sync-policy.md`
+- `docs/agent/roles.md`
