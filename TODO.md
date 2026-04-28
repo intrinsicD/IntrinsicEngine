@@ -3035,10 +3035,10 @@ struct ExecutionState {
 
 - [x] `ExtrinsicCoreTests` passes.
 - [ ] `IntrinsicTests` passes.
-- [ ] CPU graph no longer executes all passes sequentially when workers are available.
-- [ ] There is a deterministic single-thread fallback.
-- [ ] No global scheduler wait is used as the normal graph wait.
-- [ ] Structural ECS mutation hazards are represented by explicit resources.
+- [x] CPU graph no longer executes all passes sequentially when workers are available.
+- [x] There is a deterministic single-thread fallback.
+- [x] No global scheduler wait is used as the normal graph wait.
+- [x] Structural ECS mutation hazards are represented by explicit resources.
 - [x] Pass options and stats are documented.
 
 ---
@@ -3182,12 +3182,12 @@ public:
 
 **Review gate RG-03 — Streaming executor:**
 
-- [ ] Runtime or Assets focused tests pass.
-- [ ] `ExtrinsicCoreTests` still passes.
+- [x] Runtime or Assets focused tests pass.
+- [x] `ExtrinsicCoreTests` still passes.
 - [ ] `IntrinsicTests` passes.
-- [ ] Streaming jobs persist across frames.
-- [ ] Cancellation suppresses stale apply.
-- [ ] Shutdown order is deterministic.
+- [x] Streaming jobs persist across frames.
+- [x] Cancellation suppresses stale apply.
+- [x] Shutdown order is deterministic.
 - [ ] Worker code cannot mutate ECS or GPU resources directly through the executor API.
 
 ---
@@ -3422,12 +3422,12 @@ public:
 **Review gate RG-04 — RenderGraph scaffold:**
 
 - [ ] `ExtrinsicGraphicsTests` passes.
-- [ ] `ExtrinsicCoreTests` passes.
+- [x] `ExtrinsicCoreTests` passes.
 - [ ] `IntrinsicTests` passes.
-- [ ] `Graphics.RenderGraph` has no ECS dependency.
-- [ ] Core still has no GPU resource/barrier semantics.
-- [ ] RenderGraph compile order comes from declared resources, not hardcoded pass order.
-- [ ] Barriers are generated from usage transitions.
+- [x] `Graphics.RenderGraph` has no ECS dependency.
+- [x] Core still has no GPU resource/barrier semantics.
+- [x] RenderGraph compile order comes from declared resources, not hardcoded pass order.
+- [x] Barriers are generated from usage transitions.
 
 ---
 
@@ -3441,7 +3441,7 @@ public:
 
 - [x] Add `RenderGraph` member to renderer implementation.
 - [x] In `ExecuteFrame`, reset graph, import frame/backbuffer resources, add passes, compile, execute.
-- [ ] Keep `Runtime::Engine` unaware of pass-level details.
+- [x] Keep `Runtime::Engine` unaware of pass-level details.
 - [x] Renderer `BeginFrame`/`EndFrame` lifecycle remains unchanged unless documented.
 - [x] Resize invalidates/recreates graph-owned transient resources as needed.
 
@@ -3449,7 +3449,7 @@ public:
 
 - [x] Null renderer/frame path compiles and executes graph.
 - [x] Resize causes transient resource invalidation without stale handle use.
-- [ ] Runtime smoke test confirms `RunFrame` does not inspect graph resources.
+- [x] Runtime smoke test confirms `RunFrame` does not inspect graph resources.
 
 ## T051 — Register initial fixed pass sequence through graph builders
 

@@ -1,6 +1,7 @@
 intrinsic_test_object_lib(ExtrinsicRuntimeTestObjs
         SOURCES
         Test.Runtime.StreamingExecutor.cpp
+        Test.Runtime.EngineLayering.cpp
         DEPS ExtrinsicRuntime
 )
 
