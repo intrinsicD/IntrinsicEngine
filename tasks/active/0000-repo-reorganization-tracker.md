@@ -44,7 +44,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | ID | Title | Status | Branch / PR | Notes |
 |---|---|---|---|---|
 | RORG-000 | Create reorganization tracking task | done | current branch / TBD | Tracker created. |
-| RORG-001 | Capture current repository inventory | not-started | - |  |
+| RORG-001 | Capture current repository inventory | done | current branch / TBD | `docs/migration/current-repo-inventory.md` added. |
 | RORG-002 | Add a root final-state layout document | not-started | - |  |
 | RORG-003 | Add initial repo hygiene checks without enforcing them yet | not-started | - |  |
 | RORG-010 | Create canonical `AGENTS.md` | not-started | - |  |
