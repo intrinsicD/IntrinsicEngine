@@ -11,11 +11,10 @@ This page is the canonical entry point for repository documentation.
 
 ## ADRs
 
-Current ADR-style documents are maintained under `docs/architecture/` until the dedicated ADR migration is completed:
-
-- [ADR O1 — Minimal runtime refactor](architecture/adr-o1-minimal-runtime-refactor.md)
-- [ADR O2 — Pragmatic medium runtime refactor](architecture/adr-o2-pragmatic-medium-runtime-refactor.md)
-- [ADR O3 — Ideal runtime architecture](architecture/adr-o3-ideal-runtime-architecture.md)
+- [ADRs index](adr/index.md)
+- [0001 — Minimal runtime refactor](adr/0001-minimal-runtime-refactor.md)
+- [0002 — Pragmatic medium runtime refactor](adr/0002-pragmatic-medium-runtime-refactor.md)
+- [0003 — Ideal runtime architecture](adr/0003-ideal-runtime-architecture.md)
 
 ## Methods
 

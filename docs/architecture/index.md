@@ -25,9 +25,10 @@ Status labels:
 
 ## ADRs
 
-- [`adr-o1-minimal-runtime-refactor.md`](adr-o1-minimal-runtime-refactor.md) (`legacy-background`, scheduled for move to `docs/adr/` in RORG-022)
-- [`adr-o2-pragmatic-medium-runtime-refactor.md`](adr-o2-pragmatic-medium-runtime-refactor.md) (`legacy-background`, scheduled for move to `docs/adr/` in RORG-022)
-- [`adr-o3-ideal-runtime-architecture.md`](adr-o3-ideal-runtime-architecture.md) (`legacy-background`, scheduled for move to `docs/adr/` in RORG-022)
+- [ADRs index](../adr/index.md) (`canonical`)
+- [`0001-minimal-runtime-refactor.md`](../adr/0001-minimal-runtime-refactor.md) (`legacy-background`)
+- [`0002-pragmatic-medium-runtime-refactor.md`](../adr/0002-pragmatic-medium-runtime-refactor.md) (`legacy-background`)
+- [`0003-ideal-runtime-architecture.md`](../adr/0003-ideal-runtime-architecture.md) (`legacy-background`)
 
 ## Existing architecture references by status
 
