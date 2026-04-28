@@ -382,3 +382,51 @@ TEST(FrameGraphParallel, GraphLocalCompletionDoesNotWaitForUnrelatedSchedulerWor
 
     Tasks::Scheduler::Shutdown();
 }
+
+TEST(FrameGraphParallel, DeterministicSingleThreadFallbackOrder)
+{
+    Tasks::Scheduler::Initialize(1);
+
+    constexpr int kRuns = 32;
+    std::vector<std::string> baseline;
+
+    for (int run = 0; run < kRuns; ++run)
+    {
+        FrameGraph graph;
+        std::vector<std::string> executionOrder;
+
+        graph.AddPass("WritePosition",
+                      [](FrameGraphBuilder& b) { b.Write<Position>(); },
+                      [&]() { executionOrder.push_back("WritePosition"); });
+
+        graph.AddPass("ReadPosition",
+                      [](FrameGraphBuilder& b) { b.Read<Position>(); },
+                      [&]() { executionOrder.push_back("ReadPosition"); });
+
+        graph.AddPass("StructuralCommit",
+                      [](FrameGraphBuilder& b) { b.StructuralWrite(); b.CommitWorld(); },
+                      [&]() { executionOrder.push_back("StructuralCommit"); });
+
+        graph.AddPass("Extract",
+                      [](FrameGraphBuilder& b)
+                      {
+                          b.ReadResource(SceneCommitToken);
+                          b.WriteResource(RenderExtractionToken);
+                      },
+                      [&]() { executionOrder.push_back("Extract"); });
+
+        ASSERT_TRUE(graph.Compile().has_value()) << "Compile failed on run " << run;
+        ASSERT_TRUE(graph.Execute().has_value()) << "Execute failed on run " << run;
+
+        if (run == 0)
+        {
+            baseline = executionOrder;
+        }
+        else
+        {
+            EXPECT_EQ(executionOrder, baseline) << "Non-deterministic fallback order on run " << run;
+        }
+    }
+
+    Tasks::Scheduler::Shutdown();
+}
