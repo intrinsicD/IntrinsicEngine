@@ -88,7 +88,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-073 | Move performance regression script | done | work / TBD | Moved regression gate to `tools/benchmark/check_perf_regression.sh`; updated README/docs references to new canonical path. |
 | RORG-074 | Add layering checker | done | work / TBD | Added `tools/repo/check_layering.py` + `tools/repo/layering_allowlist.yaml`; checker defaults to warning mode and supports `--strict`. |
 | RORG-075 | Add module inventory generator for final layout | done | work / TBD | Updated `tools/repo/generate_module_inventory.py` to default to `src` + `docs/api/generated/module_inventory.md`, added layer summaries including `legacy`, and retained `src_new` generation support for migration. |
-| RORG-076 | Add docs sync checker | not-started | - |  |
+| RORG-076 | Add docs sync checker | done | work / TBD | Added `tools/docs/check_docs_sync.py` + `tools/docs/docs_sync_rules.yaml`; supports warning mode, strict mode, and `--diff-mode` against a base ref (default `origin/main`). |
 | RORG-080 | Add pull request template | not-started | - |  |
 | RORG-081 | Create `pr-fast.yml` | not-started | - |  |
 | RORG-082 | Replace compressed `build.yml` with `ci-linux-clang.yml` | not-started | - |  |

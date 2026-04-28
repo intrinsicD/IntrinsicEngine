@@ -1,0 +1,33 @@
+# Docs sync policy rules (warning mode by default).
+# Each key is a changed-file glob. If any changed path matches the key,
+# at least one changed path must match one of the `one_of` globs.
+
+src/geometry/**:
+  one_of:
+    - docs/architecture/geometry.md
+    - docs/methods/**
+    - tasks/**
+
+src/graphics/**:
+  one_of:
+    - docs/architecture/graphics.md
+    - docs/architecture/frame-graph.md
+    - tasks/**
+
+src/core/**:
+  one_of:
+    - docs/architecture/layering.md
+    - docs/architecture/module-rules.md
+    - tasks/**
+
+tools/**:
+  one_of:
+    - tools/**/README.md
+    - docs/agent/**
+    - tasks/**
+
+.github/workflows/**:
+  one_of:
+    - docs/architecture/ci.md
+    - docs/agent/review-checklist.md
+    - tasks/**

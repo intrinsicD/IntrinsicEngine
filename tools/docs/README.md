@@ -8,5 +8,5 @@ Documentation validation and synchronization tooling.
 
 ## Planned moves
 
-- Add `check_docs_sync.py` and `docs_sync_rules.yaml` to enforce docs-update requirements (RORG-076).
+- `check_docs_sync.py`: validates docs-update requirements from `docs_sync_rules.yaml` in warning/strict mode and supports diff-mode against a git base ref.
 - Tighten docs checks from warning mode to strict in CI after cleanup (RORG-121).
