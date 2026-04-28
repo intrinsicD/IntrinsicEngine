@@ -32,6 +32,10 @@ function(intrinsic_test_object_lib name)
     target_link_options(${name} PRIVATE ${INTRINSIC_LINK_FLAGS})
     set_target_properties(${name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
     target_link_libraries(${name} PRIVATE IntrinsicConfig ${ARG_DEPS} GTest::gtest_main)
+    target_include_directories(${name} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/support
+        ${CMAKE_CURRENT_SOURCE_DIR}/support/geometry
+    )
 endfunction()
 
 # =============================================================================
