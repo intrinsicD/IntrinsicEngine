@@ -208,10 +208,7 @@ intrinsic_test_object_lib(GeometryTestObjs
 
 if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
     # --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
-    intrinsic_test_object_lib(RuntimeTestObjs
-    SOURCES
-        Test_CoreAssets.cpp
-        Test_CoreAssetSafety.cpp
+    set(_runtime_test_files
         Test_RuntimeGraphics.cpp
         Test_RuntimeRHI.cpp
         Test_RuntimeSelection.cpp
@@ -266,7 +263,16 @@ if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
         Test_RuntimeEngineConfig.cpp
         Test_MaintenanceLane.cpp
         Test_ShaderHotReload.cpp
-
+        Test_CoreAssets.cpp
+        Test_CoreAssetSafety.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_test_sources
+        SEARCH_DIRS unit/assets unit/runtime integration/runtime integration/app contract/runtime contract/ui .
+        FILES ${_runtime_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeTestObjs
+        SOURCES
+            ${_runtime_test_sources}
         DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI nlohmann_json::nlohmann_json
     )
 endif()
@@ -287,7 +293,7 @@ if(TARGET RuntimeTestObjs)
     intrinsic_test_executable(IntrinsicTests
         OBJECTS  CoreTestObjs ECSTestObjs GeometryTestObjs RuntimeTestObjs
         LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
-        LABELS unit contract integration core ecs geometry runtime
+        LABELS unit contract integration core assets ecs geometry runtime
     )
 endif()
 
