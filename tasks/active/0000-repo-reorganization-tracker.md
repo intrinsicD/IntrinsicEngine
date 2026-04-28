@@ -96,7 +96,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-084 | Add docs workflow | done | work / TBD | Expanded `.github/workflows/ci-docs.yml` to run docs links (warning mode), task/method/benchmark validators, and module inventory freshness check on PRs. |
 | RORG-085 | Add benchmark smoke workflow | done | work / TBD | Added `.github/workflows/ci-bench-smoke.yml` (PR + manual trigger) to build `IntrinsicBenchmarkSmoke`, run CPU-only smoke benchmark, validate JSON output, and upload result artifact. |
 | RORG-086 | Add nightly deep workflow | not-started | - |  |
-| RORG-087 | Add workflow naming/check script | not-started | - |  |
+| RORG-087 | Add workflow naming/check script | done | work / TBD | Added `tools/ci/check_workflow_names.py` and integrated it into `ci-docs.yml` validation steps. |
 | RORG-090 | Write source-tree move plan before moving files | not-started | - |  |
 | RORG-091 | Add CMake path abstraction for source roots | not-started | - |  |
 | RORG-092 | Move legacy non-Geometry source into `src/legacy/` | not-started | - |  |

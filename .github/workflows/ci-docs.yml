@@ -28,6 +28,10 @@ jobs:
       - name: Validate benchmark manifests
         run: python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks
 
+
+      - name: Validate workflow file naming policy
+        run: python3 tools/ci/check_workflow_names.py --root .github/workflows
+
       - name: Validate generated module inventory freshness
         run: |
           python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
