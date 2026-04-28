@@ -72,7 +72,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-052 | Add benchmark output JSON schema | done | work / TBD | Added `docs/benchmarking/result-json-schema.md`, `tools/benchmark/validate_benchmark_results.py`, and a validated example result payload. |
 | RORG-053 | Add benchmark docs package | done | work / TBD | Added `docs/benchmarking/` docs package (`index`, `overview`, `dataset-policy`, `metrics`, `baselines`, `ci-policy`, `report-template`) and linked from docs index/workflow docs. |
 | RORG-054 | Add minimal benchmark smoke runner skeleton | done | work / TBD | Added `IntrinsicBenchmarkSmoke`, smoke dataset/baseline manifests, and JSON-emitting runner skeleton (CPU-only). |
-| RORG-060 | Create new tests directory skeleton | not-started | - |  |
+| RORG-060 | Create new tests directory skeleton | done | work / TBD | Added `tests/{unit,contract,integration,regression,gpu,benchmark,support}` skeleton with subsystem READMEs; existing build/test wiring left unchanged. |
 | RORG-061 | Add test classification policy | not-started | - |  |
 | RORG-062 | Add CMake support for test subdirectories and labels | not-started | - |  |
 | RORG-063 | Move Core unit tests | not-started | - |  |
