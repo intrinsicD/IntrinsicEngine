@@ -82,7 +82,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-067 | Move Runtime and app integration tests | not-started | - |  |
 | RORG-068 | Move regression and benchmark tests | not-started | - |  |
 | RORG-069 | Delete old root test clutter | not-started | - |  |
-| RORG-070 | Create target tools subdirectories | not-started | - |  |
+| RORG-070 | Create target tools subdirectories | done | work / TBD | Added `tools/{repo,docs,ci,benchmark,agents,analysis}/README.md` with current ownership and planned migration map. |
 | RORG-071 | Move repo/policy tools | not-started | - |  |
 | RORG-072 | Move analysis/performance tools | not-started | - |  |
 | RORG-073 | Move performance regression script | not-started | - |  |
