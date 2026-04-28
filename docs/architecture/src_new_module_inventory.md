@@ -9,7 +9,6 @@ Root scanned: `src_new`
 | Layer | Module Count |
 |---|---:|
 | `app` | 1 |
-| `ecs` | 18 |
 | `graphics` | 67 |
 | `platform` | 2 |
 | `runtime` | 3 |
@@ -19,24 +18,6 @@ Root scanned: `src_new`
 | Module | File | Layer |
 |---|---|---|
 | `Extrinsic.Sandbox` | `src_new/App/Sandbox/Sandbox.cppm` | `app` |
-| `Extrinsic.ECS.Components.AssetInstance` | `src_new/ECS/Components/ECS.Component.AssetInstance.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Collider` | `src_new/ECS/Components/ECS.Component.Collider.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Culling.Local` | `src_new/ECS/Components/ECS.Component.Culling.Local.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Culling.Proxy` | `src_new/ECS/Components/ECS.Component.Culling.Proxy.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Culling.World` | `src_new/ECS/Components/ECS.Component.Culling.World.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.DirtyTags` | `src_new/ECS/Components/ECS.Component.DirtyTags.cppm` | `ecs` |
-| `Extrinsic.ECS.Components.GeometrySources` | `src_new/ECS/Components/ECS.Component.GeometrySources.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Hierarchy` | `src_new/ECS/Components/ECS.Component.Hierarchy.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Light` | `src_new/ECS/Components/ECS.Component.Light.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.MetaData` | `src_new/ECS/Components/ECS.Component.MetaData.cppm` | `ecs` |
-| `Extrinsic.ECS.Components.Selection` | `src_new/ECS/Components/ECS.Component.Selection.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.ShadowCaster` | `src_new/ECS/Components/ECS.Component.ShadowCaster.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Transform` | `src_new/ECS/Components/ECS.Component.Transform.Local.cppm` | `ecs` |
-| `Extrinsic.ECS.Component.Transform.WorldMatrix` | `src_new/ECS/Components/ECS.Component.Transform.World.cppm` | `ecs` |
-| `Extrinsic.ECS.Scene.Handle` | `src_new/ECS/ECS.Scene.Handle.cppm` | `ecs` |
-| `Extrinsic.ECS.Scene.Registry` | `src_new/ECS/ECS.Scene.Registry.cppm` | `ecs` |
-| `Extrinsic.ECS.System.RenderSync` | `src_new/ECS/Systems/ECS.System.RenderSync.cppm` | `ecs` |
-| `Extrinsic.ECS.System.TransformHierarchy` | `src_new/ECS/Systems/ECS.System.TransformHierarchy.cppm` | `ecs` |
 | `Extrinsic.Backends.Null` | `src_new/Graphics/Backends/Null/Backends.Null.cppm` | `graphics` |
 | `Extrinsic.Backends.Vulkan:Internal` | `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.Internal.cppm` | `graphics` |
 | `Extrinsic.Backends.Vulkan` | `src_new/Graphics/Backends/Vulkan/Backends.Vulkan.cppm` | `graphics` |
@@ -110,4 +91,4 @@ Root scanned: `src_new`
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src_new/Runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **91**
+Total modules: **73**

@@ -15,7 +15,7 @@ This status page tracks promotion of `src_new` subsystems into final `src/` cano
 |---|---|---|---|---|
 | Core | `src_new/Core` | `src/core` | done | RORG-094 |
 | Assets | `src_new/Assets` | `src/assets` | done | RORG-095 |
-| ECS | `src_new/ECS` | `src/ecs` | not-started | RORG-096 |
+| ECS | `src_new/ECS` | `src/ecs` | done | RORG-096 |
 | Graphics RHI | `src_new/Graphics/RHI` | `src/graphics/rhi` | not-started | RORG-097 |
 | Graphics Vulkan backend | `src_new/Graphics/Backends/Vulkan` | `src/graphics/vulkan` | not-started | RORG-098 |
 | Remaining graphics modules | `src_new/Graphics/*` | `src/graphics/*` | not-started | RORG-099 |
