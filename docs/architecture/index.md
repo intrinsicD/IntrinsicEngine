@@ -50,7 +50,7 @@ Status labels:
 | `runtime-subsystem-boundaries.md` | legacy-background | Detailed runtime background. |
 | `src_new-rendering-architecture.md` | migration | Specific to `src_new` migration phase. |
 | `src_new-task-graphs.md` | migration | Specific to `src_new` migration phase. |
-| `src_new_module_inventory.md` | generated | Generated inventory for `src_new`; superseded in later phases. |
+| `src_new_module_inventory.md` | generated | Generated migration inventory for `src_new`; canonical inventory lives at `docs/api/generated/module_inventory.md`. |
 | `vectorfield-overlay-lifecycle-invariants.md` | legacy-background | Subsystem-specific historical notes. |
 
 ## Notes
