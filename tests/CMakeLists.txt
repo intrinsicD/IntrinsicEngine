@@ -108,12 +108,10 @@ set(_core_test_files
     Test_CoreHash.cpp
     Test_CoreFrameGraph.cpp
     Test_FrameGraphTypeTokenHelper.cpp
-    Test_ArchitectureSLO.cpp
     Test_DAGScheduler.cpp
     Test_FeatureRegistry.cpp
     Test_SystemFeatureCatalog.cpp
     Test_InplaceFunction.cpp
-    Test_Benchmark.cpp
     Test_Profiling.cpp
     Test_CoreError.cpp
     Test_LogRingBuffer.cpp
@@ -132,7 +130,6 @@ intrinsic_test_object_lib(CoreTestObjs
 set(_ecs_test_files
     Test_RuntimeECS.cpp
     Test_FrameGraphSystems.cpp
-    Test_CompileHotspotRefactors.cpp
     Test_EntityCommands.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
@@ -143,6 +140,35 @@ intrinsic_test_object_lib(ECSTestObjs
     SOURCES
         ${_ecs_test_sources}
     DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry
+)
+
+# --- Contract/build checks ---
+set(_contract_build_test_files
+    Test_CompileHotspotRefactors.cpp
+)
+intrinsic_resolve_test_sources(_contract_build_test_sources
+    SEARCH_DIRS contract/build .
+    FILES ${_contract_build_test_files}
+)
+intrinsic_test_object_lib(ContractBuildTestObjs
+    SOURCES
+        ${_contract_build_test_sources}
+    DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry
+)
+
+# --- Benchmark/SLO checks ---
+set(_benchmark_test_files
+    Test_ArchitectureSLO.cpp
+    Test_Benchmark.cpp
+)
+intrinsic_resolve_test_sources(_benchmark_test_sources
+    SEARCH_DIRS benchmark/slo benchmark .
+    FILES ${_benchmark_test_files}
+)
+intrinsic_test_object_lib(BenchmarkTestObjs
+    SOURCES
+        ${_benchmark_test_sources}
+    DEPS IntrinsicCore EnTT::EnTT
 )
 
 # --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---
@@ -301,9 +327,9 @@ intrinsic_test_object_lib(TestSupportObjs
 if(TARGET RuntimeTestObjs)
     # --- Full suite (all tests) ---
     intrinsic_test_executable(IntrinsicTests
-        OBJECTS  CoreTestObjs ECSTestObjs GeometryTestObjs RuntimeTestObjs
+        OBJECTS  CoreTestObjs ECSTestObjs ContractBuildTestObjs BenchmarkTestObjs GeometryTestObjs RuntimeTestObjs
         LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
-        LABELS unit contract integration core assets ecs geometry graphics runtime
+        LABELS unit contract integration benchmark slo core assets ecs geometry graphics runtime
     )
 endif()
 
@@ -319,6 +345,20 @@ intrinsic_test_executable(IntrinsicECSTests
     OBJECTS  ECSTestObjs
     LINK_LIBS IntrinsicCore IntrinsicECS
     LABELS unit ecs
+)
+
+# --- Contract/build checks ---
+intrinsic_test_executable(IntrinsicContractBuildTests
+    OBJECTS  ContractBuildTestObjs
+    LINK_LIBS IntrinsicCore IntrinsicECS
+    LABELS contract build
+)
+
+# --- Benchmark and SLO checks ---
+intrinsic_test_executable(IntrinsicBenchmarkTests
+    OBJECTS  BenchmarkTestObjs
+    LINK_LIBS IntrinsicCore
+    LABELS benchmark slo
 )
 
 # --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---
