@@ -81,7 +81,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-066 | Move Graphics tests | done | work / TBD | Moved selected graphics/runtime rendering tests into `tests/unit/graphics`, `tests/integration/graphics`, and `tests/contract/graphics`; updated migration-aware test source resolution + labels. |
 | RORG-067 | Move Runtime and app integration tests | done | work / TBD | Moved runtime/app integration and contract candidates into `tests/integration/{app,runtime}`, `tests/contract/{runtime,ui}`, and `tests/unit/runtime`; migration-aware test source resolution and labels remain stable via `tests/CMakeLists.txt`. |
 | RORG-068 | Move regression and benchmark tests | done | work / TBD | Moved `Test_ArchitectureSLO.cpp`, `Test_Benchmark.cpp`, and `Test_CompileHotspotRefactors.cpp` into `tests/benchmark/` and `tests/contract/build/`; added dedicated benchmark/contract executables and labels. |
-| RORG-069 | Delete old root test clutter | not-started | - |  |
+| RORG-069 | Delete old root test clutter | done | work / TBD | Moved remaining `tests/Test_*.cpp` sources into categorized directories, removed root-path resolver fallbacks from `tests/CMakeLists.txt`, and pointed shared sanitizer support to `tests/support/`. |
 | RORG-070 | Create target tools subdirectories | done | work / TBD | Added `tools/{repo,docs,ci,benchmark,agents,analysis}/README.md` with current ownership and planned migration map. |
 | RORG-071 | Move repo/policy tools | done | work / TBD | Moved repo/policy scripts to canonical owning paths (`tools/repo/*`, `tools/agents/*`) and retained root-path wrappers for one release cycle compatibility. |
 | RORG-072 | Move analysis/performance tools | not-started | - |  |
