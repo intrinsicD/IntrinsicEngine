@@ -98,7 +98,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-086 | Add nightly deep workflow | done | work / TBD | Added `.github/workflows/nightly-deep.yml` with scheduled + manual triggers, deep CPU/sanitizer/SLO/analysis runs, benchmark smoke validation, report artifacts, and optional self-hosted GPU-labeled coverage behind a repo variable gate. |
 | RORG-087 | Add workflow naming/check script | done | work / TBD | Added `tools/ci/check_workflow_names.py` and integrated it into `ci-docs.yml` validation steps. |
 | RORG-090 | Write source-tree move plan before moving files | done | work / TBD | Added `docs/migration/source-tree-move-plan.md` with explicit move table, CMake/include/CI update scope, module-name stability rule, and rollback plan. |
-| RORG-091 | Add CMake path abstraction for source roots | not-started | - |  |
+| RORG-091 | Add CMake path abstraction for source roots | done | work / TBD | Added root-level source path abstraction variables (`INTRINSIC_*_SOURCE_ROOT`) and routed `add_subdirectory(...)` calls through them to make source-root migration repointing mechanical and low-risk. |
 | RORG-092 | Move legacy non-Geometry source into `src/legacy/` | not-started | - |  |
 | RORG-093 | Promote Geometry to `src/geometry/` | not-started | - |  |
 | RORG-094 | Move `src_new/Core` to `src/core` | not-started | - |  |

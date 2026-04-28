@@ -166,18 +166,41 @@ if(INTRINSIC_BUILD_TESTS)
 endif()
 
 # ------------------------------------------------------------------------------
+# Source-root path abstraction (RORG-091)
+# ------------------------------------------------------------------------------
+# These variables centralize source tree paths so migration tasks can repoint
+# directories without touching every add_subdirectory call at once.
+set(INTRINSIC_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(INTRINSIC_SOURCE_NEW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src_new")
+
+set(INTRINSIC_LEGACY_SOURCE_ROOT "${INTRINSIC_SOURCE_ROOT}")
+set(INTRINSIC_LEGACY_CORE_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Core")
+set(INTRINSIC_LEGACY_GEOMETRY_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Geometry")
+set(INTRINSIC_LEGACY_ECS_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/ECS")
+set(INTRINSIC_LEGACY_RHI_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/RHI")
+set(INTRINSIC_LEGACY_ASSET_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Asset")
+set(INTRINSIC_LEGACY_GRAPHICS_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Graphics")
+set(INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Interface")
+set(INTRINSIC_LEGACY_EDITOR_UI_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/EditorUI")
+set(INTRINSIC_LEGACY_RUNTIME_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Runtime")
+set(INTRINSIC_LEGACY_SANDBOX_SOURCE_ROOT "${INTRINSIC_LEGACY_SOURCE_ROOT}/Apps/Sandbox")
+
+set(INTRINSIC_PROMOTED_SOURCE_ROOT "${INTRINSIC_SOURCE_NEW_ROOT}")
+set(INTRINSIC_MODULE_INVENTORY_ROOT "${INTRINSIC_PROMOTED_SOURCE_ROOT}")
+
+# ------------------------------------------------------------------------------
 # Subdirectories
 # ------------------------------------------------------------------------------
-add_subdirectory(src/Core)
-add_subdirectory(src/Geometry)
-add_subdirectory(src/ECS)
+add_subdirectory(${INTRINSIC_LEGACY_CORE_SOURCE_ROOT})
+add_subdirectory(${INTRINSIC_LEGACY_GEOMETRY_SOURCE_ROOT})
+add_subdirectory(${INTRINSIC_LEGACY_ECS_SOURCE_ROOT})
 if(NOT INTRINSIC_HEADLESS_NO_GLFW)
-    add_subdirectory(src/RHI)
-    add_subdirectory(src/Asset)       # needs Core + RHI
-    add_subdirectory(src/Graphics)    # needs Asset
-    add_subdirectory(src/Interface)
-    add_subdirectory(src/EditorUI)
-    add_subdirectory(src/Runtime)     # needs Asset
+    add_subdirectory(${INTRINSIC_LEGACY_RHI_SOURCE_ROOT})
+    add_subdirectory(${INTRINSIC_LEGACY_ASSET_SOURCE_ROOT})       # needs Core + RHI
+    add_subdirectory(${INTRINSIC_LEGACY_GRAPHICS_SOURCE_ROOT})    # needs Asset
+    add_subdirectory(${INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT})
+    add_subdirectory(${INTRINSIC_LEGACY_EDITOR_UI_SOURCE_ROOT})
+    add_subdirectory(${INTRINSIC_LEGACY_RUNTIME_SOURCE_ROOT})     # needs Asset
 else()
     message(WARNING
         "INTRINSIC_HEADLESS_NO_GLFW=ON: skipping legacy GLFW-dependent modules "
@@ -185,10 +208,10 @@ else()
     )
 endif()
 
-add_subdirectory(src_new)
+add_subdirectory(${INTRINSIC_PROMOTED_SOURCE_ROOT})
 
 if(INTRINSIC_BUILD_SANDBOX AND NOT INTRINSIC_HEADLESS_NO_GLFW)
-    add_subdirectory(src/Apps/Sandbox)
+    add_subdirectory(${INTRINSIC_LEGACY_SANDBOX_SOURCE_ROOT})
 endif()
 if(INTRINSIC_BUILD_BENCHMARKS)
     add_subdirectory(benchmarks)
