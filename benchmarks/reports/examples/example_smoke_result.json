@@ -1,0 +1,17 @@
+{
+  "benchmark_id": "geometry.example.small",
+  "method": "geometry.example",
+  "backend": "cpu_reference",
+  "dataset": "builtin.triangle_mesh.small",
+  "commit": "0000000000000000000000000000000000000000",
+  "metrics": {
+    "runtime_ms": 1.8,
+    "memory_peak_bytes": 28672,
+    "quality_error_l2": 0.0
+  },
+  "diagnostics": {
+    "warmup_runs": 1,
+    "iterations": 8
+  },
+  "status": "passed"
+}
