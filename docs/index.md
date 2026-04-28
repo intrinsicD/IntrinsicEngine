@@ -40,9 +40,12 @@ Benchmark docs are still being consolidated. Current references:
 
 ## Migration
 
-- [Migration docs index (in progress)](migration/)
+- [Migration docs index](migration/index.md)
 - [Current repository inventory snapshot](migration/current-repo-inventory.md)
 - [Target repository layout](migration/target-repo-layout.md)
+- [Legacy retirement plan](migration/legacy-retirement.md)
+- [Source-tree reorganization](migration/source-tree-reorganization.md)
+- [`src_new` transition status](migration/src-new-status.md)
 
 ## API / generated docs
 
