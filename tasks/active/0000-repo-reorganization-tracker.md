@@ -50,7 +50,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-010 | Create canonical `AGENTS.md` | done | current branch / TBD | Root contract created with required sections and invariants. |
 | RORG-011 | Convert `CLAUDE.md` into a thin redirect | done | current branch / TBD | Reduced to an authoritative redirect to `/AGENTS.md` plus doc links. |
 | RORG-012 | Convert Copilot instructions into a thin redirect | done | current branch / TBD | Replaced with thin redirect to `/AGENTS.md` and agent docs. |
-| RORG-013 | Fix `.codex/config.yaml` | not-started | - |  |
+| RORG-013 | Fix `.codex/config.yaml` | done | current branch / TBD | Updated to C++23 + valid CI preset verification command + AGENTS pointer; removed duplicated style policy. |
 | RORG-014 | Create agent docs package | not-started | - |  |
 | RORG-020 | Create `docs/index.md` | not-started | - |  |
 | RORG-021 | Create architecture docs index and taxonomy | not-started | - |  |
