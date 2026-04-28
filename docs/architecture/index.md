@@ -22,6 +22,7 @@ Status labels:
 - [Task graphs](task-graphs.md) (`canonical`)
 - [Frame graph](frame-graph.md) (`canonical`)
 - [Module rules](module-rules.md) (`canonical`)
+- [Method API contract](method-api-contract.md) (`canonical`)
 
 ## ADRs
 
