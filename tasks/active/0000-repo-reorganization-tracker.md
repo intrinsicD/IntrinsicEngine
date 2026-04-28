@@ -52,7 +52,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-012 | Convert Copilot instructions into a thin redirect | done | current branch / TBD | Replaced with thin redirect to `/AGENTS.md` and agent docs. |
 | RORG-013 | Fix `.codex/config.yaml` | done | current branch / TBD | Updated to C++23 + valid CI preset verification command + AGENTS pointer; removed duplicated style policy. |
 | RORG-014 | Create agent docs package | done | work / TBD | Added `docs/agent/*` expanded workflow package and linked from `AGENTS.md`. |
-| RORG-020 | Create `docs/index.md` | not-started | - |  |
+| RORG-020 | Create `docs/index.md` | done | current branch / TBD | Added `docs/index.md` with required sections; linked from `README.md`. |
 | RORG-021 | Create architecture docs index and taxonomy | not-started | - |  |
 | RORG-022 | Move ADRs into `docs/adr/` | not-started | - |  |
 | RORG-023 | Create migration docs package | not-started | - |  |
