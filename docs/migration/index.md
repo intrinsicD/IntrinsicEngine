@@ -14,6 +14,7 @@ This section tracks **temporary** repository transition work from the dual-tree 
 - [Target repository layout](target-repo-layout.md) — agreed final-state directory contract.
 - [Legacy retirement plan](legacy-retirement.md) — policy and exit criteria for `src/legacy/`.
 - [Source-tree reorganization](source-tree-reorganization.md) — phased move strategy and safeguards.
+- [Source-tree move plan](source-tree-move-plan.md) — exact Phase 9 move table, build/path update scope, and rollback procedure.
 - [src_new transition status](src-new-status.md) — status board for promotion from `src_new/` into final `src/` roots.
 - `docs/architecture/src_new_module_inventory.md` — generated migration inventory (kept in current path until generator/path migration task).
 
