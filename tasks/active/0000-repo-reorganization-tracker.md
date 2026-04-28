@@ -68,7 +68,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-043 | Add canonical method API concept doc | done | work / TBD | Added `docs/architecture/method-api-contract.md` and linked from architecture index. |
 | RORG-044 | Add first sample method package without real algorithm code | done | work / TBD | Added `methods/geometry/_example_vector_heat/` scaffold package, manifest, and placeholder tests/benchmarks docs. |
 | RORG-050 | Create benchmark directory structure | done | work / TBD | Added `benchmarks/` scaffold, CMake integration, and category READMEs. |
-| RORG-051 | Add benchmark manifest schema and validator | not-started | - |  |
+| RORG-051 | Add benchmark manifest schema and validator | done | work / TBD | Added `docs/benchmarking/benchmark-manifest-schema.md` and `tools/benchmark/validate_benchmark_manifests.py` with strict mode, duplicate-ID checks, and metric validation. |
 | RORG-052 | Add benchmark output JSON schema | not-started | - |  |
 | RORG-053 | Add benchmark docs package | not-started | - |  |
 | RORG-054 | Add minimal benchmark smoke runner skeleton | not-started | - |  |
