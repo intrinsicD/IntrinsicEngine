@@ -1,0 +1,50 @@
+name: ci-sanitizers
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  sanitizer-tests:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer:
+          - name: asan
+            flag: address
+          - name: ubsan
+            flag: undefined
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3
+
+      - name: Configure (${{ matrix.sanitizer.name }})
+        run: |
+          cmake --preset ci \
+            -DINTRINSIC_ENABLE_SANITIZERS=OFF \
+            -DCMAKE_CXX_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }} -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }}" \
+            -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }}"
+
+      - name: Build IntrinsicTests (${{ matrix.sanitizer.name }})
+        run: cmake --build --preset ci --target IntrinsicTests
+
+      - name: Run selected CPU tests (${{ matrix.sanitizer.name }})
+        run: ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration"
+
+      - name: Document skipped categories
+        run: |
+          echo "GPU-labeled tests are intentionally excluded from sanitizer CI."
+          echo "Heavy benchmark/SLO suites remain in dedicated workflows."

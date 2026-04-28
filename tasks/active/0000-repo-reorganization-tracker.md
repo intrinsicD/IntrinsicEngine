@@ -92,7 +92,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-080 | Add pull request template | done | work / TBD | Added `.github/pull_request_template.md` with required review sections and explicit docs/test/manifest decisions. |
 | RORG-081 | Create `pr-fast.yml` | done | work / TBD | Added `.github/workflows/pr-fast.yml` for pull requests with CI preset configure/build, `unit|contract` test labels, task validation, docs link checks (warning mode), and layering checks (warning mode). |
 | RORG-082 | Replace compressed `build.yml` with `ci-linux-clang.yml` | done | work / TBD | Added readable `.github/workflows/ci-linux-clang.yml` and removed legacy `build.yml`; preserved full CPU build/test + compile-hotspot gate behavior. |
-| RORG-083 | Add sanitizer workflow | not-started | - |  |
+| RORG-083 | Add sanitizer workflow | done | work / TBD | Added `.github/workflows/ci-sanitizers.yml` with ASan and UBSan matrix jobs, selected CPU test labels, and explicit note that GPU/heavy suites are intentionally excluded. |
 | RORG-084 | Add docs workflow | not-started | - |  |
 | RORG-085 | Add benchmark smoke workflow | not-started | - |  |
 | RORG-086 | Add nightly deep workflow | not-started | - |  |
