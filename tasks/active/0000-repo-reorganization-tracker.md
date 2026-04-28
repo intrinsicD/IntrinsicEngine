@@ -47,7 +47,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-001 | Capture current repository inventory | done | current branch / TBD | `docs/migration/current-repo-inventory.md` added. |
 | RORG-002 | Add a root final-state layout document | done | current branch / TBD | `docs/migration/target-repo-layout.md` added and linked from README. |
 | RORG-003 | Add initial repo hygiene checks without enforcing them yet | done | current branch / TBD | Added warning-mode checks and strict flags under `tools/repo`, `tools/docs`, and `tools/ci`. |
-| RORG-010 | Create canonical `AGENTS.md` | not-started | - |  |
+| RORG-010 | Create canonical `AGENTS.md` | done | current branch / TBD | Root contract created with required sections and invariants. |
 | RORG-011 | Convert `CLAUDE.md` into a thin redirect | not-started | - |  |
 | RORG-012 | Convert Copilot instructions into a thin redirect | not-started | - |  |
 | RORG-013 | Fix `.codex/config.yaml` | not-started | - |  |
