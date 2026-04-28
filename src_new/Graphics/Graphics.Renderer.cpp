@@ -220,6 +220,7 @@ namespace Extrinsic::Graphics
                 .Viewport       = input.Viewport,
                 .Alpha          = input.Alpha,
                 .HasPendingPick = input.HasPendingPick,
+                .DebugOverlayEnabled = input.DebugOverlayEnabled,
             };
         }
 
@@ -591,20 +592,25 @@ namespace Extrinsic::Graphics
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(postSelection, TextureUsage::ColorAttachmentWrite);
             });
-            [[maybe_unused]] const auto passOverlay = m_RenderGraph.AddPass("Null.OverlaySurface", [postSelection, postOverlay](RenderGraphBuilder& builder) {
-                builder.Read(postSelection, TextureUsage::ShaderRead);
-                builder.Write(postOverlay, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passDebug = m_RenderGraph.AddPass("Null.DebugView", [postOverlay, postDebug](RenderGraphBuilder& builder) {
-                builder.Read(postOverlay, TextureUsage::ShaderRead);
-                builder.Write(postDebug, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passImGui = m_RenderGraph.AddPass("Null.ImGui", [postDebug](RenderGraphBuilder& builder) {
-                builder.Read(postDebug, TextureUsage::ShaderRead);
+            auto presentSource = postSelection;
+            if (renderWorld.DebugOverlayEnabled)
+            {
+                [[maybe_unused]] const auto passOverlay = m_RenderGraph.AddPass("Null.OverlaySurface", [postSelection, postOverlay](RenderGraphBuilder& builder) {
+                    builder.Read(postSelection, TextureUsage::ShaderRead);
+                    builder.Write(postOverlay, TextureUsage::ColorAttachmentWrite);
+                });
+                [[maybe_unused]] const auto passDebug = m_RenderGraph.AddPass("Null.DebugView", [postOverlay, postDebug](RenderGraphBuilder& builder) {
+                    builder.Read(postOverlay, TextureUsage::ShaderRead);
+                    builder.Write(postDebug, TextureUsage::ColorAttachmentWrite);
+                });
+                presentSource = postDebug;
+            }
+            [[maybe_unused]] const auto passImGui = m_RenderGraph.AddPass("Null.ImGui", [presentSource](RenderGraphBuilder& builder) {
+                builder.Read(presentSource, TextureUsage::ShaderRead);
                 builder.SideEffect();
             });
-            [[maybe_unused]] const auto passPresent = m_RenderGraph.AddPass("Null.Present", [backbuffer, postDebug](RenderGraphBuilder& builder) {
-                builder.Read(postDebug, TextureUsage::ShaderRead);
+            [[maybe_unused]] const auto passPresent = m_RenderGraph.AddPass("Null.Present", [backbuffer, presentSource](RenderGraphBuilder& builder) {
+                builder.Read(presentSource, TextureUsage::ShaderRead);
                 builder.Read(backbuffer, TextureUsage::Present);
                 builder.SideEffect();
             });

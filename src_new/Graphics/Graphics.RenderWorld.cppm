@@ -33,6 +33,9 @@ namespace Extrinsic::Graphics
         /// Extracted pick request state for this frame.
         bool HasPendingPick{false};
 
+        /// Enables optional overlay/debug visualization chain.
+        bool DebugOverlayEnabled{false};
+
         /// Timeline value of the most recently completed GPU frame.
         /// Populated by EndFrame and made available here for downstream
         /// maintenance queries (deferred deletion, transfer GC).

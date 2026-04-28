@@ -32,6 +32,11 @@ namespace Extrinsic::Graphics
         /// when this is set.
         bool HasPendingPick{false};
 
+        /// Enables debug/overlay post chain in the null renderer path.
+        /// When false (default), presentation samples the selection output
+        /// directly so optional debug visualization passes are culled.
+        bool DebugOverlayEnabled{false};
+
         // Future expansion slots (zero-cost when unused):
         //   WorldSnapshot  World{};        — authoritative ECS snapshot
         //   InputSnapshot  Input{};        — input state at extraction time
