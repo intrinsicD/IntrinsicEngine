@@ -74,7 +74,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-054 | Add minimal benchmark smoke runner skeleton | done | work / TBD | Added `IntrinsicBenchmarkSmoke`, smoke dataset/baseline manifests, and JSON-emitting runner skeleton (CPU-only). |
 | RORG-060 | Create new tests directory skeleton | done | work / TBD | Added `tests/{unit,contract,integration,regression,gpu,benchmark,support}` skeleton with subsystem READMEs; existing build/test wiring left unchanged. |
 | RORG-061 | Add test classification policy | done | work / TBD | Added `docs/architecture/test-strategy.md` with required categories, naming convention, and CTest label mapping policy. |
-| RORG-062 | Add CMake support for test subdirectories and labels | not-started | - |  |
+| RORG-062 | Add CMake support for test subdirectories and labels | done | work / TBD | Added migration-aware source resolution in `tests/CMakeLists.txt` that prefers new categorized paths and falls back to legacy root paths; added CTest labels (`unit`, subsystem labels) to test executables. |
 | RORG-063 | Move Core unit tests | not-started | - |  |
 | RORG-064 | Move Geometry unit tests | not-started | - |  |
 | RORG-065 | Move Asset and ECS unit tests | not-started | - |  |
