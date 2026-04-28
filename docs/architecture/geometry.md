@@ -15,4 +15,4 @@
 
 ## Migration note
 
-During reorganization, legacy geometry implementations may temporarily remain elsewhere; canonical placement target is `src/geometry`.
+As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining `src/legacy` geometry shims (if any) must be temporary, tracked, and removed via follow-up migration tasks.
