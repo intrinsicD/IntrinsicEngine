@@ -1,0 +1,25 @@
+id: geometry.template.method
+name: Template Method
+domain: geometry
+status: proposed
+paper:
+  title: "Replace with paper title"
+  authors: "Replace with author list"
+  year: 0
+  doi: ""
+  url: ""
+inputs:
+  - "Describe required inputs"
+outputs:
+  - "Describe expected outputs"
+backends:
+  - cpu_reference
+metrics:
+  - "quality_error_l2"
+  - "runtime_ms"
+correctness_tests:
+  - "tests/README.md"
+benchmarks:
+  - "benchmarks/README.md"
+known_limitations:
+  - "Document degenerate input behavior and assumptions"
