@@ -55,9 +55,10 @@ This page is the canonical entry point for repository documentation.
 
 ## API / generated docs
 
-Generated API and inventory docs are in progress. Current generated inventory location:
+Generated API and inventory docs:
 
-- [src_new module inventory](architecture/src_new_module_inventory.md)
+- [Canonical module inventory (`src/`)](api/generated/module_inventory.md)
+- [Migration module inventory (`src_new`)](architecture/src_new_module_inventory.md)
 
 ## Build / troubleshooting
 

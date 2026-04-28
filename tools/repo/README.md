@@ -8,7 +8,7 @@ Repository structure and policy scripts.
 - `check_expected_top_level.py`: compares current top-level tree to configured expectations.
 - `check_layering.py`: validates layer dependency boundaries in warning mode by default, with `--strict` for CI enforcement.
 - `check_ui_contract_guard.sh`: UI boundary guard script (canonical path).
-- `generate_module_inventory.py`: current module inventory generator (canonical path; final-layout expansion tracked by RORG-075).
+- `generate_module_inventory.py`: module inventory generator for both `src/` (final layout) and `src_new/` (migration snapshot); defaults to `docs/api/generated/module_inventory.md`.
 
 ## Config files
 
