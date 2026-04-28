@@ -1,0 +1,45 @@
+name: ci-bench-smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  benchmark-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            python3
+
+      - name: Configure (ci preset)
+        run: cmake --preset ci
+
+      - name: Build benchmark smoke target
+        run: cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+
+      - name: Run benchmark smoke runner
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p build/ci/benchmark/IntrinsicBenchmarkSmoke
+          build/ci/IntrinsicBenchmarkSmoke build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json
+
+      - name: Validate benchmark result JSON
+        run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark
+
+      - name: Upload benchmark smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-smoke-result
+          path: build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json
