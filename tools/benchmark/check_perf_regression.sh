@@ -5,11 +5,11 @@
 # Exit code 0 = pass, 1 = regression detected, 2 = usage error.
 #
 # Usage:
-#   ./tools/check_perf_regression.sh <benchmark.json> [--avg-ms <max>] [--p99-ms <max>] [--min-fps <min>]
+#   ./tools/benchmark/check_perf_regression.sh <benchmark.json> [--avg-ms <max>] [--p99-ms <max>] [--min-fps <min>]
 #
 # Examples:
-#   ./tools/check_perf_regression.sh benchmark.json --avg-ms 16.67 --p99-ms 33.33 --min-fps 60
-#   ./tools/check_perf_regression.sh benchmark.json --avg-ms 8.33
+#   ./tools/benchmark/check_perf_regression.sh benchmark.json --avg-ms 16.67 --p99-ms 33.33 --min-fps 60
+#   ./tools/benchmark/check_perf_regression.sh benchmark.json --avg-ms 8.33
 
 set -euo pipefail
 

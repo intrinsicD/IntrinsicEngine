@@ -195,7 +195,7 @@ CSM for the directional light is complete: shadow atlas, depth-only rendering, P
 
 ### Benchmarking & Profiling (**MVP complete**)
 
-GPU timestamp queries per major render pass via `RHI::GpuProfiler`, CPU per-system timings via `RenderGraph` instrumentation, and a deterministic benchmark runner (`Core::Benchmark::BenchmarkRunner`) with JSON output are in place. The Performance panel shows per-pass GPU+CPU timings. Headless benchmark mode (`--benchmark <frames> --out file.json`) runs a fixed frame count and exits. Threshold-based regression checking via `tools/check_perf_regression.sh` supports avg/p99 frame time and min FPS gates.
+GPU timestamp queries per major render pass via `RHI::GpuProfiler`, CPU per-system timings via `RenderGraph` instrumentation, and a deterministic benchmark runner (`Core::Benchmark::BenchmarkRunner`) with JSON output are in place. The Performance panel shows per-pass GPU+CPU timings. Headless benchmark mode (`--benchmark <frames> --out file.json`) runs a fixed frame count and exits. Threshold-based regression checking via `tools/benchmark/check_perf_regression.sh` supports avg/p99 frame time and min FPS gates.
 
 Long-horizon additions: GPU-driven pass culling profiling, multi-scene benchmark suites, historical regression tracking with baseline storage.
 

@@ -4,9 +4,10 @@ Benchmark manifest, result, and performance regression tooling.
 
 ## Current state
 
-No benchmark-owned scripts are present yet.
+- `tools/benchmark/check_perf_regression.sh` — threshold-based performance regression gate for benchmark JSON outputs.
+- `tools/benchmark/validate_benchmark_manifests.py` — benchmark manifest validator.
+- `tools/benchmark/validate_benchmark_results.py` — benchmark result JSON validator.
 
-## Planned moves
+## Notes
 
-- `tools/check_perf_regression.sh` -> `tools/benchmark/check_perf_regression.sh` (RORG-073).
-- Add `validate_benchmark_manifests.py` and `validate_benchmark_results.py` (RORG-051, RORG-052).
+- `check_perf_regression.sh` was moved from `tools/check_perf_regression.sh` in RORG-073.
