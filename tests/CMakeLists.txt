@@ -267,7 +267,17 @@ if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
         Test_CoreAssetSafety.cpp
     )
     intrinsic_resolve_test_sources(_runtime_test_sources
-        SEARCH_DIRS unit/assets unit/runtime integration/runtime integration/app contract/runtime contract/ui .
+        SEARCH_DIRS
+            unit/assets
+            unit/runtime
+            unit/graphics
+            integration/runtime
+            integration/app
+            integration/graphics
+            contract/runtime
+            contract/ui
+            contract/graphics
+            .
         FILES ${_runtime_test_files}
     )
     intrinsic_test_object_lib(RuntimeTestObjs
@@ -293,7 +303,7 @@ if(TARGET RuntimeTestObjs)
     intrinsic_test_executable(IntrinsicTests
         OBJECTS  CoreTestObjs ECSTestObjs GeometryTestObjs RuntimeTestObjs
         LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
-        LABELS unit contract integration core assets ecs geometry runtime
+        LABELS unit contract integration core assets ecs geometry graphics runtime
     )
 endif()
 
