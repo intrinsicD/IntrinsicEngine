@@ -15,6 +15,8 @@ Repository reorganization planning and migration state are tracked here:
 
 Future root `AGENTS.md` contract updates should link directly to these migration docs while the move plan is active.
 
+For a single canonical navigation page across architecture, migration, agent process, and troubleshooting docs, use `docs/index.md`.
+
 ---
 
 ## Active Reimplementation: `src_new/`
