@@ -368,7 +368,7 @@ Add tests for:
 - bitmasks
 - mixed payload serialization
 
-These later items are intentionally left as backlog items in `TODO.md` until the data-layout tradeoffs are proven.
+These later items are intentionally left as backlog items in `tasks/backlog/legacy-todo.md` until the data-layout tradeoffs are proven.
 
 ## 13. Practical File List for an Initial Implementation
 
@@ -385,7 +385,7 @@ If implementation starts, the most likely files are:
 - `assets/shaders/halfedge_patch.frag`
 - `tests/Test_HtexPatch.cpp`
 - `README.md`
-- `TODO.md`
+- `tasks/backlog/legacy-todo.md`
 
 ## 14. Recommendation
 

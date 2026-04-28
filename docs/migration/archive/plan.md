@@ -20,10 +20,10 @@ The next architectural frontier is the **`src_new/` reimplementation** (see `CLA
 
 - `docs/architecture/rendering-three-pass.md` — canonical technical architecture spec for the legacy renderer (pass contracts, data contracts, invariants).
 - `docs/architecture/runtime-subsystem-boundaries.md` — legacy runtime ownership map, dependency directions, and lifecycle order.
-- `TODO.md` — active near-term execution queue.
-- `ROADMAP.md` — medium/long-horizon sequencing.
+- `tasks/backlog/legacy-todo.md` — active near-term execution queue.
+- `docs/roadmap.md` — medium/long-horizon sequencing.
 
 ## Notes
 
-- Keep `PLAN.md` intentionally small to avoid duplicating live architecture spec and active backlog content.
-- Do not add new implementation backlog items here; use `TODO.md`.
+- Keep `docs/migration/archive/plan.md` intentionally small to avoid duplicating live architecture spec and active backlog content.
+- Do not add new implementation backlog items here; use `tasks/backlog/legacy-todo.md`.

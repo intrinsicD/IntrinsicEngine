@@ -56,7 +56,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-021 | Create architecture docs index and taxonomy | done | work / TBD | Added canonical architecture docs and status taxonomy in `docs/architecture/index.md`. |
 | RORG-022 | Move ADRs into `docs/adr/` | done | current branch / TBD | Moved ADRs to `docs/adr/`, added ADR index/template, and updated links. |
 | RORG-023 | Create migration docs package | done | work / TBD | Added `docs/migration/index.md`, `legacy-retirement.md`, `source-tree-reorganization.md`, and `src-new-status.md`; kept generated inventory path stable pending generator migration task. |
-| RORG-024 | Normalize root planning docs | not-started | - |  |
+| RORG-024 | Normalize root planning docs | done | work / TBD | Moved root planning docs under `docs/` and `tasks/`; removed root planning markdown clutter. |
 | RORG-025 | Add docs link validation to CI warning mode | done | work / TBD | Added `.github/workflows/ci-docs.yml` with PR trigger and warning-mode docs link check; strict mode deferred to RORG-121. |
 | RORG-030 | Create task directory structure | done | current branch / TBD | Added `tasks/README.md`, status READMEs, and task templates under `tasks/templates/`. |
 | RORG-031 | Split current `TODO.md` into task files | not-started | - |  |

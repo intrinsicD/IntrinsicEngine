@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TODO_FILE="TODO.md"
+TODO_FILE="tasks/backlog/legacy-todo.md"
 
 if [[ ! -f "$TODO_FILE" ]]; then
   echo "ERROR: $TODO_FILE not found" >&2
@@ -19,4 +19,4 @@ if rg -n '\bDONE\.md\b' "$TODO_FILE"; then
   exit 1
 fi
 
-echo "TODO.md policy check passed: active/unfinished backlog only."
+echo "tasks/backlog/legacy-todo.md policy check passed: active/unfinished backlog only."

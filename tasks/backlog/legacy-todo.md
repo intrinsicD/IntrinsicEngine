@@ -33,11 +33,11 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - `docs/architecture/runtime-subsystem-boundaries.md` — legacy runtime ownership map, dependency directions, and startup/per-frame/shutdown lifecycle.
 - `docs/architecture/post-merge-audit-checklist.md` — required stabilization gate for architecture-touching PRs (contracts, telemetry, graph ownership, config ownership, UI churn checks).
 - `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` — ratified default runtime migration path (legacy tree).
-- `PLAN.md` — archival index for the completed three-pass migration.
-- `ROADMAP.md` — medium/long-horizon feature roadmap and phase ordering.
+- `docs/migration/archive/plan.md` — archival index for the completed three-pass migration.
+- `docs/roadmap.md` — medium/long-horizon feature roadmap and phase ordering.
 - `README.md` — user-facing architecture summary, build/test entry points, and SLOs.
 - `CLAUDE.md` — contributor conventions, C++23 policy, `src_new` migration contract, and markdown sync contract.
-- `PATTERNS.md` — reusable patterns catalog with canonical examples and usage guidance.
+- `docs/architecture/patterns.md` — reusable patterns catalog with canonical examples and usage guidance.
 - `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` — GPU-driven modular rendering pipeline plan (code-aware reuse + gap audit). Refines and implements C4 and C9; cross-references B1–B5.
 
 ---
@@ -3714,7 +3714,7 @@ public:
 - [x] Update `src_new/Core/README.md` with new graph partitions and public surface.
 - [x] Update `src_new/Graphics/README.md` with `Graphics.RenderGraph` public surface.
 - [x] Update `src_new/Runtime/README.md` with streaming executor/frame phases.
-- [x] Update top-level `TODO.md` if milestones are completed or replaced.
+- [x] Update top-level `tasks/backlog/legacy-todo.md` if milestones are completed or replaced.
 
 **Acceptance criteria:**
 
@@ -3877,7 +3877,7 @@ Constraints:
 - Update CMake, README, and module inventory when modules change.
 - Stop at the review gate for this PR and ensure all required tests pass.
 
-Implement the next unchecked TODOs from `TODO.md` and include the exact validation commands and results in the PR notes.
+Implement the next unchecked TODOs from `tasks/backlog/legacy-todo.md` and include the exact validation commands and results in the PR notes.
 ```
 
 # User-provided custom instructions

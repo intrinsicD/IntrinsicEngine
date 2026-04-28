@@ -10,7 +10,7 @@ Tasks move through this lifecycle:
 2. `tasks/active/` — currently in progress or currently blocked work.
 3. `tasks/done/` — completed work with completion metadata.
 
-Do not keep long-lived planning checklists in root-level `TODO.md` files once a task has been migrated into this structure.
+Do not keep long-lived planning checklists in root-level `tasks/backlog/legacy-todo.md` files once a task has been migrated into this structure.
 
 ## Task ID prefixes
 

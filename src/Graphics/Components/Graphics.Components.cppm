@@ -5,7 +5,7 @@
 // This module re-exports all individual component modules so that existing
 // importers (`import Graphics.Components;`) continue to work without change.
 //
-// Component Naming Contract (see PATTERNS.md S5):
+// Component Naming Contract (see docs/architecture/patterns.md S5):
 //
 //   *::Data  — Geometry data authority components (Graph::Data, PointCloud::Data,
 //              Mesh::Data). Hold shared_ptr to authoritative geometry, cached

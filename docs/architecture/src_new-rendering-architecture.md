@@ -1094,7 +1094,7 @@ Concretely: `GeometrySources::Vertices`, `::Edges`, `::Halfedges`, `::Faces` eac
 
 #### ✅ Issue B — "Runtime Modules" = Compile-Time Registered Units
 
-C++23 modules have no stable ABI. You cannot `dlopen` a `.cppm` module at runtime. `ROADMAP.md` explicitly bans this.
+C++23 modules have no stable ABI. You cannot `dlopen` a `.cppm` module at runtime. `docs/roadmap.md` explicitly bans this.
 
 **Resolution:** Algorithm modules are **compile-time registered units** that call `AlgorithmRegistry::Register(descriptor)` during engine startup. Each module is a C++23 module that is linked into the binary at build time. "Not present" means "not linked into the binary" (conditional CMake target) or "not registered" (startup flag). Not "loaded at runtime." Each compile-time module self-registers its menu entries, widget factories, ECS component descriptors, and event sinks in a single `Register()` call during `Engine::Init()`.
 

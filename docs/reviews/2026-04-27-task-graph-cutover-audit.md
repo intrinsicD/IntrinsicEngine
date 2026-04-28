@@ -1,6 +1,6 @@
 # Task Graph / Render Graph / Streaming Graph Cutover Audit (2026-04-27)
 
-This audit records the current post-merge status requested by `TODO.md` (T081) for the `src_new` graph architecture rollout.
+This audit records the current post-merge status requested by `tasks/backlog/legacy-todo.md` (T081) for the `src_new` graph architecture rollout.
 
 ## Checklist
 
@@ -28,7 +28,7 @@ This audit records the current post-merge status requested by `TODO.md` (T081) f
 ## Notes
 
 - This audit is scoped to the `src_new` task-graph migration documents and module boundaries.
-- Remaining TODO validation items requiring broader end-to-end environment coverage (e.g., Vulkan validation path) remain tracked separately in `TODO.md` Phase 6/8 checklists.
+- Remaining TODO validation items requiring broader end-to-end environment coverage (e.g., Vulkan validation path) remain tracked separately in `tasks/backlog/legacy-todo.md` Phase 6/8 checklists.
 
 ## Validation
 

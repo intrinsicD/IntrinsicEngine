@@ -3,7 +3,7 @@
 - **Status:** Accepted as a documented fallback option
 - **Date:** 2026-03-19
 - **Owners:** Runtime / Rendering Architecture
-- **Related backlog:** `TODO.md` → `B3. Engine Architecture Review Follow-Up`
+- **Related backlog:** `tasks/backlog/legacy-todo.md` → `B3. Engine Architecture Review Follow-Up`
 - **Related specs:** `docs/architecture/runtime-subsystem-boundaries.md`, `docs/architecture/rendering-three-pass.md`
 
 ## Context

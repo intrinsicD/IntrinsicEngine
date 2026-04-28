@@ -1,6 +1,6 @@
 # `src_new` Task Graph Architecture (CPU Task Graph, GPU Render Graph, Async Streaming Graph)
 
-This document defines the graph architecture contract for `src_new` and is the implementation guide for Core/Runtime/Graphics work in `TODO.md`.
+This document defines the graph architecture contract for `src_new` and is the implementation guide for Core/Runtime/Graphics work in `tasks/backlog/legacy-todo.md`.
 
 ## 1. Three graph domains and ownership
 
