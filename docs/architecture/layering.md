@@ -18,10 +18,23 @@ This document defines enforceable layer dependencies for IntrinsicEngine.
 - Any lower layer importing a higher layer.
 - Graphics importing live ECS/gameplay ownership types.
 - App symbols imported by lower layers.
+- Runtime imports in lower layers (`core`, `geometry`, `assets`, `ecs`, `graphics/*`, `platform`).
 - Undocumented legacy compatibility shortcuts.
 
 ## Enforcement
 
 - Policy source of truth: `AGENTS.md`.
-- Scripted enforcement path: `tools/repo/check_layering.py` (introduced in RORG-074).
-- Temporary exceptions must be documented in `tasks/active/0000-repo-reorganization-tracker.md` with removal task IDs.
+- Scripted enforcement path: `tools/repo/check_layering.py`.
+- Temporary exceptions are tracked in `tools/repo/layering_allowlist.yaml` and must include task IDs and expiry notes.
+- The checker runs in warning mode by default and supports `--strict` for CI hard-fail.
+
+### Local verification
+
+```bash
+python3 tools/repo/check_layering.py --root src
+python3 tools/repo/check_layering.py --root src --strict
+```
+
+### Migration note
+
+`src/legacy` may temporarily violate final boundaries only when the dependency is allowlisted and tracked in `tasks/active/0000-repo-reorganization-tracker.md` with a removal task.
