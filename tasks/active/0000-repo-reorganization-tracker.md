@@ -90,7 +90,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-075 | Add module inventory generator for final layout | done | work / TBD | Updated `tools/repo/generate_module_inventory.py` to default to `src` + `docs/api/generated/module_inventory.md`, added layer summaries including `legacy`, and retained `src_new` generation support for migration. |
 | RORG-076 | Add docs sync checker | done | work / TBD | Added `tools/docs/check_docs_sync.py` + `tools/docs/docs_sync_rules.yaml`; supports warning mode, strict mode, and `--diff-mode` against a base ref (default `origin/main`). |
 | RORG-080 | Add pull request template | done | work / TBD | Added `.github/pull_request_template.md` with required review sections and explicit docs/test/manifest decisions. |
-| RORG-081 | Create `pr-fast.yml` | not-started | - |  |
+| RORG-081 | Create `pr-fast.yml` | done | work / TBD | Added `.github/workflows/pr-fast.yml` for pull requests with CI preset configure/build, `unit|contract` test labels, task validation, docs link checks (warning mode), and layering checks (warning mode). |
 | RORG-082 | Replace compressed `build.yml` with `ci-linux-clang.yml` | not-started | - |  |
 | RORG-083 | Add sanitizer workflow | not-started | - |  |
 | RORG-084 | Add docs workflow | not-started | - |  |

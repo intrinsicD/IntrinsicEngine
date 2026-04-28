@@ -1,0 +1,41 @@
+name: pr-fast
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pr-fast:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3
+
+      - name: Configure (ci preset)
+        run: cmake --preset ci
+
+      - name: Build IntrinsicTests target
+        run: cmake --build --preset ci --target IntrinsicTests
+
+      - name: Run unit and contract tests
+        run: ctest --test-dir build/ci --output-on-failure -L "unit|contract"
+
+      - name: Validate structured tasks
+        run: python3 tools/agents/validate_tasks.py --root tasks --strict
+
+      - name: Validate docs links (warning mode)
+        run: python3 tools/docs/check_doc_links.py --root .
+
+      - name: Validate layering (warning mode)
+        run: python3 tools/repo/check_layering.py --root src
