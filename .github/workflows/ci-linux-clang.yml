@@ -1,0 +1,61 @@
+name: ci-linux-clang
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ci-linux-clang:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3 \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
+
+      - name: Enforce task policy
+        run: python3 tools/agents/check_task_policy.py --root . --strict
+
+      - name: Configure (ci preset)
+        run: cmake --preset ci
+
+      - name: Build full CPU targets
+        run: cmake --build --preset ci
+
+      - name: Compile hotspot benchmark gate
+        run: |
+          python3 tools/analysis/compile_hotspots.py \
+            --build-dir build/ci \
+            --top 40 \
+            --json-out build/ci/compile_hotspots_report.json \
+            --baseline-json tools/analysis/compile_hotspot_baseline.json
+
+      - name: Run full CPU test suite
+        run: ctest --test-dir build/ci --output-on-failure
+
+      - name: SLO performance gate (FrameGraph 2k-node scenario)
+        run: ./build/ci/bin/IntrinsicCoreTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes
