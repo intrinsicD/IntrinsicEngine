@@ -45,7 +45,7 @@ def main() -> int:
     parser.add_argument("files", nargs="*", help="Module interface files (relative to repo root)")
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     selected_files = list(args.files)
     if args.tier_a_b:
         selected_files.extend(TIER_AB_MODULES)

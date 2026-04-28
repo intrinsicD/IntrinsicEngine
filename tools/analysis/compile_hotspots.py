@@ -174,7 +174,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     log_path = root / args.build_dir / ".ninja_log"
     if not log_path.exists():
         raise SystemExit(f"Missing ninja log: {log_path}")

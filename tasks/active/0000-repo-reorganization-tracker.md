@@ -84,7 +84,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-069 | Delete old root test clutter | done | work / TBD | Moved remaining `tests/Test_*.cpp` sources into categorized directories, removed root-path resolver fallbacks from `tests/CMakeLists.txt`, and pointed shared sanitizer support to `tests/support/`. |
 | RORG-070 | Create target tools subdirectories | done | work / TBD | Added `tools/{repo,docs,ci,benchmark,agents,analysis}/README.md` with current ownership and planned migration map. |
 | RORG-071 | Move repo/policy tools | done | work / TBD | Moved repo/policy scripts to canonical owning paths (`tools/repo/*`, `tools/agents/*`) and retained root-path wrappers for one release cycle compatibility. |
-| RORG-072 | Move analysis/performance tools | not-started | - |  |
+| RORG-072 | Move analysis/performance tools | done | work / TBD | Moved analysis scripts/baselines into `tools/analysis/` and updated README/CI references. |
 | RORG-073 | Move performance regression script | not-started | - |  |
 | RORG-074 | Add layering checker | not-started | - |  |
 | RORG-075 | Add module inventory generator for final layout | not-started | - |  |

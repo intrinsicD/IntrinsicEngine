@@ -28,7 +28,7 @@ The primary PImpl benefit is that **implementation-file changes** (`.cpp`) no lo
 
 ## Module Fan-out Comparison (Interface Files)
 
-Post-PImpl interface sizes vs pre-PImpl baseline (`tools/module_fanout_baseline_2026-04-03.md`):
+Post-PImpl interface sizes vs pre-PImpl baseline (`tools/analysis/module_fanout_baseline_2026-04-03.md`):
 
 | File | Lines (pre→post) | import (pre→post) | #include (pre→post) | export (pre→post) |
 |------|-------------------|--------------------|-----------------------|--------------------|
