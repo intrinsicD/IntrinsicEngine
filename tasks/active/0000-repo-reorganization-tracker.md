@@ -86,7 +86,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-071 | Move repo/policy tools | done | work / TBD | Moved repo/policy scripts to canonical owning paths (`tools/repo/*`, `tools/agents/*`) and retained root-path wrappers for one release cycle compatibility. |
 | RORG-072 | Move analysis/performance tools | done | work / TBD | Moved analysis scripts/baselines into `tools/analysis/` and updated README/CI references. |
 | RORG-073 | Move performance regression script | done | work / TBD | Moved regression gate to `tools/benchmark/check_perf_regression.sh`; updated README/docs references to new canonical path. |
-| RORG-074 | Add layering checker | not-started | - |  |
+| RORG-074 | Add layering checker | done | work / TBD | Added `tools/repo/check_layering.py` + `tools/repo/layering_allowlist.yaml`; checker defaults to warning mode and supports `--strict`. |
 | RORG-075 | Add module inventory generator for final layout | not-started | - |  |
 | RORG-076 | Add docs sync checker | not-started | - |  |
 | RORG-080 | Add pull request template | not-started | - |  |

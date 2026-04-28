@@ -1,0 +1,15 @@
+# Temporary, tracked layering exceptions for migration.
+# Every entry must include a removal task ID and expiry note.
+exceptions:
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/**"
+    task: "RORG-092"
+    expires: "until src/legacy migration completes"
+    reason: "Legacy bridge code may reference promoted core modules during phased source moves."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/**"
+    task: "RORG-093"
+    expires: "until geometry promotion is complete"
+    reason: "Legacy systems may include geometry seams while canonical geometry ownership transitions."
