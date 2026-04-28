@@ -9,8 +9,6 @@ Root scanned: `src_new`
 | Layer | Module Count |
 |---|---:|
 | `app` | 1 |
-| `assets` | 7 |
-| `core` | 34 |
 | `ecs` | 18 |
 | `graphics` | 67 |
 | `platform` | 2 |
@@ -21,47 +19,6 @@ Root scanned: `src_new`
 | Module | File | Layer |
 |---|---|---|
 | `Extrinsic.Sandbox` | `src_new/App/Sandbox/Sandbox.cppm` | `app` |
-| `Extrinsic.Asset.EventBus` | `src_new/Assets/Asset.EventBus.cppm` | `assets` |
-| `Extrinsic.Asset.LoadPipeline` | `src_new/Assets/Asset.LoadPipeline.cppm` | `assets` |
-| `Extrinsic.Asset.PathIndex` | `src_new/Assets/Asset.PathIndex.cppm` | `assets` |
-| `Extrinsic.Asset.PayloadStore` | `src_new/Assets/Asset.PayloadStore.cppm` | `assets` |
-| `Extrinsic.Asset.Registry` | `src_new/Assets/Asset.Registry.cppm` | `assets` |
-| `Extrinsic.Asset.Service` | `src_new/Assets/Asset.Service.cppm` | `assets` |
-| `Extrinsic.Asset.TypePool` | `src_new/Assets/Asset.TypePool.cppm` | `assets` |
-| `Extrinsic.Core.CallbackRegistry` | `src_new/Core/Core.CallbackRegistry.cppm` | `core` |
-| `Extrinsic.Core.Config.Engine` | `src_new/Core/Core.Config.Engine.cppm` | `core` |
-| `Extrinsic.Core.Config.Render` | `src_new/Core/Core.Config.Render.cppm` | `core` |
-| `Extrinsic.Core.Config.Simulation` | `src_new/Core/Core.Config.Simulation.cppm` | `core` |
-| `Extrinsic.Core.Config.Window` | `src_new/Core/Core.Config.Window.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler:Compiler` | `src_new/Core/Core.Dag.Scheduler.Compiler.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler:DomainGraph` | `src_new/Core/Core.Dag.Scheduler.DomainGraph.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler:Hazards` | `src_new/Core/Core.Dag.Scheduler.Hazards.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler:Policy` | `src_new/Core/Core.Dag.Scheduler.Policy.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler:Types` | `src_new/Core/Core.Dag.Scheduler.Types.cppm` | `core` |
-| `Extrinsic.Core.Dag.Scheduler` | `src_new/Core/Core.Dag.Scheduler.cppm` | `core` |
-| `Extrinsic.Core.Dag.TaskGraph` | `src_new/Core/Core.Dag.TaskGraph.cppm` | `core` |
-| `Extrinsic.Core.Error` | `src_new/Core/Core.Error.cppm` | `core` |
-| `Extrinsic.Core.Filesystem.PathResolver` | `src_new/Core/Core.Filesystem.PathResolver.cppm` | `core` |
-| `Extrinsic.Core.Filesystem` | `src_new/Core/Core.Filesystem.cppm` | `core` |
-| `Extrinsic.Core.FrameGraph` | `src_new/Core/Core.FrameGraph.cppm` | `core` |
-| `Extrinsic.Core.HandleLease` | `src_new/Core/Core.HandleLease.cppm` | `core` |
-| `Extrinsic.Core.Hash` | `src_new/Core/Core.Hash.cppm` | `core` |
-| `Extrinsic.Core.IOBackend` | `src_new/Core/Core.IOBackend.cppm` | `core` |
-| `Extrinsic.Core.LockFreeQueue` | `src_new/Core/Core.LockFreeQueue.cppm` | `core` |
-| `Extrinsic.Core.Logging` | `src_new/Core/Core.Logging.cppm` | `core` |
-| `Extrinsic.Core.Memory:Common` | `src_new/Core/Core.Memory.Common.cppm` | `core` |
-| `Extrinsic.Core.Memory:LinearArena` | `src_new/Core/Core.Memory.LinearArena.cppm` | `core` |
-| `Extrinsic.Core.Memory:Polymorphic` | `src_new/Core/Core.Memory.Polymorphic.cppm` | `core` |
-| `Extrinsic.Core.Memory:ScopeStack` | `src_new/Core/Core.Memory.ScopeStack.cppm` | `core` |
-| `Extrinsic.Core.Memory` | `src_new/Core/Core.Memory.cppm` | `core` |
-| `Extrinsic.Core.Process` | `src_new/Core/Core.Process.cppm` | `core` |
-| `Extrinsic.Core.ResourcePool` | `src_new/Core/Core.ResourcePool.cppm` | `core` |
-| `Extrinsic.Core.StrongHandle` | `src_new/Core/Core.StrongHandle.cppm` | `core` |
-| `Extrinsic.Core.Tasks.CounterEvent` | `src_new/Core/Core.Tasks.CounterEvent.cppm` | `core` |
-| `Extrinsic.Core.Tasks:Internal` | `src_new/Core/Core.Tasks.Internal.cppm` | `core` |
-| `Extrinsic.Core.Tasks:LocalTask` | `src_new/Core/Core.Tasks.LocalTask.cppm` | `core` |
-| `Extrinsic.Core.Tasks` | `src_new/Core/Core.Tasks.cppm` | `core` |
-| `Extrinsic.Core.Telemetry` | `src_new/Core/Core.Telemetry.cppm` | `core` |
 | `Extrinsic.ECS.Components.AssetInstance` | `src_new/ECS/Components/ECS.Component.AssetInstance.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Collider` | `src_new/ECS/Components/ECS.Component.Collider.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Culling.Local` | `src_new/ECS/Components/ECS.Component.Culling.Local.cppm` | `ecs` |
@@ -153,4 +110,4 @@ Root scanned: `src_new`
 | `Extrinsic.Runtime.FrameClock` | `src_new/Runtime/Runtime.FrameClock.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src_new/Runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **132**
+Total modules: **91**

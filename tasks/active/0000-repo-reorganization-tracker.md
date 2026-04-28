@@ -102,7 +102,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-092 | Move legacy non-Geometry source into `src/legacy/` | done | work / TBD | Moved legacy source tree under `src/legacy/` with mechanical `git mv`; updated source-root CMake path abstraction and path-sensitive tooling/tests. |
 | RORG-093 | Promote Geometry to `src/geometry/` | done | work / TBD | Moved `src/legacy/Geometry` to `src/geometry` via `git mv`; updated root CMake source-root abstraction to build Geometry from canonical path and refreshed geometry architecture docs. |
 | RORG-094 | Move `src_new/Core` to `src/core` | done | work / TBD | Moved `src_new/Core` to `src/core` with `git mv`; updated root/source CMake wiring so `src/core` is built from the canonical path while `src_new` no longer references `Core`. |
-| RORG-095 | Move `src_new/Assets` to `src/assets` | not-started | - |  |
+| RORG-095 | Move `src_new/Assets` to `src/assets` | done | work / TBD | Moved `src_new/Assets` to `src/assets` with `git mv`; updated root/src_new CMake wiring so `src/assets` builds from canonical path and `src_new` no longer references `Assets`. |
 | RORG-096 | Move `src_new/ECS` to `src/ecs` | not-started | - |  |
 | RORG-097 | Move `src_new/Graphics/RHI` to `src/graphics/rhi` | not-started | - |  |
 | RORG-098 | Move Vulkan backend to `src/graphics/vulkan` | not-started | - |  |

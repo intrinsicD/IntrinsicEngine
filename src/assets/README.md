@@ -1,6 +1,6 @@
 # Assets
 
-`src_new/Assets` contains the asset subsystem built on top of `Extrinsic.Core`.
+`src/assets` contains the asset subsystem built on top of `Extrinsic.Core`.
 `AssetService` is the main entry point; it wires together the registry, payload
 store, load pipeline, event bus, and path index behind a single façade.
 
