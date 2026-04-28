@@ -63,8 +63,7 @@ function(intrinsic_test_executable name)
 endfunction()
 
 # =============================================================================
-# Helper: resolve test source paths during migration.
-# Prefers categorized directories and falls back to legacy tests/ root paths.
+# Helper: resolve test source paths from categorized directories.
 # =============================================================================
 function(intrinsic_resolve_test_sources out_var)
     cmake_parse_arguments(ARG "" "" "SEARCH_DIRS;FILES" ${ARGN})
@@ -117,7 +116,7 @@ set(_core_test_files
     Test_LogRingBuffer.cpp
 )
 intrinsic_resolve_test_sources(_core_test_sources
-    SEARCH_DIRS unit/core .
+    SEARCH_DIRS unit/core
     FILES ${_core_test_files}
 )
 intrinsic_test_object_lib(CoreTestObjs
@@ -133,7 +132,7 @@ set(_ecs_test_files
     Test_EntityCommands.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
-    SEARCH_DIRS unit/ecs contract/ecs integration/runtime .
+    SEARCH_DIRS unit/ecs contract/ecs integration/runtime
     FILES ${_ecs_test_files}
 )
 intrinsic_test_object_lib(ECSTestObjs
@@ -147,7 +146,7 @@ set(_contract_build_test_files
     Test_CompileHotspotRefactors.cpp
 )
 intrinsic_resolve_test_sources(_contract_build_test_sources
-    SEARCH_DIRS contract/build .
+    SEARCH_DIRS contract/build
     FILES ${_contract_build_test_files}
 )
 intrinsic_test_object_lib(ContractBuildTestObjs
@@ -162,7 +161,7 @@ set(_benchmark_test_files
     Test_Benchmark.cpp
 )
 intrinsic_resolve_test_sources(_benchmark_test_sources
-    SEARCH_DIRS benchmark/slo benchmark .
+    SEARCH_DIRS benchmark/slo benchmark
     FILES ${_benchmark_test_files}
 )
 intrinsic_test_object_lib(BenchmarkTestObjs
@@ -223,7 +222,7 @@ set(_geometry_test_files
     Test_SubmeshView.cpp
 )
 intrinsic_resolve_test_sources(_geometry_test_sources
-    SEARCH_DIRS unit/geometry integration/geometry regression/numerical .
+    SEARCH_DIRS unit/geometry integration/geometry regression/numerical
     FILES ${_geometry_test_files}
 )
 intrinsic_test_object_lib(GeometryTestObjs
@@ -303,7 +302,8 @@ if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
             contract/runtime
             contract/ui
             contract/graphics
-            .
+            regression
+            gpu
         FILES ${_runtime_test_files}
     )
     intrinsic_test_object_lib(RuntimeTestObjs
@@ -316,7 +316,7 @@ endif()
 # Shared support for all test executables (sanitizer defaults, shared test hooks).
 intrinsic_test_object_lib(TestSupportObjs
     SOURCES
-        Test_SanitizerConfig.cpp
+        support/Test_SanitizerConfig.cpp
     DEPS IntrinsicCore
 )
 
