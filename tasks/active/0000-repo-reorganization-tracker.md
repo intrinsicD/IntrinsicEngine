@@ -54,7 +54,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-014 | Create agent docs package | done | work / TBD | Added `docs/agent/*` expanded workflow package and linked from `AGENTS.md`. |
 | RORG-020 | Create `docs/index.md` | done | current branch / TBD | Added `docs/index.md` with required sections; linked from `README.md`. |
 | RORG-021 | Create architecture docs index and taxonomy | done | work / TBD | Added canonical architecture docs and status taxonomy in `docs/architecture/index.md`. |
-| RORG-022 | Move ADRs into `docs/adr/` | not-started | - |  |
+| RORG-022 | Move ADRs into `docs/adr/` | done | current branch / TBD | Moved ADRs to `docs/adr/`, added ADR index/template, and updated links. |
 | RORG-023 | Create migration docs package | not-started | - |  |
 | RORG-024 | Normalize root planning docs | not-started | - |  |
 | RORG-025 | Add docs link validation to CI warning mode | not-started | - |  |
