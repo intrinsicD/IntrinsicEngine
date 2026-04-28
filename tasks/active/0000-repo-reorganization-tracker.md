@@ -61,7 +61,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-030 | Create task directory structure | done | current branch / TBD | Added `tasks/README.md`, status READMEs, and task templates under `tasks/templates/`. |
 | RORG-031 | Split current `TODO.md` into task files | done | work / TBD | Added structured backlog seed tasks under architecture/rendering/runtime/src-new/geometry/ui and converted legacy backlog file to archive index. |
 | RORG-032 | Add task validator | done | work / TBD | Added `tools/agents/validate_tasks.py` with warning/strict modes and required-section checks. |
-| RORG-033 | Replace TODO policy script | not-started | - |  |
+| RORG-033 | Replace TODO policy script | done | work / TBD | Added `tools/agents/check_task_policy.py`; kept `tools/check_todo_active_only.sh` as a strict compatibility wrapper; CI now calls the new checker directly. |
 | RORG-040 | Create `methods/` root and package template | not-started | - |  |
 | RORG-041 | Add method manifest schema | not-started | - |  |
 | RORG-042 | Create method docs package | not-started | - |  |
