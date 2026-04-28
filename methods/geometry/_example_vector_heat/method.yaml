@@ -1,0 +1,24 @@
+id: geometry.example_vector_heat
+name: Example Vector Heat Package Skeleton
+domain: geometry
+status: proposed
+paper:
+  title: "Vector Heat Method (Example Placeholder)"
+  authors: "TODO"
+  year: 0
+  doi: "TODO"
+  url: "https://example.invalid/vector-heat"
+inputs:
+  - triangle_mesh
+outputs:
+  - vector_field_estimate
+backends:
+  - cpu_reference
+metrics:
+  - geodesic_direction_l2
+correctness_tests:
+  - tests/README.md
+benchmarks:
+  - benchmarks/README.md
+known_limitations:
+  - Example package only; no executable implementation is provided.
