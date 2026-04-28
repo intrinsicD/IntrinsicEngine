@@ -91,11 +91,11 @@ cmake --build --preset dev --target IntrinsicTests
 Capture and gate the slowest Ninja compile edges after a build:
 
 ```bash
-python3 ./tools/compile_hotspots.py \
+python3 ./tools/analysis/compile_hotspots.py \
   --build-dir build \
   --top 40 \
   --json-out build/compile_hotspots_report.json \
-  --baseline-json tools/compile_hotspot_baseline.json
+  --baseline-json tools/analysis/compile_hotspot_baseline.json
 ```
 
 ---

@@ -2,14 +2,14 @@
 
 Static analysis and performance analysis tooling.
 
-## Current scripts pending migration
+## Current scripts
 
-- `tools/compile_hotspots.py`
-- `tools/module_fanout.py`
-- `tools/compile_hotspot_baseline.json`
-- `tools/module_fanout_baseline_2026-04-03.md`
-- `tools/build_time_baseline_2026-04-05.md`
+- `tools/analysis/compile_hotspots.py`
+- `tools/analysis/module_fanout.py`
+- `tools/analysis/compile_hotspot_baseline.json`
+- `tools/analysis/module_fanout_baseline_2026-04-03.md`
+- `tools/analysis/build_time_baseline_2026-04-05.md`
 
-## Planned moves
+## Migration status
 
-- Move all of the above into `tools/analysis/` and update CI/docs references (RORG-072).
+- RORG-072 completed: analysis scripts/baselines now live under `tools/analysis/` and CI/docs references use the new paths.
