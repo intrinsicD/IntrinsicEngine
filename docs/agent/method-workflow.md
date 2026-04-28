@@ -31,3 +31,12 @@ This workflow governs scientific paper/method implementation in IntrinsicEngine.
 - Method correctness tests pass.
 - Benchmark manifests validate.
 - Benchmark outputs include machine-readable diagnostics and status.
+
+## Required references
+
+- [Methods docs index](../methods/index.md)
+- [Reference implementation policy](../methods/reference-implementation-policy.md)
+- [Backend policy](../methods/backend-policy.md)
+- [Numerical robustness policy](../methods/numerical-robustness-policy.md)
+- [Dataset policy](../methods/dataset-policy.md)
+- [Method report template](../methods/report-template.md)
