@@ -5,26 +5,14 @@ project:
   build_system: cmake
 
 workflow:
-  # The command the agent runs to verify its work
-  verification_command: "ninja -C build"
+  verification_command: "cmake --preset ci && cmake --build --preset ci --target help"
+  instruction_file: "AGENTS.md"
 
-  # Critical for large C++ engines:
-  # Tells the agent to ignore generated files to save context window
-  ignore:
-    - "build/**"
-    - "external/**"
-    - ".git/**"
-
-  # Guidelines for the agent (It adheres to these strictly in 5.1)
-  style_guide: |
-    - Use C++20 Modules (.cppm) for interfaces.
-    - Use LinearArena for per-frame allocations.
-    - NO exceptions (-fno-exceptions).
-    - Use std::expected for error handling.
-    - Prefer Data-Oriented Design (SoA) over OOP.
+ignore:
+  - "build/**"
+  - "external/**"
+  - ".git/**"
 
 agent:
-  # 'xhigh' reasoning is required for Vulkan synchronization logic
   reasoning_effort: xhigh
-  # Enable compaction to allow 4+ hour sessions
   enable_compaction: true
