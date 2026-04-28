@@ -60,7 +60,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-025 | Add docs link validation to CI warning mode | done | work / TBD | Added `.github/workflows/ci-docs.yml` with PR trigger and warning-mode docs link check; strict mode deferred to RORG-121. |
 | RORG-030 | Create task directory structure | done | current branch / TBD | Added `tasks/README.md`, status READMEs, and task templates under `tasks/templates/`. |
 | RORG-031 | Split current `TODO.md` into task files | done | work / TBD | Added structured backlog seed tasks under architecture/rendering/runtime/src-new/geometry/ui and converted legacy backlog file to archive index. |
-| RORG-032 | Add task validator | not-started | - |  |
+| RORG-032 | Add task validator | done | work / TBD | Added `tools/agents/validate_tasks.py` with warning/strict modes and required-section checks. |
 | RORG-033 | Replace TODO policy script | not-started | - |  |
 | RORG-040 | Create `methods/` root and package template | not-started | - |  |
 | RORG-041 | Add method manifest schema | not-started | - |  |
