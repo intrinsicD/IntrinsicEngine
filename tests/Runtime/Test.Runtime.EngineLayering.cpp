@@ -8,6 +8,11 @@
 
 namespace
 {
+    std::filesystem::path RepoRoot()
+    {
+        return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
+    }
+
     std::string ReadFile(const std::filesystem::path& path)
     {
         std::ifstream in(path);
@@ -20,7 +25,7 @@ namespace
 
 TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 {
-    const auto content = ReadFile("src_new/Runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src_new/Runtime/Runtime.Engine.cpp");
 
     // Runtime must orchestrate renderer phases, not GPU barriers/resources.
     EXPECT_NE(content.find("m_Renderer->BeginFrame"), std::string::npos);
@@ -40,7 +45,7 @@ TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 
 TEST(RuntimeEngineLayering, RunFramePreservesDocumentedBroadPhaseOrdering)
 {
-    const auto content = ReadFile("src_new/Runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src_new/Runtime/Runtime.Engine.cpp");
 
     const auto pollEvents = content.find("m_Window->PollEvents();");
     const auto simTick = content.find("m_Application->OnSimTick(*this, m_FixedDt);");
@@ -83,7 +88,7 @@ TEST(RuntimeEngineLayering, RunFramePreservesDocumentedBroadPhaseOrdering)
 
 TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)
 {
-    const auto publicApi = ReadFile("src_new/Runtime/Runtime.StreamingExecutor.cppm");
+    const auto publicApi = ReadFile(RepoRoot() / "src_new/Runtime/Runtime.StreamingExecutor.cppm");
     EXPECT_EQ(publicApi.find("import Extrinsic.ECS"), std::string::npos);
     EXPECT_EQ(publicApi.find("import Extrinsic.RHI"), std::string::npos);
     EXPECT_EQ(publicApi.find("Vk"), std::string::npos);
@@ -108,26 +113,26 @@ TEST(RuntimeEngineLayering, RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers
 
     for (const auto& path : renderGraphFiles)
     {
-        const auto content = ReadFile(path);
+        const auto content = ReadFile(RepoRoot() / path);
         EXPECT_EQ(content.find("import Extrinsic.ECS"), std::string::npos) << path.string();
         EXPECT_EQ(content.find("import ECS"), std::string::npos) << path.string();
         EXPECT_EQ(content.find("Vk"), std::string::npos) << path.string();
     }
 
     const std::vector<std::filesystem::path> coreGraphFiles{
-        "src_new/Core/Core.Dag.Scheduler.cppm",
-        "src_new/Core/Core.Dag.Scheduler.Types.cppm",
-        "src_new/Core/Core.Dag.Scheduler.Compiler.cppm",
-        "src_new/Core/Core.Dag.Scheduler.Hazards.cppm",
-        "src_new/Core/Core.Dag.TaskGraph.cppm",
-        "src_new/Core/Core.Dag.TaskGraph.cpp",
-        "src_new/Core/Core.FrameGraph.cppm",
-        "src_new/Core/Core.FrameGraph.cpp",
+        "src/core/Core.Dag.Scheduler.cppm",
+        "src/core/Core.Dag.Scheduler.Types.cppm",
+        "src/core/Core.Dag.Scheduler.Compiler.cppm",
+        "src/core/Core.Dag.Scheduler.Hazards.cppm",
+        "src/core/Core.Dag.TaskGraph.cppm",
+        "src/core/Core.Dag.TaskGraph.cpp",
+        "src/core/Core.FrameGraph.cppm",
+        "src/core/Core.FrameGraph.cpp",
     };
 
     for (const auto& path : coreGraphFiles)
     {
-        const auto content = ReadFile(path);
+        const auto content = ReadFile(RepoRoot() / path);
         EXPECT_EQ(content.find("TextureBarrier"), std::string::npos) << path.string();
         EXPECT_EQ(content.find("BufferBarrier"), std::string::npos) << path.string();
         EXPECT_EQ(content.find("TextureUsage"), std::string::npos) << path.string();
