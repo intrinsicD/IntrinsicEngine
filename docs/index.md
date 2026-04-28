@@ -18,10 +18,10 @@ This page is the canonical entry point for repository documentation.
 
 ## Methods
 
-Method-specific docs are not yet split into `docs/methods/`. During migration, use:
-
+- [Methods docs index](methods/index.md)
+- [Method template](methods/method-template.md)
+- [Method manifest schema](methods/method-manifest-schema.md)
 - [Agent method workflow](agent/method-workflow.md)
-- [Source-tree target layout (methods directory contract)](migration/target-repo-layout.md)
 
 ## Benchmarking
 

@@ -34,3 +34,15 @@ Each concrete method package should include:
 - `reports/`: validation and performance reports.
 
 The `_template` package in this directory is intentionally complete enough that agents can clone it and begin implementation without additional structure decisions.
+
+## Method documentation
+
+Method policy and onboarding docs live in `docs/methods/`:
+
+- `docs/methods/index.md`
+- `docs/methods/method-template.md`
+- `docs/methods/reference-implementation-policy.md`
+- `docs/methods/backend-policy.md`
+- `docs/methods/numerical-robustness-policy.md`
+- `docs/methods/dataset-policy.md`
+- `docs/methods/report-template.md`

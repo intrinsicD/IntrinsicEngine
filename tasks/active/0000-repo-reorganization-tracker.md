@@ -64,7 +64,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-033 | Replace TODO policy script | done | work / TBD | Added `tools/agents/check_task_policy.py`; kept `tools/check_todo_active_only.sh` as a strict compatibility wrapper; CI now calls the new checker directly. |
 | RORG-040 | Create `methods/` root and package template | done | work / TBD | Added `methods/` skeleton, template package, and pipeline documentation in `methods/README.md`. |
 | RORG-041 | Add method manifest schema | done | work / TBD | Added `docs/methods/method-manifest-schema.md` and `tools/agents/validate_method_manifests.py` with strict mode and path checks. |
-| RORG-042 | Create method docs package | not-started | - |  |
+| RORG-042 | Create method docs package | done | work / TBD | Added `docs/methods/` package and linked it from method workflow/docs index. |
 | RORG-043 | Add canonical method API concept doc | not-started | - |  |
 | RORG-044 | Add first sample method package without real algorithm code | not-started | - |  |
 | RORG-050 | Create benchmark directory structure | not-started | - |  |
