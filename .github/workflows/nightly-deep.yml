@@ -1,0 +1,123 @@
+name: nightly-deep
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly-cpu-deep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3 \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
+
+      - name: Configure (ci preset)
+        run: cmake --preset ci
+
+      - name: Build full CPU targets
+        run: cmake --build --preset ci
+
+      - name: Run full CPU test suite
+        run: ctest --test-dir build/ci --output-on-failure
+
+      - name: Run sanitizer-extended test pass (ASan)
+        run: |
+          cmake --preset ci \
+            -DINTRINSIC_ENABLE_SANITIZERS=OFF \
+            -DCMAKE_CXX_FLAGS_DEBUG="-fsanitize=address -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=address" \
+            -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=address"
+          cmake --build --preset ci --target IntrinsicTests
+          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression"
+
+      - name: Run sanitizer-extended test pass (UBSan)
+        run: |
+          cmake --preset ci \
+            -DINTRINSIC_ENABLE_SANITIZERS=OFF \
+            -DCMAKE_CXX_FLAGS_DEBUG="-fsanitize=undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=undefined" \
+            -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=undefined"
+          cmake --build --preset ci --target IntrinsicTests
+          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression"
+
+      - name: Run SLO/performance tests
+        run: ctest --test-dir build/ci --output-on-failure -L "benchmark|slo"
+
+      - name: Compile hotspot report
+        run: |
+          python3 tools/analysis/compile_hotspots.py \
+            --build-dir build/ci \
+            --top 40 \
+            --json-out build/ci/reports/compile_hotspots_report.json \
+            --baseline-json tools/analysis/compile_hotspot_baseline.json
+
+      - name: Module fanout report
+        run: |
+          python3 tools/analysis/module_fanout.py \
+            --root src \
+            --out build/ci/reports/module_fanout_report.md
+
+      - name: Build benchmark smoke target
+        run: cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+
+      - name: Run benchmark smoke and selected deep benchmarks
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p build/ci/benchmark/nightly
+          build/ci/IntrinsicBenchmarkSmoke build/ci/benchmark/nightly/smoke_result.json
+          python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark
+
+      - name: Upload nightly reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-deep-reports
+          path: |
+            build/ci/reports/compile_hotspots_report.json
+            build/ci/reports/module_fanout_report.md
+            build/ci/benchmark/nightly/smoke_result.json
+
+  nightly-gpu-optional:
+    if: ${{ vars.INTRINSIC_ENABLE_GPU_NIGHTLY == 'true' }}
+    runs-on: [self-hosted, linux, gpu]
+    timeout-minutes: 60
+    needs: nightly-cpu-deep
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (ci preset)
+        run: cmake --preset ci
+
+      - name: Build IntrinsicTests for GPU-labeled coverage
+        run: cmake --build --preset ci --target IntrinsicTests
+
+      - name: Run optional GPU tests (self-hosted runner)
+        run: ctest --test-dir build/ci --output-on-failure -L gpu
