@@ -1,0 +1,25 @@
+name: ci-docs
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  docs-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate markdown links (warning mode)
+        run: python3 tools/docs/check_doc_links.py --root .
+
+      - name: Note strict-mode follow-up
+        run: |
+          echo "Docs link validation is currently warning-only by design."
+          echo "Strict enforcement is tracked by RORG-121."
