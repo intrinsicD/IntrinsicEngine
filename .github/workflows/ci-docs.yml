@@ -19,7 +19,20 @@ jobs:
       - name: Validate markdown links (warning mode)
         run: python3 tools/docs/check_doc_links.py --root .
 
+      - name: Validate structured tasks
+        run: python3 tools/agents/validate_tasks.py --root tasks
+
+      - name: Validate method manifests
+        run: python3 tools/agents/validate_method_manifests.py --root methods
+
+      - name: Validate benchmark manifests
+        run: python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks
+
+      - name: Validate generated module inventory freshness
+        run: |
+          python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+          git diff --exit-code docs/api/generated/module_inventory.md
+
       - name: Note strict-mode follow-up
         run: |
-          echo "Docs link validation is currently warning-only by design."
-          echo "Strict enforcement is tracked by RORG-121."
+          echo "Docs/manifests checks are active; strict docs-link enforcement is tracked by RORG-121."
