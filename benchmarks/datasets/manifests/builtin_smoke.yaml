@@ -1,0 +1,9 @@
+benchmark_id: geometry.example.smoke
+method: geometry.example
+dataset: builtin.triangle_mesh.small
+params: {}
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 200
