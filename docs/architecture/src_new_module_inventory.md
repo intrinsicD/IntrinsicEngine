@@ -1,6 +1,6 @@
 # src_new Module Inventory (auto-generated)
 
-_Generated on 2026-04-27 by `tools/generate_src_new_module_inventory.py`._
+_Generated on 2026-04-28 by `tools/repo/generate_module_inventory.py`._
 
 | Module | File | Library |
 |---|---|---|

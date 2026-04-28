@@ -33,5 +33,5 @@ For EditorUI controller churn above 120 changed lines, `tests/Test_EditorUI.cpp`
 Suggested check:
 
 ```bash
-tools/check_ui_contract_guard.sh origin/main 120
+tools/repo/check_ui_contract_guard.sh origin/main 120
 ```
