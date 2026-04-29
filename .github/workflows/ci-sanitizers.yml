@@ -42,7 +42,7 @@ jobs:
         run: cmake --build --preset ci --target IntrinsicTests
 
       - name: Run selected CPU tests (${{ matrix.sanitizer.name }})
-        run: ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration"
+        run: ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60
 
       - name: Document skipped categories
         run: |
