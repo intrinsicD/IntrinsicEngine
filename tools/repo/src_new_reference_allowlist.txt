@@ -33,3 +33,5 @@ docs/roadmap.md
 docs/architecture/graphics.md
 docs/architecture/index.md
 docs/architecture/rendering-target-architecture.md
+
+.github/workflows/ci-docs.yml
