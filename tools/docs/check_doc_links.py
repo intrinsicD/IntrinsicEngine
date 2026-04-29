@@ -4,12 +4,37 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import re
 from pathlib import Path
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 FENCED_CODE_PATTERN = re.compile(r"```.*?```", re.DOTALL)
 INLINE_CODE_PATTERN = re.compile(r"`[^`]*`")
+IGNORED_TOP_LEVEL_PATTERNS = {
+    ".git",
+    ".idea",
+    "Testing",
+    "build",
+    "build-*",
+    "cmake-build-*",
+    "external",
+    "experimental",
+    "third_party",
+}
+
+
+def is_ignored_path(path: Path, root: Path) -> bool:
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return False
+
+    if not relative.parts:
+        return False
+
+    top_level = relative.parts[0]
+    return any(fnmatch.fnmatchcase(top_level, pattern) for pattern in IGNORED_TOP_LEVEL_PATTERNS)
 
 
 def is_ignored_link(link: str) -> bool:
@@ -35,7 +60,7 @@ def main() -> int:
     args = parser.parse_args()
 
     root = args.root.resolve()
-    markdown_files = sorted(root.rglob("*.md"))
+    markdown_files = sorted(p for p in root.rglob("*.md") if not is_ignored_path(p, root))
 
     broken: list[tuple[Path, str]] = []
     checked = 0

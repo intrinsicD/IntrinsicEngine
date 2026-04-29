@@ -5,7 +5,7 @@ Static analysis and performance analysis tooling.
 ## Current scripts
 
 - `tools/analysis/compile_hotspots.py`
-- `tools/analysis/module_fanout.py`
+- `tools/analysis/module_fanout.py`: reports import/include/export fan-out for selected files or `--root src`; `--fail-on-regression` compares files present in the recorded baseline.
 - `tools/analysis/compile_hotspot_baseline.json`
 - `tools/analysis/module_fanout_baseline_2026-04-03.md`
 - `tools/analysis/build_time_baseline_2026-04-05.md`

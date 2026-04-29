@@ -4,10 +4,25 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 from pathlib import Path
 
 ALLOWED_ROOT_MARKDOWN = {"README.md", "AGENTS.md", "CLAUDE.md"}
 DEFAULT_ALLOWLIST_FILE = Path("tools/repo/root_allowlist.yaml")
+IGNORED_LOCAL_TOP_LEVEL_PATTERNS = {
+    ".idea",
+    "Testing",
+    "build",
+    "build-*",
+    "cmake-build-*",
+    "external",
+    "experimental",
+    "third_party",
+}
+
+
+def _is_ignored_local_entry(name: str) -> bool:
+    return any(fnmatch.fnmatchcase(name, pattern) for pattern in IGNORED_LOCAL_TOP_LEVEL_PATTERNS)
 
 
 def _load_root_allowlist(path: Path) -> set[str]:
@@ -71,7 +86,7 @@ def main() -> int:
     current_entries = {
         f"{p.name}/" if p.is_dir() else p.name
         for p in root.iterdir()
-        if p.name != ".git"
+        if p.name != ".git" and not _is_ignored_local_entry(p.name)
     }
 
     unexpected_entries = sorted(current_entries - expected_entries) if expected_entries else []

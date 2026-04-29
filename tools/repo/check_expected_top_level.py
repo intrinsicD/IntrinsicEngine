@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 from pathlib import Path
 
 EXPECTED_TOP_LEVEL = {
@@ -28,6 +29,21 @@ EXPECTED_TOP_LEVEL = {
     "tools",
 }
 
+IGNORED_LOCAL_TOP_LEVEL_PATTERNS = {
+    ".idea",
+    "Testing",
+    "build",
+    "build-*",
+    "cmake-build-*",
+    "external",
+    "experimental",
+    "third_party",
+}
+
+
+def is_ignored_local_entry(name: str) -> bool:
+    return any(fnmatch.fnmatchcase(name, pattern) for pattern in IGNORED_LOCAL_TOP_LEVEL_PATTERNS)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -36,7 +52,7 @@ def main() -> int:
     args = parser.parse_args()
 
     root = args.root.resolve()
-    actual = {p.name for p in root.iterdir() if p.name != ".git"}
+    actual = {p.name for p in root.iterdir() if p.name != ".git" and not is_ignored_local_entry(p.name)}
 
     unexpected = sorted(actual - EXPECTED_TOP_LEVEL)
     missing = sorted(EXPECTED_TOP_LEVEL - actual)

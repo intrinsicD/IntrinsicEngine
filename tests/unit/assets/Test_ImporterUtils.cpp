@@ -11,9 +11,9 @@
 #include <glm/glm.hpp>
 
 // Include the headers under test directly (they are non-module headers).
-#include "../src/legacy/Graphics/Importers/Graphics.Importers.VertexDedup.hpp"
-#include "../src/legacy/Graphics/Importers/Graphics.Importers.TriangulationUtils.hpp"
-#include "../src/legacy/Graphics/Importers/Graphics.Importers.ColorParsing.hpp"
+#include "Importers/Graphics.Importers.VertexDedup.hpp"
+#include "Importers/Graphics.Importers.TriangulationUtils.hpp"
+#include "Importers/Graphics.Importers.ColorParsing.hpp"
 
 using namespace Graphics::Importers;
 

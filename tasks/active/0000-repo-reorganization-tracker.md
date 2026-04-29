@@ -25,19 +25,19 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 
 ## Final-state checklist (target layout)
 
-- [ ] `AGENTS.md` exists at repository root.
-- [ ] Root docs/build files are normalized: `README.md`, `CMakeLists.txt`, `CMakePresets.json`.
-- [ ] `src/` contains `legacy/`, `core/`, `assets/`, `ecs/`, `geometry/`, `graphics/`, `runtime/`, `platform/`, `app/`.
-- [ ] `src/graphics/` contains `rhi/`, `vulkan/`, `framegraph/`, `renderer/`.
-- [ ] `methods/` exists with `_template/`, `geometry/`, `rendering/`, `physics/`, `papers/`.
-- [ ] `benchmarks/` exists with `geometry/`, `rendering/`, `datasets/`, `baselines/`, `reports/`, `runners/`.
-- [ ] `tests/` contains `unit/`, `contract/`, `integration/`, `regression/`, `gpu/`, `benchmark/`, `support/`.
-- [ ] `docs/` contains `index.md`, `architecture/`, `adr/`, `methods/`, `benchmarking/`, `agent/`, `migration/`, `api/`.
-- [ ] `tasks/` contains `active/`, `backlog/`, `done/`, `templates/`.
-- [ ] `tools/` contains `repo/`, `docs/`, `ci/`, `benchmark/`, `agents/`, `analysis/`.
-- [ ] `.github/workflows/` contains split workflows (`pr-fast.yml`, `ci-linux-clang.yml`, `ci-sanitizers.yml`, `ci-docs.yml`, `ci-bench-smoke.yml`, `nightly-deep.yml`).
-- [ ] `.github/pull_request_template.md` exists.
-- [ ] `.codex/config.yaml` and `.claude/settings.json` are present and consistent with root contract.
+- [x] `AGENTS.md` exists at repository root.
+- [x] Root docs/build files are normalized: `README.md`, `CMakeLists.txt`, `CMakePresets.json`.
+- [x] `src/` contains `legacy/`, `core/`, `assets/`, `ecs/`, `geometry/`, `graphics/`, `runtime/`, `platform/`, `app/`.
+- [x] `src/graphics/` contains `rhi/`, `vulkan/`, `framegraph/`, `renderer/`.
+- [x] `methods/` exists with `_template/`, `geometry/`, `rendering/`, `physics/`, `papers/`.
+- [x] `benchmarks/` exists with `geometry/`, `rendering/`, `datasets/`, `baselines/`, `reports/`, `runners/`.
+- [x] `tests/` contains `unit/`, `contract/`, `integration/`, `regression/`, `gpu/`, `benchmark/`, `support/`.
+- [x] `docs/` contains `index.md`, `architecture/`, `adr/`, `methods/`, `benchmarking/`, `agent/`, `migration/`, `api/`.
+- [x] `tasks/` contains `active/`, `backlog/`, `done/`, `templates/`.
+- [x] `tools/` contains `repo/`, `docs/`, `ci/`, `benchmark/`, `agents/`, `analysis/`.
+- [x] `.github/workflows/` contains split workflows (`pr-fast.yml`, `ci-linux-clang.yml`, `ci-sanitizers.yml`, `ci-docs.yml`, `ci-bench-smoke.yml`, `nightly-deep.yml`).
+- [x] `.github/pull_request_template.md` exists.
+- [x] `.codex/config.yaml` and `.claude/settings.json` are present and consistent with root contract.
 
 ## Todo status board
 
@@ -81,7 +81,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-066 | Move Graphics tests | done | work / TBD | Moved selected graphics/runtime rendering tests into `tests/unit/graphics`, `tests/integration/graphics`, and `tests/contract/graphics`; updated migration-aware test source resolution + labels. |
 | RORG-067 | Move Runtime and app integration tests | done | work / TBD | Moved runtime/app integration and contract candidates into `tests/integration/{app,runtime}`, `tests/contract/{runtime,ui}`, and `tests/unit/runtime`; migration-aware test source resolution and labels remain stable via `tests/CMakeLists.txt`. |
 | RORG-068 | Move regression and benchmark tests | done | work / TBD | Moved `Test_ArchitectureSLO.cpp`, `Test_Benchmark.cpp`, and `Test_CompileHotspotRefactors.cpp` into `tests/benchmark/` and `tests/contract/build/`; added dedicated benchmark/contract executables and labels. |
-| RORG-069 | Delete old root test clutter | done | work / TBD | Moved remaining `tests/Test_*.cpp` sources into categorized directories, removed root-path resolver fallbacks from `tests/CMakeLists.txt`, and pointed shared sanitizer support to `tests/support/`. |
+| RORG-069 | Delete old root test clutter | done | work / TBD | Moved remaining root test sources/helpers into categorized directories and `tests/support/`, removed root-path resolver fallbacks from `tests/CMakeLists.txt`, and pointed shared sanitizer/ImGui support to `tests/support/`. |
 | RORG-070 | Create target tools subdirectories | done | work / TBD | Added `tools/{repo,docs,ci,benchmark,agents,analysis}/README.md` with current ownership and planned migration map. |
 | RORG-071 | Move repo/policy tools | done | work / TBD | Moved repo/policy scripts to canonical owning paths (`tools/repo/*`, `tools/agents/*`) and retained root-path wrappers for one release cycle compatibility. |
 | RORG-072 | Move analysis/performance tools | done | work / TBD | Moved analysis scripts/baselines into `tools/analysis/` and updated README/CI references. |
@@ -122,4 +122,4 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-130 | Add architecture review checklist to CI and PR process | done | work / TBD | Added `docs/agent/architecture-review-checklist.md` and `tools/repo/check_pr_contract.py`; wired CI docs workflow to run the checker in CI mode. |
 | RORG-131 | Add method implementation review checklist | done | work / TBD | Added `docs/agent/method-review-checklist.md` and linked it from `docs/agent/method-workflow.md` and `.github/pull_request_template.md`. |
 | RORG-132 | Add benchmark review checklist | done | work / TBD | Added `docs/agent/benchmark-review-checklist.md` and linked it from benchmark docs, workflow docs, and PR template. |
-| RORG-133 | Add final cleanup audit | done | work / TBD | Final cleanup audit completed; strict top-level check now passes after expected allowlist sync for `CLAUDE.md` (2026-04-29). |
+| RORG-133 | Add final cleanup audit | done | work / TBD | Final audit passes strict task policy, strict top-level layout, strict root hygiene, strict docs links, module fan-out, CI configure/build, and categorized non-GPU executable checks (2026-04-29); full local CTest still exposes separate runtime/GPU failures outside the structural reorganization gate. |

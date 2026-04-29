@@ -293,7 +293,9 @@ if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
     )
     intrinsic_resolve_test_sources(_runtime_test_sources
         SEARCH_DIRS
+            unit/core
             unit/assets
+            unit/geometry
             unit/runtime
             unit/graphics
             integration/runtime
