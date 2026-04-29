@@ -2,7 +2,7 @@
 
 Use this file as a quick “what does what, and where should it live?” reference.
 
-> **Dual-tree note.** The repository currently builds both `src/` (legacy) and `src_new/` (in-progress reimplementation). Routing rules below describe where new work belongs once a subsystem exists in `src_new`. While a subsystem still lives only in `src/`, follow the legacy layout. See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, and `docs/architecture/src_new_module_inventory.md` for the live `src_new` module list.
+> **Dual-tree note.** The repository currently builds both `src/` (legacy) and `src_new/` (in-progress reimplementation). Routing rules below describe where new work belongs once a subsystem exists in `src_new`. While a subsystem still lives only in `src/`, follow the legacy layout. See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, and `docs/migration/src_new_module_inventory.md` for the live `src_new` module list.
 
 ## Engine
 
