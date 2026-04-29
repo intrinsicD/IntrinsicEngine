@@ -42,6 +42,16 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 
 `FrameRecipe` determines which of these are allocated for a frame. Unused optional resources are not created.
 
+## Picking and sub-element selection contract
+
+`PrimitiveId` is a hint produced by the picking pass, not a replacement for CPU-side geometry authority. Its high two bits encode the primitive domain (`surface triangle`, `line segment`, `point`, or reserved) and the low 30 bits encode the domain-local primitive index. Selection resolution follows these rules:
+
+- Entity ID from `EntityId` remains the ownership key. Runtime selection rejects invalid or non-selectable entities before resolving sub-elements.
+- For explicit point and line domains on entities that expose the matching primitive component, the GPU primitive hint is authoritative for the requested vertex/edge index and may be CPU-refined for hit-space data.
+- For explicit surface-triangle domains, the surface primitive hint is authoritative for the face anchor. CPU refinement may compute the nearest vertex/edge on that face and hit-space diagnostics, but it must not fall back to a different whole-mesh raycast face while a valid surface hint exists.
+- For mesh helper lines on pure-surface entities, CPU face-anchored refinement remains the compatibility fallback because rendered helper line IDs are not necessarily topology edge IDs.
+- If no valid primitive hint is available, CPU picking is the compatibility fallback and must return IDs from the authoritative mesh/graph/point-cloud data structures.
+
 ## Pass Contract
 
 | Pass | Inputs | Outputs | Initialization / Ownership |

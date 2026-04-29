@@ -38,8 +38,10 @@ cmake --build --preset ci --target IntrinsicTests
 ### Run tests
 
 ```bash
-ctest --test-dir build/ci --output-on-failure
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+
+This is the default CPU-supported correctness gate. GPU/Vulkan, slow, and explicitly quarantined tests are opt-in through CTest labels.
 
 ## Agent Workflow Pointer
 

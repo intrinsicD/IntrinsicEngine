@@ -16,6 +16,7 @@ This section tracks **temporary** repository transition work from the dual-tree 
 - [Source-tree reorganization](source-tree-reorganization.md) — phased move strategy and safeguards.
 - [Source-tree move plan](source-tree-move-plan.md) — exact Phase 9 move table, build/path update scope, and rollback procedure.
 - [src_new transition status](src-new-status.md) — status board for promotion from `src_new/` into final `src/` roots.
+- [src_new reference audit](src-new-reference-audit.md) — HARDEN-030 classification of remaining `src_new` / `src-new` references.
 - `docs/migration/src_new_module_inventory.md` — generated migration inventory (kept in current path until generator/path migration task).
 
 ## What is explicitly temporary

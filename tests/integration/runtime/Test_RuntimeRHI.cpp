@@ -176,6 +176,24 @@ protected:
     std::unique_ptr<RHI::TransferManager> m_TransferMgr;
 };
 
+TEST_F(TransferTest, HostVisibleBufferUnmapIsSafeForPersistentVmaMapping)
+{
+    RHI::VulkanBuffer buffer(
+        *m_Device,
+        256,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    ASSERT_TRUE(buffer.IsValid());
+    ASSERT_NE(buffer.Map(), nullptr);
+
+    // Regression for HARDEN-003: buffers created with VMA's create-mapped
+    // pointer must not call vmaUnmapMemory unless this wrapper acquired an
+    // explicit map with vmaMapMemory. The old behavior aborted in VMA here.
+    buffer.Unmap();
+    buffer.Unmap();
+}
+
 // Phase 1.1: Verify that SignalGraphicsTimeline / SafeDestroy is safe under
 // concurrent access from multiple threads.
 TEST_F(TransferTest, TimelineValue_ConcurrentSafeDestroy)

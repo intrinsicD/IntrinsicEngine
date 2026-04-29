@@ -8,4 +8,5 @@ intrinsic_test_object_lib(ExtrinsicRuntimeTestObjs
 intrinsic_test_executable(ExtrinsicRuntimeTests
         OBJECTS ExtrinsicRuntimeTestObjs
         LINK_LIBS ExtrinsicRuntime
+        LABELS contract runtime
 )

@@ -23,6 +23,11 @@ Use stable task prefixes to reflect ownership and review routing:
 - `METHOD-` — paper/method implementation workflow.
 - `BENCH-` — benchmark manifests, runners, and baselines.
 - `CI-` — workflow and automation changes.
+- `HARDEN-` — post-reorganization hardening, verification, and cleanup.
+
+## Active trackers
+
+- [HARDEN-001 — Post-Reorganization Hardening Tracker](active/0001-post-reorganization-hardening-tracker.md)
 
 ## Required task shape
 

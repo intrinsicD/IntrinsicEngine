@@ -52,6 +52,13 @@ Required dependency boundaries:
 - Add/update tests for behavior changes.
 - Keep pass rate stable or improved unless temporary shim is explicitly documented.
 - Use explicit test categories: `unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`.
+- The default CPU-supported correctness gate is:
+
+  ```bash
+  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+  ```
+
+- Codex verification must configure the `ci` preset, build a real target such as `IntrinsicTests`, and run CTest. It must not use build-only or `--target help` verification as a substitute for tests.
 
 ## Documentation sync protocol
 

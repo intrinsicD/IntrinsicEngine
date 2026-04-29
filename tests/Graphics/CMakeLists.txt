@@ -15,4 +15,5 @@ intrinsic_test_object_lib(ExtrinsicGraphicsTestObjs
 intrinsic_test_executable(ExtrinsicGraphicsTests
         OBJECTS  ExtrinsicGraphicsTestObjs
         LINK_LIBS ExtrinsicCore ExtrinsicGraphics
+        LABELS integration graphics gpu vulkan
 )

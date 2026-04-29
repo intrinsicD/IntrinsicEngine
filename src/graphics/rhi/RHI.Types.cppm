@@ -108,7 +108,7 @@ export namespace Extrinsic::RHI
         std::uint32_t ElementCount = 0;
         alignas(16) glm::vec4 UniformColor{1.f};
     };
-    // Matches assets/shaders/src_new/common/gpu_scene.glsl (scalar block layout):
+    // Matches assets/shaders/common/gpu_scene.glsl (scalar block layout):
     // 8-byte BDAs + packed scalar/vector fields, total 112 bytes.
     static_assert(sizeof(GpuEntityConfig) == 112);
 

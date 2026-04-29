@@ -1,10 +1,10 @@
-# `src_new` Task Graph Architecture (CPU Task Graph, GPU Render Graph, Async Streaming Graph)
+# Task Graph Domain Architecture (CPU Task Graph, GPU Render Graph, Async Streaming Graph)
 
-This document defines the graph architecture contract for `src_new` and is the implementation guide for Core/Runtime/Graphics work in `tasks/backlog/legacy-todo.md`.
+This document defines the graph architecture contract for the canonical `src/` layout and is the implementation guide for Core/Runtime/Graphics graph work.
 
 ## 1. Three graph domains and ownership
 
-`src_new` uses three graph systems with strict ownership boundaries:
+The engine uses three graph systems with strict ownership boundaries:
 
 1. **CPU Task Graph** (`Core`): deterministic dependency scheduling for simulation/extraction/prep jobs.
 2. **GPU Render Graph** (`Graphics.RenderGraph`): pass/resource DAG for GPU execution, barriers, and transient lifetimes.

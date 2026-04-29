@@ -92,6 +92,13 @@ For each change:
 - Add/update tests for behavior changes.
 - Preserve or improve pass rate unless a temporary shim is documented.
 - Label tests by category as layout migration progresses (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
+- The default CPU-supported correctness gate is:
+
+  ```bash
+  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+  ```
+
+  GPU/Vulkan, slow, and explicitly quarantined tests are opt-in and must be justified by label policy.
 
 ## 8. Benchmarking protocol
 
@@ -114,6 +121,7 @@ When code, structure, or policy changes:
 - PR checks must remain green for touched areas.
 - Structural checks (tasks/docs/layering/manifests) should run in warning mode until explicitly tightened.
 - Workflow definitions must stay readable and split by purpose.
+- Agent/Codex verification must configure the `ci` preset, build a meaningful target such as `IntrinsicTests` (never `help` as a stand-in), and run CTest. The current Codex verification command mirrors the default CPU-supported gate from the testing protocol.
 
 ## 11. Task execution workflow
 

@@ -44,7 +44,7 @@ jobs:
         run: cmake --build --preset ci
 
       - name: Run full CPU test suite
-        run: ctest --test-dir build/ci --output-on-failure
+        run: ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60
 
       - name: Run sanitizer-extended test pass (ASan)
         run: |
@@ -54,7 +54,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=address" \
             -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=address"
           cmake --build --preset ci --target IntrinsicTests
-          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression"
+          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression" -LE "gpu|vulkan|slow|flaky-quarantine"
 
       - name: Run sanitizer-extended test pass (UBSan)
         run: |
@@ -64,7 +64,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=undefined" \
             -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=undefined"
           cmake --build --preset ci --target IntrinsicTests
-          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression"
+          ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression" -LE "gpu|vulkan|slow|flaky-quarantine"
 
       - name: Run SLO/performance tests
         run: ctest --test-dir build/ci --output-on-failure -L "benchmark|slo"
@@ -120,4 +120,4 @@ jobs:
         run: cmake --build --preset ci --target IntrinsicTests
 
       - name: Run optional GPU tests (self-hosted runner)
-        run: ctest --test-dir build/ci --output-on-failure -L gpu
+        run: ctest --test-dir build/ci --output-on-failure -L "gpu|vulkan" --timeout 60

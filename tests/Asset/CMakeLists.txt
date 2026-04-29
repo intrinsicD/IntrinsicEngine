@@ -12,4 +12,5 @@ intrinsic_test_object_lib(AssetTestObjs
 intrinsic_test_executable(ExtrinsicAssetTests
         OBJECTS  AssetTestObjs
         LINK_LIBS ExtrinsicCore ExtrinsicAssets
+        LABELS unit assets
 )

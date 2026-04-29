@@ -14,7 +14,7 @@ layout(push_constant, scalar) uniform PushConstants
     uint _pad1;
 } pc;
 
-#include "src_new/common/gpu_scene.glsl"
+#include "common/gpu_scene.glsl"
 
 void main()
 {

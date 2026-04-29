@@ -5,7 +5,7 @@ project:
   build_system: cmake
 
 workflow:
-  verification_command: "cmake --preset ci && cmake --build --preset ci --target help"
+  verification_command: "cmake --preset ci && cmake --build --preset ci --target IntrinsicTests && ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
   instruction_file: "AGENTS.md"
 
 ignore:

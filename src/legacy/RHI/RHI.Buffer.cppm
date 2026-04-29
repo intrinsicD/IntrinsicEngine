@@ -100,6 +100,7 @@ export namespace RHI {
         // The persistent pointer. nullptr if memory is GPU-only.
         void* m_MappedData = nullptr;
         bool m_IsMapped = false;
+        bool m_UnmapOnDestroy = false;
 
         size_t m_SizeBytes = 0;
         bool m_IsHostVisible = false;

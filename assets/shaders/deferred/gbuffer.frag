@@ -4,7 +4,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_nonuniform_qualifier : require
 
-#include "src_new/common/gpu_scene.glsl"
+#include "common/gpu_scene.glsl"
 
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;

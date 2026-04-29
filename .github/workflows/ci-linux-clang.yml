@@ -59,7 +59,7 @@ jobs:
         run: python3 tools/repo/check_layering.py --root src --strict
 
       - name: Run full CPU test suite
-        run: ctest --test-dir build/ci --output-on-failure
+        run: ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60
 
       - name: SLO performance gate (FrameGraph 2k-node scenario)
         run: ./build/ci/bin/IntrinsicCoreTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes

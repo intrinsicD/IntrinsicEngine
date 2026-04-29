@@ -7,4 +7,5 @@ intrinsic_test_object_lib(ExtrinsicECSTestObjs
 intrinsic_test_executable(ExtrinsicECSTests
         OBJECTS  ExtrinsicECSTestObjs
         LINK_LIBS ExtrinsicCore ExtrinsicECS
+        LABELS unit ecs
 )

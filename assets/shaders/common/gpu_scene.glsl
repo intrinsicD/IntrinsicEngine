@@ -1,5 +1,5 @@
-#ifndef INTRINSIC_SRC_NEW_GPU_SCENE_GLSL
-#define INTRINSIC_SRC_NEW_GPU_SCENE_GLSL
+#ifndef INTRINSIC_GPU_SCENE_GLSL
+#define INTRINSIC_GPU_SCENE_GLSL
 
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_scalar_block_layout : require
@@ -209,4 +209,4 @@ layout(buffer_reference, scalar) readonly buffer GpuCullBucketTableRef {
     GpuCullBucketTable Value;
 };
 
-#endif // INTRINSIC_SRC_NEW_GPU_SCENE_GLSL
+#endif // INTRINSIC_GPU_SCENE_GLSL

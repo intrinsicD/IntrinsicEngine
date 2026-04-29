@@ -71,6 +71,7 @@ namespace RHI
             {
                 m_MappedData = resultInfo.pMappedData;
                 m_IsMapped = true;
+                m_UnmapOnDestroy = false;
             }
             else
             {
@@ -85,6 +86,7 @@ namespace RHI
                 else
                 {
                     m_IsMapped = true;
+                    m_UnmapOnDestroy = true;
                 }
             }
         }
@@ -96,11 +98,12 @@ namespace RHI
 
     VulkanBuffer::~VulkanBuffer()
     {
-        if (m_IsMapped && m_Allocation)
+        if (m_IsMapped && m_UnmapOnDestroy && m_Allocation)
         {
             vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
             m_MappedData = nullptr;
             m_IsMapped = false;
+            m_UnmapOnDestroy = false;
         }
         DestructionUtils::SafeDestroyVma(m_Device, m_Buffer, m_Allocation, vmaDestroyBuffer);
     }
@@ -110,9 +113,10 @@ namespace RHI
           , m_Buffer(std::exchange(other.m_Buffer, VK_NULL_HANDLE))
           , m_Allocation(std::exchange(other.m_Allocation, VK_NULL_HANDLE))
           , m_MappedData(std::exchange(other.m_MappedData, nullptr))
+          , m_IsMapped(std::exchange(other.m_IsMapped, false))
+          , m_UnmapOnDestroy(std::exchange(other.m_UnmapOnDestroy, false))
           , m_SizeBytes(other.m_SizeBytes)
           , m_IsHostVisible(other.m_IsHostVisible)
-          , m_IsMapped(std::exchange(other.m_IsMapped, false))
     {
     }
 
@@ -121,6 +125,10 @@ namespace RHI
         if (this != &other)
         {
             // Destroy current resources if any
+            if (m_IsMapped && m_UnmapOnDestroy && m_Allocation)
+            {
+                vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
+            }
             DestructionUtils::SafeDestroyVma(m_Device, m_Buffer, m_Allocation, vmaDestroyBuffer);
 
             // Move from other
@@ -130,6 +138,7 @@ namespace RHI
             m_SizeBytes = other.m_SizeBytes;
             m_IsHostVisible = other.m_IsHostVisible;
             m_IsMapped = std::exchange(other.m_IsMapped, false);
+            m_UnmapOnDestroy = std::exchange(other.m_UnmapOnDestroy, false);
         }
         return *this;
     }
@@ -156,6 +165,7 @@ namespace RHI
             else
             {
                 m_IsMapped = true;
+                m_UnmapOnDestroy = true;
             }
         }
 
@@ -164,11 +174,12 @@ namespace RHI
 
     void VulkanBuffer::Unmap()
     {
-        if (m_IsMapped && m_Allocation)
+        if (m_IsMapped && m_UnmapOnDestroy && m_Allocation)
         {
             vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
             m_MappedData = nullptr;
             m_IsMapped = false;
+            m_UnmapOnDestroy = false;
         }
     }
 
