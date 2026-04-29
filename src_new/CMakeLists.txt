@@ -13,7 +13,6 @@ endif()
 if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     add_subdirectory(App)
 endif()
-add_subdirectory(Platform)
 add_subdirectory(Runtime)
 
 add_custom_target(src_new_module_inventory
