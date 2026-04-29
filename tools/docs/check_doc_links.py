@@ -61,6 +61,7 @@ def main() -> int:
 
     print(f"[check_doc_links] Root: {root}")
     print(f"[check_doc_links] Checked relative links: {checked}")
+    print(f"[check_doc_links] Mode: {'strict' if args.strict else 'warning'}")
 
     if broken:
         print("[check_doc_links] Broken relative links:")
