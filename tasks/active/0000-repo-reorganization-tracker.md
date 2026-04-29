@@ -105,7 +105,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-095 | Move `src_new/Assets` to `src/assets` | done | work / TBD | Moved `src_new/Assets` to `src/assets` with `git mv`; updated root/src_new CMake wiring so `src/assets` builds from canonical path and `src_new` no longer references `Assets`. |
 | RORG-096 | Move `src_new/ECS` to `src/ecs` | done | work / TBD | Moved `src_new/ECS` to `src/ecs` with `git mv`; updated root/src_new CMake wiring so `src/ecs` builds from the canonical path and `src_new` no longer references `ECS`. |
 | RORG-097 | Move `src_new/Graphics/RHI` to `src/graphics/rhi` | done | work / TBD | Moved `src_new/Graphics/RHI` to `src/graphics/rhi` with `git mv`; updated root/src_new CMake wiring so `src/graphics/rhi` is built from the canonical path and `src_new/Graphics` no longer references `RHI`. |
-| RORG-098 | Move Vulkan backend to `src/graphics/vulkan` | not-started | - |  |
+| RORG-098 | Move Vulkan backend to `src/graphics/vulkan` | done | work / TBD | Moved `src_new/Graphics/Backends/Vulkan` to `src/graphics/vulkan` via `git mv`; updated backend wiring to reference the canonical Vulkan path while preserving headless/Null backend behavior. |
 | RORG-099 | Move remaining graphics modules | not-started | - |  |
 | RORG-100 | Move Platform to `src/platform` | not-started | - |  |
 | RORG-101 | Move Runtime to `src/runtime` | not-started | - |  |
