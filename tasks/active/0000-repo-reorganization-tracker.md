@@ -119,7 +119,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-121 | Final docs link strictness | done | work / TBD | Enabled strict docs-link enforcement in `ci-docs.yml` and added explicit mode reporting in `check_doc_links.py`. |
 | RORG-122 | Final method and benchmark manifest strictness | done | work / TBD | Enabled strict validation in CI for method manifests, benchmark manifests, and benchmark result JSON (`ci-docs.yml`, `ci-bench-smoke.yml`). |
 | RORG-123 | Final task policy strictness | done | work / TBD | Enabled strict task policy enforcement in `pr-fast.yml` and `ci-docs.yml` via `tools/agents/check_task_policy.py --strict`, including root TODO-file prohibition and required task metadata validation. |
-| RORG-130 | Add architecture review checklist to CI and PR process | not-started | - |  |
+| RORG-130 | Add architecture review checklist to CI and PR process | done | work / TBD | Added `docs/agent/architecture-review-checklist.md` and `tools/repo/check_pr_contract.py`; wired CI docs workflow to run the checker in CI mode. |
 | RORG-131 | Add method implementation review checklist | done | work / TBD | Added `docs/agent/method-review-checklist.md` and linked it from `docs/agent/method-workflow.md` and `.github/pull_request_template.md`. |
 | RORG-132 | Add benchmark review checklist | done | work / TBD | Added `docs/agent/benchmark-review-checklist.md` and linked it from benchmark docs, workflow docs, and PR template. |
 | RORG-133 | Add final cleanup audit | not-started | - |  |
