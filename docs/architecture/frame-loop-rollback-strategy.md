@@ -74,7 +74,7 @@ Before a migration phase remains on by default, all of the following must stay g
   - validates canonical system registration order and feature toggles
 - `tests/Test_RenderUpdateIntegration.cpp`
   - validates CPU-side render/update contracts that depend on the frame loop
-- `tools/check_todo_active_only.sh`
+- `tools/agents/check_task_policy.py`
   - ensures the backlog stays active-only as phases complete
 
 ### Runtime/telemetry gates
