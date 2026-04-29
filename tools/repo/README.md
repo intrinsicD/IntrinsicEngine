@@ -13,7 +13,7 @@ Repository structure and policy scripts.
 
 ## Config files
 
-- `layering_allowlist.yaml`: temporary exceptions for `check_layering.py`; each entry must include task and expiry notes.
+- `layering_allowlist.yaml`: temporary path-scoped exceptions for `check_layering.py`; each entry must include task and expiry notes and avoid broad `src/legacy/**` wildcards.
 - `src_new_reference_allowlist.txt`: explicit migration/historical path allowlist used by `check_stale_src_new_references.py`.
 
 ## Compatibility entrypoints

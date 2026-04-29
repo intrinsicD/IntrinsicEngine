@@ -3,55 +3,487 @@
 exceptions:
   - from: legacy
     to: core
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: core
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: geometry
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
-    file_glob: "src/legacy/**"
-    task: "RORG-104"
-    expires: "until src/legacy retirement tasks complete"
-    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+    file_glob: "src/legacy/Apps/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/Asset/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/Core/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/ECS/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/EditorUI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/Graphics/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/Interface/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Interface while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/RHI/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/Runtime/**"
+    task: "HARDEN-010"
+    expires: "until path-specific legacy retirement tasks complete"
+    reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
