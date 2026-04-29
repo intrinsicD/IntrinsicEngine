@@ -107,7 +107,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-097 | Move `src_new/Graphics/RHI` to `src/graphics/rhi` | done | work / TBD | Moved `src_new/Graphics/RHI` to `src/graphics/rhi` with `git mv`; updated root/src_new CMake wiring so `src/graphics/rhi` is built from the canonical path and `src_new/Graphics` no longer references `RHI`. |
 | RORG-098 | Move Vulkan backend to `src/graphics/vulkan` | done | work / TBD | Moved `src_new/Graphics/Backends/Vulkan` to `src/graphics/vulkan` via `git mv`; updated backend wiring to reference the canonical Vulkan path while preserving headless/Null backend behavior. |
 | RORG-099 | Move remaining graphics modules | done | work / TBD | Moved remaining promoted graphics modules from `src_new/Graphics` into canonical `src/graphics/framegraph` and `src/graphics/renderer` paths via mechanical `git mv`, and updated `src_new/CMakeLists.txt` to stop referencing removed path. |
-| RORG-100 | Move Platform to `src/platform` | not-started | - |  |
+| RORG-100 | Move Platform to `src/platform` | done | work / TBD | Moved `src_new/Platform` to `src/platform` with `git mv`; updated root/src_new CMake wiring so `src/platform` builds from canonical path and `src_new` no longer references `Platform`. |
 | RORG-101 | Move Runtime to `src/runtime` | not-started | - |  |
 | RORG-102 | Move App/Sandbox to `src/app` | not-started | - |  |
 | RORG-103 | Remove empty `src_new/` | not-started | - |  |
