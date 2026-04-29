@@ -1,0 +1,22 @@
+allowed_root_entries:
+  - .claude/
+  - .codex/
+  - .github/
+  - .gitignore
+  - AGENTS.md
+  - CLAUDE.md
+  - README.md
+  - CMakeLists.txt
+  - CMakePresets.json
+  - assets/
+  - benchmarks/
+  - cmake/
+  - docs/
+  - lsan.supp
+  - methods/
+  - src/
+  - tasks/
+  - tests/
+  - tools/
+notes:
+  - "imgui.ini is local runtime/editor state and is intentionally excluded from source control."

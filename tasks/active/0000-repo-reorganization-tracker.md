@@ -113,7 +113,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-103 | Remove empty `src_new/` | done | work / TBD | Removed `src_new/`, updated root CMake wiring and migration docs/README references to the final canonical `src/` layout. |
 | RORG-104 | Tighten source layering checker to strict mode | done | work / TBD | Enabled strict layering checks in `pr-fast` and `ci-linux-clang`; expanded `tools/repo/layering_allowlist.yaml` to explicitly contain temporary `src/legacy/**` exceptions with task/expiry metadata. |
 | RORG-110 | Rewrite README around final layout | done | work / TBD | Rewrote `README.md` into a concise entry point aligned with final layout and required navigation pointers. |
-| RORG-111 | Add root allowlist and enforce root hygiene | not-started | - |  |
+| RORG-111 | Add root allowlist and enforce root hygiene | done | work / TBD | Added `tools/repo/root_allowlist.yaml`, extended `check_root_hygiene.py` to validate top-level entries, and removed tracked `imgui.ini` in favor of `.gitignore` local-state handling. |
 | RORG-112 | Remove compatibility wrappers after docs are updated | not-started | - |  |
 | RORG-120 | Regenerate final module inventory | not-started | - |  |
 | RORG-121 | Final docs link strictness | not-started | - |  |

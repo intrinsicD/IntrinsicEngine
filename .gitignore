@@ -3,3 +3,5 @@ build/*
 cmake-build-*/*
 external/*
 experimental/*
+# Local ImGui state
+imgui.ini
