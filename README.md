@@ -19,21 +19,16 @@ For a single canonical navigation page across architecture, migration, agent pro
 
 ---
 
-## Active Reimplementation: `src_new/`
+## Source Layout Status
 
-The repository hosts **two source trees** in parallel:
+The repository now uses the canonical final source root under `src/`:
 
-- `src/` — the legacy implementation, still built and shipped while features are migrated.
-- `src_new/` — the in-progress reimplementation. Same feature surface, sharper module boundaries, explicit dependencies, and one-way layering.
+- `src/legacy/` (temporary migration area; shrinking over time)
+- `src/core/`, `src/assets/`, `src/ecs/`, `src/geometry/`
+- `src/graphics/rhi/`, `src/graphics/vulkan/`, `src/graphics/framegraph/`, `src/graphics/renderer/`
+- `src/platform/`, `src/runtime/`, `src/app/`
 
-The new tree is organized as `Core`, `Assets`, `ECS`, `Graphics` (`RHI` + `Backends/Vulkan`), `Platform` (`LinuxGlfwVulkan`), `Runtime`, `App/Sandbox`. All `src_new` modules use the `Extrinsic.<Subsystem>.<Component>` naming convention. **`Geometry` is reused from the legacy tree as-is** and is not reimplemented; new code in `src_new` imports the existing `src/Geometry` modules.
-
-See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, and:
-
-- `docs/architecture/src_new-rendering-architecture.md` — target rendering architecture for `src_new/Graphics`.
-- `docs/api/generated/module_inventory.md` — canonical auto-generated module inventory from `src/` (regenerate via `tools/repo/generate_module_inventory.py`).
-- `docs/architecture/src_new_module_inventory.md` — migration-era inventory for `src_new` while dual-tree work remains.
-- `src_new/<Subsystem>/README.md` — per-subsystem public surface and file inventory.
+Migration records for the completed dual-tree cutover are retained under `docs/migration/`.
 
 ## Canonical Architecture Docs (legacy `src/` tree)
 
