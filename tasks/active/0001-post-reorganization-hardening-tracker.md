@@ -106,7 +106,7 @@ Excluded from this phase:
 | HARDEN-033 | Add stale `src_new` reference checker | done | tools/repo/CI | Added `tools/repo/check_stale_src_new_references.py` with explicit allowlist and wired strict enforcement in `ci-docs.yml`. |
 | HARDEN-040 | Audit remaining non-taxonomic test directories | done | tests/docs | Audit recorded in [`docs/reports/test-taxonomy-audit-2026-04-29.md`](../../docs/reports/test-taxonomy-audit-2026-04-29.md); wrapper directories inventoried and mapped to HARDEN-041/HARDEN-042. |
 | HARDEN-041 | Move remaining test sources into taxonomy directories | in-progress | tests/CMake | All 37 relocated wrapper taxonomy sources are now registered in `tests/CMakeLists.txt` under taxonomy-owned targets with explicit labels; final CPU-gate proof remains blocked locally by missing offline dependency cache (`external/cache/*-src`). |
-| HARDEN-042 | Remove or formalize old subsystem test subdirectories | not-started | tests/docs | Depends on HARDEN-041. |
+| HARDEN-042 | Remove or formalize old subsystem test subdirectories | done | tests/docs | Removed obsolete wrapper `CMakeLists.txt` stubs and relocated shared `MockRHI.hpp` into `tests/support/`; strict task/docs checks passed on 2026-04-29. |
 | HARDEN-043 | Add strict test layout checker | not-started | tools/repo/CI | Depends on final test layout from HARDEN-042. |
 | HARDEN-050 | Align CI workflows with final supported test policy | not-started | CI/docs | Depends on label/test policy from HARDEN-005 and HARDEN-006. |
 | HARDEN-051 | Add final hardening audit task | not-started | tasks/audit | Closes the hardening phase with exact pass/fail evidence. |
@@ -138,7 +138,7 @@ Known status as of 2026-04-29, carried forward from `tasks/active/final-reorgani
 
 | Test or label | Reason | Introduced by | Removal condition | Owner task | Status |
 |---|---|---|---|---|---|
-| Old subsystem wrapper CTest registration: `tests/Asset/`, `tests/Core/`, `tests/ECS/`, `tests/Graphics/`, `tests/Runtime/` | Old wrapper directories are outside the supported post-RORG taxonomy and some previously imported removed `Extrinsic.*` modules or produced `_NOT_BUILT` placeholders when only `IntrinsicTests` was built. Source files were mechanically relocated under taxonomy directories in HARDEN-041; categorized targets continue to own active CTest registration. | HARDEN-005 | HARDEN-042 formalizes/removes obsolete wrapper directories after relocation. | HARDEN-041, HARDEN-042 | temporary non-registration |
+| Old subsystem wrapper CTest registration: `tests/Asset/`, `tests/Core/`, `tests/ECS/`, `tests/Graphics/`, `tests/Runtime/` | Wrapper source relocation completed in HARDEN-041 and obsolete wrapper target stubs were removed in HARDEN-042; taxonomy-owned targets remain the only active CTest registration path. | HARDEN-005 | Completed by HARDEN-041 + HARDEN-042. | HARDEN-041, HARDEN-042 | resolved |
 
 Any future `flaky-quarantine` or skip must be capability-based or tied to a deterministic task-specific removal condition. Broad silent skips are prohibited.
 
@@ -211,3 +211,5 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-041 | `cmake --build --preset ci --target IntrinsicTests` | Failed because `build/ci` was not generated after configure failure (`build.ninja` missing). |
 | 2026-04-29 | HARDEN-041 | `ctest --test-dir build/ci --output-on-failure -L 'unit\|contract' --timeout 60`; `ctest --test-dir build/ci --output-on-failure -LE 'gpu\|vulkan\|slow\|flaky-quarantine' --timeout 60` | `ctest` executed but found no tests because configure/build did not complete in this offline-cache-limited environment. |
 | 2026-04-29 | HARDEN-041 | `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after relocation-status sync; strict task policy validated 14 task files with 0 findings and strict doc-link check validated 105 links with 0 broken links. |
+| 2026-04-29 | HARDEN-042 | `git rm tests/Asset/CMakeLists.txt tests/Core/CMakeLists.txt tests/ECS/CMakeLists.txt tests/Graphics/CMakeLists.txt tests/Runtime/CMakeLists.txt && git mv tests/Graphics/MockRHI.hpp tests/support/MockRHI.hpp` | Passed; obsolete wrapper CMake stubs removed and shared graphics test helper moved to taxonomy support include path. |
+| 2026-04-29 | HARDEN-042 | `rg -n "ExtrinsicAssetTests|ExtrinsicCoreTests|ExtrinsicECSTests|ExtrinsicGraphicsTests|ExtrinsicRuntimeTests" tests`; `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed; no remaining wrapper-target registration references under `tests`, strict task/doc checks green. |
