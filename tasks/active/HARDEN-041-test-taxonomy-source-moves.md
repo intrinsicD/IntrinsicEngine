@@ -41,7 +41,7 @@ HARDEN-040 completed the audit of non-taxonomic test directories and mapped conc
 - [x] Wrapper source files are relocated from old subsystem directories into taxonomy directories per HARDEN-040 mapping.
 - [x] CMake test registration resolves relocated files without missing-source or missing-target errors.
 - [ ] CPU-supported CTest gate remains green after the move.
-- [ ] Hardening tracker records HARDEN-041 progress and verification evidence.
+- [x] Hardening tracker records HARDEN-041 progress and verification evidence.
 - [ ] Strict task/doc validators pass.
 
 ## Verification
@@ -121,5 +121,10 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
 - Applied a mechanical-only relocation patch for all 37 wrapper `*.cpp` sources using `git mv` from `tests/{Asset,Core,ECS,Graphics,Runtime}` into taxonomy directories under `tests/unit`, `tests/contract`, and `tests/integration`.
 - No test source content edits were made; only file paths changed.
-- `tests/CMakeLists.txt` required no path rewiring in this patch because active source resolution already targets taxonomy directories and wrapper directories were intentionally unregistered from active CTest registration.
+- HARDEN-041B updated `tests/CMakeLists.txt` to register relocated sources under taxonomy-specific object libraries and executable targets:
+  - `AssetUnitTestObjs` / `IntrinsicAssetUnitTests`
+  - `CoreWrapperUnitTestObjs` / `IntrinsicCoreWrapperUnitTests`
+  - `GraphicsUnitTestObjs` + `GraphicsContractTestObjs` / `IntrinsicGraphicsUnitTests` + `IntrinsicGraphicsContractTests`
+  - `RuntimeIntegrationTestObjs` / `IntrinsicRuntimeIntegrationTests`
+- GPU/backend-facing relocated graphics/runtime suites are labeled `gpu` + `vulkan` and remain outside the default CPU-supported CTest gate.
 - Strict task/doc validators pass after the relocation patch.

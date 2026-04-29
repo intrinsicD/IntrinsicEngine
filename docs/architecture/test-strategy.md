@@ -90,5 +90,5 @@ Operational expectations:
 - During migration, temporary compatibility entries in `tests/CMakeLists.txt` are allowed.
 - Reclassified tests must update both file location and labels in the same change.
 - Any temporary category mismatch must be tracked in `tasks/active/0000-repo-reorganization-tracker.md`.
-- As of HARDEN-005, old subsystem wrapper directories (`tests/Asset/`, `tests/Core/`, `tests/ECS/`, `tests/Graphics/`, `tests/Runtime/`) are not registered in the supported CTest suite. Their sources remain in the tree for HARDEN-040/HARDEN-041 to audit, move, remove, or formalize; active CTest registration is owned by categorized targets.
-- As of HARDEN-005, `IntrinsicRuntimeTests` is conservatively labeled `gpu`/`vulkan` because the executable still mixes CPU-side runtime selection tests with Vulkan-backed headless graphics tests. HARDEN-041/HARDEN-042 must split or formalize those sources so CPU-only runtime tests can re-enter the default CPU-supported gate without risking accidental GPU requirements.
+- HARDEN-041B registers relocated wrapper sources under taxonomy-owned targets (`IntrinsicAssetUnitTests`, `IntrinsicCoreWrapperUnitTests`, `IntrinsicGraphicsUnitTests`, `IntrinsicGraphicsContractTests`, `IntrinsicRuntimeIntegrationTests`) instead of subsystem wrapper directories.
+- Graphics/runtime relocated wrapper suites are currently labeled `gpu`/`vulkan` because they include backend-facing coverage; CPU-only relabeling/splits remain follow-up work under HARDEN-042.

@@ -239,6 +239,80 @@ intrinsic_test_object_lib(GeometryTestObjs
     DEPS IntrinsicCore IntrinsicGeometry
 )
 
+# --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
+set(_asset_unit_test_files
+    Test_Asset_EventBus.cpp
+    Test_Asset_PathIndex.cpp
+    Test_Asset_PayloadStore.cpp
+    Test_Asset_Registry.cpp
+)
+intrinsic_resolve_test_sources(_asset_unit_test_sources
+    SEARCH_DIRS unit/assets
+    FILES ${_asset_unit_test_files}
+)
+intrinsic_test_object_lib(AssetUnitTestObjs
+    SOURCES
+        ${_asset_unit_test_sources}
+    DEPS IntrinsicCore IntrinsicAssets
+)
+
+set(_core_wrapper_unit_test_files
+    Test_Core_CallbackRegistry.cpp
+    Test_Core_Config.cpp
+    Test_Core_DagScheduler.cpp
+    Test_Core_ErrorLegacy.cpp
+    Test_Core_Filesystem.cpp
+    Test_Core_GraphCompiler.cpp
+    Test_Core_HandleLease.cpp
+    Test_Core_HashLegacy.cpp
+    Test_Core_LockFreeQueue.cpp
+    Test_Core_Logging.cpp
+    Test_Core_MemoryLegacy.cpp
+    Test_Core_ResourcePool.cpp
+    Test_Core_StrongHandleLegacy.cpp
+    Test_Core_TaskGraphLegacy.cpp
+    Test_Core_TasksLegacy.cpp
+)
+intrinsic_resolve_test_sources(_core_wrapper_unit_test_sources
+    SEARCH_DIRS unit/core
+    FILES ${_core_wrapper_unit_test_files}
+)
+intrinsic_test_object_lib(CoreWrapperUnitTestObjs
+    SOURCES
+        ${_core_wrapper_unit_test_sources}
+    DEPS IntrinsicCore
+)
+
+set(_graphics_unit_test_files
+    Test_RHI_BufferManager.cpp
+    Test_RHI_PipelineManager.cpp
+    Test_RHI_SamplerManager.cpp
+    Test_RHI_TextureManager.cpp
+)
+intrinsic_resolve_test_sources(_graphics_unit_test_sources
+    SEARCH_DIRS unit/graphics
+    FILES ${_graphics_unit_test_files}
+)
+intrinsic_test_object_lib(GraphicsUnitTestObjs
+    SOURCES
+        ${_graphics_unit_test_sources}
+    DEPS IntrinsicCore IntrinsicRuntime
+)
+
+set(_graphics_contract_test_files
+    Test_MinimalTriangleAcceptance.cpp
+    Test_RHI_CommandContextBarriers.cpp
+)
+intrinsic_resolve_test_sources(_graphics_contract_test_sources
+    SEARCH_DIRS contract/graphics
+    FILES ${_graphics_contract_test_files}
+)
+intrinsic_test_object_lib(GraphicsContractTestObjs
+    SOURCES
+        ${_graphics_contract_test_sources}
+    DEPS IntrinsicCore IntrinsicRuntime
+)
+
 if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
     # --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
     set(_runtime_test_files
@@ -321,6 +395,29 @@ if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
             ${_runtime_test_sources}
         DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI nlohmann_json::nlohmann_json
     )
+
+    set(_runtime_integration_test_files
+        Test_AssetLoadPipeline.cpp
+        Test_AssetService.cpp
+        Test_CoreFrameGraphParallel.cpp
+        Test_CoreGraphInterfaces.cpp
+        Test_CoreGraphStress.cpp
+        Test_CoreProcess.cpp
+        Test_RuntimeEngineLayering.cpp
+        Test_RuntimeStreamingExecutor.cpp
+        Test_GpuWorldAndCulling.cpp
+        Test_RenderGraphLegacy.cpp
+        Test_RendererLegacy.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_integration_test_sources
+        SEARCH_DIRS integration/runtime contract/runtime integration/graphics
+        FILES ${_runtime_integration_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeIntegrationTestObjs
+        SOURCES
+            ${_runtime_integration_test_sources}
+        DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI
+    )
 endif()
 
 # Shared support for all test executables (sanitizer defaults, shared test hooks).
@@ -350,6 +447,12 @@ if(TARGET RuntimeTestObjs)
         OBJECTS RuntimeTestObjs
         LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
         LABELS integration runtime headless graphics gpu vulkan
+    )
+
+    intrinsic_test_executable(IntrinsicRuntimeIntegrationTests
+        OBJECTS RuntimeIntegrationTestObjs
+        LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
+        LABELS integration runtime graphics gpu vulkan
     )
 endif()
 
@@ -388,12 +491,32 @@ intrinsic_test_executable(IntrinsicGeometryTests
     LABELS unit geometry
 )
 
-# Old subsystem wrapper directories (`tests/Asset`, `tests/Core`, `tests/ECS`,
-# `tests/Graphics`, `tests/Runtime`) are intentionally not registered in the
-# supported post-RORG CTest suite. Some still import removed `Extrinsic.*`
-# modules or produce `_NOT_BUILT` placeholders when only `IntrinsicTests` is
-# built. Keep their sources for HARDEN-040/HARDEN-041 taxonomy audit/migration;
-# categorized targets above own active CTest registration.
+intrinsic_test_executable(IntrinsicAssetUnitTests
+    OBJECTS AssetUnitTestObjs
+    LINK_LIBS IntrinsicCore IntrinsicAssets
+    LABELS unit assets
+)
+
+intrinsic_test_executable(IntrinsicCoreWrapperUnitTests
+    OBJECTS CoreWrapperUnitTestObjs
+    LINK_LIBS IntrinsicCore
+    LABELS unit core
+)
+
+intrinsic_test_executable(IntrinsicGraphicsUnitTests
+    OBJECTS GraphicsUnitTestObjs
+    LINK_LIBS IntrinsicRuntime
+    LABELS unit graphics gpu vulkan
+)
+
+intrinsic_test_executable(IntrinsicGraphicsContractTests
+    OBJECTS GraphicsContractTestObjs
+    LINK_LIBS IntrinsicRuntime
+    LABELS contract graphics gpu vulkan
+)
+
+# Old wrapper directories remain on disk only as empty compatibility folders.
+# Their relocated taxonomy sources are now compiled/registered via categorized targets.
 
 get_property(_intrinsic_registered_test_labels GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_LABELS)
 if(_intrinsic_registered_test_labels)
@@ -427,4 +550,3 @@ if(TARGET RuntimeTestObjs)
         add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})
     endif()
 endif()
-
