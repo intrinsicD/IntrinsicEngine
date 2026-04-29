@@ -16,4 +16,4 @@ Graphics is organized into explicit sublayers:
 ## Related references
 
 - Frame graph details: [frame-graph.md](frame-graph.md).
-- Historical migration docs: `src_new-rendering-architecture.md`, `gpu-driven-modular-rendering-pipeline-plan.md`.
+- Historical migration docs: `legacy-rendering-architecture-migration.md`, `gpu-driven-modular-rendering-pipeline-plan.md`.

@@ -58,7 +58,7 @@ This page is the canonical entry point for repository documentation.
 Generated API and inventory docs:
 
 - [Canonical module inventory (`src/`)](api/generated/module_inventory.md)
-- [Migration module inventory (historical `src_new` snapshot)](migration/src_new_module_inventory.md)
+- [Migration module inventory (historical migration snapshot)](migration/src_new_module_inventory.md)
 
 ## Build / troubleshooting
 

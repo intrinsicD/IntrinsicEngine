@@ -48,9 +48,9 @@ Status labels:
 | `rendering-three-pass.md` | legacy-background | Rendering strategy context. |
 | `retained-geometry-lifecycle-consolidation-plan.md` | migration | Migration planning note. |
 | `runtime-subsystem-boundaries.md` | legacy-background | Detailed runtime background. |
-| `src_new-rendering-architecture.md` | migration | Specific to `src_new` migration phase. |
-| `src_new-task-graphs.md` | migration | Specific to `src_new` migration phase. |
-| `../migration/src_new_module_inventory.md` | migration | Archived migration inventory for retired `src_new`; canonical inventory lives at `docs/api/generated/module_inventory.md`. |
+| `legacy-rendering-architecture-migration.md` | migration | Specific to the source-tree migration phase. |
+| `legacy-task-graphs-migration.md` | migration | Specific to the source-tree migration phase. |
+| `../migration/src_new_module_inventory.md` | migration | Archived migration inventory for the retired migration source tree; canonical inventory lives at `docs/api/generated/module_inventory.md`. |
 | `vectorfield-overlay-lifecycle-invariants.md` | legacy-background | Subsystem-specific historical notes. |
 
 ## Notes

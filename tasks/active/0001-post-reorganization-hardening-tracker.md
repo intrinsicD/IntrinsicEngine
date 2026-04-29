@@ -21,7 +21,7 @@ Legacy retirement is explicitly deferred. Any temporary legacy exception must re
 - **Owner/agent:** repository maintainers / hardening agents
 - **Branch:** `work`
 - **PR:** TBD
-- **Next verification step:** begin HARDEN-033 stale `src_new` reference checker implementation.
+- **Next verification step:** begin HARDEN-040 non-taxonomic test directory audit.
 - **Status values:** `not-started`, `in-progress`, `blocked`, `done`, `deferred`
 
 ## Required changes
@@ -103,7 +103,7 @@ Excluded from this phase:
 | HARDEN-030 | Classify all remaining `src_new` references | done | docs/migration | Audit created at [`docs/migration/src-new-reference-audit.md`](../../docs/migration/src-new-reference-audit.md); active-stale references are assigned to HARDEN-031, HARDEN-032, HARDEN-033, and HARDEN-041. |
 | HARDEN-031 | Rename active shader asset `src_new` path | done | assets/graphics | Moved shader subdirectories to `assets/shaders/{common,culling,deferred,forward}/`; updated includes, test paths, and source comment without shader semantic edits. |
 | HARDEN-032 | Rename stale active task/doc names containing `src-new` | done | docs/tasks | Updated active source-layer README terminology and canonical docs/task navigation links; strict task/doc checks passed on 2026-04-29. |
-| HARDEN-033 | Add stale `src_new` reference checker | not-started | tools/repo/CI | Depends on HARDEN-030 through HARDEN-032 cleanup. |
+| HARDEN-033 | Add stale `src_new` reference checker | done | tools/repo/CI | Added `tools/repo/check_stale_src_new_references.py` with explicit allowlist and wired strict enforcement in `ci-docs.yml`. |
 | HARDEN-040 | Audit remaining non-taxonomic test directories | not-started | tests/docs | Create `docs/reports/test-taxonomy-audit-2026-04-29.md`. |
 | HARDEN-041 | Move remaining test sources into taxonomy directories | not-started | tests/CMake | Depends on HARDEN-040 decisions. |
 | HARDEN-042 | Remove or formalize old subsystem test subdirectories | not-started | tests/docs | Depends on HARDEN-041. |
@@ -193,3 +193,5 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-032 | `python3 tools/agents/check_task_policy.py --root . --strict` | Passed; strict task schema validation including new active task file. |
 | 2026-04-29 | HARDEN-032 | `python3 tools/docs/check_doc_links.py --root . --strict` | Passed; docs/task link integrity remained green after stale-name updates. |
 | 2026-04-29 | HARDEN-032 | `rg -n "src_new|src-new|src new" src/app/README.md src/core/README.md src/ecs/README.md src/graphics/renderer/README.md src/platform/README.md src/runtime/README.md docs/index.md docs/architecture/patterns.md docs/architecture/task-graphs.md docs/roadmap.md tasks/backlog/README.md tasks/backlog/legacy-todo.md tasks/backlog/rendering/RORG-031-rendering-pipeline.md` | Passed; active-stale references removed, with only explicit historical migration-inventory mentions retained. |
+| 2026-04-29 | HARDEN-033 | `python3 tools/repo/check_stale_src_new_references.py --root . --strict` | Passed; stale references now blocked outside explicit migration/historical allowlist entries. |
+| 2026-04-29 | HARDEN-033 | `python3 tools/repo/check_stale_src_new_references.py --root . --strict` after CI follow-up allowlist update for `.github/workflows/ci-docs.yml` | Passed; workflow self-reference no longer causes strict-mode false positives. |

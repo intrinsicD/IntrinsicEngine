@@ -2,7 +2,7 @@
 
 > **Status:** Historical target-design document for the promoted canonical `src/graphics` layout. Current canonical rendering policy lives in `rendering-three-pass.md` and `graphics.md`.
 > Resolved decisions are marked ✅. Deferred items are marked **[DEFERRED]**. Remaining open questions are in §13.
-> See `docs/migration/archive/src-new-status.md` for the completed source-promotion status that originally gated work against this design.
+> See `docs/migration/archive/source-promotion-status.md` for the completed source-promotion status that originally gated work against this design.
 
 ---
 

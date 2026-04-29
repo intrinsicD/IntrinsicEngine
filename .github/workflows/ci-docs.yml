@@ -16,6 +16,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install Python validation deps
+        run: python3 -m pip install --disable-pip-version-check pyyaml
+
       - name: Validate markdown links (strict mode)
         run: python3 tools/docs/check_doc_links.py --root . --strict
 
@@ -24,6 +27,9 @@ jobs:
 
       - name: Validate Codex config (strict mode)
         run: python3 tools/agents/check_codex_config.py --root . --strict
+
+      - name: Validate stale src_new references
+        run: python3 tools/repo/check_stale_src_new_references.py --root . --strict
 
       - name: Validate method manifests
         run: python3 tools/agents/validate_method_manifests.py --root methods --strict
