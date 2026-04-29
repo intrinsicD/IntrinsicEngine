@@ -61,5 +61,6 @@
 - Contract: `/AGENTS.md`
 - Task format: `/docs/agent/task-format.md`
 - Review checklist: `/docs/agent/review-checklist.md`
+- Architecture review checklist: `/docs/agent/architecture-review-checklist.md`
 - Method workflow: `/docs/agent/method-workflow.md`
 - Benchmark workflow: `/docs/agent/benchmark-workflow.md`
