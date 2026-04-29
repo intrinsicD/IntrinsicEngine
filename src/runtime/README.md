@@ -1,6 +1,6 @@
 # Runtime
 
-`src_new/Runtime` is the composition root for the `src_new` engine. It owns
+`src/runtime` is the composition root for the engine. It owns
 subsystem instantiation order, frame-phase orchestration, and deterministic
 startup/shutdown.
 

@@ -7,7 +7,7 @@ Current backlog categories:
 - `tasks/backlog/architecture/`
 - `tasks/backlog/rendering/`
 - `tasks/backlog/runtime/`
-- `tasks/backlog/src-new/`
+- `tasks/backlog/` (organized by domain subdirectories such as `architecture/`, `rendering/`, `runtime/`, `geometry/`, `ui/`, and `source-parity/`)
 - `tasks/backlog/geometry/`
 - `tasks/backlog/ui/`
 - `tasks/backlog/bugs/`

@@ -14,5 +14,5 @@ IntrinsicEngine uses explicit task graphs to structure concurrent CPU and async 
 
 ## Related references
 
-- Migration-era details: `src_new-task-graphs.md`.
+- Migration-era details: `task-graph-domains.md`.
 - Runtime ownership rules: [runtime.md](runtime.md).

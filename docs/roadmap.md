@@ -4,14 +4,14 @@ This document tracks medium- and long-horizon feature planning for IntrinsicEngi
 
 ---
 
-## Cross-Cutting: `src_new/` Reimplementation
+## Cross-Cutting: source-tree reorganization hardening
 
-All feature tracks below ultimately land in the new `src_new/` tree. The reimplementation runs as a **cross-cutting track in parallel** with the phases below: improve modularity, clarity, and explicitness in `src_new/` while `src/` still ships, and retire each legacy subsystem once its `src_new` counterpart reaches parity. **Geometry (`src/Geometry`) is reused as-is and is not forked into `src_new`.**
+All feature tracks below target the reorganized `src/` layer layout. The current cross-cutting focus is hardening: enforce modularity, explicit dependencies, and one-way layering while preserving build/test reliability. Legacy retirement remains separately tracked and deferred in this phase.
 
-- Contract and layering rules: `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation".
-- Live module list: `docs/migration/src_new_module_inventory.md`.
-- Rendering target architecture: `docs/architecture/src_new-rendering-architecture.md`.
-- Top-level migration milestones: `tasks/backlog/legacy-todo.md` → §1a "`src_new/` Reimplementation".
+- Contract and layering rules: `AGENTS.md` and `docs/agent/contract.md`.
+- Historical migration module snapshot: `docs/migration/src_new_module_inventory.md`.
+- Rendering target architecture: `docs/architecture/rendering-target-architecture.md`.
+- Top-level hardening tracker: `tasks/active/0001-post-reorganization-hardening-tracker.md`.
 
 ---
 

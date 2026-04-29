@@ -1,7 +1,7 @@
 # Core
 
-`src_new/Core` contains foundational engine modules reused by all other
-`src_new` subsystems.
+`src/core` contains foundational engine modules reused by all other
+engine subsystems.
 
 ## Public module surface
 

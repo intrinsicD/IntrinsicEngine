@@ -7,7 +7,7 @@ The active backlog is now tracked as structured task files under:
 - `tasks/backlog/architecture/`
 - `tasks/backlog/rendering/`
 - `tasks/backlog/runtime/`
-- `tasks/backlog/src-new/`
+- `tasks/backlog/source-parity/` and domain backlog directories under `tasks/backlog/`
 - `tasks/backlog/geometry/`
 - `tasks/backlog/ui/`
 - `tasks/backlog/bugs/`

@@ -1,7 +1,7 @@
 # App
 
-`src_new/App` hosts reference and test applications built on top of the
-`src_new` engine. The canonical entry point is `Sandbox`.
+`src/app` hosts reference and test applications built on top of the
+engine runtime. The canonical entry point is `Sandbox`.
 
 ## Applications
 
@@ -22,5 +22,5 @@ Sandbox/
 
 `App` depends on `Runtime` (and transitively on every subsystem it wires). An
 application is the only layer that may depend on everything; it must not
-expose types back to the engine. No other `src_new` module may import an
+expose types back to the engine. No other engine layer may import an
 application module.

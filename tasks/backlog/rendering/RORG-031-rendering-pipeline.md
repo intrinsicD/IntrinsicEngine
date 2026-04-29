@@ -20,7 +20,7 @@
 - Ensure this task file is parseable by the task template structure.
 
 ## Docs
-- Maintain references to `docs/architecture/src_new-rendering-architecture.md` and related runtime/frame-loop docs while they remain active.
+- Maintain references to `docs/architecture/rendering-target-architecture.md` and related runtime/frame-loop docs while they remain active.
 
 ## Acceptance criteria
 - Rendering backlog is represented by a structured task file under `tasks/backlog/rendering/` with required sections.
