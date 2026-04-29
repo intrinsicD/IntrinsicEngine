@@ -4,12 +4,54 @@ exceptions:
   - from: legacy
     to: core
     file_glob: "src/legacy/**"
-    task: "RORG-092"
-    expires: "until src/legacy migration completes"
-    reason: "Legacy bridge code may reference promoted core modules during phased source moves."
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
   - from: legacy
     to: geometry
     file_glob: "src/legacy/**"
-    task: "RORG-093"
-    expires: "until geometry promotion is complete"
-    reason: "Legacy systems may include geometry seams while canonical geometry ownership transitions."
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+  - from: legacy
+    to: assets
+    file_glob: "src/legacy/**"
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+  - from: legacy
+    to: ecs
+    file_glob: "src/legacy/**"
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+  - from: legacy
+    to: graphics_rhi
+    file_glob: "src/legacy/**"
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+  - from: legacy
+    to: graphics
+    file_glob: "src/legacy/**"
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+  - from: legacy
+    to: runtime
+    file_glob: "src/legacy/**"
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+  - from: legacy
+    to: platform
+    file_glob: "src/legacy/**"
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
+  - from: legacy
+    to: app
+    file_glob: "src/legacy/**"
+    task: "RORG-104"
+    expires: "until src/legacy retirement tasks complete"
+    reason: "Final strict mode allows legacy-internal dependencies while preventing violations in promoted canonical layers."
