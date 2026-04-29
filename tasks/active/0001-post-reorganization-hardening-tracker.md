@@ -105,7 +105,7 @@ Excluded from this phase:
 | HARDEN-032 | Rename stale active task/doc names containing `src-new` | done | docs/tasks | Updated active source-layer README terminology and canonical docs/task navigation links; strict task/doc checks passed on 2026-04-29. |
 | HARDEN-033 | Add stale `src_new` reference checker | done | tools/repo/CI | Added `tools/repo/check_stale_src_new_references.py` with explicit allowlist and wired strict enforcement in `ci-docs.yml`. |
 | HARDEN-040 | Audit remaining non-taxonomic test directories | done | tests/docs | Audit recorded in [`docs/reports/test-taxonomy-audit-2026-04-29.md`](../../docs/reports/test-taxonomy-audit-2026-04-29.md); wrapper directories inventoried and mapped to HARDEN-041/HARDEN-042. |
-| HARDEN-041 | Move remaining test sources into taxonomy directories | in-progress | tests/CMake | Task file now includes a full 37-file source→destination mechanical mapping table (2026-04-29); next patch is pure `git mv` + CMake path rewires + verification evidence. |
+| HARDEN-041 | Move remaining test sources into taxonomy directories | in-progress | tests/CMake | Mechanical `git mv` relocation of all 37 wrapper sources into taxonomy directories completed on 2026-04-29; local build/CTest verification is pending dependency-cache availability (`external/cache/*-src`). |
 | HARDEN-042 | Remove or formalize old subsystem test subdirectories | not-started | tests/docs | Depends on HARDEN-041. |
 | HARDEN-043 | Add strict test layout checker | not-started | tools/repo/CI | Depends on final test layout from HARDEN-042. |
 | HARDEN-050 | Align CI workflows with final supported test policy | not-started | CI/docs | Depends on label/test policy from HARDEN-005 and HARDEN-006. |
@@ -138,7 +138,7 @@ Known status as of 2026-04-29, carried forward from `tasks/active/final-reorgani
 
 | Test or label | Reason | Introduced by | Removal condition | Owner task | Status |
 |---|---|---|---|---|---|
-| Old subsystem wrapper CTest registration: `tests/Asset/`, `tests/Core/`, `tests/ECS/`, `tests/Graphics/`, `tests/Runtime/` | Old wrapper directories are outside the supported post-RORG taxonomy and some still import removed `Extrinsic.*` modules or produce `_NOT_BUILT` placeholders when only `IntrinsicTests` is built. Sources remain in place for taxonomy audit/move; categorized targets own active CTest registration. | HARDEN-005 | HARDEN-040/HARDEN-041 classifies and moves/removes/formalizes old subsystem wrapper sources. | HARDEN-040, HARDEN-041 | temporary non-registration |
+| Old subsystem wrapper CTest registration: `tests/Asset/`, `tests/Core/`, `tests/ECS/`, `tests/Graphics/`, `tests/Runtime/` | Old wrapper directories are outside the supported post-RORG taxonomy and some previously imported removed `Extrinsic.*` modules or produced `_NOT_BUILT` placeholders when only `IntrinsicTests` was built. Source files were mechanically relocated under taxonomy directories in HARDEN-041; categorized targets continue to own active CTest registration. | HARDEN-005 | HARDEN-042 formalizes/removes obsolete wrapper directories after relocation. | HARDEN-041, HARDEN-042 | temporary non-registration |
 
 Any future `flaky-quarantine` or skip must be capability-based or tied to a deterministic task-specific removal condition. Broad silent skips are prohibited.
 
@@ -203,3 +203,7 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-041 | `task file creation` | Created `tasks/active/HARDEN-041-test-taxonomy-source-moves.md` with scoped mechanical-move plan and verification commands. |
 | 2026-04-29 | HARDEN-041 | `cat docs/reports/test-taxonomy-audit-2026-04-29.md`; `sed -n '1,520p' tests/CMakeLists.txt` | Confirmed wrapper inventory exists but per-file destination mapping is not yet documented; HARDEN-041 task updated with explicit next-step gating to keep moves mechanical-only. |
 | 2026-04-29 | HARDEN-041 | `find tests/Asset tests/Core tests/ECS tests/Graphics tests/Runtime -type f -name '*.cpp' | sort`; update `tasks/active/HARDEN-041-test-taxonomy-source-moves.md` | Completed inventory-backed 37-file source→destination move table to gate the upcoming mechanical-only relocation patch. |
+| 2026-04-29 | HARDEN-041 | `git mv ...` (37 wrapper sources from `tests/{Asset,Core,ECS,Graphics,Runtime}` into `tests/{unit,contract,integration}/...`) | Completed pure mechanical relocation patch with no test-source semantic edits. |
+| 2026-04-29 | HARDEN-041 | `cmake --build --preset ci --target IntrinsicTests` | Failed before configure in this environment because `build/ci` was absent. |
+| 2026-04-29 | HARDEN-041 | `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++)` | Failed: offline dependency cache missing (`external/cache/glm-src`), so build/CTest gates could not be executed locally. |
+| 2026-04-29 | HARDEN-041 | `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after relocation patch; task/docs strict checks remain green. |

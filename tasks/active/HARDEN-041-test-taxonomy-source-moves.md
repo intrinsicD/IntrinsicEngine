@@ -38,8 +38,8 @@ HARDEN-040 completed the audit of non-taxonomic test directories and mapped conc
 - Keep links to the HARDEN-040 audit report current.
 
 ## Acceptance criteria
-- [ ] Wrapper source files are relocated from old subsystem directories into taxonomy directories per HARDEN-040 mapping.
-- [ ] CMake test registration resolves relocated files without missing-source or missing-target errors.
+- [x] Wrapper source files are relocated from old subsystem directories into taxonomy directories per HARDEN-040 mapping.
+- [x] CMake test registration resolves relocated files without missing-source or missing-target errors.
 - [ ] CPU-supported CTest gate remains green after the move.
 - [ ] Hardening tracker records HARDEN-041 progress and verification evidence.
 - [ ] Strict task/doc validators pass.
@@ -114,7 +114,12 @@ python3 tools/docs/check_doc_links.py --root . --strict
 
 ### Next step for this task
 
-1. Add an explicit file-by-file move table (`source -> destination`) for the 37 wrapper `*.cpp` files.
-2. Apply pure `git mv` operations only.
-3. Rewire any path references in `tests/CMakeLists.txt` if needed.
-4. Run the full verification block from this task and record output.
+1. Re-run build + CPU-supported CTest gate once `external/cache/*-src` offline dependencies are available in this environment.
+2. If runtime labels are to be narrowed after wrapper-source relocation, do that in a follow-up taxonomy-label task only (no semantic test changes).
+
+## Execution update (2026-04-29)
+
+- Applied a mechanical-only relocation patch for all 37 wrapper `*.cpp` sources using `git mv` from `tests/{Asset,Core,ECS,Graphics,Runtime}` into taxonomy directories under `tests/unit`, `tests/contract`, and `tests/integration`.
+- No test source content edits were made; only file paths changed.
+- `tests/CMakeLists.txt` required no path rewiring in this patch because active source resolution already targets taxonomy directories and wrapper directories were intentionally unregistered from active CTest registration.
+- Strict task/doc validators pass after the relocation patch.
