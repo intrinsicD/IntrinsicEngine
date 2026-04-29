@@ -1,0 +1,35 @@
+# Repo-relative glob patterns that may intentionally contain historical/migration `src_new` references.
+
+# Migration and historical documentation.
+docs/migration/**
+docs/reports/**
+docs/reviews/**
+
+# Historical and migration-era task records.
+tasks/active/0000-repo-reorganization-tracker.md
+tasks/active/final-reorganization-audit.md
+tasks/active/HARDEN-032-stale-src-new-active-name-cleanup.md
+tasks/backlog/source-parity/**
+
+# Current hardening tracker and checker task text mentioning this policy.
+tasks/active/0001-post-reorganization-hardening-tracker.md
+tasks/active/HARDEN-033-stale-src-new-reference-checker.md
+
+# Known compatibility references in tools/docs.
+tools/repo/README.md
+tools/repo/check_layering.py
+tools/repo/generate_module_inventory.py
+
+# Legacy compatibility checks that intentionally reference historical names.
+tests/Runtime/Test.Runtime.EngineLayering.cpp
+src/ecs/Systems/ECS.System.TransformHierarchy.cppm
+
+# Self files.
+tools/repo/check_stale_src_new_references.py
+tools/repo/src_new_reference_allowlist.txt
+
+docs/index.md
+docs/roadmap.md
+docs/architecture/graphics.md
+docs/architecture/index.md
+docs/architecture/rendering-target-architecture.md

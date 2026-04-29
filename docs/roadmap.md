@@ -9,7 +9,7 @@ This document tracks medium- and long-horizon feature planning for IntrinsicEngi
 All feature tracks below target the reorganized `src/` layer layout. The current cross-cutting focus is hardening: enforce modularity, explicit dependencies, and one-way layering while preserving build/test reliability. Legacy retirement remains separately tracked and deferred in this phase.
 
 - Contract and layering rules: `AGENTS.md` and `docs/agent/contract.md`.
-- Historical migration module snapshot: `docs/migration/src_new_module_inventory.md`.
+- Historical migration module snapshot: `docs/migration/src_new_module_inventory.md` (historical migration snapshot).
 - Rendering target architecture: `docs/architecture/rendering-target-architecture.md`.
 - Top-level hardening tracker: `tasks/active/0001-post-reorganization-hardening-tracker.md`.
 
