@@ -109,7 +109,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-099 | Move remaining graphics modules | done | work / TBD | Moved remaining promoted graphics modules from `src_new/Graphics` into canonical `src/graphics/framegraph` and `src/graphics/renderer` paths via mechanical `git mv`, and updated `src_new/CMakeLists.txt` to stop referencing removed path. |
 | RORG-100 | Move Platform to `src/platform` | done | work / TBD | Moved `src_new/Platform` to `src/platform` with `git mv`; updated root/src_new CMake wiring so `src/platform` builds from canonical path and `src_new` no longer references `Platform`. |
 | RORG-101 | Move Runtime to `src/runtime` | done | work / TBD | Moved `src_new/Runtime` to `src/runtime` with `git mv`; updated root/src_new CMake wiring so `src/runtime` builds from the canonical path and `src_new` no longer references `Runtime`. |
-| RORG-102 | Move App/Sandbox to `src/app` | not-started | - |  |
+| RORG-102 | Move App/Sandbox to `src/app` | done | work / TBD | Moved `src_new/App` to `src/app` via `git mv`; updated root/src_new CMake wiring so app builds from canonical path and `src_new` no longer references `App`. |
 | RORG-103 | Remove empty `src_new/` | not-started | - |  |
 | RORG-104 | Tighten source layering checker to strict mode | not-started | - |  |
 | RORG-110 | Rewrite README around final layout | not-started | - |  |
