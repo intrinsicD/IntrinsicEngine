@@ -109,7 +109,7 @@ Excluded from this phase:
 | HARDEN-042 | Remove or formalize old subsystem test subdirectories | done | tests/docs | Removed obsolete wrapper `CMakeLists.txt` stubs and relocated shared `MockRHI.hpp` into `tests/support/`; strict task/docs checks passed on 2026-04-29. |
 | HARDEN-043 | Add strict test layout checker | done | tools/repo/CI | Added `tools/repo/check_test_layout.py`, wired strict CI docs validation, and documented usage in `tools/repo/README.md` on 2026-04-29. |
 | HARDEN-050 | Align CI workflows with final supported test policy | done | CI/docs | `pr-fast.yml` unit/contract gate now includes `--timeout 60` and matches the documented policy. |
-| HARDEN-051 | Add final hardening audit task | not-started | tasks/audit | Closes the hardening phase with exact pass/fail evidence. |
+| HARDEN-051 | Add final hardening audit task | in-progress | tasks/audit | Active task definition created at `tasks/active/HARDEN-051-final-hardening-audit-task.md`; next step is executing the final audit evidence task file. |
 
 ## Current full-test status
 
@@ -215,3 +215,4 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-042 | `rg -n "ExtrinsicAssetTests|ExtrinsicCoreTests|ExtrinsicECSTests|ExtrinsicGraphicsTests|ExtrinsicRuntimeTests" tests`; `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed; no remaining wrapper-target registration references under `tests`, strict task/doc checks green. |
 | 2026-04-29 | HARDEN-043 | `python3 tools/repo/check_test_layout.py --root . --strict`; `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed; strict test taxonomy layout enforcement is active and docs/task strict checks remained green. |
 | 2026-04-29 | HARDEN-050 | `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after adding `--timeout 60` to `.github/workflows/pr-fast.yml` unit/contract CTest step and syncing HARDEN-050 task/tracker docs. |
+| 2026-04-29 | HARDEN-051 | `task file creation` | Created `tasks/active/HARDEN-051-final-hardening-audit-task.md` to scope final hardening audit closure evidence and keep execution as a follow-up task step. |
