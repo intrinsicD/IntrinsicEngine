@@ -132,3 +132,20 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Re-ran strict policy/docs validators after relocation status sync:
   - `python3 tools/agents/check_task_policy.py --root . --strict` → passed (`Validated 14 task file(s); findings: 0`).
   - `python3 tools/docs/check_doc_links.py --root . --strict` → passed (`Checked relative links: 105; no broken links`).
+
+
+## HARDEN-041C update (2026-04-29)
+
+- Audited every relocated source currently registered under `AssetUnitTestObjs`, `CoreWrapperUnitTestObjs`, `GraphicsUnitTestObjs`, `GraphicsContractTestObjs`, and `RuntimeIntegrationTestObjs` in `tests/CMakeLists.txt` against module imports in the relocated taxonomy sources.
+- Fixed stale legacy target wiring for relocated suites:
+  - `AssetUnitTestObjs` / `IntrinsicAssetUnitTests` now link `ExtrinsicAssets` + `ExtrinsicCore`.
+  - `CoreWrapperUnitTestObjs` / `IntrinsicCoreWrapperUnitTests` now link `ExtrinsicCore`.
+  - `GraphicsUnitTestObjs` / `IntrinsicGraphicsUnitTests` now link `ExtrinsicRHI` + `ExtrinsicCore` + `ExtrinsicPlatform`.
+  - `GraphicsContractTestObjs` / `IntrinsicGraphicsContractTests` now link `ExtrinsicGraphics` + `ExtrinsicRHI` + `ExtrinsicECS` + `ExtrinsicCore` + `ExtrinsicPlatform`.
+  - `RuntimeIntegrationTestObjs` / `IntrinsicRuntimeIntegrationTests` now link `ExtrinsicRuntime`.
+- Updated runtime-integration registration gate to `if(TARGET ExtrinsicRuntime)` to match the owning promoted runtime target.
+- Confirmed no relocated HARDEN-041 `.cpp` in these groups is orphaned in registration (all listed files resolve through taxonomy `SEARCH_DIRS` entries).
+- Verification status in this environment:
+  - `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON` fails before generation because offline cache is missing (`external/cache/glm-src`).
+  - Downstream build/ctest commands therefore cannot prove compiled test execution here.
+  - Strict task/docs/layout validators pass.

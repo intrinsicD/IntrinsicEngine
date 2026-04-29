@@ -253,7 +253,7 @@ intrinsic_resolve_test_sources(_asset_unit_test_sources
 intrinsic_test_object_lib(AssetUnitTestObjs
     SOURCES
         ${_asset_unit_test_sources}
-    DEPS IntrinsicCore IntrinsicAssets
+    DEPS ExtrinsicAssets ExtrinsicCore
 )
 
 set(_core_wrapper_unit_test_files
@@ -280,7 +280,7 @@ intrinsic_resolve_test_sources(_core_wrapper_unit_test_sources
 intrinsic_test_object_lib(CoreWrapperUnitTestObjs
     SOURCES
         ${_core_wrapper_unit_test_sources}
-    DEPS IntrinsicCore
+    DEPS ExtrinsicCore
 )
 
 set(_graphics_unit_test_files
@@ -296,7 +296,7 @@ intrinsic_resolve_test_sources(_graphics_unit_test_sources
 intrinsic_test_object_lib(GraphicsUnitTestObjs
     SOURCES
         ${_graphics_unit_test_sources}
-    DEPS IntrinsicCore IntrinsicRuntime
+    DEPS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
 )
 
 set(_graphics_contract_test_files
@@ -310,10 +310,10 @@ intrinsic_resolve_test_sources(_graphics_contract_test_sources
 intrinsic_test_object_lib(GraphicsContractTestObjs
     SOURCES
         ${_graphics_contract_test_sources}
-    DEPS IntrinsicCore IntrinsicRuntime
+    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
 )
 
-if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
+if(TARGET ExtrinsicRuntime)
     # --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
     set(_runtime_test_files
         Test_RuntimeGraphics.cpp
@@ -393,7 +393,7 @@ if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
     intrinsic_test_object_lib(RuntimeTestObjs
         SOURCES
             ${_runtime_test_sources}
-        DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI nlohmann_json::nlohmann_json
+        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json
     )
 
     set(_runtime_integration_test_files
@@ -416,7 +416,7 @@ if(TARGET IntrinsicRuntime AND TARGET IntrinsicEditorUI)
     intrinsic_test_object_lib(RuntimeIntegrationTestObjs
         SOURCES
             ${_runtime_integration_test_sources}
-        DEPS IntrinsicCore IntrinsicRuntime IntrinsicEditorUI
+        DEPS ExtrinsicRuntime
     )
 endif()
 
@@ -451,7 +451,7 @@ if(TARGET RuntimeTestObjs)
 
     intrinsic_test_executable(IntrinsicRuntimeIntegrationTests
         OBJECTS RuntimeIntegrationTestObjs
-        LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
+        LINK_LIBS ExtrinsicRuntime
         LABELS integration runtime graphics gpu vulkan
     )
 endif()
@@ -459,7 +459,7 @@ endif()
 # --- Core-only (no Runtime, no ECS, no GPU) ---
 intrinsic_test_executable(IntrinsicCoreTests
     OBJECTS  CoreTestObjs
-    LINK_LIBS IntrinsicCore
+    LINK_LIBS ExtrinsicCore
     LABELS unit core
 )
 
@@ -493,25 +493,25 @@ intrinsic_test_executable(IntrinsicGeometryTests
 
 intrinsic_test_executable(IntrinsicAssetUnitTests
     OBJECTS AssetUnitTestObjs
-    LINK_LIBS IntrinsicCore IntrinsicAssets
+    LINK_LIBS ExtrinsicAssets ExtrinsicCore
     LABELS unit assets
 )
 
 intrinsic_test_executable(IntrinsicCoreWrapperUnitTests
     OBJECTS CoreWrapperUnitTestObjs
-    LINK_LIBS IntrinsicCore
+    LINK_LIBS ExtrinsicCore
     LABELS unit core
 )
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
     OBJECTS GraphicsUnitTestObjs
-    LINK_LIBS IntrinsicRuntime
+    LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS unit graphics gpu vulkan
 )
 
 intrinsic_test_executable(IntrinsicGraphicsContractTests
     OBJECTS GraphicsContractTestObjs
-    LINK_LIBS IntrinsicRuntime
+    LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
     LABELS contract graphics gpu vulkan
 )
 
