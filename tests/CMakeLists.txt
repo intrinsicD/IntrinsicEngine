@@ -421,8 +421,10 @@ if(NOT TARGET IntrinsicTests)
     add_custom_target(IntrinsicTests)
 endif()
 
-get_property(_intrinsic_registered_test_targets GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS)
-if(TARGET IntrinsicTests AND _intrinsic_registered_test_targets)
-    add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})
+if(TARGET RuntimeTestObjs)
+    get_property(_intrinsic_registered_test_targets GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS)
+    if(TARGET IntrinsicTests AND _intrinsic_registered_test_targets)
+        add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})
+    endif()
 endif()
 
