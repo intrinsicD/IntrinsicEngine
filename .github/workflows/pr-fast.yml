@@ -37,5 +37,5 @@ jobs:
       - name: Validate docs links (warning mode)
         run: python3 tools/docs/check_doc_links.py --root .
 
-      - name: Validate layering (warning mode)
-        run: python3 tools/repo/check_layering.py --root src
+      - name: Validate layering (strict mode)
+        run: python3 tools/repo/check_layering.py --root src --strict
