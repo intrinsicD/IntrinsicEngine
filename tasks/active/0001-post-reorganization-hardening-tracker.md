@@ -21,7 +21,7 @@ Legacy retirement is explicitly deferred. Any temporary legacy exception must re
 - **Owner/agent:** repository maintainers / hardening agents
 - **Branch:** `work`
 - **PR:** TBD
-- **Next verification step:** begin HARDEN-040 non-taxonomic test directory audit.
+- **Next verification step:** begin HARDEN-041 taxonomy source moves based on HARDEN-040 audit.
 - **Status values:** `not-started`, `in-progress`, `blocked`, `done`, `deferred`
 
 ## Required changes
@@ -104,7 +104,7 @@ Excluded from this phase:
 | HARDEN-031 | Rename active shader asset `src_new` path | done | assets/graphics | Moved shader subdirectories to `assets/shaders/{common,culling,deferred,forward}/`; updated includes, test paths, and source comment without shader semantic edits. |
 | HARDEN-032 | Rename stale active task/doc names containing `src-new` | done | docs/tasks | Updated active source-layer README terminology and canonical docs/task navigation links; strict task/doc checks passed on 2026-04-29. |
 | HARDEN-033 | Add stale `src_new` reference checker | done | tools/repo/CI | Added `tools/repo/check_stale_src_new_references.py` with explicit allowlist and wired strict enforcement in `ci-docs.yml`. |
-| HARDEN-040 | Audit remaining non-taxonomic test directories | not-started | tests/docs | Create `docs/reports/test-taxonomy-audit-2026-04-29.md`. |
+| HARDEN-040 | Audit remaining non-taxonomic test directories | done | tests/docs | Audit recorded in [`docs/reports/test-taxonomy-audit-2026-04-29.md`](../../docs/reports/test-taxonomy-audit-2026-04-29.md); wrapper directories inventoried and mapped to HARDEN-041/HARDEN-042. |
 | HARDEN-041 | Move remaining test sources into taxonomy directories | not-started | tests/CMake | Depends on HARDEN-040 decisions. |
 | HARDEN-042 | Remove or formalize old subsystem test subdirectories | not-started | tests/docs | Depends on HARDEN-041. |
 | HARDEN-043 | Add strict test layout checker | not-started | tools/repo/CI | Depends on final test layout from HARDEN-042. |
@@ -195,3 +195,4 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-032 | `rg -n "src_new|src-new|src new" src/app/README.md src/core/README.md src/ecs/README.md src/graphics/renderer/README.md src/platform/README.md src/runtime/README.md docs/index.md docs/architecture/patterns.md docs/architecture/task-graphs.md docs/roadmap.md tasks/backlog/README.md tasks/backlog/legacy-todo.md tasks/backlog/rendering/RORG-031-rendering-pipeline.md` | Passed; active-stale references removed, with only explicit historical migration-inventory mentions retained. |
 | 2026-04-29 | HARDEN-033 | `python3 tools/repo/check_stale_src_new_references.py --root . --strict` | Passed; stale references now blocked outside explicit migration/historical allowlist entries. |
 | 2026-04-29 | HARDEN-033 | `python3 tools/repo/check_stale_src_new_references.py --root . --strict` after CI follow-up allowlist update for `.github/workflows/ci-docs.yml` | Passed; workflow self-reference no longer causes strict-mode false positives. |
+| 2026-04-29 | HARDEN-040 | `find tests -maxdepth 3 -type d | sort`; `find tests/Asset tests/Core tests/ECS tests/Graphics tests/Runtime -type f -name '*.cpp' | wc -l`; `for d in tests/Asset tests/Core tests/ECS tests/Graphics tests/Runtime; do echo "$(find "$d" -type f -name '*.cpp' | wc -l) $d"; done` | Audit evidence captured in `docs/reports/test-taxonomy-audit-2026-04-29.md`; 37 wrapper `*.cpp` files inventoried with follow-up mapping. |
