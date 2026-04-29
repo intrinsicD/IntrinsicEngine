@@ -13,7 +13,7 @@ This file is the archival index for the completed three-pass rendering refactor 
 The next architectural frontier is the **`src_new/` reimplementation** (see `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation"). Forward-looking design lives in:
 
 - `docs/architecture/src_new-rendering-architecture.md` — target design for `src_new/Graphics`.
-- `docs/architecture/src_new_module_inventory.md` — live module inventory for `src_new`.
+- `docs/migration/src_new_module_inventory.md` — live module inventory for `src_new`.
 - Per-subsystem `src_new/<Subsystem>/README.md` files.
 
 ## Canonical Documents (legacy `src/` tree)
