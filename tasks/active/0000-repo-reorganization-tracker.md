@@ -21,7 +21,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 
 | Blocker | Owner | Tracking task | Status | Notes |
 |---|---|---|---|---|
-| Root strict top-level check fails on `CLAUDE.md` allowlist mismatch | Repo maintainers | RORG-133 follow-up | blocked | `check_expected_top_level.py --strict` flags `CLAUDE.md` as unexpected. |
+| _None_ | - | - | - | No open final cleanup blockers as of 2026-04-29 after top-level allowlist sync. |
 
 ## Final-state checklist (target layout)
 
@@ -122,4 +122,4 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-130 | Add architecture review checklist to CI and PR process | done | work / TBD | Added `docs/agent/architecture-review-checklist.md` and `tools/repo/check_pr_contract.py`; wired CI docs workflow to run the checker in CI mode. |
 | RORG-131 | Add method implementation review checklist | done | work / TBD | Added `docs/agent/method-review-checklist.md` and linked it from `docs/agent/method-workflow.md` and `.github/pull_request_template.md`. |
 | RORG-132 | Add benchmark review checklist | done | work / TBD | Added `docs/agent/benchmark-review-checklist.md` and linked it from benchmark docs, workflow docs, and PR template. |
-| RORG-133 | Add final cleanup audit | blocked | work / TBD | Audit file exists and strict task policy passes; strict top-level check fails on `CLAUDE.md` allowlist mismatch (2026-04-29). |
+| RORG-133 | Add final cleanup audit | done | work / TBD | Final cleanup audit completed; strict top-level check now passes after expected allowlist sync for `CLAUDE.md` (2026-04-29). |

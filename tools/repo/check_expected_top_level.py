@@ -12,6 +12,7 @@ EXPECTED_TOP_LEVEL = {
     ".github",
     ".gitignore",
     "AGENTS.md",
+    "CLAUDE.md",
     "README.md",
     "CMakeLists.txt",
     "CMakePresets.json",
