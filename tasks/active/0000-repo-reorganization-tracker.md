@@ -116,7 +116,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-111 | Add root allowlist and enforce root hygiene | done | work / TBD | Added `tools/repo/root_allowlist.yaml`, extended `check_root_hygiene.py` to validate top-level entries, and removed tracked `imgui.ini` in favor of `.gitignore` local-state handling. |
 | RORG-112 | Remove compatibility wrappers after docs are updated | done | work / TBD | Removed obsolete root compatibility wrappers after updating remaining references to canonical tool paths. |
 | RORG-120 | Regenerate final module inventory | done | work / TBD | Regenerated `docs/api/generated/module_inventory.md` from canonical `src/` tree and archived the legacy `src_new` inventory under `docs/migration/src_new_module_inventory.md`. |
-| RORG-121 | Final docs link strictness | not-started | - |  |
+| RORG-121 | Final docs link strictness | done | work / TBD | Enabled strict docs-link enforcement in `ci-docs.yml` and added explicit mode reporting in `check_doc_links.py`. |
 | RORG-122 | Final method and benchmark manifest strictness | not-started | - |  |
 | RORG-123 | Final task policy strictness | not-started | - |  |
 | RORG-130 | Add architecture review checklist to CI and PR process | not-started | - |  |

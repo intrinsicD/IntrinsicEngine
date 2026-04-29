@@ -16,8 +16,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Validate markdown links (warning mode)
-        run: python3 tools/docs/check_doc_links.py --root .
+      - name: Validate markdown links (strict mode)
+        run: python3 tools/docs/check_doc_links.py --root . --strict
 
       - name: Validate structured tasks
         run: python3 tools/agents/validate_tasks.py --root tasks
@@ -37,6 +37,3 @@ jobs:
           python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
           git diff --exit-code docs/api/generated/module_inventory.md
 
-      - name: Note strict-mode follow-up
-        run: |
-          echo "Docs/manifests checks are active; strict docs-link enforcement is tracked by RORG-121."
