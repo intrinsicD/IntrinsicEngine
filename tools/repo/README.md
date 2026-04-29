@@ -19,6 +19,6 @@ Repository structure and policy scripts.
 To avoid breaking historical docs/scripts during migration, legacy wrappers are temporarily retained at:
 
 - `tools/check_ui_contract_guard.sh`
-- `tools/generate_src_new_module_inventory.py`
+- `tools/repo/generate_module_inventory.py`
 
 These wrappers should be removed in the compatibility cleanup phase (RORG-112).

@@ -61,7 +61,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-030 | Create task directory structure | done | current branch / TBD | Added `tasks/README.md`, status READMEs, and task templates under `tasks/templates/`. |
 | RORG-031 | Split current `TODO.md` into task files | done | work / TBD | Added structured backlog seed tasks under architecture/rendering/runtime/src-new/geometry/ui and converted legacy backlog file to archive index. |
 | RORG-032 | Add task validator | done | work / TBD | Added `tools/agents/validate_tasks.py` with warning/strict modes and required-section checks. |
-| RORG-033 | Replace TODO policy script | done | work / TBD | Added `tools/agents/check_task_policy.py`; kept `tools/agents/check_todo_active_only.sh` as the canonical wrapper with `tools/check_todo_active_only.sh` retained as a compatibility entrypoint; CI now calls the new checker directly. |
+| RORG-033 | Replace TODO policy script | done | work / TBD | Added `tools/agents/check_task_policy.py`; migrated TODO policy enforcement to `tools/agents/check_task_policy.py`; compatibility wrappers were later removed in RORG-112. |
 | RORG-040 | Create `methods/` root and package template | done | work / TBD | Added `methods/` skeleton, template package, and pipeline documentation in `methods/README.md`. |
 | RORG-041 | Add method manifest schema | done | work / TBD | Added `docs/methods/method-manifest-schema.md` and `tools/agents/validate_method_manifests.py` with strict mode and path checks. |
 | RORG-042 | Create method docs package | done | work / TBD | Added `docs/methods/` package and linked it from method workflow/docs index. |
@@ -114,7 +114,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-104 | Tighten source layering checker to strict mode | done | work / TBD | Enabled strict layering checks in `pr-fast` and `ci-linux-clang`; expanded `tools/repo/layering_allowlist.yaml` to explicitly contain temporary `src/legacy/**` exceptions with task/expiry metadata. |
 | RORG-110 | Rewrite README around final layout | done | work / TBD | Rewrote `README.md` into a concise entry point aligned with final layout and required navigation pointers. |
 | RORG-111 | Add root allowlist and enforce root hygiene | done | work / TBD | Added `tools/repo/root_allowlist.yaml`, extended `check_root_hygiene.py` to validate top-level entries, and removed tracked `imgui.ini` in favor of `.gitignore` local-state handling. |
-| RORG-112 | Remove compatibility wrappers after docs are updated | not-started | - |  |
+| RORG-112 | Remove compatibility wrappers after docs are updated | done | work / TBD | Removed obsolete root compatibility wrappers after updating remaining references to canonical tool paths. |
 | RORG-120 | Regenerate final module inventory | not-started | - |  |
 | RORG-121 | Final docs link strictness | not-started | - |  |
 | RORG-122 | Final method and benchmark manifest strictness | not-started | - |  |
