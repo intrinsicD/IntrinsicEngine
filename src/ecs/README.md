@@ -1,7 +1,7 @@
 # ECS
 
-`src_new/ECS` contains the entity-component infrastructure used by every
-`src_new` subsystem that needs to query or mutate scene state. Components are
+`src/ecs` contains the entity-component infrastructure used by every
+engine subsystem that needs to query or mutate scene state. Components are
 plain data; systems are stateless functions that operate on components.
 
 ## Public module surface

@@ -1,6 +1,6 @@
 # Platform
 
-`src_new/Platform` owns the windowing and input abstractions used by the
+`src/platform` owns the windowing and input abstractions used by the
 engine. The public surface is a port-style interface; concrete backends live in
 per-platform subdirectories.
 

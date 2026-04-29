@@ -2,7 +2,7 @@
 
 This document catalogs the main reusable patterns in the IntrinsicEngine codebase, with canonical examples and guidance on when/how to apply each pattern.
 
-> **Dual-tree note.** The canonical examples below live in the legacy `src/` tree. These patterns apply to the in-progress `src_new/` reimplementation as well — prefer them verbatim when porting a subsystem. The `src_new` migration contract (`CLAUDE.md` → "Active Effort: `src_new/` Reimplementation") requires *stricter* adherence on modularity, explicit dependencies, and one-way layering, not looser.
+> **Dual-tree note.** The canonical examples below live in the legacy `src/` tree. These patterns apply to the reorganized layer layout as well — prefer them verbatim when evolving a subsystem. The active agent contract (`AGENTS.md`) requires *stricter* adherence on modularity, explicit dependencies, and one-way layering, not looser.
 
 ---
 
@@ -497,7 +497,7 @@ Each command captures the minimal before/after state needed to reverse the opera
 
 ## 19. Owner / Worker Split Pattern
 
-**The P0 architectural rule for every module in `src_new/`.** Applies identically
+**The P0 architectural rule for every module in `src/`.** Applies identically
 to GPU rendering, CPU simulation, asset loading, ECS systems, and audio.
 
 ### The rule

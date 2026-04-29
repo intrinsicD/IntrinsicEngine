@@ -7,7 +7,7 @@ This page is the canonical entry point for repository documentation.
 - [Architecture documents](architecture/) — subsystem design notes, runtime boundaries, rendering plans, and migration-era architecture records.
 - [Rendering three-pass architecture](architecture/rendering-three-pass.md)
 - [Runtime subsystem boundaries](architecture/runtime-subsystem-boundaries.md)
-- [Task graph architecture](architecture/src_new-task-graphs.md)
+- [Task graph architecture](architecture/task-graph-domains.md)
 
 ## ADRs
 
@@ -51,14 +51,14 @@ This page is the canonical entry point for repository documentation.
 - [Target repository layout](migration/target-repo-layout.md)
 - [Legacy retirement plan](migration/legacy-retirement.md)
 - [Source-tree reorganization](migration/source-tree-reorganization.md)
-- [`src_new` transition status](migration/src-new-status.md)
+- [source-tree reorganization transition status](migration/active-status.md)
 
 ## API / generated docs
 
 Generated API and inventory docs:
 
 - [Canonical module inventory (`src/`)](api/generated/module_inventory.md)
-- [Migration module inventory (`src_new`)](migration/src_new_module_inventory.md)
+- [Migration module inventory (historical `src_new` snapshot)](migration/src_new_module_inventory.md)
 
 ## Build / troubleshooting
 

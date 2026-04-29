@@ -1,6 +1,6 @@
 # Graphics
 
-`src_new/Graphics` owns rendering, GPU scene state, and GPU pass orchestration.
+`src/graphics/renderer` owns rendering, GPU scene state, and GPU pass orchestration.
 It is layered into backend-agnostic RHI abstractions, backend implementations,
 and renderer/render-graph orchestration.
 
@@ -95,5 +95,5 @@ and renderer/render-graph orchestration.
 
 ## Architecture references
 
-- `docs/architecture/src_new-rendering-architecture.md`
-- `docs/architecture/src_new-task-graphs.md`
+- `docs/architecture/rendering-target-architecture.md`
+- `docs/architecture/task-graph-domains.md`
