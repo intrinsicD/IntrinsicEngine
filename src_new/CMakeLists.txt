@@ -10,9 +10,6 @@ if(INTRINSIC_HEADLESS_NO_GLFW AND EXTRINSIC_BACKEND STREQUAL "Vulkan")
     set(EXTRINSIC_BACKEND "Null" CACHE STRING "Graphics backend to use (Vulkan, DirectX12, Metal, Null)" FORCE)
 endif()
 
-if(NOT INTRINSIC_HEADLESS_NO_GLFW)
-    add_subdirectory(App)
-endif()
 
 add_custom_target(src_new_module_inventory
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/repo/generate_module_inventory.py --root ${INTRINSIC_MODULE_INVENTORY_ROOT}
