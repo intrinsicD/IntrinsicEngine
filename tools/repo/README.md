@@ -9,6 +9,7 @@ Repository structure and policy scripts.
 - `check_layering.py`: validates layer dependency boundaries in warning mode by default, with `--strict` for CI enforcement.
 - `check_ui_contract_guard.sh`: UI boundary guard script (canonical path).
 - `check_stale_src_new_references.py`: enforces no new stale `src_new` naming outside an explicit migration/historical allowlist.
+- `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, and broad legacy wildcard bans).
 - `generate_module_inventory.py`: module inventory generator for both `src/` (final layout) and `src_new/` (migration snapshot); defaults to `docs/api/generated/module_inventory.md`.
 
 ## Config files
