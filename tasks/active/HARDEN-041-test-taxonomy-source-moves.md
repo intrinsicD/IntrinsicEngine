@@ -56,3 +56,22 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - No test semantic refactors in the same patch as mechanical moves.
 - No changes to production runtime/graphics behavior.
 - No legacy retirement or `src/legacy/` shrink work.
+
+
+## Execution notes (2026-04-29)
+
+- Inspected the current taxonomy audit report and `tests/CMakeLists.txt` source-resolution wiring before performing moves.
+- Confirmed HARDEN-040 produced inventory counts but did **not** yet publish a per-file destination table for all 37 wrapper sources.
+- To avoid mixing mechanical moves with semantic categorization guesses, this task remains **in-progress** until the per-file mapping list is written directly into this task (or a linked mapping appendix) and then executed in one mechanical patch.
+
+### Verified preconditions
+
+- Wrapper directories remain intentionally unregistered in active CTest registration.
+- Active taxonomy targets already resolve from `tests/unit`, `tests/contract`, `tests/integration`, `tests/regression`, `tests/gpu`, and `tests/benchmark`.
+
+### Next step for this task
+
+1. Add an explicit file-by-file move table (`source -> destination`) for the 37 wrapper `*.cpp` files.
+2. Apply pure `git mv` operations only.
+3. Rewire any path references in `tests/CMakeLists.txt` if needed.
+4. Run the full verification block from this task and record output.
