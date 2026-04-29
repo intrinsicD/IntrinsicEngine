@@ -120,6 +120,6 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-122 | Final method and benchmark manifest strictness | done | work / TBD | Enabled strict validation in CI for method manifests, benchmark manifests, and benchmark result JSON (`ci-docs.yml`, `ci-bench-smoke.yml`). |
 | RORG-123 | Final task policy strictness | done | work / TBD | Enabled strict task policy enforcement in `pr-fast.yml` and `ci-docs.yml` via `tools/agents/check_task_policy.py --strict`, including root TODO-file prohibition and required task metadata validation. |
 | RORG-130 | Add architecture review checklist to CI and PR process | not-started | - |  |
-| RORG-131 | Add method implementation review checklist | not-started | - |  |
+| RORG-131 | Add method implementation review checklist | done | work / TBD | Added `docs/agent/method-review-checklist.md` and linked it from `docs/agent/method-workflow.md` and `.github/pull_request_template.md`. |
 | RORG-132 | Add benchmark review checklist | not-started | - |  |
 | RORG-133 | Add final cleanup audit | not-started | - |  |

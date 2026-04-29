@@ -40,3 +40,4 @@ This workflow governs scientific paper/method implementation in IntrinsicEngine.
 - [Numerical robustness policy](../methods/numerical-robustness-policy.md)
 - [Dataset policy](../methods/dataset-policy.md)
 - [Method report template](../methods/report-template.md)
+- [Method implementation review checklist](./method-review-checklist.md)

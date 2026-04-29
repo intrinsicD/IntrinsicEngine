@@ -63,4 +63,5 @@
 - Review checklist: `/docs/agent/review-checklist.md`
 - Architecture review checklist: `/docs/agent/architecture-review-checklist.md`
 - Method workflow: `/docs/agent/method-workflow.md`
+- Method review checklist: `/docs/agent/method-review-checklist.md`
 - Benchmark workflow: `/docs/agent/benchmark-workflow.md`
