@@ -112,7 +112,7 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 | RORG-102 | Move App/Sandbox to `src/app` | done | work / TBD | Moved `src_new/App` to `src/app` via `git mv`; updated root/src_new CMake wiring so app builds from canonical path and `src_new` no longer references `App`. |
 | RORG-103 | Remove empty `src_new/` | done | work / TBD | Removed `src_new/`, updated root CMake wiring and migration docs/README references to the final canonical `src/` layout. |
 | RORG-104 | Tighten source layering checker to strict mode | not-started | - |  |
-| RORG-110 | Rewrite README around final layout | not-started | - |  |
+| RORG-110 | Rewrite README around final layout | done | work / TBD | Rewrote `README.md` into a concise entry point aligned with final layout and required navigation pointers. |
 | RORG-111 | Add root allowlist and enforce root hygiene | not-started | - |  |
 | RORG-112 | Remove compatibility wrappers after docs are updated | not-started | - |  |
 | RORG-120 | Regenerate final module inventory | not-started | - |  |
