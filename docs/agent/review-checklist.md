@@ -36,3 +36,6 @@ Use this checklist before commit and PR creation.
 
 - [ ] Touched CI/workflow logic remains readable and maintainable.
 - [ ] Any temporary shim is recorded in tracker with removal task and timeline.
+
+
+Related: `docs/agent/architecture-review-checklist.md`.
