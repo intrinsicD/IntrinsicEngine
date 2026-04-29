@@ -34,6 +34,9 @@ jobs:
       - name: Validate layering allowlist quality
         run: python3 tools/repo/check_layering_allowlist_quality.py --root . --strict
 
+      - name: Validate test taxonomy layout
+        run: python3 tools/repo/check_test_layout.py --root . --strict
+
       - name: Validate method manifests
         run: python3 tools/agents/validate_method_manifests.py --root methods --strict
 
