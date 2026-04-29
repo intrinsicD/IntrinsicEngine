@@ -16,6 +16,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install Python validation deps
+        run: python3 -m pip install --disable-pip-version-check pyyaml
+
       - name: Validate markdown links (strict mode)
         run: python3 tools/docs/check_doc_links.py --root . --strict
 
