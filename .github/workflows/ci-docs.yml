@@ -19,8 +19,8 @@ jobs:
       - name: Validate markdown links (strict mode)
         run: python3 tools/docs/check_doc_links.py --root . --strict
 
-      - name: Validate structured tasks
-        run: python3 tools/agents/validate_tasks.py --root tasks
+      - name: Validate task policy (strict mode)
+        run: python3 tools/agents/check_task_policy.py --root . --strict
 
       - name: Validate method manifests
         run: python3 tools/agents/validate_method_manifests.py --root methods --strict
