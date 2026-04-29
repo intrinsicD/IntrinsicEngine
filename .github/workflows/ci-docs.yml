@@ -23,10 +23,10 @@ jobs:
         run: python3 tools/agents/validate_tasks.py --root tasks
 
       - name: Validate method manifests
-        run: python3 tools/agents/validate_method_manifests.py --root methods
+        run: python3 tools/agents/validate_method_manifests.py --root methods --strict
 
       - name: Validate benchmark manifests
-        run: python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks
+        run: python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict
 
 
       - name: Validate workflow file naming policy
@@ -36,4 +36,3 @@ jobs:
         run: |
           python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
           git diff --exit-code docs/api/generated/module_inventory.md
-
