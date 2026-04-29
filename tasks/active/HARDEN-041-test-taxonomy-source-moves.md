@@ -42,7 +42,7 @@ HARDEN-040 completed the audit of non-taxonomic test directories and mapped conc
 - [x] CMake test registration resolves relocated files without missing-source or missing-target errors.
 - [ ] CPU-supported CTest gate remains green after the move.
 - [x] Hardening tracker records HARDEN-041 progress and verification evidence.
-- [ ] Strict task/doc validators pass.
+- [x] Strict task/doc validators pass.
 
 ## Verification
 ```bash
@@ -128,3 +128,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - `RuntimeIntegrationTestObjs` / `IntrinsicRuntimeIntegrationTests`
 - GPU/backend-facing relocated graphics/runtime suites are labeled `gpu` + `vulkan` and remain outside the default CPU-supported CTest gate.
 - Strict task/doc validators pass after the relocation patch.
+
+- Re-ran strict policy/docs validators after relocation status sync:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` → passed (`Validated 14 task file(s); findings: 0`).
+  - `python3 tools/docs/check_doc_links.py --root . --strict` → passed (`Checked relative links: 105; no broken links`).
