@@ -31,8 +31,8 @@ jobs:
       - name: Run unit and contract tests
         run: ctest --test-dir build/ci --output-on-failure -L "unit|contract"
 
-      - name: Validate structured tasks
-        run: python3 tools/agents/validate_tasks.py --root tasks --strict
+      - name: Validate task policy (strict mode)
+        run: python3 tools/agents/check_task_policy.py --root . --strict
 
       - name: Validate docs links (warning mode)
         run: python3 tools/docs/check_doc_links.py --root .
