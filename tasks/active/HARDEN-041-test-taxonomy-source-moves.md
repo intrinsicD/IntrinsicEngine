@@ -69,6 +69,49 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Wrapper directories remain intentionally unregistered in active CTest registration.
 - Active taxonomy targets already resolve from `tests/unit`, `tests/contract`, `tests/integration`, `tests/regression`, `tests/gpu`, and `tests/benchmark`.
 
+
+### File-by-file move table (planned mechanical mapping)
+
+| Source wrapper file | Destination taxonomy path | Category rationale |
+|---|---|---|
+| `tests/Asset/Test.Asset.EventBus.cpp` | `tests/unit/assets/Test_Asset_EventBus.cpp` | Asset/core utility behavior; unit scope. |
+| `tests/Asset/Test.Asset.LoadPipeline.cpp` | `tests/integration/runtime/Test_AssetLoadPipeline.cpp` | Cross-subsystem loading flow; integration scope. |
+| `tests/Asset/Test.Asset.PathIndex.cpp` | `tests/unit/assets/Test_Asset_PathIndex.cpp` | Deterministic asset index behavior; unit scope. |
+| `tests/Asset/Test.Asset.PayloadStore.cpp` | `tests/unit/assets/Test_Asset_PayloadStore.cpp` | In-memory payload semantics; unit scope. |
+| `tests/Asset/Test.Asset.Registry.cpp` | `tests/unit/assets/Test_Asset_Registry.cpp` | Registry contracts without runtime composition; unit scope. |
+| `tests/Asset/Test.Asset.Service.cpp` | `tests/integration/runtime/Test_AssetService.cpp` | Service wiring with runtime-facing seams; integration scope. |
+| `tests/Core/Test.Core.CallbackRegistry.cpp` | `tests/unit/core/Test_Core_CallbackRegistry.cpp` | Core container/registration primitive; unit scope. |
+| `tests/Core/Test.Core.Config.cpp` | `tests/unit/core/Test_Core_Config.cpp` | Config parsing/validation behavior; unit scope. |
+| `tests/Core/Test.Core.DagScheduler.cpp` | `tests/unit/core/Test_Core_DagScheduler.cpp` | Scheduler primitive behavior; unit scope. |
+| `tests/Core/Test.Core.Error.cpp` | `tests/unit/core/Test_Core_ErrorLegacy.cpp` | Legacy core error behavior parity; unit scope. |
+| `tests/Core/Test.Core.Filesystem.cpp` | `tests/unit/core/Test_Core_Filesystem.cpp` | Filesystem helpers with deterministic seams; unit scope. |
+| `tests/Core/Test.Core.FrameGraphParallel.cpp` | `tests/integration/runtime/Test_CoreFrameGraphParallel.cpp` | Multi-system framegraph behavior; integration scope. |
+| `tests/Core/Test.Core.GraphCompiler.cpp` | `tests/unit/core/Test_Core_GraphCompiler.cpp` | Graph compile semantics; unit scope. |
+| `tests/Core/Test.Core.GraphInterfaces.cpp` | `tests/contract/runtime/Test_CoreGraphInterfaces.cpp` | API/interface contract guarantees. |
+| `tests/Core/Test.Core.GraphStress.cpp` | `tests/integration/runtime/Test_CoreGraphStress.cpp` | Stress/scenario-level behavior; integration scope. |
+| `tests/Core/Test.Core.HandleLease.cpp` | `tests/unit/core/Test_Core_HandleLease.cpp` | Handle lease primitive behavior; unit scope. |
+| `tests/Core/Test.Core.Hash.cpp` | `tests/unit/core/Test_Core_HashLegacy.cpp` | Hash behavior parity; unit scope. |
+| `tests/Core/Test.Core.LockFreeQueue.cpp` | `tests/unit/core/Test_Core_LockFreeQueue.cpp` | Lock-free container semantics; unit scope. |
+| `tests/Core/Test.Core.Logging.cpp` | `tests/unit/core/Test_Core_Logging.cpp` | Logging primitive behavior; unit scope. |
+| `tests/Core/Test.Core.Memory.cpp` | `tests/unit/core/Test_Core_MemoryLegacy.cpp` | Memory primitive behavior parity; unit scope. |
+| `tests/Core/Test.Core.Process.cpp` | `tests/integration/runtime/Test_CoreProcess.cpp` | Process/runtime seam behavior; integration scope. |
+| `tests/Core/Test.Core.ResourcePool.cpp` | `tests/unit/core/Test_Core_ResourcePool.cpp` | Resource-pool primitive invariants; unit scope. |
+| `tests/Core/Test.Core.StrongHandle.cpp` | `tests/unit/core/Test_Core_StrongHandleLegacy.cpp` | Strong-handle parity checks; unit scope. |
+| `tests/Core/Test.Core.TaskGraph.cpp` | `tests/unit/core/Test_Core_TaskGraphLegacy.cpp` | Task graph primitive semantics; unit scope. |
+| `tests/Core/Test.Core.Tasks.cpp` | `tests/unit/core/Test_Core_TasksLegacy.cpp` | Task utility behavior; unit scope. |
+| `tests/ECS/Test.ECS.Scene.Registry.cpp` | `tests/unit/ecs/Test_ECS_SceneRegistry.cpp` | ECS registry data behavior; unit scope. |
+| `tests/Graphics/Test.Graphics.GpuWorldAndCulling.cpp` | `tests/integration/graphics/Test_GpuWorldAndCulling.cpp` | Graphics pipeline+culling interaction; integration scope. |
+| `tests/Graphics/Test.Graphics.MinimalTriangleAcceptance.cpp` | `tests/contract/graphics/Test_MinimalTriangleAcceptance.cpp` | Minimal rendering acceptance contract. |
+| `tests/Graphics/Test.Graphics.RenderGraph.cpp` | `tests/integration/graphics/Test_RenderGraphLegacy.cpp` | Render graph multi-system behavior; integration scope. |
+| `tests/Graphics/Test.Graphics.Renderer.cpp` | `tests/integration/graphics/Test_RendererLegacy.cpp` | Renderer end-to-end behavior; integration scope. |
+| `tests/Graphics/Test.RHI.BufferManager.cpp` | `tests/unit/graphics/Test_RHI_BufferManager.cpp` | RHI resource primitive behavior; unit scope. |
+| `tests/Graphics/Test.RHI.CommandContextBarriers.cpp` | `tests/contract/graphics/Test_RHI_CommandContextBarriers.cpp` | Barrier/synchronization contract checks. |
+| `tests/Graphics/Test.RHI.PipelineManager.cpp` | `tests/unit/graphics/Test_RHI_PipelineManager.cpp` | RHI pipeline state primitive behavior; unit scope. |
+| `tests/Graphics/Test.RHI.SamplerManager.cpp` | `tests/unit/graphics/Test_RHI_SamplerManager.cpp` | RHI sampler primitive behavior; unit scope. |
+| `tests/Graphics/Test.RHI.TextureManager.cpp` | `tests/unit/graphics/Test_RHI_TextureManager.cpp` | RHI texture primitive behavior; unit scope. |
+| `tests/Runtime/Test.Runtime.EngineLayering.cpp` | `tests/contract/runtime/Test_RuntimeEngineLayering.cpp` | Layering/ownership contract checks. |
+| `tests/Runtime/Test.Runtime.StreamingExecutor.cpp` | `tests/integration/runtime/Test_RuntimeStreamingExecutor.cpp` | Runtime streaming executor integration behavior. |
+
 ### Next step for this task
 
 1. Add an explicit file-by-file move table (`source -> destination`) for the 37 wrapper `*.cpp` files.
