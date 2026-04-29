@@ -415,10 +415,14 @@ if(_intrinsic_registered_test_labels)
     set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${_intrinsic_label_fixup_file}")
 endif()
 
-if(TARGET IntrinsicTests)
-    get_property(_intrinsic_registered_test_targets GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS)
-    if(_intrinsic_registered_test_targets)
-        add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})
-    endif()
+if(NOT TARGET IntrinsicTests)
+    # Some CI configurations intentionally skip RuntimeTestObjs; keep a stable
+    # aggregate build target for agent/CI verification commands.
+    add_custom_target(IntrinsicTests)
+endif()
+
+get_property(_intrinsic_registered_test_targets GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS)
+if(TARGET IntrinsicTests AND _intrinsic_registered_test_targets)
+    add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})
 endif()
 
