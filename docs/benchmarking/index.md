@@ -17,3 +17,5 @@ This section defines how IntrinsicEngine benchmarks are authored, executed, vali
 
 - [Agent benchmark workflow](../agent/benchmark-workflow.md)
 - [Benchmarks root README](../../benchmarks/README.md)
+
+- [Benchmark review checklist](../agent/benchmark-review-checklist.md)

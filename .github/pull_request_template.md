@@ -65,3 +65,5 @@
 - Method workflow: `/docs/agent/method-workflow.md`
 - Method review checklist: `/docs/agent/method-review-checklist.md`
 - Benchmark workflow: `/docs/agent/benchmark-workflow.md`
+
+- Benchmark review checklist: `/docs/agent/benchmark-review-checklist.md`
