@@ -1,4 +1,3 @@
-add_subdirectory(RHI)
 
 set(target_name ExtrinsicGraphics)
 intrinsic_add_module_library(${target_name})
