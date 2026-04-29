@@ -31,6 +31,9 @@ jobs:
       - name: Validate stale src_new references
         run: python3 tools/repo/check_stale_src_new_references.py --root . --strict
 
+      - name: Validate layering allowlist quality
+        run: python3 tools/repo/check_layering_allowlist_quality.py --root . --strict
+
       - name: Validate method manifests
         run: python3 tools/agents/validate_method_manifests.py --root methods --strict
 
