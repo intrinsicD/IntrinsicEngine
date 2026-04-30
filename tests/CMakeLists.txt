@@ -314,7 +314,6 @@ if(INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
 endif()
 
 set(_graphics_unit_test_files
-    Test_GpuAssetCache.cpp
     Test_RHI_BufferManager.cpp
     Test_RHI_PipelineManager.cpp
     Test_RHI_SamplerManager.cpp
@@ -327,7 +326,25 @@ intrinsic_resolve_test_sources(_graphics_unit_test_sources
 intrinsic_test_object_lib(GraphicsUnitTestObjs
     SOURCES
         ${_graphics_unit_test_sources}
-    DEPS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform ExtrinsicAssets ExtrinsicGraphicsAssets
+    DEPS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+)
+
+# Graphics-assets bridge tests — pure CPU mock-driven, no real GPU.
+# Kept in a separate object lib + target so they carry only `unit graphics`
+# labels and participate in the default CPU-supported correctness gate
+# (the existing GraphicsUnitTestObjs target inherits HARDEN-041 `gpu`/`vulkan`
+# label debt that excludes it from the CPU gate).
+set(_graphics_assets_unit_test_files
+    Test.GpuAssetCache.cpp
+)
+intrinsic_resolve_test_sources(_graphics_assets_unit_test_sources
+    SEARCH_DIRS unit/graphics
+    FILES ${_graphics_assets_unit_test_files}
+)
+intrinsic_test_object_lib(GraphicsAssetsUnitTestObjs
+    SOURCES
+        ${_graphics_assets_unit_test_sources}
+    DEPS ExtrinsicCore ExtrinsicAssets ExtrinsicRHI ExtrinsicPlatform ExtrinsicGraphicsAssets
 )
 
 set(_graphics_contract_test_files
@@ -552,8 +569,15 @@ endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
     OBJECTS GraphicsUnitTestObjs
-    LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform ExtrinsicAssets ExtrinsicGraphicsAssets
+    LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS unit graphics gpu vulkan
+)
+
+# CPU-only graphics tests — runs in the default CPU gate.
+intrinsic_test_executable(IntrinsicGraphicsAssetsUnitTests
+    OBJECTS GraphicsAssetsUnitTestObjs
+    LINK_LIBS ExtrinsicCore ExtrinsicAssets ExtrinsicRHI ExtrinsicPlatform ExtrinsicGraphicsAssets
+    LABELS unit graphics
 )
 
 intrinsic_test_executable(IntrinsicGraphicsContractTests

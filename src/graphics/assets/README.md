@@ -39,3 +39,12 @@ type-specific bridges (mesh / texture) are responsible for calling
 
 `AssetHooks::TickAssets()` calls `cache.Tick(device.GetGlobalFrameNumber(),
 device.GetFramesInFlight())` once per frame, after `AssetService::Tick()`.
+
+## Tests
+
+`tests/unit/graphics/Test.GpuAssetCache.cpp`, target
+`IntrinsicGraphicsAssetsUnitTests`, labels `unit graphics`. The target
+runs in the default CPU correctness gate
+(`-LE 'gpu|vulkan|slow|flaky-quarantine'`) — the cache is exercised via
+`MockDevice` from `tests/support/MockRHI.hpp` and never touches a real
+GPU.
