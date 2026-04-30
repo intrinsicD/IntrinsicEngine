@@ -1,6 +1,6 @@
 # Module Inventory (auto-generated)
 
-_Generated on 2026-04-29 by `tools/repo/generate_module_inventory.py`._
+_Generated on 2026-04-30 by `tools/repo/generate_module_inventory.py`._
 
 Root scanned: `src`
 
@@ -16,10 +16,10 @@ Root scanned: `src`
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 43 |
 | `graphics/rhi` | 15 |
-| `graphics/vulkan` | 2 |
+| `graphics/vulkan` | 12 |
 | `legacy` | 182 |
-| `platform` | 2 |
-| `runtime` | 3 |
+| `platform` | 5 |
+| `runtime` | 4 |
 
 ## Modules
 
@@ -224,7 +224,17 @@ Root scanned: `src`
 | `Extrinsic.RHI.Transfer` | `src/graphics/rhi/RHI.Transfer.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.TransferQueue` | `src/graphics/rhi/RHI.TransferQueue.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Types` | `src/graphics/rhi/RHI.Types.cppm` | `graphics/rhi` |
-| `Extrinsic.Backends.Vulkan:Internal` | `src/graphics/vulkan/Backends.Vulkan.Internal.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:CommandPools` | `src/graphics/vulkan/Backends.Vulkan.CommandPools.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Descriptors` | `src/graphics/vulkan/Backends.Vulkan.Descriptors.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Device` | `src/graphics/vulkan/Backends.Vulkan.Device.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Diagnostics` | `src/graphics/vulkan/Backends.Vulkan.Diagnostics.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Memory` | `src/graphics/vulkan/Backends.Vulkan.Memory.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Pipelines` | `src/graphics/vulkan/Backends.Vulkan.Pipelines.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Queues` | `src/graphics/vulkan/Backends.Vulkan.Queues.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Surface` | `src/graphics/vulkan/Backends.Vulkan.Surface.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Swapchain` | `src/graphics/vulkan/Backends.Vulkan.Swapchain.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Sync` | `src/graphics/vulkan/Backends.Vulkan.Sync.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:Transfer` | `src/graphics/vulkan/Backends.Vulkan.Transfer.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan` | `src/graphics/vulkan/Backends.Vulkan.cppm` | `graphics/vulkan` |
 | `Asset.Errors` | `src/legacy/Asset/Asset.Errors.cppm` | `legacy` |
 | `Asset.Manager` | `src/legacy/Asset/Asset.Manager.cppm` | `legacy` |
@@ -410,8 +420,12 @@ Root scanned: `src`
 | `Runtime.SystemBundles` | `src/legacy/Runtime/Runtime.SystemBundles.cppm` | `legacy` |
 | `Extrinsic.Platform.Window` | `src/platform/Platform.IWindow.cppm` | `platform` |
 | `Extrinsic.Platform.Input` | `src/platform/Platform.Input.cppm` | `platform` |
+| `Extrinsic.Platform.Backend.Glfw` | `src/platform/backends/glfw/Platform.Backend.Glfw.cppm` | `platform` |
+| `Extrinsic.Platform.Backend.GlfwVulkanSurface` | `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` | `platform` |
+| `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.FrameClock` | `src/runtime/Runtime.FrameClock.cppm` | `runtime` |
+| `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **388**
+Total modules: **402**

@@ -10,6 +10,7 @@ startup/shutdown.
 |---|---|
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring |
 | `Extrinsic.Runtime.FrameClock` | Per-frame wall-clock management |
+| `Extrinsic.Runtime.FrameLoop` | Testable platform/render/maintenance/shutdown phase contracts |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
 
 ## Canonical frame loop phases (`Engine::RunFrame`)

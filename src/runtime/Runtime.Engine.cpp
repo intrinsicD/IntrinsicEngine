@@ -22,6 +22,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.FrameClock;
+import Extrinsic.Runtime.FrameLoop;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
@@ -164,44 +165,111 @@ namespace Extrinsic::Runtime
 
     void Engine::Shutdown()
     {
-        m_Running = false;
-
-        if (m_Device)
-            m_Device->WaitIdle();
-
-        if (m_Application)
-            m_Application->OnShutdown(*this);
-
-        if (m_StreamingExecutor)
+        struct ShutdownHooks final : IRuntimeShutdownHooks
         {
-            m_StreamingExecutor->ShutdownAndDrain();
-        }
+            Engine& Owner;
+            bool& Running;
+            bool& Initialized;
+            std::unique_ptr<IApplication>& Application;
+            std::unique_ptr<Platform::IWindow>& Window;
+            std::unique_ptr<RHI::IDevice>& Device;
+            std::unique_ptr<Graphics::IRenderer>& Renderer;
+            std::unique_ptr<Core::FrameGraph>& FrameGraph;
+            std::unique_ptr<Core::Dag::TaskGraph>& StreamingGraph;
+            std::unique_ptr<StreamingExecutor>& StreamingExecutorPtr;
+            std::unique_ptr<Assets::AssetService>& AssetService;
+            std::unique_ptr<ECS::Scene::Registry>& Scene;
 
-        m_Scene.reset();
-        m_AssetService.reset();
-        m_StreamingExecutor.reset();
-        m_StreamingGraph.reset();
-        m_FrameGraph.reset();
+            ShutdownHooks(Engine& owner,
+                          bool& running,
+                          bool& initialized,
+                          std::unique_ptr<IApplication>& application,
+                          std::unique_ptr<Platform::IWindow>& window,
+                          std::unique_ptr<RHI::IDevice>& device,
+                          std::unique_ptr<Graphics::IRenderer>& renderer,
+                          std::unique_ptr<Core::FrameGraph>& frameGraph,
+                          std::unique_ptr<Core::Dag::TaskGraph>& streamingGraph,
+                          std::unique_ptr<StreamingExecutor>& streamingExecutor,
+                          std::unique_ptr<Assets::AssetService>& assetService,
+                          std::unique_ptr<ECS::Scene::Registry>& scene)
+                : Owner(owner)
+                , Running(running)
+                , Initialized(initialized)
+                , Application(application)
+                , Window(window)
+                , Device(device)
+                , Renderer(renderer)
+                , FrameGraph(frameGraph)
+                , StreamingGraph(streamingGraph)
+                , StreamingExecutorPtr(streamingExecutor)
+                , AssetService(assetService)
+                , Scene(scene)
+            {
+            }
 
-        if (m_Renderer)
-        {
-            m_Renderer->Shutdown();
-            m_Renderer.reset();
-        }
+            void StopRunning() override { Running = false; }
+            void WaitDeviceIdle() override
+            {
+                if (Device)
+                    Device->WaitIdle();
+            }
+            void ShutdownApplication() override
+            {
+                if (Application)
+                    Application->OnShutdown(Owner);
+            }
+            void ShutdownStreaming() override
+            {
+                if (StreamingExecutorPtr)
+                    StreamingExecutorPtr->ShutdownAndDrain();
+            }
+            void DestroyScene() override { Scene.reset(); }
+            void DestroyAssets() override { AssetService.reset(); }
+            void DestroyStreamingState() override
+            {
+                StreamingExecutorPtr.reset();
+                StreamingGraph.reset();
+            }
+            void DestroyFrameGraph() override { FrameGraph.reset(); }
+            void ShutdownRenderer() override
+            {
+                if (Renderer)
+                {
+                    Renderer->Shutdown();
+                    Renderer.reset();
+                }
+            }
+            void ShutdownDevice() override
+            {
+                if (Device)
+                {
+                    Device->Shutdown();
+                    Device.reset();
+                }
+            }
+            void DestroyWindow() override { Window.reset(); }
+            void ShutdownScheduler() override
+            {
+                // Shut down the fiber scheduler last — worker threads must exit cleanly
+                // before any other thread-local storage or allocators are destroyed.
+                Core::Tasks::Scheduler::Shutdown();
+            }
+            void MarkUninitialized() override { Initialized = false; }
+        };
 
-        if (m_Device)
-        {
-            m_Device->Shutdown();
-            m_Device.reset();
-        }
-
-        m_Window.reset();
-
-        // Shut down the fiber scheduler last — worker threads must exit cleanly
-        // before any other thread-local storage or allocators are destroyed.
-        Core::Tasks::Scheduler::Shutdown();
-
-        m_Initialized = false;
+        ShutdownHooks hooks(*this,
+                            m_Running,
+                            m_Initialized,
+                            m_Application,
+                            m_Window,
+                            m_Device,
+                            m_Renderer,
+                            m_FrameGraph,
+                            m_StreamingGraph,
+                            m_StreamingExecutor,
+                            m_AssetService,
+                            m_Scene);
+        ExecuteRuntimeShutdownContract(hooks);
     }
 
     // ── Main loop ─────────────────────────────────────────────────────────
@@ -288,45 +356,103 @@ namespace Extrinsic::Runtime
             .Viewport = m_Window->GetFramebufferExtent(),
         };
 
-        // ── Phase 5: Renderer — BeginFrame (GPU task graph — acquire) ─────
+        // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
-        if (!m_Renderer->BeginFrame(frame))
+        Graphics::RenderWorld renderWorld{};
+
+        struct RenderFrameHooks final : IRuntimeRenderFrameHooks
+        {
+            Graphics::IRenderer& Renderer;
+            RHI::FrameHandle& Frame;
+            const Graphics::RenderFrameInput& Input;
+            Graphics::RenderWorld& World;
+
+            RenderFrameHooks(Graphics::IRenderer& renderer,
+                             RHI::FrameHandle& frame,
+                             const Graphics::RenderFrameInput& input,
+                             Graphics::RenderWorld& world)
+                : Renderer(renderer)
+                , Frame(frame)
+                , Input(input)
+                , World(world)
+            {
+            }
+
+            bool BeginFrame() override { return Renderer.BeginFrame(Frame); }
+            void ExtractRenderWorld() override { World = Renderer.ExtractRenderWorld(Input); }
+            void PrepareFrame() override { Renderer.PrepareFrame(World); }
+            void ExecuteFrame() override { Renderer.ExecuteFrame(Frame, World); }
+            std::uint64_t EndFrame() override { return Renderer.EndFrame(Frame); }
+        };
+
+        RenderFrameHooks renderHooks(*m_Renderer, frame, renderInput, renderWorld);
+
+        const RuntimeRenderFrameResult renderResult = ExecuteRuntimeRenderFrameContract(renderHooks);
+        if (!renderResult.BeganFrame)
         {
             m_FrameClock.EndFrame();
             return;
         }
 
-        // ── Phase 6: Renderer — ExtractRenderWorld ────────────────────────
-        Graphics::RenderWorld renderWorld =
-            m_Renderer->ExtractRenderWorld(renderInput);
-
-        // ── Phase 7: Renderer — PrepareFrame ──────────────────────────────
-        m_Renderer->PrepareFrame(renderWorld);
-
-        // ── Phase 8: Renderer — ExecuteFrame (GPU task graph) ─────────────
-        // IRenderer owns its GPU Dag::TaskGraph(Gpu) internally.
-        // It compiles render-pass dependencies, resolves virtual-resource
-        // lifetimes, emits Vulkan Sync2 barriers, and records command buffers.
-        m_Renderer->ExecuteFrame(frame, renderWorld);
-
-        // ── Phase 9: Renderer — EndFrame + Present ────────────────────────
-        const std::uint64_t completedGpuValue = m_Renderer->EndFrame(frame);
+        const std::uint64_t completedGpuValue = renderResult.CompletedGpuValue;
         m_Device->Present(frame);
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
-        // GPU-side resource retirement, staging GC, readback processing.
-        m_Device->GetTransferQueue().CollectCompleted();
+        struct TransferHooks final : IRuntimeTransferFrameHooks
+        {
+            RHI::IDevice& Device;
+
+            explicit TransferHooks(RHI::IDevice& device)
+                : Device(device)
+            {
+            }
+
+            void CollectCompletedTransfers() override
+            {
+                // GPU-side resource retirement, staging GC, readback processing.
+                Device.GetTransferQueue().CollectCompleted();
+            }
+        };
+
+        struct StreamingHooks final : IRuntimeStreamingFrameHooks
+        {
+            Core::Dag::TaskGraph& Graph;
+            StreamingExecutor& Executor;
+
+            StreamingHooks(Core::Dag::TaskGraph& graph, StreamingExecutor& executor)
+                : Graph(graph)
+                , Executor(executor)
+            {
+            }
+
+            void DrainCompletions() override { Executor.DrainCompletions(); }
+            void ApplyMainThreadResults() override { Executor.ApplyMainThreadResults(); }
+            void SubmitFrameWork() override { SubmitStreamingGraphToExecutor(Graph, Executor); }
+            void PumpBackground(std::uint32_t maxLaunches) override { Executor.PumpBackground(maxLaunches); }
+        };
+
+        struct AssetHooks final : IRuntimeAssetFrameHooks
+        {
+            Assets::AssetService& AssetService;
+
+            explicit AssetHooks(Assets::AssetService& assetService)
+                : AssetService(assetService)
+            {
+            }
+
+            void TickAssets() override
+            {
+                // Asset service main-thread tick: advances state machines, fires
+                // AssetEventBus::Ready / Reloaded / Destroyed callbacks.
+                AssetService.Tick();
+            }
+        };
+
+        TransferHooks transferHooks(*m_Device);
+        StreamingHooks streamingHooks(*m_StreamingGraph, *m_StreamingExecutor);
+        AssetHooks assetHooks(*m_AssetService);
+        ExecuteRuntimeMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
         (void)completedGpuValue; // placeholder until GpuAssetCache / deferred-delete lands
-
-        m_StreamingExecutor->DrainCompletions();
-        m_StreamingExecutor->ApplyMainThreadResults();
-
-        // Asset service main-thread tick: advances state machines, fires
-        // AssetEventBus::Ready / Reloaded / Destroyed callbacks.
-        m_AssetService->Tick();
-
-        SubmitStreamingGraphToExecutor(*m_StreamingGraph, *m_StreamingExecutor);
-        m_StreamingExecutor->PumpBackground(8);
 
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();

@@ -11,7 +11,7 @@ module;
 
 module Extrinsic.Backends.Vulkan;
 
-import :Internal;
+import :Pipelines;
 
 namespace Extrinsic::Backends::Vulkan
 {

@@ -50,6 +50,7 @@ This page is the canonical entry point for repository documentation.
 - [Current repository inventory snapshot](migration/current-repo-inventory.md)
 - [Target repository layout](migration/target-repo-layout.md)
 - [Legacy retirement plan](migration/legacy-retirement.md)
+- [Non-legacy parity matrix](migration/nonlegacy-parity-matrix.md)
 - [Source-tree reorganization](migration/source-tree-reorganization.md)
 - [source-tree reorganization transition status](migration/active-status.md)
 

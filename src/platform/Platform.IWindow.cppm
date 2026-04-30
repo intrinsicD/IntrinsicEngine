@@ -1,6 +1,8 @@
 module;
 
 #include <memory>
+#include <string>
+#include <string_view>
 #include <vector>
 #include <functional>
 #include <variant>
@@ -18,52 +20,52 @@ namespace Extrinsic::Platform
         int Height{0};
     };
 
-    struct WindowCloseEvent
+    export struct WindowCloseEvent
     {
     };
 
-    struct WindowResizeEvent
+    export struct WindowResizeEvent
     {
         int Width;
         int Height;
     };
 
-    struct KeyEvent
+    export struct KeyEvent
     {
         int KeyCode;
         bool IsPressed; // true = pressed, false = released
     };
 
-    struct MouseButtonEvent
+    export struct MouseButtonEvent
     {
         int ButtonCode;
         bool IsPressed; // true = pressed, false = released
     };
 
-    struct ScrollEvent
+    export struct ScrollEvent
     {
         double XOffset;
         double YOffset;
     };
 
-    struct CursorEvent
+    export struct CursorEvent
     {
         double XPos;
         double YPos;
     };
 
-    struct CharEvent
+    export struct CharEvent
     {
         unsigned int Character;
     };
 
-    struct WindowDropEvent
+    export struct WindowDropEvent
     {
-        std::vector<std::string> Paths;
+        std::vector<std::string> Paths{};
     };
 
     // Type-safe variant
-    using Event = std::variant<
+    export using Event = std::variant<
         WindowCloseEvent,
         WindowResizeEvent,
         KeyEvent,
@@ -73,6 +75,13 @@ namespace Extrinsic::Platform
         CharEvent,
         WindowDropEvent
     >;
+
+    export enum class CursorMode
+    {
+        Normal,
+        Hidden,
+        Disabled,
+    };
 
     export class IWindow
     {
@@ -91,9 +100,15 @@ namespace Extrinsic::Platform
 
         using EventCallbackFn = std::function<void(const Event&)>;
         virtual void Listen(EventCallbackFn callback) = 0;
+        [[nodiscard]] virtual std::vector<Event> DrainEvents() = 0;
 
         virtual void OnUpdate() = 0;
         virtual void WaitForEventsTimeout(double timeoutSeconds) = 0;
+
+        virtual void SetClipboardText(std::string_view text) = 0;
+        [[nodiscard]] virtual std::string GetClipboardText() const = 0;
+        virtual void SetCursorMode(CursorMode mode) = 0;
+        [[nodiscard]] virtual CursorMode GetCursorMode() const = 0;
 
 
         [[nodiscard]] const Input::Context& GetInput() const { return m_InputContext; }

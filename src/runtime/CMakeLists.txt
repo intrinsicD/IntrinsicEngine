@@ -6,6 +6,7 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
         Runtime.FrameClock.cppm
+        Runtime.FrameLoop.cppm
         Runtime.StreamingExecutor.cppm
         PRIVATE
         Runtime.Engine.cpp

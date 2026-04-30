@@ -13,6 +13,7 @@ This section tracks **temporary** repository transition work from the dual-tree 
 - [Current repository inventory](current-repo-inventory.md) — factual snapshot baseline before structural moves.
 - [Target repository layout](target-repo-layout.md) — agreed final-state directory contract.
 - [Legacy retirement plan](legacy-retirement.md) — policy and exit criteria for `src/legacy/`.
+- [Non-legacy parity matrix](nonlegacy-parity-matrix.md) — promoted `src/` subsystem parity state excluding `src/legacy/`.
 - [Source-tree reorganization](source-tree-reorganization.md) — phased move strategy and safeguards.
 - [Source-tree move plan](source-tree-move-plan.md) — exact Phase 9 move table, build/path update scope, and rollback procedure.
 - [Source-tree reorganization transition status](active-status.md) — status board for promotion from migration layouts into final `src/` roots.

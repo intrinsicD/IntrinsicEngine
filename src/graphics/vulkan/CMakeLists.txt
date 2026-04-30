@@ -5,7 +5,17 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Backends.Vulkan.cppm
-        Backends.Vulkan.Internal.cppm   # non-exported :Internal partition
+        Backends.Vulkan.CommandPools.cppm
+        Backends.Vulkan.Descriptors.cppm
+        Backends.Vulkan.Device.cppm
+        Backends.Vulkan.Diagnostics.cppm
+        Backends.Vulkan.Memory.cppm
+        Backends.Vulkan.Pipelines.cppm
+        Backends.Vulkan.Queues.cppm
+        Backends.Vulkan.Surface.cppm
+        Backends.Vulkan.Swapchain.cppm
+        Backends.Vulkan.Sync.cppm
+        Backends.Vulkan.Transfer.cppm
         PRIVATE
         Backends.Vulkan.Mappings.cpp        # §2  RHI enum → VkEnum tables
         Backends.Vulkan.Staging.cpp         # §5  StagingBelt ring-buffer

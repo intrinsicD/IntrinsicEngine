@@ -8,7 +8,7 @@ module;
 
 module Extrinsic.Backends.Vulkan;
 
-import :Internal;
+import :CommandPools;
 
 namespace Extrinsic::Backends::Vulkan
 {

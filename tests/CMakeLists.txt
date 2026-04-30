@@ -283,6 +283,36 @@ intrinsic_test_object_lib(CoreWrapperUnitTestObjs
     DEPS ExtrinsicCore
 )
 
+set(_platform_test_files
+    Test.NullPlatform.cpp
+    Test.PlatformLayering.cpp
+)
+intrinsic_resolve_test_sources(_platform_test_sources
+    SEARCH_DIRS unit/platform contract/platform
+    FILES ${_platform_test_files}
+)
+intrinsic_test_object_lib(PlatformTestObjs
+    SOURCES
+        ${_platform_test_sources}
+    DEPS ExtrinsicPlatform ExtrinsicCore
+)
+target_compile_definitions(PlatformTestObjs PRIVATE INTRINSIC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
+if(INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    set(_platform_glfw_smoke_test_files
+        Test.GlfwPlatformSmoke.cpp
+    )
+    intrinsic_resolve_test_sources(_platform_glfw_smoke_test_sources
+        SEARCH_DIRS integration/platform
+        FILES ${_platform_glfw_smoke_test_files}
+    )
+    intrinsic_test_object_lib(PlatformGlfwSmokeTestObjs
+        SOURCES
+            ${_platform_glfw_smoke_test_sources}
+        DEPS ExtrinsicPlatform ExtrinsicCore
+    )
+endif()
+
 set(_graphics_unit_test_files
     Test_RHI_BufferManager.cpp
     Test_RHI_PipelineManager.cpp
@@ -301,7 +331,8 @@ intrinsic_test_object_lib(GraphicsUnitTestObjs
 
 set(_graphics_contract_test_files
     Test_MinimalTriangleAcceptance.cpp
-    Test_RHI_CommandContextBarriers.cpp
+    Test.RHI.CommandContextBarriers.cpp
+    Test_RendererRhiBoundary.cpp
 )
 intrinsic_resolve_test_sources(_graphics_contract_test_sources
     SEARCH_DIRS contract/graphics
@@ -403,6 +434,7 @@ if(TARGET ExtrinsicRuntime)
         Test_CoreGraphInterfaces.cpp
         Test_CoreGraphStress.cpp
         Test_CoreProcess.cpp
+        Test.RuntimeFrameLoopContract.cpp
         Test_RuntimeEngineLayering.cpp
         Test_RuntimeStreamingExecutor.cpp
         Test_GpuWorldAndCulling.cpp
@@ -502,6 +534,20 @@ intrinsic_test_executable(IntrinsicCoreWrapperUnitTests
     LINK_LIBS ExtrinsicCore
     LABELS unit core
 )
+
+intrinsic_test_executable(IntrinsicPlatformTests
+    OBJECTS PlatformTestObjs
+    LINK_LIBS ExtrinsicPlatform ExtrinsicCore
+    LABELS unit contract platform headless
+)
+
+if(TARGET PlatformGlfwSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicPlatformGlfwSmokeTests
+        OBJECTS PlatformGlfwSmokeTestObjs
+        LINK_LIBS ExtrinsicPlatform ExtrinsicCore
+        LABELS integration platform glfw vulkan
+    )
+endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
     OBJECTS GraphicsUnitTestObjs

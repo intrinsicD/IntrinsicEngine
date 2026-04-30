@@ -11,14 +11,25 @@ device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
 | Module | Exported API |
 |---|---|
 | `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()` |
-| `Extrinsic.Backends.Vulkan:Internal` | *(internal — not re-exported)* |
+| `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
 
 | File | Responsibility |
 |---|---|
 | `Backends.Vulkan.cppm` | Umbrella interface — exports `CreateVulkanDevice()` |
-| `Backends.Vulkan.Internal.cppm` | Non-exported `:Internal` partition — all concrete type declarations (structs, class headers, constants, mapping function forward-decls). Never re-exported from the umbrella. |
+| `Backends.Vulkan.Device.cppm` | Non-re-exported `:Device` partition — `VulkanDevice` declaration and aggregate backend ownership. |
+| `Backends.Vulkan.Queues.cppm` | Non-re-exported `:Queues` partition — queue-family and raw queue state contracts. |
+| `Backends.Vulkan.Memory.cppm` | Non-re-exported `:Memory` partition — backend buffer/image/sampler records. |
+| `Backends.Vulkan.CommandPools.cppm` | Non-re-exported `:CommandPools` partition — command-context declaration. |
+| `Backends.Vulkan.Descriptors.cppm` | Non-re-exported `:Descriptors` partition — bindless descriptor heap declaration. |
+| `Backends.Vulkan.Swapchain.cppm` | Non-re-exported `:Swapchain` partition — swapchain state contract. |
+| `Backends.Vulkan.Pipelines.cppm` | Non-re-exported `:Pipelines` partition — pipeline record and RHI-to-Vulkan mapping declarations. |
+| `Backends.Vulkan.Transfer.cppm` | Non-re-exported `:Transfer` partition — staging belt and transfer queue declarations. |
+| `Backends.Vulkan.Sync.cppm` | Non-re-exported `:Sync` partition — frames-in-flight, per-frame sync, deferred deletion. |
+| `Backends.Vulkan.Surface.cppm` | Non-re-exported `:Surface` partition — surface ownership contract. |
+| `Backends.Vulkan.Diagnostics.cppm` | Non-re-exported `:Diagnostics` partition — profiler/timestamp declaration. |
+| `Backends.Vulkan.Internal.cppm` | Retired migration stub; contains no module declaration. |
 | `Backends.Vulkan.Mappings.cpp` | §2 RHI enum → Vulkan enum conversion tables (`ToVkFormat`, `ToVkImageLayout`, `AspectFromFormat`, `ToVkBufferUsage`, etc.) |
 | `Backends.Vulkan.Staging.cpp` | §5 `StagingBelt` — host-visible ring-buffer for async uploads |
 | `Backends.Vulkan.Profiler.cpp` | §6 `VulkanProfiler` — `IProfiler` backed by `VkQueryPool` timestamps |
@@ -33,22 +44,20 @@ device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
 
 ## Partition design
 
-All internal Vulkan types (`VulkanBuffer`, `VulkanImage`, `StagingBelt`,
-`VulkanProfiler`, `VulkanBindlessHeap`, `VulkanTransferQueue`,
-`VulkanCommandContext`, `PerFrame`, `VulkanDevice`) are declared in
-`Backends.Vulkan.Internal.cppm` — a non-exported partition of the module.
-Each implementation `.cpp` file opens with:
+Internal Vulkan types are declared in focused non-re-exported module partitions.
+Implementation `.cpp` files import the partition that owns the declarations they
+define or consume. For example:
 
 ```cpp
 module;
 #include "Vulkan.hpp"   // provides VkDevice, VmaAllocator, etc.
 module Extrinsic.Backends.Vulkan;
-import :Internal;       // gets all concrete types + re-exported Extrinsic imports
+import :Transfer;       // gets StagingBelt/VulkanTransferQueue declarations
 ```
 
-The umbrella `Backends.Vulkan.cppm` does **NOT** `export import :Internal`,
-so external consumers of `Extrinsic.Backends.Vulkan` see only
-`CreateVulkanDevice()` — the concrete Vulkan types are fully hidden.
+The umbrella `Backends.Vulkan.cppm` does **not** `export import` any internal
+partition, so external consumers of `Extrinsic.Backends.Vulkan` see only
+`CreateVulkanDevice()` — concrete Vulkan types remain hidden.
 
 ## Dependencies
 

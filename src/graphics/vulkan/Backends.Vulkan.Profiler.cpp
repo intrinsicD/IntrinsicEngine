@@ -14,7 +14,7 @@ module;
 
 module Extrinsic.Backends.Vulkan;
 
-import :Internal;
+import :Diagnostics;
 
 namespace Extrinsic::Backends::Vulkan
 {

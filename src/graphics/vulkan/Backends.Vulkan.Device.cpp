@@ -15,7 +15,7 @@ module;
 
 module Extrinsic.Backends.Vulkan;
 
-import :Internal;
+import :Device;
 
 namespace Extrinsic::Backends::Vulkan
 {

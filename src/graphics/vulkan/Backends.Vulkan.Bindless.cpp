@@ -12,7 +12,7 @@ module;
 
 module Extrinsic.Backends.Vulkan;
 
-import :Internal;
+import :Descriptors;
 
 namespace Extrinsic::Backends::Vulkan
 {
