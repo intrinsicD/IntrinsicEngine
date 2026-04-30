@@ -42,7 +42,7 @@ Execute the final hardening audit with command-backed evidence for every accepta
 
 | Acceptance item (from HARDEN-001) | Status | Evidence |
 |---|---|---|
-| Default local/CI CPU-supported test gate is green. | ❌ blocked | `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON` failed during configure because required offline cache path `external/cache/glm-src` is absent. Configure did not complete, so build and CPU gate `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` could not run. |
+| Default local/CI CPU-supported test gate is green. | ❌ blocked | `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON -DCMAKE_C_COMPILER=/root/.swiftly/bin/clang -DCMAKE_CXX_COMPILER=/root/.swiftly/bin/clang++` now succeeds after HARDEN-052 cache bootstrap. Remaining blocker is completing `cmake --build --preset ci --target IntrinsicTests` and the CPU gate `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` in this environment (scan-deps/toolchain follow-up in progress). |
 | GPU/runtime tests are fixed or capability-gated with explicit skip reasons. | ❌ blocked | Runtime/GPU execution evidence depends on successful `build/ci` generation; configure failure above prevents runtime gate execution in this environment. |
 | Codex verification builds meaningful targets and runs tests. | ✅ pass | `python3 tools/agents/check_codex_config.py --root . --strict` passed (`findings=0`). |
 | Active migration-era source-root alias references are removed or policy-managed. | ✅ pass | strict stale-reference checker passed (`findings=0`) after updating contract runtime layering test file paths to promoted source directories. |

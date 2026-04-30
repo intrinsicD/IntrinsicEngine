@@ -110,7 +110,7 @@ Excluded from this phase:
 | HARDEN-043 | Add strict test layout checker | done | tools/repo/CI | Added `tools/repo/check_test_layout.py`, wired strict CI docs validation, and documented usage in `tools/repo/README.md` on 2026-04-29. |
 | HARDEN-050 | Align CI workflows with final supported test policy | done | CI/docs | `pr-fast.yml` unit/contract gate includes `--timeout 60`; HARDEN-050B follow-up updated `ci-sanitizers.yml` to run `-L "unit|contract|integration"` with canonical `-LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60`. |
 | HARDEN-051 | Execute final post-reorganization hardening audit | in-progress | tasks/audit | Final audit artifact re-executed on 2026-04-30 at `tasks/active/final-post-reorganization-hardening-audit.md`; source-root stale-reference check is now green, but closure remains blocked by missing offline dependency cache required by the CI preset configure gate. |
-| HARDEN-052 | Bootstrap offline dependency cache for CI preset | in-progress | build/deps/docs | Added follow-up task `tasks/active/HARDEN-052-offline-dependency-cache-bootstrap.md` to unblock `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON` and final HARDEN-051 closure evidence. |
+| HARDEN-052 | Bootstrap offline dependency cache for CI preset | in-progress | build/deps/docs | Bootstrap procedure documented; cache prime + offline `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON` now pass locally with explicit compiler overrides, while final build/CPU-gate evidence remains in progress. |
 
 ## Current full-test status
 
@@ -220,3 +220,6 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-051 | `task file creation` | Created `tasks/active/HARDEN-051-final-hardening-audit-task.md` to scope final hardening audit closure evidence and keep execution as a follow-up task step. |
 
 | 2026-04-30 | HARDEN-051B | `python3 tools/repo/check_stale_src_new_references.py --root . --strict`; `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`; validator strict checks | Re-executed final hardening audit with command evidence in `tasks/active/final-post-reorganization-hardening-audit.md`; stale-reference checker is now green (`findings=0`), but configure remains blocked by missing offline cache `external/cache/glm-src`. Follow-up task HARDEN-052 created. |
+
+| 2026-04-30 | HARDEN-052 | `cmake --preset ci -DCMAKE_C_COMPILER=/root/.swiftly/bin/clang -DCMAKE_CXX_COMPILER=/root/.swiftly/bin/clang++`; `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON -DCMAKE_C_COMPILER=/root/.swiftly/bin/clang -DCMAKE_CXX_COMPILER=/root/.swiftly/bin/clang++` | Passed; online prime populated `external/cache/*-src`, then offline configure succeeded from a fresh preset state. |
+| 2026-04-30 | HARDEN-052 | `cmake --build --preset ci --target IntrinsicTests` then reconfigure with `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/bin/clang-scan-deps-20` and rebuild | First build failed (`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS-NOTFOUND`); follow-up reconfigure unblocked dependency scanning and resumed long-running build. CPU-supported ctest gate pending completion. |
