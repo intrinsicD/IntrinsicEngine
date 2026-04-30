@@ -20,7 +20,7 @@ HARDEN-041 mechanically relocated all wrapper `*.cpp` sources from `tests/{Asset
   - `tests/Runtime/`
 - Relocate `tests/Graphics/MockRHI.hpp` into `tests/support/MockRHI.hpp`.
 - Keep the patch mechanical only and avoid semantic test behavior changes.
-- Update the hardening tracker (`tasks/active/0001-post-reorganization-hardening-tracker.md`) status/evidence for HARDEN-042.
+- Update the hardening tracker (`tasks/done/0001-post-reorganization-hardening-tracker.md`) status/evidence for HARDEN-042.
 
 ## Tests
 - `rg -n "ExtrinsicAssetTests|ExtrinsicCoreTests|ExtrinsicECSTests|ExtrinsicGraphicsTests|ExtrinsicRuntimeTests" tests`
@@ -28,7 +28,7 @@ HARDEN-041 mechanically relocated all wrapper `*.cpp` sources from `tests/{Asset
 - `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md`:
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md`:
   - status board row for HARDEN-042.
   - temporary wrapper subdirectory note under temporary test skips/quarantines.
   - evidence log entries for HARDEN-042 execution.

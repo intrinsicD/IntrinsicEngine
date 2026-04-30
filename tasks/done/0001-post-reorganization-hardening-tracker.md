@@ -17,11 +17,13 @@ This tracker follows completion of the RORG source-layout reorganization. It cov
 
 Legacy retirement is explicitly deferred. Any temporary legacy exception must remain tracked separately and must not become a broad migration-retirement effort under this tracker.
 
-- **Status:** done for HARDEN-001; hardening phase in-progress
+- **Status:** done; post-reorganization hardening phase closed and archived on 2026-04-30
 - **Owner/agent:** repository maintainers / hardening agents
 - **Branch:** `work`
 - **PR:** TBD
-- **Next verification step:** no active post-reorganization hardening blocker remains after HARDEN-053 closure; keep the default CPU-supported gate and opt-in GPU/runtime gate green for touched areas.
+- **Commit reference:** pending local review/commit
+- **Next verification step:** no active post-reorganization hardening blocker remains; keep the default CPU-supported gate and opt-in GPU/runtime gate green for touched areas.
+- **Closure evidence:** all `HARDEN-*` rows are `done`; final acceptance checklist is complete; `IntrinsicTests` builds; CPU-supported CTest and GPU/Vulkan/runtime opt-in CTest gates passed on 2026-04-30; strict task/docs and structural validators passed during final cleanup.
 - **Status values:** `not-started`, `in-progress`, `blocked`, `done`, `deferred`
 
 ## Required changes
@@ -39,13 +41,13 @@ Legacy retirement is explicitly deferred. Any temporary legacy exception must re
 
 ## Docs
 
-- `tasks/README.md` links this tracker as the active post-RORG hardening tracker.
+- `tasks/README.md` linked this tracker while the post-RORG hardening phase was active; after closure, it lists no active trackers and this record is archived under `tasks/done/`.
 - Follow-up reports and docs created by later hardening tasks must link back to this tracker when they change active hardening status.
 
 ## Acceptance criteria
 
-- [x] Tracker exists at `tasks/active/0001-post-reorganization-hardening-tracker.md`.
-- [x] Tracker is linked from `tasks/README.md` or `docs/migration/active-status.md`.
+- [x] Tracker existed under `tasks/active/` while active and is archived at `tasks/done/0001-post-reorganization-hardening-tracker.md` after closure.
+- [x] Tracker was linked from `tasks/README.md` while active; `tasks/README.md` now records that no active trackers remain.
 - [x] Tracker explicitly states that legacy retirement is deferred.
 - [x] Tracker contains no vague `fix later` entries; every known issue maps to a `HARDEN-*` task ID.
 - [x] Current full-test status is recorded.

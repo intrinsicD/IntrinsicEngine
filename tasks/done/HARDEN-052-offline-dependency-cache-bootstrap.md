@@ -18,7 +18,7 @@ Unblock the CI preset offline configure requirement by populating `external/cach
 - `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
 
 ## Docs
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` with bootstrap and gate results.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` with bootstrap and gate results.
 - Update `tasks/done/final-post-reorganization-hardening-audit.md` when blocker is resolved.
 
 ## Acceptance criteria

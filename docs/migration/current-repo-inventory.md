@@ -111,7 +111,7 @@ Currently all tooling scripts and baselines are mostly flat under `tools/`:
 - `CLAUDE.md` (large repository policy + workflow prompt).
 - `.github/copilot-instructions.md`.
 - `.codex/config.yaml`.
-- `tasks/active/0000-repo-reorganization-tracker.md` (migration tracker task file).
+- `tasks/done/0000-repo-reorganization-tracker.md` (archived migration tracker task file).
 
 ## 8) Current generated files and regeneration paths
 

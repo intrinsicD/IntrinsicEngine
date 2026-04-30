@@ -16,7 +16,7 @@
 - Add `tools/repo/check_test_layout.py` to enforce allowed test source roots and block legacy wrapper test source directories.
 - Wire the checker into `.github/workflows/ci-docs.yml` strict validation.
 - Document checker usage in `tools/repo/README.md`.
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-043.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-043.
 
 ## Tests
 - Run `python3 tools/repo/check_test_layout.py --root . --strict`.
@@ -24,7 +24,7 @@
 
 ## Docs
 - `tools/repo/README.md` checker inventory update.
-- `tasks/active/0001-post-reorganization-hardening-tracker.md` status board and evidence log update.
+- `tasks/done/0001-post-reorganization-hardening-tracker.md` status board and evidence log update.
 
 ## Acceptance criteria
 - [x] Strict test layout checker exists and validates the final taxonomy layout.

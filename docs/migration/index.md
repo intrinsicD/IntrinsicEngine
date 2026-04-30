@@ -6,7 +6,7 @@ This section tracks **temporary** repository transition work from the dual-tree 
 
 - These docs are migration-scoped and may become obsolete when reorganization is complete.
 - Canonical long-lived architecture docs remain under `docs/architecture/`.
-- Temporary exceptions must also be recorded in `tasks/active/0000-repo-reorganization-tracker.md`.
+- Temporary exceptions must also be recorded in a current task under `tasks/active/` with a removal task ID.
 
 ## Migration documents
 

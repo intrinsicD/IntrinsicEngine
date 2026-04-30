@@ -9,7 +9,7 @@
 - Do not add new allowlist exception categories outside legacy path narrowing.
 
 ## Context
-- `tasks/active/0001-post-reorganization-hardening-tracker.md` tracks `HARDEN-010` as the prerequisite for allowlist-quality enforcement in `HARDEN-011`.
+- `tasks/done/0001-post-reorganization-hardening-tracker.md` tracks `HARDEN-010` as the prerequisite for allowlist-quality enforcement in `HARDEN-011`.
 - Current `tools/repo/layering_allowlist.yaml` uses broad `src/legacy/**` exceptions for every legacy->promoted layer edge.
 
 ## Required changes
@@ -24,7 +24,7 @@
 
 ## Docs
 - `tools/repo/README.md`
-- `tasks/active/0001-post-reorganization-hardening-tracker.md`
+- `tasks/done/0001-post-reorganization-hardening-tracker.md`
 
 ## Acceptance criteria
 - No `src/legacy/**` wildcard remains in `tools/repo/layering_allowlist.yaml`.

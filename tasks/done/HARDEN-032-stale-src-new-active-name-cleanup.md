@@ -9,14 +9,14 @@
 - Do not rewrite historical migration/archive records that intentionally preserve past terminology.
 
 ## Context
-- `tasks/active/0001-post-reorganization-hardening-tracker.md` marks `HARDEN-032` as not-started and scopes it to docs/tasks cleanup.
+- `tasks/done/0001-post-reorganization-hardening-tracker.md` marks `HARDEN-032` as not-started and scopes it to docs/tasks cleanup.
 - `docs/migration/src-new-reference-audit.md` classifies the active-stale references that must be cleaned up by this task.
 
 ## Required changes
 - Update active source-layer README files to describe current `src/<layer>` ownership without `src_new` terminology.
 - Update canonical documentation navigation (`docs/index.md`, architecture cross-links, roadmap) to avoid stale `src_new` naming and links.
 - Update backlog navigation/docs entries that still reference `tasks/backlog/src-new/`.
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` status/evidence for `HARDEN-032`.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for `HARDEN-032`.
 
 ## Tests
 - `python3 tools/agents/check_task_policy.py --root . --strict`
@@ -31,7 +31,7 @@
 - `tasks/backlog/README.md`
 - `tasks/backlog/legacy-todo.md`
 - `tasks/backlog/rendering/RORG-031-rendering-pipeline.md`
-- `tasks/active/0001-post-reorganization-hardening-tracker.md`
+- `tasks/done/0001-post-reorganization-hardening-tracker.md`
 
 ## Acceptance criteria
 - Active-stale `src_new`/`src-new` references listed for these files in `docs/migration/src-new-reference-audit.md` are removed or renamed to current terminology.

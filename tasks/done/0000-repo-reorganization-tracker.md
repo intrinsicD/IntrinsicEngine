@@ -8,8 +8,12 @@ This tracker is the canonical migration status log for the IntrinsicEngine repos
 
 ## Current branch / PR
 
+- **Status:** done; source-layout reorganization tracker closed and archived on 2026-04-30.
 - **Branch:** `work`
 - **PR:** `TBD`
+- **Commit reference:** pending local review/commit
+- **Closure evidence:** all `RORG-*` rows are `done`; the final-state checklist is complete; no final cleanup blockers remain; strict task/docs and structural validators passed during final cleanup.
+- **Future exception tracking:** new temporary migration exceptions must use a new active task under `tasks/active/` with a specific removal task ID; this tracker is retained only as historical RORG evidence after archival.
 
 ## Temporary compatibility shims
 

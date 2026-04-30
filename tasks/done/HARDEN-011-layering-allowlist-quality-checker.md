@@ -9,7 +9,7 @@
 - Do not alter dependency-layer semantics beyond quality validation.
 
 ## Context
-- `tasks/active/0001-post-reorganization-hardening-tracker.md` marks `HARDEN-011` as the next allowlist-hardening step after `HARDEN-010`.
+- `tasks/done/0001-post-reorganization-hardening-tracker.md` marks `HARDEN-011` as the next allowlist-hardening step after `HARDEN-010`.
 - `tools/repo/check_layering.py` validates live dependency edges, but it does not yet validate allowlist-entry hygiene (duplicates, broad globs, missing metadata) as a dedicated policy gate.
 
 ## Required changes
@@ -26,7 +26,7 @@
 
 ## Docs
 - `tools/repo/README.md`
-- `tasks/active/0001-post-reorganization-hardening-tracker.md`
+- `tasks/done/0001-post-reorganization-hardening-tracker.md`
 
 ## Acceptance criteria
 - Checker fails strict mode when required fields are missing, broad globs are present, or duplicate entries exist.

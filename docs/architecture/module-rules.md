@@ -7,7 +7,7 @@ This document captures module/path stability expectations during reorganization.
 - Mechanical directory moves must preserve module names unless a task explicitly changes them.
 - Mechanical moves and semantic refactors must not be mixed in one PR.
 - New dependency edges must follow [layering.md](layering.md) and be documented.
-- Transitional exceptions must be tracked in `tasks/active/0000-repo-reorganization-tracker.md`.
+- Transitional exceptions must be tracked in a current task under `tasks/active/` with a removal task ID.
 
 ## Review expectations
 

@@ -89,6 +89,6 @@ Operational expectations:
 
 - During migration, temporary compatibility entries in `tests/CMakeLists.txt` are allowed.
 - Reclassified tests must update both file location and labels in the same change.
-- Any temporary category mismatch must be tracked in `tasks/active/0000-repo-reorganization-tracker.md`.
+- Any temporary category mismatch must be tracked in a current task under `tasks/active/` with a removal condition.
 - HARDEN-041B registers relocated wrapper sources under taxonomy-owned targets (`IntrinsicAssetUnitTests`, `IntrinsicCoreWrapperUnitTests`, `IntrinsicGraphicsUnitTests`, `IntrinsicGraphicsContractTests`, `IntrinsicRuntimeIntegrationTests`) instead of subsystem wrapper directories.
 - Graphics/runtime relocated wrapper suites are currently labeled `gpu`/`vulkan` because they include backend-facing coverage; CPU-only relabeling/splits remain follow-up work under HARDEN-042.

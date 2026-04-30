@@ -27,7 +27,12 @@ Use stable task prefixes to reflect ownership and review routing:
 
 ## Active trackers
 
-- [HARDEN-001 — Post-Reorganization Hardening Tracker](active/0001-post-reorganization-hardening-tracker.md)
+None. `tasks/active/` should contain only currently in-progress or blocked task files.
+
+Recently archived trackers:
+
+- [RORG-0000 — Repository Reorganization Tracker](done/0000-repo-reorganization-tracker.md)
+- [HARDEN-001 — Post-Reorganization Hardening Tracker](done/0001-post-reorganization-hardening-tracker.md)
 
 ## Required task shape
 

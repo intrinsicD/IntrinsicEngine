@@ -6,13 +6,13 @@ docs/reports/**
 docs/reviews/**
 
 # Historical and migration-era task records.
-tasks/active/0000-repo-reorganization-tracker.md
+tasks/done/0000-repo-reorganization-tracker.md
 tasks/done/final-reorganization-audit.md
 tasks/done/HARDEN-032-stale-src-new-active-name-cleanup.md
 tasks/backlog/source-parity/**
 
 # Current hardening tracker and checker task text mentioning this policy.
-tasks/active/0001-post-reorganization-hardening-tracker.md
+tasks/done/0001-post-reorganization-hardening-tracker.md
 tasks/done/HARDEN-033-stale-src-new-reference-checker.md
 
 # Known compatibility references in tools/docs.

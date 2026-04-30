@@ -12,7 +12,7 @@
 ## Layering
 - [ ] I verified this change preserves the architecture invariants in `AGENTS.md`.
 - [ ] I verified no prohibited cross-layer dependency was added.
-- [ ] If a temporary exception was introduced, it is tracked in `tasks/active/0000-repo-reorganization-tracker.md` with a removal task ID.
+- [ ] If a temporary exception was introduced, it is tracked by a current task under `tasks/active/` with a removal task ID.
 
 ## Tests
 - Test category decision (required):

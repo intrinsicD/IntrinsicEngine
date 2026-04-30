@@ -17,7 +17,7 @@ Owned by tests/docs under post-reorganization hardening. This task is documentat
   - Remaining non-taxonomic directories and file inventories.
   - Current registration status and rationale.
   - Concrete follow-up action mapping to HARDEN-041 and HARDEN-042.
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-040.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-040.
 
 ## Tests
 - `python3 tools/agents/check_task_policy.py --root . --strict`

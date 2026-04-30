@@ -25,7 +25,7 @@ HARDEN-040 completed the audit of non-taxonomic test directories and mapped conc
   according to the mapping recorded in `docs/reports/test-taxonomy-audit-2026-04-29.md`.
 - Update affected `tests/CMakeLists.txt` (and subordinate CMake files if present) to point to relocated files.
 - Keep target names and labels stable unless a taxonomy-only rename is explicitly required by the audit mapping.
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-041.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-041.
 
 ## Tests
 - `cmake --build --preset ci --target IntrinsicTests`

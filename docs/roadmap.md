@@ -11,7 +11,7 @@ All feature tracks below target the reorganized `src/` layer layout. The current
 - Contract and layering rules: `AGENTS.md` and `docs/agent/contract.md`.
 - Historical migration module snapshot: `docs/migration/src_new_module_inventory.md` (historical migration snapshot).
 - Rendering target architecture: `docs/architecture/rendering-target-architecture.md`.
-- Top-level hardening tracker: `tasks/active/0001-post-reorganization-hardening-tracker.md`.
+- Archived hardening tracker: `tasks/done/0001-post-reorganization-hardening-tracker.md`.
 
 ---
 

@@ -79,7 +79,7 @@ When structure, policy, or behavior changes:
 
 Exceptions are allowed only if:
 
-- recorded in `tasks/active/0000-repo-reorganization-tracker.md`,
+- recorded in a current task under `tasks/active/`,
 - linked to a removal task ID,
 - time-bounded,
 - and isolated so they do not create new promoted-layer violations.

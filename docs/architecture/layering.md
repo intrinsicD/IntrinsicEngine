@@ -37,4 +37,4 @@ python3 tools/repo/check_layering.py --root src --strict
 
 ### Migration note
 
-`src/legacy` may temporarily violate final boundaries only when the dependency is allowlisted and tracked in `tasks/active/0000-repo-reorganization-tracker.md` with a removal task.
+`src/legacy` may temporarily violate final boundaries only when the dependency is allowlisted and tracked in a current task under `tasks/active/` with a removal task.

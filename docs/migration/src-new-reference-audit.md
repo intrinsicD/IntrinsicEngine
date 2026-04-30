@@ -51,7 +51,7 @@ These references are acceptable while migration records and compatibility toolin
 | `docs/migration/current-repo-inventory.md:30,39,54,56-64,78-79,102,120` | migration-ok | allowlisted by `HARDEN-033` | This is a factual migration snapshot of the old dual-tree repository. |
 | `docs/migration/src_new_module_inventory.md:5,20-92` | migration-ok | allowlisted by `HARDEN-033` | This is an archived/generated migration inventory for the removed `src_new` tree. |
 | `tools/repo/README.md:11`; `tools/repo/check_layering.py:86`; `tools/repo/generate_module_inventory.py:40` | migration-ok | `HARDEN-033` checker allowlist or later tooling cleanup | Tooling intentionally retains migration compatibility and final-layout inventory generation support. |
-| `tasks/active/0001-post-reorganization-hardening-tracker.md:16,24,78,103-106,149-150,157` | migration-ok | current hardening tracker | The active hardening tracker owns `src_new` cleanup tasks and must mention the stale name until the phase closes. |
+| `tasks/done/0001-post-reorganization-hardening-tracker.md` | historical-ok | archived hardening tracker | The archived hardening tracker records completed `src_new` cleanup ownership and intentionally preserves historical wording. |
 
 ## Historical-ok references
 
@@ -62,7 +62,7 @@ These references intentionally preserve past decisions or old review context.
 | `docs/migration/archive/plan.md:13,15-17` | historical-ok | Archived migration plan. |
 | `docs/reports/2026-04-23-commit-metrics-analysis.md:18,46` | historical-ok | Historical commit metrics report. |
 | `docs/reviews/2026-04-22-commit-review.md:8,45,50,56,64,69`; `docs/reviews/2026-04-27-task-graph-cutover-audit.md:3,8,30` | historical-ok | Historical review/audit records. |
-| `tasks/active/0000-repo-reorganization-tracker.md:58,62,90,104-113,118` | historical-ok | Completed RORG tracker evidence. |
+| `tasks/done/0000-repo-reorganization-tracker.md` | historical-ok | Completed RORG tracker evidence. |
 | `tasks/done/final-reorganization-audit.md:28` | historical-ok | Completed final reorganization audit evidence. |
 
 ## False positives

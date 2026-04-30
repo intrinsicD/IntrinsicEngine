@@ -19,7 +19,7 @@ Most workflows already follow this policy. Follow-up HARDEN-050B found `ci-sanit
 ## Required changes
 - Update `.github/workflows/pr-fast.yml` to set `--timeout 60` on the unit/contract test command.
 - Update `.github/workflows/ci-sanitizers.yml` selected CPU test command to include `-LE "gpu|vulkan|slow|flaky-quarantine"` and `--timeout 60`.
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` status and evidence entries for HARDEN-050.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status and evidence entries for HARDEN-050.
 
 ## Tests
 - `python3 tools/agents/check_task_policy.py --root . --strict`

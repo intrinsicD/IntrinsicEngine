@@ -26,7 +26,7 @@ Execute the final hardening audit with command-backed evidence for every accepta
 - `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`
 
 ## Docs
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` with latest HARDEN-051 evidence and blocker status.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` with latest HARDEN-051 evidence and blocker status.
 - Add follow-up task for unresolved blocker if closure evidence is still incomplete.
 
 ## Acceptance criteria

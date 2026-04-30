@@ -13,7 +13,7 @@ The hardening tracker originally marked HARDEN-051 as `not-started` and required
 
 ## Required changes
 - Add this active task file under `tasks/active/`.
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` to point HARDEN-051 at this task file and record creation evidence.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` to point HARDEN-051 at this task file and record creation evidence.
 
 ## Tests
 - `python3 tools/agents/check_task_policy.py --root . --strict`

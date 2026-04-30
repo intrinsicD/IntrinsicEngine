@@ -152,7 +152,7 @@ Before commit/PR, verify:
 
 Temporary exceptions are allowed only when all of the following are true:
 
-- Exception is documented in `tasks/active/0000-repo-reorganization-tracker.md`.
+- Exception is documented in a current task under `tasks/active/`.
 - Exception has a specific removal task ID.
 - Exception is time-bounded and reviewed.
 - Exception does not create new violations in promoted final layers.

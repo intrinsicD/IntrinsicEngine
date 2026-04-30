@@ -2,7 +2,7 @@
 
 ## Scope
 
-This report records the post-reorganization full-CTest baseline for HARDEN-002. It is linked from the active hardening tracker: [`tasks/active/0001-post-reorganization-hardening-tracker.md`](../../tasks/active/0001-post-reorganization-hardening-tracker.md).
+This report records the post-reorganization full-CTest baseline for HARDEN-002. It is linked from the archived hardening tracker: [`tasks/done/0001-post-reorganization-hardening-tracker.md`](../../tasks/done/0001-post-reorganization-hardening-tracker.md).
 
 Legacy retirement is not in scope for this baseline.
 

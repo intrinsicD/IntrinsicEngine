@@ -77,7 +77,7 @@ On 2026-04-30 the deterministic groups were fixed or aligned with the current do
 - Classify the 38 failing tests into deterministic defect groups.
 - Fix defects or add capability-based skip/guard behavior with explicit reasons.
 - Keep labels accurate for `gpu`, `vulkan`, `runtime`, `integration`, and related categories.
-- Update `tasks/active/0001-post-reorganization-hardening-tracker.md` and this task with command-backed results.
+- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` and this task with command-backed results.
 
 ## Tests
 - `cmake --build --preset ci --target IntrinsicTests`

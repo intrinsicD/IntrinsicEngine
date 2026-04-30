@@ -21,7 +21,7 @@ This task is the closing audit gate for the IntrinsicEngine reorganization. It v
 - Run top-level expected-layout check in strict mode.
 
 ## Docs
-- Keep this audit task synchronized with `tasks/active/0000-repo-reorganization-tracker.md` final-state status.
+- Keep this audit task synchronized with the RORG tracker final-state status.
 
 ## Acceptance criteria
 - [x] Root layout matches target.
@@ -76,10 +76,10 @@ cmake --build --preset ci --target IntrinsicTests IntrinsicCoreTests IntrinsicEC
 ## Completion status
 - **Status:** done
 - **Blocker:** None.
-- **Follow-up:** Continue recording any future temporary migration exceptions in `tasks/active/0000-repo-reorganization-tracker.md`.
+- **Follow-up:** Continue recording any future temporary migration exceptions in a current task under `tasks/active/` with a removal task ID.
 
 ## Completion metadata
 - Completion date: 2026-04-29.
 - Commit reference: pending current workspace/PR.
-- Follow-up: Post-reorganization hardening continues in `tasks/active/0001-post-reorganization-hardening-tracker.md`; the resolved GPU/runtime triage record is archived at `tasks/done/HARDEN-053-gpu-runtime-opt-in-failure-triage.md`.
+- Follow-up: Post-reorganization hardening is archived at `tasks/done/0001-post-reorganization-hardening-tracker.md`; the resolved GPU/runtime triage record is archived at `tasks/done/HARDEN-053-gpu-runtime-opt-in-failure-triage.md`.
 

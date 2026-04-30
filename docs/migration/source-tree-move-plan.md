@@ -92,7 +92,7 @@ If a move task introduces a build break, unresolved include graph issue, or unex
 
 1. Revert only the failing move commit(s) for the affected task (no partial semantic edits mixed in).
 2. Re-run baseline verification (`cmake --preset ci`, build, tests, structural checks).
-3. Record blocker details and temporary status in `tasks/active/0000-repo-reorganization-tracker.md`.
+3. Record blocker details and temporary status in a current task under `tasks/active/` with a removal task ID.
 4. Split the task into smaller mechanical sub-steps (for example, move-only then path-fix-only) before retrying.
 
 ## Pre-move review gate

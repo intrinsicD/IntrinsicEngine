@@ -7,7 +7,7 @@
 ## Policy
 
 - New feature work should target canonical layers, not `src/legacy/`, unless needed for compatibility.
-- Any temporary cross-layer exception inside `src/legacy/` must be tracked in `tasks/active/0000-repo-reorganization-tracker.md`.
+- Any temporary cross-layer exception inside `src/legacy/` must be tracked in a current task under `tasks/active/` with a removal task ID.
 - Promotion work from `src/legacy/` must keep mechanical path moves separate from semantic refactors.
 
 ## Exit criteria

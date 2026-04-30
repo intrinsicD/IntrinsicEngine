@@ -9,7 +9,7 @@
 - Do not perform runtime/graphics semantic refactors.
 
 ## Context
-- `tasks/active/0001-post-reorganization-hardening-tracker.md` marks `HARDEN-033` as not-started with owner `tools/repo/CI`.
+- `tasks/done/0001-post-reorganization-hardening-tracker.md` marks `HARDEN-033` as not-started with owner `tools/repo/CI`.
 - `docs/migration/src-new-reference-audit.md` already classifies remaining references as active-stale, migration-ok, or historical-ok.
 
 ## Required changes
@@ -25,7 +25,7 @@
 
 ## Docs
 - `tools/repo/README.md`
-- `tasks/active/0001-post-reorganization-hardening-tracker.md`
+- `tasks/done/0001-post-reorganization-hardening-tracker.md`
 
 ## Acceptance criteria
 - Checker fails strict mode when non-allowlisted stale references are present.
