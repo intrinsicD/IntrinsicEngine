@@ -25,7 +25,7 @@ namespace
 
 TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 {
-    const auto content = ReadFile(RepoRoot() / "src_new/Runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
 
     // Runtime must orchestrate renderer phases, not GPU barriers/resources.
     EXPECT_NE(content.find("m_Renderer->BeginFrame"), std::string::npos);
@@ -45,7 +45,7 @@ TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 
 TEST(RuntimeEngineLayering, RunFramePreservesDocumentedBroadPhaseOrdering)
 {
-    const auto content = ReadFile(RepoRoot() / "src_new/Runtime/Runtime.Engine.cpp");
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
 
     const auto pollEvents = content.find("m_Window->PollEvents();");
     const auto simTick = content.find("m_Application->OnSimTick(*this, m_FixedDt);");
@@ -88,7 +88,7 @@ TEST(RuntimeEngineLayering, RunFramePreservesDocumentedBroadPhaseOrdering)
 
 TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)
 {
-    const auto publicApi = ReadFile(RepoRoot() / "src_new/Runtime/Runtime.StreamingExecutor.cppm");
+    const auto publicApi = ReadFile(RepoRoot() / "src/runtime/Runtime.StreamingExecutor.cppm");
     EXPECT_EQ(publicApi.find("import Extrinsic.ECS"), std::string::npos);
     EXPECT_EQ(publicApi.find("import Extrinsic.RHI"), std::string::npos);
     EXPECT_EQ(publicApi.find("Vk"), std::string::npos);
@@ -98,17 +98,17 @@ TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)
 TEST(RuntimeEngineLayering, RenderGraphStaysOutOfECSAndCoreStaysOutOfGpuBarriers)
 {
     const std::vector<std::filesystem::path> renderGraphFiles{
-        "src_new/Graphics/Graphics.RenderGraph.cppm",
-        "src_new/Graphics/Graphics.RenderGraph.Resources.cppm",
-        "src_new/Graphics/Graphics.RenderGraph.Pass.cppm",
-        "src_new/Graphics/Graphics.RenderGraph.Compiler.cppm",
-        "src_new/Graphics/Graphics.RenderGraph.Barriers.cppm",
-        "src_new/Graphics/Graphics.RenderGraph.TransientAllocator.cppm",
-        "src_new/Graphics/Graphics.RenderGraph.Executor.cppm",
-        "src_new/Graphics/Graphics.RenderGraph.cpp",
-        "src_new/Graphics/Graphics.RenderGraph.Compiler.cpp",
-        "src_new/Graphics/Graphics.RenderGraph.Executor.cpp",
-        "src_new/Graphics/Graphics.RenderGraph.TransientAllocator.cpp",
+        "src/graphics/framegraph/Graphics.RenderGraph.cppm",
+        "src/graphics/framegraph/Graphics.RenderGraph.Resources.cppm",
+        "src/graphics/framegraph/Graphics.RenderGraph.Pass.cppm",
+        "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm",
+        "src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm",
+        "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cppm",
+        "src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm",
+        "src/graphics/framegraph/Graphics.RenderGraph.cpp",
+        "src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp",
+        "src/graphics/framegraph/Graphics.RenderGraph.Executor.cpp",
+        "src/graphics/framegraph/Graphics.RenderGraph.TransientAllocator.cpp",
     };
 
     for (const auto& path : renderGraphFiles)
