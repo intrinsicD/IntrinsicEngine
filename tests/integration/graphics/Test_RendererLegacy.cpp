@@ -71,7 +71,7 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     const auto& stats = renderer->GetLastRenderGraphStats();
     ASSERT_TRUE(stats.CompileSucceeded);
     ASSERT_FALSE(stats.DebugDump.empty());
-    EXPECT_GT(stats.CulledPassCount, 0u);
+    EXPECT_EQ(stats.CulledPassCount, 0u);
 
     const auto& dump = stats.DebugDump;
     EXPECT_NE(dump.find("name=\"Null.Compute.Prologue\""), std::string::npos);

@@ -19,12 +19,12 @@ Unblock the CI preset offline configure requirement by populating `external/cach
 
 ## Docs
 - Update `tasks/active/0001-post-reorganization-hardening-tracker.md` with bootstrap and gate results.
-- Update `tasks/active/final-post-reorganization-hardening-audit.md` when blocker is resolved.
+- Update `tasks/done/final-post-reorganization-hardening-audit.md` when blocker is resolved.
 
 ## Acceptance criteria
 - [x] Offline dependency cache bootstrap steps are documented and reproducible.
 - [x] `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON` succeeds in a clean workspace after bootstrap (validated with `--fresh` and explicit local compiler overrides in this environment).
-- [ ] Follow-on build/ctest evidence is recorded for HARDEN-051 closure.
+- [x] Follow-on build/ctest evidence is recorded for HARDEN-051 closure.
 
 ## Verification
 - `python3 tools/agents/check_task_policy.py --root . --strict`
@@ -44,5 +44,13 @@ Unblock the CI preset offline configure requirement by populating `external/cach
 - Cache bootstrap configure (online prime): passed; `external/cache/*-src` was created/populated.
 - Offline configure with `INTRINSIC_OFFLINE_DEPS=ON` + `--fresh`: passed in this environment after bootstrap.
 - Initial build attempt failed before recompilation because `CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` was unset for local Clang 17 wrapper (`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS-NOTFOUND`).
-- Re-configure with `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/bin/clang-scan-deps-20` unblocked build progression; long-running build was started and is still in-progress at handoff.
-- CPU-supported ctest gate remains pending on completion of the full `IntrinsicTests` build in this environment.
+- Re-configure with explicit local toolchain paths passed in this environment:
+  - `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps`
+- `cmake --build --preset ci --target IntrinsicTests`: passed after declaring direct test object-library dependencies needed by C++ module scanning in `tests/CMakeLists.txt`.
+- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`: passed; `100% tests passed, 0 tests failed out of 1432`; total real time `96.09 sec`; 2 benchmark/SLO tests were reported as skipped by test-internal conditions.
+
+## Completion metadata
+- Completion date: 2026-04-30.
+- Commit reference: pending current workspace/PR.
+- Follow-up: HARDEN-051/final hardening audit still owns GPU/Vulkan/runtime opt-in closure evidence.
+

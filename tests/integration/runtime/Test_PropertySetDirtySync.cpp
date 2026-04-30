@@ -19,10 +19,83 @@
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 import Graphics;
 import Geometry;
+import ECS;
 
 using namespace ECS;
+
+namespace
+{
+    void PopulateGraphSources(entt::registry& registry,
+                              entt::entity entity,
+                              const std::shared_ptr<Geometry::Graph::Graph>& graph)
+    {
+        ASSERT_TRUE(graph != nullptr);
+
+        if (graph->HasGarbage())
+            graph->GarbageCollection();
+
+        auto& nodes = registry.emplace_or_replace<ECS::Components::GeometrySources::Nodes>(entity);
+        nodes.Properties = graph->VertexProperties();
+        nodes.NumDeleted = 0;
+
+        auto positions = nodes.Properties.GetOrAdd<glm::vec3>(
+            std::string{ECS::Components::GeometrySources::PropertyNames::kPosition}, glm::vec3(0.0f));
+        positions.Vector().resize(graph->VerticesSize());
+        for (std::size_t i = 0; i < graph->VerticesSize(); ++i)
+        {
+            const Geometry::VertexHandle vertex{static_cast<Geometry::PropertyIndex>(i)};
+            positions.Vector()[i] = graph->VertexPosition(vertex);
+        }
+
+        auto& edges = registry.emplace_or_replace<ECS::Components::GeometrySources::Edges>(entity);
+        edges.Properties = graph->EdgeProperties();
+        edges.NumDeleted = 0;
+
+        auto edgeV0 = edges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{ECS::Components::GeometrySources::PropertyNames::kEdgeV0}, 0u);
+        auto edgeV1 = edges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{ECS::Components::GeometrySources::PropertyNames::kEdgeV1}, 0u);
+        edgeV0.Vector().resize(graph->EdgesSize());
+        edgeV1.Vector().resize(graph->EdgesSize());
+        for (std::size_t i = 0; i < graph->EdgesSize(); ++i)
+        {
+            const Geometry::EdgeHandle edge{static_cast<Geometry::PropertyIndex>(i)};
+            const auto [v0, v1] = graph->EdgeVertices(edge);
+            edgeV0.Vector()[i] = static_cast<std::uint32_t>(v0.Index);
+            edgeV1.Vector()[i] = static_cast<std::uint32_t>(v1.Index);
+        }
+    }
+
+    void PopulateCloudSources(entt::registry& registry,
+                              entt::entity entity,
+                              const std::shared_ptr<Geometry::PointCloud::Cloud>& cloud)
+    {
+        ASSERT_TRUE(cloud != nullptr);
+
+        auto& vertices = registry.emplace_or_replace<ECS::Components::GeometrySources::Vertices>(entity);
+        vertices.Properties = cloud->PointProperties();
+        vertices.NumDeleted = cloud->VerticesSize() - cloud->VertexCount();
+
+        const auto sourcePositions = cloud->Positions();
+        auto positions = vertices.Properties.GetOrAdd<glm::vec3>(
+            std::string{ECS::Components::GeometrySources::PropertyNames::kPosition}, glm::vec3(0.0f));
+        positions.Vector().assign(sourcePositions.begin(), sourcePositions.end());
+
+        if (cloud->HasNormals())
+        {
+            const auto sourceNormals = cloud->Normals();
+            auto normals = vertices.Properties.GetOrAdd<glm::vec3>(
+                std::string{ECS::Components::GeometrySources::PropertyNames::kNormal}, glm::vec3(0.0f, 1.0f, 0.0f));
+            normals.Vector().assign(sourceNormals.begin(), sourceNormals.end());
+        }
+    }
+}
 
 // =============================================================================
 // Section 1: Dirty Tag Component Properties
@@ -190,6 +263,7 @@ TEST(PropertySetDirtySync, VertexAttributes_Graph_ReExtractsColors)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1); // Simulate valid handle.
     gd.GpuVertexCount = 2; // Matches graph vertex count.
@@ -237,6 +311,7 @@ TEST(PropertySetDirtySync, VertexAttributes_Graph_ReExtractsRadii)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuVertexCount = 2;
@@ -262,6 +337,7 @@ TEST(PropertySetDirtySync, VertexAttributes_Graph_UpdatesPointComponentFlags)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuVertexCount = 1;
@@ -292,6 +368,7 @@ TEST(PropertySetDirtySync, VertexAttributes_Graph_CountDivergence_Escalates)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuVertexCount = 2; // Stale: last upload had 2 vertices.
@@ -315,6 +392,7 @@ TEST(PropertySetDirtySync, VertexAttributes_PointCloud_CountDivergence_Escalates
 
     auto& pcd = reg.emplace<PointCloud::Data>(e);
     pcd.CloudRef = cloud;
+    PopulateCloudSources(reg, e, cloud);
     pcd.GpuDirty = false;
     pcd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     pcd.GpuPointCount = 1; // Stale: last upload had 1 point.
@@ -345,6 +423,7 @@ TEST(PropertySetDirtySync, EdgeAttributes_ReExtractsEdgeColors)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuEdgeCount = 1;
@@ -376,6 +455,7 @@ TEST(PropertySetDirtySync, EdgeAttributes_CountDivergence_Escalates)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuEdgeCount = 1; // Stale
@@ -444,6 +524,7 @@ TEST(PropertySetDirtySync, VertexAttributes_PointCloud_ReExtractsColors)
 
     auto& pcd = reg.emplace<PointCloud::Data>(e);
     pcd.CloudRef = cloud;
+    PopulateCloudSources(reg, e, cloud);
     pcd.GpuDirty = false;
     pcd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     pcd.GpuPointCount = 2;
@@ -478,6 +559,7 @@ TEST(PropertySetDirtySync, VertexAttributes_PointCloud_ReExtractsRadii)
 
     auto& pcd = reg.emplace<PointCloud::Data>(e);
     pcd.CloudRef = cloud;
+    PopulateCloudSources(reg, e, cloud);
     pcd.GpuDirty = false;
     pcd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     pcd.GpuPointCount = 1;
@@ -531,6 +613,7 @@ TEST(PropertySetDirtySync, VertexAttributeChange_DoesNotTriggerEdgeRebuild)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuVertexCount = 1;
@@ -559,6 +642,7 @@ TEST(PropertySetDirtySync, MultipleDomains_AllProcessed)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuVertexCount = 1;
@@ -597,6 +681,7 @@ TEST(PropertySetDirtySync, PositionsAndAttributes_PositionWins)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = Geometry::GeometryHandle(0, 1);
     gd.GpuVertexCount = 1;
@@ -672,6 +757,7 @@ TEST(PropertySetDirtySync, VertexAttributes_InvalidGeometry_EscalatesToGpuDirty)
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
+    PopulateGraphSources(reg, e, graph);
     gd.GpuDirty = false;
     gd.GpuGeometry = {}; // Invalid handle — no GPU buffer yet.
 

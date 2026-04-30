@@ -10,7 +10,7 @@ namespace
 {
     std::filesystem::path RepoRoot()
     {
-        return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
+        return std::filesystem::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
     }
 
     std::string ReadFile(const std::filesystem::path& path)

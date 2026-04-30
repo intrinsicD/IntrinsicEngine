@@ -1225,7 +1225,11 @@ namespace Graphics
         if (a.AttachmentHead == nullptr || b.AttachmentHead == nullptr)
             return false;
 
-        // Walk both linked lists and compare resource IDs, depth classification, and attachment semantics.
+        // Walk both linked lists and compare resource IDs, depth classification,
+        // and merge-safe attachment semantics. A continuation pass that LOADs
+        // the same attachment can share the first pass's dynamic-rendering
+        // scope; a continuation pass that CLEARs cannot because that clear
+        // operation would be lost inside an already-open rendering scope.
         const AttachmentNode* na = a.AttachmentHead;
         const AttachmentNode* nb = b.AttachmentHead;
         while (na != nullptr && nb != nullptr)
@@ -1233,28 +1237,9 @@ namespace Graphics
             if (na->ID != nb->ID || na->IsDepth != nb->IsDepth)
                 return false;
 
-            if (na->Info.LoadOp != nb->Info.LoadOp || na->Info.StoreOp != nb->Info.StoreOp)
+            if (nb->Info.LoadOp != VK_ATTACHMENT_LOAD_OP_LOAD)
                 return false;
 
-            if (na->Info.LoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)
-            {
-                if (na->IsDepth)
-                {
-                    if (na->Info.ClearValue.depthStencil.depth != nb->Info.ClearValue.depthStencil.depth ||
-                        na->Info.ClearValue.depthStencil.stencil != nb->Info.ClearValue.depthStencil.stencil)
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    for (uint32_t c = 0; c < 4; ++c)
-                    {
-                        if (na->Info.ClearValue.color.float32[c] != nb->Info.ClearValue.color.float32[c])
-                            return false;
-                    }
-                }
-            }
             na = na->Next;
             nb = nb->Next;
         }

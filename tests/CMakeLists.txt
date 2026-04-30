@@ -310,7 +310,7 @@ intrinsic_resolve_test_sources(_graphics_contract_test_sources
 intrinsic_test_object_lib(GraphicsContractTestObjs
     SOURCES
         ${_graphics_contract_test_sources}
-    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
+    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform EnTT::EnTT glm::glm
 )
 
 if(TARGET ExtrinsicRuntime)
@@ -393,7 +393,7 @@ if(TARGET ExtrinsicRuntime)
     intrinsic_test_object_lib(RuntimeTestObjs
         SOURCES
             ${_runtime_test_sources}
-        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json
+        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json EnTT::EnTT glm::glm IntrinsicRHI IntrinsicGraphics IntrinsicRuntime IntrinsicEditorUI
     )
 
     set(_runtime_integration_test_files
@@ -416,7 +416,7 @@ if(TARGET ExtrinsicRuntime)
     intrinsic_test_object_lib(RuntimeIntegrationTestObjs
         SOURCES
             ${_runtime_integration_test_sources}
-        DEPS ExtrinsicRuntime
+        DEPS ExtrinsicRuntime glm::glm
     )
 endif()
 

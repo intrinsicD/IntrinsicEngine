@@ -34,7 +34,11 @@ namespace
         VkResult result = vkCreateInstance(&createInfo, nullptr, &probeInstance);
         if (result != VK_SUCCESS || probeInstance == VK_NULL_HANDLE)
             return false;
-        vkDestroyInstance(probeInstance, nullptr);
+
+        const auto destroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(
+            vkGetInstanceProcAddr(probeInstance, "vkDestroyInstance"));
+        if (destroyInstance != nullptr)
+            destroyInstance(probeInstance, nullptr);
         return true;
     }
 }

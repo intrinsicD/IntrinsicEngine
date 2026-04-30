@@ -14,6 +14,7 @@ namespace TestSupport
             ImGuiIO& io = ImGui::GetIO();
             io.IniFilename = nullptr;
             io.LogFilename = nullptr;
+            io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
             io.DisplaySize = ImVec2(800.0f, 600.0f);
 
             unsigned char* pixels = nullptr;
@@ -31,6 +32,12 @@ namespace TestSupport
         {
             ImGui::EndFrame();
             ImGui::DestroyContext(Context);
+        }
+
+        void NextFrame()
+        {
+            ImGui::EndFrame();
+            ImGui::NewFrame();
         }
 
         ImGuiContext* Context = nullptr;

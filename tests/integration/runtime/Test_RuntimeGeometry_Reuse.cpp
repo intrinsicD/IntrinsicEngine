@@ -41,11 +41,14 @@ namespace
 
             if (m_TransferManager)
                 m_TransferManager->GarbageCollect();
+
+            // GeometryGpuData owns BufferManager leases; clear pooled geometry
+            // before destroying the manager those leases release into.
+            m_Pool.Clear();
+
             m_TransferManager.reset();
             m_BufferManager.reset();
 
-            // Ensure GeometryGpuData instances are destroyed before VulkanDevice teardown.
-            m_Pool.Clear();
 
             if (m_Device)
             {

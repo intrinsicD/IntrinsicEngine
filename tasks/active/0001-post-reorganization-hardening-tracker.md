@@ -21,7 +21,7 @@ Legacy retirement is explicitly deferred. Any temporary legacy exception must re
 - **Owner/agent:** repository maintainers / hardening agents
 - **Branch:** `work`
 - **PR:** TBD
-- **Next verification step:** begin HARDEN-041 taxonomy source moves based on HARDEN-040 audit.
+- **Next verification step:** no active post-reorganization hardening blocker remains after HARDEN-053 closure; keep the default CPU-supported gate and opt-in GPU/runtime gate green for touched areas.
 - **Status values:** `not-started`, `in-progress`, `blocked`, `done`, `deferred`
 
 ## Required changes
@@ -105,16 +105,17 @@ Excluded from this phase:
 | HARDEN-032 | Rename stale active task/doc names containing `src-new` | done | docs/tasks | Updated active source-layer README terminology and canonical docs/task navigation links; strict task/doc checks passed on 2026-04-29. |
 | HARDEN-033 | Add stale `src_new` reference checker | done | tools/repo/CI | Added `tools/repo/check_stale_src_new_references.py` with explicit allowlist and wired strict enforcement in `ci-docs.yml`. |
 | HARDEN-040 | Audit remaining non-taxonomic test directories | done | tests/docs | Audit recorded in [`docs/reports/test-taxonomy-audit-2026-04-29.md`](../../docs/reports/test-taxonomy-audit-2026-04-29.md); wrapper directories inventoried and mapped to HARDEN-041/HARDEN-042. |
-| HARDEN-041 | Move remaining test sources into taxonomy directories | in-progress | tests/CMake | HARDEN-041C corrected relocated suite link targets to promoted `Extrinsic*` owners (`assets/core/rhi/graphics/runtime`) and removed stale runtime-integration gate/links to legacy targets; final CPU-gate proof remains blocked locally by missing offline dependency cache (`external/cache/*-src`). |
+| HARDEN-041 | Move remaining test sources into taxonomy directories | done | tests/CMake | HARDEN-041C corrected relocated suite link targets to promoted `Extrinsic*` owners (`assets/core/rhi/graphics/runtime`) and removed stale runtime-integration gate/links to legacy targets; HARDEN-052 supplied the post-relocation build/CPU-gate proof. |
 | HARDEN-042 | Remove or formalize old subsystem test subdirectories | done | tests/docs | Removed obsolete wrapper `CMakeLists.txt` stubs and relocated shared `MockRHI.hpp` into `tests/support/`; strict task/docs checks passed on 2026-04-29. |
 | HARDEN-043 | Add strict test layout checker | done | tools/repo/CI | Added `tools/repo/check_test_layout.py`, wired strict CI docs validation, and documented usage in `tools/repo/README.md` on 2026-04-29. |
 | HARDEN-050 | Align CI workflows with final supported test policy | done | CI/docs | `pr-fast.yml` unit/contract gate includes `--timeout 60`; HARDEN-050B follow-up updated `ci-sanitizers.yml` to run `-L "unit|contract|integration"` with canonical `-LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60`. |
-| HARDEN-051 | Execute final post-reorganization hardening audit | in-progress | tasks/audit | Final audit artifact re-executed on 2026-04-30 at `tasks/active/final-post-reorganization-hardening-audit.md`; source-root stale-reference check is now green, but closure remains blocked by missing offline dependency cache required by the CI preset configure gate. |
-| HARDEN-052 | Bootstrap offline dependency cache for CI preset | in-progress | build/deps/docs | Bootstrap procedure documented; cache prime + offline `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON` now pass locally with explicit compiler overrides, while final build/CPU-gate evidence remains in progress. |
+| HARDEN-051 | Execute final post-reorganization hardening audit | done | tasks/audit | Final audit artifact re-executed on 2026-04-30; source-root stale-reference, offline configure, build, default CPU gate, and validators are recorded. The remaining GPU/runtime opt-in failures are split to HARDEN-053. |
+| HARDEN-052 | Bootstrap offline dependency cache for CI preset | done | build/deps/docs | Bootstrap procedure documented; cache prime + offline `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON` passed locally with explicit compiler/scanner overrides, `IntrinsicTests` built, and the CPU-supported CTest gate passed with 1432 selected tests. |
+| HARDEN-053 | Triage GPU/runtime opt-in gate failures | done | runtime/graphics/gpu tests | Resolved on 2026-04-30: `IntrinsicTests` builds, focused failure clusters pass, GPU/Vulkan/runtime opt-in gate passes with 1218 selected tests, and the default CPU-supported gate passes with 1432 selected tests. |
 
 ## Current full-test status
 
-Known status as of 2026-04-29, carried forward from `tasks/active/final-reorganization-audit.md`:
+Known status as of 2026-04-29, carried forward from `tasks/done/final-reorganization-audit.md`:
 
 - `ctest --test-dir build/ci --output-on-failure` was attempted during the final RORG audit and interrupted after 300 seconds.
 - The run reached GPU/headless Vulkan runtime coverage and exposed failures outside the structural reorganization gate.
@@ -123,6 +124,8 @@ Known status as of 2026-04-29, carried forward from `tasks/active/final-reorgani
 - HARDEN-003 fixed the focused VMA unmap assertion group without deleting or quarantining tests.
 - HARDEN-004 fixed the two deterministic runtime selection sub-element expectation failures and documented the selection ID contract.
 - HARDEN-006 made the default local/CI CPU-supported test gate canonical across docs/config/workflows and verified it locally with explicit available Clang paths.
+- HARDEN-053 resolved the final GPU/runtime opt-in blocker on 2026-04-30: `ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan|runtime' -LE 'slow|flaky-quarantine' --timeout 60` passed with 1218 selected tests, 0 failures, in 249.03 seconds.
+- The default CPU-supported gate remained green after HARDEN-053: `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passed with 1432 selected tests, 0 failures, in 95.74 seconds; the two SLO/benchmark tests were skipped by test-internal conditions.
 - Exact `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON` is blocked on this machine because `clang-20`/`clang++-20` are not on `PATH`; the report used explicit `/usr/bin/clang` and `/usr/bin/clang++` overrides to build and test.
 - Exact full single-threaded `ctest --test-dir build/ci --output-on-failure --timeout 60` reproduced known failures but was interrupted after 300 seconds; focused failing groups were repeated twice.
 
@@ -132,8 +135,9 @@ Known status as of 2026-04-29, carried forward from `tasks/active/final-reorgani
 |---|---|---|---|---|---|
 | VMA unmap assertion | `TransferTest.*`, `GraphicsBackendHeadlessTest.*`, `AssetPipelineHeadlessTest.*` | assertion / subprocess abort in VMA unmap | deterministic across two focused runs | Vulkan-capable headless device; no window required in focused runs | Resolved by HARDEN-003. |
 | Runtime selection sub-element expectations | `RuntimeSelection.ResolveGpuSubElementPick_MeshSurfacePrimitiveDoesNotFallbackToWholeMeshRaycast`, `RuntimeSelection.ResolveGpuSubElementPick_MeshLinePrimitiveRefinesNearestEndpointVertex` | deterministic logic expectation failure | deterministic across two focused runs | CPU-side selection resolution tests; no direct Vulkan requirement observed | Resolved by HARDEN-004. |
-| Generated missing test executables | `ExtrinsicAssetTests_NOT_BUILT`, `ExtrinsicCoreTests_NOT_BUILT`, `ExtrinsicECSTests_NOT_BUILT`, `ExtrinsicGraphicsTests_NOT_BUILT`, `ExtrinsicRuntimeTests_NOT_BUILT` | CTest `Not Run` / missing executable | deterministic | no GPU requirement | Resolved by HARDEN-005 active-suite registration; HARDEN-041 still owns old source taxonomy decisions. |
+| Generated missing test executables | `ExtrinsicAssetTests_NOT_BUILT`, `ExtrinsicCoreTests_NOT_BUILT`, `ExtrinsicECSTests_NOT_BUILT`, `ExtrinsicGraphicsTests_NOT_BUILT`, `ExtrinsicRuntimeTests_NOT_BUILT` | CTest `Not Run` / missing executable | deterministic | no GPU requirement | Resolved by HARDEN-005 active-suite registration and HARDEN-041 taxonomy source relocation. |
 | Label selection gaps | `ctest -L gpu`, `ctest -L runtime`, `ctest -L graphics` select no tests | taxonomy/CTest label wiring issue | directly observed | no GPU requirement for the label check itself | Resolved by HARDEN-005 label fixups. |
+| Final GPU/runtime opt-in failures | 38 failures from graph/BDA data contracts, geometry reuse, dirty sync, panel registration, render extraction, render graph packetization, maintenance lane GPU tests, runtime layering contracts, and null renderer debug dump | deterministic test/production contract drift and production defects | deterministic in focused reruns | Vulkan-capable headless device for GPU groups; pure CPU for contract groups | Resolved by HARDEN-053. |
 
 ## Temporary test skips and quarantines
 
@@ -147,22 +151,22 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 
 | Alias / stale name | Current use | Introduced by | Removal condition | Owner task | Status |
 |---|---|---|---|---|---|
-| `src_new` references | Classified as active-stale, migration-ok, or historical-ok in [`docs/migration/src-new-reference-audit.md`](../../docs/migration/src-new-reference-audit.md). | RORG migration history | Complete active-stale cleanup and add allowlist checker. | HARDEN-031, HARDEN-032, HARDEN-033, HARDEN-041 | classified |
+| `src_new` references | Classified as active-stale, migration-ok, or historical-ok in [`docs/migration/src-new-reference-audit.md`](../../docs/migration/src-new-reference-audit.md). Active-stale references are cleaned up; historical/migration records remain allowlisted. | RORG migration history | Maintain strict stale-reference checker and explicit allowlist. | HARDEN-031, HARDEN-032, HARDEN-033, HARDEN-041 | resolved/allowlisted |
 | Shader asset `src_new` root | Renamed to final shader-root subdirectories; active include/path leaks removed. | RORG migration history | None for shader path; stale docs/tasks continue under HARDEN-032/HARDEN-033. | HARDEN-031 | resolved |
 
 ## Final acceptance checklist
 
 - [x] Default local/CI CPU-supported test gate is green.
-- [ ] GPU/runtime tests are fixed or capability-gated with explicit skip reasons.
+- [x] GPU/runtime tests are fixed or capability-gated with explicit skip reasons.
 - [x] Codex verification builds meaningful targets and runs tests.
-- [ ] Active `src_new` naming is gone or allowlisted as historical/migration-only.
-- [ ] Test taxonomy is strict and checked.
-- [ ] Layering allowlist is no longer migration-wide except where explicitly justified.
-- [ ] CI workflows and docs agree on developer and agent verification commands.
-- [ ] Docs links pass strict mode.
-- [ ] Task policy passes strict mode.
-- [ ] Method and benchmark validators pass strict mode.
-- [x] `tasks/active/final-post-reorganization-hardening-audit.md` records final evidence for HARDEN-051.
+- [x] Active `src_new` naming is gone or allowlisted as historical/migration-only.
+- [x] Test taxonomy is strict and checked.
+- [x] Layering allowlist is no longer migration-wide except where explicitly justified.
+- [x] CI workflows and docs agree on developer and agent verification commands.
+- [x] Docs links pass strict mode.
+- [x] Task policy passes strict mode.
+- [x] Method and benchmark validators pass strict mode.
+- [x] `tasks/done/final-post-reorganization-hardening-audit.md` records final evidence for HARDEN-051.
 
 ## Evidence log
 
@@ -201,9 +205,9 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-011 | `python3 tools/repo/check_layering_allowlist_quality.py --root . --strict` | Passed; 81 entries checked, 0 findings. |
 | 2026-04-29 | HARDEN-011 | `python3 tools/agents/check_task_policy.py --root . --strict && python3 tools/docs/check_doc_links.py --root . --strict` | Passed; task schema and docs links remained strict-green after HARDEN-011 updates. |
 | 2026-04-29 | HARDEN-040 | `find tests -maxdepth 3 -type d | sort`; `find tests/Asset tests/Core tests/ECS tests/Graphics tests/Runtime -type f -name '*.cpp' | wc -l`; `for d in tests/Asset tests/Core tests/ECS tests/Graphics tests/Runtime; do echo "$(find "$d" -type f -name '*.cpp' | wc -l) $d"; done` | Audit evidence captured in `docs/reports/test-taxonomy-audit-2026-04-29.md`; 37 wrapper `*.cpp` files inventoried with follow-up mapping. |
-| 2026-04-29 | HARDEN-041 | `task file creation` | Created `tasks/active/HARDEN-041-test-taxonomy-source-moves.md` with scoped mechanical-move plan and verification commands. |
+| 2026-04-29 | HARDEN-041 | `task file creation` | Created `tasks/done/HARDEN-041-test-taxonomy-source-moves.md` with scoped mechanical-move plan and verification commands. |
 | 2026-04-29 | HARDEN-041 | `cat docs/reports/test-taxonomy-audit-2026-04-29.md`; `sed -n '1,520p' tests/CMakeLists.txt` | Confirmed wrapper inventory exists but per-file destination mapping is not yet documented; HARDEN-041 task updated with explicit next-step gating to keep moves mechanical-only. |
-| 2026-04-29 | HARDEN-041 | `find tests/Asset tests/Core tests/ECS tests/Graphics tests/Runtime -type f -name '*.cpp' | sort`; update `tasks/active/HARDEN-041-test-taxonomy-source-moves.md` | Completed inventory-backed 37-file source→destination move table to gate the upcoming mechanical-only relocation patch. |
+| 2026-04-29 | HARDEN-041 | `find tests/Asset tests/Core tests/ECS tests/Graphics tests/Runtime -type f -name '*.cpp' | sort`; update `tasks/done/HARDEN-041-test-taxonomy-source-moves.md` | Completed inventory-backed 37-file source→destination move table to gate the upcoming mechanical-only relocation patch. |
 | 2026-04-29 | HARDEN-041 | `git mv ...` (37 wrapper sources from `tests/{Asset,Core,ECS,Graphics,Runtime}` into `tests/{unit,contract,integration}/...`) | Completed pure mechanical relocation patch with no test-source semantic edits. |
 | 2026-04-29 | HARDEN-041 | `cmake --build --preset ci --target IntrinsicTests` | Failed before configure in this environment because `build/ci` was absent. |
 | 2026-04-29 | HARDEN-041 | `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON -DCMAKE_C_COMPILER=$(which clang) -DCMAKE_CXX_COMPILER=$(which clang++)` | Failed: offline dependency cache missing (`external/cache/glm-src`), so build/CTest gates could not be executed locally. |
@@ -217,9 +221,18 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-043 | `python3 tools/repo/check_test_layout.py --root . --strict`; `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed; strict test taxonomy layout enforcement is active and docs/task strict checks remained green. |
 | 2026-04-29 | HARDEN-050 | `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after adding `--timeout 60` to `.github/workflows/pr-fast.yml` unit/contract CTest step and syncing HARDEN-050 task/tracker docs. |
 | 2026-04-29 | HARDEN-050B | `.github/workflows/ci-sanitizers.yml` inspection/update; `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after updating sanitizer CTest selection to `-L "unit\|contract\|integration" -LE "gpu\|vulkan\|slow\|flaky-quarantine" --timeout 60` and syncing HARDEN-050 task + tracker evidence. |
-| 2026-04-29 | HARDEN-051 | `task file creation` | Created `tasks/active/HARDEN-051-final-hardening-audit-task.md` to scope final hardening audit closure evidence and keep execution as a follow-up task step. |
+| 2026-04-29 | HARDEN-051 | `task file creation` | Created `tasks/done/HARDEN-051-final-hardening-audit-task.md` to scope final hardening audit closure evidence and keep execution as a follow-up task step. |
 
-| 2026-04-30 | HARDEN-051B | `python3 tools/repo/check_stale_src_new_references.py --root . --strict`; `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`; validator strict checks | Re-executed final hardening audit with command evidence in `tasks/active/final-post-reorganization-hardening-audit.md`; stale-reference checker is now green (`findings=0`), but configure remains blocked by missing offline cache `external/cache/glm-src`. Follow-up task HARDEN-052 created. |
+| 2026-04-30 | HARDEN-051B | `python3 tools/repo/check_stale_src_new_references.py --root . --strict`; `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`; validator strict checks | Re-executed final hardening audit with command evidence in `tasks/done/final-post-reorganization-hardening-audit.md`; stale-reference checker is green (`findings=0`). Initial offline-cache blocker was split to and resolved by HARDEN-052. |
 
 | 2026-04-30 | HARDEN-052 | `cmake --preset ci -DCMAKE_C_COMPILER=/root/.swiftly/bin/clang -DCMAKE_CXX_COMPILER=/root/.swiftly/bin/clang++`; `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON -DCMAKE_C_COMPILER=/root/.swiftly/bin/clang -DCMAKE_CXX_COMPILER=/root/.swiftly/bin/clang++` | Passed; online prime populated `external/cache/*-src`, then offline configure succeeded from a fresh preset state. |
-| 2026-04-30 | HARDEN-052 | `cmake --build --preset ci --target IntrinsicTests` then reconfigure with `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/bin/clang-scan-deps-20` and rebuild | First build failed (`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS-NOTFOUND`); follow-up reconfigure unblocked dependency scanning and resumed long-running build. CPU-supported ctest gate pending completion. |
+| 2026-04-30 | HARDEN-052 | `cmake --preset ci --fresh -DINTRINSIC_OFFLINE_DEPS=ON -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps`; `cmake --build --preset ci --target IntrinsicTests`; `ctest --test-dir build/ci --output-on-failure -LE 'gpu\|vulkan\|slow\|flaky-quarantine' --timeout 60` | Passed after test object libraries declared their direct C++ module/header dependencies; `IntrinsicTests` linked successfully and CPU-supported CTest reported `100% tests passed, 0 tests failed out of 1432` in 96.09 sec, with 2 benchmark/SLO tests skipped by test-internal conditions. |
+| 2026-04-30 | HARDEN-041 | `cmake --build --preset ci --target IntrinsicTests`; `ctest --test-dir build/ci --output-on-failure -LE 'gpu\|vulkan\|slow\|flaky-quarantine' --timeout 60` | Passed using the HARDEN-052 rebuilt `build/ci`; this closes the post-relocation CPU-supported gate evidence for HARDEN-041. |
+| 2026-04-30 | HARDEN-051/HARDEN-053 | `ctest --test-dir build/ci --output-on-failure -L 'gpu\|vulkan\|runtime' -LE 'slow\|flaky-quarantine' --timeout 60` | Failed; `97% tests passed, 38 tests failed out of 1218` in 249.43 sec. HARDEN-051 audit execution is complete; deterministic triage/capability-gating is tracked by HARDEN-053. |
+| 2026-04-30 | HARDEN-053 | `cmake --build --preset ci --target IntrinsicTests` | Passed; `IntrinsicTests` linked successfully after HARDEN-053 fixes. |
+| 2026-04-30 | HARDEN-053 | `ctest --test-dir build/ci --output-on-failure -R 'Graph_Data\|BDA_GraphData\|BDA_PerEdgeAttr\|PropertySetDirtySync\|PanelRegistration' --timeout 60` | Passed; 54 tests, 0 failures. |
+| 2026-04-30 | HARDEN-053 | `ctest --test-dir build/ci --output-on-failure -R 'GeometryReuseTest\|RenderExtraction\.FrameContext_DeferredDeletions_(DropNeverSubmittedSlotOnReuse\|SurviveSlotReuse)\|RenderGraphPacketTest\.(TwoRasterPasses_SameAttachments_Merge\|ThreeRasterPasses_SameAttachments_MergeAll\|TwoRasterPasses_ColorOnly_SameTarget_Merge\|TwoRasterPasses_SameAttachments_DifferentClearValues_NoMerge)\|MaintenanceLaneGpuTest\|RuntimeEngineLayering\|GraphicsRenderer\.NullRendererDebugDumpContainsCanonicalPassesAndDataflowOrder' --timeout 60` | Passed; 16 tests, 0 failures. |
+| 2026-04-30 | HARDEN-053 | `ctest --test-dir build/ci --output-on-failure -L 'gpu\|vulkan\|runtime' -LE 'slow\|flaky-quarantine' --timeout 60` | Passed; 1218 tests, 0 failures, total real time 249.03 sec. |
+| 2026-04-30 | HARDEN-053 | `ctest --test-dir build/ci --output-on-failure -LE 'gpu\|vulkan\|slow\|flaky-quarantine' --timeout 60` | Passed; 1432 tests, 0 failures, total real time 95.74 sec; `ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes` and `ArchitectureSLO.TaskSchedulerContentionAndWakeLatencyBudgets` skipped by test-internal conditions. |
+| 2026-04-30 | HARDEN-053 | `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after HARDEN-053 archival/tracker updates. |
+| 2026-04-30 | task cleanup | `python3 tools/repo/check_layering.py --root src --strict`; `python3 tools/repo/check_layering_allowlist_quality.py --root . --strict`; `python3 tools/repo/check_test_layout.py --root . --strict`; `python3 tools/repo/check_stale_src_new_references.py --root . --strict`; `python3 tools/agents/check_codex_config.py --root . --strict`; `python3 tools/agents/validate_method_manifests.py --root methods --strict`; `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict`; `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after moving completed task records to `tasks/done`; task policy validated 21 task files with 0 findings and doc links checked 105 relative links with no broken links. |

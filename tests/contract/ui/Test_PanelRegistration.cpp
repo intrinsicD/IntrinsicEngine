@@ -57,6 +57,7 @@ TEST(PanelRegistration, RemovePanel_StopsCallback)
     Interface::GUI::RemovePanel("TestPanel_B");
 
     callCount = 0;
+    frame.NextFrame();
     Interface::GUI::DrawGUI();
     EXPECT_EQ(callCount, 0);
 }
@@ -106,6 +107,7 @@ TEST(PanelRegistration, RegisterPanel_DefaultClosed_SkipsDrawUntilOpened)
     EXPECT_EQ(callCount, 0);
 
     Interface::GUI::OpenPanel("Closed_Default");
+    frame.NextFrame();
     Interface::GUI::DrawGUI();
     EXPECT_EQ(callCount, 1);
 
@@ -126,6 +128,7 @@ TEST(PanelRegistration, DuplicateRegistration_PreservesClosedState)
     EXPECT_EQ(secondCount, 0);
 
     Interface::GUI::OpenPanel("Closed_Dup");
+    frame.NextFrame();
     Interface::GUI::DrawGUI();
     EXPECT_EQ(firstCount, 0);
     EXPECT_EQ(secondCount, 1);
@@ -147,6 +150,7 @@ TEST(PanelRegistration, DuplicateRegistration_PreservesOpenedState)
 
     Interface::GUI::RegisterPanel("Opened_Dup", [&secondCount]() { ++secondCount; });
 
+    frame.NextFrame();
     Interface::GUI::DrawGUI();
     EXPECT_EQ(firstCount, 1);
     EXPECT_EQ(secondCount, 1);
@@ -202,6 +206,7 @@ TEST(PanelRegistration, RegisterOverlay_IsInvokedDuringDrawGUI)
     Interface::GUI::RemoveOverlay("TestOverlay");
 
     overlayFired = false;
+    frame.NextFrame();
     Interface::GUI::DrawGUI();
     EXPECT_FALSE(overlayFired);
 }
@@ -299,6 +304,7 @@ TEST(PanelRegistration, NonClosablePanel_AlwaysDrawn)
     EXPECT_EQ(callCount, 1);
 
     // Draw again — non-closable panels should still be drawn.
+    frame.NextFrame();
     Interface::GUI::DrawGUI();
     EXPECT_EQ(callCount, 2);
 

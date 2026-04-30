@@ -49,3 +49,9 @@ rg -n "src_new|src-new|src new" src/app/README.md src/core/README.md src/ecs/REA
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: HARDEN-033 enforces stale `src_new` reference prevention with an explicit allowlist.
+

@@ -39,3 +39,9 @@ Most workflows already follow this policy. Follow-up HARDEN-050B found `ci-sanit
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 ```
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: HARDEN-052 later supplied fresh offline configure/build/CPU-gate evidence for the same canonical policy.
+

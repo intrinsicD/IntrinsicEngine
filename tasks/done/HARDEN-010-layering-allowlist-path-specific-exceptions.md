@@ -43,3 +43,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Broad semantic refactors unrelated to allowlist scoping.
 - Editing allowlist metadata to hide temporary nature or task ownership.
 - Any `src/legacy` migration/retirement work.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: HARDEN-011 added strict allowlist-quality enforcement.
+

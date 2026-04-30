@@ -63,7 +63,7 @@ These references intentionally preserve past decisions or old review context.
 | `docs/reports/2026-04-23-commit-metrics-analysis.md:18,46` | historical-ok | Historical commit metrics report. |
 | `docs/reviews/2026-04-22-commit-review.md:8,45,50,56,64,69`; `docs/reviews/2026-04-27-task-graph-cutover-audit.md:3,8,30` | historical-ok | Historical review/audit records. |
 | `tasks/active/0000-repo-reorganization-tracker.md:58,62,90,104-113,118` | historical-ok | Completed RORG tracker evidence. |
-| `tasks/active/final-reorganization-audit.md:28` | historical-ok | Completed final reorganization audit evidence. |
+| `tasks/done/final-reorganization-audit.md:28` | historical-ok | Completed final reorganization audit evidence. |
 
 ## False positives
 

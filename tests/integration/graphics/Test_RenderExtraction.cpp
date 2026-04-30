@@ -1488,11 +1488,10 @@ TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_UnsubmittedSlotsCl
     EXPECT_EQ(counter, 0);
 }
 
-TEST(RenderExtraction, FrameContext_DeferredDeletions_SurviveSlotReuse)
+TEST(RenderExtraction, FrameContext_DeferredDeletions_DropNeverSubmittedSlotOnReuse)
 {
-    // Deferred deletions enqueued on a slot persist until explicitly flushed.
-    // The ring's BeginFrame does NOT auto-flush (that's the orchestrator's job
-    // after the timeline wait). Verify the queue survives wrap-around.
+    // Deferred deletions on a never-submitted slot do not have a valid GPU
+    // ownership state. The ring defensively drops them when the slot is reused.
     Runtime::FrameContextRing ring(2u);
     constexpr Runtime::RenderViewport vp{.Width = 800, .Height = 600};
 
@@ -1504,12 +1503,12 @@ TEST(RenderExtraction, FrameContext_DeferredDeletions_SurviveSlotReuse)
     [[maybe_unused]] auto& slot1 = ring.BeginFrame(1u, vp);
     Runtime::FrameContext& slot0_frame2 = ring.BeginFrame(2u, vp);
 
-    // Deletion callback should still be pending (not auto-flushed by ring).
+    // The callback was dropped, not invoked.
     EXPECT_EQ(counter, 0);
 
-    // Explicit flush simulates what the orchestrator does after timeline wait.
+    // Explicit flush has nothing left to execute for the unsubmitted slot.
     slot0_frame2.FlushDeferredDeletions();
-    EXPECT_EQ(counter, 1);
+    EXPECT_EQ(counter, 0);
 }
 
 TEST(RenderExtraction, FrameContext_DeferredDeletions_ReentrancySafe)

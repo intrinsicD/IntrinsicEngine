@@ -53,8 +53,10 @@ TEST(Graph_Data, WithGraphRef)
     ECS::Graph::Data data;
     data.GraphRef = MakeTriangleGraph();
 
-    EXPECT_EQ(data.NodeCount(), 3u);
-    EXPECT_EQ(data.EdgeCount(), 3u);
+    EXPECT_EQ(data.GraphRef->VertexCount(), 3u);
+    EXPECT_EQ(data.GraphRef->EdgeCount(), 3u);
+    EXPECT_EQ(data.NodeCount(), 0u);
+    EXPECT_EQ(data.EdgeCount(), 0u);
     EXPECT_FALSE(data.HasNodeColors());
     EXPECT_FALSE(data.HasNodeRadii());
 }
@@ -121,8 +123,10 @@ TEST(Graph_Data, SharedPtrSemantics)
 
     // Mutation through one reference is visible to the other.
     graph->AddVertex(glm::vec3(1, 1, 0));
-    EXPECT_EQ(data1.NodeCount(), 4u);
-    EXPECT_EQ(data2.NodeCount(), 4u);
+    EXPECT_EQ(data1.GraphRef->VertexCount(), 4u);
+    EXPECT_EQ(data2.GraphRef->VertexCount(), 4u);
+    EXPECT_EQ(data1.NodeCount(), 0u);
+    EXPECT_EQ(data2.NodeCount(), 0u);
 }
 
 TEST(Graph_Data, EmptyGraph)
@@ -145,13 +149,17 @@ TEST(Graph_Data, GraphWithDeletedVertices)
 
     ECS::Graph::Data data;
     data.GraphRef = g;
-    EXPECT_EQ(data.NodeCount(), 3u);
-    EXPECT_EQ(data.EdgeCount(), 2u);
+    EXPECT_EQ(data.GraphRef->VertexCount(), 3u);
+    EXPECT_EQ(data.GraphRef->EdgeCount(), 2u);
+    EXPECT_EQ(data.NodeCount(), 0u);
+    EXPECT_EQ(data.EdgeCount(), 0u);
 
     // Delete a vertex — adjacent edges are removed too.
     g->DeleteVertex(v0);
-    EXPECT_EQ(data.NodeCount(), 2u);
-    EXPECT_EQ(data.EdgeCount(), 1u);
+    EXPECT_EQ(data.GraphRef->VertexCount(), 2u);
+    EXPECT_EQ(data.GraphRef->EdgeCount(), 1u);
+    EXPECT_EQ(data.NodeCount(), 0u);
+    EXPECT_EQ(data.EdgeCount(), 0u);
 }
 
 // ---- RenderMode Enum Coverage ----

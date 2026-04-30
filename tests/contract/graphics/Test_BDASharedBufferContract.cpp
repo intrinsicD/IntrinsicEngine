@@ -392,7 +392,8 @@ TEST(BDA_GraphData, PropertySetBackedColors)
     (void)graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 1, 1, 1});
     EXPECT_TRUE(data.HasNodeColors());
 
-    EXPECT_EQ(data.NodeCount(), 2u);
+    EXPECT_EQ(data.GraphRef->VertexCount(), 2u);
+    EXPECT_EQ(data.NodeCount(), 0u);
 }
 
 TEST(BDA_GraphData, PropertySetBackedRadii)
@@ -483,7 +484,8 @@ TEST(BDA_PerEdgeAttr, GraphDataEdgeColorFromPropertySet)
     (void)graph->GetOrAddEdgeProperty<glm::vec4>(
         "e:color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
     EXPECT_TRUE(data.HasEdgeColors());
-    EXPECT_EQ(data.EdgeCount(), 2u);
+    EXPECT_EQ(data.GraphRef->EdgeCount(), 2u);
+    EXPECT_EQ(data.EdgeCount(), 0u);
 }
 
 // =============================================================================

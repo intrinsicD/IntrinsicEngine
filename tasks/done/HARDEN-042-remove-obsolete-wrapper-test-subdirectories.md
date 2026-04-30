@@ -54,3 +54,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 ## Execution log
 - 2026-04-29: Removed obsolete wrapper `CMakeLists.txt` files and relocated `MockRHI.hpp` to `tests/support/MockRHI.hpp`.
 - 2026-04-29: Ran strict task/docs validators and stale wrapper-target grep check.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: HARDEN-043 added strict test-layout enforcement.
+

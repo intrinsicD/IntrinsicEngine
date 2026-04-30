@@ -77,3 +77,9 @@ cmake --build --preset ci --target IntrinsicTests IntrinsicCoreTests IntrinsicEC
 - **Status:** done
 - **Blocker:** None.
 - **Follow-up:** Continue recording any future temporary migration exceptions in `tasks/active/0000-repo-reorganization-tracker.md`.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: Post-reorganization hardening continues in `tasks/active/0001-post-reorganization-hardening-tracker.md`; the resolved GPU/runtime triage record is archived at `tasks/done/HARDEN-053-gpu-runtime-opt-in-failure-triage.md`.
+

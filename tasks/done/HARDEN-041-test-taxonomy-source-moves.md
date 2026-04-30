@@ -40,7 +40,7 @@ HARDEN-040 completed the audit of non-taxonomic test directories and mapped conc
 ## Acceptance criteria
 - [x] Wrapper source files are relocated from old subsystem directories into taxonomy directories per HARDEN-040 mapping.
 - [x] CMake test registration resolves relocated files without missing-source or missing-target errors.
-- [ ] CPU-supported CTest gate remains green after the move.
+- [x] CPU-supported CTest gate remains green after the move.
 - [x] Hardening tracker records HARDEN-041 progress and verification evidence.
 - [x] Strict task/doc validators pass.
 
@@ -149,3 +149,11 @@ python3 tools/docs/check_doc_links.py --root . --strict
   - `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON` fails before generation because offline cache is missing (`external/cache/glm-src`).
   - Downstream build/ctest commands therefore cannot prove compiled test execution here.
   - Strict task/docs/layout validators pass.
+
+## Completion metadata
+
+- Completion date: 2026-04-30.
+- Commit reference: pending current workspace/PR.
+- Verification closure: HARDEN-052 populated the offline dependency cache and reran the post-relocation gate; `cmake --build --preset ci --target IntrinsicTests` passed and `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passed with `100% tests passed, 0 tests failed out of 1432`.
+- Follow-up: runtime/GPU opt-in evidence remains tracked by HARDEN-051/final hardening audit, not by this mechanical taxonomy source-move task.
+

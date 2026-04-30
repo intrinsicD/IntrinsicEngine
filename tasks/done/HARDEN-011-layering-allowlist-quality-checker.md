@@ -45,3 +45,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Broad cleanup/refactors unrelated to allowlist-quality policy enforcement.
 - Any `src/legacy` migration/retirement work.
 - Converting temporary exceptions into undocumented permanent policy.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: Continue tracking temporary layering exceptions through their owning tasks and expiry metadata.
+

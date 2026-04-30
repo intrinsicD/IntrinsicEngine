@@ -43,3 +43,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
 - Reintroducing wrapper test source ownership (`tests/Asset`, `tests/Core`, `tests/ECS`, `tests/Graphics`, `tests/Runtime`).
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: Keep `tools/repo/check_test_layout.py --root . --strict` in CI docs validation.
+

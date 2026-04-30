@@ -9,7 +9,7 @@ Create the final hardening audit task definition that captures exact closure evi
 - Do not modify CI workflow semantics.
 
 ## Context
-The hardening tracker currently marks HARDEN-051 as `not-started` and requires a final audit artifact at `tasks/active/final-post-reorganization-hardening-audit.md`. This task scopes only the creation of that audit task definition so a follow-up execution step can record pass/fail closure evidence without mixing unrelated changes.
+The hardening tracker originally marked HARDEN-051 as `not-started` and required a final audit artifact, now archived at `tasks/done/final-post-reorganization-hardening-audit.md`. This task scoped only the creation of that audit task definition so a follow-up execution step could record pass/fail closure evidence without mixing unrelated changes.
 
 ## Required changes
 - Add this active task file under `tasks/active/`.
@@ -38,3 +38,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - No source-code behavioral changes.
 - No test deletion or relabeling.
 - No legacy retirement or migration work.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: The executable audit artifact is archived at `tasks/done/final-post-reorganization-hardening-audit.md`; GPU/runtime failure triage is resolved and archived at `tasks/done/HARDEN-053-gpu-runtime-opt-in-failure-triage.md`.
+

@@ -43,3 +43,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 ## Forbidden changes
 - Mixing broad cleanup/refactors unrelated to stale-reference policy.
 - Editing historical records to hide migration history.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: Keep `tools/repo/src_new_reference_allowlist.txt` synchronized when historical task records move.
+

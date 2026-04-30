@@ -28,10 +28,10 @@ Owned by tests/docs under post-reorganization hardening. This task is documentat
 - Synchronize hardening tracker status and evidence log.
 
 ## Acceptance criteria
-- [ ] Audit report exists with directory-by-directory disposition.
-- [ ] Non-taxonomic directories are explicitly linked to follow-up hardening tasks.
-- [ ] Hardening tracker reflects HARDEN-040 progress and links the report.
-- [ ] Strict task/doc validation passes.
+- [x] Audit report exists with directory-by-directory disposition.
+- [x] Non-taxonomic directories are explicitly linked to follow-up hardening tasks.
+- [x] Hardening tracker reflects HARDEN-040 progress and links the report.
+- [x] Strict task/doc validation passes.
 
 ## Verification
 ```bash
@@ -43,3 +43,9 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - No source-level migration of old test wrappers in this task.
 - No C++ test semantic edits.
 - No silent changes to CTest registration policy.
+
+## Completion metadata
+- Completion date: 2026-04-29.
+- Commit reference: pending current workspace/PR.
+- Follow-up: HARDEN-041 performed the mechanical source relocation; HARDEN-042 removed obsolete wrapper stubs.
+
