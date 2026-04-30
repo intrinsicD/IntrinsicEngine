@@ -47,7 +47,7 @@ def detect_layer(path: pathlib.Path, root: pathlib.Path) -> str:
         if top == "graphics":
             if len(rel.parts) >= 2:
                 sub = rel.parts[1]
-                if sub in {"rhi", "vulkan", "framegraph", "renderer"}:
+                if sub in {"rhi", "vulkan", "framegraph", "renderer", "assets"}:
                     return f"graphics/{sub}"
             return "graphics"
         return SRC_LAYER_BY_TOP.get(top, "legacy")

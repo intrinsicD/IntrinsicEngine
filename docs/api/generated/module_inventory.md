@@ -13,6 +13,7 @@ Root scanned: `src`
 | `core` | 34 |
 | `ecs` | 18 |
 | `geometry` | 74 |
+| `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 43 |
 | `graphics/rhi` | 15 |
@@ -159,6 +160,7 @@ Root scanned: `src`
 | `Geometry.Validation` | `src/geometry/Geometry.Validation.cppm` | `geometry` |
 | `Geometry.VectorHeatMethod` | `src/geometry/Geometry.VectorHeatMethod.cppm` | `geometry` |
 | `Geometry` | `src/geometry/Geometry.cppm` | `geometry` |
+| `Extrinsic.Graphics.GpuAssetCache` | `src/graphics/assets/Graphics.GpuAssetCache.cppm` | `graphics/assets` |
 | `Extrinsic.Graphics.RenderGraph:Barriers` | `src/graphics/framegraph/Graphics.RenderGraph.Barriers.cppm` | `graphics/framegraph` |
 | `Extrinsic.Graphics.RenderGraph:Compiler` | `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm` | `graphics/framegraph` |
 | `Extrinsic.Graphics.RenderGraph:Executor` | `src/graphics/framegraph/Graphics.RenderGraph.Executor.cppm` | `graphics/framegraph` |
@@ -428,4 +430,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **402**
+Total modules: **403**

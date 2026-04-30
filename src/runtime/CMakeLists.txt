@@ -21,5 +21,6 @@ target_link_libraries(${target_name}
         ExtrinsicCore
         ExtrinsicECS
         ExtrinsicGraphics
+        ExtrinsicGraphicsAssets
         ExtrinsicPlatform
 )

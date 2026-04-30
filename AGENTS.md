@@ -43,7 +43,7 @@ Target source layout:
 - `src/assets/`.
 - `src/ecs/`.
 - `src/geometry/`.
-- `src/graphics/rhi/`, `src/graphics/vulkan/`, `src/graphics/framegraph/`, `src/graphics/renderer/`.
+- `src/graphics/rhi/`, `src/graphics/assets/`, `src/graphics/vulkan/`, `src/graphics/framegraph/`, `src/graphics/renderer/`.
 - `src/runtime/`.
 - `src/platform/`.
 - `src/app/`.
