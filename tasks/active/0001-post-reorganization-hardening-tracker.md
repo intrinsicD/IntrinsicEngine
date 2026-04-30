@@ -109,7 +109,7 @@ Excluded from this phase:
 | HARDEN-042 | Remove or formalize old subsystem test subdirectories | done | tests/docs | Removed obsolete wrapper `CMakeLists.txt` stubs and relocated shared `MockRHI.hpp` into `tests/support/`; strict task/docs checks passed on 2026-04-29. |
 | HARDEN-043 | Add strict test layout checker | done | tools/repo/CI | Added `tools/repo/check_test_layout.py`, wired strict CI docs validation, and documented usage in `tools/repo/README.md` on 2026-04-29. |
 | HARDEN-050 | Align CI workflows with final supported test policy | done | CI/docs | `pr-fast.yml` unit/contract gate includes `--timeout 60`; HARDEN-050B follow-up updated `ci-sanitizers.yml` to run `-L "unit|contract|integration"` with canonical `-LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60`. |
-| HARDEN-051 | Add final hardening audit task | in-progress | tasks/audit | Active task definition created at `tasks/active/HARDEN-051-final-hardening-audit-task.md`; next step is executing the final audit evidence task file. |
+| HARDEN-051 | Execute final post-reorganization hardening audit | in-progress | tasks/audit | Final audit artifact executed at `tasks/active/final-post-reorganization-hardening-audit.md`; remains open pending stale `src_new` cleanup and complete configure/build/test evidence. |
 
 ## Current full-test status
 
@@ -161,7 +161,7 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 - [ ] Docs links pass strict mode.
 - [ ] Task policy passes strict mode.
 - [ ] Method and benchmark validators pass strict mode.
-- [ ] `tasks/active/final-post-reorganization-hardening-audit.md` records final evidence for HARDEN-051.
+- [x] `tasks/active/final-post-reorganization-hardening-audit.md` records final evidence for HARDEN-051.
 
 ## Evidence log
 
@@ -217,3 +217,5 @@ Any future `flaky-quarantine` or skip must be capability-based or tied to a dete
 | 2026-04-29 | HARDEN-050 | `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after adding `--timeout 60` to `.github/workflows/pr-fast.yml` unit/contract CTest step and syncing HARDEN-050 task/tracker docs. |
 | 2026-04-29 | HARDEN-050B | `.github/workflows/ci-sanitizers.yml` inspection/update; `python3 tools/agents/check_task_policy.py --root . --strict`; `python3 tools/docs/check_doc_links.py --root . --strict` | Passed after updating sanitizer CTest selection to `-L "unit\|contract\|integration" -LE "gpu\|vulkan\|slow\|flaky-quarantine" --timeout 60` and syncing HARDEN-050 task + tracker evidence. |
 | 2026-04-29 | HARDEN-051 | `task file creation` | Created `tasks/active/HARDEN-051-final-hardening-audit-task.md` to scope final hardening audit closure evidence and keep execution as a follow-up task step. |
+
+| 2026-04-29 | HARDEN-051B | `python3 tools/repo/check_stale_src_new_references.py --root . --strict`; `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON` | Final hardening audit execution recorded in `tasks/active/final-post-reorganization-hardening-audit.md`; status remains in-progress due 14 stale `src_new` findings and missing offline dependency cache (`external/cache/glm-src`). |
