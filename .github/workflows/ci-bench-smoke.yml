@@ -33,7 +33,7 @@ jobs:
           GIT_COMMIT: ${{ github.sha }}
         run: |
           mkdir -p build/ci/benchmark/IntrinsicBenchmarkSmoke
-          build/ci/IntrinsicBenchmarkSmoke build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json
+          build/ci/bin/IntrinsicBenchmarkSmoke build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json
 
       - name: Validate benchmark result JSON
         run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark --strict
