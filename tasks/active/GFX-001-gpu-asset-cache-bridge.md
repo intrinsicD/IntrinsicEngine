@@ -1,4 +1,4 @@
-# GFX-001 Graphics.GpuAssetCache bridge
+# GFX-001 — Graphics.GpuAssetCache bridge
 
 ## Goal
 

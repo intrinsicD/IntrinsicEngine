@@ -1,4 +1,4 @@
-# RORG-032 Non-legacy parity matrix
+# RORG-032 — Non-legacy parity matrix
 
 ## Goal
 
@@ -56,3 +56,8 @@ python3 tools/docs/check_doc_links.py --root . --strict
   reports staleness.
 - Do not introduce source-level behavior changes.
 
+## Completion metadata
+
+- Completion date: 2026-04-30.
+- Commit reference: commit d3d2ece (`docs/migration/nonlegacy-parity-matrix.md`
+  and accompanying index updates landed alongside the Vulkan-backend split).
