@@ -362,7 +362,21 @@ intrinsic_test_object_lib(GraphicsContractTestObjs
     DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform EnTT::EnTT glm::glm
 )
 
-if(TARGET ExtrinsicRuntime)
+# Runtime/integration test object libraries pull in test sources that
+# `#include "RHI.Vulkan.hpp"` (a legacy-RHI header) and `import` the legacy
+# single-segment modules (`RHI`, `Graphics`, `Asset.Pipeline`, ...). Those
+# legacy modules are only built when `INTRINSIC_HEADLESS_NO_GLFW=OFF`
+# (top-level `CMakeLists.txt:215-221`), so when configure auto-detects a
+# headless environment (no X11/Vulkan dev headers) the tests would fail to
+# compile.
+#
+# Gate the Runtime/Integration object libs behind both `ExtrinsicRuntime`
+# being available *and* the legacy GLFW stack being built. Headless CI jobs
+# (pr-fast, sanitizer-tests, benchmark-smoke) consequently don't compile the
+# legacy-Vulkan-dependent tests; an alternative `IntrinsicTests` umbrella
+# target is provided in the headless branch below so workflow steps that
+# build `IntrinsicTests` keep working.
+if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     # --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
     set(_runtime_test_files
         Test_RuntimeGraphics.cpp
@@ -610,14 +624,18 @@ if(_intrinsic_registered_test_labels)
 endif()
 
 if(NOT TARGET IntrinsicTests)
-    # Some CI configurations intentionally skip RuntimeTestObjs; keep a stable
-    # aggregate build target for agent/CI verification commands.
+    # Some CI configurations intentionally skip RuntimeTestObjs (e.g. the
+    # headless `pr-fast`, `sanitizer-tests`, and `benchmark-smoke` workflows
+    # that don't install GLFW/Vulkan dev packages). Keep a stable aggregate
+    # build target for agent/CI verification commands.
     add_custom_target(IntrinsicTests)
 endif()
 
-if(TARGET RuntimeTestObjs)
-    get_property(_intrinsic_registered_test_targets GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS)
-    if(TARGET IntrinsicTests AND _intrinsic_registered_test_targets)
-        add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})
-    endif()
+# Make the aggregate build everything that registered itself with the helper,
+# whether or not RuntimeTestObjs was created. Workflows that invoke
+# `cmake --build --target IntrinsicTests` then exercise the full set of
+# headless-buildable test executables.
+get_property(_intrinsic_registered_test_targets GLOBAL PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS)
+if(TARGET IntrinsicTests AND _intrinsic_registered_test_targets)
+    add_dependencies(IntrinsicTests ${_intrinsic_registered_test_targets})
 endif()
