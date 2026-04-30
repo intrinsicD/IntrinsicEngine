@@ -314,6 +314,7 @@ if(INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
 endif()
 
 set(_graphics_unit_test_files
+    Test_GpuAssetCache.cpp
     Test_RHI_BufferManager.cpp
     Test_RHI_PipelineManager.cpp
     Test_RHI_SamplerManager.cpp
@@ -326,7 +327,7 @@ intrinsic_resolve_test_sources(_graphics_unit_test_sources
 intrinsic_test_object_lib(GraphicsUnitTestObjs
     SOURCES
         ${_graphics_unit_test_sources}
-    DEPS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+    DEPS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform ExtrinsicAssets ExtrinsicGraphicsAssets
 )
 
 set(_graphics_contract_test_files
@@ -551,7 +552,7 @@ endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
     OBJECTS GraphicsUnitTestObjs
-    LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+    LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform ExtrinsicAssets ExtrinsicGraphicsAssets
     LABELS unit graphics gpu vulkan
 )
 

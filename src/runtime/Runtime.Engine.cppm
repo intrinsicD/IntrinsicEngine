@@ -10,9 +10,11 @@ import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.FrameClock;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
 
@@ -133,6 +135,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] RHI::IDevice&           GetDevice()        noexcept;
         [[nodiscard]] Graphics::IRenderer&    GetRenderer()      noexcept;
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
+        [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
         [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
@@ -155,6 +158,13 @@ namespace Extrinsic::Runtime
         std::unique_ptr<StreamingExecutor>      m_StreamingExecutor;
         // Asset service — CPU payload authority
         std::unique_ptr<Assets::AssetService>  m_AssetService;
+        // GPU-side asset cache — bridges AssetId to refcounted GPU resources.
+        // Constructed after the renderer; destroyed before the renderer so
+        // BufferLease/TextureLease destructors run while their managers are
+        // still alive.
+        std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache;
+        Assets::AssetEventBus::ListenerToken     m_GpuAssetCacheListener{
+            Assets::AssetEventBus::InvalidToken};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
 

@@ -9,6 +9,7 @@ This document defines enforceable layer dependencies for IntrinsicEngine.
 - `assets` -> `core`
 - `ecs` -> `core` (+ geometry handles/types only when explicitly required)
 - `graphics/rhi` -> `core`
+- `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only — no live `AssetService` traffic), `graphics/rhi`
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views
 - `runtime` -> all lower layers; owns composition/wiring
 - `app` -> `runtime`

@@ -18,12 +18,15 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.FrameClock;
 import Extrinsic.Runtime.FrameLoop;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Asset.EventBus;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
 
@@ -153,6 +156,27 @@ namespace Extrinsic::Runtime
         // ── 5. Asset service ──────────────────────────────────────────────
         m_AssetService = std::make_unique<Assets::AssetService>();
 
+        // ── 5b. GPU asset cache ───────────────────────────────────────────
+        // Bridges AssetId to refcounted Buffer/Texture leases.  Subscribes
+        // to AssetEventBus for Failed / Reloaded / Destroyed transitions;
+        // type-specific bridges drive RequestUpload separately.
+        m_GpuAssetCache = std::make_unique<Graphics::GpuAssetCache>(
+            m_Renderer->GetBufferManager(),
+            m_Renderer->GetTextureManager(),
+            m_Device->GetTransferQueue());
+        m_GpuAssetCacheListener = m_AssetService->SubscribeAll(
+            [cache = m_GpuAssetCache.get()](Assets::AssetId id, Assets::AssetEvent ev)
+            {
+                switch (ev)
+                {
+                case Assets::AssetEvent::Failed:    cache->NotifyFailed(id);    break;
+                case Assets::AssetEvent::Reloaded:  cache->NotifyReloaded(id);  break;
+                case Assets::AssetEvent::Destroyed: cache->NotifyDestroyed(id); break;
+                case Assets::AssetEvent::Ready:     /* no-op: type-specific bridges
+                                                       drive RequestUpload */    break;
+                }
+            });
+
         // ── 6. ECS scene ──────────────────────────────────────────────────
         m_Scene = std::make_unique<ECS::Scene::Registry>();
 
@@ -178,6 +202,8 @@ namespace Extrinsic::Runtime
             std::unique_ptr<Core::Dag::TaskGraph>& StreamingGraph;
             std::unique_ptr<StreamingExecutor>& StreamingExecutorPtr;
             std::unique_ptr<Assets::AssetService>& AssetService;
+            std::unique_ptr<Graphics::GpuAssetCache>& GpuAssetCache;
+            Assets::AssetEventBus::ListenerToken& GpuAssetCacheListener;
             std::unique_ptr<ECS::Scene::Registry>& Scene;
 
             ShutdownHooks(Engine& owner,
@@ -191,6 +217,8 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<Core::Dag::TaskGraph>& streamingGraph,
                           std::unique_ptr<StreamingExecutor>& streamingExecutor,
                           std::unique_ptr<Assets::AssetService>& assetService,
+                          std::unique_ptr<Graphics::GpuAssetCache>& gpuAssetCache,
+                          Assets::AssetEventBus::ListenerToken& gpuAssetCacheListener,
                           std::unique_ptr<ECS::Scene::Registry>& scene)
                 : Owner(owner)
                 , Running(running)
@@ -203,6 +231,8 @@ namespace Extrinsic::Runtime
                 , StreamingGraph(streamingGraph)
                 , StreamingExecutorPtr(streamingExecutor)
                 , AssetService(assetService)
+                , GpuAssetCache(gpuAssetCache)
+                , GpuAssetCacheListener(gpuAssetCacheListener)
                 , Scene(scene)
             {
             }
@@ -224,7 +254,21 @@ namespace Extrinsic::Runtime
                     StreamingExecutorPtr->ShutdownAndDrain();
             }
             void DestroyScene() override { Scene.reset(); }
-            void DestroyAssets() override { AssetService.reset(); }
+            void DestroyAssets() override
+            {
+                // Unsubscribe before destroying the cache so a late event
+                // flush cannot reach a freed cache.  The cache is destroyed
+                // before the renderer (which owns Buffer/Texture managers)
+                // so leases unwind through live managers.
+                if (AssetService &&
+                    GpuAssetCacheListener != Assets::AssetEventBus::InvalidToken)
+                {
+                    AssetService->UnsubscribeAll(GpuAssetCacheListener);
+                    GpuAssetCacheListener = Assets::AssetEventBus::InvalidToken;
+                }
+                GpuAssetCache.reset();
+                AssetService.reset();
+            }
             void DestroyStreamingState() override
             {
                 StreamingExecutorPtr.reset();
@@ -268,6 +312,8 @@ namespace Extrinsic::Runtime
                             m_StreamingGraph,
                             m_StreamingExecutor,
                             m_AssetService,
+                            m_GpuAssetCache,
+                            m_GpuAssetCacheListener,
                             m_Scene);
         ExecuteRuntimeShutdownContract(hooks);
     }
@@ -433,26 +479,43 @@ namespace Extrinsic::Runtime
 
         struct AssetHooks final : IRuntimeAssetFrameHooks
         {
-            Assets::AssetService& AssetService;
+            Assets::AssetService&     AssetService;
+            Graphics::GpuAssetCache*  GpuAssetCache;
+            RHI::IDevice&             Device;
 
-            explicit AssetHooks(Assets::AssetService& assetService)
+            AssetHooks(Assets::AssetService& assetService,
+                       Graphics::GpuAssetCache* gpuAssetCache,
+                       RHI::IDevice& device)
                 : AssetService(assetService)
+                , GpuAssetCache(gpuAssetCache)
+                , Device(device)
             {
             }
 
             void TickAssets() override
             {
                 // Asset service main-thread tick: advances state machines, fires
-                // AssetEventBus::Ready / Reloaded / Destroyed callbacks.
+                // AssetEventBus::Ready / Reloaded / Destroyed callbacks.  The
+                // cache subscribed in Engine::Initialize observes those events
+                // synchronously during this Tick.
                 AssetService.Tick();
+                if (GpuAssetCache)
+                {
+                    GpuAssetCache->Tick(Device.GetGlobalFrameNumber(),
+                                        Device.GetFramesInFlight());
+                }
             }
         };
 
         TransferHooks transferHooks(*m_Device);
         StreamingHooks streamingHooks(*m_StreamingGraph, *m_StreamingExecutor);
-        AssetHooks assetHooks(*m_AssetService);
+        AssetHooks assetHooks(*m_AssetService, m_GpuAssetCache.get(), *m_Device);
         ExecuteRuntimeMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
-        (void)completedGpuValue; // placeholder until GpuAssetCache / deferred-delete lands
+        // completedGpuValue is the renderer's per-frame timeline value.  The
+        // GpuAssetCache currently retires on the CPU frame counter (which is
+        // a conservative proxy for GPU completion); a follow-up may key
+        // retirement directly on completedGpuValue for tighter recycling.
+        (void)completedGpuValue;
 
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();
@@ -467,6 +530,7 @@ namespace Extrinsic::Runtime
     RHI::IDevice&         Engine::GetDevice()        noexcept { return *m_Device;        }
     Graphics::IRenderer&  Engine::GetRenderer()      noexcept { return *m_Renderer;      }
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
+    Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
     Core::Dag::TaskGraph& Engine::GetStreamingGraph() noexcept { return *m_StreamingGraph; }
