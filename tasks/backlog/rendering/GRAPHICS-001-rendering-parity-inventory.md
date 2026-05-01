@@ -8,6 +8,11 @@
 - No copy/paste from `src/legacy` into promoted graphics layers.
 
 ## Context
+- This task is the canonical rendering backlog index. The earlier seed
+  `RORG-031B — Rendering pipeline backlog seed` is a superseded historical
+  parent seed and has been retired to
+  `tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`; it is not an
+  active implementation plan and must not be selected as next-active work.
 - Owner: `graphics` planning across `graphics/rhi`, `graphics/vulkan`, `graphics/framegraph`, `graphics/renderer`, and `graphics/assets`.
 - `src/legacy/Graphics` contains render orchestration, passes, materials, shader registries, visualization, selection, debug drawing, and lifecycle systems that are behavioral references only.
 - Final graphics code must consume snapshots/views and must not depend on live ECS ownership.

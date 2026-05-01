@@ -28,7 +28,7 @@
 
 ## Verification
 ```bash
-test -f tasks/backlog/architecture/RORG-031-architecture-foundation.md
+test -f tasks/backlog/architecture/RORG-031A-architecture-foundation.md
 ```
 
 ## Forbidden changes

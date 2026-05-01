@@ -1,5 +1,24 @@
 # RORG-031B — Rendering pipeline backlog seed
 
+## Status
+
+Superseded historical seed. Retired from `tasks/backlog/rendering/` and archived
+here so the rendering backlog cannot be confused with the canonical
+implementation plan.
+
+- Completed: 2026-05-01.
+- Commit: pending (lands with this task).
+- PR: see branch `claude/next-active-task-CaTBY`.
+- Superseded by: `tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md`
+  (canonical rendering backlog index) and the `GRAPHICS-002` through `GRAPHICS-021`
+  task chain enumerated by `GRAPHICS-001`.
+- Follow-up: workflow/cleanup tracking continues under
+  `tasks/backlog/rendering/GRAPHICS-021-rendering-backlog-workflow-cleanup.md`.
+
+This seed remains here only as a historical record of how the rendering
+backlog was first extracted from the legacy living TODO; it is not an
+executable plan.
+
 ## Goal
 - Extract rendering and frame-pipeline work from the legacy backlog into a dedicated structured task for phased execution.
 
@@ -27,7 +46,7 @@
 
 ## Verification
 ```bash
-test -f tasks/backlog/rendering/RORG-031-rendering-pipeline.md
+test -f tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md
 ```
 
 ## Forbidden changes
