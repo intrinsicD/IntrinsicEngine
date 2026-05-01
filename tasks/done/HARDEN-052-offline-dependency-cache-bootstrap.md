@@ -7,6 +7,9 @@ Unblock the CI preset offline configure requirement by populating `external/cach
 - Runtime/graphics feature work.
 - Broad build-system redesign.
 
+## Context
+HARDEN-051 closure was blocked because the CI preset requires `INTRINSIC_OFFLINE_DEPS=ON` configure success against a populated `external/cache/*-src` dependency snapshot. This task supplies the reproducible bootstrap procedure and CPU-supported gate evidence so the canonical hardening tracker can record fresh pass/fail status for the offline configure/build/test pipeline.
+
 ## Required changes
 - Add/verify documented bootstrap steps for dependency cache population.
 - Validate offline configure success after cache bootstrap.
@@ -30,6 +33,10 @@ Unblock the CI preset offline configure requirement by populating `external/cach
 - `python3 tools/agents/check_task_policy.py --root . --strict`
 - `python3 tools/docs/check_doc_links.py --root . --strict`
 
+## Forbidden changes
+- No changes to runtime/graphics behavior.
+- No restructuring of build presets beyond the documented offline bootstrap path.
+- No new feature dependencies introduced under `external/cache/`.
 
 ## Bootstrap procedure (reproducible)
 1. Prime `external/cache/*-src` once with network enabled:

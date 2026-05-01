@@ -20,14 +20,30 @@ DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 REQUIRED_SECTIONS = [
     "Goal",
     "Non-goals",
+    "Context",
     "Required changes",
     "Tests",
     "Docs",
     "Acceptance criteria",
     "Verification",
+    "Forbidden changes",
 ]
 
-SKIP_FILENAMES = {"README.md", "index.md", "legacy-todo.md", "0000-repo-reorganization-tracker.md"}
+SKIP_FILENAMES = {
+    "README.md",
+    "index.md",
+    "legacy-todo.md",
+    "0000-repo-reorganization-tracker.md",
+    "RENDERING-CLEANUP-TASK-PACK.md",
+}
+
+# Queue/index meta-files (e.g. `tasks/active/task-NN-<slug>.md`) are
+# ordering trackers for a series of structured tasks rather than canonical
+# tasks themselves; the structured tasks they describe live elsewhere
+# under `tasks/backlog|done` with proper task IDs.
+SKIP_PATTERNS = [
+    re.compile(r"^task-\d+-.*\.md$"),
+]
 
 
 @dataclass
@@ -76,6 +92,8 @@ def find_markdown_files(root: Path) -> list[Path]:
             continue
         for path in sorted(task_root.rglob("*.md")):
             if path.name in SKIP_FILENAMES:
+                continue
+            if any(pattern.match(path.name) for pattern in SKIP_PATTERNS):
                 continue
             files.append(path)
     return files

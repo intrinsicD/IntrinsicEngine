@@ -51,6 +51,11 @@ cmake --preset ci -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bi
 cmake --build --preset ci --target IntrinsicTests IntrinsicCoreTests IntrinsicECSTests IntrinsicContractBuildTests IntrinsicBenchmarkTests IntrinsicGeometryTests
 ```
 
+## Forbidden changes
+- No new engine/runtime/graphics features added under cover of an audit task.
+- No additional source-tree moves performed by this audit.
+- No rewrites of historical migration records beyond factual completion updates.
+
 ## Temporary exceptions
 - None currently recorded.
 
