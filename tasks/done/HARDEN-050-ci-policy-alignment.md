@@ -40,6 +40,11 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 ```
 
+## Forbidden changes
+- No changes to `src/legacy/` or production source code.
+- No new test sources or label re-categorization.
+- No new feature behavior outside CI gating policy.
+
 ## Completion metadata
 - Completion date: 2026-04-29.
 - Commit reference: pending current workspace/PR.

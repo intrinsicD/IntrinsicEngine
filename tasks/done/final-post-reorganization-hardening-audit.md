@@ -8,6 +8,9 @@ Execute the final hardening audit with command-backed evidence for every accepta
 - No broad refactors to force an audit pass.
 - Do not mark `HARDEN-051` done without complete configure/build/test/validator evidence.
 
+## Context
+This is the closing audit for the post-reorganization hardening series tracked by `tasks/done/0001-post-reorganization-hardening-tracker.md`. It records command-backed pass/fail evidence for every acceptance item in `HARDEN-001` and routes any unresolved blockers (e.g. GPU/runtime opt-in gate failures) to explicit follow-up tasks.
+
 ## Required changes
 - Re-run hardening validators in strict mode and record exact outcomes.
 - Re-run CI preset configure gate evidence and record pass/fail.
@@ -37,6 +40,11 @@ Execute the final hardening audit with command-backed evidence for every accepta
 ## Verification
 - `python3 tools/agents/check_task_policy.py --root . --strict`
 - `python3 tools/docs/check_doc_links.py --root . --strict`
+
+## Forbidden changes
+- No new engine/runtime/graphics feature work.
+- No tests rewritten to force a green gate without evidence.
+- No closure of `HARDEN-051` blockers without a tracked follow-up task ID.
 
 ## Final acceptance evidence (executed 2026-04-30 UTC)
 
