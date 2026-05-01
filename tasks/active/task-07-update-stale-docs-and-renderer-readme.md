@@ -1,9 +1,11 @@
 # Task 7 — Update stale docs and renderer README ownership contract
 
-- Status: planned (queued for Codex)
-- Owner: TBD
-- Branch / PR: TBD
-- Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` after rewriting stale rendering docs.
+- Status: in-progress
+- Owner: Claude (claude/next-active-task-mtji0)
+- Branch / PR: `claude/next-active-task-mtji0`
+- Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` and `python3 tools/agents/check_task_policy.py --root . --strict` after rewriting stale rendering docs (both pass; 0 findings).
+
+`docs/architecture/rendering-three-pass.md` "Where Active Work Lives" now points at `tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md` and `tasks/backlog/rendering/README.md` as the canonical near-term execution sources, retains `docs/roadmap.md` for medium/long-horizon planning, and keeps the historical migration narrative link as archival. `docs/roadmap.md` no longer references stale `tasks/backlog/legacy-todo.md` anchors (B4, C4, C9, F1–F7) or the missing `adr-o2-pragmatic-medium-runtime-refactor.md` ADR; runtime/frame-pipeline execution now points at the runtime backlog index and `GRAPHICS-016`, the GPU-driven pipeline plan cross-references the structured GRAPHICS backlog, and the UI Architecture & Feature Wiring section is rewritten as plain completion notes. `src/graphics/renderer/README.md` ownership contract no longer claims graphics may depend on ECS component contracts; instead it states that runtime owns ECS access/extraction, graphics consumes immutable snapshots/views and owns GPU resources, graphics must not import live ECS ownership or store graphics GPU handles in canonical ECS components, and the architecture references now include `AGENTS.md`, `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, and `docs/migration/nonlegacy-parity-matrix.md` (with the parity matrix labeled historical/advisory). Validators pass with zero findings.
 
 ---
 

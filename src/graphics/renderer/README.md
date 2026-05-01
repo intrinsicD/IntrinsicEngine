@@ -87,13 +87,23 @@ and renderer/render-graph orchestration.
 
 ## Ownership contract
 
-- `Graphics` owns GPU resource/state transitions and pass-level scheduling through
+- `Runtime` owns live ECS access, extraction, sidecar mappings, dirty-domain
+  interpretation, deletion events, and compaction/relocation handoff.
+- `Graphics` consumes immutable snapshots/views supplied by runtime and owns GPU
+  resource/state transitions and pass-level scheduling through
   `Graphics.RenderGraph`.
-- `Graphics` may depend on `Core`, `RHI`, and ECS component contracts.
-- `Graphics.RenderGraph` must not import ECS internals directly.
+- `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
+  must not import live ECS ownership and must not store graphics GPU handles in
+  canonical ECS components.
+- `Graphics.RenderGraph` must not import ECS internals or runtime ownership
+  directly.
 - `Runtime` must not manipulate render-graph barriers/resources directly.
 
 ## Architecture references
 
-- `docs/architecture/rendering-target-architecture.md`
-- `docs/architecture/task-graph-domains.md`
+- [AGENTS.md](../../../AGENTS.md) — authoritative repository contract and layering rules.
+- [docs/architecture/graphics.md](../../../docs/architecture/graphics.md)
+- [docs/architecture/rendering-three-pass.md](../../../docs/architecture/rendering-three-pass.md)
+- [docs/architecture/rendering-target-architecture.md](../../../docs/architecture/rendering-target-architecture.md)
+- [docs/architecture/task-graph-domains.md](../../../docs/architecture/task-graph-domains.md)
+- [docs/migration/nonlegacy-parity-matrix.md](../../../docs/migration/nonlegacy-parity-matrix.md) — historical/advisory parity tracking.

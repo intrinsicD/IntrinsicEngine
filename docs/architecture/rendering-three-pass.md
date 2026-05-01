@@ -169,6 +169,7 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 
 ## Where Active Work Lives
 
-- Near-term execution queue: `tasks/backlog/legacy-todo.md` (`P0 / P1 / P2 / Planned Constraints`).
-- Medium/long-horizon planning: `docs/roadmap.md`.
-- Historical migration narrative: `docs/migration/archive/plan.md` (archival index).
+- Canonical rendering backlog index: [GRAPHICS-001 — Rendering parity inventory and task index](../../tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md).
+- Rendering backlog dependency DAG and agent selection rules: [tasks/backlog/rendering/README.md](../../tasks/backlog/rendering/README.md).
+- Medium/long-horizon planning: [docs/roadmap.md](../roadmap.md).
+- Historical migration narrative: [docs/migration/archive/plan.md](../migration/archive/plan.md) (archival index).
