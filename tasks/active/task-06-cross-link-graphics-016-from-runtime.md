@@ -1,9 +1,11 @@
 # Task 6 — Cross-link GRAPHICS-016 from runtime backlog
 
-- Status: planned (queued for Codex)
-- Owner: TBD
-- Branch / PR: TBD
-- Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` after adding the runtime cross-link.
+- Status: in-progress
+- Owner: Claude (claude/next-active-task-NtmGp)
+- Branch / PR: `claude/next-active-task-NtmGp`
+- Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` and `python3 tools/agents/check_task_policy.py --root . --strict` after adding the runtime cross-link (both pass; 0 findings, 145 relative links resolved).
+
+`tasks/backlog/runtime/README.md` has been added. It indexes the existing runtime backlog (`RORG-031-runtime-composition.md`) and cross-links GRAPHICS-016 with explicit notes that runtime owns live ECS access, extraction, sidecar/cache mappings, dirty-domain interpretation, deletion events, and compaction/relocation handoff; that graphics must not import live ECS ownership; and that GRAPHICS-016 is the first implementation gate before pass implementation. The full task content is not duplicated. Validators pass with zero findings.
 
 ---
 
