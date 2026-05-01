@@ -34,7 +34,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ## Runtime Architecture Track
 
-This roadmap now explicitly tracks the staged runtime/frame-pipeline work captured in `tasks/backlog/legacy-todo.md` → `B4. Next-Gen Frame Pipeline Refactor`. The default migration path is **O2** from `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md`: preserve the current subsystem split, but introduce explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages before considering any O3-scale redesign.
+Runtime/frame-pipeline execution work is tracked through the structured task system: see the runtime backlog index at [tasks/backlog/runtime/README.md](../tasks/backlog/runtime/README.md) and the runtime extraction gate [GRAPHICS-016 — Runtime extraction and graphics handoff](../tasks/backlog/rendering/GRAPHICS-016-runtime-extraction-handoff.md). The default migration intent preserves the current subsystem split while introducing explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages; concrete sequencing lives in the structured GRAPHICS/runtime tasks rather than this roadmap.
 
 ### Near-term architecture sequencing
 
@@ -54,7 +54,7 @@ This roadmap now explicitly tracks the staged runtime/frame-pipeline work captur
 
 This architecture track is intentionally cross-cutting: it enables later rendering, streaming, and interaction work without reordering the feature roadmap below.
 
-**GPU-driven pipeline plan:** `docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md` provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It refines tasks/backlog/legacy-todo.md C4/C9 and cross-references B1–B5.
+**GPU-driven pipeline plan:** [docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md](architecture/gpu-driven-modular-rendering-pipeline-plan.md) provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It is consumed by the structured rendering backlog (see [GRAPHICS-001 — Rendering parity inventory and task index](../tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md) and [tasks/backlog/rendering/README.md](../tasks/backlog/rendering/README.md)).
 
 ### Architecture constraints (preserve during all refactor work)
 
@@ -143,17 +143,17 @@ Undo/redo integration now lives in `Core::CommandHistory`; editor panels should 
 
 The editor UI foundation is in place: programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View → Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool, GPU VRAM usage), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
 
-Concrete remaining items are tracked in `tasks/backlog/legacy-todo.md` → P1/F (UI Architecture & Feature Wiring):
+The UI Architecture & Feature Wiring scope has landed:
 
-- ~~**Wire remaining geometry operators**~~ — `tasks/backlog/legacy-todo.md` F1 **complete**. All geometry operators (including Boolean CSG) are now wired to the editor UI.
-- ~~**Rendering controls**~~ — `tasks/backlog/legacy-todo.md` F2 **complete**. Light environment serialization, camera property editor, global render mode override, and lighting path selector are all implemented.
-- ~~**Undo/redo integration**~~ — `tasks/backlog/legacy-todo.md` F3 **complete**. CommandHistory wired to gizmo, inspector, entity lifecycle, and geometry operators (simplify, remesh, smooth, subdivide, repair) with shared-ptr mesh snapshot undo.
-- ~~**Hierarchy refinements**~~ — `tasks/backlog/legacy-todo.md` F4 **complete**. Drag-and-drop reparenting with undo, expand/collapse all, extended context menu, and multi-entity selection (Ctrl+click toggle, Shift+click range) are all implemented.
-- ~~**Viewport context menus**~~ — `tasks/backlog/legacy-todo.md` F5 **core complete**. Entity context menu (Focus/Delete/Duplicate/Select Children/Visibility/Isolate), empty-space menu (Create Primitive/Reset Camera/Create Empty), and sub-element menu (Select Connected/Grow/Shrink Selection) are implemented with undo support. Paste and Edge Ring/Loop selection deferred.
-- ~~**Editor polish**~~ — `tasks/backlog/legacy-todo.md` F6 **complete**. GPU memory display in status bar (color-coded VRAM usage), comprehensive tooltip coverage on all Inspector fields and View Settings sliders (AA, histogram, color grading, selection outline). Console/Log panel, Keyboard Shortcuts panel, Help menu, and multi-object property editing were already complete.
-- ~~**Render Target Viewer**~~ panel enhancements — `tasks/backlog/legacy-todo.md` F7 **complete**. Per-resource memory estimates, visual lifetime timeline bar (per-pass column headers, write-range overlay), and zoomable texture preview (zoom-to-cursor, pan, pixel coordinate tooltips) are all implemented.
+- ~~**Wire remaining geometry operators**~~ **complete**. All geometry operators (including Boolean CSG) are wired to the editor UI.
+- ~~**Rendering controls**~~ **complete**. Light environment serialization, camera property editor, global render mode override, and lighting path selector are all implemented.
+- ~~**Undo/redo integration**~~ **complete**. `Core::CommandHistory` is wired to gizmo, inspector, entity lifecycle, and geometry operators (simplify, remesh, smooth, subdivide, repair) with shared-ptr mesh snapshot undo.
+- ~~**Hierarchy refinements**~~ **complete**. Drag-and-drop reparenting with undo, expand/collapse all, extended context menu, and multi-entity selection (Ctrl+click toggle, Shift+click range) are all implemented.
+- ~~**Viewport context menus**~~ **core complete**. Entity context menu (Focus/Delete/Duplicate/Select Children/Visibility/Isolate), empty-space menu (Create Primitive/Reset Camera/Create Empty), and sub-element menu (Select Connected/Grow/Shrink Selection) are implemented with undo support. Paste and Edge Ring/Loop selection deferred.
+- ~~**Editor polish**~~ **complete**. GPU memory display in status bar (color-coded VRAM usage), comprehensive tooltip coverage on all Inspector fields and View Settings sliders (AA, histogram, color grading, selection outline). Console/Log panel, Keyboard Shortcuts panel, Help menu, and multi-object property editing were already complete.
+- ~~**Render Target Viewer**~~ panel enhancements **complete**. Per-resource memory estimates, visual lifetime timeline bar (per-pass column headers, write-range overlay), and zoomable texture preview (zoom-to-cursor, pan, pixel coordinate tooltips) are all implemented.
 
-Each improvement is independent and can land incrementally.
+Future incremental UI improvements are filed as structured tasks under `tasks/backlog/ui/` rather than tracked in this roadmap.
 
 ### Scene Serialization (**MVP complete**)
 
