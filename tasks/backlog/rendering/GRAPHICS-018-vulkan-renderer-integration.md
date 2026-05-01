@@ -17,6 +17,7 @@
 - Add opt-in `gpu`/`vulkan` tests for device creation, swapchain lifecycle, command recording, barriers, transfer, resize, and presentation where environment support exists.
 - Add opt-in Vulkan smoke coverage for scene-table descriptor binding and GPU-driven culling/draw-bucket execution.
 - Preserve CPU/null tests for all backend-independent behavior.
+- Label Vulkan/GPU smoke tests `gpu;vulkan` so they remain opt-in; keep backend-independent CPU tests under `unit;graphics` or `contract;graphics` so they continue to run in the default CPU gate.
 ## Docs
 - Document GPU verification requirements, headless/fallback behavior, and Vulkan label policy.
 ## Acceptance criteria
@@ -25,6 +26,7 @@
 - Backend failures are surfaced through structured diagnostics.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 # Optional when hardware/driver support is available:

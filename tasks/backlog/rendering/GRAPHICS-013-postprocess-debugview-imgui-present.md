@@ -16,6 +16,7 @@
 ## Tests
 - Add pass-order, resource-lifetime, load/store, dispatch/draw/copy/blit, and disabled-effect tests using null/mock backend seams.
 - Add optional GPU/Vulkan smoke tests behind labels when backend behavior is implemented.
+- Label CPU/mock pass tests `contract;graphics` for the default CPU gate; label optional post-process/present smoke tests `gpu;vulkan` so they stay opt-in.
 ## Docs
 - Update canonical post-process chain, debug-view behavior, ImGui ownership, and backbuffer policy.
 ## Acceptance criteria
@@ -24,8 +25,11 @@
 - Debug view and ImGui overlays are explicit and testable.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# Optional when hardware/driver support is available:
+ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.

@@ -17,6 +17,7 @@
 - Add mock command-context tests for pipeline bind, descriptor/material bind, index/vertex bind, push-constant budget, and indirect draw calls.
 - Add mock checks that the scene-table and required SSBO descriptors are bound before indirect draws.
 - Add framegraph tests for resource load/store and optional G-buffer allocation.
+- Label these CPU/mock-backend tests `contract;graphics` so they run in the default CPU gate.
 ## Docs
 - Update pass resource contracts and any push-constant budget notes affected by implementation.
 ## Acceptance criteria
@@ -25,6 +26,7 @@
 - CPU-supported tests validate command sequencing without requiring Vulkan.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

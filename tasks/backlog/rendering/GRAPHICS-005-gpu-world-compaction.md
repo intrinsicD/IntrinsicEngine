@@ -16,6 +16,7 @@
 - Expose diagnostics for fragmentation and bytes moved.
 ## Tests
 - Add unit tests for fragmentation thresholds, relocation table correctness, skipped compaction, and stale relocation rejection.
+- Label compaction unit tests `unit;graphics` so they run in the default CPU gate.
 ## Docs
 - Document the compaction contract and runtime handoff expectations in graphics/runtime architecture docs.
 ## Acceptance criteria
@@ -25,6 +26,7 @@
 - Disabled compaction preserves existing allocation behavior.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

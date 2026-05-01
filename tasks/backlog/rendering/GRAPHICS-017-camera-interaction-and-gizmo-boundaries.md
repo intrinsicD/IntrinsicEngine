@@ -16,6 +16,7 @@
 ## Tests
 - Add unit/contract tests for camera packet defaults, projection/view validity, gizmo render packets, and invalid input handling.
 - Add runtime integration tests for input-to-pick-request handoff when implementation lands.
+- Label graphics-only contract tests `contract;graphics` and runtime input/handoff integration tests `integration;runtime;graphics` so both run in the default CPU gate.
 ## Docs
 - Update graphics, runtime, and platform boundary docs for camera/interaction/gizmo ownership.
 ## Acceptance criteria
@@ -25,6 +26,7 @@
 - Legacy interaction behavior has a promoted-task path without layer violations.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

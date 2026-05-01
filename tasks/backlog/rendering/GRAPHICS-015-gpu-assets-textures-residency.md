@@ -14,6 +14,7 @@
 - Add bounded cache/eviction or explicit non-eviction diagnostics as appropriate.
 ## Tests
 - Add unit tests for cache hits/misses, fallback texture behavior, sampler keys, failed uploads, residency transitions, and null backend behavior.
+- Label GPU asset cache unit tests `unit;graphics` so they run in the default CPU gate.
 ## Docs
 - Document graphics asset residency, fallback resources, and texture upload lifecycle.
 ## Acceptance criteria
@@ -22,6 +23,7 @@
 - Cache behavior is CPU-testable without requiring Vulkan.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

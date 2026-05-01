@@ -17,6 +17,7 @@
 - Add mock command-context tests for line buckets, point buckets, debug primitive packets, clamping, empty scenes, and invalid data.
 - Add line/point bucket tests that verify canonical instance-slot indexing and transform/material lookup.
 - Cover graph, mesh-helper, point-cloud, and transient debug use cases at the contract level.
+- Label these CPU/mock-backend tests `contract;graphics` so they run in the default CPU gate.
 ## Docs
 - Document transient debug rendering versus persistent overlay ownership.
 ## Acceptance criteria
@@ -25,6 +26,7 @@
 - Tests prove overlays accumulate onto the expected HDR/depth resources.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

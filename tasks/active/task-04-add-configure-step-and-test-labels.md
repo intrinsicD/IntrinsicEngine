@@ -1,9 +1,9 @@
 # Task 4 — Add configure step and label expectations to rendering tasks
 
-- Status: planned (queued for Codex)
-- Owner: TBD
-- Branch / PR: TBD
-- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` after normalizing GRAPHICS-002..GRAPHICS-018 verification blocks.
+- Status: in-progress
+- Owner: claude (claude/next-active-task-OvcHb)
+- Branch / PR: claude/next-active-task-OvcHb
+- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` after normalizing GRAPHICS-002..GRAPHICS-018 verification blocks.
 
 ---
 

@@ -17,6 +17,7 @@
 ## Tests
 - Add unit/contract tests for shader registration, cache-key stability, reload invalidation, material defaults, and failure diagnostics.
 - Keep Vulkan shader compilation as opt-in when it requires GPU or external tooling.
+- Label registry behavior tests `unit;graphics` and `contract;graphics` for the default CPU gate; label any backend shader-compilation smoke tests `gpu;vulkan` so they stay opt-in.
 ## Docs
 - Document shader asset ownership, hot-reload lifecycle, material parameter layout, and pipeline-cache policy.
 ## Acceptance criteria
@@ -26,8 +27,11 @@
 - Backend-specific work remains behind declared RHI/backend integration points.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# Optional when hardware/driver support is available:
+ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.

@@ -16,6 +16,7 @@
 ## Tests
 - Add contract/integration tests for entity IDs, primitive domain bits, pending-pick gating, readback seams, outline resource use, and no-hit behavior.
 - Use CPU/mock tests for command order and data encoding.
+- Label graphics-only contract tests `contract;graphics` and runtime-handoff tests `integration;runtime;graphics` so both run in the default CPU gate.
 ## Docs
 - Update picking, sub-element selection, and outline sections in architecture docs.
 ## Acceptance criteria
@@ -24,6 +25,7 @@
 - Runtime resolves selected ECS entities from extracted stable IDs; graphics never mutates ECS selection state.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

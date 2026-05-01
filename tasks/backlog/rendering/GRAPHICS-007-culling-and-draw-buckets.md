@@ -19,6 +19,7 @@
 - Add mock command-context tests for reset, dispatch, barriers, bucket selection, and indirect draw metadata.
 - Add contract tests proving instance-slot alignment across renderable, transform, bounds/culling, and draw-bucket records.
 - Cover empty-scene, single-draw, multi-bucket, and invalid-range cases.
+- Label these CPU/mock-backend tests `contract;graphics` so they run in the default CPU gate.
 ## Docs
 - Update the culling and draw-bucket sections of `docs/architecture/rendering-three-pass.md`.
 - Document the GPU scene SSBO layout and instance-slot identity rules.
@@ -28,6 +29,7 @@
 - Bucket behavior is independent of live ECS state.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

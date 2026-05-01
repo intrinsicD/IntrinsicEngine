@@ -18,6 +18,7 @@
 ## Tests
 - Add runtime/graphics integration tests using null renderer and extracted snapshots.
 - Cover creation, update, deletion, dirty domains, and invalid entity filtering.
+- Label these extraction-handoff integration tests `integration;runtime;graphics` so they run in the default CPU gate.
 ## Docs
 - Update runtime subsystem boundaries, graphics architecture, and migration parity docs.
 ## Acceptance criteria
@@ -27,6 +28,7 @@
 - Integration tests prove lifecycle handoff without Vulkan.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

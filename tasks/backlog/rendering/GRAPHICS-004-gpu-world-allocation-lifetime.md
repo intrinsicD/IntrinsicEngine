@@ -17,6 +17,7 @@
 ## Tests
 - Add unit tests for allocate/free/reuse, stale handles, overflow, frame-delayed deletion, and null backend behavior.
 - Add regression coverage for deterministic diagnostics.
+- Label allocator unit tests `unit;graphics` and diagnostics regression tests `regression;graphics` so both run in the default CPU gate.
 ## Docs
 - Update `docs/migration/nonlegacy-parity-matrix.md` and any GPU-world architecture notes touched by the implementation.
 ## Acceptance criteria
@@ -25,6 +26,7 @@
 - Diagnostics make retained-buffer pressure visible.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
