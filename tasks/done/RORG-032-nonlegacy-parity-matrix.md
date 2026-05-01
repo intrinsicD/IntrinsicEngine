@@ -1,4 +1,4 @@
-# RORG-032 Non-legacy parity matrix
+# RORG-032 — Non-legacy parity matrix
 
 ## Goal
 
@@ -48,6 +48,11 @@ roots under `src/{core,assets,ecs,geometry,graphics,platform,runtime,app}`.
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
 python3 tools/docs/check_doc_links.py --root . --strict
 ```
+
+## Completion
+
+- Completed: 2026-04-30.
+- Commit: d3d2ece.
 
 ## Forbidden changes
 

@@ -1,6 +1,6 @@
 # Module Inventory (auto-generated)
 
-_Generated on 2026-04-30 by `tools/repo/generate_module_inventory.py`._
+_Generated on 2026-05-01 by `tools/repo/generate_module_inventory.py`._
 
 Root scanned: `src`
 

@@ -1,4 +1,4 @@
-# GFX-001 Graphics.GpuAssetCache bridge
+# GFX-001 — Graphics.GpuAssetCache bridge
 
 ## Goal
 
@@ -133,6 +133,20 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/generate_module_inventory.py --check
 ```
 
+## Completion
+
+- Completed: 2026-05-01.
+- Commit reference: pending local commit.
+- Verified:
+  - `cmake --preset ci`
+  - `cmake --build build/ci --target IntrinsicGraphicsAssetsUnitTests -j2`
+  - `cmake --build build/ci --target ExtrinsicRuntime -j2`
+  - `ctest --test-dir build/ci --output-on-failure -R 'GpuAssetCache' --timeout 60`
+  - `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+  - `python3 tools/repo/check_layering.py --root src --strict`
+  - `python3 tools/repo/generate_module_inventory.py --check`
+  - `python3 tools/docs/check_doc_links.py --root . --strict`
+
 ## Forbidden changes
 
 - No edits to `src/legacy/`.
@@ -157,3 +171,4 @@ python3 tools/repo/generate_module_inventory.py --check
   rather than the CPU frame counter.
 - HARDEN-041 follow-up to relabel the existing `IntrinsicGraphicsUnitTests`
   target so its mock-driven tests no longer carry `gpu`/`vulkan`.
+
