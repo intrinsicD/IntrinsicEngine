@@ -18,6 +18,8 @@ These primitive-owned passes feed later composition/overlay stages. There are no
 - ECS toggle model is presence/absence of typed components (`ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component`).
 - CPU geometry authority is PropertySet-backed (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`).
 - GPU rendering is BDA-driven from shared `GeometryGpuData` buffers.
+- GPU-driven rendering uses one canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
+- Runtime owns CPU scene composition and extraction-side mappings; graphics owns GPU scene buffers and must not store graphics GPU handles in canonical ECS components.
 - Mesh/graph/point-cloud paths are equal peers in lifecycle, upload, and scheduling.
 - Frame construction is recipe-driven: resource allocation/import happens once in `FrameSetup`, then later passes only consume canonical blackboard handles.
 
@@ -72,6 +74,29 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 ## Data Contract (CPU -> GPU)
 
 All renderable buffers are derived from PropertySet spans (`std::span`) and uploaded through lifecycle/sync systems.
+
+The promoted GPU scene is organized around these canonical buffers:
+
+- `RenderableInstance` buffer: one record per renderable instance slot with geometry record reference, material slot, stable entity/pick ID, render-domain flags, visibility/layer flags, selection flags, and draw-bucket participation bits.
+- `Transform` buffer: current and previous world transforms indexed by the same instance slot as `RenderableInstance`.
+- `Bounds/Culling` buffer: local/world-space bounds, culling flags, shadow participation, and visibility metadata indexed by the same instance slot; any compacted visible list is an indirection over instance slots.
+- `Material` buffer: graphics-owned material slots populated from runtime-extracted CPU material descriptions or asset IDs, including fallback material data and texture/bindless references.
+- `Geometry` records: graphics-owned references to uploaded geometry views/buffers, shared by renderable instances through generation-checked handles.
+- `Light` buffer / `LightEnvironmentPacket`: runtime-extracted light descriptions, directional/ambient parameters, and shadow data consumed by lighting and shadow passes.
+- Scene table / descriptor set: the backend binding point that exposes the renderable, transform, bounds/culling, material, geometry, and light buffers to passes.
+
+Runtime owns ECS access, dirty-domain interpretation, deletion events, and sidecar mappings from entities/assets/geometry sources to graphics handles. Graphics owns GPU allocation, generation checks, descriptor binding, and diagnostics for invalid or stale handles.
+
+### Legacy feature coverage classification
+
+The canonical GPU scene covers renderable identity and per-instance state. Legacy-inspired features that need different ownership attach through declared auxiliary resources or remain outside graphics ownership.
+
+- Fits directly in canonical instance slots: retained surface, line, and point renderables; current/previous transforms; local/world bounds; visibility, layer, selection, and shadow flags; material slot references; stable entity/pick/primitive IDs; and draw-bucket participation.
+- Needs auxiliary GPU resources/buffers: per-vertex, per-edge, and per-face attributes; colors, widths, radii, normals, labels, centroid/Voronoi data, point-render-mode data, transient debug primitive streams, Htex/visualization atlases, texture/bindless residency, post-process intermediates/LUTs/readbacks, and shadow/camera packets.
+- Remains CPU/runtime-only: ECS extraction and deletion handling, dirty-domain interpretation, runtime sidecar mappings, selection resolution and CPU hit refinement, camera/input/gizmo mutation, property enumeration/range policy, ImGui draw-data production, and async visualization baking.
+- Belongs to assets/geometry: import/export/model loading, PropertySet/Halfedge/Graph/PointCloud authority, geometry algorithms and spatial structures, and isoline/vector-field/Htex patch generation when they produce source geometry/data.
+
+Graphics may reference asset IDs and geometry GPU views only through snapshots/handles supplied by runtime; it must not import live ECS ownership or store graphics GPU handles in canonical ECS components.
 
 - Vertex-domain data -> positions/normals/aux buffers
 - Edge-domain data -> edge index + optional per-edge aux
