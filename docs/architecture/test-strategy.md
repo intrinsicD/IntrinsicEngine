@@ -33,20 +33,20 @@ Target directory ownership:
 
 All C++ test sources should use:
 
-`Test_<Subsystem>_<Feature>_<Kind>.cpp`
+`Test.<Name>.cpp`
 
 Where:
 
-- `<Subsystem>` is the owning layer or subsystem (for example `Core`, `Geometry`, `Runtime`, `Graphics`).
-- `<Feature>` describes the behavior under test.
-- `<Kind>` is a short category cue (`Unit`, `Contract`, `Integration`, `Gpu`, `Regression`, `Benchmark`).
+- `<Name>` starts with the owning layer or subsystem when that is not already obvious from the directory (for example `Core`, `Geometry`, `Runtime`, `Graphics`, or `RHI`).
+- Additional dot-separated name segments describe the behavior under test.
+- Existing `Test_*.cpp` files are compatibility carryover and should only be renamed by explicit mechanical cleanup tasks that preserve test behavior and CMake ownership.
 
 Examples:
 
-- `Test_Core_LogRingBuffer_Unit.cpp`
-- `Test_Graphics_FrameGraph_Contract.cpp`
-- `Test_Runtime_HeadlessEngine_Integration.cpp`
-- `Test_Geometry_VectorHeat_Regression.cpp`
+- `Test.Core.LogRingBuffer.cpp`
+- `Test.Graphics.FrameGraphContract.cpp`
+- `Test.Runtime.HeadlessEngine.cpp`
+- `Test.Geometry.VectorHeatRegression.cpp`
 
 ## CTest label policy
 

@@ -241,10 +241,10 @@ intrinsic_test_object_lib(GeometryTestObjs
 
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
 set(_asset_unit_test_files
-    Test_Asset_EventBus.cpp
-    Test_Asset_PathIndex.cpp
-    Test_Asset_PayloadStore.cpp
-    Test_Asset_Registry.cpp
+    Test.Asset.EventBus.cpp
+    Test.Asset.PathIndex.cpp
+    Test.Asset.PayloadStore.cpp
+    Test.Asset.Registry.cpp
 )
 intrinsic_resolve_test_sources(_asset_unit_test_sources
     SEARCH_DIRS unit/assets
@@ -257,21 +257,21 @@ intrinsic_test_object_lib(AssetUnitTestObjs
 )
 
 set(_core_wrapper_unit_test_files
-    Test_Core_CallbackRegistry.cpp
-    Test_Core_Config.cpp
-    Test_Core_DagScheduler.cpp
-    Test_Core_ErrorLegacy.cpp
-    Test_Core_Filesystem.cpp
-    Test_Core_GraphCompiler.cpp
-    Test_Core_HandleLease.cpp
-    Test_Core_HashLegacy.cpp
-    Test_Core_LockFreeQueue.cpp
-    Test_Core_Logging.cpp
-    Test_Core_MemoryLegacy.cpp
-    Test_Core_ResourcePool.cpp
-    Test_Core_StrongHandleLegacy.cpp
-    Test_Core_TaskGraphLegacy.cpp
-    Test_Core_TasksLegacy.cpp
+    Test.Core.CallbackRegistry.cpp
+    Test.Core.Config.cpp
+    Test.Core.DagScheduler.cpp
+    Test.Core.ErrorLegacy.cpp
+    Test.Core.Filesystem.cpp
+    Test.Core.GraphCompiler.cpp
+    Test.Core.HandleLease.cpp
+    Test.Core.HashLegacy.cpp
+    Test.Core.LockFreeQueue.cpp
+    Test.Core.Logging.cpp
+    Test.Core.MemoryLegacy.cpp
+    Test.Core.ResourcePool.cpp
+    Test.Core.StrongHandleLegacy.cpp
+    Test.Core.TaskGraphLegacy.cpp
+    Test.Core.TasksLegacy.cpp
 )
 intrinsic_resolve_test_sources(_core_wrapper_unit_test_sources
     SEARCH_DIRS unit/core
@@ -314,10 +314,10 @@ if(INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
 endif()
 
 set(_graphics_unit_test_files
-    Test_RHI_BufferManager.cpp
-    Test_RHI_PipelineManager.cpp
-    Test_RHI_SamplerManager.cpp
-    Test_RHI_TextureManager.cpp
+    Test.RHI.BufferManager.cpp
+    Test.RHI.PipelineManager.cpp
+    Test.RHI.SamplerManager.cpp
+    Test.RHI.TextureManager.cpp
 )
 intrinsic_resolve_test_sources(_graphics_unit_test_sources
     SEARCH_DIRS unit/graphics
@@ -348,9 +348,9 @@ intrinsic_test_object_lib(GraphicsAssetsUnitTestObjs
 )
 
 set(_graphics_contract_test_files
-    Test_MinimalTriangleAcceptance.cpp
+    Test.MinimalTriangleAcceptance.cpp
     Test.RHI.CommandContextBarriers.cpp
-    Test_RendererRhiBoundary.cpp
+    Test.RendererRhiBoundary.cpp
 )
 intrinsic_resolve_test_sources(_graphics_contract_test_sources
     SEARCH_DIRS contract/graphics
@@ -460,18 +460,18 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     )
 
     set(_runtime_integration_test_files
-        Test_AssetLoadPipeline.cpp
-        Test_AssetService.cpp
-        Test_CoreFrameGraphParallel.cpp
-        Test_CoreGraphInterfaces.cpp
-        Test_CoreGraphStress.cpp
-        Test_CoreProcess.cpp
+        Test.AssetLoadPipeline.cpp
+        Test.AssetService.cpp
+        Test.CoreFrameGraphParallel.cpp
+        Test.CoreGraphInterfaces.cpp
+        Test.CoreGraphStress.cpp
+        Test.CoreProcess.cpp
         Test.RuntimeFrameLoopContract.cpp
-        Test_RuntimeEngineLayering.cpp
-        Test_RuntimeStreamingExecutor.cpp
-        Test_GpuWorldAndCulling.cpp
-        Test_RenderGraphLegacy.cpp
-        Test_RendererLegacy.cpp
+        Test.RuntimeEngineLayering.cpp
+        Test.RuntimeStreamingExecutor.cpp
+        Test.GpuWorldAndCulling.cpp
+        Test.RenderGraphLegacy.cpp
+        Test.RendererLegacy.cpp
     )
     intrinsic_resolve_test_sources(_runtime_integration_test_sources
         SEARCH_DIRS integration/runtime contract/runtime integration/graphics
