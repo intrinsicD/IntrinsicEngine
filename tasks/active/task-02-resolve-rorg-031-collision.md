@@ -1,9 +1,11 @@
 # Task 2 — Resolve RORG-031 collision and stale RORG-031B seed
 
-- Status: planned (queued for Codex)
-- Owner: TBD
-- Branch / PR: TBD
+- Status: in-progress
+- Owner: Claude (claude/next-active-task-CaTBY)
+- Branch / PR: `claude/next-active-task-CaTBY`
 - Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` after renames and link updates.
+
+The architecture seed has been renamed to `tasks/backlog/architecture/RORG-031A-architecture-foundation.md` and the rendering seed has been retired to `tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md` with completion metadata. GRAPHICS-001 now records RORG-031B as a superseded historical seed. Both validators pass without new findings; pre-existing findings in the `tasks/active/` queue files remain tracked by Task 3.
 
 ---
 
