@@ -20,6 +20,7 @@
 ## Tests
 - Add non-legacy contract tests for packet defaults, immutability expectations, stable IDs, optional feature flags, and invalid-data handling.
 - Ensure tests do not import legacy modules.
+- Label CPU contract tests `contract;graphics` so they run in the default CPU gate.
 ## Docs
 - Update `docs/architecture/rendering-three-pass.md` and `docs/architecture/graphics.md` when the contract changes.
 ## Acceptance criteria
@@ -29,6 +30,7 @@
 - Contract tests document expected defaults and invalid states.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

@@ -16,6 +16,7 @@
 ## Tests
 - Add contract tests for default pass order, optional-resource gating, imported backbuffer policy, and missing-resource diagnostics.
 - Use null/mock backend seams for CPU-supported tests.
+- Label CPU contract tests `contract;graphics` so they run in the default CPU gate.
 ## Docs
 - Update the frame recipe and pass table in `docs/architecture/rendering-three-pass.md`.
 ## Acceptance criteria
@@ -24,6 +25,7 @@
 - Backbuffer writes are restricted to the present/finalization step.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

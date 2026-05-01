@@ -15,6 +15,7 @@
 ## Tests
 - Add unit tests for deterministic packet generation from minimal BVH/bounds/KD-tree/octree/convex-hull fixtures.
 - Add clamp/limit tests for large or invalid debug visualizations.
+- Label spatial debug visualizer unit tests `unit;graphics` so they run in the default CPU gate.
 ## Docs
 - Document supported spatial debug visualization inputs and graphics-layer ownership boundaries.
 ## Acceptance criteria
@@ -23,6 +24,7 @@
 - Ownership remains compatible with graphics layer rules.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```

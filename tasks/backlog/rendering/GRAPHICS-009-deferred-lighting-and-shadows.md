@@ -17,6 +17,7 @@
 ## Tests
 - Add contract tests for light defaults, cascade packet defaults, atlas sizing, shadow bucket use, and fullscreen lighting dispatch/draw behavior.
 - Add optional GPU/Vulkan smoke tests only behind appropriate labels.
+- Label CPU contract tests `contract;graphics` for the default CPU gate; label optional shadow/lighting smoke tests `gpu;vulkan` so they stay opt-in.
 ## Docs
 - Update lighting, shadow, and deferred composition sections in `docs/architecture/rendering-three-pass.md`.
 ## Acceptance criteria
@@ -26,8 +27,11 @@
 - Disabled shadows avoid unnecessary resources and commands.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# Optional when hardware/driver support is available:
+ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.

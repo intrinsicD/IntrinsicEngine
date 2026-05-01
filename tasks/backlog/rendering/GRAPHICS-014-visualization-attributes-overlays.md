@@ -16,6 +16,7 @@
 - Add diagnostics for missing attributes, mismatched domains, invalid ranges, and unsupported colormap IDs.
 ## Tests
 - Add unit/integration tests for scalar/color BDA config, colormap selection, isoline defaults, vector-field packets, and overlay split from geometry ownership.
+- Label graphics-only unit tests `unit;graphics` and runtime/overlay handoff tests `integration;runtime;graphics` so both run in the default CPU gate.
 ## Docs
 - Update visualization sections in rendering architecture docs and the non-legacy parity matrix.
 ## Acceptance criteria
@@ -24,6 +25,7 @@
 - Overlay data does not require live ECS ownership in graphics.
 ## Verification
 ```bash
+cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
