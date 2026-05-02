@@ -1,6 +1,6 @@
 # Task 6 — Cross-link GRAPHICS-016 from runtime backlog
 
-- Status: in-progress
+- Status: completed
 - Owner: Claude (claude/next-active-task-NtmGp)
 - Branch / PR: `claude/next-active-task-NtmGp`
 - Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` and `python3 tools/agents/check_task_policy.py --root . --strict` after adding the runtime cross-link (both pass; 0 findings, 145 relative links resolved).

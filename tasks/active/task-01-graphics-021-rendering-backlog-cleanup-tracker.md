@@ -1,6 +1,6 @@
 # Task 1 — Create rendering backlog cleanup tracker
 
-- Status: in-progress
+- Status: completed
 - Owner: Claude (claude/next-active-task-yNINC)
 - Branch / PR: `claude/next-active-task-yNINC`
 - Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` after creating `GRAPHICS-021`.

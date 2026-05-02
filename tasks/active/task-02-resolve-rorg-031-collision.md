@@ -1,6 +1,6 @@
 # Task 2 — Resolve RORG-031 collision and stale RORG-031B seed
 
-- Status: in-progress
+- Status: completed
 - Owner: Claude (claude/next-active-task-CaTBY)
 - Branch / PR: `claude/next-active-task-CaTBY`
 - Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` after renames and link updates.

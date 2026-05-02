@@ -1,6 +1,6 @@
 # Task 3 — Fix task validator to match documented task format
 
-- Status: in-progress
+- Status: completed
 - Owner: Claude (claude/next-active-task-PMyma)
 - Branch / PR: `claude/next-active-task-PMyma`
 - Next verification step: `python3 tools/agents/validate_tasks.py --root tasks --strict` (passes; 46 files validated, 0 findings).

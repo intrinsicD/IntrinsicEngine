@@ -1,9 +1,9 @@
 # Task 11 — Add missing task: shader/material/texture hot reload
 
-- Status: planned (queued for Codex)
-- Owner: TBD
-- Branch / PR: TBD
-- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` after creating GRAPHICS-023.
+- Status: completed (2026-05-02)
+- Owner: Codex (current branch)
+- Branch / PR: current branch / TBD
+- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict`.
 
 ---
 

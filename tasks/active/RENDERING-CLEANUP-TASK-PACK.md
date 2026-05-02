@@ -4,8 +4,9 @@ This index lists the queued task pack for Codex. Hand the tasks to Codex one at 
 
 ## Status
 
-- All entries are `planned` (queued). No task is yet `in-progress` or assigned to an owner.
-- This pack lives under `tasks/active/` so reviewers and agents can see the queue. Tasks describe work to perform on `tasks/backlog/` and source files; they do not themselves modify renderer behavior.
+- Tasks 1–13 are completed as cleanup/governance work. Task 8 was reviewed on 2026-05-02 and corrected to keep the C++ source changes out of the docs-only naming reconciliation scope.
+- Task 14 remains the next implementation gate before downstream rendering pass implementation work.
+- This pack lives under `tasks/active/` so reviewers and agents can see the queue. Tasks describe work to perform on `tasks/backlog/` and source files; they do not themselves modify renderer behavior except for the explicitly gated Task 14 boundary cleanup.
 - Authoritative process docs: `AGENTS.md`, `docs/agent/contract.md`, `docs/agent/task-format.md`, `docs/agent/review-checklist.md`.
 
 ## Recommended execution order
