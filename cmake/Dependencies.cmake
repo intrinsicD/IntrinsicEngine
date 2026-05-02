@@ -7,12 +7,20 @@ get_filename_component(ROOT_DIR ${CMAKE_SOURCE_DIR} ABSOLUTE)
 # IMPORTANT: FetchContent only honors FETCHCONTENT_BASE_DIR when it's a CACHE variable.
 # If it's a normal variable, CMake will default to <build>/_deps and <name>_SOURCE_DIR
 # can end up unset/empty in some policy/config combinations.
+if(NOT DEFINED INTRINSIC_DEPS_CACHE_DIR OR "${INTRINSIC_DEPS_CACHE_DIR}" STREQUAL "")
+    set(INTRINSIC_DEPS_CACHE_DIR "${ROOT_DIR}/external/cache" CACHE PATH
+        "Shared FetchContent dependency cache directory used by all build trees" FORCE)
+endif()
+
 if(NOT DEFINED FETCHCONTENT_BASE_DIR OR "${FETCHCONTENT_BASE_DIR}" STREQUAL "")
-    set(FETCHCONTENT_BASE_DIR "${ROOT_DIR}/external/cache" CACHE PATH "FetchContent base directory" FORCE)
+    set(FETCHCONTENT_BASE_DIR "${INTRINSIC_DEPS_CACHE_DIR}" CACHE PATH "FetchContent base directory" FORCE)
 else()
     # Re-export it as a cache variable to ensure FetchContent honors it.
     set(FETCHCONTENT_BASE_DIR "${FETCHCONTENT_BASE_DIR}" CACHE PATH "FetchContent base directory" FORCE)
+    set(INTRINSIC_DEPS_CACHE_DIR "${FETCHCONTENT_BASE_DIR}" CACHE PATH
+        "Shared FetchContent dependency cache directory used by all build trees" FORCE)
 endif()
+file(MAKE_DIRECTORY "${FETCHCONTENT_BASE_DIR}/.locks")
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -36,7 +44,20 @@ endif()
 if(INTRINSIC_OFFLINE_DEPS)
     set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "Disable all FetchContent network updates" FORCE)
     message(STATUS "INTRINSIC_OFFLINE_DEPS=ON: using only local dependency sources")
+elseif(NOT INTRINSIC_UPDATE_DEPS)
+    set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL
+        "Skip network update checks for already-populated FetchContent sources" FORCE)
 endif()
+
+function(intrinsic_lock_dependency dep_name)
+    set(lock_path "${FETCHCONTENT_BASE_DIR}/.locks/${dep_name}.lock")
+    file(LOCK "${lock_path}" GUARD FUNCTION TIMEOUT 600 RESULT_VARIABLE lock_result)
+    if(NOT lock_result STREQUAL "0")
+        message(FATAL_ERROR
+            "Timed out waiting for dependency cache lock: ${lock_path}\n"
+            "Another configure may be populating '${dep_name}'. Stop stale CMake/Ninja/Git processes or remove the lock after verifying no configure is running.")
+    endif()
+endfunction()
 
 function(intrinsic_require_offline_source dep_name)
     string(TOUPPER "${dep_name}" dep_name_upper)
@@ -70,10 +91,26 @@ function(intrinsic_require_offline_source dep_name)
 endfunction()
 
 function(intrinsic_make_available dep_name)
+    intrinsic_lock_dependency(${dep_name})
     if(INTRINSIC_OFFLINE_DEPS)
         intrinsic_require_offline_source(${dep_name})
     endif()
     FetchContent_MakeAvailable(${dep_name})
+endfunction()
+
+function(intrinsic_populate_source dep_name)
+    intrinsic_lock_dependency(${dep_name})
+    if(INTRINSIC_OFFLINE_DEPS)
+        intrinsic_require_offline_source(${dep_name})
+    endif()
+    FetchContent_GetProperties(${dep_name})
+    if(NOT ${dep_name}_POPULATED)
+        FetchContent_Populate(${dep_name})
+    endif()
+    FetchContent_GetProperties(${dep_name})
+    set(${dep_name}_SOURCE_DIR "${${dep_name}_SOURCE_DIR}" PARENT_SCOPE)
+    set(${dep_name}_BINARY_DIR "${${dep_name}_BINARY_DIR}" PARENT_SCOPE)
+    set(${dep_name}_POPULATED "${${dep_name}_POPULATED}" PARENT_SCOPE)
 endfunction()
 
 # --- GLM ---
@@ -180,6 +217,8 @@ FetchContent_Declare(
         draco
         GIT_REPOSITORY https://github.com/google/draco.git
         GIT_TAG 1.5.7
+        GIT_SUBMODULES ""
+        GIT_SUBMODULES_RECURSE FALSE
 )
 intrinsic_make_available(draco)
 
@@ -212,9 +251,7 @@ FetchContent_Declare(
 # ImGui is not a first-class CMake project; depending on CMake policies/version,
 # FetchContent_MakeAvailable(imgui) may not leave us with a reliable imgui_SOURCE_DIR.
 # We therefore ensure the content is populated and then resolve the source path.
-if(NOT imgui_POPULATED)
-    FetchContent_Populate(imgui)
-endif()
+intrinsic_populate_source(imgui)
 
 if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     FetchContent_Declare(
