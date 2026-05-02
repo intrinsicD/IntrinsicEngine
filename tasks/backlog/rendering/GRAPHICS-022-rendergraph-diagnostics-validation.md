@@ -1,52 +1,45 @@
 # GRAPHICS-022 — Rendergraph diagnostics and validation
 
 ## Goal
-- Implement and verify a deterministic, testable diagnostics surface for rendergraph validation so invalid frame-graph state fails early without Vulkan dependencies.
+Define and implement a deterministic, CPU-testable rendergraph diagnostics surface that validates pass/resource correctness before Vulkan execution.
 
 ## Non-goals
-- No new rendering features or pass shading behavior.
-- No Vulkan-only validation paths that block CPU/null test coverage.
-- No runtime/ECS ownership expansion into promoted graphics layers.
-- No framegraph scheduler redesign beyond diagnostics requirements.
+- No new rendering features, shading models, or pass visuals.
+- No Vulkan-only validation path as the sole correctness mechanism.
+- No replacement of existing framegraph ownership boundaries between runtime and graphics.
 
 ## Context
-- Owner: `src/graphics/framegraph/` and `src/graphics/renderer/` validation surfaces consumed by runtime wiring.
-- This task fills a missing task home identified by `GRAPHICS-021` and should be treated as rendering infrastructure hardening, not feature delivery.
-- Diagnostics must remain deterministic and unit-testable to support CI without GPU availability.
-- Architecture contract reminders: promoted graphics consumes snapshots/views and must not depend on live ECS ownership.
+The rendering architecture expects explicit graph validation and inspectable diagnostics, but there is no single backlog task that owns this scope. A dedicated task is needed so agents can implement validation behavior (missing producers, illegal writes, load/store correctness) with deterministic outputs that run in the default CPU gate.
 
 ## Required changes
 - Add rendergraph introspection coverage for:
-  - pass submission order;
-  - resource producers and consumers;
-  - attachment metadata;
-  - imported versus transient resource status;
-  - first and last read/write pass indices.
-- Add a structured validation result object that reports:
-  - severity (`error`/`warning`);
-  - missing-producer errors;
-  - transient resource without producer errors;
-  - `LOAD` without guaranteed earlier writer warning/error according to policy;
-  - unauthorized imported-resource write diagnostics.
-- Enforce imported backbuffer write policy in validation:
-  - imported `Backbuffer` may only be written by present/finalization stages.
-- Ensure debug dump output used by tests is stable and deterministic.
+  - pass order,
+  - resource producers/consumers,
+  - attachment metadata,
+  - imported vs transient resource status,
+  - first/last read and write pass indices.
+- Define a structured validation result object with severity and stable diagnostics for:
+  - missing producer errors,
+  - transient resource without producer errors,
+  - `LOAD` without guaranteed earlier writer warning/error according to policy,
+  - unauthorized imported resource writes.
+- Enforce or explicitly diagnose imported backbuffer write policy:
+  - only present/finalization may write imported `Backbuffer`.
+- Ensure debug dump/diagnostic output has deterministic formatting suitable for tests.
 
 ## Tests
-- Add `contract;graphics` tests for validation diagnostics and policy failures.
+- Add `contract;graphics` tests for rendergraph validation diagnostics behavior.
 - Add `unit;graphics` tests for deterministic debug dump formatting where applicable.
-- Ensure tests are runnable without Vulkan.
+- Keep tests CPU-capable; Vulkan/GPU execution must remain optional, not required.
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` validation/audit section with the diagnostics contract.
-- Update `src/graphics/renderer/README.md` if public rendergraph diagnostics APIs or ownership notes change.
-- Cross-link this task from `GRAPHICS-001`/rendering backlog index material when adding implementation references.
+- Update `docs/architecture/rendering-three-pass.md` validation/audit section to reflect diagnostics ownership and behavior.
+- Update `src/graphics/renderer/README.md` if public diagnostics APIs or contracts change.
 
 ## Acceptance criteria
-- Rendergraph diagnostics are testable in CPU/null environments without Vulkan.
-- Invalid graph states fail deterministically with structured diagnostics.
-- Imported backbuffer write policy is enforced by validation or explicitly surfaced in diagnostics.
-- Debug dump formatting used by tests is deterministic.
+- Rendergraph diagnostics are executable and testable in the default CPU gate.
+- Invalid graphs fail deterministically with structured diagnostics.
+- Imported backbuffer write policy is enforced or represented explicitly in diagnostics.
 
 ## Verification
 ```bash
@@ -56,7 +49,6 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 ```
 
 ## Forbidden changes
-- No renderer feature implementation.
-- No shader changes.
-- No Vulkan-only mandatory test coverage.
-- No unrelated backlog rewrites outside task cross-link updates.
+- No renderer feature implementation unrelated to diagnostics/validation.
+- No Vulkan-only mandatory tests.
+- No shader/pass behavior changes for visual output.
