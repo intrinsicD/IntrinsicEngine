@@ -101,6 +101,11 @@ and renderer/render-graph orchestration.
   graphics. The renderer copies snapshot records into frame-local storage before
   `ExtractRenderWorld()`/`PrepareFrame()` consume them; it does not retain ECS
   registry references.
+- `RenderWorld` exposes immutable spans of renderer-owned `RenderableSnapshot`
+  and `LightSnapshot` values, defaulted optional packets for picking,
+  selection, shadows, debug primitives, postprocess/readback, and invalid-record
+  diagnostics. These records are valid for the frame and never reference live
+  ECS storage.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.

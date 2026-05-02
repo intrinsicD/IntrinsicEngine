@@ -30,7 +30,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   completed first implementation gate for runtime-owned extraction and graphics
   snapshot handoff. Downstream graphics pass work can proceed through
   GRAPHICS-002+ without introducing live ECS ownership into graphics.
-- [GRAPHICS-002 — Render-world / frame-input snapshot contract](GRAPHICS-002-render-world-contract.md):
+- [GRAPHICS-002 — Render-world / frame-input snapshot contract](../../active/GRAPHICS-002-render-world-contract.md):
   depends on GRAPHICS-016, or must explicitly avoid touching runtime
   extraction.
 - [GRAPHICS-003 — Frame recipe and default pipeline](GRAPHICS-003-frame-recipe-pipeline.md):

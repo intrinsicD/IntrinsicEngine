@@ -76,6 +76,27 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 
 All renderable buffers are derived from PropertySet spans (`std::span`) and uploaded through lifecycle/sync systems.
 
+`RenderWorld` is the frame-local immutable snapshot consumed by renderer passes.
+Runtime submits extraction packets through `IRenderer::SubmitRuntimeSnapshots()`;
+the renderer copies them into renderer-owned frame storage and exposes read-only
+spans from `RenderWorld`:
+
+- `RenderableSnapshot`: stable renderable ID, canonical `GpuInstanceHandle`,
+  current model matrix, bounds/culling data, render flags, and resolved material
+  slot metadata.
+- `LightSnapshot`: typed directional/point/spot light values extracted by
+  runtime.
+- `PickRequestSnapshot`, `SelectionSnapshot`, `ShadowSnapshot`,
+  `DebugPrimitiveSnapshot`, and `PostProcessSnapshot`: optional frame-feature
+  packets with explicit default states. Runtime/pass tasks populate these as
+  GRAPHICS-012, GRAPHICS-009, GRAPHICS-010/011/014, and GRAPHICS-013A/B/C land.
+- `InvalidSnapshotRecordCount`: deterministic diagnostics for malformed runtime
+  records dropped while building the immutable snapshot.
+
+These spans never reference live ECS storage. Runtime-owned pointer sidecars used
+by the current visualization sync seam remain a GRAPHICS-002 follow-up question
+before pass contracts depend on them directly.
+
 The promoted GPU scene is organized around these canonical buffers:
 
 - `RenderableInstance` buffer: one record per renderable instance slot with geometry record reference, material slot, stable entity/pick ID, render-domain flags, visibility/layer flags, selection flags, and draw-bucket participation bits.

@@ -363,6 +363,19 @@ intrinsic_test_object_lib(GraphicsContractTestObjs
     DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
+set(_graphics_contract_cpu_test_files
+    Test.RenderWorldContract.cpp
+)
+intrinsic_resolve_test_sources(_graphics_contract_cpu_test_sources
+    SEARCH_DIRS contract/graphics
+    FILES ${_graphics_contract_cpu_test_files}
+)
+intrinsic_test_object_lib(GraphicsContractCpuTestObjs
+    SOURCES
+        ${_graphics_contract_cpu_test_sources}
+    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
+)
+
 set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
 )
@@ -612,6 +625,12 @@ intrinsic_test_executable(IntrinsicGraphicsContractTests
     OBJECTS GraphicsContractTestObjs
     LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
     LABELS contract graphics gpu vulkan
+)
+
+intrinsic_test_executable(IntrinsicGraphicsContractCpuTests
+    OBJECTS GraphicsContractCpuTestObjs
+    LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+    LABELS contract graphics
 )
 
 intrinsic_test_executable(IntrinsicRuntimeGraphicsCpuTests

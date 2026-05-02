@@ -309,6 +309,7 @@ namespace Extrinsic::Runtime
             });
 
             m_Transforms.push_back(Graphics::TransformSyncRecord{
+                .StableId = stableId,
                 .Instance = sidecar->Instance,
                 .Model = world.Matrix,
                 .RenderFlags = BuildRenderFlags(registry, entity),
@@ -350,4 +351,5 @@ namespace Extrinsic::Runtime
         m_LastStats = stats;
     }
 }
+
 

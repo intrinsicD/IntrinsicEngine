@@ -209,6 +209,8 @@ namespace Extrinsic::Graphics
             m_VisualizationSyncRecords.clear();
             m_TransformSyncRecords.clear();
             m_LightSnapshots.clear();
+            m_RenderableSnapshots.clear();
+            m_InvalidSnapshotRecordCount = 0;
             m_HasExtractedRenderWorld = false;
             m_HasPreparedFrame = false;
             return true;
@@ -219,6 +221,28 @@ namespace Extrinsic::Graphics
             m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());
             m_LightSnapshots.assign(snapshots.Lights.begin(), snapshots.Lights.end());
             m_VisualizationSyncRecords.assign(snapshots.Visualizations.begin(), snapshots.Visualizations.end());
+
+            m_RenderableSnapshots.clear();
+            m_RenderableSnapshots.reserve(m_TransformSyncRecords.size());
+            m_InvalidSnapshotRecordCount = 0;
+            for (const TransformSyncRecord& record : m_TransformSyncRecords)
+            {
+                if (!record.Instance.IsValid())
+                {
+                    ++m_InvalidSnapshotRecordCount;
+                    continue;
+                }
+
+                m_RenderableSnapshots.push_back(RenderableSnapshot{
+                    .StableId = record.StableId,
+                    .Instance = record.Instance,
+                    .Model = record.Model,
+                    .Bounds = record.Bounds,
+                    .RenderFlags = record.RenderFlags,
+                    .MaterialSlot = record.MaterialSlot,
+                    .HasMaterialSlot = record.HasMaterialSlot,
+                });
+            }
         }
 
         RenderWorld ExtractRenderWorld(const RenderFrameInput& input) override
@@ -230,6 +254,18 @@ namespace Extrinsic::Graphics
                 .Alpha          = input.Alpha,
                 .HasPendingPick = input.HasPendingPick,
                 .DebugOverlayEnabled = input.DebugOverlayEnabled,
+                .Renderables = m_RenderableSnapshots,
+                .Lights = m_LightSnapshots,
+                .PickRequest = PickRequestSnapshot{
+                    .Pending = input.HasPendingPick,
+                },
+                .DebugPrimitives = DebugPrimitiveSnapshot{
+                    .HasTransientDebug = input.DebugOverlayEnabled,
+                },
+                .PostProcess = PostProcessSnapshot{
+                    .Enabled = input.DebugOverlayEnabled,
+                },
+                .InvalidSnapshotRecordCount = m_InvalidSnapshotRecordCount,
             };
         }
 
@@ -741,6 +777,8 @@ namespace Extrinsic::Graphics
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<TransformSyncRecord>     m_TransformSyncRecords;
         std::vector<LightSnapshot>           m_LightSnapshots;
+        std::vector<RenderableSnapshot>      m_RenderableSnapshots;
+        std::uint32_t                        m_InvalidSnapshotRecordCount{0};
         bool                                 m_EnableRenderPrepTaskGraph{true};
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};

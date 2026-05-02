@@ -10,6 +10,13 @@
 - Owner: `src/graphics/renderer`.
 - `docs/architecture/rendering-three-pass.md` requires graphics to consume snapshots/views and canonical frame resources.
 - Legacy render systems expose useful behavior for drawables, lights, picking, debug, and selection, but the promoted contract must be independent and typed.
+## Implementation note (2026-05-03)
+- `RenderWorld` now exposes immutable renderer-owned spans for `RenderableSnapshot` and `LightSnapshot` plus `InvalidSnapshotRecordCount` diagnostics.
+- `RenderableSnapshot` captures stable renderable ID, canonical `GpuInstanceHandle`, model matrix, bounds, render flags, and material slot metadata.
+- `PickRequestSnapshot`, `SelectionSnapshot`, `ShadowSnapshot`, `DebugPrimitiveSnapshot`, and `PostProcessSnapshot` provide defaulted optional frame-feature packets for downstream pass tasks to populate.
+- `NullRenderer::SubmitRuntimeSnapshots()` copies runtime-submitted transform/light packets into renderer-owned frame storage and filters invalid transform records before `ExtractRenderWorld()` exposes spans.
+- `TransformSyncRecord` now carries `StableId` so render-world snapshots can preserve runtime identity without importing ECS.
+- Follow-up packet expansion remains for selection/picking, debug primitives, shadows, postprocess/readback, and value-only visualization packets.
 ## Required changes
 - Define stable packets for surface, line, point, debug, light, shadow, selection, pick-request, visualization-atlas, auxiliary-attribute, post-process/readback, and runtime-only handoff data.
 - Define canonical renderable-instance records that reference geometry records, transform slots, bounds/culling records, material slots, entity/pick IDs, render flags, visibility/layer flags, and dirty-domain metadata.
@@ -18,9 +25,9 @@
 - Preserve explicit ownership and default states for optional frame features.
 - Add failure/diagnostic fields for invalid or unsupported snapshot data.
 ## Tests
-- Add non-legacy contract tests for packet defaults, immutability expectations, stable IDs, optional feature flags, and invalid-data handling.
-- Ensure tests do not import legacy modules.
-- Label CPU contract tests `contract;graphics` so they run in the default CPU gate.
+- Added non-legacy contract tests for immutable render-world spans, stable IDs, optional feature flags, frame clearing, and invalid-record diagnostics.
+- Ensured tests do not import legacy modules.
+- Labeled CPU contract tests `contract;graphics` through `IntrinsicGraphicsContractCpuTests` so they run in the default CPU gate.
 ## Docs
 - Update `docs/architecture/rendering-three-pass.md` and `docs/architecture/graphics.md` when the contract changes.
 ## Clarification questions from GRAPHICS-016

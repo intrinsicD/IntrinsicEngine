@@ -20,6 +20,11 @@ Graphics is organized into explicit sublayers:
 
 - Runtime composes the CPU render scene from ECS, assets, geometry, transforms, materials, lights, selection, camera, and debug inputs.
 - Graphics receives immutable `RenderWorld` / `RenderFrameInput` snapshots plus runtime-submitted transform/light/visualization record batches and uploads them into graphics-owned GPU scene buffers.
+- `RenderWorld` currently exposes renderer-owned spans of `RenderableSnapshot`
+  and `LightSnapshot` values, defaulted optional packets for picking,
+  selection, shadows, debug primitives, postprocess/readback, and invalid-record
+  diagnostics. Runtime-submitted batches are copied by the renderer before
+  these spans are exposed, so no live ECS storage is retained by graphics.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - Heavy CPU scene data lives in the owning subsystem or runtime extraction pools; canonical ECS components keep source data/IDs, not graphics backend resources.
 

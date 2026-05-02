@@ -19,6 +19,7 @@ export namespace Extrinsic::Graphics
 {
     struct TransformSyncRecord
     {
+        std::uint32_t     StableId{0u};
         GpuInstanceHandle Instance{};
         glm::mat4         Model{1.f};
         std::uint32_t     RenderFlags{RHI::GpuRender_Visible | RHI::GpuRender_Opaque};
