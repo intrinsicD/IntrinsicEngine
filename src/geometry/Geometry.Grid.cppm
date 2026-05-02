@@ -98,7 +98,18 @@ export namespace Geometry::Grid
             return NX > 0 && NY > 0 && NZ > 0;
         }
 
-        auto operator<=>(const GridDimensions&) const = default;
+        [[nodiscard]] bool operator==(const GridDimensions& other) const noexcept
+        {
+            return NX == other.NX
+                && NY == other.NY
+                && NZ == other.NZ
+                && Origin.x == other.Origin.x
+                && Origin.y == other.Origin.y
+                && Origin.z == other.Origin.z
+                && Spacing.x == other.Spacing.x
+                && Spacing.y == other.Spacing.y
+                && Spacing.z == other.Spacing.z;
+        }
     };
 
     // =========================================================================
