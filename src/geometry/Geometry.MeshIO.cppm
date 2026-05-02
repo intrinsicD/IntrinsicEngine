@@ -1,6 +1,7 @@
 module;
 
 #include <string_view>
+#include <string>
 
 export module Geometry.MeshIO;
 
@@ -16,8 +17,8 @@ export namespace Geometry::MeshIO
         PropertySet Edges{};
         PropertySet Faces{};
 
-        std::string_view SourcePath;       // Original file path (for error messages)
-        std::string_view BasePath;         // Directory containing the file (for relative refs)
+        std::string SourcePath;            // Original file path (for error messages)
+        std::string BasePath;              // Directory containing the file (for relative refs)
     };
 
     Core::Expected<MeshIOResult> LoadOBJ(std::string_view absolute_path);

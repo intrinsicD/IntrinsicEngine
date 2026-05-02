@@ -6,122 +6,128 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Geometry.cppm
         Geometry.AABB.cppm
-        Geometry.OBB.cppm
-        Geometry.Sphere.cppm
-        Geometry.SphereSampling.cppm
+        Geometry.AdaptiveRemeshing.cppm
+        Geometry.Boolean.cppm
+        Geometry.BVH.cppm
         Geometry.Capsule.cppm
-        Geometry.Cylinder.cppm
-        Geometry.Ellipsoid.cppm
-        Geometry.PCA.cppm
-        Geometry.Segment.cppm
-        Geometry.Triangle.cppm
-        Geometry.Plane.cppm
-        Geometry.ConvexHull.cppm
-        Geometry.Frustum.cppm
-        Geometry.Ray.cppm
+        Geometry.CatmullClark.cppm
+        Geometry.Circulators.cppm
         Geometry.ContactManifold.cppm
         Geometry.Containment.cppm
-        Geometry.GJK.cppm
-        Geometry.EPA.cppm
-        Geometry.Handle.cppm
-        Geometry.Overlap.cppm
-        Geometry.Primitives.cppm
-        Geometry.Support.cppm
-        Geometry.SDF.cppm
-        Geometry.SDFContact.cppm
-        Geometry.Validation.cppm
-        Geometry.Properties.cppm
-        Geometry.Circulators.cppm
-        Geometry.MeshUtils.cppm
-        Geometry.SpatialQueries.cppm
-        Geometry.Octree.cppm
-        Geometry.KDTree.cppm
-        Geometry.BVH.cppm
-        Geometry.Raycast.cppm
-        Geometry.HalfedgeMesh.cppm
-        Geometry.HtexPatch.cppm
-        Geometry.MeshBuilder.cppm
-        Geometry.MeshOperator.cppm
-        Geometry.GraphUtils.cppm
-        Geometry.Graph.cppm
-        Geometry.DEC.cppm
-        Geometry.Curvature.cppm
-        Geometry.Smoothing.cppm
-        Geometry.Simplification.cppm
-        Geometry.Subdivision.cppm
-        Geometry.LinearSolver.cppm
-        Geometry.Remeshing.cppm
-        Geometry.Geodesic.cppm
-        Geometry.CatmullClark.cppm
-        Geometry.NormalEstimation.cppm
-        Geometry.MeshRepair.cppm
-        Geometry.Grid.cppm
-        Geometry.MarchingCubes.cppm
-        Geometry.MeshBoundary.cppm
-        Geometry.ImplicitPlaneField.cppm
-        Geometry.SurfaceReconstruction.cppm
-        Geometry.Parameterization.cppm
-        Geometry.MeshQuality.cppm
-        Geometry.MeshAnalysis.cppm
-        Geometry.AdaptiveRemeshing.cppm
+        Geometry.ConvexHull.cppm
         Geometry.ConvexHullBuilder.cppm
+        Geometry.Curvature.cppm
+        Geometry.Cylinder.cppm
+        Geometry.DEC.cppm
+        Geometry.Ellipsoid.cppm
+        Geometry.EPA.cppm
+        Geometry.Frustum.cppm
+        Geometry.Geodesic.cppm
+        Geometry.GJK.cppm
+        Geometry.Graph.cppm
+        Geometry.GraphIO.cppm
+        Geometry.GraphUtils.cppm
+        Geometry.Grid.cppm
+        Geometry.HalfedgeMesh.cppm
+        Geometry.Handle.cppm
+        Geometry.HtexPatch.cppm
+        Geometry.ImplicitPlaneField.cppm
+        Geometry.KDTree.cppm
         Geometry.KMeans.cppm
-        Geometry.PointCloudUtils.cppm
+        Geometry.LinearSolver.cppm
+        Geometry.MarchingCubes.cppm
+        Geometry.MeshAnalysis.cppm
+        Geometry.MeshBoundary.cppm
+        Geometry.MeshBuilder.cppm
+        Geometry.MeshIO.cppm
+        Geometry.MeshOperator.cppm
+        Geometry.MeshQuality.cppm
+        Geometry.MeshRepair.cppm
+        Geometry.MeshUtils.cppm
+        Geometry.NormalEstimation.cppm
+        Geometry.OBB.cppm
+        Geometry.Octree.cppm
+        Geometry.Overlap.cppm
+        Geometry.Parameterization.cppm
+        Geometry.PCA.cppm
+        Geometry.Plane.cppm
         Geometry.PointCloud.cppm
-        Geometry.Boolean.cppm
+        Geometry.PointCloudIO.cppm
+        Geometry.PointCloudUtils.cppm
+        Geometry.Primitives.cppm
+        Geometry.Properties.cppm
         Geometry.Quadric.cppm
         Geometry.Queries.cppm
-        Geometry.ShortestPath.cppm
-        Geometry.VectorHeatMethod.cppm
+        Geometry.Ray.cppm
+        Geometry.Raycast.cppm
         Geometry.Registration.cppm
+        Geometry.Remeshing.cppm
+        Geometry.SDF.cppm
+        Geometry.SDFContact.cppm
+        Geometry.Segment.cppm
+        Geometry.ShortestPath.cppm
+        Geometry.Simplification.cppm
+        Geometry.Smoothing.cppm
+        Geometry.SpatialQueries.cppm
+        Geometry.Sphere.cppm
+        Geometry.SphereSampling.cppm
+        Geometry.Subdivision.cppm
+        Geometry.Support.cppm
+        Geometry.SurfaceReconstruction.cppm
+        Geometry.Triangle.cppm
+        Geometry.Validation.cppm
+        Geometry.VectorHeatMethod.cppm
         PRIVATE
-        Geometry.MeshUtils.cpp
-        Geometry.Raycast.cpp
+        Geometry.AdaptiveRemeshing.cpp
+        Geometry.Boolean.cpp
+        Geometry.BVH.cpp
+        Geometry.CatmullClark.cpp
+        Geometry.ConvexHullBuilder.cpp
+        Geometry.Curvature.cpp
+        Geometry.DEC.cpp
         Geometry.EPA.cpp
+        Geometry.Geodesic.cpp
+        Geometry.Graph.cpp
+        Geometry.GraphIO.cpp
+        Geometry.GraphUtils.cpp
         Geometry.HalfedgeMesh.cpp
         Geometry.HtexPatch.cpp
-        Geometry.MeshBuilder.cpp
-        Geometry.Properties.cpp
-        Geometry.GraphUtils.cpp
-        Geometry.Graph.cpp
-        Geometry.Octree.cpp
-        Geometry.KDTree.cpp
-        Geometry.BVH.cpp
-        Geometry.DEC.cpp
-        Geometry.Curvature.cpp
-        Geometry.Smoothing.cpp
-        Geometry.SphereSampling.cpp
-        Geometry.Simplification.cpp
-        Geometry.Subdivision.cpp
-        Geometry.Remeshing.cpp
-        Geometry.Geodesic.cpp
-        Geometry.CatmullClark.cpp
-        Geometry.NormalEstimation.cpp
-        Geometry.MeshRepair.cpp
-        Geometry.MarchingCubes.cpp
-        Geometry.MeshBoundary.cpp
         Geometry.ImplicitPlaneField.cpp
-        Geometry.SurfaceReconstruction.cpp
-        Geometry.Parameterization.cpp
-        Geometry.MeshQuality.cpp
-        Geometry.MeshAnalysis.cpp
-        Geometry.AdaptiveRemeshing.cpp
-        Geometry.ConvexHullBuilder.cpp
+        Geometry.KDTree.cpp
         Geometry.KMeans.cpp
-        Geometry.PointCloudUtils.cpp
+        Geometry.MarchingCubes.cpp
+        Geometry.MeshAnalysis.cpp
+        Geometry.MeshBoundary.cpp
+        Geometry.MeshBuilder.cpp
+        Geometry.MeshIO.cpp
+        Geometry.MeshQuality.cpp
+        Geometry.MeshRepair.cpp
+        Geometry.MeshUtils.cpp
+        Geometry.NormalEstimation.cpp
+        Geometry.Octree.cpp
+        Geometry.Parameterization.cpp
         Geometry.PointCloud.cpp
-        Geometry.Sphere.cpp
-        Geometry.Boolean.cpp
-        Geometry.ShortestPath.cpp
-        Geometry.VectorHeatMethod.cpp
+        Geometry.PointCloudIO.cpp
+        Geometry.PointCloudUtils.cpp
+        Geometry.Properties.cpp
+        Geometry.Raycast.cpp
         Geometry.Registration.cpp
+        Geometry.Remeshing.cpp
         Geometry.SDF.cpp
+        Geometry.ShortestPath.cpp
+        Geometry.Simplification.cpp
+        Geometry.Smoothing.cpp
+        Geometry.Sphere.cpp
+        Geometry.SphereSampling.cpp
+        Geometry.Subdivision.cpp
+        Geometry.SurfaceReconstruction.cpp
+        Geometry.VectorHeatMethod.cpp
 
         #Partitioned modules: how do we tell cmake about these? Do we need to list them all here, or can we just list the main module and have it import the others?
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-        Geometry.HalfedgeMeshFwd.cppm
         Geometry.GraphFwd.cppm
+        Geometry.HalfedgeMeshFwd.cppm
         Geometry.PointCloudFwd.cppm
 )
 

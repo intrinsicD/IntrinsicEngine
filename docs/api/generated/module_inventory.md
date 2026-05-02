@@ -1,6 +1,6 @@
 # Module Inventory (auto-generated)
 
-_Generated on 2026-05-01 by `tools/repo/generate_module_inventory.py`._
+_Generated on 2026-05-03 by `tools/repo/generate_module_inventory.py`._
 
 Root scanned: `src`
 
@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 34 |
 | `ecs` | 18 |
-| `geometry` | 74 |
+| `geometry` | 76 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 43 |
@@ -107,6 +107,7 @@ Root scanned: `src`
 | `Geometry.Geodesic` | `src/geometry/Geometry.Geodesic.cppm` | `geometry` |
 | `Geometry.Graph` | `src/geometry/Geometry.Graph.cppm` | `geometry` |
 | `Geometry.GraphFwd` | `src/geometry/Geometry.GraphFwd.cppm` | `geometry` |
+| `Geometry.GraphIO` | `src/geometry/Geometry.GraphIO.cppm` | `geometry` |
 | `Geometry.GraphUtils` | `src/geometry/Geometry.GraphUtils.cppm` | `geometry` |
 | `Geometry.Grid` | `src/geometry/Geometry.Grid.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh` | `src/geometry/Geometry.HalfedgeMesh.cppm` | `geometry` |
@@ -135,6 +136,7 @@ Root scanned: `src`
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
 | `Geometry.PointCloud` | `src/geometry/Geometry.PointCloud.cppm` | `geometry` |
 | `Geometry.PointCloudFwd` | `src/geometry/Geometry.PointCloudFwd.cppm` | `geometry` |
+| `Geometry.PointCloudIO` | `src/geometry/Geometry.PointCloudIO.cppm` | `geometry` |
 | `Geometry.PointCloudUtils` | `src/geometry/Geometry.PointCloudUtils.cppm` | `geometry` |
 | `Geometry.Primitives` | `src/geometry/Geometry.Primitives.cppm` | `geometry` |
 | `Geometry.Properties` | `src/geometry/Geometry.Properties.cppm` | `geometry` |
@@ -430,4 +432,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **403**
+Total modules: **405**

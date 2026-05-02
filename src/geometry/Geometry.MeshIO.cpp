@@ -1,0 +1,458 @@
+module;
+
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+#include <glm/glm.hpp>
+
+#include "Geometry.IOText.hpp"
+
+module Geometry.MeshIO;
+
+import Geometry.Properties;
+import Core.Error;
+
+namespace Geometry::MeshIO
+{
+    namespace
+    {
+        using Geometry::IOText::MakePathInfo;
+        using Geometry::IOText::NextLine;
+        using Geometry::IOText::ParseNumber;
+        using Geometry::IOText::ReadTextFile;
+        using Geometry::IOText::SplitWhitespace;
+        using Geometry::IOText::TextFileError;
+        using Geometry::IOText::Trim;
+
+        [[nodiscard]] Core::ErrorCode ToCoreError(TextFileError error)
+        {
+            switch (error)
+            {
+            case TextFileError::FileNotFound:
+                return Core::ErrorCode::FileNotFound;
+            case TextFileError::FileReadError:
+                return Core::ErrorCode::FileReadError;
+            }
+            return Core::ErrorCode::Unknown;
+        }
+
+        [[nodiscard]] std::optional<std::uint32_t> ParseOBJVertexIndex(std::string_view token, std::size_t vertexCount)
+        {
+            const std::size_t slash = token.find('/');
+            if (slash != std::string_view::npos)
+            {
+                token = token.substr(0, slash);
+            }
+            const auto index = ParseNumber<int>(token);
+            if (!index || *index == 0)
+            {
+                return std::nullopt;
+            }
+
+            const int resolved = *index > 0 ? *index - 1 : static_cast<int>(vertexCount) + *index;
+            if (resolved < 0 || static_cast<std::size_t>(resolved) >= vertexCount)
+            {
+                return std::nullopt;
+            }
+            return static_cast<std::uint32_t>(resolved);
+        }
+
+        void PopulateResult(MeshIOResult& result,
+                            std::span<const glm::vec3> vertices,
+                            std::span<const std::vector<std::uint32_t>> faces,
+                            std::span<const glm::vec3> normals = {})
+        {
+            result.Vertices.Resize(vertices.size());
+            auto positions = result.Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.0f));
+            for (std::size_t i = 0; i < vertices.size(); ++i)
+            {
+                positions[i] = vertices[i];
+            }
+
+            if (!normals.empty() && normals.size() == vertices.size())
+            {
+                auto normalProperty = result.Vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3(0.0f, 1.0f, 0.0f));
+                for (std::size_t i = 0; i < normals.size(); ++i)
+                {
+                    normalProperty[i] = normals[i];
+                }
+            }
+
+            result.Faces.Resize(faces.size());
+            auto faceVertices = result.Faces.GetOrAdd<std::vector<std::uint32_t>>("f:vertices", {});
+            for (std::size_t i = 0; i < faces.size(); ++i)
+            {
+                faceVertices[i] = faces[i];
+            }
+        }
+
+        [[nodiscard]] Core::Expected<MeshIOResult> InvalidMeshFormat()
+        {
+            return Core::Err<MeshIOResult>(Core::ErrorCode::InvalidFormat);
+        }
+    }
+
+    Core::Expected<MeshIOResult> LoadOBJ(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+        }
+
+        std::vector<glm::vec3> vertices;
+        std::vector<std::vector<std::uint32_t>> faces;
+        std::size_t cursor = 0;
+        std::string_view line;
+        while (NextLine(*text, cursor, line))
+        {
+            const std::size_t comment = line.find('#');
+            if (comment != std::string_view::npos)
+            {
+                line = Trim(line.substr(0, comment));
+            }
+            if (line.empty())
+            {
+                continue;
+            }
+
+            const auto tokens = SplitWhitespace(line);
+            if (tokens.empty())
+            {
+                continue;
+            }
+            if (tokens[0] == "v")
+            {
+                if (tokens.size() < 4)
+                {
+                    return InvalidMeshFormat();
+                }
+                const auto x = ParseNumber<float>(tokens[1]);
+                const auto y = ParseNumber<float>(tokens[2]);
+                const auto z = ParseNumber<float>(tokens[3]);
+                if (!x || !y || !z)
+                {
+                    return InvalidMeshFormat();
+                }
+                vertices.emplace_back(*x, *y, *z);
+            }
+            else if (tokens[0] == "f")
+            {
+                if (tokens.size() < 4)
+                {
+                    return InvalidMeshFormat();
+                }
+                std::vector<std::uint32_t> face;
+                face.reserve(tokens.size() - 1);
+                for (std::size_t i = 1; i < tokens.size(); ++i)
+                {
+                    const auto index = ParseOBJVertexIndex(tokens[i], vertices.size());
+                    if (!index)
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    face.push_back(*index);
+                }
+                faces.push_back(std::move(face));
+            }
+        }
+
+        if (vertices.empty() || faces.empty())
+        {
+            return InvalidMeshFormat();
+        }
+
+        MeshIOResult result;
+        const auto pathInfo = MakePathInfo(absolute_path);
+        result.SourcePath = pathInfo.SourcePath;
+        result.BasePath = pathInfo.BasePath;
+        PopulateResult(result, vertices, faces);
+        return result;
+    }
+
+    Core::Expected<MeshIOResult> LoadOFF(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+        }
+
+        std::size_t cursor = 0;
+        std::string_view line;
+        do
+        {
+            if (!NextLine(*text, cursor, line))
+            {
+                return InvalidMeshFormat();
+            }
+        } while (line.empty() || line.front() == '#');
+
+        if (line != "OFF")
+        {
+            return InvalidMeshFormat();
+        }
+
+        do
+        {
+            if (!NextLine(*text, cursor, line))
+            {
+                return InvalidMeshFormat();
+            }
+        } while (line.empty() || line.front() == '#');
+
+        const auto counts = SplitWhitespace(line);
+        if (counts.size() < 2)
+        {
+            return InvalidMeshFormat();
+        }
+        const auto vertexCount = ParseNumber<std::size_t>(counts[0]);
+        const auto faceCount = ParseNumber<std::size_t>(counts[1]);
+        if (!vertexCount || !faceCount || *vertexCount == 0 || *faceCount == 0)
+        {
+            return InvalidMeshFormat();
+        }
+
+        std::vector<glm::vec3> vertices;
+        vertices.reserve(*vertexCount);
+        for (std::size_t i = 0; i < *vertexCount; ++i)
+        {
+            if (!NextLine(*text, cursor, line))
+            {
+                return InvalidMeshFormat();
+            }
+            if (line.empty() || line.front() == '#')
+            {
+                --i;
+                continue;
+            }
+            const auto tokens = SplitWhitespace(line);
+            if (tokens.size() < 3)
+            {
+                return InvalidMeshFormat();
+            }
+            const auto x = ParseNumber<float>(tokens[0]);
+            const auto y = ParseNumber<float>(tokens[1]);
+            const auto z = ParseNumber<float>(tokens[2]);
+            if (!x || !y || !z)
+            {
+                return InvalidMeshFormat();
+            }
+            vertices.emplace_back(*x, *y, *z);
+        }
+
+        std::vector<std::vector<std::uint32_t>> faces;
+        faces.reserve(*faceCount);
+        for (std::size_t i = 0; i < *faceCount; ++i)
+        {
+            if (!NextLine(*text, cursor, line))
+            {
+                return InvalidMeshFormat();
+            }
+            if (line.empty() || line.front() == '#')
+            {
+                --i;
+                continue;
+            }
+            const auto tokens = SplitWhitespace(line);
+            if (tokens.empty())
+            {
+                return InvalidMeshFormat();
+            }
+            const auto count = ParseNumber<std::size_t>(tokens[0]);
+            if (!count || *count < 3 || tokens.size() < *count + 1)
+            {
+                return InvalidMeshFormat();
+            }
+            std::vector<std::uint32_t> face;
+            face.reserve(*count);
+            for (std::size_t j = 0; j < *count; ++j)
+            {
+                const auto index = ParseNumber<std::size_t>(tokens[j + 1]);
+                if (!index || *index >= vertices.size())
+                {
+                    return InvalidMeshFormat();
+                }
+                face.push_back(static_cast<std::uint32_t>(*index));
+            }
+            faces.push_back(std::move(face));
+        }
+
+        MeshIOResult result;
+        const auto pathInfo = MakePathInfo(absolute_path);
+        result.SourcePath = pathInfo.SourcePath;
+        result.BasePath = pathInfo.BasePath;
+        PopulateResult(result, vertices, faces);
+        return result;
+    }
+
+    Core::Expected<MeshIOResult> LoadPLY(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+        }
+
+        std::size_t cursor = 0;
+        std::string_view line;
+        if (!NextLine(*text, cursor, line) || line != "ply")
+        {
+            return InvalidMeshFormat();
+        }
+
+        bool ascii = false;
+        std::size_t vertexCount = 0;
+        std::size_t faceCount = 0;
+        while (NextLine(*text, cursor, line))
+        {
+            if (line == "end_header")
+            {
+                break;
+            }
+            const auto tokens = SplitWhitespace(line);
+            if (tokens.size() >= 3 && tokens[0] == "format" && tokens[1] == "ascii")
+            {
+                ascii = true;
+            }
+            else if (tokens.size() >= 3 && tokens[0] == "element" && tokens[1] == "vertex")
+            {
+                if (const auto parsed = ParseNumber<std::size_t>(tokens[2]))
+                {
+                    vertexCount = *parsed;
+                }
+            }
+            else if (tokens.size() >= 3 && tokens[0] == "element" && tokens[1] == "face")
+            {
+                if (const auto parsed = ParseNumber<std::size_t>(tokens[2]))
+                {
+                    faceCount = *parsed;
+                }
+            }
+        }
+
+        if (!ascii || vertexCount == 0 || faceCount == 0)
+        {
+            return InvalidMeshFormat();
+        }
+
+        std::vector<glm::vec3> vertices;
+        vertices.reserve(vertexCount);
+        for (std::size_t i = 0; i < vertexCount; ++i)
+        {
+            if (!NextLine(*text, cursor, line))
+            {
+                return InvalidMeshFormat();
+            }
+            const auto tokens = SplitWhitespace(line);
+            if (tokens.size() < 3)
+            {
+                return InvalidMeshFormat();
+            }
+            const auto x = ParseNumber<float>(tokens[0]);
+            const auto y = ParseNumber<float>(tokens[1]);
+            const auto z = ParseNumber<float>(tokens[2]);
+            if (!x || !y || !z)
+            {
+                return InvalidMeshFormat();
+            }
+            vertices.emplace_back(*x, *y, *z);
+        }
+
+        std::vector<std::vector<std::uint32_t>> faces;
+        faces.reserve(faceCount);
+        for (std::size_t i = 0; i < faceCount; ++i)
+        {
+            if (!NextLine(*text, cursor, line))
+            {
+                return InvalidMeshFormat();
+            }
+            const auto tokens = SplitWhitespace(line);
+            if (tokens.empty())
+            {
+                return InvalidMeshFormat();
+            }
+            const auto count = ParseNumber<std::size_t>(tokens[0]);
+            if (!count || *count < 3 || tokens.size() < *count + 1)
+            {
+                return InvalidMeshFormat();
+            }
+            std::vector<std::uint32_t> face;
+            face.reserve(*count);
+            for (std::size_t j = 0; j < *count; ++j)
+            {
+                const auto index = ParseNumber<std::size_t>(tokens[j + 1]);
+                if (!index || *index >= vertices.size())
+                {
+                    return InvalidMeshFormat();
+                }
+                face.push_back(static_cast<std::uint32_t>(*index));
+            }
+            faces.push_back(std::move(face));
+        }
+
+        MeshIOResult result;
+        const auto pathInfo = MakePathInfo(absolute_path);
+        result.SourcePath = pathInfo.SourcePath;
+        result.BasePath = pathInfo.BasePath;
+        PopulateResult(result, vertices, faces);
+        return result;
+    }
+
+    Core::Expected<MeshIOResult> LoadSTL(std::string_view absolute_path)
+    {
+        auto text = ReadTextFile(absolute_path);
+        if (!text)
+        {
+            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+        }
+
+        std::vector<glm::vec3> vertices;
+        std::vector<std::vector<std::uint32_t>> faces;
+        std::vector<std::uint32_t> currentFace;
+        currentFace.reserve(3);
+
+        std::size_t cursor = 0;
+        std::string_view line;
+        while (NextLine(*text, cursor, line))
+        {
+            const auto tokens = SplitWhitespace(line);
+            if (tokens.size() == 4 && tokens[0] == "vertex")
+            {
+                const auto x = ParseNumber<float>(tokens[1]);
+                const auto y = ParseNumber<float>(tokens[2]);
+                const auto z = ParseNumber<float>(tokens[3]);
+                if (!x || !y || !z)
+                {
+                    return InvalidMeshFormat();
+                }
+                vertices.emplace_back(*x, *y, *z);
+                currentFace.push_back(static_cast<std::uint32_t>(vertices.size() - 1));
+                if (currentFace.size() == 3)
+                {
+                    faces.push_back(currentFace);
+                    currentFace.clear();
+                }
+            }
+        }
+
+        if (vertices.empty() || faces.empty() || !currentFace.empty())
+        {
+            return InvalidMeshFormat();
+        }
+
+        MeshIOResult result;
+        const auto pathInfo = MakePathInfo(absolute_path);
+        result.SourcePath = pathInfo.SourcePath;
+        result.BasePath = pathInfo.BasePath;
+        PopulateResult(result, vertices, faces);
+        return result;
+    }
+}
+
+

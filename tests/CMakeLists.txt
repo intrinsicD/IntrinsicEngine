@@ -181,6 +181,7 @@ intrinsic_test_object_lib(BenchmarkTestObjs
 # --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---
 set(_geometry_test_files
     Test_RuntimeGeometry.cpp
+    Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp
     Test_RuntimeGraphKNN.cpp
     Test_KDTree.cpp
