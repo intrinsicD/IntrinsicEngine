@@ -25,7 +25,9 @@ The following dependency boundaries are mandatory:
 - `assets` -> `core`.
 - `ecs` -> `core`; may use geometry handles/types only when explicitly required.
 - `graphics/rhi` -> `core`.
+- `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic.
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views; **no live ECS knowledge**.
+- `platform` -> `core`.
 - `runtime` -> all lower layers; owns composition/wiring.
 - `app` -> `runtime` only.
 - `methods` -> public method API + declared backend integration only.
@@ -50,7 +52,7 @@ Target source layout:
 
 Supporting architecture roots are mandatory parts of the system contract:
 
-- `methods/`, `benchmarks/`, `tests/`, `docs/`, `tasks/`, `tools/`, `.github/workflows/`.
+- `methods/`, `benchmarks/`, `tests/`, `docs/`, `tasks/`, `tools/`, `cmake/`, `.github/workflows/`.
 
 ## 4. Layering rules
 
@@ -59,6 +61,8 @@ Agents must enforce ownership and dependency flow:
 - Lower layers never import higher layers.
 - Runtime wiring remains in `runtime`; lower subsystems remain reusable.
 - Graphics subsystems operate on snapshots/views, not live gameplay ownership.
+- `assets` is CPU-only and GPU-agnostic; GPU-side asset state lives in `src/graphics/assets/` and is wired by `runtime` from asset events.
+- `platform` exposes window/input ports and explicit backends; it must not import `graphics`, `ecs`, or `runtime`.
 - `src/legacy` may contain transitional exceptions only when tracked in migration docs/tasks.
 
 Every new dependency edge must be justifiable by layer policy and reflected in docs when architectural.
@@ -71,6 +75,9 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 - Avoid introducing new engine features during reorganization tasks.
 - Keep patches small and scoped to one task when possible.
 - Prefer deterministic, testable APIs with explicit ownership and failure states.
+- Use out-of-source CMake presets only; `CMakeLists.txt` rejects in-source configure. Default agent build setup is `cmake --preset ci` followed by `cmake --build --preset ci --target IntrinsicTests`.
+- Add C++23 module libraries with `intrinsic_add_module_library(...)` from `cmake/IntrinsicModule.cmake` and declare module interfaces via `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
+- FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated.
 
 ## 6. Method implementation protocol
 
@@ -92,6 +99,7 @@ For each change:
 - Add/update tests for behavior changes.
 - Preserve or improve pass rate unless a temporary shim is documented.
 - Label tests by category as layout migration progresses (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
+- New C++ test files use `Test.<Name>.cpp`; existing `Test_*.cpp` files are compatibility carryover and should only be renamed by explicit mechanical cleanup tasks.
 - The default CPU-supported correctness gate is:
 
   ```bash
@@ -114,6 +122,7 @@ When code, structure, or policy changes:
 - Update relevant architecture/migration/task docs in the same PR.
 - Update references and links for moved files.
 - Regenerate inventories when required by tooling.
+- After module surface changes, refresh `docs/api/generated/module_inventory.md` with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
 - Keep docs factual (current state), not aspirational unless clearly labeled.
 
 ## 10. CI expectations
@@ -122,6 +131,7 @@ When code, structure, or policy changes:
 - Structural checks (tasks/docs/layering/manifests) should run in warning mode until explicitly tightened.
 - Workflow definitions must stay readable and split by purpose.
 - Agent/Codex verification must configure the `ci` preset, build a meaningful target such as `IntrinsicTests` (never `help` as a stand-in), and run CTest. The current Codex verification command mirrors the default CPU-supported gate from the testing protocol.
+- Touched-scope structural checks use the repository tools, for example `python3 tools/agents/check_task_policy.py --root . --strict`, `python3 tools/docs/check_doc_links.py --root .`, `python3 tools/repo/check_layering.py --root src --strict`, and `python3 tools/repo/check_test_layout.py --root . --strict`.
 
 ## 11. Task execution workflow
 
@@ -130,6 +140,7 @@ Every task execution should follow this sequence:
 1. Inspect existing code and docs.
 2. Identify owning subsystem and layer.
 3. Write or update task file.
+   - Base new task files on `tasks/templates/`; do not create long-lived root-level planning checklists once work belongs in `tasks/backlog/`, `tasks/active/`, or `tasks/done/`.
 4. Implement the smallest useful patch.
 5. Add or update tests.
 6. Add or update docs.
@@ -166,7 +177,10 @@ Use the expanded procedure docs under `docs/agent/`:
 - `docs/agent/contract.md`
 - `docs/agent/task-format.md`
 - `docs/agent/review-checklist.md`
+- `docs/agent/architecture-review-checklist.md`
 - `docs/agent/method-workflow.md`
+- `docs/agent/method-review-checklist.md`
 - `docs/agent/benchmark-workflow.md`
+- `docs/agent/benchmark-review-checklist.md`
 - `docs/agent/docs-sync-policy.md`
 - `docs/agent/roles.md`
