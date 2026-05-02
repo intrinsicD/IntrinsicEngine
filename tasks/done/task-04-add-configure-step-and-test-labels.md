@@ -3,6 +3,9 @@
 - Status: completed
 - Owner: claude (claude/next-active-task-OvcHb)
 - Branch / PR: claude/next-active-task-OvcHb
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: none for this queue item; implementation tasks retain their configure/build/CTest gates.
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` after normalizing GRAPHICS-002..GRAPHICS-018 verification blocks.
 
 ---

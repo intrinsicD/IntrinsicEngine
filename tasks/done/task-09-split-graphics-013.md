@@ -3,6 +3,9 @@
 - Status: completed (2026-05-02)
 - Owner: Codex (gpt-5.3-codex)
 - Branch / PR: current branch / TBD
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: implementation remains in GRAPHICS-013A/B/C backlog tasks.
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` after creating GRAPHICS-013A/B/C.
 
 ---

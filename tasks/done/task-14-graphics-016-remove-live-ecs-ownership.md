@@ -3,6 +3,9 @@
 - Status: completed (Stage A API seam, 2026-05-02; full CI configure blocked locally by Draco FetchContent cache clone)
 - Owner: Codex (current branch)
 - Branch / PR: current branch / TBD
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: continue runtime-owned ECS extraction/wiring under `tasks/backlog/rendering/GRAPHICS-016-runtime-extraction-handoff.md` before downstream rendering pass implementation.
 - Next verification step: `cmake --preset ci && cmake --build --preset ci --target IntrinsicTests && ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` after the API-boundary patch.
 
 ---

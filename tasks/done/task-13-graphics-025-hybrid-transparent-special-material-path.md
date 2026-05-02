@@ -3,6 +3,9 @@
 - Status: completed (2026-05-02)
 - Owner: Codex (current branch)
 - Branch / PR: current branch / TBD
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: planning/implementation remains in `tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md`.
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict`.
 
 ---

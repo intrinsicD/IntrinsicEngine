@@ -3,6 +3,9 @@
 - Status: completed (reviewed and corrected 2026-05-02)
 - Owner: Claude (claude/next-active-task-YdXAU)
 - Branch / PR: `claude/next-active-task-YdXAU`
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: none for this docs-only queue item.
 - Next verification step: re-run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` on the proposed PR (both currently pass locally with zero findings).
 
 `docs/architecture/rendering-three-pass.md` now lists `CullingPass` in the Pass Contract table and Pipeline Order, identifies it as a real rendergraph pass owned by `Extrinsic.Graphics.Pass.Culling`, and adds a Pass module naming map that documents the split selection source modules under the logical `PickingPass` stage. `GRAPHICS-007` claims `Pass.Culling` ownership and adds `CullingPass::Execute` test expectations. `GRAPHICS-012` defines the logical `PickingPass` over the split `Pass.Selection.*` modules with explicit acceptance criteria that names agree across docs and source. `tasks/backlog/rendering/README.md` was updated to reference both ownership claims. A later review reverted out-of-scope C++ class renames from this docs-only task and updated the naming table to match the existing source classes.

@@ -3,6 +3,9 @@
 - Status: completed
 - Owner: Claude (claude/next-active-task-AonjU)
 - Branch / PR: `claude/next-active-task-AonjU`
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: none for this queue item; the DAG is maintained in `tasks/backlog/rendering/README.md`.
 - Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` and `python3 tools/agents/check_task_policy.py --root . --strict` after creating `tasks/backlog/rendering/README.md` (both pass; 0 findings, 143 relative links resolved).
 
 `tasks/backlog/rendering/README.md` has been added. It declares GRAPHICS-001 as the canonical rendering backlog index, marks RORG-031B as historical/superseded, encodes the dependency DAG required by this task, defines agent selection rules (earliest unblocked task, GRAPHICS-016 precedes pass implementation, no docs+behavior mixing, no legacy copies), and links to AGENTS.md, GRAPHICS-001, `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, and `docs/migration/nonlegacy-parity-matrix.md`. Validators pass with zero findings.

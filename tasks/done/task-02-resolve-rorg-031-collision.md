@@ -3,6 +3,9 @@
 - Status: completed
 - Owner: Claude (claude/next-active-task-CaTBY)
 - Branch / PR: `claude/next-active-task-CaTBY`
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: none for this queue item; superseded rendering seed is archived as `tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`.
 - Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` after renames and link updates.
 
 The architecture seed has been renamed to `tasks/backlog/architecture/RORG-031A-architecture-foundation.md` and the rendering seed has been retired to `tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md` with completion metadata. GRAPHICS-001 now records RORG-031B as a superseded historical seed. Both validators pass without new findings; pre-existing findings in the `tasks/active/` queue files remain tracked by Task 3.

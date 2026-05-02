@@ -3,6 +3,9 @@
 - Status: completed
 - Owner: Claude (claude/next-active-task-PMyma)
 - Branch / PR: `claude/next-active-task-PMyma`
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: none.
 - Next verification step: `python3 tools/agents/validate_tasks.py --root tasks --strict` (passes; 46 files validated, 0 findings).
 
 `tools/agents/validate_tasks.py` now requires `Context` and `Forbidden changes` in `REQUIRED_SECTIONS`, matching `docs/agent/task-format.md`. Queue/index meta-files under `tasks/active/` (`task-NN-*.md`, `RENDERING-CLEANUP-TASK-PACK.md`) are excluded via `SKIP_PATTERNS`/`SKIP_FILENAMES` because they are queue ordering trackers, not canonical structured tasks. Four pre-existing `tasks/done/` files (`HARDEN-050-ci-policy-alignment.md`, `HARDEN-052-offline-dependency-cache-bootstrap.md`, `final-post-reorganization-hardening-audit.md`, `final-reorganization-audit.md`) received minimal `Context` / `Forbidden changes` sections to match the tightened policy. All three validators (`validate_tasks.py`, `check_task_policy.py --strict`, `check_doc_links.py --strict`) report zero findings.

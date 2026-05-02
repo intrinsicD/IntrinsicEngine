@@ -3,6 +3,9 @@
 - Status: completed
 - Owner: Claude (claude/next-active-task-NtmGp)
 - Branch / PR: `claude/next-active-task-NtmGp`
+- Completion date: 2026-05-02
+- Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
+- Follow-ups: GRAPHICS-016 remains the runtime/graphics extraction implementation follow-up.
 - Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` and `python3 tools/agents/check_task_policy.py --root . --strict` after adding the runtime cross-link (both pass; 0 findings, 145 relative links resolved).
 
 `tasks/backlog/runtime/README.md` has been added. It indexes the existing runtime backlog (`RORG-031-runtime-composition.md`) and cross-links GRAPHICS-016 with explicit notes that runtime owns live ECS access, extraction, sidecar/cache mappings, dirty-domain interpretation, deletion events, and compaction/relocation handoff; that graphics must not import live ECS ownership; and that GRAPHICS-016 is the first implementation gate before pass implementation. The full task content is not duplicated. Validators pass with zero findings.
