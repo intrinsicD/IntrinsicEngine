@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
 | `platform` | 5 |
-| `runtime` | 4 |
+| `runtime` | 5 |
 
 ## Modules
 
@@ -430,6 +430,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.FrameClock` | `src/runtime/Runtime.FrameClock.cppm` | `runtime` |
 | `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
+| `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **405**
+Total modules: **406**

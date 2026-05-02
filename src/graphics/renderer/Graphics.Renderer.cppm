@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 
 export module Extrinsic.Graphics.Renderer;
@@ -45,6 +46,13 @@ namespace Extrinsic::Graphics
         std::string Diagnostic{};
     };
 
+    export struct RuntimeRenderSnapshotBatch
+    {
+        std::span<const TransformSyncRecord>     Transforms{};
+        std::span<const LightSnapshot>           Lights{};
+        std::span<const VisualizationSyncRecord> Visualizations{};
+    };
+
     export class IRenderer
     {
     public:
@@ -79,6 +87,8 @@ namespace Extrinsic::Graphics
         //                      maintenance service.
 
         [[nodiscard]] virtual bool BeginFrame(RHI::FrameHandle& outFrame) = 0;
+
+        virtual void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) = 0;
 
         [[nodiscard]] virtual RenderWorld ExtractRenderWorld(
             const RenderFrameInput& input) = 0;

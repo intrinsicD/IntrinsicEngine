@@ -7,6 +7,7 @@ target_sources(${target_name}
         Runtime.Engine.cppm
         Runtime.FrameClock.cppm
         Runtime.FrameLoop.cppm
+        Runtime.RenderExtraction.cppm
         Runtime.StreamingExecutor.cppm
         PRIVATE
         Runtime.Engine.cpp
@@ -23,4 +24,5 @@ target_link_libraries(${target_name}
         ExtrinsicGraphics
         ExtrinsicGraphicsAssets
         ExtrinsicPlatform
+        EnTT::EnTT
 )

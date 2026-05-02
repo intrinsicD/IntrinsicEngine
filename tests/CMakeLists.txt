@@ -363,6 +363,19 @@ intrinsic_test_object_lib(GraphicsContractTestObjs
     DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
+set(_runtime_graphics_cpu_test_files
+    Test.RuntimeRenderExtraction.cpp
+)
+intrinsic_resolve_test_sources(_runtime_graphics_cpu_test_sources
+    SEARCH_DIRS integration/runtime
+    FILES ${_runtime_graphics_cpu_test_files}
+)
+intrinsic_test_object_lib(RuntimeGraphicsCpuTestObjs
+    SOURCES
+        ${_runtime_graphics_cpu_test_sources}
+    DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform glm::glm
+)
+
 # Runtime/integration test object libraries pull in test sources that
 # `#include "RHI.Vulkan.hpp"` (a legacy-RHI header) and `import` the legacy
 # single-segment modules (`RHI`, `Graphics`, `Asset.Pipeline`, ...). Those
@@ -599,6 +612,12 @@ intrinsic_test_executable(IntrinsicGraphicsContractTests
     OBJECTS GraphicsContractTestObjs
     LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
     LABELS contract graphics gpu vulkan
+)
+
+intrinsic_test_executable(IntrinsicRuntimeGraphicsCpuTests
+    OBJECTS RuntimeGraphicsCpuTestObjs
+    LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
+    LABELS integration runtime graphics
 )
 
 # Old wrapper directories remain on disk only as empty compatibility folders.

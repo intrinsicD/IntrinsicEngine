@@ -15,6 +15,14 @@
 - `tests/contract/graphics/Test.RendererRhiBoundary.cpp` guards against reintroducing `entt` or `Extrinsic.ECS` imports under `src/graphics/renderer`.
 - Remaining follow-up is runtime wiring: runtime must own live ECS queries, sidecar mappings, dirty-domain filtering, deletion handling, and conversion into the graphics snapshot records.
 
+## Stage B/C implementation note (2026-05-03)
+- `Extrinsic.Runtime.RenderExtraction` now owns the promoted runtime ECS query and sidecar cache for transform/light/visualization extraction.
+- `RenderExtractionCache` stores entity-to-graphics instance/material/visualization sidecars outside canonical ECS components, allocates/frees `GpuWorld` instances, clears consumed `DirtyTransform` tags, handles destroyed renderables, and submits snapshot packets to graphics.
+- `IRenderer::SubmitRuntimeSnapshots(RuntimeRenderSnapshotBatch)` is the promoted runtime-to-graphics handoff; the null renderer copies records into renderer-owned frame storage before render-world extraction/prepare.
+- `Engine::RunFrame()` calls runtime extraction after `BeginFrame()` and before `ExtractRenderWorld()` so renderer prep consumes runtime-submitted snapshots without importing ECS.
+- CPU integration coverage lives in `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp` and the CPU-labeled `IntrinsicRuntimeGraphicsCpuTests` target.
+- Full mesh/graph/point-cloud geometry upload parity, selection/picking packets, debug primitive packets, and value-only visualization packet cleanup remain downstream GRAPHICS-002/004/010/012 work.
+
 ## Staged implementation plan
 - Stage A (API seam): introduced runtime-owned snapshot packets for transform/light/visualization sync and switched promoted graphics sync entry points from `entt::registry&` to typed snapshot spans.
 - Stage B (wiring): perform ECS queries and dirty-domain filtering inside runtime extraction, then feed packets into graphics systems.
@@ -27,9 +35,9 @@
 - Route lifecycle/sync decisions through runtime-owned handoff APIs.
 - Add compatibility shims only if they are tracked and time-bounded by active tasks.
 ## Tests
-- Add runtime/graphics integration tests using null renderer and extracted snapshots.
-- Cover creation, update, deletion, dirty domains, and invalid entity filtering.
-- Label these extraction-handoff integration tests `integration;runtime;graphics` so they run in the default CPU gate.
+- Added runtime/graphics integration tests using the null renderer and extracted snapshots.
+- Covered creation, update, deletion, dirty transform-domain clearing, visualization extraction, light extraction, and destroyed-entity filtering.
+- Labeled extraction-handoff integration tests `integration;runtime;graphics` through `IntrinsicRuntimeGraphicsCpuTests` so they are not excluded by the default CPU gate.
 ## Docs
 - Update runtime subsystem boundaries, graphics architecture, and migration parity docs.
 ## Acceptance criteria

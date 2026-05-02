@@ -23,6 +23,9 @@
 - Label CPU contract tests `contract;graphics` so they run in the default CPU gate.
 ## Docs
 - Update `docs/architecture/rendering-three-pass.md` and `docs/architecture/graphics.md` when the contract changes.
+## Clarification questions from GRAPHICS-016
+- Should `VisualizationSyncRecord` become a value/handle-only packet before pass work begins, replacing the current runtime-owned pointer sidecar used by `VisualizationSyncSystem`?
+- Should `RuntimeRenderSnapshotBatch` be folded into `RenderWorld` as a fully immutable per-frame snapshot, or remain a renderer handoff API that copies runtime packets into renderer-owned frame storage?
 ## Acceptance criteria
 - Passes can consume render snapshots without higher-layer imports.
 - Snapshot fields cover surface, line, point, lighting, shadow, picking, selection, and transient debug needs.

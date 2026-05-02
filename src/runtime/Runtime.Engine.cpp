@@ -25,6 +25,7 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.FrameClock;
 import Extrinsic.Runtime.FrameLoop;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
@@ -279,6 +280,7 @@ namespace Extrinsic::Runtime
             {
                 if (Renderer)
                 {
+                    Owner.m_RenderExtraction.Shutdown(*Renderer);
                     Renderer->Shutdown();
                     Renderer.reset();
                 }
@@ -409,15 +411,21 @@ namespace Extrinsic::Runtime
         struct RenderFrameHooks final : IRuntimeRenderFrameHooks
         {
             Graphics::IRenderer& Renderer;
+            ECS::Scene::Registry& Scene;
+            RenderExtractionCache& Extraction;
             RHI::FrameHandle& Frame;
             const Graphics::RenderFrameInput& Input;
             Graphics::RenderWorld& World;
 
             RenderFrameHooks(Graphics::IRenderer& renderer,
+                             ECS::Scene::Registry& scene,
+                             RenderExtractionCache& extraction,
                              RHI::FrameHandle& frame,
                              const Graphics::RenderFrameInput& input,
                              Graphics::RenderWorld& world)
                 : Renderer(renderer)
+                , Scene(scene)
+                , Extraction(extraction)
                 , Frame(frame)
                 , Input(input)
                 , World(world)
@@ -425,13 +433,17 @@ namespace Extrinsic::Runtime
             }
 
             bool BeginFrame() override { return Renderer.BeginFrame(Frame); }
-            void ExtractRenderWorld() override { World = Renderer.ExtractRenderWorld(Input); }
+            void ExtractRenderWorld() override
+            {
+                Extraction.ExtractAndSubmit(Scene, Renderer);
+                World = Renderer.ExtractRenderWorld(Input);
+            }
             void PrepareFrame() override { Renderer.PrepareFrame(World); }
             void ExecuteFrame() override { Renderer.ExecuteFrame(Frame, World); }
             std::uint64_t EndFrame() override { return Renderer.EndFrame(Frame); }
         };
 
-        RenderFrameHooks renderHooks(*m_Renderer, frame, renderInput, renderWorld);
+        RenderFrameHooks renderHooks(*m_Renderer, *m_Scene, m_RenderExtraction, frame, renderInput, renderWorld);
 
         const RuntimeRenderFrameResult renderResult = ExecuteRuntimeRenderFrameContract(renderHooks);
         if (!renderResult.BeganFrame)

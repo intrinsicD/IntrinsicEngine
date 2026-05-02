@@ -17,7 +17,7 @@ Some rendering backlog tasks are runtime-owned for extraction/wiring even
 though they currently live under `tasks/backlog/rendering/`. Runtime reviewers
 must treat these as runtime work when scheduling and review:
 
-- [GRAPHICS-016 — Runtime extraction and graphics handoff](../rendering/GRAPHICS-016-runtime-extraction-handoff.md):
+- [GRAPHICS-016 — Runtime extraction and graphics handoff](../../active/GRAPHICS-016-runtime-extraction-handoff.md):
   - Runtime owns live ECS access, extraction, sidecar/cache mappings from ECS
     entities and asset/source handles to graphics handles, dirty-domain
     interpretation, deletion events, and compaction/relocation handoff.

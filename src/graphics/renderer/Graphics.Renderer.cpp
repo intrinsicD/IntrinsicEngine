@@ -214,6 +214,13 @@ namespace Extrinsic::Graphics
             return true;
         }
 
+        void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) override
+        {
+            m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());
+            m_LightSnapshots.assign(snapshots.Lights.begin(), snapshots.Lights.end());
+            m_VisualizationSyncRecords.assign(snapshots.Visualizations.begin(), snapshots.Visualizations.end());
+        }
+
         RenderWorld ExtractRenderWorld(const RenderFrameInput& input) override
         {
             m_HasExtractedRenderWorld = true;

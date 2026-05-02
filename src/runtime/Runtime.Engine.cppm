@@ -14,6 +14,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.FrameClock;
 import Extrinsic.Runtime.StreamingExecutor;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
@@ -101,6 +102,7 @@ namespace Extrinsic::Runtime
     //   BuildRenderFrameInput
     //   Renderer::BeginFrame      (GPU task graph — acquire)
     //     [if skip: EndFrame(clock) → continue]
+    //   Runtime::RenderExtractionCache::ExtractAndSubmit
     //   Renderer::ExtractRenderWorld
     //   Renderer::PrepareFrame
     //   Renderer::ExecuteFrame    (GPU task graph — compile/record/submit)
@@ -149,6 +151,7 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
+        RenderExtractionCache                 m_RenderExtraction;
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;

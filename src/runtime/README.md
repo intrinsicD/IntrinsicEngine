@@ -11,6 +11,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring |
 | `Extrinsic.Runtime.FrameClock` | Per-frame wall-clock management |
 | `Extrinsic.Runtime.FrameLoop` | Testable platform/render/maintenance/shutdown phase contracts |
+| `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
 
 ## Canonical frame loop phases (`Engine::RunFrame`)
@@ -20,12 +21,13 @@ startup/shutdown.
 3. Variable tick.
 4. Render input snapshot.
 5. Renderer begin frame.
-6. Render world extraction.
-7. Render prepare.
-8. Render execute.
-9. End frame + present.
-10. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick.
-11. Frame clock finalize.
+6. Runtime render extraction: ECS queries, runtime sidecars, dirty-domain interpretation, deletion cleanup, and `IRenderer::SubmitRuntimeSnapshots()` handoff.
+7. Renderer render-world extraction.
+8. Render prepare.
+9. Render execute.
+10. End frame + present.
+11. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick.
+12. Frame clock finalize.
 
 ## Streaming integration
 
@@ -43,3 +45,10 @@ Shutdown order requirement:
 `Runtime` depends on `Core`, `Assets`, `ECS`, `Platform`, and `Graphics`.
 It orchestrates but does not own GPU barrier/resource policy or render-pass
 branching logic.
+
+`Extrinsic.Runtime.RenderExtraction` is the only promoted runtime owner for live
+ECS render queries. It stores entity-to-graphics sidecars outside canonical ECS
+components, allocates/frees `GpuWorld` instance handles through the renderer,
+builds transform/light/visualization snapshot records, and submits those records
+to graphics through `IRenderer::SubmitRuntimeSnapshots()`.
+
