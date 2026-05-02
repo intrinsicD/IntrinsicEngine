@@ -26,10 +26,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-021 — Rendering backlog workflow cleanup](../../done/GRAPHICS-021-rendering-backlog-workflow-cleanup.md):
   completed cleanup precondition for further rendering task churn
   (task-format/validator/doc hygiene for the rest of the queue).
-- [GRAPHICS-016 — Runtime extraction and graphics handoff](../../active/GRAPHICS-016-runtime-extraction-handoff.md):
-  first implementation gate. Must land before any graphics pass implementation
-  work begins, because promoted graphics must consume snapshots/views and must
-  not depend on live ECS ownership.
+- [GRAPHICS-016 — Runtime extraction and graphics handoff](../../done/GRAPHICS-016-runtime-extraction-handoff.md):
+  completed first implementation gate for runtime-owned extraction and graphics
+  snapshot handoff. Downstream graphics pass work can proceed through
+  GRAPHICS-002+ without introducing live ECS ownership into graphics.
 - [GRAPHICS-002 — Render-world / frame-input snapshot contract](GRAPHICS-002-render-world-contract.md):
   depends on GRAPHICS-016, or must explicitly avoid touching runtime
   extraction.

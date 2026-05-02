@@ -7,7 +7,7 @@ This index lists the queued task pack for Codex. Hand the tasks to Codex one at 
 - Status: completed / archived
 - Completion date: 2026-05-02
 - Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
-- Follow-ups: continue GRAPHICS-016 runtime-owned extraction follow-up from `tasks/active/GRAPHICS-016-runtime-extraction-handoff.md` before downstream rendering pass implementation work.
+- Follow-ups: GRAPHICS-016 runtime-owned extraction follow-up is retired at `tasks/done/GRAPHICS-016-runtime-extraction-handoff.md`; continue downstream rendering pass implementation through GRAPHICS-002+.
 - Tasks 1–13 are completed as cleanup/governance work. Task 8 was reviewed on 2026-05-02 and corrected to keep the C++ source changes out of the docs-only naming reconciliation scope.
 - Task 14 completed the Stage A promoted-graphics API boundary gate; runtime-owned extraction/wiring remains tracked by GRAPHICS-016.
 - This pack is archived under `tasks/done/`; `tasks/active/` should contain only currently in-progress or blocked task files.

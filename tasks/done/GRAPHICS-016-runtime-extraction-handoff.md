@@ -1,4 +1,13 @@
 # GRAPHICS-016 — Runtime extraction and graphics handoff
+
+- Status: completed
+- Completion date: 2026-05-03
+- Commit / PR: local split commit f2b5394; remote PR reference TBD.
+
+Runtime-owned transform/light/visualization extraction and renderer handoff are
+implemented. Downstream packet expansion and value-only snapshot cleanup remain
+tracked in `tasks/backlog/rendering/GRAPHICS-002-render-world-contract.md`.
+
 ## Goal
 - Define runtime-owned CPU scene composition and ECS-to-graphics extraction so promoted graphics systems consume immutable snapshots/views only.
 ## Non-goals
@@ -51,6 +60,24 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+
+Local verification performed on 2026-05-03:
+
+```bash
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+grep -R "entt\|Extrinsic.ECS" -n src/graphics/renderer || true
+```
+
+`cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and
+the targeted `cmake --build build/ci --target IntrinsicRuntimeGraphicsCpuTests`
+were attempted. Project compilation could not complete locally because CMake
+regeneration failed while populating Draco from `external/cache/draco-src`
+(`fatal: fetch-pack: invalid index-pack output`) before the new target could be
+built or run.
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.

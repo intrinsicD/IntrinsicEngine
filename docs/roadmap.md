@@ -34,7 +34,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ## Runtime Architecture Track
 
-Runtime/frame-pipeline execution work is tracked through the structured task system: see the runtime backlog index at [tasks/backlog/runtime/README.md](../tasks/backlog/runtime/README.md) and the active runtime extraction gate [GRAPHICS-016 — Runtime extraction and graphics handoff](../tasks/active/GRAPHICS-016-runtime-extraction-handoff.md). The default migration intent preserves the current subsystem split while introducing explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages; concrete sequencing lives in the structured GRAPHICS/runtime tasks rather than this roadmap.
+Runtime/frame-pipeline execution work is tracked through the structured task system: see the runtime backlog index at [tasks/backlog/runtime/README.md](../tasks/backlog/runtime/README.md) and the completed runtime extraction gate [GRAPHICS-016 — Runtime extraction and graphics handoff](../tasks/done/GRAPHICS-016-runtime-extraction-handoff.md). The default migration intent preserves the current subsystem split while introducing explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages; concrete sequencing lives in the structured GRAPHICS/runtime tasks rather than this roadmap.
 
 ### Near-term architecture sequencing
 
