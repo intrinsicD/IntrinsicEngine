@@ -64,6 +64,7 @@ Task index and intended order:
 19. `GRAPHICS-018` Vulkan renderer integration after CPU/null contracts stabilize.
 20. `GRAPHICS-019` legacy graphics IO boundary split to assets/geometry owners.
 21. `GRAPHICS-020` legacy graphics retirement gates.
+22. `GRAPHICS-022` rendergraph diagnostics and validation (infrastructure hardening for deterministic contract failures).
 
 ## Tests
 - Run task policy validation after adding or updating backlog files.
@@ -87,4 +88,3 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
 - Treating `src/legacy` as a copy source instead of a behavioral reference.
-

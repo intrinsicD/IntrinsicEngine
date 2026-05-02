@@ -35,6 +35,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   extraction.
 - [GRAPHICS-003 — Frame recipe and default pipeline](GRAPHICS-003-frame-recipe-pipeline.md):
   depends on GRAPHICS-002.
+- [GRAPHICS-022 — Rendergraph diagnostics and validation](GRAPHICS-022-rendergraph-diagnostics-validation.md):
+  depends on GRAPHICS-003 and owns deterministic rendergraph validation and
+  diagnostics contracts (must remain testable without Vulkan).
 - [GRAPHICS-004 — GPU-world allocation and lifetime](GRAPHICS-004-gpu-world-allocation-lifetime.md):
   depends on GRAPHICS-002.
 - [GRAPHICS-005 — GPU-world compaction](GRAPHICS-005-gpu-world-compaction.md):
