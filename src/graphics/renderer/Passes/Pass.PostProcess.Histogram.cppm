@@ -8,13 +8,13 @@ import Extrinsic.Graphics.PostProcessSystem;
 
 namespace Extrinsic::Graphics
 {
-	export class HistogramPass
+	export class PostProcessHistogramPass
 	{
 	public:
-		explicit HistogramPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
+		explicit PostProcessHistogramPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
 
-		HistogramPass(const HistogramPass&)            = delete;
-		HistogramPass& operator=(const HistogramPass&) = delete;
+		PostProcessHistogramPass(const PostProcessHistogramPass&)            = delete;
+		PostProcessHistogramPass& operator=(const PostProcessHistogramPass&) = delete;
 
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 

@@ -13,13 +13,13 @@ import Extrinsic.Graphics.GpuWorld;
 
 namespace Extrinsic::Graphics
 {
-    export class PointPass
+    export class ForwardPointPass
     {
     public:
-        explicit PointPass(ForwardSystem& forward) : m_ForwardSystem(forward) {}
+        explicit ForwardPointPass(ForwardSystem& forward) : m_ForwardSystem(forward) {}
 
-        PointPass(const PointPass&)            = delete;
-        PointPass& operator=(const PointPass&) = delete;
+        ForwardPointPass(const ForwardPointPass&)            = delete;
+        ForwardPointPass& operator=(const ForwardPointPass&) = delete;
 
         void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
         void Execute(RHI::ICommandContext& cmd,

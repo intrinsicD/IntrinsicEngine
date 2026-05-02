@@ -224,7 +224,7 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     Graphics::CullingPass cullPass{culling};
     Graphics::DeferredSystem deferred;
     deferred.Initialize();
-    Graphics::GBufferPass gbufferPass{deferred};
+    Graphics::DeferredGBufferPass gbufferPass{deferred};
     gbufferPass.SetPipeline(RHI::PipelineHandle{11u, 1u});
 
     RecordingCommandContext cmd;

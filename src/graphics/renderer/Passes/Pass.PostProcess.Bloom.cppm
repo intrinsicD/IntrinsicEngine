@@ -8,13 +8,13 @@ import Extrinsic.Graphics.PostProcessSystem;
 
 namespace Extrinsic::Graphics
 {
-	export class BloomPass
+	export class PostProcessBloomPass
 	{
 	public:
-		explicit BloomPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
+		explicit PostProcessBloomPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
 
-		BloomPass(const BloomPass&)            = delete;
-		BloomPass& operator=(const BloomPass&) = delete;
+		PostProcessBloomPass(const PostProcessBloomPass&)            = delete;
+		PostProcessBloomPass& operator=(const PostProcessBloomPass&) = delete;
 
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 

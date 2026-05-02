@@ -8,13 +8,13 @@ import Extrinsic.Graphics.PostProcessSystem;
 
 namespace Extrinsic::Graphics
 {
-	export class FXAAPass
+	export class PostProcessFXAAPass
 	{
 	public:
-		explicit FXAAPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
+		explicit PostProcessFXAAPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
 
-		FXAAPass(const FXAAPass&)            = delete;
-		FXAAPass& operator=(const FXAAPass&) = delete;
+		PostProcessFXAAPass(const PostProcessFXAAPass&)            = delete;
+		PostProcessFXAAPass& operator=(const PostProcessFXAAPass&) = delete;
 
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 

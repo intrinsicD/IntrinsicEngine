@@ -6,12 +6,12 @@ module Extrinsic.Graphics.Pass.Forward.Line;
 
 namespace Extrinsic::Graphics
 {
-    void LinePass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
+    void ForwardLinePass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
     {
         m_Pipeline = pipeline;
     }
 
-    void LinePass::Execute(RHI::ICommandContext& cmd,
+    void ForwardLinePass::Execute(RHI::ICommandContext& cmd,
                            const RHI::CameraUBO& camera,
                            const GpuWorld&       gpuWorld,
                            const CullingSystem&  culling,

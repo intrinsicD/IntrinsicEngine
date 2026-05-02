@@ -6,12 +6,12 @@ module Extrinsic.Graphics.Pass.Deferred.GBuffers;
 
 namespace Extrinsic::Graphics
 {
-    void GBufferPass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
+    void DeferredGBufferPass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
     {
         m_Pipeline = pipeline;
     }
 
-    void GBufferPass::Execute(RHI::ICommandContext& cmd,
+    void DeferredGBufferPass::Execute(RHI::ICommandContext& cmd,
                               const RHI::CameraUBO& camera,
                               const GpuWorld&       gpuWorld,
                               const CullingSystem&  culling,

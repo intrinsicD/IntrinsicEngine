@@ -6,12 +6,12 @@ module Extrinsic.Graphics.Pass.Forward.Point;
 
 namespace Extrinsic::Graphics
 {
-    void PointPass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
+    void ForwardPointPass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
     {
         m_Pipeline = pipeline;
     }
 
-    void PointPass::Execute(RHI::ICommandContext& cmd,
+    void ForwardPointPass::Execute(RHI::ICommandContext& cmd,
                             const RHI::CameraUBO& camera,
                             const GpuWorld&       gpuWorld,
                             const CullingSystem&  culling,

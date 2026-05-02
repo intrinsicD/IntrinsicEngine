@@ -8,13 +8,13 @@ import Extrinsic.Graphics.PostProcessSystem;
 
 namespace Extrinsic::Graphics
 {
-	export class SMAAPass
+	export class PostProcessSMAAPass
 	{
 	public:
-		explicit SMAAPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
+		explicit PostProcessSMAAPass(PostProcessSystem& postProcess) : m_PostProcessSystem(postProcess) {}
 
-		SMAAPass(const SMAAPass&)            = delete;
-		SMAAPass& operator=(const SMAAPass&) = delete;
+		PostProcessSMAAPass(const PostProcessSMAAPass&)            = delete;
+		PostProcessSMAAPass& operator=(const PostProcessSMAAPass&) = delete;
 
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 

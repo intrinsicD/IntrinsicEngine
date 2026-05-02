@@ -13,13 +13,13 @@ import Extrinsic.Graphics.GpuWorld;
 
 namespace Extrinsic::Graphics
 {
-    export class GBufferPass
+    export class DeferredGBufferPass
     {
     public:
-        explicit GBufferPass(DeferredSystem& deferred) : m_DeferredSystem(deferred) {}
+        explicit DeferredGBufferPass(DeferredSystem& deferred) : m_DeferredSystem(deferred) {}
 
-        GBufferPass(const GBufferPass&)            = delete;
-        GBufferPass& operator=(const GBufferPass&) = delete;
+        DeferredGBufferPass(const DeferredGBufferPass&)            = delete;
+        DeferredGBufferPass& operator=(const DeferredGBufferPass&) = delete;
 
         void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
         void Execute(RHI::ICommandContext& cmd,

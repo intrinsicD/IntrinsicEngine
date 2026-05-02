@@ -8,13 +8,13 @@ import Extrinsic.Graphics.SelectionSystem;
 
 namespace Extrinsic::Graphics
 {
-    export class PointIdPass
+    export class SelectionPointIdPass
     {
     public:
-        explicit PointIdPass(SelectionSystem& selection) : m_SelectionSystem(selection) {}
+        explicit SelectionPointIdPass(SelectionSystem& selection) : m_SelectionSystem(selection) {}
 
-        PointIdPass(const PointIdPass&)            = delete;
-        PointIdPass& operator=(const PointIdPass&) = delete;
+        SelectionPointIdPass(const SelectionPointIdPass&)            = delete;
+        SelectionPointIdPass& operator=(const SelectionPointIdPass&) = delete;
 
         void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 
