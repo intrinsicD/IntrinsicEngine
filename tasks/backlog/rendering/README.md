@@ -42,7 +42,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-006 — Material/shader/pipeline registry](GRAPHICS-006-material-shader-pipeline-registry.md):
   depends on GRAPHICS-002.
 - [GRAPHICS-007 — Culling and draw buckets](GRAPHICS-007-culling-and-draw-buckets.md):
-  depends on GRAPHICS-002 and GRAPHICS-004.
+  depends on GRAPHICS-002 and GRAPHICS-004. Owns `CullingPass`
+  (source module `Extrinsic.Graphics.Pass.Culling`) command contracts and the
+  GPU draw-bucket contracts consumed by the surface, line, point, shadow, and
+  selection passes.
 - [GRAPHICS-008 — Depth/surface/G-buffer passes](GRAPHICS-008-depth-surface-gbuffer-passes.md):
   depends on GRAPHICS-003, GRAPHICS-006, and GRAPHICS-007.
 - [GRAPHICS-009 — Deferred lighting and shadows](GRAPHICS-009-deferred-lighting-and-shadows.md):
@@ -52,7 +55,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-011 — Spatial debug visualizers](GRAPHICS-011-spatial-debug-visualizers.md):
   depends on GRAPHICS-010.
 - [GRAPHICS-012 — Picking, selection, and outline](GRAPHICS-012-picking-selection-outline.md):
-  depends on GRAPHICS-002, GRAPHICS-007, GRAPHICS-008, and GRAPHICS-010.
+  depends on GRAPHICS-002, GRAPHICS-007, GRAPHICS-008, and GRAPHICS-010. Owns
+  the logical `PickingPass` stage (split source modules
+  `Pass.Selection.EntityId`/`FaceId`/`EdgeId`/`PointId`) and the
+  `SelectionOutlinePass` (`Pass.Selection.Outline`); see the Pass module
+  naming map in `docs/architecture/rendering-three-pass.md`.
 - [GRAPHICS-013 — Postprocess, debug view, ImGui, and present](GRAPHICS-013-postprocess-debugview-imgui-present.md)
   (or its split replacements once Task 9 lands): depends on GRAPHICS-003 and on
   GRAPHICS-008/GRAPHICS-009 wherever scene-color or HDR inputs are required.

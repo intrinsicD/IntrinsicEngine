@@ -10,13 +10,13 @@ import Extrinsic.RHI.CommandContext;
 
 namespace Extrinsic::Graphics
 {
-    export class DepthPrepassPass
+    export class DepthPrePass
     {
     public:
-        DepthPrepassPass() = default;
+        DepthPrePass() = default;
 
-        DepthPrepassPass(const DepthPrepassPass&)            = delete;
-        DepthPrepassPass& operator=(const DepthPrepassPass&) = delete;
+        DepthPrePass(const DepthPrePass&)            = delete;
+        DepthPrePass& operator=(const DepthPrePass&) = delete;
 
         void Execute(RHI::ICommandContext& cmd);
     };

@@ -58,7 +58,8 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 
 | Pass | Inputs | Outputs | Initialization / Ownership |
 |------|--------|---------|----------------------------|
-| `PickingPass` | `SceneDepth` | `EntityId` | Clears both; no swapchain ownership |
+| `CullingPass` | GPUScene buffers, `CameraUBO` | GPU draw-bucket args/count buffers | Real rendergraph pass that runs before any geometry-consuming pass; resets bucket counters and dispatches GPU culling against the canonical instance/bounds records. Source module: `Pass.Culling` (`CullingPass`). Drives the surface, line, point, alpha-mask, shadow, and selection draw buckets owned by `CullingSystem`. Not a per-geometry-pass helper |
+| `PickingPass` | `SceneDepth` | `EntityId` | Clears both; no swapchain ownership. Logical picking/selection ID stage: composed of split source modules (`Pass.Selection.EntityId`, `Pass.Selection.FaceId`, `Pass.Selection.EdgeId`, `Pass.Selection.PointId`) plus the readback/result seam owned by `SelectionSystem`. Each module fills part of the `EntityId` / `PrimitiveId` outputs; the logical name is `PickingPass` |
 | `DepthPrepass` | GPUScene buffers | `SceneDepth` | Depth-only early-Z fill (triangle-list geometry only). Clears depth to 1.0. Recipe-driven: active only when `FrameRecipe::DepthPrepass` is true. Internal to `SurfacePass` (shares draw stream and GPU culling infrastructure) |
 | `ShadowPass` | GPUScene buffers, `ShadowCascadeData` (push constants) | `ShadowAtlas` | Renders depth-only from each cascade's light-space VP into a horizontal-strip atlas (`CascadeCount × Resolution` wide). Uses dedicated depth pipeline with `VK_CULL_MODE_FRONT_BIT` to reduce self-shadowing. Recipe-gated by `ShadowParams::Enabled`. Texel-snapped cascade frusta computed in `ComputeCascadeViewProjections()` |
 | `SurfacePass` | `SceneDepth`, `ShadowAtlas` (sampled), GPUScene buffers | forward: `SceneColorHDR`; deferred: `SceneNormal` + `Albedo` + `Material0`, `SceneDepth` | Opaque surface lane. Forward path samples `ShadowAtlas` via global set (binding 1, `sampler2DShadow` with `VK_COMPARE_OP_LESS_OR_EQUAL`). When depth prepass is active, loads existing depth and uses `VK_COMPARE_OP_EQUAL` (zero overdraw). Otherwise clears depth with `VK_COMPARE_OP_LESS` |
@@ -66,7 +67,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for wireframe/graph/debug lines; accumulates via `LOAD` |
 | `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for point clouds/debug points; accumulates via `LOAD` |
 | `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR` | Initializes LDR target; internal temp when FXAA enabled |
-| `SelectionOutlinePass` | `EntityId`, presentation target | presentation target | Alpha-blends via `LOAD`; outlines the **union stencil** of selected/hovered renderable PickIDs across surface, line, and point lanes (including mesh/graph/cloud point modes such as sphere impostors) |
+| `SelectionOutlinePass` | `EntityId`, presentation target | presentation target | Alpha-blends via `LOAD`; outlines the **union stencil** of selected/hovered renderable PickIDs across surface, line, and point lanes (including mesh/graph/cloud point modes such as sphere impostors). Source module: `Pass.Selection.Outline` (`SelectionOutlinePass`). Conceptually paired with `PickingPass` but scheduled later in the pipeline so it can read overlay results |
 | `DebugViewPass` | selected sampled resource | `DebugViewRGBA`, optional presentation target | Writes preview image, optional viewport composite |
 | `ImGuiPass` | presentation target | presentation target | UI overlay via `LOAD` |
 | `Present` | `SceneColorLDR` | `Backbuffer` | Explicit final blit/copy |
@@ -119,18 +120,44 @@ Per-frame lighting is carried by `LightEnvironmentPacket` and includes direction
 
 `DefaultPipeline` execution order:
 
-1. `PickingPass`
-2. `DepthPrepass` (internal to `SurfacePass`, recipe-gated)
-3. `ShadowPass` (recipe-gated by `ShadowParams::Enabled`)
-4. `SurfacePass`
-5. `CompositionPass`
-5. `LinePass`
-6. `PointPass`
-7. `PostProcessPass`
-8. `SelectionOutlinePass`
-9. `DebugViewPass`
-10. `ImGuiPass`
-11. `Present`
+1. `CullingPass` (populates per-bucket indirect args/count buffers for downstream geometry/shadow/selection passes)
+2. `PickingPass` (logical stage; source modules `Pass.Selection.EntityId`/`FaceId`/`EdgeId`/`PointId`)
+3. `DepthPrepass` (internal to `SurfacePass`, recipe-gated)
+4. `ShadowPass` (recipe-gated by `ShadowParams::Enabled`)
+5. `SurfacePass`
+6. `CompositionPass`
+7. `LinePass`
+8. `PointPass`
+9. `PostProcessPass`
+10. `SelectionOutlinePass`
+11. `DebugViewPass`
+12. `ImGuiPass`
+13. `Present`
+
+### Pass module naming
+
+The promoted graphics layer keeps a 1:1 mapping between logical passes documented above and the C++20 module names under `src/graphics/renderer/Passes/`. Agents and reviewers should treat the table below as canonical when reconciling task text, doc text, and source.
+
+| Logical pass | Source modules | Source class(es) |
+|--------------|----------------|------------------|
+| `CullingPass` | `Extrinsic.Graphics.Pass.Culling` | `CullingPass` |
+| `PickingPass` (logical stage) | `Extrinsic.Graphics.Pass.Selection.EntityId`, `Extrinsic.Graphics.Pass.Selection.FaceId`, `Extrinsic.Graphics.Pass.Selection.EdgeId`, `Extrinsic.Graphics.Pass.Selection.PointId` | `EntityIdPass`, `FaceIdPass`, `EdgeIdPass`, `PointIdPass` |
+| `DepthPrepass` | `Extrinsic.Graphics.Pass.DepthPrepass` (internal to `SurfacePass`) | `DepthPrePass` |
+| `ShadowPass` | `Extrinsic.Graphics.Pass.Shadows` | `ShadowPass` |
+| `SurfacePass` | `Extrinsic.Graphics.Pass.Forward.Surface`, `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `ForwardSurfacePass`, `GBufferPass` |
+| `CompositionPass` | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `DeferredLightingPass` |
+| `LinePass` | `Extrinsic.Graphics.Pass.Forward.Line` | `LinePass` |
+| `PointPass` | `Extrinsic.Graphics.Pass.Forward.Point` | `PointPass` |
+| `PostProcessPass` | `Extrinsic.Graphics.Pass.PostProcess.*` | bloom/FXAA/SMAA/ToneMap/Histogram passes |
+| `SelectionOutlinePass` | `Extrinsic.Graphics.Pass.Selection.Outline` | `SelectionOutlinePass` |
+| `ImGuiPass` | `Extrinsic.Graphics.Pass.ImGui` | `ImGuiPass` |
+| `Present` | `Extrinsic.Graphics.Pass.Present` | `PresentPass` |
+
+Notes:
+
+- `CullingPass` is a real rendergraph pass, not a per-pass helper. It is owned by `Extrinsic.Graphics.Pass.Culling` and drives the GPU draw buckets consumed by depth, surface, line, point, shadow, and selection passes.
+- `PickingPass` is a logical name for the picking/selection ID stage. The source intentionally splits it into `Pass.Selection.EntityId` / `FaceId` / `EdgeId` / `PointId` modules so each primitive domain has independent contracts and tests. Splitting the implementation modules is **acceptable**; collapsing them into a single source module is **not required** by this architecture doc.
+- `Pass.Selection.Outline` is the source module for `SelectionOutlinePass`. Although it shares the `Selection.*` source prefix with the picking ID modules, it is a separate logical pass (scheduled after post-process) and must not be merged with `PickingPass` in the pipeline order.
 
 Lighting-path coexistence is now explicit:
 
