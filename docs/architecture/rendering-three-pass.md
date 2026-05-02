@@ -142,9 +142,9 @@ The promoted graphics layer keeps a 1:1 mapping between logical passes documente
 |--------------|----------------|------------------|
 | `CullingPass` | `Extrinsic.Graphics.Pass.Culling` | `CullingPass` |
 | `PickingPass` (logical stage) | `Extrinsic.Graphics.Pass.Selection.EntityId`, `Extrinsic.Graphics.Pass.Selection.FaceId`, `Extrinsic.Graphics.Pass.Selection.EdgeId`, `Extrinsic.Graphics.Pass.Selection.PointId` | `EntityIdPass`, `FaceIdPass`, `EdgeIdPass`, `PointIdPass` |
-| `DepthPrepass` | `Extrinsic.Graphics.Pass.DepthPrepass` (internal to `SurfacePass`) | `DepthPrePass` |
+| `DepthPrepass` | `Extrinsic.Graphics.Pass.DepthPrepass` (internal to `SurfacePass`) | `DepthPrepassPass` |
 | `ShadowPass` | `Extrinsic.Graphics.Pass.Shadows` | `ShadowPass` |
-| `SurfacePass` | `Extrinsic.Graphics.Pass.Forward.Surface`, `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `ForwardSurfacePass`, `GBufferPass` |
+| `SurfacePass` | `Extrinsic.Graphics.Pass.Forward.Surface`, `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `SurfacePass`, `GBufferPass` |
 | `CompositionPass` | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `DeferredLightingPass` |
 | `LinePass` | `Extrinsic.Graphics.Pass.Forward.Line` | `LinePass` |
 | `PointPass` | `Extrinsic.Graphics.Pass.Forward.Point` | `PointPass` |
@@ -163,7 +163,7 @@ Lighting-path coexistence is now explicit:
 
 - **Forward mode:** `SurfacePass` writes directly to `SceneColorHDR`; `CompositionPass` is a no-op; `LinePass` and `PointPass` accumulate onto the same HDR target.
 - **Deferred mode:** `SurfacePass` writes only the G-buffer MRT set (`SceneNormal`, `Albedo`, `Material0`) plus depth; `CompositionPass` resolves those buffers into `SceneColorHDR`; `LinePass` and `PointPass` then execute as forward overlays on top of the lit HDR scene.
-- **Hybrid contract (staging):** recipe/pipeline contracts treat `Hybrid` as a deferred-backed path for resource declaration and composition scheduling. Until a dedicated hybrid composer lands, it reuses the same G-buffer + `CompositionPass` contract as deferred while preserving a distinct typed lighting-path value.
+- **Hybrid contract (staging):** recipe/pipeline contracts treat `Hybrid` as a deferred-backed path for resource declaration and composition scheduling. Until a dedicated hybrid composer lands, it reuses the same G-buffer + `CompositionPass` contract as deferred while preserving a distinct typed lighting-path value. The real hybrid/transparent/special-material follow-up is tracked by [GRAPHICS-025](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md).
 
 This establishes the current composition rule: deferred-capable opaque surfaces live in `SurfacePass`, while line/point/debug content remains in the forward lane. The same ordering is the extension point for future transparent or special-material forward overlays.
 

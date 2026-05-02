@@ -8,13 +8,13 @@ import Extrinsic.Graphics.ForwardSystem;
 
 namespace Extrinsic::Graphics
 {
-	export class ForwardSurfacePass
+	export class SurfacePass
 	{
 	public:
-		explicit ForwardSurfacePass(ForwardSystem& forward) : m_ForwardSystem(forward) {}
+		explicit SurfacePass(ForwardSystem& forward) : m_ForwardSystem(forward) {}
 
-		ForwardSurfacePass(const ForwardSurfacePass&)            = delete;
-		ForwardSurfacePass& operator=(const ForwardSurfacePass&) = delete;
+		SurfacePass(const SurfacePass&)            = delete;
+		SurfacePass& operator=(const SurfacePass&) = delete;
 
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 
