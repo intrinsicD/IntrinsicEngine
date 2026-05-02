@@ -74,6 +74,20 @@ TEST(RendererRhiBoundary, RendererDoesNotImportVulkanBackend)
     }
 }
 
+TEST(RendererRhiBoundary, RendererDoesNotImportLiveEcsOwnership)
+{
+    const auto rendererRoot = RepoRoot() / "src/graphics/renderer";
+
+    for (const auto& path : FilesUnder(rendererRoot))
+    {
+        const auto content = ReadFile(path);
+        EXPECT_EQ(content.find("#include <entt"), std::string::npos) << path.string();
+        EXPECT_EQ(content.find("entt::registry"), std::string::npos) << path.string();
+        EXPECT_EQ(content.find("entt::entity"), std::string::npos) << path.string();
+        EXPECT_EQ(content.find("import Extrinsic.ECS"), std::string::npos) << path.string();
+    }
+}
+
 TEST(RendererRhiBoundary, RhiLayerDoesNotImportVulkan)
 {
     const auto rhiRoot = RepoRoot() / "src/graphics/rhi";

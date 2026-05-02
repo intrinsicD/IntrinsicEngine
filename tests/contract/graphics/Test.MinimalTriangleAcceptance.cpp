@@ -4,12 +4,9 @@
 #include <string>
 #include <span>
 
-#include <entt/entity/registry.hpp>
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
-import Extrinsic.ECS.Component.Culling.Local;
-import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.Material;
@@ -153,9 +150,6 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     const auto baseType = matSys.FindType("StandardPBR");
     ASSERT_TRUE(baseType.IsValid());
 
-    entt::registry registry;
-    const auto e = registry.create();
-
     const auto instance = world.AllocateInstance(1u);
     ASSERT_TRUE(instance.IsValid());
 
@@ -169,7 +163,7 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     const auto geometry = world.UploadGeometry(upload);
     ASSERT_TRUE(geometry.IsValid());
 
-    auto& gpuSlot = registry.emplace<Graphics::Components::GpuSceneSlot>(e);
+    Graphics::Components::GpuSceneSlot gpuSlot{};
     gpuSlot.SetInstanceHandle(instance);
     gpuSlot.SetGeometryHandle(geometry);
 
@@ -179,41 +173,52 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     materialParams.BaseColorFactor = {0.8f, 0.7f, 0.6f, 1.0f};
     auto baseLease = matSys.CreateInstance(baseType, materialParams);
     ASSERT_TRUE(baseLease.IsValid());
-    registry.emplace<Graphics::Components::MaterialInstance>(
-        e,
-        Graphics::Components::MaterialInstance{
-            .Lease = std::move(baseLease),
-            .TintOverride = std::nullopt,
-            .EffectiveSlot = 0u,
-        });
+    Graphics::Components::MaterialInstance materialInstance{
+        .Lease = std::move(baseLease),
+        .TintOverride = std::nullopt,
+        .EffectiveSlot = 0u,
+    };
 
-    registry.emplace<Graphics::Components::RenderSurface>(e);
-    registry.emplace<Graphics::Components::VisualizationConfig>(
-        e,
-        Graphics::Components::VisualizationConfig{
-            .Source = Graphics::Components::VisualizationConfig::ColorSource::UniformColor,
-            .Color = {1.0f, 0.1f, 0.1f, 1.0f},
-            .ScalarFieldName = std::string{},
-            .Scalar = {},
-            .ScalarDomain = Graphics::Components::VisualizationConfig::Domain::Vertex,
-            .ColorBufferName = std::string{},
-        });
+    Graphics::Components::VisualizationConfig visualization{
+        .Source = Graphics::Components::VisualizationConfig::ColorSource::UniformColor,
+        .Color = {1.0f, 0.1f, 0.1f, 1.0f},
+        .ScalarFieldName = std::string{},
+        .Scalar = {},
+        .ScalarDomain = Graphics::Components::VisualizationConfig::Domain::Vertex,
+        .ColorBufferName = std::string{},
+    };
 
-    registry.emplace<ECS::Components::Transform::WorldMatrix>(e, ECS::Components::Transform::WorldMatrix{.Matrix = glm::mat4{1.0f}});
+    std::array<Graphics::VisualizationSyncRecord, 1> visualizationRecords{{
+        Graphics::VisualizationSyncRecord{
+            .StableId = 1u,
+            .Material = &materialInstance,
+            .GpuSlot = &gpuSlot,
+            .Visualization = &visualization,
+        },
+    }};
 
-    ECS::Components::Culling::Bounds localBounds{};
-    localBounds.LocalBoundingSphere.Center = {0.0f, 0.0f, 0.0f};
-    localBounds.LocalBoundingSphere.Radius = 1.0f;
-    registry.emplace<ECS::Components::Culling::Bounds>(e, localBounds);
-
-    visSync.Sync(registry, matSys, colorSys, world);
+    visSync.Sync(visualizationRecords, matSys, colorSys, world);
     matSys.SyncGpuBuffer();
-    transformSync.SyncGpuBuffer(registry, world, matSys);
+
+    RHI::GpuBounds bounds{};
+    bounds.LocalSphere = {0.0f, 0.0f, 0.0f, 1.0f};
+    bounds.WorldSphere = {0.0f, 0.0f, 0.0f, 1.0f};
+
+    const std::array<Graphics::TransformSyncRecord, 1> transformRecords{{
+        Graphics::TransformSyncRecord{
+            .Instance = instance,
+            .Model = glm::mat4{1.0f},
+            .RenderFlags = RHI::GpuRender_Visible | RHI::GpuRender_Surface | RHI::GpuRender_Opaque,
+            .Bounds = bounds,
+            .MaterialSlot = materialInstance.EffectiveSlot,
+            .HasMaterialSlot = true,
+        },
+    }};
+    transformSync.SyncGpuBuffer(transformRecords, world);
     world.SetMaterialBuffer(matSys.GetBuffer(), matSys.GetCapacity());
     world.SyncFrame();
 
-    const auto& materialInst = registry.get<Graphics::Components::MaterialInstance>(e);
-    EXPECT_NE(materialInst.EffectiveSlot, 0u);
+    EXPECT_NE(materialInstance.EffectiveSlot, 0u);
     EXPECT_EQ(visSync.GetOverrideLeaseCount(), 1u);
 
     Graphics::CullingPass cullPass{culling};
@@ -243,7 +248,6 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     culling.Shutdown();
     transformSync.Shutdown();
     visSync.Shutdown();
-    registry.clear();
     matSys.Shutdown();
     world.Shutdown();
 }

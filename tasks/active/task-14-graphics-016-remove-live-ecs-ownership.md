@@ -1,8 +1,8 @@
 # Task 14 — Add hard implementation gate: remove live ECS ownership from promoted graphics
 
-- Status: planned (queued for Codex) — first actual code-cleanup task; run only after Tasks 1–8 are complete.
-- Owner: TBD
-- Branch / PR: TBD
+- Status: completed (Stage A API seam, 2026-05-02; full CI configure blocked locally by Draco FetchContent cache clone)
+- Owner: Codex (current branch)
+- Branch / PR: current branch / TBD
 - Next verification step: `cmake --preset ci && cmake --build --preset ci --target IntrinsicTests && ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` after the API-boundary patch.
 
 ---
@@ -10,6 +10,8 @@
 You are working in https://github.com/intrinsicD/IntrinsicEngine.
 
 Start GRAPHICS-016 by removing live ECS ownership from promoted graphics APIs. Keep the patch small and do not implement new renderer features.
+
+Stage A implementation note (2026-05-02): promoted graphics sync systems now consume typed snapshot records/spans instead of `entt::registry&`; `ExtrinsicGraphics` no longer links `ExtrinsicECS` or `EnTT::EnTT`; a graphics boundary contract test guards against reintroducing live ECS/EnTT imports under `src/graphics/renderer`. Runtime-owned ECS extraction/wiring remains the next GRAPHICS-016 follow-up. Local verification ran strict task/docs checks and a promoted graphics ECS/EnTT boundary check successfully; `cmake --preset ci` was attempted but blocked before project compilation by a broken `external/cache/draco-src` FetchContent clone.
 
 ## Goal
 

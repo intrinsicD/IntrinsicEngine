@@ -1,13 +1,15 @@
 module;
 
 #include <bit>
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 #include <glm/glm.hpp>
-#include <entt/entity/registry.hpp>
 
 module Extrinsic.Graphics.VisualizationSyncSystem;
 
@@ -55,17 +57,16 @@ namespace Extrinsic::Graphics
 
         MaterialTypeHandle SciVisTypeHandle;
 
-        // Per-entity override material leases.
-        // Key = entt::entity (raw uint32_t cast to avoid hashing issues).
+        // Per-record override material leases.
+        // Key = runtime-provided stable renderable ID.
         using EntityInt = std::uint32_t;
         std::unordered_map<EntityInt, MaterialSystem::MaterialLease> OverrideLeases;
 
         // ----------------------------------------------------------------
-        /// Get or create the override lease for an entity.
-        MaterialSystem::MaterialLease& EnsureOverrideLease(entt::entity entity,
+        /// Get or create the override lease for a stable renderable record.
+        MaterialSystem::MaterialLease& EnsureOverrideLease(EntityInt key,
                                                            MaterialSystem& matSys)
         {
-            const auto key = static_cast<EntityInt>(entity);
             auto it = OverrideLeases.find(key);
             if (it == OverrideLeases.end())
             {
@@ -75,10 +76,10 @@ namespace Extrinsic::Graphics
             return it->second;
         }
 
-        /// Release the override lease for an entity (if any).
-        void ReleaseOverrideLease(entt::entity entity)
+        /// Release the override lease for a stable renderable record (if any).
+        void ReleaseOverrideLease(EntityInt key)
         {
-            OverrideLeases.erase(static_cast<EntityInt>(entity));
+            OverrideLeases.erase(key);
         }
 
         static std::uint32_t ToVisDomain(Components::VisualizationConfig::Domain d) noexcept
@@ -268,7 +269,7 @@ namespace Extrinsic::Graphics
     }
 
     // ----------------------------------------------------------------
-    void VisualizationSyncSystem::Sync(entt::registry& registry,
+    void VisualizationSyncSystem::Sync(std::span<VisualizationSyncRecord> records,
                                        MaterialSystem& matSys,
                                        ColormapSystem& colormapSys,
                                        GpuWorld&       gpuWorld)
@@ -276,11 +277,22 @@ namespace Extrinsic::Graphics
         using namespace Components;
         using ColorSource = VisualizationConfig::ColorSource;
 
-        // ---- Pass 1: entities with MaterialInstance + GpuSceneSlot -------
-        auto view = registry.view<MaterialInstance, GpuSceneSlot>();
+        std::vector<std::uint32_t> liveKeys;
+        liveKeys.reserve(records.size());
 
-        for (const auto [entity, matInst, gpuSlot] : view.each())
+        // ---- Pass 1: extracted records with MaterialInstance + GpuSceneSlot -------
+        for (VisualizationSyncRecord& record : records)
         {
+            liveKeys.push_back(record.StableId);
+            if (!record.Material || !record.GpuSlot)
+            {
+                m_Impl->ReleaseOverrideLease(record.StableId);
+                continue;
+            }
+
+            auto& matInst = *record.Material;
+            const auto& gpuSlot = *record.GpuSlot;
+
             // Apply TintOverride to the BASE material if set.
             if (matInst.TintOverride.has_value() && matInst.Lease.IsValid())
             {
@@ -291,7 +303,7 @@ namespace Extrinsic::Graphics
                     });
             }
 
-            const auto* visCfg = registry.try_get<VisualizationConfig>(entity);
+            const auto* visCfg = record.Visualization;
 
             if (gpuSlot.HasInstance())
             {
@@ -305,7 +317,7 @@ namespace Extrinsic::Graphics
                 // No sci-vis override — use the base material slot directly.
                 if (matInst.Lease.IsValid())
                     matInst.EffectiveSlot = matSys.GetMaterialSlot(matInst.Lease.GetHandle());
-                m_Impl->ReleaseOverrideLease(entity);
+                m_Impl->ReleaseOverrideLease(record.StableId);
                 continue;
             }
 
@@ -331,8 +343,8 @@ namespace Extrinsic::Graphics
                 break;
             }
 
-            // Apply params to the per-entity override material.
-            auto& lease = m_Impl->EnsureOverrideLease(entity, matSys);
+            // Apply params to the per-renderable override material.
+            auto& lease = m_Impl->EnsureOverrideLease(record.StableId, matSys);
             assert(lease.IsValid());
             matSys.SetParams(lease.GetHandle(), overrideParams);
 
@@ -340,13 +352,13 @@ namespace Extrinsic::Graphics
         }
 
         // ---- Pass 2: release stale override leases -----------------------
-        // Entities that no longer carry MaterialInstance have been destroyed
-        // or had the component removed.  Their map entries must be cleaned up.
+        // Records that are no longer extracted have been destroyed or are no
+        // longer visualized. Their map entries must be cleaned up.
         std::vector<std::uint32_t> staleKeys;
         for (const auto& [key, lease] : m_Impl->OverrideLeases)
         {
-            const auto entity = static_cast<entt::entity>(key);
-            if (!registry.valid(entity) || !registry.all_of<MaterialInstance>(entity))
+            (void)lease;
+            if (std::find(liveKeys.begin(), liveKeys.end(), key) == liveKeys.end())
                 staleKeys.push_back(key);
         }
         for (const auto key : staleKeys)

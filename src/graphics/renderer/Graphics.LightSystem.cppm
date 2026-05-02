@@ -1,7 +1,8 @@
 module;
 
 #include <memory>
-#include <entt/entity/registry.hpp>
+#include <span>
+#include <cstdint>
 
 #include <glm/glm.hpp>
 
@@ -22,6 +23,24 @@ export namespace Extrinsic::Graphics
 
 		glm::vec3 AmbientColor{0.2f, 0.2f, 0.2f};
 		float     AmbientIntensity{1.f};
+	};
+
+	struct LightSnapshot
+	{
+		enum class Type : std::uint8_t
+		{
+			Directional,
+			Point,
+			Spot,
+		} LightType{Type::Directional};
+
+		glm::vec3 Position{0.f};
+		float     Range{10.f};
+		glm::vec3 Direction{0.f, -1.f, 0.f};
+		float     Intensity{1.f};
+		glm::vec3 Color{1.f};
+		float     InnerConeCos{0.80f};
+		float     OuterConeCos{0.65f};
 	};
 
 	class LightSystem
@@ -46,7 +65,7 @@ export namespace Extrinsic::Graphics
 		void SetAmbientLight(glm::vec3 color, float intensity) noexcept;
 
 		void ApplyTo(RHI::CameraUBO& camera) const noexcept;
-		void SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld);
+		void SyncGpuBuffer(std::span<const LightSnapshot> lights, GpuWorld& gpuWorld);
 
 		[[nodiscard]] bool IsInitialized() const noexcept;
 

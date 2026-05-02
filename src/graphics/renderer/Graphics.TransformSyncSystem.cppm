@@ -5,15 +5,28 @@
 module;
 
 #include <memory>
-#include <entt/entity/registry.hpp>
+#include <span>
+#include <cstdint>
+
+#include <glm/glm.hpp>
 
 export module Extrinsic.Graphics.TransformSyncSystem;
 
 import Extrinsic.Graphics.GpuWorld;
-import Extrinsic.Graphics.MaterialSystem;
+import Extrinsic.RHI.Types;
 
 export namespace Extrinsic::Graphics
 {
+    struct TransformSyncRecord
+    {
+        GpuInstanceHandle Instance{};
+        glm::mat4         Model{1.f};
+        std::uint32_t     RenderFlags{RHI::GpuRender_Visible | RHI::GpuRender_Opaque};
+        RHI::GpuBounds    Bounds{};
+        std::uint32_t     MaterialSlot{0u};
+        bool              HasMaterialSlot{false};
+    };
+
     class TransformSyncSystem
     {
     public:
@@ -25,7 +38,7 @@ export namespace Extrinsic::Graphics
 
         void Initialize();
         void Shutdown();
-        void SyncGpuBuffer(entt::registry& registry, GpuWorld& gpuWorld, MaterialSystem& materialSystem);
+        void SyncGpuBuffer(std::span<const TransformSyncRecord> records, GpuWorld& gpuWorld);
 
         [[nodiscard]] bool IsInitialized() const noexcept;
 

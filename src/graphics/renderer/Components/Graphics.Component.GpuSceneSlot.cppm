@@ -20,7 +20,7 @@ export namespace Extrinsic::Graphics
 
 export namespace Extrinsic::Graphics::Components
 {
-    // A named GPU buffer view owned by this entity's GpuSceneSlot.
+    // A named GPU buffer view owned by this renderable's GpuSceneSlot.
     // The lifecycle system populates these; render passes and visualization
     // components reference them by name.
     //
@@ -39,18 +39,19 @@ export namespace Extrinsic::Graphics::Components
         uint32_t       Stride       = 0;  // bytes per element
     };
 
-    // Per-entity GPU scene state. Written exclusively by lifecycle systems; read by render passes.
+    // Per-renderable GPU scene state. Written exclusively by runtime/graphics
+    // lifecycle sidecars; read by render passes.
     //
     // CullingSlotIndex
     //   Index into the GPU-side per-instance SSBO consumed by instance_cull.comp.
     //   The compute shader reads each slot's bounding sphere + model matrix, tests
     //   against the camera frustum, and writes surviving draw commands into the
-    //   indirect draw buffer.  UINT32_MAX = not yet registered (entity not in GPU scene).
+    //   indirect draw buffer.  UINT32_MAX = not yet registered (renderable not in GPU scene).
     //   Only surface geometry that participates in GPU-driven culling needs this;
     //   point clouds and line draws that go through BDA directly can leave it unset.
     //
     // Buffers
-    //   All uploaded geometry buffers for this entity, keyed by canonical name.
+    //   All uploaded geometry buffers for this renderable, keyed by canonical name.
     //   Render geometry components (RenderPoints, RenderLines, RenderSurface) and
     //   visualization configs (ScalarFieldDataSource, ColorDataSource) name their
     //   required buffer here; the render pass resolves name → handle at extraction time.

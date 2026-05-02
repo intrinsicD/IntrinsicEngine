@@ -359,7 +359,7 @@ intrinsic_resolve_test_sources(_graphics_contract_test_sources
 intrinsic_test_object_lib(GraphicsContractTestObjs
     SOURCES
         ${_graphics_contract_test_sources}
-    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform EnTT::EnTT glm::glm
+    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
 # Runtime/integration test object libraries pull in test sources that

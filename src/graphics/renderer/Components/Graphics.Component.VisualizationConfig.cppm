@@ -9,14 +9,14 @@ export module Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;  // ScalarFieldConfig
 
 // ============================================================
-// VisualizationConfig — per-entity scientific-visualisation override.
+// VisualizationConfig — per-renderable scientific-visualisation override.
 //
-// When this component is present on an entity that has both a
+// When this record is present for a renderable that has both a
 // MaterialInstance and a GpuSceneSlot, VisualizationSyncSystem
 // selects an appropriate GPU rendering mode each frame and writes
 // MaterialInstance::EffectiveSlot accordingly.
 //
-// When the component is absent, MaterialInstance governs appearance.
+// When the record is absent, MaterialInstance governs appearance.
 //
 // Colour source priority (descending):
 //   ScalarField       — GPU colourmap with optional isolines / binning
@@ -36,15 +36,15 @@ import Extrinsic.Graphics.Component.RenderGeometry;  // ScalarFieldConfig
 //   "face_colors"    — vec4 per-face RGBA colours
 //
 // ScalarField GPU path:
-//   VisualizationSyncSystem patches the entity's override material
+//   VisualizationSyncSystem patches the renderable's override material
 //   with MaterialTypeID = kMaterialTypeID_SciVis and writes per-entity
 //   attribute pointers/metadata to GpuWorld::GpuEntityConfig.
 //   The surface shader branches on MaterialTypeID to apply the
 //   colourmap at fragment level.
 //
 // Usage — geodesic distance on a mesh:
-//   auto& vis          = registry.emplace<VisualizationConfig>(entity);
-//   vis.Source         = VisualizationConfig::ColorSource::ScalarField;
+//   VisualizationConfig vis{};
+//   vis.Source          = VisualizationConfig::ColorSource::ScalarField;
 //   vis.ScalarFieldName = "geodesic";
 //   vis.Scalar.Map     = Colormap::Type::Plasma;
 //   vis.Scalar.AutoRange = true;
