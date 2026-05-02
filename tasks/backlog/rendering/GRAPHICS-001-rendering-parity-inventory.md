@@ -55,13 +55,15 @@ Task index and intended order:
 10. `GRAPHICS-010` line/point/transient debug primitive passes.
 11. `GRAPHICS-011` spatial debug visualizers on top of debug primitive packets.
 12. `GRAPHICS-012` picking and selection outline after primitive pass contracts.
-13. `GRAPHICS-013` post-process, debug view, ImGui, and present passes.
-14. `GRAPHICS-014` visualization attributes and overlays.
-15. `GRAPHICS-015` GPU assets/textures/residency.
-16. `GRAPHICS-017` camera, interaction, and gizmo ownership boundaries.
-17. `GRAPHICS-018` Vulkan renderer integration after CPU/null contracts stabilize.
-18. `GRAPHICS-019` legacy graphics IO boundary split to assets/geometry owners.
-19. `GRAPHICS-020` legacy graphics retirement gates.
+13. `GRAPHICS-013A` postprocess chain (bloom, FXAA, SMAA, tone map, histogram, HDR→LDR, and postprocess lifetimes).
+14. `GRAPHICS-013B` debug-view and render-target inspection contracts.
+15. `GRAPHICS-013C` ImGui overlay and present/finalization contracts.
+16. `GRAPHICS-014` visualization attributes and overlays.
+17. `GRAPHICS-015` GPU assets/textures/residency.
+18. `GRAPHICS-017` camera, interaction, and gizmo ownership boundaries.
+19. `GRAPHICS-018` Vulkan renderer integration after CPU/null contracts stabilize.
+20. `GRAPHICS-019` legacy graphics IO boundary split to assets/geometry owners.
+21. `GRAPHICS-020` legacy graphics retirement gates.
 
 ## Tests
 - Run task policy validation after adding or updating backlog files.
