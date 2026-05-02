@@ -9,6 +9,17 @@
 ## Context
 - Owner: `src/runtime` for extraction/wiring and `src/graphics/renderer` for consumed snapshot contracts.
 - Legacy runtime render extraction and graphics lifecycle systems show required behavior for mesh, graph, point-cloud, selection, and visualization handoff.
+## Current boundary audit (2026-05-02)
+- `src/graphics/renderer/Graphics.TransformSyncSystem.cppm` and `.cpp` still require `entt::registry&` for transform/material synchronization.
+- `src/graphics/renderer/Graphics.LightSystem.cppm` and `.cpp` still require `entt::registry&` for light extraction.
+- `src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm` and `.cpp` still require `entt::registry&` for visualization payload extraction.
+- `src/graphics/renderer/CMakeLists.txt` still links `ExtrinsicECS` into promoted graphics.
+
+## Staged implementation plan
+- Stage A (API seam): introduce runtime-owned snapshot packets for transform/light/visualization sync and switch promoted graphics sync entry points from `entt::registry&` to typed snapshot spans.
+- Stage B (wiring): perform ECS queries and dirty-domain filtering inside runtime extraction, then feed packets into graphics systems.
+- Stage C (dependency cleanup): remove `ExtrinsicECS` link from promoted graphics once all Stage A/B callsites are migrated; keep any temporary shim time-bounded in `tasks/active/`.
+
 ## Required changes
 - Define extraction records for mesh, graph, point-cloud, material, transform, lighting, selection, visualization, and debug inputs.
 - Define runtime-owned sidecar/cache mappings from ECS entities, asset IDs, and geometry source handles to graphics instance, geometry, material, transform, bounds/culling, and light handles.
