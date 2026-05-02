@@ -86,6 +86,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   must not put IO ownership into graphics.
 - [GRAPHICS-020 — Legacy graphics retirement gates](GRAPHICS-020-legacy-graphics-retirement-gates.md):
   final retirement gating after parity tasks complete.
+- [GRAPHICS-022 — Rendergraph diagnostics and validation](GRAPHICS-022-rendergraph-diagnostics-validation.md):
+  queued follow-on infrastructure hardening task; canonical ordering matches
+  GRAPHICS-001 and it depends on GRAPHICS-003 for frame-recipe context while
+  remaining CPU/null testable (no Vulkan requirement).
 
 ## Agent selection rules
 
