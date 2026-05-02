@@ -142,7 +142,7 @@ The promoted graphics layer keeps a 1:1 mapping between logical passes documente
 |--------------|----------------|------------------|
 | `CullingPass` | `Extrinsic.Graphics.Pass.Culling` | `CullingPass` |
 | `PickingPass` (logical stage) | `Extrinsic.Graphics.Pass.Selection.EntityId`, `Extrinsic.Graphics.Pass.Selection.FaceId`, `Extrinsic.Graphics.Pass.Selection.EdgeId`, `Extrinsic.Graphics.Pass.Selection.PointId` | `EntityIdPass`, `FaceIdPass`, `EdgeIdPass`, `PointIdPass` |
-| `DepthPrepass` | `Extrinsic.Graphics.Pass.DepthPrepass` (internal to `SurfacePass`) | `DepthPrepass` |
+| `DepthPrepass` | `Extrinsic.Graphics.Pass.DepthPrepass` (internal to `SurfacePass`) | `DepthPrePass` |
 | `ShadowPass` | `Extrinsic.Graphics.Pass.Shadows` | `ShadowPass` |
 | `SurfacePass` | `Extrinsic.Graphics.Pass.Forward.Surface`, `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `ForwardSurfacePass`, `GBufferPass` |
 | `CompositionPass` | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `DeferredLightingPass` |
