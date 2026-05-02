@@ -1,37 +1,31 @@
-# GRAPHICS-013 — Post-process, debug view, ImGui, and present passes
+# GRAPHICS-013 — Post-process, debug view, ImGui, and present (umbrella)
 ## Goal
-- Complete post-process chain, debug-view output, ImGui overlay, and explicit present/finalization pass contracts.
+- Keep a high-level planning index for the formerly over-scoped rendering follow-up area.
+- Delegate implementation planning to split tasks with narrow ownership boundaries.
 ## Non-goals
-- No new effects beyond bloom, FXAA, SMAA, tone mapping, histogram, debug view, ImGui overlay, and present.
-- No platform window ownership in graphics.
-- No Vulkan-only mandatory tests.
+- No implementation details in this umbrella task.
+- No renderer, shader, or pass code changes.
 ## Context
-- Owner: `src/graphics/renderer/Passes`, framegraph, and RHI/backend seams.
-- Legacy post-process/debug-view/ImGui/presentation modules are behavioral references only.
+- This task was originally over-scoped and bundled multiple independent feature families.
+- Split ownership now lives in GRAPHICS-013A/B/C for reviewability and execution sequencing.
 ## Required changes
-- Fill bloom, FXAA, SMAA, tone-map, histogram, debug-view, ImGui, and present command/resource contracts.
-- Declare auxiliary GPU resources for bloom temporaries, SMAA lookup textures, histogram readbacks, debug-view sampled resources, and ImGui draw-data imports.
-- Make HDR-to-LDR ownership, temporary resources, and final backbuffer writes explicit in the frame recipe.
-- Add diagnostics for missing HDR/LDR/backbuffer resources and unsupported effect combinations.
+- Use this file as an index only.
+- Plan and execute implementation through:
+  - `GRAPHICS-013A` postprocess chain.
+  - `GRAPHICS-013B` debug-view and render-target inspection.
+  - `GRAPHICS-013C` ImGui overlay and present/finalization.
 ## Tests
-- Add pass-order, resource-lifetime, load/store, dispatch/draw/copy/blit, and disabled-effect tests using null/mock backend seams.
-- Add optional GPU/Vulkan smoke tests behind labels when backend behavior is implemented.
-- Label CPU/mock pass tests `contract;graphics` for the default CPU gate; label optional post-process/present smoke tests `gpu;vulkan` so they stay opt-in.
+- N/A in this umbrella file; tests are defined by split tasks.
 ## Docs
-- Update canonical post-process chain, debug-view behavior, ImGui ownership, and backbuffer policy.
+- Keep cross-links synchronized with GRAPHICS-001 and rendering README DAG/order.
 ## Acceptance criteria
-- `SceneColorHDR` is converted to `SceneColorLDR` through explicit post-process passes.
-- Only present/finalization writes the imported backbuffer.
-- Debug view and ImGui overlays are explicit and testable.
+- GRAPHICS-013A/B/C collectively replace implementation scope previously attached to GRAPHICS-013.
+- Each split task owns one coherent feature family with explicit boundaries.
 ## Verification
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-# Optional when hardware/driver support is available:
-ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root . --strict
 ```
 ## Forbidden changes
-- Mixing mechanical file moves with semantic refactors.
-- Introducing unrelated feature work.
-- Moving platform/window ownership into graphics.
+- Re-expanding this umbrella into implementation detail.
+- Mixing unrelated feature families back into one task.

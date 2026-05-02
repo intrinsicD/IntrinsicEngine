@@ -1,8 +1,8 @@
 # Task 9 — Split GRAPHICS-013 into smaller tasks
 
-- Status: planned (queued for Codex)
-- Owner: TBD
-- Branch / PR: TBD
+- Status: in-progress
+- Owner: Codex (gpt-5.3-codex)
+- Branch / PR: current branch / TBD
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` after creating GRAPHICS-013A/B/C.
 
 ---

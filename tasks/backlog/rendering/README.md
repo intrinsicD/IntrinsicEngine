@@ -60,9 +60,12 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `Pass.Selection.EntityId`/`FaceId`/`EdgeId`/`PointId`) and the
   `SelectionOutlinePass` (`Pass.Selection.Outline`); see the Pass module
   naming map in `docs/architecture/rendering-three-pass.md`.
-- [GRAPHICS-013 — Postprocess, debug view, ImGui, and present](GRAPHICS-013-postprocess-debugview-imgui-present.md)
-  (or its split replacements once Task 9 lands): depends on GRAPHICS-003 and on
-  GRAPHICS-008/GRAPHICS-009 wherever scene-color or HDR inputs are required.
+- [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](GRAPHICS-013-postprocess-debugview-imgui-present.md)
+- [GRAPHICS-013A — Postprocess chain](GRAPHICS-013A-postprocess-chain.md)
+- [GRAPHICS-013B — Debug view and render-target inspection](GRAPHICS-013B-debug-view-and-render-target-inspection.md)
+- [GRAPHICS-013C — ImGui overlay and present/finalization](GRAPHICS-013C-imgui-overlay-and-present.md)
+  depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
+  scene-color or HDR inputs are required.
 - [GRAPHICS-014 — Visualization attributes and overlays](GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever
   texture/atlas resources are required.
@@ -74,7 +77,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-018 — Vulkan renderer integration](GRAPHICS-018-vulkan-renderer-integration.md):
   depends on stable CPU/null contracts from GRAPHICS-002, GRAPHICS-003,
   GRAPHICS-004, GRAPHICS-006, GRAPHICS-007, GRAPHICS-008, GRAPHICS-009, and
-  GRAPHICS-013.
+  GRAPHICS-013C.
 - [GRAPHICS-019 — Legacy graphics IO boundaries](GRAPHICS-019-legacy-graphics-io-boundaries.md):
   may run as planning in parallel with the implementation tasks above, but
   must not put IO ownership into graphics.
