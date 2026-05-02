@@ -108,6 +108,28 @@ TEST(GridDimensions, IsValid)
     EXPECT_FALSE(dims.IsValid());
 }
 
+TEST(GridDimensions, EqualityComparesLayoutFields)
+{
+    GridDimensions lhs;
+    lhs.NX = 3; lhs.NY = 4; lhs.NZ = 5;
+    lhs.Origin = glm::vec3{-1.0f, 2.0f, 3.0f};
+    lhs.Spacing = glm::vec3{0.25f, 0.5f, 1.0f};
+
+    GridDimensions rhs = lhs;
+    EXPECT_EQ(lhs, rhs);
+
+    rhs.Spacing.z = 2.0f;
+    EXPECT_NE(lhs, rhs);
+
+    rhs = lhs;
+    rhs.Origin.x = 0.0f;
+    EXPECT_NE(lhs, rhs);
+
+    rhs = lhs;
+    rhs.NY = 6;
+    EXPECT_NE(lhs, rhs);
+}
+
 // =============================================================================
 // DenseGrid — construction and property management
 // =============================================================================

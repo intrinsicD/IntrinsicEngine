@@ -9,11 +9,12 @@ export module Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.MaterialSystem;
 
 // ============================================================
-// MaterialInstance — per-entity material ownership component.
+// MaterialInstance — per-renderable material ownership sidecar.
 //
-// Held directly on ECS entities that participate in rendering.
-// Owns an RAII lease into MaterialSystem so that the GPU material
-// slot remains valid for exactly as long as the entity is alive.
+// Owned by runtime extraction sidecars or graphics snapshots for renderables
+// that participate in rendering. Owns an RAII lease into MaterialSystem so
+// that the GPU material slot remains valid for exactly as long as the
+// renderable-sidecar record is alive.
 //
 // EffectiveSlot lifecycle:
 //   Written each frame by VisualizationSyncSystem::Sync():
@@ -24,7 +25,7 @@ import Extrinsic.Graphics.MaterialSystem;
 //
 // Usage:
 //   auto lease = matSys.CreateInstance(matSys.FindType("StandardPBR"), params);
-//   registry.emplace<Components::MaterialInstance>(entity, std::move(lease));
+//   Components::MaterialInstance material{.Lease = std::move(lease)};
 // ============================================================
 
 export namespace Extrinsic::Graphics::Components

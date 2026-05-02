@@ -65,6 +65,9 @@ Task index and intended order:
 20. `GRAPHICS-019` legacy graphics IO boundary split to assets/geometry owners.
 21. `GRAPHICS-020` legacy graphics retirement gates.
 22. `GRAPHICS-022` rendergraph diagnostics and validation (infrastructure hardening for deterministic contract failures).
+23. `GRAPHICS-023` shader/material/texture hot reload.
+24. `GRAPHICS-024` overlays, presentation adjacency, and editor handoff.
+25. `GRAPHICS-025` hybrid/transparent/special-material forward path follow-up.
 
 ## Tests
 - Run task policy validation after adding or updating backlog files.

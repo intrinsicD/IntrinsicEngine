@@ -2,7 +2,7 @@ module;
 
 #include <cstdint>
 #include <memory>
-#include <entt/entity/registry.hpp>
+#include <span>
 
 export module Extrinsic.Graphics.VisualizationSyncSystem;
 
@@ -10,19 +10,22 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.Component.Material;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 
 // ============================================================
 // VisualizationSyncSystem — visualization-config → material sync.
 //
-// OWNER: manages one MaterialLease per entity that carries an
-//        active VisualizationConfig (the "override lease").
+// OWNER: manages one MaterialLease per runtime-extracted renderable record that
+//        carries an active VisualizationConfig (the "override lease").
 //
 // Responsibilities:
-//   1. For each entity with MaterialInstance + GpuSceneSlot:
+//   1. For each extracted record with MaterialInstance + GpuSceneSlot:
 //        a. No VisualizationConfig → EffectiveSlot = base material.
 //        b. VisualizationConfig present → allocate/reuse an override
 //           material lease (kMaterialTypeID_SciVis), patch it with
-//           shading-mode constants, then write per-entity BDA/config
+//           shading-mode constants, then write per-renderable BDA/config
 //           into GpuWorld::GpuEntityConfig and set EffectiveSlot
 //           to the override slot.
 //      Additionally applies TintOverride to the base material when set.
@@ -52,6 +55,14 @@ import Extrinsic.Graphics.GpuWorld;
 
 export namespace Extrinsic::Graphics
 {
+    struct VisualizationSyncRecord
+    {
+        std::uint32_t StableId{0u};
+        Components::MaterialInstance* Material{nullptr};
+        const Components::GpuSceneSlot* GpuSlot{nullptr};
+        const Components::VisualizationConfig* Visualization{nullptr};
+    };
+
     class VisualizationSyncSystem
     {
     public:
@@ -78,7 +89,7 @@ export namespace Extrinsic::Graphics
         // Per-frame sync
         // -----------------------------------------------------------------
 
-        /// Iterate all entities carrying MaterialInstance + GpuSceneSlot
+        /// Iterate all runtime-extracted records carrying MaterialInstance + GpuSceneSlot
         /// and resolve their EffectiveSlot:
         ///   - No VisualizationConfig → EffectiveSlot = base material slot.
         ///   - VisualizationConfig present → create/patch override material
@@ -86,7 +97,7 @@ export namespace Extrinsic::Graphics
         ///
         /// colormapSys must be initialised before Sync() is called so that
         /// GetBindlessIndex() returns valid slot indices.
-        void Sync(entt::registry& registry,
+        void Sync(std::span<VisualizationSyncRecord> records,
                   MaterialSystem& matSys,
                   ColormapSystem& colormapSys,
                   GpuWorld& gpuWorld);

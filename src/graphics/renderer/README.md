@@ -92,6 +92,10 @@ and renderer/render-graph orchestration.
 - `Graphics` consumes immutable snapshots/views supplied by runtime and owns GPU
   resource/state transitions and pass-level scheduling through
   `Graphics.RenderGraph`.
+- `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
+  graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
+  `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
+  responsible for building those records from ECS/assets/geometry state.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.

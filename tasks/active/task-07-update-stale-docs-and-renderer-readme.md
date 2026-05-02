@@ -1,6 +1,6 @@
 # Task 7 — Update stale docs and renderer README ownership contract
 
-- Status: in-progress
+- Status: completed
 - Owner: Claude (claude/next-active-task-mtji0)
 - Branch / PR: `claude/next-active-task-mtji0`
 - Next verification step: `python3 tools/docs/check_doc_links.py --root . --strict` and `python3 tools/agents/check_task_policy.py --root . --strict` after rewriting stale rendering docs (both pass; 0 findings).

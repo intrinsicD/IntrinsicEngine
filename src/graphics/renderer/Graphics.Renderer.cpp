@@ -5,7 +5,6 @@ module;
 #include <memory>
 #include <optional>
 #include <vector>
-#include <entt/entity/registry.hpp>
 
 module Extrinsic.Graphics.Renderer;
 
@@ -207,6 +206,9 @@ namespace Extrinsic::Graphics
             // NullRenderer has no swapchain; always reports "frame available"
             // so the rest of the loop exercises the extraction/prepare/execute
             // seams even without a real GPU backend.
+            m_VisualizationSyncRecords.clear();
+            m_TransformSyncRecords.clear();
+            m_LightSnapshots.clear();
             m_HasExtractedRenderWorld = false;
             m_HasPreparedFrame = false;
             return true;
@@ -276,7 +278,7 @@ namespace Extrinsic::Graphics
                     [this]
                     {
                         m_VisualizationSyncSystem->Sync(
-                            m_SyncRegistry,
+                            m_VisualizationSyncRecords,
                             *m_MaterialSystem,
                             *m_ColormapSystem,
                             *m_GpuWorld);
@@ -301,7 +303,7 @@ namespace Extrinsic::Graphics
                     },
                     [this]
                     {
-                        m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld, *m_MaterialSystem);
+                        m_TransformSyncSystem->SyncGpuBuffer(m_TransformSyncRecords, *m_GpuWorld);
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.LightSync",
@@ -312,7 +314,7 @@ namespace Extrinsic::Graphics
                     },
                     [this]
                     {
-                        m_LightSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
+                        m_LightSystem->SyncGpuBuffer(m_LightSnapshots, *m_GpuWorld);
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.GpuWorldSync",
@@ -360,13 +362,13 @@ namespace Extrinsic::Graphics
                 m_PipelineManager->CommitPending();
                 m_MaterialSystem->SyncGpuBuffer();
                 m_VisualizationSyncSystem->Sync(
-                    m_SyncRegistry,
+                    m_VisualizationSyncRecords,
                     *m_MaterialSystem,
                     *m_ColormapSystem,
                     *m_GpuWorld);
                 m_MaterialSystem->SyncGpuBuffer();
-                m_TransformSyncSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld, *m_MaterialSystem);
-                m_LightSystem->SyncGpuBuffer(m_SyncRegistry, *m_GpuWorld);
+                m_TransformSyncSystem->SyncGpuBuffer(m_TransformSyncRecords, *m_GpuWorld);
+                m_LightSystem->SyncGpuBuffer(m_LightSnapshots, *m_GpuWorld);
                 m_GpuWorld->SetMaterialBuffer(
                     m_MaterialSystem->GetBuffer(),
                     m_MaterialSystem->GetCapacity());
@@ -726,10 +728,12 @@ namespace Extrinsic::Graphics
         std::optional<PostProcessSystem>     m_PostProcessSystem;
         std::optional<ShadowSystem>          m_ShadowSystem;
         RHI::IDevice*                        m_Device{nullptr};
-        entt::registry                       m_SyncRegistry;
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
+        std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
+        std::vector<TransformSyncRecord>     m_TransformSyncRecords;
+        std::vector<LightSnapshot>           m_LightSnapshots;
         bool                                 m_EnableRenderPrepTaskGraph{true};
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};

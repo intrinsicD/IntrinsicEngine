@@ -114,6 +114,13 @@ option(INTRINSIC_OFFLINE_DEPS
     "Disable network dependency fetches and require pre-populated external/cache/<name>-src trees"
     OFF
 )
+set(INTRINSIC_DEPS_CACHE_DIR "${CMAKE_SOURCE_DIR}/external/cache" CACHE PATH
+    "Shared FetchContent dependency cache directory used by all build trees"
+)
+option(INTRINSIC_UPDATE_DEPS
+    "Allow FetchContent to contact remotes to update existing dependency sources"
+    OFF
+)
 
 set(INTRINSIC_RELEASE_FLAGS
         $<$<CONFIG:Release>:-O3>
