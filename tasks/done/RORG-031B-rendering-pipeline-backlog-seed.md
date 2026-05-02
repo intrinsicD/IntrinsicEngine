@@ -13,7 +13,7 @@ implementation plan.
   (canonical rendering backlog index) and the `GRAPHICS-002` through `GRAPHICS-021`
   task chain enumerated by `GRAPHICS-001`.
 - Follow-up: workflow/cleanup tracking continues under
-  `tasks/backlog/rendering/GRAPHICS-021-rendering-backlog-workflow-cleanup.md`.
+  `tasks/done/GRAPHICS-021-rendering-backlog-workflow-cleanup.md`.
 
 This seed remains here only as a historical record of how the rendering
 backlog was first extracted from the legacy living TODO; it is not an

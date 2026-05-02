@@ -1,5 +1,13 @@
 # GRAPHICS-021 — Rendering backlog workflow cleanup
 
+- Status: completed
+- Completion date: 2026-05-03
+- Commit / PR: local split commit; remote PR reference TBD.
+
+The cleanup follow-ups are tracked in structured task records, the rendering
+backlog README/DAG exists, and the remaining implementation gate is
+`GRAPHICS-016`.
+
 ## Goal
 - Track the workflow, task-format, and doc-cleanup work that must complete on the rendering backlog before any further `GRAPHICS-002`+ implementation work proceeds. This is the canonical anchor for the rendering-backlog cleanup series.
 

@@ -23,9 +23,9 @@ The following list is the minimum dependency order for the rendering backlog.
 Each entry lists the upstream tasks that must be complete (or explicitly
 out-of-scope) before the entry is eligible for "in-progress" selection.
 
-- [GRAPHICS-021 — Rendering backlog workflow cleanup](GRAPHICS-021-rendering-backlog-workflow-cleanup.md):
-  must complete before further rendering task churn (task-format/validator/doc
-  hygiene precondition for the rest of the queue).
+- [GRAPHICS-021 — Rendering backlog workflow cleanup](../../done/GRAPHICS-021-rendering-backlog-workflow-cleanup.md):
+  completed cleanup precondition for further rendering task churn
+  (task-format/validator/doc hygiene for the rest of the queue).
 - [GRAPHICS-016 — Runtime extraction and graphics handoff](GRAPHICS-016-runtime-extraction-handoff.md):
   first implementation gate. Must land before any graphics pass implementation
   work begins, because promoted graphics must consume snapshots/views and must
