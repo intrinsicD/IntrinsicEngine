@@ -25,4 +25,5 @@ target_link_libraries(${target_name}
         ExtrinsicGraphicsAssets
         ExtrinsicPlatform
         EnTT::EnTT
+        glm::glm
 )
