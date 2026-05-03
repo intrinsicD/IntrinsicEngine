@@ -32,6 +32,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.Material`
 - `Extrinsic.Graphics.MaterialSystem`
 - `Extrinsic.Graphics.ColormapSystem`
+- `Extrinsic.Graphics.VisualizationPackets`
 - `Extrinsic.Graphics.VisualizationSyncSystem`
 - `Extrinsic.Graphics.CullingSystem`
 - `Extrinsic.Graphics.DebugViewSystem`
@@ -124,6 +125,11 @@ and renderer/render-graph orchestration.
   transient debug packet vectors plus deterministic diagnostics. It does not
   import geometry tree implementations, runtime, editor UI, or ECS ownership;
   higher layers/adapters translate their structures into these snapshot records.
+- `Graphics.VisualizationPackets` is a CPU-only packet contract for scalar,
+  color, vector-field, isoline, and Htex patch-preview visualization data. It
+  validates packet domains, ranges, colormap IDs, BDA/resource seams, and Htex
+  atlas descriptors while leaving texture residency and geometry algorithm
+  generation to later graphics-assets/runtime/geometry owners.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
   `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /

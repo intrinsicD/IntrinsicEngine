@@ -349,6 +349,7 @@ set(_graphics_renderer_cpu_unit_test_files
     Test.Graphics.MaterialSystem.cpp
     Test.Graphics.PostProcessSystem.cpp
     Test.Graphics.SpatialDebugVisualizers.cpp
+    Test.Graphics.VisualizationPackets.cpp
 )
 intrinsic_resolve_test_sources(_graphics_renderer_cpu_unit_test_sources
     SEARCH_DIRS unit/graphics

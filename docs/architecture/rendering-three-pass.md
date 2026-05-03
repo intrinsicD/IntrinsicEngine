@@ -175,6 +175,12 @@ The global camera-light packet now carries shadow cascade matrices, split/count 
 
 Transient debug primitive packets are frame-local submissions owned by runtime extraction/debug tooling and copied into `RenderWorld`. They are not persistent editor overlay entities and do not create ECS ownership inside graphics. Concrete GPU expansion of transient packets into line/point/surface draw buckets is a backend/runtime upload concern; the promoted contract guarantees packet shape, sanitization, counts, and line/point overlay resource scheduling.
 
+### Visualization attribute and overlay packet contract
+
+`Graphics.VisualizationPackets` defines the renderer-owned, data-only packet seam for visualization attributes and overlays. Runtime/geometry systems remain responsible for property enumeration, isoline extraction, vector-field generation, Htex patch content, and ECS ownership; graphics consumes immutable packets with explicit domains, element counts, buffer device-address seams, ranges, colormap IDs, and overlay descriptors.
+
+The CPU/null contract validates scalar, color, vector-field, isoline, generic attribute-buffer, and Htex patch-preview atlas descriptors without requiring texture residency. Diagnostics report missing attributes/resources, domain mismatches, invalid ranges or non-finite overlay parameters, unsupported colormap IDs, and Htex descriptors whose texture residency is intentionally deferred to `GRAPHICS-015`. `VisualizationOverlaySummary` aggregates vector glyph counts, isoline layer/value counts, and whether later texture residency is required, so downstream upload/pass work can remain deterministic and testable without importing live geometry or editor overlay ownership.
+
 ### Postprocess chain contract
 
 `PostProcessSystem` owns backend-agnostic postprocess settings, deterministic chain description, push-constant data, and diagnostics. The promoted chain is data-only and CPU/null-testable: when enabled it always contains `ToneMap` to transform `SceneColorHDR` into `SceneColorLDR`; `Histogram` and `Bloom` are optional pre-tonemap stages; `FXAA` and `SMAA` are mutually exclusive typed anti-aliasing choices after tonemapping. Disabling the chain produces no stages and no `SceneColorLDR` write in the system description; the frame recipe likewise gates `SceneColorLDR` and postprocess intermediates behind `FrameRecipeFeatures::EnablePostProcess`.

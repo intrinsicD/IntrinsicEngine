@@ -32,6 +32,12 @@ Graphics is organized into explicit sublayers:
   diagnostics. Geometry/runtime/editor adapters remain outside graphics and feed
   snapshot records instead of giving graphics live ownership of geometry trees or
   editor state.
+- `Extrinsic.Graphics.VisualizationPackets` is the promoted data-only seam for
+  scalar/color/vector attribute buffers, vector-field overlays, isoline overlays,
+  and Htex patch-preview atlas descriptors. It validates domains, ranges,
+  colormap IDs, buffer-address seams, and missing resources without importing
+  geometry algorithms, ECS ownership, or texture residency. Htex atlas texture
+  allocation remains deferred to graphics asset/residency work.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.
   Managed-buffer compaction is explicit and opt-in: callers first request a

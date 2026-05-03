@@ -1,4 +1,11 @@
 # GRAPHICS-014 — Visualization attributes and overlays
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-013C` completion.
+- Current slice: data-only visualization packet contracts and diagnostics; texture/atlas residency remains deferred to `GRAPHICS-015`.
+
 ## Goal
 - Complete visualization attribute upload, colormap, isoline, vector-field, Htex patch-preview atlas, and overlay rendering contracts through graphics snapshots.
 ## Non-goals

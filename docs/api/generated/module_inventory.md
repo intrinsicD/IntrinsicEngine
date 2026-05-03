@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 76 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 48 |
+| `graphics/renderer` | 49 |
 | `graphics/rhi` | 16 |
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
@@ -196,6 +196,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.ShadowSystem` | `src/graphics/renderer/Graphics.ShadowSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.SpatialDebugVisualizers` | `src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransformSyncSystem` | `src/graphics/renderer/Graphics.TransformSyncSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.VisualizationPackets` | `src/graphics/renderer/Graphics.VisualizationPackets.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationSyncSystem` | `src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Culling` | `src/graphics/renderer/Passes/Pass.Culling.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.DebugView` | `src/graphics/renderer/Passes/Pass.DebugView.cppm` | `graphics/renderer` |
@@ -439,4 +440,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **412**
+Total modules: **413**
