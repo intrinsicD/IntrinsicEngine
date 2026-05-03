@@ -22,10 +22,11 @@ Graphics is organized into explicit sublayers:
 - Graphics receives immutable `RenderWorld` / `RenderFrameInput` snapshots plus runtime-submitted transform/light/visualization record batches and uploads them into graphics-owned GPU scene buffers.
 - `RenderWorld` currently exposes renderer-owned spans of `RenderableSnapshot`
   and `LightSnapshot` values, sanitized transient debug line/point/triangle
-  packet spans, defaulted optional packets for picking, selection, shadows,
-  postprocess/readback, and invalid-record diagnostics. Runtime-submitted
-  batches are copied by the renderer before these spans are exposed, so no live
-  ECS storage is retained by graphics.
+  packet spans, data-only visualization packet spans/diagnostics, defaulted
+  optional packets for picking, selection, shadows, postprocess/readback, and
+  invalid-record diagnostics. Runtime-submitted batches are copied by the
+  renderer before these spans are exposed, so no live ECS storage is retained by
+  graphics.
 - `Extrinsic.Graphics.SpatialDebugVisualizers` converts data-only spatial debug
   snapshots (bounds, hierarchy nodes, split planes, convex-hull wire edges, and
   point markers) into transient debug packets with deterministic limits and

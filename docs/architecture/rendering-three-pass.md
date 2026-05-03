@@ -108,6 +108,12 @@ spans from `RenderWorld`:
   renderer-owned frame storage. Non-finite coordinates/colors are rejected,
   line widths are clamped to `[0.5, 32]`, point radii are clamped to
   `[0.0001, 1]`, and rejected records increment `InvalidSnapshotRecordCount`.
+- `VisualizationSnapshot`: renderer-owned spans of data-only visualization
+  packets submitted through `RuntimeRenderSnapshotBatch` (`AttributeBuffers`,
+  `Scalars`, `Colors`, `VectorFields`, `Isolines`, `HtexAtlases`, and
+  `FragmentBakeAtlases`). The renderer copies these spans into frame-local
+  storage, attaches `VisualizationDiagnostics` and `VisualizationOverlaySummary`,
+  and clears them on the next `BeginFrame()`.
 - `InvalidSnapshotRecordCount`: deterministic diagnostics for malformed runtime
   records dropped while building the immutable snapshot.
 
@@ -179,7 +185,7 @@ Transient debug primitive packets are frame-local submissions owned by runtime e
 
 `Graphics.VisualizationPackets` defines the renderer-owned, data-only packet seam for visualization attributes and overlays. Runtime/geometry systems remain responsible for property enumeration, isoline extraction, vector-field generation, texcoord discovery, Htex patch content, and ECS ownership; graphics consumes immutable packets with explicit domains, element counts, buffer device-address seams, ranges, colormap IDs, and overlay descriptors.
 
-The CPU/null contract validates scalar, color, vector-field, isoline, generic attribute-buffer, fragment-bake atlas, and Htex patch-preview atlas descriptors without requiring texture residency. Per-fragment bakes may target existing mesh texcoords when they are present (for example baking KMeans labels or scalar-derived colors into a UV texture), or may target an Htex patch atlas. Htex is not a replacement for existing UVs; it is the always-available alternate mapping for meshes without texcoords and an explicit user-selectable/recreatable mapping even when texcoords exist. Diagnostics report missing attributes/resources, missing texcoords for UV-backed bakes, domain mismatches, invalid ranges or non-finite overlay parameters, unsupported colormap IDs, explicit Htex recreation requests, and atlas descriptors whose texture residency is intentionally deferred to `GRAPHICS-015`. `VisualizationOverlaySummary` aggregates vector glyph counts, isoline layer/value counts, UV/Htex bake-atlas descriptor counts, and whether later texture residency is required, so downstream upload/pass work can remain deterministic and testable without importing live geometry or editor overlay ownership.
+The CPU/null contract validates scalar, color, vector-field, isoline, generic attribute-buffer, fragment-bake atlas, and Htex patch-preview atlas descriptors without requiring texture residency. Per-fragment bakes may target existing mesh texcoords when they are present (for example baking KMeans labels or scalar-derived colors into a UV texture), or may target an Htex patch atlas. Htex is not a replacement for existing UVs; it is the always-available alternate mapping for meshes without texcoords and an explicit user-selectable/recreatable mapping even when texcoords exist. Diagnostics report missing attributes/resources, missing texcoords for UV-backed bakes, domain mismatches, invalid ranges or non-finite overlay parameters, unsupported colormap IDs, explicit Htex recreation requests, and atlas descriptors whose texture residency is intentionally deferred to `GRAPHICS-015`. `VisualizationOverlaySummary` aggregates vector glyph counts, isoline layer/value counts, UV/Htex bake-atlas descriptor counts, and whether later texture residency is required, so downstream upload/pass work can remain deterministic and testable without importing live geometry or editor overlay ownership. `RenderWorld::Visualization` is the immutable frame snapshot consumed by later upload/pass work.
 
 ### Postprocess chain contract
 

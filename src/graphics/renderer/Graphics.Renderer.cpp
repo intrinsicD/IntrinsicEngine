@@ -24,6 +24,7 @@ import Extrinsic.RHI.CommandContext;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
@@ -246,6 +247,15 @@ namespace Extrinsic::Graphics
             // so the rest of the loop exercises the extraction/prepare/execute
             // seams even without a real GPU backend.
             m_VisualizationSyncRecords.clear();
+            m_VisualizationAttributeBuffers.clear();
+            m_VisualizationScalars.clear();
+            m_VisualizationColors.clear();
+            m_VisualizationVectorFields.clear();
+            m_VisualizationIsolines.clear();
+            m_VisualizationHtexAtlases.clear();
+            m_VisualizationFragmentBakeAtlases.clear();
+            m_VisualizationDiagnostics = {};
+            m_VisualizationOverlaySummary = {};
             m_TransformSyncRecords.clear();
             m_LightSnapshots.clear();
             m_DebugLinePackets.clear();
@@ -263,6 +273,24 @@ namespace Extrinsic::Graphics
             m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());
             m_LightSnapshots.assign(snapshots.Lights.begin(), snapshots.Lights.end());
             m_VisualizationSyncRecords.assign(snapshots.Visualizations.begin(), snapshots.Visualizations.end());
+            m_VisualizationAttributeBuffers.assign(snapshots.VisualizationAttributeBuffers.begin(), snapshots.VisualizationAttributeBuffers.end());
+            m_VisualizationScalars.assign(snapshots.VisualizationScalars.begin(), snapshots.VisualizationScalars.end());
+            m_VisualizationColors.assign(snapshots.VisualizationColors.begin(), snapshots.VisualizationColors.end());
+            m_VisualizationVectorFields.assign(snapshots.VisualizationVectorFields.begin(), snapshots.VisualizationVectorFields.end());
+            m_VisualizationIsolines.assign(snapshots.VisualizationIsolines.begin(), snapshots.VisualizationIsolines.end());
+            m_VisualizationHtexAtlases.assign(snapshots.VisualizationHtexAtlases.begin(), snapshots.VisualizationHtexAtlases.end());
+            m_VisualizationFragmentBakeAtlases.assign(snapshots.VisualizationFragmentBakeAtlases.begin(), snapshots.VisualizationFragmentBakeAtlases.end());
+            const VisualizationPacketBatch visualizationBatch{
+                .AttributeBuffers = m_VisualizationAttributeBuffers,
+                .Scalars = m_VisualizationScalars,
+                .Colors = m_VisualizationColors,
+                .VectorFields = m_VisualizationVectorFields,
+                .Isolines = m_VisualizationIsolines,
+                .HtexAtlases = m_VisualizationHtexAtlases,
+                .FragmentBakeAtlases = m_VisualizationFragmentBakeAtlases,
+            };
+            m_VisualizationDiagnostics = ValidateVisualizationPackets(visualizationBatch);
+            m_VisualizationOverlaySummary = BuildVisualizationOverlaySummary(visualizationBatch);
             m_InvalidSnapshotRecordCount = 0;
 
             m_DebugLinePackets.clear();
@@ -351,6 +379,18 @@ namespace Extrinsic::Graphics
                         !m_DebugLinePackets.empty() ||
                         !m_DebugPointPackets.empty() ||
                         !m_DebugTrianglePackets.empty(),
+                },
+                .Visualization = VisualizationSnapshot{
+                    .AttributeBuffers = m_VisualizationAttributeBuffers,
+                    .Scalars = m_VisualizationScalars,
+                    .Colors = m_VisualizationColors,
+                    .VectorFields = m_VisualizationVectorFields,
+                    .Isolines = m_VisualizationIsolines,
+                    .HtexAtlases = m_VisualizationHtexAtlases,
+                    .FragmentBakeAtlases = m_VisualizationFragmentBakeAtlases,
+                    .Diagnostics = m_VisualizationDiagnostics,
+                    .OverlaySummary = m_VisualizationOverlaySummary,
+                    .HasVisualizationPackets = m_VisualizationDiagnostics.InputPacketCount > 0u,
                 },
                 .PostProcess = PostProcessSnapshot{
                     .Enabled = input.DebugOverlayEnabled,
@@ -673,6 +713,15 @@ namespace Extrinsic::Graphics
         RenderGraphExecutor                  m_RenderGraphExecutor;
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
+        std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
+        std::vector<ScalarAttributePacket>              m_VisualizationScalars;
+        std::vector<ColorAttributePacket>               m_VisualizationColors;
+        std::vector<VectorFieldOverlayPacket>           m_VisualizationVectorFields;
+        std::vector<IsolineOverlayPacket>               m_VisualizationIsolines;
+        std::vector<HtexPatchPreviewAtlasPacket>        m_VisualizationHtexAtlases;
+        std::vector<FragmentBakeAtlasPacket>            m_VisualizationFragmentBakeAtlases;
+        VisualizationDiagnostics             m_VisualizationDiagnostics{};
+        VisualizationOverlaySummary          m_VisualizationOverlaySummary{};
         std::vector<TransformSyncRecord>     m_TransformSyncRecords;
         std::vector<LightSnapshot>           m_LightSnapshots;
         std::vector<DebugLinePacket>         m_DebugLinePackets;

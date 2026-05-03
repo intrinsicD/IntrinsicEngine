@@ -12,6 +12,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.TransformSyncSystem;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Types;
 
@@ -90,11 +91,44 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
             .Color = {0.f, 0.f, 1.f, 1.f},
         },
     }};
+    const std::array<Graphics::ScalarAttributePacket, 1> visualizationScalars{{
+        Graphics::ScalarAttributePacket{
+            .Name = "temperature",
+            .Domain = Graphics::VisualizationAttributeDomain::Vertex,
+            .ElementCount = 12u,
+            .RangeMin = 0.f,
+            .RangeMax = 1.f,
+            .ScalarBufferBDA = 0x1000u,
+        },
+    }};
+    const std::array<Graphics::FragmentBakeAtlasPacket, 2> visualizationBakes{{
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "labels_uv_bake",
+            .SourceAttributeName = "kmeans_label_rgba",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 128u,
+            .AtlasHeight = 128u,
+            .TexcoordBufferBDA = 0x2000u,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "labels_htex_bake",
+            .SourceAttributeName = "kmeans_label_rgba",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::RecreateHtex,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 128u,
+            .AtlasHeight = 128u,
+        },
+    }};
 
     renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
         .Transforms = transforms,
         .Lights = lights,
         .Visualizations = {},
+        .VisualizationScalars = visualizationScalars,
+        .VisualizationFragmentBakeAtlases = visualizationBakes,
         .DebugLines = debugLines,
         .DebugPoints = debugPoints,
         .DebugTriangles = debugTriangles,
@@ -136,6 +170,19 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
     EXPECT_FLOAT_EQ(world.DebugPrimitives.Lines[0].Width, 32.f);
     EXPECT_FLOAT_EQ(world.DebugPrimitives.Points[0].Radius, 0.0001f);
     EXPECT_EQ(world.DebugPrimitives.Triangles[0].Color, glm::vec4(0.f, 0.f, 1.f, 1.f));
+    EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    ASSERT_EQ(world.Visualization.FragmentBakeAtlases.size(), 2u);
+    EXPECT_EQ(world.Visualization.Scalars[0].Name, "temperature");
+    EXPECT_EQ(world.Visualization.FragmentBakeAtlases[0].Mapping,
+              Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords);
+    EXPECT_EQ(world.Visualization.FragmentBakeAtlases[1].Mapping,
+              Graphics::VisualizationFragmentBakeMapping::RecreateHtex);
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 3u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 3u);
+    EXPECT_EQ(world.Visualization.Diagnostics.HtexRecreateRequestCount, 1u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.UvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.HtexBakeAtlasDescriptorCount, 1u);
     EXPECT_TRUE(world.PostProcess.Enabled);
     EXPECT_FALSE(world.PostProcess.RequiresReadback);
     EXPECT_EQ(world.Viewport.Width, 1280u);
@@ -178,6 +225,10 @@ TEST(RenderWorldContract, BeginFrameClearsPreviousRuntimeSnapshots)
     EXPECT_EQ(emptyWorld.DebugPrimitives.LineCount, 0u);
     EXPECT_EQ(emptyWorld.DebugPrimitives.PointCount, 0u);
     EXPECT_EQ(emptyWorld.DebugPrimitives.TriangleCount, 0u);
+    EXPECT_FALSE(emptyWorld.Visualization.HasVisualizationPackets);
+    EXPECT_TRUE(emptyWorld.Visualization.Scalars.empty());
+    EXPECT_TRUE(emptyWorld.Visualization.FragmentBakeAtlases.empty());
+    EXPECT_EQ(emptyWorld.Visualization.Diagnostics.InputPacketCount, 0u);
     EXPECT_FALSE(emptyWorld.PostProcess.Enabled);
     EXPECT_EQ(emptyWorld.InvalidSnapshotRecordCount, 0u);
 

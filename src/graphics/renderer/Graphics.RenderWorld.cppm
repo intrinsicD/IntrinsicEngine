@@ -9,6 +9,7 @@ export module Extrinsic.Graphics.RenderWorld;
 
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.LightSystem;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Types;
 
@@ -97,6 +98,20 @@ namespace Extrinsic::Graphics
         bool HasTransientDebug{false};
     };
 
+    export struct VisualizationSnapshot
+    {
+        std::span<const VisualizationAttributeBufferPacket> AttributeBuffers{};
+        std::span<const ScalarAttributePacket> Scalars{};
+        std::span<const ColorAttributePacket> Colors{};
+        std::span<const VectorFieldOverlayPacket> VectorFields{};
+        std::span<const IsolineOverlayPacket> Isolines{};
+        std::span<const HtexPatchPreviewAtlasPacket> HtexAtlases{};
+        std::span<const FragmentBakeAtlasPacket> FragmentBakeAtlases{};
+        VisualizationDiagnostics Diagnostics{};
+        VisualizationOverlaySummary OverlaySummary{};
+        bool HasVisualizationPackets{false};
+    };
+
     export struct PostProcessSnapshot
     {
         bool Enabled{false};
@@ -129,6 +144,7 @@ namespace Extrinsic::Graphics
         SelectionSnapshot       Selection{};
         ShadowSnapshot          Shadows{};
         DebugPrimitiveSnapshot  DebugPrimitives{};
+        VisualizationSnapshot   Visualization{};
         PostProcessSnapshot     PostProcess{};
 
         /// Number of malformed/invalid runtime records dropped while building

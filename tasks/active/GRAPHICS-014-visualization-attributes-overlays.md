@@ -6,6 +6,7 @@
 - Activated: 2026-05-03 after `GRAPHICS-013C` completion.
 - Current slice: data-only visualization packet contracts and diagnostics; texture/atlas residency remains deferred to `GRAPHICS-015`.
 - Clarification: existing mesh UVs/texcoords must be usable for per-fragment visualization bakes (for example KMeans labels), and Htex must remain an always-recreatable alternate mapping for any mesh, including meshes that already have UVs.
+- Completed slices in active work: data-only packet contracts/diagnostics, UV-vs-Htex bake mapping policy, renderer-owned `RenderWorld::Visualization` snapshot spans, and CPU/null tests. GPU texture residency remains deferred to `GRAPHICS-015`.
 
 ## Goal
 - Complete visualization attribute upload, colormap, isoline, vector-field, Htex patch-preview atlas, and overlay rendering contracts through graphics snapshots.
