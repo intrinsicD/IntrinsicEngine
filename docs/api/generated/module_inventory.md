@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 76 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 45 |
+| `graphics/renderer` | 47 |
 | `graphics/rhi` | 16 |
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
@@ -178,6 +178,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Colormap` | `src/graphics/renderer/Graphics.Colormap.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ColormapSystem` | `src/graphics/renderer/Graphics.ColormapSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.CullingSystem` | `src/graphics/renderer/Graphics.CullingSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.DebugViewSystem` | `src/graphics/renderer/Graphics.DebugViewSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.DeferredSystem` | `src/graphics/renderer/Graphics.DeferredSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ForwardSystem` | `src/graphics/renderer/Graphics.ForwardSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.FrameRecipe` | `src/graphics/renderer/Graphics.FrameRecipe.cppm` | `graphics/renderer` |
@@ -196,6 +197,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.TransformSyncSystem` | `src/graphics/renderer/Graphics.TransformSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationSyncSystem` | `src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Culling` | `src/graphics/renderer/Passes/Pass.Culling.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.Pass.DebugView` | `src/graphics/renderer/Passes/Pass.DebugView.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `src/graphics/renderer/Passes/Pass.Deferred.GBuffers.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `src/graphics/renderer/Passes/Pass.Deferred.Lighting.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.DepthPrepass` | `src/graphics/renderer/Passes/Pass.DepthPrepass.cppm` | `graphics/renderer` |
@@ -436,4 +438,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **409**
+Total modules: **411**

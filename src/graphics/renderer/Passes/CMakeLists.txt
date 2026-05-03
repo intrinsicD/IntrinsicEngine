@@ -5,6 +5,7 @@ target_sources(${target_name}
 		Pass.DepthPrepass.cppm
 		Pass.Deferred.GBuffers.cppm
 		Pass.Deferred.Lighting.cppm
+		Pass.DebugView.cppm
 		Pass.Forward.Line.cppm
 		Pass.Forward.Point.cppm
 		Pass.Forward.Surface.cppm
@@ -26,6 +27,7 @@ target_sources(${target_name}
 		Pass.DepthPrepass.cpp
 		Pass.Deferred.GBuffers.cpp
 		Pass.Deferred.Lighting.cpp
+		Pass.DebugView.cpp
 		Pass.Forward.Line.cpp
 		Pass.Forward.Point.cpp
 		Pass.Forward.Surface.cpp

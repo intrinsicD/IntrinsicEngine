@@ -344,6 +344,7 @@ intrinsic_test_object_lib(GraphicsRhiCpuUnitTestObjs
 )
 
 set(_graphics_renderer_cpu_unit_test_files
+    Test.Graphics.DebugViewSystem.cpp
     Test.Graphics.MaterialSystem.cpp
     Test.Graphics.PostProcessSystem.cpp
     Test.Graphics.SpatialDebugVisualizers.cpp
@@ -393,6 +394,7 @@ intrinsic_test_object_lib(GraphicsContractTestObjs
 
 set(_graphics_contract_cpu_test_files
     Test.CullingPassContracts.cpp
+    Test.DebugViewContract.cpp
     Test.FrameRecipeContract.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp

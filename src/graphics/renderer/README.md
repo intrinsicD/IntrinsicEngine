@@ -34,6 +34,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.ColormapSystem`
 - `Extrinsic.Graphics.VisualizationSyncSystem`
 - `Extrinsic.Graphics.CullingSystem`
+- `Extrinsic.Graphics.DebugViewSystem`
 - `Extrinsic.Graphics.LightSystem`
 - `Extrinsic.Graphics.SelectionSystem`
 - `Extrinsic.Graphics.ForwardSystem`
@@ -71,6 +72,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.Pass.DepthPrepass`
 - `Extrinsic.Graphics.Pass.Deferred.GBuffers`
 - `Extrinsic.Graphics.Pass.Deferred.Lighting`
+- `Extrinsic.Graphics.Pass.DebugView`
 - `Extrinsic.Graphics.Pass.Forward.Surface`
 - `Extrinsic.Graphics.Pass.Forward.Line`
 - `Extrinsic.Graphics.Pass.Forward.Point`
@@ -131,6 +133,11 @@ and renderer/render-graph orchestration.
   recipe resources `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
   `PostProcess.AATemp` are transient postprocess-owned intermediates; concrete
   Vulkan descriptors/shaders remain backend follow-ups.
+- `DebugViewSystem` owns backend-agnostic render-target inspection metadata and
+  debug-view resource selection. It resolves requested frame-recipe resources to
+  enabled previewable texture/depth resources, reports missing/disabled/buffer
+  selections through deterministic diagnostics, and falls back to the current
+  presentation source without platform/window ownership.
 - `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and

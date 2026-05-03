@@ -43,6 +43,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `PostProcess.AATemp` | Swapchain format | Frame transient | Optional anti-aliasing intermediate owned by `PostProcessPass` |
 | `SelectionMask` | `R8_UNORM` | Frame transient | Reserved for future outline mask split |
 | `SelectionOutline` | Swapchain format | Frame transient | Reserved for future standalone outline target |
+| `DebugViewRGBA` | `R8G8B8A8_UNORM` | Frame transient | Debug-view preview output for sampled resource inspection |
 | `Backbuffer` | Swapchain format | Imported | Final presentation destination only |
 
 `FrameRecipe` determines which of these are allocated for a frame. Unused optional resources are not created. The promoted implementation lives in `Extrinsic.Graphics.FrameRecipe`; it declares typed feature gates, canonical resource names, pass-order introspection, and the backend-agnostic graph construction helper consumed by the null renderer.
@@ -79,7 +80,7 @@ The imported `Backbuffer` is declared once and finalized only by the `Present` d
 | `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for point clouds/debug points; accumulates via `LOAD` |
 | `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp` | Backend-agnostic HDR-to-LDR chain. `PostProcessSystem` describes deterministic stages in order: optional `Histogram`, optional `Bloom`, required enabled-chain `ToneMap`, then optional `FXAA` or `SMAA`. Invalid numeric settings are sanitized and unsupported AA enum values are diagnosed without Vulkan |
 | `SelectionOutlinePass` | `EntityId`, presentation target | presentation target | Alpha-blends via `LOAD`; outlines the **union stencil** of selected/hovered renderable PickIDs across surface, line, and point lanes (including mesh/graph/cloud point modes such as sphere impostors). Source module: `Pass.Selection.Outline` (`SelectionOutlinePass`). Conceptually paired with `PickingPass` but scheduled later in the pipeline so it can read overlay results |
-| `DebugViewPass` | selected sampled resource | `DebugViewRGBA`, optional presentation target | Writes preview image, optional viewport composite |
+| `DebugViewPass` | selected sampled resource or deterministic fallback | `DebugViewRGBA` | Writes a fullscreen preview image for backend-agnostic render-target inspection. `DebugViewSystem` resolves requested resources from frame-recipe introspection, rejects disabled/missing/buffer/backbuffer selections with structured diagnostics, and falls back to the current presentation source without platform/window ownership |
 | `ImGuiPass` | presentation target | presentation target | UI overlay via `LOAD` |
 | `Present` | `SceneColorLDR` | `Backbuffer` | Explicit final blit/copy |
 
@@ -180,6 +181,12 @@ Transient debug primitive packets are frame-local submissions owned by runtime e
 
 The split source modules (`Pass.PostProcess.Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`) are command-contract shims. Each pass records no commands unless `PostProcessSystem` is initialized, its stage is enabled, and a valid pipeline has been configured. Enabled fullscreen stages bind their pipeline, push `PostProcessPushConstants`, and draw a fullscreen triangle; the histogram diagnostics stage binds its pipeline, pushes the same packet, and dispatches a compute-style diagnostics workload. Concrete descriptor binding, shader kernels, downsample pyramids, exposure adaptation history, and Vulkan-specific layout choices are backend follow-ups, not GRAPHICS-013A ownership.
 
+### Debug-view and render-target inspection contract
+
+`DebugViewSystem` owns backend-agnostic debug-view selection and inspection metadata. It builds a deterministic inspection table from `FrameRecipeIntrospection`, classifying resources as texture, depth texture, buffer, backbuffer, alias, or unknown. Only enabled texture/depth resources are previewable, and `DebugViewRGBA` is deliberately excluded as an input preview target to avoid feedback. Buffer resources such as GPU scene tables, draw buckets, histogram buffers, and picking readbacks are inspectable metadata entries but are not sampled by the preview pass.
+
+Selection resolution is deterministic and CPU-testable. Disabled debug view produces no enabled preview selection. Missing, disabled, or unsupported requested resources increment structured diagnostics and fall back first to the requested presentation-source resource (default `SceneColorLDR`), then to `SceneColorHDR`, then to the first enabled previewable texture if needed. `Pass.DebugView` (`DebugViewPass`) records no commands unless `DebugViewSystem` is initialized, a valid pipeline is set, and a resolved selection is enabled; otherwise it binds the pipeline, pushes `DebugViewPushConstants`, and draws a fullscreen triangle into `DebugViewRGBA`. Concrete sampled-image descriptor binding and shader visualization modes remain backend follow-ups.
+
 ### Legacy feature coverage classification
 
 The canonical GPU scene covers renderable identity and per-instance state. Legacy-inspired features that need different ownership attach through declared auxiliary resources or remain outside graphics ownership.
@@ -244,6 +251,7 @@ The promoted graphics layer keeps a 1:1 mapping between logical passes documente
 | `PointPass` | `Extrinsic.Graphics.Pass.Forward.Point` | `PointPass` |
 | `PostProcessPass` | `Extrinsic.Graphics.Pass.PostProcess.*` | bloom/FXAA/SMAA/ToneMap/Histogram passes |
 | `SelectionOutlinePass` | `Extrinsic.Graphics.Pass.Selection.Outline` | `SelectionOutlinePass` |
+| `DebugViewPass` | `Extrinsic.Graphics.Pass.DebugView` | `DebugViewPass` |
 | `ImGuiPass` | `Extrinsic.Graphics.Pass.ImGui` | `ImGuiPass` |
 | `Present` | `Extrinsic.Graphics.Pass.Present` | `PresentPass` |
 

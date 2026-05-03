@@ -16,6 +16,7 @@ target_sources(${target_name}
         Graphics.ColormapSystem.cppm
         Graphics.VisualizationSyncSystem.cppm
         Graphics.CullingSystem.cppm
+        Graphics.DebugViewSystem.cppm
         Graphics.LightSystem.cppm
         Graphics.SelectionSystem.cppm
         Graphics.ForwardSystem.cppm
@@ -33,6 +34,7 @@ target_sources(${target_name}
         Graphics.VisualizationSyncSystem.cpp
         Graphics.GpuScene.cpp
         Graphics.CullingSystem.cpp
+        Graphics.DebugViewSystem.cpp
         Graphics.LightSystem.cpp
         Graphics.SelectionSystem.cpp
         Graphics.ForwardSystem.cpp
