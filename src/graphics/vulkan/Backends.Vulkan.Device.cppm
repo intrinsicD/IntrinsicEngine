@@ -2,8 +2,10 @@ module;
 
 #include <array>
 #include <cstdint>
+#include <cstddef>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <vector>
 
 #include "Vulkan.hpp"
@@ -81,13 +83,70 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::PipelineHandle CreatePipeline(const RHI::PipelineDesc& desc) override;
         void DestroyPipeline(RHI::PipelineHandle handle) override;
 
-        [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override { return *m_TransferQueue; }
-        [[nodiscard]] RHI::IBindlessHeap&  GetBindlessHeap()  override { return *m_BindlessHeap; }
+        [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override
+        {
+            if (m_TransferQueue)
+                return *m_TransferQueue;
+            return m_FallbackTransferQueue;
+        }
+        [[nodiscard]] RHI::IBindlessHeap& GetBindlessHeap() override
+        {
+            if (m_BindlessHeap)
+                return *m_BindlessHeap;
+            return m_FallbackBindlessHeap;
+        }
         [[nodiscard]] RHI::IProfiler*      GetProfiler()      override { return m_Profiler.get(); }
         [[nodiscard]] uint32_t GetFramesInFlight()    const override { return kMaxFramesInFlight; }
         [[nodiscard]] uint64_t GetGlobalFrameNumber() const override { return m_GlobalFrameNumber; }
 
     private:
+        class FallbackBindlessHeap final : public RHI::IBindlessHeap
+        {
+        public:
+            [[nodiscard]] RHI::BindlessIndex AllocateTextureSlot(RHI::TextureHandle, RHI::SamplerHandle) override
+            {
+                return RHI::kInvalidBindlessIndex;
+            }
+
+            void UpdateTextureSlot(RHI::BindlessIndex, RHI::TextureHandle, RHI::SamplerHandle) override {}
+            void FreeSlot(RHI::BindlessIndex) override {}
+            void FlushPending() override {}
+
+            [[nodiscard]] std::uint32_t GetCapacity() const override { return 0; }
+            [[nodiscard]] std::uint32_t GetAllocatedSlotCount() const override { return 0; }
+        };
+
+        class FallbackTransferQueue final : public RHI::ITransferQueue
+        {
+        public:
+            [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
+                                                          const void*,
+                                                          std::uint64_t,
+                                                          std::uint64_t) override
+            {
+                return {};
+            }
+
+            [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
+                                                          std::span<const std::byte>,
+                                                          std::uint64_t) override
+            {
+                return {};
+            }
+
+            [[nodiscard]] RHI::TransferToken UploadTexture(RHI::TextureHandle,
+                                                           const void*,
+                                                           std::uint64_t,
+                                                           std::uint32_t,
+                                                           std::uint32_t) override
+            {
+                return {};
+            }
+
+            [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override { return !token.IsValid(); }
+            void CollectCompleted() override {}
+        };
+
         void CreateInstance(const Core::Config::RenderConfig& cfg);
         void CreateSurface(Platform::IWindow& window);
         void PickPhysicalDevice();
@@ -147,6 +206,8 @@ namespace Extrinsic::Backends::Vulkan
         std::unique_ptr<VulkanBindlessHeap>   m_BindlessHeap;
         std::unique_ptr<VulkanProfiler>       m_Profiler;
         std::unique_ptr<VulkanTransferQueue>  m_TransferQueue;
+        FallbackBindlessHeap                  m_FallbackBindlessHeap;
+        FallbackTransferQueue                 m_FallbackTransferQueue;
 
         VkPipelineLayout m_GlobalPipelineLayout = VK_NULL_HANDLE;
         RHI::SamplerHandle m_DefaultSamplerHandle{};

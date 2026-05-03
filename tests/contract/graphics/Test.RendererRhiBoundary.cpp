@@ -126,5 +126,18 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedDeviceLifecycle)
         EXPECT_NE(content.find(definition), std::string::npos) << definition;
 }
 
+TEST(RendererRhiBoundary, VulkanBackendProvidesFailClosedServiceFallbacks)
+{
+    const auto deviceInterface = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cppm";
+    const auto content = ReadFile(deviceInterface);
+
+    EXPECT_NE(content.find("class FallbackBindlessHeap final : public RHI::IBindlessHeap"), std::string::npos);
+    EXPECT_NE(content.find("class FallbackTransferQueue final : public RHI::ITransferQueue"), std::string::npos);
+    EXPECT_NE(content.find("return m_FallbackTransferQueue;"), std::string::npos);
+    EXPECT_NE(content.find("return m_FallbackBindlessHeap;"), std::string::npos);
+    EXPECT_NE(content.find("return RHI::kInvalidBindlessIndex;"), std::string::npos);
+    EXPECT_NE(content.find("return !token.IsValid();"), std::string::npos);
+}
+
 
 
