@@ -65,6 +65,56 @@ void VulkanDevice::Shutdown()
     m_TransferQueue.reset();
     m_Profiler.reset();
     m_BindlessHeap.reset();
+
+    const VkDevice device = m_Device;
+    const VmaAllocator vma = m_Vma;
+
+    m_Pipelines.ForEach([device](RHI::PipelineHandle, VulkanPipeline& pipeline)
+    {
+        if (device != VK_NULL_HANDLE)
+        {
+            if (pipeline.Pipeline != VK_NULL_HANDLE)
+                vkDestroyPipeline(device, pipeline.Pipeline, nullptr);
+            if (pipeline.OwnsLayout && pipeline.Layout != VK_NULL_HANDLE)
+                vkDestroyPipelineLayout(device, pipeline.Layout, nullptr);
+        }
+        pipeline.Pipeline = VK_NULL_HANDLE;
+        pipeline.Layout = VK_NULL_HANDLE;
+    });
+    m_Pipelines.Clear();
+
+    m_Samplers.ForEach([device](RHI::SamplerHandle, VulkanSampler& sampler)
+    {
+        if (device != VK_NULL_HANDLE && sampler.Sampler != VK_NULL_HANDLE)
+            vkDestroySampler(device, sampler.Sampler, nullptr);
+        sampler.Sampler = VK_NULL_HANDLE;
+    });
+    m_Samplers.Clear();
+
+    m_Images.ForEach([device, vma](RHI::TextureHandle, VulkanImage& image)
+    {
+        if (device != VK_NULL_HANDLE && image.View != VK_NULL_HANDLE)
+            vkDestroyImageView(device, image.View, nullptr);
+        if (image.OwnsMemory && vma != VK_NULL_HANDLE && image.Image != VK_NULL_HANDLE &&
+            image.Allocation != VK_NULL_HANDLE)
+            vmaDestroyImage(vma, image.Image, image.Allocation);
+        image.Image = VK_NULL_HANDLE;
+        image.View = VK_NULL_HANDLE;
+        image.Allocation = VK_NULL_HANDLE;
+    });
+    m_Images.Clear();
+
+    m_Buffers.ForEach([vma](RHI::BufferHandle, VulkanBuffer& buffer)
+    {
+        if (vma != VK_NULL_HANDLE && buffer.Buffer != VK_NULL_HANDLE &&
+            buffer.Allocation != VK_NULL_HANDLE)
+            vmaDestroyBuffer(vma, buffer.Buffer, buffer.Allocation);
+        buffer.Buffer = VK_NULL_HANDLE;
+        buffer.Allocation = VK_NULL_HANDLE;
+        buffer.MappedPtr = nullptr;
+    });
+    m_Buffers.Clear();
+
     m_SwapchainHandles.clear();
     m_SwapchainViews.clear();
     m_SwapchainImages.clear();

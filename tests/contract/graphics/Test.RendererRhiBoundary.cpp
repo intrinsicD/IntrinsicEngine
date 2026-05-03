@@ -205,6 +205,30 @@ TEST(RendererRhiBoundary, VulkanBackendCreatesTexturesWhenOperational)
         EXPECT_NE(content.find(snippet), std::string::npos) << snippet;
 }
 
+TEST(RendererRhiBoundary, VulkanBackendShutdownDrainsLiveResourcePools)
+{
+    const auto deviceSource = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp";
+    const auto content = ReadFile(deviceSource);
+
+    const std::vector<std::string> requiredSnippets{
+        "m_Pipelines.ForEach([device](RHI::PipelineHandle, VulkanPipeline& pipeline)",
+        "vkDestroyPipeline(device, pipeline.Pipeline, nullptr);",
+        "m_Pipelines.Clear();",
+        "m_Samplers.ForEach([device](RHI::SamplerHandle, VulkanSampler& sampler)",
+        "vkDestroySampler(device, sampler.Sampler, nullptr);",
+        "m_Samplers.Clear();",
+        "m_Images.ForEach([device, vma](RHI::TextureHandle, VulkanImage& image)",
+        "vmaDestroyImage(vma, image.Image, image.Allocation);",
+        "m_Images.Clear();",
+        "m_Buffers.ForEach([vma](RHI::BufferHandle, VulkanBuffer& buffer)",
+        "vmaDestroyBuffer(vma, buffer.Buffer, buffer.Allocation);",
+        "m_Buffers.Clear();",
+    };
+
+    for (const auto& snippet : requiredSnippets)
+        EXPECT_NE(content.find(snippet), std::string::npos) << snippet;
+}
+
 TEST(RendererRhiBoundary, VulkanBackendProvidesFailClosedServiceFallbacks)
 {
     const auto deviceInterface = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cppm";
