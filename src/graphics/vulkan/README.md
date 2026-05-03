@@ -32,6 +32,9 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   device feature negotiation records support. Texture upload/layout transitions
   and pipeline creation still return invalid/no-op results until staging/barrier
   and shader/pipeline construction are wired.
+- `Shutdown()` waits idle, flushes deferred deletes, and drains any still-live
+  buffer, texture, sampler, and pipeline pool entries so partial bring-up slices
+  do not leak backend resources when callers omit explicit per-resource destroys.
 - Completing real Vulkan execution remains in `GRAPHICS-018`: create instance,
   surface, logical device, swapchain images, per-frame command buffers/sync,
   concrete resource creation/upload, pipeline creation, and presentation
