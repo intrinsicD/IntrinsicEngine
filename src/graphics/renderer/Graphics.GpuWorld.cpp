@@ -27,6 +27,12 @@ namespace Extrinsic::Graphics
             bool Live = false;
         };
 
+        struct PendingFreeSlot
+        {
+            std::uint32_t Index = kInvalidSlot;
+            std::uint64_t ReuseFrame = 0;
+        };
+
         template <typename Tag>
         struct SlotAllocator
         {
@@ -34,15 +40,37 @@ namespace Extrinsic::Graphics
 
             std::vector<SlotMeta> Meta;
             std::vector<std::uint32_t> FreeList;
+            std::vector<PendingFreeSlot> PendingFree;
             std::uint32_t NextFresh = 0;
             std::uint32_t LiveCount = 0;
+            std::uint32_t OverflowCount = 0;
+            std::uint32_t InvalidHandleCount = 0;
+            std::uint32_t StaleHandleCount = 0;
 
             void Reset(std::uint32_t capacity)
             {
                 Meta.assign(capacity, {});
                 FreeList.clear();
+                PendingFree.clear();
                 NextFresh = 0;
                 LiveCount = 0;
+                OverflowCount = 0;
+                InvalidHandleCount = 0;
+                StaleHandleCount = 0;
+            }
+
+            void RetirePending(std::uint64_t frame)
+            {
+                for (std::size_t i = 0; i < PendingFree.size();)
+                {
+                    if (PendingFree[i].ReuseFrame > frame)
+                    {
+                        ++i;
+                        continue;
+                    }
+                    FreeList.push_back(PendingFree[i].Index);
+                    PendingFree.erase(PendingFree.begin() + static_cast<std::ptrdiff_t>(i));
+                }
             }
 
             [[nodiscard]] Handle Allocate()
@@ -60,6 +88,7 @@ namespace Extrinsic::Graphics
 
                 if (idx == kInvalidSlot)
                 {
+                    ++OverflowCount;
                     return {};
                 }
 
@@ -80,21 +109,52 @@ namespace Extrinsic::Graphics
                 return meta.Live && meta.Generation == h.Generation;
             }
 
-            void Free(Handle h)
+            [[nodiscard]] bool ResolveForUse(Handle h)
             {
-                if (!Resolve(h))
+                if (!h.IsValid() || h.Index >= Meta.size())
                 {
-                    return;
+                    ++InvalidHandleCount;
+                    return false;
+                }
+
+                const auto& meta = Meta[h.Index];
+                if (!meta.Live || meta.Generation != h.Generation)
+                {
+                    ++StaleHandleCount;
+                    return false;
+                }
+                return true;
+            }
+
+            bool Free(Handle h, std::uint64_t reuseFrame)
+            {
+                if (!ResolveForUse(h))
+                {
+                    return false;
                 }
 
                 auto& meta = Meta[h.Index];
                 meta.Live = false;
                 ++meta.Generation;
-                FreeList.push_back(h.Index);
+                PendingFree.push_back(PendingFreeSlot{.Index = h.Index, .ReuseFrame = reuseFrame});
                 if (LiveCount > 0)
                 {
                     --LiveCount;
                 }
+                return true;
+            }
+
+            [[nodiscard]] GpuWorld::PoolDiagnostics Diagnostics() const noexcept
+            {
+                return GpuWorld::PoolDiagnostics{
+                    .Capacity = static_cast<std::uint32_t>(Meta.size()),
+                    .LiveCount = LiveCount,
+                    .ReusableCount = static_cast<std::uint32_t>(FreeList.size()),
+                    .PendingFreeCount = static_cast<std::uint32_t>(PendingFree.size()),
+                    .OverflowCount = OverflowCount,
+                    .InvalidHandleCount = InvalidHandleCount,
+                    .StaleHandleCount = StaleHandleCount,
+                };
             }
         };
 
@@ -159,6 +219,10 @@ namespace Extrinsic::Graphics
         std::vector<bool> DirtyBounds;
         bool DirtyLights = false;
         bool DirtySceneTable = true;
+        std::uint64_t FrameIndex = 0;
+        std::uint32_t VertexOverflowCount = 0;
+        std::uint32_t IndexOverflowCount = 0;
+        std::uint32_t LightOverflowCount = 0;
 
         std::uint64_t VertexBumpOffset = 0;
         std::uint64_t IndexBumpOffset  = 0;
@@ -349,6 +413,10 @@ namespace Extrinsic::Graphics
 
         m_Impl->VertexBumpOffset = 0;
         m_Impl->IndexBumpOffset = 0;
+        m_Impl->FrameIndex = 0;
+        m_Impl->VertexOverflowCount = 0;
+        m_Impl->IndexOverflowCount = 0;
+        m_Impl->LightOverflowCount = 0;
         m_Impl->MaterialBuffer = {};
         m_Impl->MaterialCapacity = 0;
 
@@ -390,7 +458,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::FreeInstance(GpuInstanceHandle instance)
     {
-        if (!m_Impl->InstanceSlots.Resolve(instance))
+        if (!m_Impl->InstanceSlots.ResolveForUse(instance))
         {
             return;
         }
@@ -405,7 +473,7 @@ namespace Extrinsic::Graphics
         m_Impl->DirtyEntityConfig[instance.Index] = true;
         m_Impl->DirtyBounds[instance.Index] = true;
 
-        m_Impl->InstanceSlots.Free(instance);
+        m_Impl->InstanceSlots.Free(instance, m_Impl->FrameIndex + m_Impl->Desc.DeferredFreeFrames);
     }
 
     GpuGeometryHandle GpuWorld::UploadGeometry(const GeometryUploadDesc& desc)
@@ -427,7 +495,15 @@ namespace Extrinsic::Graphics
         if (vbOffset + vbSize > m_Impl->Desc.VertexBufferBytes ||
             lineOffset + lineSize > m_Impl->Desc.IndexBufferBytes)
         {
-            m_Impl->GeometrySlots.Free(h);
+            if (vbOffset + vbSize > m_Impl->Desc.VertexBufferBytes)
+            {
+                ++m_Impl->VertexOverflowCount;
+            }
+            if (lineOffset + lineSize > m_Impl->Desc.IndexBufferBytes)
+            {
+                ++m_Impl->IndexOverflowCount;
+            }
+            m_Impl->GeometrySlots.Free(h, m_Impl->FrameIndex);
             return {};
         }
 
@@ -484,7 +560,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::FreeGeometry(GpuGeometryHandle geometry)
     {
-        if (!m_Impl->GeometrySlots.Resolve(geometry))
+        if (!m_Impl->GeometrySlots.ResolveForUse(geometry))
         {
             return;
         }
@@ -506,17 +582,17 @@ namespace Extrinsic::Graphics
 
         m_Impl->GeometryRecordsCpu[geometry.Index] = {};
         m_Impl->DirtyGeometryRecord[geometry.Index] = true;
-        m_Impl->GeometrySlots.Free(geometry);
+        m_Impl->GeometrySlots.Free(geometry, m_Impl->FrameIndex + m_Impl->Desc.DeferredFreeFrames);
         // TODO: reclaim managed vertex/index ranges via a free-list + compaction pass.
     }
 
     void GpuWorld::SetInstanceGeometry(GpuInstanceHandle instance, GpuGeometryHandle geometry)
     {
-        if (!m_Impl->InstanceSlots.Resolve(instance))
+        if (!m_Impl->InstanceSlots.ResolveForUse(instance))
         {
             return;
         }
-        if (geometry.IsValid() && !m_Impl->GeometrySlots.Resolve(geometry))
+        if (geometry.IsValid() && !m_Impl->GeometrySlots.ResolveForUse(geometry))
         {
             return;
         }
@@ -528,7 +604,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::SetInstanceMaterialSlot(GpuInstanceHandle instance, std::uint32_t materialSlot)
     {
-        if (!m_Impl->InstanceSlots.Resolve(instance))
+        if (!m_Impl->InstanceSlots.ResolveForUse(instance))
         {
             return;
         }
@@ -539,7 +615,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::SetInstanceRenderFlags(GpuInstanceHandle instance, std::uint32_t flags)
     {
-        if (!m_Impl->InstanceSlots.Resolve(instance))
+        if (!m_Impl->InstanceSlots.ResolveForUse(instance))
         {
             return;
         }
@@ -550,7 +626,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::SetInstanceTransform(GpuInstanceHandle instance, const glm::mat4& model, const glm::mat4& prevModel)
     {
-        if (!m_Impl->InstanceSlots.Resolve(instance))
+        if (!m_Impl->InstanceSlots.ResolveForUse(instance))
         {
             return;
         }
@@ -563,7 +639,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::SetEntityConfig(GpuInstanceHandle instance, const RHI::GpuEntityConfig& config)
     {
-        if (!m_Impl->InstanceSlots.Resolve(instance))
+        if (!m_Impl->InstanceSlots.ResolveForUse(instance))
         {
             return;
         }
@@ -574,7 +650,7 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::SetBounds(GpuInstanceHandle instance, const RHI::GpuBounds& bounds)
     {
-        if (!m_Impl->InstanceSlots.Resolve(instance))
+        if (!m_Impl->InstanceSlots.ResolveForUse(instance))
         {
             return;
         }
@@ -593,6 +669,10 @@ namespace Extrinsic::Graphics
     void GpuWorld::SetLights(std::span<const RHI::GpuLight> lights)
     {
         const std::size_t capped = std::min<std::size_t>(lights.size(), m_Impl->Desc.MaxLights);
+        if (lights.size() > capped)
+        {
+            ++m_Impl->LightOverflowCount;
+        }
         m_Impl->LightsCpu.assign(lights.begin(), lights.begin() + capped);
         m_Impl->DirtyLights = true;
         m_Impl->RefreshSceneTable();
@@ -600,6 +680,10 @@ namespace Extrinsic::Graphics
 
     void GpuWorld::SyncFrame()
     {
+        ++m_Impl->FrameIndex;
+        m_Impl->InstanceSlots.RetirePending(m_Impl->FrameIndex);
+        m_Impl->GeometrySlots.RetirePending(m_Impl->FrameIndex);
+
         if (!m_Impl->Device || !m_Impl->Initialized || !m_Impl->Device->IsOperational())
         {
             return;
@@ -666,4 +750,21 @@ namespace Extrinsic::Graphics
 
     std::uint32_t GpuWorld::GetLiveInstanceCount() const noexcept { return m_Impl->InstanceSlots.LiveCount; }
     std::uint32_t GpuWorld::GetInstanceCapacity() const noexcept { return m_Impl->Desc.MaxInstances; }
+    std::uint32_t GpuWorld::GetLiveGeometryCount() const noexcept { return m_Impl->GeometrySlots.LiveCount; }
+    std::uint32_t GpuWorld::GetGeometryCapacity() const noexcept { return m_Impl->Desc.MaxGeometryRecords; }
+    GpuWorld::Diagnostics GpuWorld::GetDiagnostics() const noexcept
+    {
+        return Diagnostics{
+            .Instances = m_Impl->InstanceSlots.Diagnostics(),
+            .Geometry = m_Impl->GeometrySlots.Diagnostics(),
+            .VertexBytesUsed = m_Impl->VertexBumpOffset,
+            .VertexBytesCapacity = m_Impl->Desc.VertexBufferBytes,
+            .IndexBytesUsed = m_Impl->IndexBumpOffset,
+            .IndexBytesCapacity = m_Impl->Desc.IndexBufferBytes,
+            .VertexOverflowCount = m_Impl->VertexOverflowCount,
+            .IndexOverflowCount = m_Impl->IndexOverflowCount,
+            .LightOverflowCount = m_Impl->LightOverflowCount,
+            .NullDevice = m_Impl->Device != nullptr && !m_Impl->Device->IsOperational(),
+        };
+    }
 }

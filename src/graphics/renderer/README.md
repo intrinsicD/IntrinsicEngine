@@ -110,6 +110,10 @@ and renderer/render-graph orchestration.
   selection, shadows, debug primitives, postprocess/readback, and invalid-record
   diagnostics. These records are valid for the frame and never reference live
   ECS storage.
+- `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
+  lifetime diagnostics for instance/geometry slots, deferred reuse windows,
+  retained-buffer pressure, overflow, stale handles, invalid handles, and
+  null-device mode.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.

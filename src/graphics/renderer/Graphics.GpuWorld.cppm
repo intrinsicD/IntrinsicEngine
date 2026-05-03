@@ -29,8 +29,34 @@ export namespace Extrinsic::Graphics
             std::uint32_t MaxInstances = 100'000;
             std::uint32_t MaxGeometryRecords = 65'536;
             std::uint32_t MaxLights = 4'096;
+            std::uint32_t DeferredFreeFrames = 2;
             std::uint64_t VertexBufferBytes = 256ull * 1024ull * 1024ull;
             std::uint64_t IndexBufferBytes = 512ull * 1024ull * 1024ull;
+        };
+
+        struct PoolDiagnostics
+        {
+            std::uint32_t Capacity = 0;
+            std::uint32_t LiveCount = 0;
+            std::uint32_t ReusableCount = 0;
+            std::uint32_t PendingFreeCount = 0;
+            std::uint32_t OverflowCount = 0;
+            std::uint32_t InvalidHandleCount = 0;
+            std::uint32_t StaleHandleCount = 0;
+        };
+
+        struct Diagnostics
+        {
+            PoolDiagnostics Instances{};
+            PoolDiagnostics Geometry{};
+            std::uint64_t VertexBytesUsed = 0;
+            std::uint64_t VertexBytesCapacity = 0;
+            std::uint64_t IndexBytesUsed = 0;
+            std::uint64_t IndexBytesCapacity = 0;
+            std::uint32_t VertexOverflowCount = 0;
+            std::uint32_t IndexOverflowCount = 0;
+            std::uint32_t LightOverflowCount = 0;
+            bool NullDevice = false;
         };
 
         struct GeometryUploadDesc
@@ -88,6 +114,9 @@ export namespace Extrinsic::Graphics
 
         [[nodiscard]] std::uint32_t GetLiveInstanceCount() const noexcept;
         [[nodiscard]] std::uint32_t GetInstanceCapacity() const noexcept;
+        [[nodiscard]] std::uint32_t GetLiveGeometryCount() const noexcept;
+        [[nodiscard]] std::uint32_t GetGeometryCapacity() const noexcept;
+        [[nodiscard]] Diagnostics GetDiagnostics() const noexcept;
 
     private:
         struct Impl;
