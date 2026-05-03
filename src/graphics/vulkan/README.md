@@ -26,11 +26,12 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   make maintenance calls no-ops so callers never dereference null backend state.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
-  Sampler creation now creates real `VkSampler` objects once a future device
+  Texture creation now allocates VMA-backed `VkImage` objects and image views,
+  and sampler creation creates real `VkSampler` objects once a future device
   bootstrap marks the backend operational; anisotropy remains disabled unless
-  device feature negotiation records support. Texture and pipeline creation still
-  return invalid handles until real Vulkan allocation/upload/pipeline construction
-  is wired.
+  device feature negotiation records support. Texture upload/layout transitions
+  and pipeline creation still return invalid/no-op results until staging/barrier
+  and shader/pipeline construction are wired.
 - Completing real Vulkan execution remains in `GRAPHICS-018`: create instance,
   surface, logical device, swapchain images, per-frame command buffers/sync,
   concrete resource creation/upload, pipeline creation, and presentation

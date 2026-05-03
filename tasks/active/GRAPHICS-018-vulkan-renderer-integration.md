@@ -4,7 +4,7 @@
 - State: in-progress.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-017` completion.
-- Current slice: renderer frame lifecycle now delegates `BeginFrame`/`EndFrame` and backbuffer import through `RHI::IDevice`, brackets render-graph execution with the frame graphics command context, records the canonical `CullingPass` command sequence on operational devices, routes `DepthPrepass` after culling when its pipeline is ready, reports structured command-recording diagnostics with CPU/mock contract coverage, keeps the promoted Vulkan `IDevice` lifecycle/services/resource overrides symbol-complete and fail-closed until full device/swapchain/resource bring-up lands, and has a guarded real `VkSampler` creation path for future operational Vulkan devices. Keep Vulkan opt-in and preserve the CPU/null correctness gate.
+- Current slice: renderer frame lifecycle now delegates `BeginFrame`/`EndFrame` and backbuffer import through `RHI::IDevice`, brackets render-graph execution with the frame graphics command context, records the canonical `CullingPass` command sequence on operational devices, routes `DepthPrepass` after culling when its pipeline is ready, reports structured command-recording diagnostics with CPU/mock contract coverage, keeps the promoted Vulkan `IDevice` lifecycle/services/resource overrides symbol-complete and fail-closed until full device/swapchain/resource bring-up lands, and has guarded real texture allocation/view and `VkSampler` creation paths for future operational Vulkan devices. Keep Vulkan opt-in and preserve the CPU/null correctness gate.
 - Nonblocking questions: tracked in `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`.
 
 ## Goal
