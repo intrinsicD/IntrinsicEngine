@@ -1,4 +1,11 @@
 # GRAPHICS-008 — Depth, surface, and G-buffer passes
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-007` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff.
+
 ## Goal
 - Reimplement depth prepass, forward surface, and deferred G-buffer command/resource behavior through current RHI and framegraph abstractions.
 ## Non-goals
