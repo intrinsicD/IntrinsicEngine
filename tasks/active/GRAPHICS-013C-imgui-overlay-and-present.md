@@ -1,4 +1,11 @@
 # GRAPHICS-013C — ImGui overlay and present/finalization
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-013B` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff.
+
 ## Goal
 - Define and implement ImGui draw-data import, overlay composition policy, and final present/finalization backbuffer ownership.
 ## Non-goals

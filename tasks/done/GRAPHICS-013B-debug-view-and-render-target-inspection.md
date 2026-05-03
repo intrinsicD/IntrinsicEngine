@@ -1,10 +1,13 @@
 # GRAPHICS-013B — Debug view and render-target inspection
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-013A` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Completed: 2026-05-03.
+- PR/commit: 1606637.
+- Completed slice: CPU/null debug-view inspection table, sampled-resource selection/fallback diagnostics, `DebugViewPass` command shim, frame-recipe preview scheduling tests, docs, and regenerated module inventory.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-013BQ-debug-view-backend-clarifications.md`.
 
 ## Goal
 - Define and implement debug-view sampled-resource selection and render-target inspection contracts with deterministic diagnostics.
@@ -38,6 +41,7 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+- Verified locally with targeted graphics debug-view/frame-recipe tests and the default CPU-supported correctness gate on 2026-05-03.
 ## Forbidden changes
 - Expanding into postprocess effect ownership.
 - Expanding into ImGui/present/backbuffer finalization policy ownership.

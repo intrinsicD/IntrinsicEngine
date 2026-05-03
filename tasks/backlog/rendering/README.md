@@ -85,9 +85,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   scene-color or HDR inputs are required.
 - [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](GRAPHICS-013AQ-postprocess-backend-clarifications.md):
   nonblocking docs-only follow-up for bloom backend shape, histogram/exposure history, AA shader/LUT policy, and postprocess descriptor ownership.
-- [GRAPHICS-013B — Debug view and render-target inspection](../../active/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
+- [GRAPHICS-013B — Debug view and render-target inspection](../../done/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
   depends on GRAPHICS-013A.
-- [GRAPHICS-013C — ImGui overlay and present/finalization](GRAPHICS-013C-imgui-overlay-and-present.md):
+- [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](GRAPHICS-013BQ-debug-view-backend-clarifications.md):
+  nonblocking docs-only follow-up for shader visualization modes, selected-resource descriptors, UI resource-name mapping, and buffer inspection policy.
+- [GRAPHICS-013C — ImGui overlay and present/finalization](../../active/GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.
 - [GRAPHICS-014 — Visualization attributes and overlays](GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever
