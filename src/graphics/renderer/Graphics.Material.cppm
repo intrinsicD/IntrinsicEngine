@@ -9,6 +9,7 @@ module;
 export module Extrinsic.Graphics.Material;
 
 import Extrinsic.Core.StrongHandle;
+import Extrinsic.Asset.Registry;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Types;
 
@@ -199,5 +200,13 @@ export namespace Extrinsic::Graphics
 
         // Custom data — maps directly to GpuMaterialSlot::CustomData[0..3]
         glm::vec4 CustomData[4]{};
+    };
+
+    struct MaterialTextureAssetBindings
+    {
+        Assets::AssetId Albedo{};
+        Assets::AssetId Normal{};
+        Assets::AssetId MetallicRoughness{};
+        Assets::AssetId Emissive{};
     };
 }

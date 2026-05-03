@@ -108,14 +108,18 @@ Graphics is organized into explicit sublayers:
   per material, four custom `vec4` slots, and four texture/bindless references
   (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`).
 - Texture references remain `RHI::BindlessIndex` values in `MaterialParams` for
-  this contract. Asset-ID-to-resident-texture resolution is deferred to the
-  graphics asset residency task and must be wired through runtime/graphics asset
-  seams rather than live asset-service traffic inside renderer passes.
+  this contract. `MaterialTextureAssetBindings` carries data-only `AssetId`
+  texture slots (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`), and
+  `MaterialSystem::ResolveTextureAssetBindings()` resolves them through
+  `GpuAssetCache` into bindless material params. Missing, pending, or failed
+  texture assets can resolve to the cache fallback texture; unavailable
+  fallbacks are deterministic diagnostics. Runtime owns the asset-event and
+  material-authoring sidecars, not renderer passes or live asset-service traffic.
 - Material type registration rejects duplicate names and incompatible layouts
   (for example more custom parameters than the four shader-visible custom data
   slots). Dirty material updates are coalesced before upload and reported through
-  `MaterialSystemDiagnostics` so CPU-only tests can cover fallback, layout, and
-  update behavior without Vulkan.
+  `MaterialSystemDiagnostics` so CPU-only tests can cover fallback, layout,
+  texture asset binding, and update behavior without Vulkan.
 
 ## Related references
 

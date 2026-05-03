@@ -14,12 +14,16 @@ module;
 
 module Extrinsic.Graphics.MaterialSystem;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
+import Extrinsic.Asset.Registry;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Types;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 
 // ============================================================
@@ -52,6 +56,20 @@ namespace Extrinsic::Graphics
     // -----------------------------------------------------------------
     static constexpr std::uint32_t kInitialCapacity     = 256;
     static constexpr std::uint32_t kGrowthFactor        = 2;
+
+    [[nodiscard]] RHI::BindlessIndex* SelectTextureSlot(
+        MaterialParams& params,
+        MaterialTextureSemantic semantic) noexcept
+    {
+        switch (semantic)
+        {
+        case MaterialTextureSemantic::Albedo:            return &params.AlbedoID;
+        case MaterialTextureSemantic::Normal:            return &params.NormalID;
+        case MaterialTextureSemantic::MetallicRoughness: return &params.MetallicRoughnessID;
+        case MaterialTextureSemantic::Emissive:          return &params.EmissiveID;
+        }
+        return nullptr;
+    }
 
     // -----------------------------------------------------------------
     // Registered type record
@@ -356,6 +374,72 @@ namespace Extrinsic::Graphics
     {
         const InstanceMeta* meta = m_Impl->Resolve(handle);
         return meta ? meta->Params : MaterialParams{};
+    }
+
+    // -----------------------------------------------------------------
+    Core::Result MaterialSystem::ResolveTextureAssetBindings(
+        MaterialHandle handle,
+        const MaterialTextureAssetBindings& bindings,
+        GpuAssetCache& assets)
+    {
+        InstanceMeta* meta = m_Impl->Resolve(handle);
+        if (!meta)
+        {
+            ++m_Impl->Diagnostics.InvalidTextureAssetBindingCount;
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        struct Binding
+        {
+            Assets::AssetId Id{};
+            MaterialTextureSemantic Semantic = MaterialTextureSemantic::Albedo;
+        };
+
+        const Binding requested[] = {
+            Binding{.Id = bindings.Albedo, .Semantic = MaterialTextureSemantic::Albedo},
+            Binding{.Id = bindings.Normal, .Semantic = MaterialTextureSemantic::Normal},
+            Binding{.Id = bindings.MetallicRoughness, .Semantic = MaterialTextureSemantic::MetallicRoughness},
+            Binding{.Id = bindings.Emissive, .Semantic = MaterialTextureSemantic::Emissive},
+        };
+
+        MaterialParams params = meta->Params;
+        bool anyFailure = false;
+
+        for (const Binding& binding : requested)
+        {
+            if (!binding.Id.IsValid())
+                continue;
+
+            RHI::BindlessIndex* target = SelectTextureSlot(params, binding.Semantic);
+            if (target == nullptr)
+            {
+                anyFailure = true;
+                ++m_Impl->Diagnostics.TextureAssetResolveFailureCount;
+                continue;
+            }
+
+            ++m_Impl->Diagnostics.TextureAssetResolveCount;
+            auto resolved = assets.GetViewOrFallback(binding.Id);
+            if (!resolved.has_value() ||
+                resolved->View.Kind != GpuAssetKind::Texture ||
+                resolved->View.BindlessIdx == RHI::kInvalidBindlessIndex)
+            {
+                anyFailure = true;
+                *target = RHI::kInvalidBindlessIndex;
+                ++m_Impl->Diagnostics.TextureAssetResolveFailureCount;
+                continue;
+            }
+
+            if (resolved->UsedFallback)
+                ++m_Impl->Diagnostics.TextureAssetFallbackResolveCount;
+
+            *target = resolved->View.BindlessIdx;
+        }
+
+        SetParams(handle, params);
+        return anyFailure
+            ? Core::Err(Core::ErrorCode::ResourceNotFound)
+            : Core::Ok();
     }
 
     // -----------------------------------------------------------------

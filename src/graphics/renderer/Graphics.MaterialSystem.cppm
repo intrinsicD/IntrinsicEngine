@@ -7,11 +7,13 @@ module;
 
 export module Extrinsic.Graphics.MaterialSystem;
 
+import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Types;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 
 // ============================================================
@@ -79,6 +81,10 @@ export namespace Extrinsic::Graphics
         std::uint32_t FallbackSlotResolveCount = 0;
         std::uint32_t LastUploadRangeCount = 0;
         std::uint32_t LastUploadedSlotCount = 0;
+        std::uint32_t TextureAssetResolveCount = 0;
+        std::uint32_t TextureAssetFallbackResolveCount = 0;
+        std::uint32_t TextureAssetResolveFailureCount = 0;
+        std::uint32_t InvalidTextureAssetBindingCount = 0;
         std::uint32_t DirtySlotCount = 0;
         std::uint32_t LiveInstanceCount = 0;
         std::uint32_t RegisteredTypeCount = 0;
@@ -149,6 +155,15 @@ export namespace Extrinsic::Graphics
 
         /// Current CPU-side params for an instance (for editor reads).
         [[nodiscard]] MaterialParams GetParams(MaterialHandle handle) const noexcept;
+
+        /// Resolve AssetId-backed texture bindings through the graphics-owned
+        /// GPU asset cache and write the resulting bindless indices into the
+        /// material params. Missing/pending/failed texture assets may resolve
+        /// to the cache fallback texture; unavailable fallbacks are reported as
+        /// deterministic failures. No asset service or runtime state is read.
+        Core::Result ResolveTextureAssetBindings(MaterialHandle handle,
+                                                 const MaterialTextureAssetBindings& bindings,
+                                                 GpuAssetCache& assets);
 
         // -----------------------------------------------------------------
         // LeasableManager concept requirements

@@ -30,6 +30,11 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
 - The cache does not evict ready assets yet. Capacity/eviction work must be a
   later semantic task; callers can still observe deterministic diagnostics and
   retire-queue behavior today.
+- `MaterialSystem::ResolveTextureAssetBindings()` consumes data-only
+  `MaterialTextureAssetBindings` (`AssetId` slots) and resolves them through the
+  cache into `MaterialParams` bindless indices, using the fallback texture for
+  missing/pending/failed assets when available. Runtime owns producer sidecars;
+  graphics only consumes IDs and cache views.
 
 ## Layering
 

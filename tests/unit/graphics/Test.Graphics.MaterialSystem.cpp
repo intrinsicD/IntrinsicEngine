@@ -1,7 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <array>
+#include <cstddef>
+#include <span>
 
+import Extrinsic.Asset.Registry;
+import Extrinsic.Core.Error;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.RHI.BufferManager;
@@ -12,6 +18,8 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.SamplerManager;
+import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.Types;
 import Extrinsic.Core.Config.Render;
@@ -21,6 +29,41 @@ import Extrinsic.Platform.Window;
 
 using namespace Extrinsic;
 using Tests::MockDevice;
+
+namespace
+{
+    Assets::AssetId MakeAssetId(std::uint32_t index, std::uint32_t generation = 1u)
+    {
+        return Assets::AssetId{index, generation};
+    }
+
+    RHI::TextureDesc AnyTextureDesc()
+    {
+        return RHI::TextureDesc{
+            .Width = 4,
+            .Height = 4,
+            .MipLevels = 1,
+            .Fmt = RHI::Format::RGBA8_UNORM,
+            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
+            .DebugName = "material-texture",
+        };
+    }
+
+    RHI::SamplerDesc AnySamplerDesc()
+    {
+        return RHI::SamplerDesc{
+            .MagFilter = RHI::FilterMode::Linear,
+            .MinFilter = RHI::FilterMode::Linear,
+            .MipFilter = RHI::MipmapMode::Nearest,
+            .AddressU = RHI::AddressMode::ClampToEdge,
+            .AddressV = RHI::AddressMode::ClampToEdge,
+            .AddressW = RHI::AddressMode::ClampToEdge,
+            .DebugName = "material-sampler",
+        };
+    }
+
+    std::array<std::byte, 64> ZeroBytes64{};
+}
 
 TEST(GraphicsMaterialSystem, CanonicalLayoutContractMatchesRhiSlot)
 {
@@ -129,6 +172,118 @@ TEST(GraphicsMaterialSystem, DirtyMaterialUpdatesAreCoalescedAndReported)
 
     second.Reset();
     first.Reset();
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, ResolvesReadyTextureAssetBindingsToBindlessMaterialParams)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    RHI::TextureManager textures{device, device.Bindless};
+    RHI::SamplerManager samplers{device};
+    Graphics::GpuAssetCache assets{buffers, textures, samplers, device.TransferQueue};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    const auto albedoId = MakeAssetId(101u);
+    ASSERT_TRUE(assets.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = albedoId,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    assets.Tick(0, 2);
+    auto albedoView = assets.GetView(albedoId);
+    ASSERT_TRUE(albedoView.has_value());
+
+    const auto standard = materials.FindType("StandardPBR");
+    auto material = materials.CreateInstance(standard, {});
+    ASSERT_TRUE(material.IsValid());
+
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{.Albedo = albedoId},
+        assets).has_value());
+
+    const Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.AlbedoID, albedoView->BindlessIdx);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 1u);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetFallbackResolveCount, 0u);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveFailureCount, 0u);
+
+    material.Reset();
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, ResolvesMissingTextureAssetBindingsToFallback)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    RHI::TextureManager textures{device, device.Bindless};
+    RHI::SamplerManager samplers{device};
+    Graphics::GpuAssetCache assets{buffers, textures, samplers, device.TransferQueue};
+    ASSERT_TRUE(assets.InitializeFallbackTexture(Graphics::GpuTextureFallbackDesc{
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+    auto material = materials.CreateInstance(materials.FindType("StandardPBR"), {});
+    ASSERT_TRUE(material.IsValid());
+
+    const auto missingNormal = MakeAssetId(102u);
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{.Normal = missingNormal},
+        assets).has_value());
+
+    const Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
+    EXPECT_NE(params.NormalID, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 1u);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetFallbackResolveCount, 1u);
+    EXPECT_EQ(assets.GetDiagnostics().FallbackHits, 1u);
+
+    material.Reset();
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, ReportsTextureAssetBindingFailuresWithoutFallback)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    RHI::TextureManager textures{device, device.Bindless};
+    RHI::SamplerManager samplers{device};
+    Graphics::GpuAssetCache assets{buffers, textures, samplers, device.TransferQueue};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+    auto material = materials.CreateInstance(materials.FindType("StandardPBR"), {});
+    ASSERT_TRUE(material.IsValid());
+
+    const auto missingEmissive = MakeAssetId(103u);
+    auto result = materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{.Emissive = missingEmissive},
+        assets);
+    EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::ResourceNotFound);
+
+    const Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.EmissiveID, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 1u);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveFailureCount, 1u);
+    EXPECT_EQ(assets.GetDiagnostics().FallbackMisses, 1u);
+
+    result = materials.ResolveTextureAssetBindings(
+        Graphics::MaterialHandle{},
+        Graphics::MaterialTextureAssetBindings{.Albedo = missingEmissive},
+        assets);
+    EXPECT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(materials.GetDiagnostics().InvalidTextureAssetBindingCount, 1u);
+
+    material.Reset();
     materials.Shutdown();
 }
 

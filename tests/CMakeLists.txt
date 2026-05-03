@@ -358,7 +358,7 @@ intrinsic_resolve_test_sources(_graphics_renderer_cpu_unit_test_sources
 intrinsic_test_object_lib(GraphicsRendererCpuUnitTestObjs
     SOURCES
         ${_graphics_renderer_cpu_unit_test_sources}
-    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
+    DEPS ExtrinsicGraphics ExtrinsicGraphicsAssets ExtrinsicAssets ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
 # Graphics-assets bridge tests — pure CPU mock-driven, no real GPU.
