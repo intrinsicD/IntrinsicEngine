@@ -31,7 +31,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 |----------|--------|----------|----------------|
 | `SceneDepth` | Swapchain/device depth format | Imported | Depth-tested scene + picking |
 | `EntityId` | `R32_UINT` | Frame transient | `PickingPass`, selection/debug sampling |
-| `PrimitiveId` | `R32_UINT` | Frame transient | `PickingPass` primitive-domain hint (`2` high bits = domain, `30` low bits = authoritative face ID for surfaces when available, otherwise primitive index) for sub-element selection/debug |
+| `PrimitiveId` | `R32_UINT` | Frame transient | `PickingPass` primitive-domain hint (`4` high bits = `SelectionPrimitiveDomain`, `28` low bits = authoritative face/edge/point ID when available, otherwise primitive index) for sub-element selection/debug |
 | `SceneNormal` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface normal target; also sampleable for debug |
 | `Albedo` | `R8G8B8A8_UNORM` | Frame transient | Deferred-capable surface albedo target |
 | `Material0` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface material/shading parameters |
@@ -242,6 +242,8 @@ Notes:
 
 - `CullingPass` is a real rendergraph pass, not a per-pass helper. It is owned by `Extrinsic.Graphics.Pass.Culling` and drives the GPU draw buckets consumed by depth, surface, line, point, shadow, and selection passes.
 - `PickingPass` is a logical name for the picking/selection ID stage. The source intentionally splits it into `Pass.Selection.EntityId` / `FaceId` / `EdgeId` / `PointId` modules so each primitive domain has independent contracts and tests. Splitting the implementation modules is **acceptable**; collapsing them into a single source module is **not required** by this architecture doc.
+- `SelectionSystem` owns the CPU-visible pending-pick/readback seam. `EncodedSelectionId` reserves the high four bits for `SelectionPrimitiveDomain` (`Entity`, `Face`, `Edge`, `Point`) and the low 28 bits for stable primitive-domain payload. `PickReadbackResult` reports hit/no-hit plus the extracted stable entity ID; graphics reports results but never mutates ECS selection state.
+- The frame recipe declares `PickingPass` dependencies on surface, line, and point cull buckets (`Cull.SurfaceOpaque.*`, `Cull.Lines.*`, and `Cull.Points.*`) so each split selection ID pass can reuse the canonical GPU-driven bucket contracts.
 - `Pass.Selection.Outline` is the source module for `SelectionOutlinePass`. Although it shares the `Selection.*` source prefix with the picking ID modules, it is a separate logical pass (scheduled after post-process) and must not be merged with `PickingPass` in the pipeline order.
 
 Lighting-path coexistence is now explicit:

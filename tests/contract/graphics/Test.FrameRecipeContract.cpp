@@ -274,6 +274,9 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     EXPECT_TRUE(picking->Enabled);
     EXPECT_TRUE(Contains(picking->Writes, "EntityId"));
     EXPECT_TRUE(Contains(picking->Writes, "PrimitiveId"));
+    EXPECT_TRUE(Contains(picking->Reads, "Cull.SurfaceOpaque.IndexedArgs"));
+    EXPECT_TRUE(Contains(picking->Reads, "Cull.Lines.IndexedArgs"));
+    EXPECT_TRUE(Contains(picking->Reads, "Cull.Points.NonIndexedArgs"));
 
     const auto* present = FindPass(description, FrameRecipePassKind::Present);
     ASSERT_NE(present, nullptr);

@@ -1,25 +1,38 @@
 module;
 
+#include <cstdint>
+
 export module Extrinsic.Graphics.Pass.Selection.FaceId;
 
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
+import Extrinsic.Graphics.CullingSystem;
+import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.SelectionSystem;
 
 namespace Extrinsic::Graphics
 {
-	export class SelectionFaceIdPass
+	export class FaceIdPass
 	{
 	public:
-		explicit SelectionFaceIdPass(SelectionSystem& selection) : m_SelectionSystem(selection) {}
+		explicit FaceIdPass(SelectionSystem& selection) : m_SelectionSystem(selection) {}
 
-		SelectionFaceIdPass(const SelectionFaceIdPass&)            = delete;
-		SelectionFaceIdPass& operator=(const SelectionFaceIdPass&) = delete;
+		FaceIdPass(const FaceIdPass&)            = delete;
+		FaceIdPass& operator=(const FaceIdPass&) = delete;
 
+		void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
+		void Execute(RHI::ICommandContext& cmd,
+		             const RHI::CameraUBO& camera,
+		             const GpuWorld&       gpuWorld,
+		             const CullingSystem&  culling,
+		             std::uint32_t         frameIndex);
 
 	private:
-		SelectionSystem& m_SelectionSystem;
+		SelectionSystem&    m_SelectionSystem;
+		RHI::PipelineHandle m_Pipeline{};
 	};
-}
 
+	export using SelectionFaceIdPass = FaceIdPass;
+}

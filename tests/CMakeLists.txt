@@ -398,6 +398,8 @@ set(_graphics_contract_cpu_test_files
     Test.LightingShadowContracts.cpp
     Test.LinePointPassContracts.cpp
     Test.RenderWorldContract.cpp
+    Test.SelectionPassContracts.cpp
+    Test.SelectionSystemContracts.cpp
     Test.SurfacePassContracts.cpp
 )
 intrinsic_resolve_test_sources(_graphics_contract_cpu_test_sources

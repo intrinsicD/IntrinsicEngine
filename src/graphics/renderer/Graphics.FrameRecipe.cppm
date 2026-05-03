@@ -246,7 +246,7 @@ namespace Extrinsic::Graphics
                 {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.EntityConfig", "GpuWorld.GeometryRecords", "GpuWorld.Bounds", "Material.Buffer", "GpuWorld.Lights"},
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"});
         AddPass(out, FrameRecipePassKind::Picking, "PickingPass", features.EnablePicking, false,
-                {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"},
+                {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
                 {"EntityId", "PrimitiveId", "Picking.Readback"});
         AddPass(out, FrameRecipePassKind::DepthPrepass, "DepthPrepass", features.EnableDepthPrepass, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"SceneDepth"});
@@ -430,6 +430,10 @@ namespace Extrinsic::Graphics
             addOrderedPass("PickingPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
+                builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
+                builder.Read(lineDrawCount, BufferUsage::IndirectRead);
+                builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
+                builder.Read(pointDrawCount, BufferUsage::IndirectRead);
                 builder.Write(entityId, TextureUsage::ColorAttachmentWrite);
                 builder.Write(primitiveId, TextureUsage::ColorAttachmentWrite);
                 builder.Write(pickingReadback, BufferUsage::TransferDst);
