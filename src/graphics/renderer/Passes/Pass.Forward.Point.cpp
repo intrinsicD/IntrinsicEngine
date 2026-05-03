@@ -24,6 +24,11 @@ namespace Extrinsic::Graphics
         }
 
         const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Points);
+        if (bucket.Indexed || !bucket.NonIndexedArgsBuffer.IsValid() ||
+            !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
+        {
+            return;
+        }
 
         cmd.BindPipeline(m_Pipeline);
 

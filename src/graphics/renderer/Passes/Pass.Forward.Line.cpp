@@ -24,6 +24,11 @@ namespace Extrinsic::Graphics
         }
 
         const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Lines);
+        if (!bucket.Indexed || !bucket.IndexedArgsBuffer.IsValid() ||
+            !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
+        {
+            return;
+        }
 
         cmd.BindPipeline(m_Pipeline);
         cmd.BindIndexBuffer(gpuWorld.GetManagedIndexBuffer(), 0, RHI::IndexType::Uint32);

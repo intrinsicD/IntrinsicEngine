@@ -395,6 +395,7 @@ set(_graphics_contract_cpu_test_files
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp
     Test.LightingShadowContracts.cpp
+    Test.LinePointPassContracts.cpp
     Test.RenderWorldContract.cpp
     Test.SurfacePassContracts.cpp
 )

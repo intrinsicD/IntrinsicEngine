@@ -4,7 +4,9 @@
 - State: in-progress.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-009` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Current slice: line/point bucket command contracts implemented and tested; transient debug packet/API work remains.
+- Progress: `ForwardLinePass` and `ForwardPointPass` now validate draw buckets before recording commands. Added CPU/mock contract tests for indexed line and non-indexed point indirect draws.
+- Blockers/follow-ups: full task completion still needs render snapshot packet APIs for transient line/point/triangle data, concrete renderer pass invocation wiring, and width/radius/coordinate sanitization at extraction or packet submission seams.
 
 ## Goal
 - Complete line, point, and transient debug primitive rendering contracts through non-legacy pass APIs.

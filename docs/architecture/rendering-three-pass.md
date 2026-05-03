@@ -159,6 +159,12 @@ The global camera-light packet now carries shadow cascade matrices, split/count 
 
 `DeferredLightingPass` is the promoted `CompositionPass` command contract. With an initialized `DeferredSystem` and a configured pipeline it binds the fullscreen lighting pipeline, pushes the scene-table BDA, and records a fullscreen triangle draw that resolves canonical G-buffer resources into `SceneColorHDR`. Without the owning system or pipeline it records no commands.
 
+### Line and point command contract
+
+`ForwardLinePass` and `ForwardPointPass` consume draw buckets produced by `CullingPass` and never query live ECS/editor/debug ownership. `ForwardLinePass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid indexed `Lines` bucket before it binds the managed index buffer, pushes `GpuScenePushConstants`, and records `DrawIndexedIndirectCount`. `ForwardPointPass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid non-indexed `Points` bucket before it pushes `GpuScenePushConstants` and records `DrawIndirectCount`. Invalid or empty buckets are deterministic no-ops so CPU/null tests can validate the contract without Vulkan.
+
+Transient debug primitive packet APIs are still a `GRAPHICS-010` follow-up slice: until line/point/triangle packet spans are added to the render snapshot, transient debug ownership remains documented as counts/flags only and concrete pass command tests cover retained GPU-driven line/point buckets.
+
 ### Legacy feature coverage classification
 
 The canonical GPU scene covers renderable identity and per-instance state. Legacy-inspired features that need different ownership attach through declared auxiliary resources or remain outside graphics ownership.
