@@ -26,8 +26,10 @@ namespace Extrinsic::Backends::Vulkan
         VkFormat      Format      = VK_FORMAT_UNDEFINED;
         uint32_t      Width       = 0;
         uint32_t      Height      = 0;
+        uint32_t      Depth       = 1;
         uint32_t      MipLevels   = 1;
         uint32_t      ArrayLayers = 1;
+        VkImageLayout CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         bool          OwnsMemory  = true;
     };
 

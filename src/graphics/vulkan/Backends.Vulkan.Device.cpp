@@ -260,6 +260,116 @@ namespace
         default: return VK_SAMPLE_COUNT_1_BIT;
         }
     }
+
+    [[nodiscard]] std::uint32_t MipExtent(const std::uint32_t extent, const std::uint32_t mipLevel)
+    {
+        const std::uint32_t shifted = extent >> mipLevel;
+        return shifted == 0 ? 1u : shifted;
+    }
+
+    [[nodiscard]] std::uint32_t FormatBlockByteSize(const VkFormat format)
+    {
+        switch (format)
+        {
+        case VK_FORMAT_R8_UNORM: return 1;
+        case VK_FORMAT_R8G8_UNORM: return 2;
+        case VK_FORMAT_R16_SFLOAT:
+        case VK_FORMAT_R16_UINT:
+        case VK_FORMAT_R16_UNORM: return 2;
+        case VK_FORMAT_R16G16_SFLOAT: return 4;
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_R8G8B8A8_SRGB:
+        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_SRGB:
+        case VK_FORMAT_R32_SFLOAT:
+        case VK_FORMAT_R32_UINT:
+        case VK_FORMAT_R32_SINT: return 4;
+        case VK_FORMAT_R16G16B16A16_SFLOAT: return 8;
+        case VK_FORMAT_R32G32_SFLOAT: return 8;
+        case VK_FORMAT_R32G32B32_SFLOAT: return 12;
+        case VK_FORMAT_R32G32B32A32_SFLOAT: return 16;
+        case VK_FORMAT_D16_UNORM: return 2;
+        case VK_FORMAT_D32_SFLOAT: return 4;
+        case VK_FORMAT_D24_UNORM_S8_UINT:
+        case VK_FORMAT_D32_SFLOAT_S8_UINT: return 0;
+        case VK_FORMAT_BC1_RGBA_UNORM_BLOCK: return 8;
+        case VK_FORMAT_BC3_UNORM_BLOCK:
+        case VK_FORMAT_BC5_UNORM_BLOCK:
+        case VK_FORMAT_BC7_UNORM_BLOCK:
+        case VK_FORMAT_BC7_SRGB_BLOCK: return 16;
+        default: return 0;
+        }
+    }
+
+    [[nodiscard]] bool IsBlockCompressedFormat(const VkFormat format)
+    {
+        switch (format)
+        {
+        case VK_FORMAT_BC1_RGBA_UNORM_BLOCK:
+        case VK_FORMAT_BC3_UNORM_BLOCK:
+        case VK_FORMAT_BC5_UNORM_BLOCK:
+        case VK_FORMAT_BC7_UNORM_BLOCK:
+        case VK_FORMAT_BC7_SRGB_BLOCK:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    [[nodiscard]] std::uint64_t RequiredUploadBytes(const VulkanImage& image,
+                                                    const std::uint32_t mipLevel)
+    {
+        const std::uint32_t blockBytes = FormatBlockByteSize(image.Format);
+        if (blockBytes == 0)
+            return 0;
+
+        const std::uint32_t width = MipExtent(image.Width, mipLevel);
+        const std::uint32_t height = MipExtent(image.Height, mipLevel);
+        const std::uint32_t depth = MipExtent(image.Depth, mipLevel);
+
+        if (IsBlockCompressedFormat(image.Format))
+        {
+            const std::uint64_t blocksWide = (static_cast<std::uint64_t>(width) + 3u) / 4u;
+            const std::uint64_t blocksHigh = (static_cast<std::uint64_t>(height) + 3u) / 4u;
+            return blocksWide * blocksHigh * depth * blockBytes;
+        }
+
+        return static_cast<std::uint64_t>(width) * height * depth * blockBytes;
+    }
+
+    void ImageBarrier(VkCommandBuffer cmd,
+                      VkImage image,
+                      VkImageAspectFlags aspectMask,
+                      std::uint32_t mipLevel,
+                      std::uint32_t arrayLayer,
+                      VkImageLayout oldLayout,
+                      VkImageLayout newLayout,
+                      VkPipelineStageFlags2 srcStage,
+                      VkAccessFlags2 srcAccess,
+                      VkPipelineStageFlags2 dstStage,
+                      VkAccessFlags2 dstAccess)
+    {
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = srcStage;
+        barrier.srcAccessMask = srcAccess;
+        barrier.dstStageMask = dstStage;
+        barrier.dstAccessMask = dstAccess;
+        barrier.oldLayout = oldLayout;
+        barrier.newLayout = newLayout;
+        barrier.image = image;
+        barrier.subresourceRange = VkImageSubresourceRange{.aspectMask = aspectMask,
+                                                           .baseMipLevel = mipLevel,
+                                                           .levelCount = 1,
+                                                           .baseArrayLayer = arrayLayer,
+                                                           .layerCount = 1};
+
+        VkDependencyInfo dependency{};
+        dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependency.imageMemoryBarrierCount = 1;
+        dependency.pImageMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(cmd, &dependency);
+    }
 }
 
 RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
@@ -450,8 +560,10 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     image.Format = format;
     image.Width = desc.Width;
     image.Height = desc.Height;
+    image.Depth = desc.Dimension == RHI::TextureDimension::Tex3D ? desc.DepthOrArrayLayers : 1u;
     image.MipLevels = desc.MipLevels;
     image.ArrayLayers = desc.Dimension == RHI::TextureDimension::Tex3D ? 1u : desc.DepthOrArrayLayers;
+    image.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image.OwnsMemory = true;
 
     VkImageCreateInfo imageInfo{};
@@ -536,6 +648,7 @@ void VulkanDevice::DestroyTexture(RHI::TextureHandle handle)
     image->Image = VK_NULL_HANDLE;
     image->View = VK_NULL_HANDLE;
     image->Allocation = VK_NULL_HANDLE;
+    image->CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     m_Images.Remove(handle, m_GlobalFrameNumber);
 
     if (device == VK_NULL_HANDLE)
@@ -556,16 +669,106 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
                                 uint32_t mipLevel,
                                 uint32_t arrayLayer)
 {
-    (void)handle;
-    (void)data;
-    (void)dataSizeBytes;
-    (void)mipLevel;
-    (void)arrayLayer;
-    if (!m_Operational)
+    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE)
         return;
 
-    // Texture upload is intentionally fail-closed until real Vulkan image
-    // staging/layout transition support is wired through GRAPHICS-018.
+    if (!data || dataSizeBytes == 0)
+        return;
+
+    VulkanImage* image = m_Images.GetIfValid(handle);
+    if (!image || image->Image == VK_NULL_HANDLE)
+        return;
+
+    if (mipLevel >= image->MipLevels || arrayLayer >= image->ArrayLayers)
+        return;
+
+    const std::uint64_t requiredBytes = RequiredUploadBytes(*image, mipLevel);
+    if (requiredBytes == 0 || dataSizeBytes < requiredBytes)
+        return;
+
+    VkBufferCreateInfo stagingInfo{};
+    stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    stagingInfo.size = dataSizeBytes;
+    stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VmaAllocationCreateInfo allocationInfo{};
+    allocationInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    allocationInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT
+                         | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VmaAllocation stagingAllocation = VK_NULL_HANDLE;
+    VmaAllocationInfo stagingAllocationInfo{};
+
+    if (vmaCreateBuffer(m_Vma,
+                        &stagingInfo,
+                        &allocationInfo,
+                        &stagingBuffer,
+                        &stagingAllocation,
+                        &stagingAllocationInfo) != VK_SUCCESS)
+    {
+        std::fprintf(stderr, "[VulkanDevice::WriteTexture] Failed to allocate staging buffer\n");
+        return;
+    }
+
+    std::memcpy(stagingAllocationInfo.pMappedData, data, static_cast<std::size_t>(dataSizeBytes));
+
+    VkCommandBuffer cmd = BeginOneShot();
+    if (cmd == VK_NULL_HANDLE)
+    {
+        vmaDestroyBuffer(m_Vma, stagingBuffer, stagingAllocation);
+        return;
+    }
+
+    const VkImageAspectFlags aspectMask = AspectFromFormat(image->Format);
+    ImageBarrier(cmd,
+                 image->Image,
+                 aspectMask,
+                 mipLevel,
+                 arrayLayer,
+                 image->CurrentLayout,
+                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                 image->CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED ? VK_PIPELINE_STAGE_2_NONE
+                                                                   : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                 image->CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED ? 0
+                                                                   : VK_ACCESS_2_MEMORY_WRITE_BIT |
+                                                                         VK_ACCESS_2_MEMORY_READ_BIT,
+                 VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                 VK_ACCESS_2_TRANSFER_WRITE_BIT);
+
+    const std::uint32_t mipWidth = MipExtent(image->Width, mipLevel);
+    const std::uint32_t mipHeight = MipExtent(image->Height, mipLevel);
+    const std::uint32_t mipDepth = MipExtent(image->Depth, mipLevel);
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.imageSubresource = VkImageSubresourceLayers{.aspectMask = aspectMask,
+                                                       .mipLevel = mipLevel,
+                                                       .baseArrayLayer = arrayLayer,
+                                                       .layerCount = 1};
+    region.imageExtent = VkExtent3D{.width = mipWidth, .height = mipHeight, .depth = mipDepth};
+    vkCmdCopyBufferToImage(cmd,
+                           stagingBuffer,
+                           image->Image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1,
+                           &region);
+
+    ImageBarrier(cmd,
+                 image->Image,
+                 aspectMask,
+                 mipLevel,
+                 arrayLayer,
+                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                 VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                 VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                 VK_ACCESS_2_SHADER_READ_BIT);
+
+    EndOneShot(cmd);
+    image->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    vmaDestroyBuffer(m_Vma, stagingBuffer, stagingAllocation);
 }
 
 RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)

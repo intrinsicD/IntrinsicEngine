@@ -205,6 +205,38 @@ TEST(RendererRhiBoundary, VulkanBackendCreatesTexturesWhenOperational)
         EXPECT_NE(content.find(snippet), std::string::npos) << snippet;
 }
 
+TEST(RendererRhiBoundary, VulkanBackendUploadsTexturesWhenOperational)
+{
+    const auto deviceSource = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp";
+    const auto memoryInterface = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Memory.cppm";
+    const auto sourceContent = ReadFile(deviceSource);
+    const auto memoryContent = ReadFile(memoryInterface);
+
+    const std::vector<std::string> requiredSourceSnippets{
+        "void VulkanDevice::WriteTexture(",
+        "std::uint64_t RequiredUploadBytes(",
+        "std::uint32_t FormatBlockByteSize(",
+        "bool IsBlockCompressedFormat(",
+        "void ImageBarrier(",
+        "if (mipLevel >= image->MipLevels || arrayLayer >= image->ArrayLayers)",
+        "if (requiredBytes == 0 || dataSizeBytes < requiredBytes)",
+        "vmaCreateBuffer(m_Vma,",
+        "VkCommandBuffer cmd = BeginOneShot();",
+        "vkCmdCopyBufferToImage(cmd,",
+        "VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL",
+        "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL",
+        "image->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;",
+        "vmaDestroyBuffer(m_Vma, stagingBuffer, stagingAllocation);",
+    };
+
+    for (const auto& snippet : requiredSourceSnippets)
+        EXPECT_NE(sourceContent.find(snippet), std::string::npos) << snippet;
+
+    EXPECT_NE(memoryContent.find("uint32_t      Depth       = 1;"), std::string::npos);
+    EXPECT_NE(memoryContent.find("VkImageLayout CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;"),
+              std::string::npos);
+}
+
 TEST(RendererRhiBoundary, VulkanBackendShutdownDrainsLiveResourcePools)
 {
     const auto deviceSource = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp";
