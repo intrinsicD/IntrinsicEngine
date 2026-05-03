@@ -1,10 +1,13 @@
 # GRAPHICS-013A — Postprocess chain
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-012` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Completed: 2026-05-03.
+- PR/commit: 6940767.
+- Completed slice: CPU/null postprocess chain contracts, deterministic settings/stage diagnostics, explicit HDR-to-LDR frame-recipe resources, guarded `Histogram`/`Bloom`/`ToneMap`/`FXAA`/`SMAA` pass command shims, docs, and unit/contract tests.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-013AQ-postprocess-backend-clarifications.md`.
 
 ## Goal
 - Define and implement the HDR-to-LDR postprocess chain contract with explicit resource lifetime and diagnostics.
@@ -42,6 +45,7 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+- Verified locally with targeted graphics postprocess/frame-recipe tests and the default CPU-supported correctness gate on 2026-05-03.
 ## Forbidden changes
 - Folding debug-view or ImGui/present policy ownership into this task.
 - Shader-only feature work without matching contract/test updates.

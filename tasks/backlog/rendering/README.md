@@ -80,10 +80,12 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   nonblocking docs-only follow-up for shader-side ID encoding, backend readback, runtime ECS selection resolution, and transparent/special forward picking eligibility.
 - [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](GRAPHICS-013-postprocess-debugview-imgui-present.md):
   planning-only umbrella; execute through GRAPHICS-013A/B/C.
-- [GRAPHICS-013A — Postprocess chain](../../active/GRAPHICS-013A-postprocess-chain.md):
+- [GRAPHICS-013A — Postprocess chain](../../done/GRAPHICS-013A-postprocess-chain.md):
   depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
   scene-color or HDR inputs are required.
-- [GRAPHICS-013B — Debug view and render-target inspection](GRAPHICS-013B-debug-view-and-render-target-inspection.md):
+- [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](GRAPHICS-013AQ-postprocess-backend-clarifications.md):
+  nonblocking docs-only follow-up for bloom backend shape, histogram/exposure history, AA shader/LUT policy, and postprocess descriptor ownership.
+- [GRAPHICS-013B — Debug view and render-target inspection](../../active/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
   depends on GRAPHICS-013A.
 - [GRAPHICS-013C — ImGui overlay and present/finalization](GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.

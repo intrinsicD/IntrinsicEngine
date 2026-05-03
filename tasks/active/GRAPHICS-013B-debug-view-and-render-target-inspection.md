@@ -1,4 +1,11 @@
 # GRAPHICS-013B — Debug view and render-target inspection
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-013A` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff.
+
 ## Goal
 - Define and implement debug-view sampled-resource selection and render-target inspection contracts with deterministic diagnostics.
 ## Non-goals
