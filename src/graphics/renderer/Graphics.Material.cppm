@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <cstddef>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
@@ -16,7 +17,8 @@ import Extrinsic.RHI.Types;
 //
 // These are the CPU-side representations.  The GPU layout is
 // GpuMaterialSlot (RHI.Types), a 128-byte std430 struct with
-// 64 bytes of standard PBR fields and 64 bytes of custom data.
+// 48 bytes of standard PBR fields, 16 bytes of material type/flags and
+// padding, and 64 bytes of custom data.
 //
 // Separation of concerns:
 //   Graphics.Material      — descriptors, params, handles (this file)
@@ -25,6 +27,44 @@ import Extrinsic.RHI.Types;
 
 export namespace Extrinsic::Graphics
 {
+    // -----------------------------------------------------------------
+    // Canonical material slot/layout contract
+    // -----------------------------------------------------------------
+    // Material slots are graphics-owned indices into the MaterialSystem SSBO.
+    // Runtime may cache entity/asset -> slot sidecars, but canonical ECS
+    // components store CPU material descriptions or asset IDs, never these
+    // graphics-owned slot values.
+    // -----------------------------------------------------------------
+    inline constexpr std::uint32_t kDefaultMaterialSlotIndex = 0u;
+    inline constexpr std::uint32_t kMaterialLayoutVersion = 1u;
+    inline constexpr std::size_t   kMaterialSlotSizeBytes = sizeof(RHI::GpuMaterialSlot);
+    inline constexpr std::uint32_t kMaterialCustomDataSlotCount = 4u;
+    inline constexpr std::uint32_t kMaterialTextureBindingCount = 4u;
+
+    enum class MaterialTextureSemantic : std::uint32_t
+    {
+        Albedo = 0,
+        Normal = 1,
+        MetallicRoughness = 2,
+        Emissive = 3,
+    };
+
+    struct MaterialLayoutContract
+    {
+        std::uint32_t Version = kMaterialLayoutVersion;
+        std::uint32_t DefaultSlot = kDefaultMaterialSlotIndex;
+        std::uint32_t SlotSizeBytes = static_cast<std::uint32_t>(kMaterialSlotSizeBytes);
+        std::uint32_t CustomVec4SlotCount = kMaterialCustomDataSlotCount;
+        std::uint32_t TextureBindingCount = kMaterialTextureBindingCount;
+    };
+
+    [[nodiscard]] constexpr MaterialLayoutContract GetCanonicalMaterialLayoutContract() noexcept
+    {
+        return {};
+    }
+
+    static_assert(kMaterialSlotSizeBytes == 128u, "GpuMaterialSlot layout version 1 is 128 bytes");
+
     // -----------------------------------------------------------------
     // Well-known material type IDs
     // -----------------------------------------------------------------

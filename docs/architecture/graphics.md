@@ -52,6 +52,30 @@ Graphics is organized into explicit sublayers:
   failures are deterministic diagnostics. Backend-specific shader compilation
   remains behind RHI/backend integration and stays opt-in for GPU/Vulkan tests.
 
+## Material registry and slot contract
+
+- `Extrinsic.Graphics.MaterialSystem` owns promoted material-slot allocation in
+  the renderer layer. Runtime extraction may maintain sidecar mappings from ECS
+  entities or material asset IDs to `MaterialSystem` leases/slots, but canonical
+  ECS components must not store graphics-owned material-slot indices.
+- Slot `0` is the immutable fallback/default material slot
+  (`kDefaultMaterialSlotIndex`). Stale or invalid material handles resolve to
+  that fallback and increment deterministic CPU-visible diagnostics.
+- The canonical material SSBO layout is versioned by
+  `kMaterialLayoutVersion == 1` and described by
+  `GetCanonicalMaterialLayoutContract()`: one 128-byte `RHI::GpuMaterialSlot`
+  per material, four custom `vec4` slots, and four texture/bindless references
+  (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`).
+- Texture references remain `RHI::BindlessIndex` values in `MaterialParams` for
+  this contract. Asset-ID-to-resident-texture resolution is deferred to the
+  graphics asset residency task and must be wired through runtime/graphics asset
+  seams rather than live asset-service traffic inside renderer passes.
+- Material type registration rejects duplicate names and incompatible layouts
+  (for example more custom parameters than the four shader-visible custom data
+  slots). Dirty material updates are coalesced before upload and reported through
+  `MaterialSystemDiagnostics` so CPU-only tests can cover fallback, layout, and
+  update behavior without Vulkan.
+
 ## Related references
 
 - Frame graph details: [frame-graph.md](frame-graph.md).

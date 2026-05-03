@@ -50,7 +50,6 @@ namespace Extrinsic::Graphics
     // -----------------------------------------------------------------
     // Constants
     // -----------------------------------------------------------------
-    static constexpr std::uint32_t kDefaultMaterialSlot = 0;
     static constexpr std::uint32_t kInitialCapacity     = 256;
     static constexpr std::uint32_t kGrowthFactor        = 2;
 
@@ -102,6 +101,7 @@ namespace Extrinsic::Graphics
         std::vector<RHI::GpuMaterialSlot> GpuSlots; // CPU mirror of SSBO
         std::vector<std::uint32_t>       FreeList;
         std::vector<bool>                DirtySet;
+        MaterialSystemDiagnostics        Diagnostics{};
 
         // -----------------------------------------------------------------
         [[nodiscard]] InstanceMeta* Resolve(MaterialHandle h) noexcept
@@ -241,7 +241,16 @@ namespace Extrinsic::Graphics
         assert(m_Impl->Device && "RegisterType called before Initialize()");
 
         if (m_Impl->TypeNameIndex.contains(desc.Name))
+        {
+            ++m_Impl->Diagnostics.DuplicateTypeNameCount;
             return {}; // duplicate name
+        }
+
+        if (desc.Name.empty() || desc.CustomParams.size() > kMaterialCustomDataSlotCount)
+        {
+            ++m_Impl->Diagnostics.IncompatibleLayoutCount;
+            return {};
+        }
 
         const std::uint32_t typeID = static_cast<std::uint32_t>(m_Impl->Types.size());
         const std::uint32_t index  = typeID; // same as typeID for our simple vector
@@ -278,7 +287,10 @@ namespace Extrinsic::Graphics
         assert(m_Impl->Device && "CreateInstance called before Initialize()");
 
         if (!type.IsValid() || type.Index >= m_Impl->Types.size())
+        {
+            ++m_Impl->Diagnostics.InvalidCreateTypeCount;
             return {};
+        }
 
         const std::uint32_t typeID = m_Impl->Types[type.Index].TypeID;
 
@@ -300,7 +312,10 @@ namespace Extrinsic::Graphics
 
             // Grow GPU-side arrays if needed (keeps them parallel to Meta).
             if (!m_Impl->EnsureCapacity(index + 1))
+            {
+                ++m_Impl->Diagnostics.CapacityFailureCount;
                 return {};
+            }
         }
 
         InstanceMeta& meta  = m_Impl->Meta[index];
@@ -391,12 +406,16 @@ namespace Extrinsic::Graphics
         constexpr std::uint64_t kStride = sizeof(RHI::GpuMaterialSlot);
 
         std::uint32_t rangeStart = UINT32_MAX;
+        m_Impl->Diagnostics.LastUploadRangeCount = 0;
+        m_Impl->Diagnostics.LastUploadedSlotCount = 0;
 
         auto flush = [&](std::uint32_t end)
         {
             if (rangeStart == UINT32_MAX) return;
             const std::uint64_t byteOffset = rangeStart * kStride;
             const std::uint64_t byteSize   = (end - rangeStart) * kStride;
+            ++m_Impl->Diagnostics.LastUploadRangeCount;
+            m_Impl->Diagnostics.LastUploadedSlotCount += end - rangeStart;
             m_Impl->Device->WriteBuffer(
                 m_Impl->Buffer.GetHandle(),
                 m_Impl->GpuSlots.data() + rangeStart,
@@ -430,7 +449,18 @@ namespace Extrinsic::Graphics
     std::uint32_t MaterialSystem::GetMaterialSlot(MaterialHandle handle) const noexcept
     {
         const InstanceMeta* meta = m_Impl->Resolve(handle);
-        return meta ? handle.Index : kDefaultMaterialSlot;
+        if (!meta)
+        {
+            ++m_Impl->Diagnostics.FallbackSlotResolveCount;
+            return kDefaultMaterialSlotIndex;
+        }
+        return handle.Index;
+    }
+
+    // -----------------------------------------------------------------
+    MaterialLayoutContract MaterialSystem::GetLayoutContract() const noexcept
+    {
+        return GetCanonicalMaterialLayoutContract();
     }
 
     // -----------------------------------------------------------------
@@ -450,6 +480,19 @@ namespace Extrinsic::Graphics
     std::uint32_t MaterialSystem::GetCapacity() const noexcept
     {
         return m_Impl->GpuCapacity;
+    }
+
+    MaterialSystemDiagnostics MaterialSystem::GetDiagnostics() const noexcept
+    {
+        MaterialSystemDiagnostics diagnostics = m_Impl->Diagnostics;
+        for (const bool dirty : m_Impl->DirtySet)
+        {
+            if (dirty) ++diagnostics.DirtySlotCount;
+        }
+        diagnostics.LiveInstanceCount = GetLiveInstanceCount();
+        diagnostics.RegisteredTypeCount = GetRegisteredTypeCount();
+        diagnostics.Capacity = GetCapacity();
+        return diagnostics;
     }
 
 } // namespace Extrinsic::Graphics

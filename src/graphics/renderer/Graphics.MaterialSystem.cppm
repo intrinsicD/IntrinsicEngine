@@ -70,6 +70,21 @@ import Extrinsic.Graphics.Material;
 
 export namespace Extrinsic::Graphics
 {
+    struct MaterialSystemDiagnostics
+    {
+        std::uint32_t DuplicateTypeNameCount = 0;
+        std::uint32_t IncompatibleLayoutCount = 0;
+        std::uint32_t InvalidCreateTypeCount = 0;
+        std::uint32_t CapacityFailureCount = 0;
+        std::uint32_t FallbackSlotResolveCount = 0;
+        std::uint32_t LastUploadRangeCount = 0;
+        std::uint32_t LastUploadedSlotCount = 0;
+        std::uint32_t DirtySlotCount = 0;
+        std::uint32_t LiveInstanceCount = 0;
+        std::uint32_t RegisteredTypeCount = 0;
+        std::uint32_t Capacity = 0;
+    };
+
     class MaterialSystem
     {
     public:
@@ -166,12 +181,18 @@ export namespace Extrinsic::Graphics
         /// Returns 0 (default material) for stale handles.
         [[nodiscard]] std::uint32_t GetMaterialSlot(MaterialHandle handle) const noexcept;
 
+        /// Canonical layout consumed by renderer passes and runtime extraction
+        /// sidecars. This is CPU-visible metadata only; backend descriptor
+        /// allocation remains owned by graphics/RHI wiring.
+        [[nodiscard]] MaterialLayoutContract GetLayoutContract() const noexcept;
+
         // -----------------------------------------------------------------
         // Diagnostics
         // -----------------------------------------------------------------
         [[nodiscard]] std::uint32_t GetLiveInstanceCount()  const noexcept;
         [[nodiscard]] std::uint32_t GetRegisteredTypeCount() const noexcept;
         [[nodiscard]] std::uint32_t GetCapacity()           const noexcept;
+        [[nodiscard]] MaterialSystemDiagnostics GetDiagnostics() const noexcept;
 
     private:
         struct Impl;

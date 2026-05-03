@@ -110,7 +110,14 @@ The promoted GPU scene is organized around these canonical buffers:
 - `RenderableInstance` buffer: one record per renderable instance slot with geometry record reference, material slot, stable entity/pick ID, render-domain flags, visibility/layer flags, selection flags, and draw-bucket participation bits.
 - `Transform` buffer: current and previous world transforms indexed by the same instance slot as `RenderableInstance`.
 - `Bounds/Culling` buffer: local/world-space bounds, culling flags, shadow participation, and visibility metadata indexed by the same instance slot; any compacted visible list is an indirection over instance slots.
-- `Material` buffer: graphics-owned material slots populated from runtime-extracted CPU material descriptions or asset IDs, including fallback material data and texture/bindless references.
+- `Material` buffer: graphics-owned `Extrinsic.Graphics.MaterialSystem` slots
+  populated from runtime-extracted CPU material descriptions or asset IDs.
+  Slot `0` is the default/fallback material, and layout version `1` is a
+  128-byte `RHI::GpuMaterialSlot` with four custom `vec4` slots plus four
+  bindless texture references (`Albedo`, `Normal`, `MetallicRoughness`,
+  `Emissive`). Asset IDs are resolved to material leases/slots by runtime or
+  graphics asset sidecars; canonical ECS components do not store graphics-owned
+  material-slot indices.
 - `Geometry` records: graphics-owned references to uploaded geometry views/buffers, shared by renderable instances through generation-checked handles.
 - `Light` buffer / `LightEnvironmentPacket`: runtime-extracted light descriptions, directional/ambient parameters, and shadow data consumed by lighting and shadow passes.
 - Scene table / descriptor set: the backend binding point that exposes the renderable, transform, bounds/culling, material, geometry, and light buffers to passes.

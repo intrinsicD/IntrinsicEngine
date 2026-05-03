@@ -343,6 +343,19 @@ intrinsic_test_object_lib(GraphicsRhiCpuUnitTestObjs
     DEPS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
 )
 
+set(_graphics_renderer_cpu_unit_test_files
+    Test.Graphics.MaterialSystem.cpp
+)
+intrinsic_resolve_test_sources(_graphics_renderer_cpu_unit_test_sources
+    SEARCH_DIRS unit/graphics
+    FILES ${_graphics_renderer_cpu_unit_test_files}
+)
+intrinsic_test_object_lib(GraphicsRendererCpuUnitTestObjs
+    SOURCES
+        ${_graphics_renderer_cpu_unit_test_sources}
+    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+)
+
 # Graphics-assets bridge tests — pure CPU mock-driven, no real GPU.
 # Kept in a separate object lib + target so they carry only `unit graphics`
 # labels and participate in the default CPU-supported correctness gate
@@ -642,6 +655,15 @@ intrinsic_test_executable(IntrinsicGraphicsRhiCpuUnitTests
     LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
     LABELS unit graphics
 )
+
+intrinsic_test_executable(IntrinsicGraphicsRendererCpuUnitTests
+    OBJECTS GraphicsRendererCpuUnitTestObjs
+    LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+    LABELS unit graphics
+)
+if(TARGET IntrinsicTests)
+    add_dependencies(IntrinsicTests IntrinsicGraphicsRendererCpuUnitTests)
+endif()
 
 intrinsic_test_executable(IntrinsicGraphicsContractTests
     OBJECTS GraphicsContractTestObjs
