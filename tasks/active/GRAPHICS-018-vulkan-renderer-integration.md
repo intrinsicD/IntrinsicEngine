@@ -1,4 +1,11 @@
 # GRAPHICS-018 — Vulkan renderer integration
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-017` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff. Keep Vulkan opt-in and preserve the CPU/null correctness gate.
+
 ## Goal
 - Wire concrete Vulkan backend execution behind the promoted graphics interfaces and default frame recipe.
 ## Non-goals

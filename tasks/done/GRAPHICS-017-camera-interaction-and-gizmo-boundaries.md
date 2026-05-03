@@ -1,11 +1,14 @@
 # GRAPHICS-017 — Camera, interaction, and gizmo boundaries
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-015` completion.
 - Current slice: CPU/null camera/view snapshot contracts, frustum-plane extraction, pick-ray derivation, and data-only transform-gizmo render packets. Prefer snapshot contracts before runtime/platform integration.
 - Completed slices in active work: `Graphics.CameraSnapshots`, `RenderFrameInput` camera/pick data, `RenderWorld` camera/gizmo snapshots, null-renderer handoff, and contract tests.
+- Completed: 2026-05-03.
+- PR/commit: 769aac8.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md`.
 
 ## Goal
 - Re-home or reimplement camera, interaction helper, and transform-gizmo behavior behind architecture-compliant runtime/platform/graphics boundaries.
@@ -38,6 +41,7 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+- Verified locally with targeted `RenderWorldContract` tests and the default CPU-supported correctness gate on 2026-05-03.
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
