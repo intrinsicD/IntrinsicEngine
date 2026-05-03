@@ -70,15 +70,17 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   depends on GRAPHICS-010.
 - [GRAPHICS-011Q — Spatial debug adapter clarification follow-ups](GRAPHICS-011Q-spatial-debug-adapter-clarifications.md):
   nonblocking docs-only follow-up for concrete BVH/KD-tree/octree/convex-hull adapter ownership and diagnostics handoff.
-- [GRAPHICS-012 — Picking, selection, and outline](../../active/GRAPHICS-012-picking-selection-outline.md):
+- [GRAPHICS-012 — Picking, selection, and outline](../../done/GRAPHICS-012-picking-selection-outline.md):
   depends on GRAPHICS-002, GRAPHICS-007, GRAPHICS-008, and GRAPHICS-010. Owns
   the logical `PickingPass` stage (split source modules
   `Pass.Selection.EntityId`/`FaceId`/`EdgeId`/`PointId`) and the
   `SelectionOutlinePass` (`Pass.Selection.Outline`); see the Pass module
   naming map in `docs/architecture/rendering-three-pass.md`.
+- [GRAPHICS-012Q — Picking backend/runtime clarification follow-ups](GRAPHICS-012Q-picking-backend-runtime-clarifications.md):
+  nonblocking docs-only follow-up for shader-side ID encoding, backend readback, runtime ECS selection resolution, and transparent/special forward picking eligibility.
 - [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](GRAPHICS-013-postprocess-debugview-imgui-present.md):
   planning-only umbrella; execute through GRAPHICS-013A/B/C.
-- [GRAPHICS-013A — Postprocess chain](GRAPHICS-013A-postprocess-chain.md):
+- [GRAPHICS-013A — Postprocess chain](../../active/GRAPHICS-013A-postprocess-chain.md):
   depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
   scene-color or HDR inputs are required.
 - [GRAPHICS-013B — Debug view and render-target inspection](GRAPHICS-013B-debug-view-and-render-target-inspection.md):

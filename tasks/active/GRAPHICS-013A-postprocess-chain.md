@@ -1,4 +1,11 @@
 # GRAPHICS-013A — Postprocess chain
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-012` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff.
+
 ## Goal
 - Define and implement the HDR-to-LDR postprocess chain contract with explicit resource lifetime and diagnostics.
 ## Non-goals

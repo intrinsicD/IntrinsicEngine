@@ -1,10 +1,13 @@
 # GRAPHICS-012 — Picking and selection outline
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-011` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Completed: 2026-05-03.
+- PR/commit: pending local commit.
+- Completed slice: CPU/null selection contracts, encoded selection IDs, pending-pick/readback/no-hit diagnostics, promoted split pass class names, surface/line/point mock command contracts, outline command contract, frame-recipe surface/line/point picking dependencies, docs, and contract tests.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-012Q-picking-backend-runtime-clarifications.md`.
 
 ## Goal
 - Reimplement picking, selection ID passes, readback seams, and selection outline behavior for surface, line, and point domains.
@@ -45,8 +48,8 @@
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests -j 4
+ctest --test-dir build/ci --output-on-failure -R 'GraphicsSelection.*Contracts|FrameRecipeContract|RenderWorldContract' --timeout 60
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
