@@ -1,10 +1,17 @@
 # GRAPHICS-008 — Depth, surface, and G-buffer passes
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-007` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Completed: 2026-05-03.
+- Result: implemented CPU/null-testable depth prepass, forward surface, and deferred G-buffer command contracts over the surface opaque culling bucket.
+- Follow-up task: `GRAPHICS-009 — Deferred lighting and shadows` promoted to `tasks/active/`.
+
+## Completion metadata
+- Implementation commit: pending local agent workflow handoff.
+- Task-state commit: pending local agent workflow handoff.
+- Verification: focused surface/frame-recipe contract tests, aggregate build, and default CPU gate passed; commands recorded below.
 
 ## Goal
 - Reimplement depth prepass, forward surface, and deferred G-buffer command/resource behavior through current RHI and framegraph abstractions.
@@ -33,8 +40,9 @@
 - CPU-supported tests validate command sequencing without requiring Vulkan.
 ## Verification
 ```bash
-cmake --preset ci
+cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON
 cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -R 'GraphicsSurfacePassContracts|FrameRecipeContract' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
 ## Forbidden changes

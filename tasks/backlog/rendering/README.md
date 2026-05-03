@@ -53,9 +53,12 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-007Q — Culling bucket clarification follow-ups](GRAPHICS-007Q-culling-bucket-clarifications.md):
   clarification-only backlog for selection bucket specialization, layer-mask
   policy, culling diagnostics ownership, and unsupported bucket combinations.
-- [GRAPHICS-008 — Depth/surface/G-buffer passes](../../active/GRAPHICS-008-depth-surface-gbuffer-passes.md):
+- [GRAPHICS-008 — Depth/surface/G-buffer passes](../../done/GRAPHICS-008-depth-surface-gbuffer-passes.md):
   depends on GRAPHICS-003, GRAPHICS-006, and GRAPHICS-007.
-- [GRAPHICS-009 — Deferred lighting and shadows](GRAPHICS-009-deferred-lighting-and-shadows.md):
+- [GRAPHICS-008Q — Surface pass clarification follow-ups](GRAPHICS-008Q-surface-pass-clarifications.md):
+  clarification-only backlog for alpha-mask depth/G-buffer policy, descriptor
+  bind seams, renderpass attachment ownership, and empty-bucket diagnostics.
+- [GRAPHICS-009 — Deferred lighting and shadows](../../active/GRAPHICS-009-deferred-lighting-and-shadows.md):
   depends on GRAPHICS-008.
 - [GRAPHICS-010 — Lines, points, and debug primitives](GRAPHICS-010-lines-points-debug-primitives.md):
   depends on GRAPHICS-002, GRAPHICS-003, and GRAPHICS-007.

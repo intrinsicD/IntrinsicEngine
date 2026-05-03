@@ -1,4 +1,11 @@
 # GRAPHICS-009 — Deferred lighting and shadows
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-008` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff.
+
 ## Goal
 - Complete non-legacy lighting environment, shadow atlas, shadow pass, and deferred lighting pass contracts.
 ## Non-goals
