@@ -19,6 +19,10 @@ Use this checklist before commit and PR creation.
 - [ ] Strongest relevant verification subset was run.
 - [ ] Tests for behavior changes were added or updated.
 - [ ] Test labels/category are correct (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
+- [ ] Focused build/test targets were run before broad or long-running targets.
+- [ ] Build trees used for evidence were confirmed current and compatible with repository C++23/toolchain requirements.
+- [ ] Current CTest output, not stale `LastTestsFailed.log` contents, was used to assess pass/fail state.
+- [ ] Noisy command output was captured to a log and filtered with `set -o pipefail` so failures remain visible.
 
 ## Performance and benchmarking
 

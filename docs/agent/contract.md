@@ -52,6 +52,12 @@ Required dependency boundaries:
 - Add/update tests for behavior changes.
 - Keep pass rate stable or improved unless temporary shim is explicitly documented.
 - Use explicit test categories: `unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`.
+- Verification hygiene:
+  - Prefer configured presets over ad-hoc build directories. If a non-default build tree is needed, first confirm it uses a compiler/toolchain that satisfies the repository C++23 requirements; stale trees using older toolchains are not valid evidence.
+  - When a task needs a non-headless backend sanity check, prefer the smallest direct target that proves the touched seam. For Vulkan renderer integration, use focused CPU contract tests plus a direct `ExtrinsicBackendsVulkan` build before attempting broad runtime-test executables.
+  - Treat `Testing/Temporary/LastTestsFailed.log` as historical state only. A failure is current only when reproduced by the CTest command just run.
+  - For noisy or long builds, preserve the full log with `tee` and display only the tail, for example `2>&1 | tee /tmp/intrinsic-build.log | tail -n 120`. Use `set -o pipefail` so failures are not hidden by filtering.
+  - Do not use long-running broad targets as the first verification step. Run focused build/test targets first, then broaden only when the focused gate passes and the task requires it.
 - The default CPU-supported correctness gate is:
 
   ```bash

@@ -35,6 +35,17 @@
 ## Verification
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicGraphicsContractTests
+ctest --test-dir build/ci --output-on-failure -R '^RendererRhiBoundary\.' --timeout 60
+
+# Optional non-headless Vulkan backend sanity check. Use only a configured build tree
+# whose C++23 compiler/toolchain has been confirmed current; do not use stale trees
+# with older compilers as verification evidence.
+compiler=$(cmake -LA -N build/dev-clang-ninja | sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p')
+"$compiler" --version | head -n 1
+set -o pipefail
+cmake --build build/dev-clang-ninja --target ExtrinsicBackendsVulkan -j2 2>&1 | tee /tmp/intrinsic-vulkan-backend-build.log | tail -n 120
+
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 # Optional when hardware/driver support is available:

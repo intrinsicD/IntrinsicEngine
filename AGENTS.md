@@ -100,6 +100,11 @@ For each change:
 - Preserve or improve pass rate unless a temporary shim is documented.
 - Label tests by category as layout migration progresses (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
 - New C++ test files use `Test.<Name>.cpp`; existing `Test_*.cpp` files are compatibility carryover and should only be renamed by explicit mechanical cleanup tasks.
+- Verification hygiene:
+  - Prefer configured presets and task-specific focused targets before broad or long-running targets.
+  - Treat non-default build trees as valid evidence only after confirming their compiler/toolchain satisfies the repository C++23 requirements; stale trees with older compilers are not valid verification.
+  - Treat `Testing/Temporary/LastTestsFailed.log` as historical state only; current pass/fail state comes from the CTest command just run.
+  - For noisy commands, capture full output with `tee`, display a bounded tail, and use `set -o pipefail` so filtering does not hide failures.
 - The default CPU-supported correctness gate is:
 
   ```bash
