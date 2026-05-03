@@ -1,10 +1,28 @@
 # Graphics/Backends/Vulkan
 
-Full Vulkan 1.3 `IDevice` implementation. Exports `Extrinsic.Backends.Vulkan`
-with the `CreateVulkanDevice()` factory. Requires a surface-capable physical
-device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
-(PARTIALLY_BOUND + UPDATE_AFTER_BIND), and dynamic rendering
-(`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
+Promoted Vulkan 1.3 `IDevice` backend surface. Exports
+`Extrinsic.Backends.Vulkan` with the `CreateVulkanDevice()` factory. The current
+promoted lifecycle symbols are concrete and fail closed: until swapchain/device
+bring-up is completed, `Initialize()` leaves the device non-operational and
+`BeginFrame()` returns `false` instead of fabricating a frame. Full execution
+requires a surface-capable physical device with `VK_KHR_timeline_semaphore`,
+`VK_EXT_descriptor_indexing` (PARTIALLY_BOUND + UPDATE_AFTER_BIND), and dynamic
+rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
+
+## Frame lifecycle status
+
+- `CreateVulkanDevice()` returns an `RHI::IDevice` instance without exposing
+  concrete Vulkan types across renderer/RHI boundaries.
+- The promoted device lifecycle methods (`Initialize`, `Shutdown`, `WaitIdle`,
+  `BeginFrame`, `EndFrame`, `Present`, `Resize`, backbuffer extent/handle access,
+  present-mode selection, and graphics-context lookup) are defined in
+  `Backends.Vulkan.Device.cpp`.
+- `Initialize()` currently reports that promoted swapchain/device bring-up is not
+  complete and keeps `IsOperational() == false`; renderers must continue to gate
+  GPU command recording on `IDevice::IsOperational()`.
+- Completing real Vulkan execution remains in `GRAPHICS-018`: create instance,
+  surface, logical device, swapchain images, per-frame command buffers/sync, and
+  presentation diagnostics before enabling opt-in `gpu;vulkan` smoke tests.
 
 ## Module surface
 
