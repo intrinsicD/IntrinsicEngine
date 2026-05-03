@@ -182,6 +182,29 @@ TEST(RendererRhiBoundary, VulkanBackendCreatesSamplersWhenOperational)
               std::string::npos);
 }
 
+TEST(RendererRhiBoundary, VulkanBackendCreatesTexturesWhenOperational)
+{
+    const auto deviceSource = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp";
+    const auto content = ReadFile(deviceSource);
+
+    const std::vector<std::string> requiredSnippets{
+        "RHI::TextureHandle VulkanDevice::CreateTexture(",
+        "VkImageType ToVkImageType(",
+        "VkImageViewType ToVkImageViewType(",
+        "VkSampleCountFlagBits ToVkSampleCount(",
+        "const VkFormat format = ToVkFormat(desc.Fmt);",
+        "const VkImageUsageFlags usage = ToVkTextureUsage(desc.Usage);",
+        "desc.Dimension == RHI::TextureDimension::TexCube && desc.DepthOrArrayLayers != 6",
+        "vmaCreateImage(m_Vma, &imageInfo, &allocationInfo, &image.Image, &image.Allocation, nullptr)",
+        "viewInfo.subresourceRange.aspectMask = AspectFromFormat(format);",
+        "vkCreateImageView(m_Device, &viewInfo, nullptr, &image.View)",
+        "return m_Images.Add(std::move(image));",
+    };
+
+    for (const auto& snippet : requiredSnippets)
+        EXPECT_NE(content.find(snippet), std::string::npos) << snippet;
+}
+
 TEST(RendererRhiBoundary, VulkanBackendProvidesFailClosedServiceFallbacks)
 {
     const auto deviceInterface = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cppm";

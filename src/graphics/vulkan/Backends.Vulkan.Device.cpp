@@ -170,6 +170,48 @@ RHI::ICommandContext& VulkanDevice::GetGraphicsContext(uint32_t frameIndex)
 // lifetime of the VkBuffer.
 // =============================================================================
 
+namespace
+{
+    [[nodiscard]] VkImageType ToVkImageType(const RHI::TextureDimension dimension)
+    {
+        switch (dimension)
+        {
+        case RHI::TextureDimension::Tex1D: return VK_IMAGE_TYPE_1D;
+        case RHI::TextureDimension::Tex2D: return VK_IMAGE_TYPE_2D;
+        case RHI::TextureDimension::Tex3D: return VK_IMAGE_TYPE_3D;
+        case RHI::TextureDimension::TexCube: return VK_IMAGE_TYPE_2D;
+        }
+        return VK_IMAGE_TYPE_2D;
+    }
+
+    [[nodiscard]] VkImageViewType ToVkImageViewType(const RHI::TextureDimension dimension)
+    {
+        switch (dimension)
+        {
+        case RHI::TextureDimension::Tex1D: return VK_IMAGE_VIEW_TYPE_1D;
+        case RHI::TextureDimension::Tex2D: return VK_IMAGE_VIEW_TYPE_2D;
+        case RHI::TextureDimension::Tex3D: return VK_IMAGE_VIEW_TYPE_3D;
+        case RHI::TextureDimension::TexCube: return VK_IMAGE_VIEW_TYPE_CUBE;
+        }
+        return VK_IMAGE_VIEW_TYPE_2D;
+    }
+
+    [[nodiscard]] VkSampleCountFlagBits ToVkSampleCount(const std::uint32_t sampleCount)
+    {
+        switch (sampleCount)
+        {
+        case 1: return VK_SAMPLE_COUNT_1_BIT;
+        case 2: return VK_SAMPLE_COUNT_2_BIT;
+        case 4: return VK_SAMPLE_COUNT_4_BIT;
+        case 8: return VK_SAMPLE_COUNT_8_BIT;
+        case 16: return VK_SAMPLE_COUNT_16_BIT;
+        case 32: return VK_SAMPLE_COUNT_32_BIT;
+        case 64: return VK_SAMPLE_COUNT_64_BIT;
+        default: return VK_SAMPLE_COUNT_1_BIT;
+        }
+    }
+}
+
 RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
 {
     if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || desc.SizeBytes == 0)
@@ -340,13 +382,92 @@ uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const
 
 RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
 {
-    (void)desc;
     if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE)
         return {};
 
-    // Real image allocation/import remains a later GRAPHICS-018 slice. Until
-    // then, fail closed instead of manufacturing an unusable texture handle.
-    return {};
+    const VkFormat format = ToVkFormat(desc.Fmt);
+    const VkImageUsageFlags usage = ToVkTextureUsage(desc.Usage);
+    if (format == VK_FORMAT_UNDEFINED || usage == 0 || desc.Width == 0 || desc.Height == 0 ||
+        desc.DepthOrArrayLayers == 0 || desc.MipLevels == 0)
+    {
+        return {};
+    }
+
+    if (desc.Dimension == RHI::TextureDimension::TexCube && desc.DepthOrArrayLayers != 6)
+        return {};
+
+    VulkanImage image{};
+    image.Format = format;
+    image.Width = desc.Width;
+    image.Height = desc.Height;
+    image.MipLevels = desc.MipLevels;
+    image.ArrayLayers = desc.Dimension == RHI::TextureDimension::Tex3D ? 1u : desc.DepthOrArrayLayers;
+    image.OwnsMemory = true;
+
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = ToVkImageType(desc.Dimension);
+    imageInfo.format = format;
+    imageInfo.extent = VkExtent3D{.width = desc.Width,
+                                  .height = desc.Height,
+                                  .depth = desc.Dimension == RHI::TextureDimension::Tex3D
+                                               ? desc.DepthOrArrayLayers
+                                               : 1u};
+    imageInfo.mipLevels = desc.MipLevels;
+    imageInfo.arrayLayers = image.ArrayLayers;
+    imageInfo.samples = ToVkSampleCount(desc.SampleCount);
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = usage;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (desc.Dimension == RHI::TextureDimension::TexCube)
+        imageInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+    VmaAllocationCreateInfo allocationInfo{};
+    allocationInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    if (vmaCreateImage(m_Vma, &imageInfo, &allocationInfo, &image.Image, &image.Allocation, nullptr) != VK_SUCCESS)
+    {
+        std::fprintf(stderr, "[VulkanDevice::CreateTexture] Failed to allocate image\n");
+        return {};
+    }
+
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image.Image;
+    viewInfo.viewType = ToVkImageViewType(desc.Dimension);
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = AspectFromFormat(format);
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = desc.MipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = image.ArrayLayers;
+
+    if (vkCreateImageView(m_Device, &viewInfo, nullptr, &image.View) != VK_SUCCESS)
+    {
+        std::fprintf(stderr, "[VulkanDevice::CreateTexture] Failed to create image view\n");
+        vmaDestroyImage(m_Vma, image.Image, image.Allocation);
+        return {};
+    }
+
+    if (desc.DebugName && m_ValidationEnabled && vkSetDebugUtilsObjectNameEXT)
+    {
+        VkDebugUtilsObjectNameInfoEXT imageName{};
+        imageName.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        imageName.objectType = VK_OBJECT_TYPE_IMAGE;
+        imageName.objectHandle = reinterpret_cast<std::uint64_t>(image.Image);
+        imageName.pObjectName = desc.DebugName;
+        vkSetDebugUtilsObjectNameEXT(m_Device, &imageName);
+
+        VkDebugUtilsObjectNameInfoEXT viewName{};
+        viewName.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        viewName.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
+        viewName.objectHandle = reinterpret_cast<std::uint64_t>(image.View);
+        viewName.pObjectName = desc.DebugName;
+        vkSetDebugUtilsObjectNameEXT(m_Device, &viewName);
+    }
+
+    return m_Images.Add(std::move(image));
 }
 
 void VulkanDevice::DestroyTexture(RHI::TextureHandle handle)
