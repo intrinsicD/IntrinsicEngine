@@ -46,7 +46,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 
 Default feature gates:
 
-- Always active: `CullingPass`, `SurfacePass`, `LinePass`, `PointPass`, `Present`, `SceneDepth`, `SceneColorHDR`, GPU scene buffers, material buffer, and surface-opaque draw bucket buffers.
+- Always active: `CullingPass`, `SurfacePass`, `LinePass`, `PointPass`, `Present`, `SceneDepth`, `SceneColorHDR`, GPU scene buffers, material buffer, and draw-bucket buffers for surface opaque, surface alpha-mask, lines, points, shadow opaque, and selection surface/line/point lanes.
 - Default active but explicitly gateable: `DepthPrepass`, deferred/hybrid `CompositionPass`, `PostProcessPass`, and `ImGuiPass`.
 - Optional: `PickingPass` (`EntityId`, `PrimitiveId`, `Picking.Readback`), `ShadowPass` (`ShadowAtlas`), `SelectionOutlinePass` (`SelectionOutline`), and `DebugViewPass` (`DebugViewRGBA`).
 
@@ -123,6 +123,25 @@ The promoted GPU scene is organized around these canonical buffers:
 - Scene table / descriptor set: the backend binding point that exposes the renderable, transform, bounds/culling, material, geometry, and light buffers to passes.
 
 Runtime owns ECS access, dirty-domain interpretation, deletion events, and sidecar mappings from entities/assets/geometry sources to graphics handles. Graphics owns GPU allocation, generation checks, descriptor binding, and diagnostics for invalid or stale handles.
+
+### Culling and draw-bucket contract
+
+`CullingPass` records the culling command sequence in a fixed order: reset every bucket counter, publish the `GpuCullBucketTable`, barrier that table for shader reads, bind the cull pipeline, push `GpuCullPushConstants`, dispatch over canonical instance slots, then barrier every indirect-args/count buffer for indirect reads. Bucket outputs are indexed by canonical GPU instance slot through each indirect command's `firstInstance`; compacted visible lists are not a second entity identity source.
+
+The current `GpuCullBucketTable` contains eight bucket outputs:
+
+| Bucket | Command type | Producer condition | Consumer lane |
+|--------|--------------|--------------------|---------------|
+| `SurfaceOpaque` | indexed | `GpuRender_Surface`, not alpha-mask | depth/surface opaque |
+| `SurfaceAlphaMask` | indexed | `GpuRender_Surface | GpuRender_AlphaMask` | surface alpha-mask |
+| `Lines` | indexed | `GpuRender_Line` | line pass |
+| `Points` | non-indexed | `GpuRender_Point` | point pass |
+| `ShadowOpaque` | indexed | `GpuRender_Surface | GpuRender_CastShadow`, not transparent | shadow pass |
+| `SelectionSurface` | indexed | selectable surface renderable | selection/picking surface lane |
+| `SelectionLines` | indexed | selectable line renderable | selection/picking line lane |
+| `SelectionPoints` | non-indexed | selectable point renderable | selection/picking point lane |
+
+Selection participation is explicit via `GpuRender_Selectable`; the culling shader mirrors otherwise visible surface/line/point renderables into the matching selection bucket. Invalid geometry slots, out-of-range geometry slots, zero-sized geometry ranges, non-positive world-sphere radii, invisible instances, and frustum-culled instances produce no bucket writes. CPU-side generation checks in `GpuWorld` keep stale freed geometry from remaining in instance records before this shader path runs.
 
 ### Legacy feature coverage classification
 

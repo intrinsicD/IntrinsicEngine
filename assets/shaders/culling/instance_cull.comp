@@ -102,6 +102,7 @@ void main() {
 
     GpuGeometryRecordRef geometryRecords = GpuGeometryRecordRef(scene.GeometryRecordBDA);
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
+    const bool selectable = (inst.RenderFlags & GpuRender_Selectable) != 0u;
 
     if ((inst.RenderFlags & GpuRender_Surface) != 0u) {
         const bool alphaMask = (inst.RenderFlags & GpuRender_AlphaMask) != 0u;
@@ -119,6 +120,14 @@ void main() {
                         int(geo.VertexOffset),
                         slot);
         }
+
+        if (selectable) {
+            emitIndexed(buckets.SelectionSurface,
+                        geo.SurfaceIndexCount,
+                        geo.SurfaceFirstIndex,
+                        int(geo.VertexOffset),
+                        slot);
+        }
     }
 
     if ((inst.RenderFlags & GpuRender_Line) != 0u) {
@@ -127,6 +136,14 @@ void main() {
                     geo.LineFirstIndex,
                     int(geo.VertexOffset),
                     slot);
+
+        if (selectable) {
+            emitIndexed(buckets.SelectionLines,
+                        geo.LineIndexCount,
+                        geo.LineFirstIndex,
+                        int(geo.VertexOffset),
+                        slot);
+        }
     }
 
     if ((inst.RenderFlags & GpuRender_Point) != 0u) {
@@ -134,5 +151,12 @@ void main() {
                        geo.PointVertexCount,
                        geo.PointFirstVertex,
                        slot);
+
+        if (selectable) {
+            emitNonIndexed(buckets.SelectionPoints,
+                           geo.PointVertexCount,
+                           geo.PointFirstVertex,
+                           slot);
+        }
     }
 }

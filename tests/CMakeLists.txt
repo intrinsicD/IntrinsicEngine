@@ -390,6 +390,7 @@ intrinsic_test_object_lib(GraphicsContractTestObjs
 )
 
 set(_graphics_contract_cpu_test_files
+    Test.CullingPassContracts.cpp
     Test.FrameRecipeContract.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp

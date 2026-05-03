@@ -137,7 +137,11 @@ namespace Extrinsic::Graphics
             const bool lineOk    = AllocateBucket(RHI::GpuDrawBucketKind::Lines, true, capacity);
             const bool pointOk   = AllocateBucket(RHI::GpuDrawBucketKind::Points, false, capacity);
             const bool shadowOk  = AllocateBucket(RHI::GpuDrawBucketKind::ShadowOpaque, true, capacity);
-            if (!(surfaceOk && alphaOk && lineOk && pointOk && shadowOk))
+            const bool selectionSurfaceOk = AllocateBucket(RHI::GpuDrawBucketKind::SelectionSurface, true, capacity);
+            const bool selectionLinesOk   = AllocateBucket(RHI::GpuDrawBucketKind::SelectionLines, true, capacity);
+            const bool selectionPointsOk  = AllocateBucket(RHI::GpuDrawBucketKind::SelectionPoints, false, capacity);
+            if (!(surfaceOk && alphaOk && lineOk && pointOk && shadowOk &&
+                  selectionSurfaceOk && selectionLinesOk && selectionPointsOk))
             {
                 return false;
             }
@@ -327,6 +331,9 @@ namespace Extrinsic::Graphics
         const auto& lines   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Lines)];
         const auto& points  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Points)];
         const auto& shadow  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::ShadowOpaque)];
+        const auto& selectionSurface = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionSurface)];
+        const auto& selectionLines   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionLines)];
+        const auto& selectionPoints  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionPoints)];
 
         pc.InstanceCapacity = gpuWorld.GetInstanceCapacity();
 
@@ -346,6 +353,15 @@ namespace Extrinsic::Graphics
         bucketTable.ShadowOpaque.ArgsBDA = shadow.IndexedArgsBDA;
         bucketTable.ShadowOpaque.CountBDA = shadow.CountBDA;
         bucketTable.ShadowOpaque.Capacity = shadow.Bucket.Capacity;
+        bucketTable.SelectionSurface.ArgsBDA = selectionSurface.IndexedArgsBDA;
+        bucketTable.SelectionSurface.CountBDA = selectionSurface.CountBDA;
+        bucketTable.SelectionSurface.Capacity = selectionSurface.Bucket.Capacity;
+        bucketTable.SelectionLines.ArgsBDA = selectionLines.IndexedArgsBDA;
+        bucketTable.SelectionLines.CountBDA = selectionLines.CountBDA;
+        bucketTable.SelectionLines.Capacity = selectionLines.Bucket.Capacity;
+        bucketTable.SelectionPoints.ArgsBDA = selectionPoints.NonIndexedArgsBDA;
+        bucketTable.SelectionPoints.CountBDA = selectionPoints.CountBDA;
+        bucketTable.SelectionPoints.Capacity = selectionPoints.Bucket.Capacity;
         m_Impl->Device->WriteBuffer(m_Impl->CullBucketTableLease.GetHandle(), &bucketTable, sizeof(bucketTable), 0);
         cmd.BufferBarrier(m_Impl->CullBucketTableLease.GetHandle(),
                           RHI::MemoryAccess::TransferWrite,

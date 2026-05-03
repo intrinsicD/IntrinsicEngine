@@ -36,6 +36,7 @@ export namespace Extrinsic::RHI
         GpuRender_Transparent = 1u << 6,
         GpuRender_Unlit       = 1u << 7,
         GpuRender_FlatShading = 1u << 8,
+        GpuRender_Selectable  = 1u << 9,
         GpuRender_Visible     = 1u << 31,
     };
 
@@ -46,8 +47,47 @@ export namespace Extrinsic::RHI
         Lines,
         Points,
         ShadowOpaque,
+        SelectionSurface,
+        SelectionLines,
+        SelectionPoints,
         Count
     };
+
+    [[nodiscard]] constexpr bool IsIndexedDrawBucket(const GpuDrawBucketKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case GpuDrawBucketKind::SurfaceOpaque:
+        case GpuDrawBucketKind::SurfaceAlphaMask:
+        case GpuDrawBucketKind::Lines:
+        case GpuDrawBucketKind::ShadowOpaque:
+        case GpuDrawBucketKind::SelectionSurface:
+        case GpuDrawBucketKind::SelectionLines:
+            return true;
+        case GpuDrawBucketKind::Points:
+        case GpuDrawBucketKind::SelectionPoints:
+        case GpuDrawBucketKind::Count:
+            return false;
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr const char* GpuDrawBucketName(const GpuDrawBucketKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case GpuDrawBucketKind::SurfaceOpaque: return "SurfaceOpaque";
+        case GpuDrawBucketKind::SurfaceAlphaMask: return "SurfaceAlphaMask";
+        case GpuDrawBucketKind::Lines: return "Lines";
+        case GpuDrawBucketKind::Points: return "Points";
+        case GpuDrawBucketKind::ShadowOpaque: return "ShadowOpaque";
+        case GpuDrawBucketKind::SelectionSurface: return "SelectionSurface";
+        case GpuDrawBucketKind::SelectionLines: return "SelectionLines";
+        case GpuDrawBucketKind::SelectionPoints: return "SelectionPoints";
+        case GpuDrawBucketKind::Count: return "Count";
+        }
+        return "Unknown";
+    }
 
     struct alignas(16) GpuGeometryRecord
     {
@@ -185,8 +225,11 @@ export namespace Extrinsic::RHI
         GpuCullBucketOutput Lines{};
         GpuCullBucketOutput Points{};
         GpuCullBucketOutput ShadowOpaque{};
+        GpuCullBucketOutput SelectionSurface{};
+        GpuCullBucketOutput SelectionLines{};
+        GpuCullBucketOutput SelectionPoints{};
     };
-    static_assert(sizeof(GpuCullBucketTable) == 120);
+    static_assert(sizeof(GpuCullBucketTable) == 192);
     static_assert(alignof(GpuCullBucketTable) == 8);
     // -------------------------------------------------------
     // Per-frame camera + lighting UBO  (set 0, binding 0)

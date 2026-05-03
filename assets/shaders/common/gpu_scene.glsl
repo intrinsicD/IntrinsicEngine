@@ -15,6 +15,7 @@ const uint GpuRender_AlphaMask   = 1u << 5;
 const uint GpuRender_Transparent = 1u << 6;
 const uint GpuRender_Unlit       = 1u << 7;
 const uint GpuRender_FlatShading = 1u << 8;
+const uint GpuRender_Selectable  = 1u << 9;
 const uint GpuRender_Visible     = 1u << 31;
 const uint GpuInvalidGeometrySlot = 0xFFFFFFFFu;
 
@@ -158,6 +159,9 @@ struct GpuCullBucketTable {
     GpuCullBucketOutput Lines;
     GpuCullBucketOutput Points;
     GpuCullBucketOutput ShadowOpaque;
+    GpuCullBucketOutput SelectionSurface;
+    GpuCullBucketOutput SelectionLines;
+    GpuCullBucketOutput SelectionPoints;
 };
 
 layout(buffer_reference, scalar) readonly buffer GpuSceneTableRef {
