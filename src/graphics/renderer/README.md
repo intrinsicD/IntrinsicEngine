@@ -37,6 +37,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.LightSystem`
 - `Extrinsic.Graphics.SelectionSystem`
 - `Extrinsic.Graphics.ForwardSystem`
+- `Extrinsic.Graphics.SpatialDebugVisualizers`
 - `Extrinsic.Graphics.GpuScene`
 - `Extrinsic.Graphics.DeferredSystem`
 - `Extrinsic.Graphics.PostProcessSystem`
@@ -114,6 +115,12 @@ and renderer/render-graph orchestration.
   editor overlay entities. The renderer rejects non-finite coordinates/colors,
   clamps line widths to `[0.5, 32]`, clamps point radii to `[0.0001, 1]`, and
   reports rejected records through `InvalidSnapshotRecordCount`.
+- `Graphics.SpatialDebugVisualizers` is a CPU-only packet builder layer for
+  spatial debug views. It consumes data-only bounds, hierarchy-node,
+  split-plane, convex-hull edge, and point-marker snapshots and produces owned
+  transient debug packet vectors plus deterministic diagnostics. It does not
+  import geometry tree implementations, runtime, editor UI, or ECS ownership;
+  higher layers/adapters translate their structures into these snapshot records.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
   `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /

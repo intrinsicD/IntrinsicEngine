@@ -21,10 +21,17 @@ Graphics is organized into explicit sublayers:
 - Runtime composes the CPU render scene from ECS, assets, geometry, transforms, materials, lights, selection, camera, and debug inputs.
 - Graphics receives immutable `RenderWorld` / `RenderFrameInput` snapshots plus runtime-submitted transform/light/visualization record batches and uploads them into graphics-owned GPU scene buffers.
 - `RenderWorld` currently exposes renderer-owned spans of `RenderableSnapshot`
-  and `LightSnapshot` values, defaulted optional packets for picking,
-  selection, shadows, debug primitives, postprocess/readback, and invalid-record
-  diagnostics. Runtime-submitted batches are copied by the renderer before
-  these spans are exposed, so no live ECS storage is retained by graphics.
+  and `LightSnapshot` values, sanitized transient debug line/point/triangle
+  packet spans, defaulted optional packets for picking, selection, shadows,
+  postprocess/readback, and invalid-record diagnostics. Runtime-submitted
+  batches are copied by the renderer before these spans are exposed, so no live
+  ECS storage is retained by graphics.
+- `Extrinsic.Graphics.SpatialDebugVisualizers` converts data-only spatial debug
+  snapshots (bounds, hierarchy nodes, split planes, convex-hull wire edges, and
+  point markers) into transient debug packets with deterministic limits and
+  diagnostics. Geometry/runtime/editor adapters remain outside graphics and feed
+  snapshot records instead of giving graphics live ownership of geometry trees or
+  editor state.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.
   Managed-buffer compaction is explicit and opt-in: callers first request a

@@ -345,6 +345,7 @@ intrinsic_test_object_lib(GraphicsRhiCpuUnitTestObjs
 
 set(_graphics_renderer_cpu_unit_test_files
     Test.Graphics.MaterialSystem.cpp
+    Test.Graphics.SpatialDebugVisualizers.cpp
 )
 intrinsic_resolve_test_sources(_graphics_renderer_cpu_unit_test_sources
     SEARCH_DIRS unit/graphics
@@ -353,7 +354,7 @@ intrinsic_resolve_test_sources(_graphics_renderer_cpu_unit_test_sources
 intrinsic_test_object_lib(GraphicsRendererCpuUnitTestObjs
     SOURCES
         ${_graphics_renderer_cpu_unit_test_sources}
-    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+    DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
 # Graphics-assets bridge tests — pure CPU mock-driven, no real GPU.

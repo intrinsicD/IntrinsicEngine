@@ -19,6 +19,7 @@ target_sources(${target_name}
         Graphics.LightSystem.cppm
         Graphics.SelectionSystem.cppm
         Graphics.ForwardSystem.cppm
+        Graphics.SpatialDebugVisualizers.cppm
         Graphics.GpuScene.cppm
         Graphics.DeferredSystem.cppm
         Graphics.PostProcessSystem.cppm
