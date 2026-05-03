@@ -1,12 +1,15 @@
 # GRAPHICS-014 — Visualization attributes and overlays
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-013C` completion.
 - Current slice: data-only visualization packet contracts and diagnostics; texture/atlas residency remains deferred to `GRAPHICS-015`.
 - Clarification: existing mesh UVs/texcoords must be usable for per-fragment visualization bakes (for example KMeans labels), and Htex must remain an always-recreatable alternate mapping for any mesh, including meshes that already have UVs.
 - Completed slices in active work: data-only packet contracts/diagnostics, UV-vs-Htex bake mapping policy, renderer-owned `RenderWorld::Visualization` snapshot spans, and CPU/null tests. GPU texture residency remains deferred to `GRAPHICS-015`.
+- Completed: 2026-05-03.
+- PR/commit: 1a95b78, 9a265ec, c134901.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md`.
 
 ## Goal
 - Complete visualization attribute upload, colormap, isoline, vector-field, Htex patch-preview atlas, and overlay rendering contracts through graphics snapshots.
@@ -39,6 +42,7 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+- Verified locally with targeted visualization packet/render-world tests and the default CPU-supported correctness gate on 2026-05-03.
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.

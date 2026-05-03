@@ -1,4 +1,11 @@
 # GRAPHICS-015 — GPU assets, textures, and residency
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-014` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff. Must preserve `GRAPHICS-014` UV/Htex visualization bake packet contracts while adding texture/residency seams.
+
 ## Goal
 - Promote graphics-side GPU asset cache, texture loading/upload, sampler policy, and residency tracking needed by materials and passes.
 ## Non-goals
