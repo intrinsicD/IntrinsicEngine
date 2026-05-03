@@ -1,4 +1,11 @@
 # GRAPHICS-011 — Spatial debug visualizers
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-010` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff.
+
 ## Goal
 - Reimplement BVH, bounding volume, KD-tree, octree, convex-hull, and similar spatial debug visualizers as snapshot-producing helpers for graphics debug primitives.
 ## Non-goals

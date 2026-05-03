@@ -62,9 +62,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   depends on GRAPHICS-008.
 - [GRAPHICS-009Q — Lighting and shadow clarification follow-ups](GRAPHICS-009Q-lighting-shadow-clarifications.md):
   nonblocking docs-only follow-up for shadow atlas sizing input, backend sampler binding, cascade extraction ownership, and deferred-lighting debug mode seams. It must not be mixed with C++ behavior work.
-- [GRAPHICS-010 — Lines, points, and debug primitives](../../active/GRAPHICS-010-lines-points-debug-primitives.md):
+- [GRAPHICS-010 — Lines, points, and debug primitives](../../done/GRAPHICS-010-lines-points-debug-primitives.md):
   depends on GRAPHICS-002, GRAPHICS-003, and GRAPHICS-007.
-- [GRAPHICS-011 — Spatial debug visualizers](GRAPHICS-011-spatial-debug-visualizers.md):
+- [GRAPHICS-010Q — Transient debug backend clarification follow-ups](GRAPHICS-010Q-transient-debug-backend-clarifications.md):
+  nonblocking docs-only follow-up for transient debug packet upload/routing, debug triangle backend path, overlay bucket policy, and excessive-count diagnostics.
+- [GRAPHICS-011 — Spatial debug visualizers](../../active/GRAPHICS-011-spatial-debug-visualizers.md):
   depends on GRAPHICS-010.
 - [GRAPHICS-012 — Picking, selection, and outline](GRAPHICS-012-picking-selection-outline.md):
   depends on GRAPHICS-002, GRAPHICS-007, GRAPHICS-008, and GRAPHICS-010. Owns

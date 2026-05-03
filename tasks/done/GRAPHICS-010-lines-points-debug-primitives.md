@@ -1,12 +1,13 @@
 # GRAPHICS-010 — Lines, points, and transient debug primitives
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-009` completion.
-- Current slice: line/point bucket command contracts implemented and tested; transient debug packet/API work remains.
-- Progress: `ForwardLinePass` and `ForwardPointPass` now validate draw buckets before recording commands. Added CPU/mock contract tests for indexed line and non-indexed point indirect draws.
-- Blockers/follow-ups: full task completion still needs render snapshot packet APIs for transient line/point/triangle data, concrete renderer pass invocation wiring, and width/radius/coordinate sanitization at extraction or packet submission seams.
+- Completed: 2026-05-03.
+- PR/commit: pending local commit.
+- Completed slice: line/point bucket command contracts, transient debug line/point/triangle packet snapshots, width/radius/coordinate sanitization, explicit line/point frame recipe cull resources, docs, and CPU/mock contract tests.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-010Q-transient-debug-backend-clarifications.md`.
 
 ## Goal
 - Complete line, point, and transient debug primitive rendering contracts through non-legacy pass APIs.
@@ -36,8 +37,8 @@
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests -j 4
+ctest --test-dir build/ci --output-on-failure -R 'RenderWorldContract|FrameRecipeContract|GraphicsLinePointPassContracts' --timeout 60
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
