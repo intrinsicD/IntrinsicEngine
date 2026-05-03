@@ -6,10 +6,19 @@ import Extrinsic.RHI.CommandContext;
 
 namespace Extrinsic::Graphics
 {
-    class PresentPass;
+    void PresentPass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
+    {
+        m_Pipeline = pipeline;
+    }
 
     void PresentPass::Execute(RHI::ICommandContext& cmd)
     {
-        (void)cmd;
+        if (!m_Pipeline.IsValid())
+        {
+            return;
+        }
+
+        cmd.BindPipeline(m_Pipeline);
+        cmd.Draw(3u, 1u, 0u, 0u);
     }
 }

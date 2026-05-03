@@ -81,8 +81,8 @@ The imported `Backbuffer` is declared once and finalized only by the `Present` d
 | `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp` | Backend-agnostic HDR-to-LDR chain. `PostProcessSystem` describes deterministic stages in order: optional `Histogram`, optional `Bloom`, required enabled-chain `ToneMap`, then optional `FXAA` or `SMAA`. Invalid numeric settings are sanitized and unsupported AA enum values are diagnosed without Vulkan |
 | `SelectionOutlinePass` | `EntityId`, presentation target | presentation target | Alpha-blends via `LOAD`; outlines the **union stencil** of selected/hovered renderable PickIDs across surface, line, and point lanes (including mesh/graph/cloud point modes such as sphere impostors). Source module: `Pass.Selection.Outline` (`SelectionOutlinePass`). Conceptually paired with `PickingPass` but scheduled later in the pipeline so it can read overlay results |
 | `DebugViewPass` | selected sampled resource or deterministic fallback | `DebugViewRGBA` | Writes a fullscreen preview image for backend-agnostic render-target inspection. `DebugViewSystem` resolves requested resources from frame-recipe introspection, rejects disabled/missing/buffer/backbuffer selections with structured diagnostics, and falls back to the current presentation source without platform/window ownership |
-| `ImGuiPass` | presentation target | presentation target | UI overlay via `LOAD` |
-| `Present` | `SceneColorLDR` | `Backbuffer` | Explicit final blit/copy |
+| `ImGuiPass` | presentation target | presentation target | UI overlay via `LOAD`; consumes renderer-owned `ImGuiOverlayFrame` draw-data summaries translated by runtime/editor, never platform/window state |
+| `Present` | `FrameRecipe.PresentSource`, `Backbuffer` | imported `Backbuffer` finalization | Explicit finalization stage and the only pass declaration allowed to finalize the imported backbuffer |
 
 ## Data Contract (CPU -> GPU)
 
@@ -186,6 +186,14 @@ The split source modules (`Pass.PostProcess.Histogram`, `Bloom`, `ToneMap`, `FXA
 `DebugViewSystem` owns backend-agnostic debug-view selection and inspection metadata. It builds a deterministic inspection table from `FrameRecipeIntrospection`, classifying resources as texture, depth texture, buffer, backbuffer, alias, or unknown. Only enabled texture/depth resources are previewable, and `DebugViewRGBA` is deliberately excluded as an input preview target to avoid feedback. Buffer resources such as GPU scene tables, draw buckets, histogram buffers, and picking readbacks are inspectable metadata entries but are not sampled by the preview pass.
 
 Selection resolution is deterministic and CPU-testable. Disabled debug view produces no enabled preview selection. Missing, disabled, or unsupported requested resources increment structured diagnostics and fall back first to the requested presentation-source resource (default `SceneColorLDR`), then to `SceneColorHDR`, then to the first enabled previewable texture if needed. `Pass.DebugView` (`DebugViewPass`) records no commands unless `DebugViewSystem` is initialized, a valid pipeline is set, and a resolved selection is enabled; otherwise it binds the pipeline, pushes `DebugViewPushConstants`, and draws a fullscreen triangle into `DebugViewRGBA`. Concrete sampled-image descriptor binding and shader visualization modes remain backend follow-ups.
+
+### ImGui overlay and present/finalization contract
+
+`ImGuiOverlaySystem` owns only backend-agnostic overlay draw-data summaries and diagnostics. Runtime/editor code translates concrete `ImDrawData` into `ImGuiOverlayFrame` records; graphics records accepted draw-list counts, command/vertex/index totals, user-texture presence, invalid display-size diagnostics, and deterministic text diagnostics. It does not import Dear ImGui platform/window backends or mutate platform state.
+
+`Pass.ImGui` records no commands unless the overlay system is initialized, accepted overlay work exists, and a valid pipeline is configured. The command contract binds the overlay pipeline, pushes `ImGuiOverlayPushConstants`, and records an indexed draw over the accepted overlay index count. The frame recipe schedules `ImGuiPass` as a side-effect overlay over `FrameRecipe.PresentSource`; it does not write or finalize `Backbuffer`.
+
+`Present` is the only frame-recipe declaration with `FinalizesBackbuffer=true`. The render graph rejects attempted writes to imported backbuffer resources through normal color/depth/shader/transfer write usages; the imported backbuffer is consumed only through `TextureUsage::Present` by the final present pass. `Pass.Present` is a CPU-testable fullscreen finalization shim that records only when a valid pipeline is configured. Swapchain acquire/present and platform window ownership remain platform/backend responsibilities.
 
 ### Legacy feature coverage classification
 

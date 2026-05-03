@@ -202,6 +202,11 @@ namespace Extrinsic::Graphics
                     return false;
                 }
 
+                if (desc->IsBackbuffer && write)
+                {
+                    return false;
+                }
+
                 if (desc->Imported && write)
                 {
                     const bool writableContract = TextureStateAllowsWrite(desc->InitialState) ||

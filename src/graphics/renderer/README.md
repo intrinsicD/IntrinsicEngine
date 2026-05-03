@@ -35,6 +35,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.VisualizationSyncSystem`
 - `Extrinsic.Graphics.CullingSystem`
 - `Extrinsic.Graphics.DebugViewSystem`
+- `Extrinsic.Graphics.ImGuiOverlaySystem`
 - `Extrinsic.Graphics.LightSystem`
 - `Extrinsic.Graphics.SelectionSystem`
 - `Extrinsic.Graphics.ForwardSystem`
@@ -138,6 +139,11 @@ and renderer/render-graph orchestration.
   enabled previewable texture/depth resources, reports missing/disabled/buffer
   selections through deterministic diagnostics, and falls back to the current
   presentation source without platform/window ownership.
+- `ImGuiOverlaySystem` owns backend-agnostic overlay draw-data summaries and
+  diagnostics translated from higher-level UI/runtime code. `ImGuiPass` overlays
+  accepted draw data on `FrameRecipe.PresentSource`; it never writes the imported
+  backbuffer. `PresentPass` is the explicit finalization shim, and render-graph
+  validation rejects non-present writes to imported backbuffer resources.
 - `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and
