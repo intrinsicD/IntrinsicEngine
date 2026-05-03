@@ -73,6 +73,7 @@ void VulkanDevice::Shutdown()
     m_SwapchainExtent  = {};
     m_DefaultSamplerHandle = {};
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
+    m_SamplerAnisotropySupported = false;
     m_Operational      = false;
     m_NeedsResize      = false;
 }
@@ -398,12 +399,47 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
 
 RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)
 {
-    (void)desc;
     if (!m_Operational || m_Device == VK_NULL_HANDLE)
         return {};
 
-    // Real sampler creation remains part of the Vulkan resource bring-up slice.
-    return {};
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = ToVkFilter(desc.MagFilter);
+    samplerInfo.minFilter = ToVkFilter(desc.MinFilter);
+    samplerInfo.mipmapMode = ToVkMipmapMode(desc.MipFilter);
+    samplerInfo.addressModeU = ToVkAddressMode(desc.AddressU);
+    samplerInfo.addressModeV = ToVkAddressMode(desc.AddressV);
+    samplerInfo.addressModeW = ToVkAddressMode(desc.AddressW);
+    samplerInfo.mipLodBias = desc.MipLodBias;
+    samplerInfo.minLod = desc.MinLod;
+    samplerInfo.maxLod = desc.MaxLod;
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = desc.CompareEnable ? VK_TRUE : VK_FALSE;
+    samplerInfo.compareOp = ToVkCompareOp(desc.Compare);
+
+    const bool enableAnisotropy = m_SamplerAnisotropySupported && desc.MaxAnisotropy > 1.0f;
+    samplerInfo.anisotropyEnable = enableAnisotropy ? VK_TRUE : VK_FALSE;
+    samplerInfo.maxAnisotropy = enableAnisotropy ? desc.MaxAnisotropy : 1.0f;
+
+    VulkanSampler sampler{};
+    if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler.Sampler) != VK_SUCCESS)
+    {
+        std::fprintf(stderr, "[VulkanDevice::CreateSampler] Failed to create sampler\n");
+        return {};
+    }
+
+    if (desc.DebugName && m_ValidationEnabled && vkSetDebugUtilsObjectNameEXT)
+    {
+        VkDebugUtilsObjectNameInfoEXT nameInfo{};
+        nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        nameInfo.objectType = VK_OBJECT_TYPE_SAMPLER;
+        nameInfo.objectHandle = reinterpret_cast<std::uint64_t>(sampler.Sampler);
+        nameInfo.pObjectName = desc.DebugName;
+        vkSetDebugUtilsObjectNameEXT(m_Device, &nameInfo);
+    }
+
+    return m_Samplers.Add(std::move(sampler));
 }
 
 void VulkanDevice::DestroySampler(RHI::SamplerHandle handle)

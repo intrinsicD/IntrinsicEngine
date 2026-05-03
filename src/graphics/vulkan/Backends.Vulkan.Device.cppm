@@ -200,6 +200,7 @@ namespace Extrinsic::Backends::Vulkan
         bool             m_Operational  = false;
         bool             m_NeedsResize  = false;
         bool             m_ValidationEnabled = false;
+        bool             m_SamplerAnisotropySupported = false;
     };
 }
 

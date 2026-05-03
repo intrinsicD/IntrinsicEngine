@@ -156,6 +156,32 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedResourceSurface)
               std::string::npos);
 }
 
+TEST(RendererRhiBoundary, VulkanBackendCreatesSamplersWhenOperational)
+{
+    const auto deviceSource = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp";
+    const auto deviceInterface = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cppm";
+    const auto sourceContent = ReadFile(deviceSource);
+    const auto interfaceContent = ReadFile(deviceInterface);
+
+    const std::vector<std::string> requiredSourceSnippets{
+        "RHI::SamplerHandle VulkanDevice::CreateSampler(",
+        "vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler.Sampler)",
+        "return m_Samplers.Add(std::move(sampler));",
+        "samplerInfo.magFilter = ToVkFilter(desc.MagFilter);",
+        "samplerInfo.mipmapMode = ToVkMipmapMode(desc.MipFilter);",
+        "samplerInfo.addressModeU = ToVkAddressMode(desc.AddressU);",
+        "samplerInfo.compareOp = ToVkCompareOp(desc.Compare);",
+        "m_SamplerAnisotropySupported && desc.MaxAnisotropy > 1.0f",
+        "vkSetDebugUtilsObjectNameEXT(m_Device, &nameInfo);",
+    };
+
+    for (const auto& snippet : requiredSourceSnippets)
+        EXPECT_NE(sourceContent.find(snippet), std::string::npos) << snippet;
+
+    EXPECT_NE(interfaceContent.find("bool             m_SamplerAnisotropySupported = false;"),
+              std::string::npos);
+}
+
 TEST(RendererRhiBoundary, VulkanBackendProvidesFailClosedServiceFallbacks)
 {
     const auto deviceInterface = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cppm";
