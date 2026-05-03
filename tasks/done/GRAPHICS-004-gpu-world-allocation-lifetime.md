@@ -1,4 +1,10 @@
 # GRAPHICS-004 — GPU world allocation and lifetime
+
+## Completion metadata
+- Completion date: 2026-05-03.
+- Commit/PR: pending local agent workflow handoff.
+- Follow-up task: `GRAPHICS-005 — GPU world compaction and relocation reporting` promoted to `tasks/active/`.
+
 ## Goal
 - Harden `GpuWorld` allocation, lifetime tracking, frees, deferred reuse, and diagnostics for retained GPU scene pools: instances, geometry records, transforms, bounds/culling records, materials, lights, and scene-table bindings.
 ## Non-goals

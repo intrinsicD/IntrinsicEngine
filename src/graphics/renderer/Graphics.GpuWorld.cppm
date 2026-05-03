@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -59,6 +60,71 @@ export namespace Extrinsic::Graphics
             bool NullDevice = false;
         };
 
+        struct ManagedBufferFragmentation
+        {
+            std::uint64_t CapacityBytes = 0;
+            std::uint64_t UsedHighWaterBytes = 0;
+            std::uint64_t LiveBytes = 0;
+            std::uint64_t FragmentedBytes = 0;
+            float FragmentationRatio = 0.0f;
+        };
+
+        struct ManagedBufferDiagnostics
+        {
+            ManagedBufferFragmentation Vertex{};
+            ManagedBufferFragmentation Index{};
+            std::uint64_t CompactionBytesMoved = 0;
+            std::uint32_t CompactionCount = 0;
+            std::uint32_t StaleRelocationCount = 0;
+        };
+
+        struct CompactionPlanDesc
+        {
+            bool Enabled = true;
+            bool AllowWhilePendingFrees = false;
+            float MinFragmentationRatio = 0.25f;
+            std::uint64_t MinRecoverableBytes = 1;
+        };
+
+        struct GeometryRelocation
+        {
+            GpuGeometryHandle Geometry{};
+            std::uint64_t OldVertexByteOffset = 0;
+            std::uint64_t NewVertexByteOffset = 0;
+            std::uint64_t VertexByteCount = 0;
+            std::uint64_t OldIndexByteOffset = 0;
+            std::uint64_t NewIndexByteOffset = 0;
+            std::uint64_t IndexByteCount = 0;
+            std::uint32_t OldVertexOffset = 0;
+            std::uint32_t NewVertexOffset = 0;
+            std::uint32_t OldSurfaceFirstIndex = 0;
+            std::uint32_t NewSurfaceFirstIndex = 0;
+            std::uint32_t OldLineFirstIndex = 0;
+            std::uint32_t NewLineFirstIndex = 0;
+        };
+
+        struct CompactionPlan
+        {
+            bool Enabled = false;
+            bool ShouldCompact = false;
+            bool BlockedByPendingFrees = false;
+            ManagedBufferFragmentation Vertex{};
+            ManagedBufferFragmentation Index{};
+            std::uint64_t RecoverableBytes = 0;
+            std::uint64_t BytesToMove = 0;
+            std::vector<GeometryRelocation> Relocations;
+        };
+
+        struct CompactionResult
+        {
+            bool Applied = false;
+            bool Skipped = false;
+            bool RejectedStaleRelocations = false;
+            std::uint32_t RelocationCount = 0;
+            std::uint32_t StaleRelocationCount = 0;
+            std::uint64_t BytesMoved = 0;
+        };
+
         struct GeometryUploadDesc
         {
             std::span<const std::byte> PackedVertexBytes;
@@ -99,6 +165,10 @@ export namespace Extrinsic::Graphics
 
         void SyncFrame();
 
+        [[nodiscard]] CompactionPlan PlanManagedBufferCompaction() const;
+        [[nodiscard]] CompactionPlan PlanManagedBufferCompaction(const CompactionPlanDesc& desc) const;
+        [[nodiscard]] CompactionResult ApplyManagedBufferCompaction(const CompactionPlan& plan);
+
         [[nodiscard]] RHI::BufferHandle GetSceneTableBuffer() const noexcept;
         [[nodiscard]] std::uint64_t GetSceneTableBDA() const noexcept;
 
@@ -117,6 +187,7 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] std::uint32_t GetLiveGeometryCount() const noexcept;
         [[nodiscard]] std::uint32_t GetGeometryCapacity() const noexcept;
         [[nodiscard]] Diagnostics GetDiagnostics() const noexcept;
+        [[nodiscard]] ManagedBufferDiagnostics GetManagedBufferDiagnostics() const noexcept;
 
     private:
         struct Impl;

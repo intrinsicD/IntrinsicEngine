@@ -33,6 +33,27 @@ namespace Extrinsic::Graphics
             std::uint64_t ReuseFrame = 0;
         };
 
+        struct ManagedGeometryAllocation
+        {
+            bool Live = false;
+            std::uint32_t Generation = 0;
+            std::uint64_t VertexByteOffset = 0;
+            std::uint64_t VertexByteCount = 0;
+            std::uint64_t IndexByteOffset = 0;
+            std::uint64_t SurfaceIndexByteCount = 0;
+            std::uint64_t LineIndexByteCount = 0;
+            std::uint32_t VertexCount = 0;
+            std::uint32_t VertexStride = 0;
+            std::vector<std::byte> VertexBytes;
+            std::vector<std::uint32_t> SurfaceIndices;
+            std::vector<std::uint32_t> LineIndices;
+
+            [[nodiscard]] std::uint64_t IndexByteCount() const noexcept
+            {
+                return SurfaceIndexByteCount + LineIndexByteCount;
+            }
+        };
+
         template <typename Tag>
         struct SlotAllocator
         {
@@ -192,6 +213,15 @@ namespace Extrinsic::Graphics
                                    static_cast<std::uint64_t>(begin * sizeof(T)));
             }
         }
+
+        [[nodiscard]] float FragmentationRatio(std::uint64_t fragmented, std::uint64_t usedHighWater) noexcept
+        {
+            if (usedHighWater == 0)
+            {
+                return 0.0f;
+            }
+            return static_cast<float>(static_cast<double>(fragmented) / static_cast<double>(usedHighWater));
+        }
     }
 
     struct GpuWorld::Impl
@@ -210,6 +240,7 @@ namespace Extrinsic::Graphics
         std::vector<RHI::GpuGeometryRecord>  GeometryRecordsCpu;
         std::vector<RHI::GpuBounds>          BoundsCpu;
         std::vector<RHI::GpuLight>           LightsCpu;
+        std::vector<ManagedGeometryAllocation> GeometryAllocations;
         RHI::GpuSceneTable                   SceneTableCpu{};
 
         std::vector<bool> DirtyInstanceStatic;
@@ -223,6 +254,9 @@ namespace Extrinsic::Graphics
         std::uint32_t VertexOverflowCount = 0;
         std::uint32_t IndexOverflowCount = 0;
         std::uint32_t LightOverflowCount = 0;
+        std::uint64_t ManagedCompactionBytesMoved = 0;
+        std::uint32_t ManagedCompactionCount = 0;
+        std::uint32_t StaleCompactionRelocationCount = 0;
 
         std::uint64_t VertexBumpOffset = 0;
         std::uint64_t IndexBumpOffset  = 0;
@@ -272,6 +306,124 @@ namespace Extrinsic::Graphics
             SceneTableCpu.LightCount         = static_cast<std::uint32_t>(LightsCpu.size());
             DirtySceneTable = true;
         }
+
+        [[nodiscard]] std::uint64_t LiveVertexBytes() const noexcept
+        {
+            std::uint64_t bytes = 0;
+            for (const auto& allocation : GeometryAllocations)
+            {
+                if (allocation.Live)
+                {
+                    bytes += allocation.VertexByteCount;
+                }
+            }
+            return bytes;
+        }
+
+        [[nodiscard]] std::uint64_t LiveIndexBytes() const noexcept
+        {
+            std::uint64_t bytes = 0;
+            for (const auto& allocation : GeometryAllocations)
+            {
+                if (allocation.Live)
+                {
+                    bytes += allocation.IndexByteCount();
+                }
+            }
+            return bytes;
+        }
+
+        [[nodiscard]] ManagedBufferFragmentation VertexFragmentation() const noexcept
+        {
+            const std::uint64_t liveBytes = LiveVertexBytes();
+            const std::uint64_t fragmented = VertexBumpOffset >= liveBytes ? VertexBumpOffset - liveBytes : 0;
+            return ManagedBufferFragmentation{
+                .CapacityBytes = Desc.VertexBufferBytes,
+                .UsedHighWaterBytes = VertexBumpOffset,
+                .LiveBytes = liveBytes,
+                .FragmentedBytes = fragmented,
+                .FragmentationRatio = FragmentationRatio(fragmented, VertexBumpOffset),
+            };
+        }
+
+        [[nodiscard]] ManagedBufferFragmentation IndexFragmentation() const noexcept
+        {
+            const std::uint64_t liveBytes = LiveIndexBytes();
+            const std::uint64_t fragmented = IndexBumpOffset >= liveBytes ? IndexBumpOffset - liveBytes : 0;
+            return ManagedBufferFragmentation{
+                .CapacityBytes = Desc.IndexBufferBytes,
+                .UsedHighWaterBytes = IndexBumpOffset,
+                .LiveBytes = liveBytes,
+                .FragmentedBytes = fragmented,
+                .FragmentationRatio = FragmentationRatio(fragmented, IndexBumpOffset),
+            };
+        }
+
+        [[nodiscard]] std::uint32_t VertexOffsetUnits(const ManagedGeometryAllocation& allocation) const noexcept
+        {
+            return allocation.VertexStride > 0u
+                ? static_cast<std::uint32_t>(allocation.VertexByteOffset / allocation.VertexStride)
+                : 0u;
+        }
+
+        [[nodiscard]] std::uint32_t SurfaceFirstIndex(const ManagedGeometryAllocation& allocation) const noexcept
+        {
+            return static_cast<std::uint32_t>(allocation.IndexByteOffset / sizeof(std::uint32_t));
+        }
+
+        [[nodiscard]] std::uint32_t LineFirstIndex(const ManagedGeometryAllocation& allocation) const noexcept
+        {
+            return static_cast<std::uint32_t>((allocation.IndexByteOffset + allocation.SurfaceIndexByteCount) / sizeof(std::uint32_t));
+        }
+
+        void RewriteGeometryRecord(std::uint32_t slot)
+        {
+            auto& allocation = GeometryAllocations[slot];
+            auto& rec = GeometryRecordsCpu[slot];
+            rec = {};
+            rec.VertexBufferBDA = Device ? Device->GetBufferDeviceAddress(ManagedVertexLease.GetHandle()) : 0;
+            rec.IndexBufferBDA = Device ? Device->GetBufferDeviceAddress(ManagedIndexLease.GetHandle()) : 0;
+            const std::uint32_t vertexOffset = VertexOffsetUnits(allocation);
+            rec.VertexOffset = vertexOffset;
+            rec.VertexCount = allocation.VertexCount;
+            rec.SurfaceFirstIndex = SurfaceFirstIndex(allocation);
+            rec.SurfaceIndexCount = static_cast<std::uint32_t>(allocation.SurfaceIndices.size());
+            rec.LineFirstIndex = LineFirstIndex(allocation);
+            rec.LineIndexCount = static_cast<std::uint32_t>(allocation.LineIndices.size());
+            rec.PointFirstVertex = vertexOffset;
+            rec.PointVertexCount = allocation.VertexCount;
+            DirtyGeometryRecord[slot] = true;
+        }
+
+        void ReplayManagedUpload(const ManagedGeometryAllocation& allocation)
+        {
+            if (!Device || !Device->IsOperational())
+            {
+                return;
+            }
+
+            if (!allocation.VertexBytes.empty())
+            {
+                Device->WriteBuffer(ManagedVertexLease.GetHandle(),
+                                    allocation.VertexBytes.data(),
+                                    static_cast<std::uint64_t>(allocation.VertexBytes.size()),
+                                    allocation.VertexByteOffset);
+            }
+            if (!allocation.SurfaceIndices.empty())
+            {
+                Device->WriteBuffer(ManagedIndexLease.GetHandle(),
+                                    allocation.SurfaceIndices.data(),
+                                    allocation.SurfaceIndexByteCount,
+                                    allocation.IndexByteOffset);
+            }
+            if (!allocation.LineIndices.empty())
+            {
+                Device->WriteBuffer(ManagedIndexLease.GetHandle(),
+                                    allocation.LineIndices.data(),
+                                    allocation.LineIndexByteCount,
+                                    allocation.IndexByteOffset + allocation.SurfaceIndexByteCount);
+            }
+        }
     };
 
     GpuWorld::GpuWorld()
@@ -302,6 +454,7 @@ namespace Extrinsic::Graphics
         m_Impl->EntityConfigCpu.assign(desc.MaxInstances, {});
         m_Impl->BoundsCpu.assign(desc.MaxInstances, {});
         m_Impl->GeometryRecordsCpu.assign(desc.MaxGeometryRecords, {});
+        m_Impl->GeometryAllocations.assign(desc.MaxGeometryRecords, {});
         m_Impl->LightsCpu.clear();
         m_Impl->LightsCpu.reserve(desc.MaxLights);
 
@@ -403,6 +556,7 @@ namespace Extrinsic::Graphics
         m_Impl->InstanceDynamicCpu.clear();
         m_Impl->EntityConfigCpu.clear();
         m_Impl->GeometryRecordsCpu.clear();
+        m_Impl->GeometryAllocations.clear();
         m_Impl->BoundsCpu.clear();
         m_Impl->LightsCpu.clear();
         m_Impl->DirtyInstanceStatic.clear();
@@ -417,6 +571,9 @@ namespace Extrinsic::Graphics
         m_Impl->VertexOverflowCount = 0;
         m_Impl->IndexOverflowCount = 0;
         m_Impl->LightOverflowCount = 0;
+        m_Impl->ManagedCompactionBytesMoved = 0;
+        m_Impl->ManagedCompactionCount = 0;
+        m_Impl->StaleCompactionRelocationCount = 0;
         m_Impl->MaterialBuffer = {};
         m_Impl->MaterialCapacity = 0;
 
@@ -532,29 +689,30 @@ namespace Extrinsic::Graphics
             }
         }
 
-        auto& rec = m_Impl->GeometryRecordsCpu[h.Index];
-        rec = {};
-        rec.VertexBufferBDA = m_Impl->Device->GetBufferDeviceAddress(GetManagedVertexBuffer());
-        rec.IndexBufferBDA = m_Impl->Device->GetBufferDeviceAddress(GetManagedIndexBuffer());
         const std::uint32_t vertexStride =
             (desc.VertexCount > 0u) ? static_cast<std::uint32_t>(vbSize / desc.VertexCount) : 0u;
         assert(desc.VertexCount == 0u || (vbSize % desc.VertexCount) == 0u);
         assert(vertexStride == 0u || (vbOffset % vertexStride) == 0u);
-        const std::uint32_t vertexOffset =
-            (vertexStride > 0u) ? static_cast<std::uint32_t>(vbOffset / vertexStride) : 0u;
-        rec.VertexOffset = vertexOffset;
-        rec.VertexCount = desc.VertexCount;
-        rec.SurfaceFirstIndex = static_cast<std::uint32_t>(surfOffset / sizeof(std::uint32_t));
-        rec.SurfaceIndexCount = static_cast<std::uint32_t>(desc.SurfaceIndices.size());
-        rec.LineFirstIndex = static_cast<std::uint32_t>(lineOffset / sizeof(std::uint32_t));
-        rec.LineIndexCount = static_cast<std::uint32_t>(desc.LineIndices.size());
-        rec.PointFirstVertex = vertexOffset;
-        rec.PointVertexCount = desc.VertexCount;
+
+        auto& allocation = m_Impl->GeometryAllocations[h.Index];
+        allocation = {};
+        allocation.Live = true;
+        allocation.Generation = h.Generation;
+        allocation.VertexByteOffset = vbOffset;
+        allocation.VertexByteCount = vbSize;
+        allocation.IndexByteOffset = surfOffset;
+        allocation.SurfaceIndexByteCount = surfSize;
+        allocation.LineIndexByteCount = lineSize;
+        allocation.VertexCount = desc.VertexCount;
+        allocation.VertexStride = vertexStride;
+        allocation.VertexBytes.assign(desc.PackedVertexBytes.begin(), desc.PackedVertexBytes.end());
+        allocation.SurfaceIndices.assign(desc.SurfaceIndices.begin(), desc.SurfaceIndices.end());
+        allocation.LineIndices.assign(desc.LineIndices.begin(), desc.LineIndices.end());
+
+        m_Impl->RewriteGeometryRecord(h.Index);
 
         m_Impl->VertexBumpOffset += vbSize;
         m_Impl->IndexBumpOffset = lineOffset + lineSize;
-
-        m_Impl->DirtyGeometryRecord[h.Index] = true;
         return h;
     }
 
@@ -581,9 +739,12 @@ namespace Extrinsic::Graphics
         }
 
         m_Impl->GeometryRecordsCpu[geometry.Index] = {};
+        if (geometry.Index < m_Impl->GeometryAllocations.size())
+        {
+            m_Impl->GeometryAllocations[geometry.Index].Live = false;
+        }
         m_Impl->DirtyGeometryRecord[geometry.Index] = true;
         m_Impl->GeometrySlots.Free(geometry, m_Impl->FrameIndex + m_Impl->Desc.DeferredFreeFrames);
-        // TODO: reclaim managed vertex/index ranges via a free-list + compaction pass.
     }
 
     void GpuWorld::SetInstanceGeometry(GpuInstanceHandle instance, GpuGeometryHandle geometry)
@@ -678,6 +839,157 @@ namespace Extrinsic::Graphics
         m_Impl->RefreshSceneTable();
     }
 
+    GpuWorld::CompactionPlan GpuWorld::PlanManagedBufferCompaction() const
+    {
+        return PlanManagedBufferCompaction(CompactionPlanDesc{});
+    }
+
+    GpuWorld::CompactionPlan GpuWorld::PlanManagedBufferCompaction(const CompactionPlanDesc& desc) const
+    {
+        CompactionPlan plan{};
+        plan.Enabled = desc.Enabled;
+        plan.Vertex = m_Impl->VertexFragmentation();
+        plan.Index = m_Impl->IndexFragmentation();
+        plan.RecoverableBytes = plan.Vertex.FragmentedBytes + plan.Index.FragmentedBytes;
+
+        if (!desc.Enabled)
+        {
+            return plan;
+        }
+
+        plan.BlockedByPendingFrees = !desc.AllowWhilePendingFrees &&
+            (!m_Impl->GeometrySlots.PendingFree.empty() || !m_Impl->InstanceSlots.PendingFree.empty());
+
+        std::uint64_t nextVertexOffset = 0;
+        std::uint64_t nextIndexOffset = 0;
+        for (std::uint32_t slot = 0; slot < m_Impl->GeometryAllocations.size(); ++slot)
+        {
+            const auto& allocation = m_Impl->GeometryAllocations[slot];
+            if (!allocation.Live)
+            {
+                continue;
+            }
+
+            const std::uint64_t oldVertexOffset = allocation.VertexByteOffset;
+            const std::uint64_t oldIndexOffset = allocation.IndexByteOffset;
+            const std::uint64_t oldLineOffset = oldIndexOffset + allocation.SurfaceIndexByteCount;
+            const std::uint64_t newVertexOffset = nextVertexOffset;
+            const std::uint64_t newIndexOffset = nextIndexOffset;
+            const std::uint64_t newLineOffset = newIndexOffset + allocation.SurfaceIndexByteCount;
+
+            if (oldVertexOffset != newVertexOffset || oldIndexOffset != newIndexOffset)
+            {
+                if (oldVertexOffset != newVertexOffset)
+                {
+                    plan.BytesToMove += allocation.VertexByteCount;
+                }
+                if (oldIndexOffset != newIndexOffset)
+                {
+                    plan.BytesToMove += allocation.IndexByteCount();
+                }
+
+                plan.Relocations.push_back(GeometryRelocation{
+                    .Geometry = GpuGeometryHandle{slot, allocation.Generation},
+                    .OldVertexByteOffset = oldVertexOffset,
+                    .NewVertexByteOffset = newVertexOffset,
+                    .VertexByteCount = allocation.VertexByteCount,
+                    .OldIndexByteOffset = oldIndexOffset,
+                    .NewIndexByteOffset = newIndexOffset,
+                    .IndexByteCount = allocation.IndexByteCount(),
+                    .OldVertexOffset = allocation.VertexStride > 0u
+                        ? static_cast<std::uint32_t>(oldVertexOffset / allocation.VertexStride)
+                        : 0u,
+                    .NewVertexOffset = allocation.VertexStride > 0u
+                        ? static_cast<std::uint32_t>(newVertexOffset / allocation.VertexStride)
+                        : 0u,
+                    .OldSurfaceFirstIndex = static_cast<std::uint32_t>(oldIndexOffset / sizeof(std::uint32_t)),
+                    .NewSurfaceFirstIndex = static_cast<std::uint32_t>(newIndexOffset / sizeof(std::uint32_t)),
+                    .OldLineFirstIndex = static_cast<std::uint32_t>(oldLineOffset / sizeof(std::uint32_t)),
+                    .NewLineFirstIndex = static_cast<std::uint32_t>(newLineOffset / sizeof(std::uint32_t)),
+                });
+            }
+
+            nextVertexOffset += allocation.VertexByteCount;
+            nextIndexOffset += allocation.IndexByteCount();
+        }
+
+        const float maxFragmentation = std::max(plan.Vertex.FragmentationRatio, plan.Index.FragmentationRatio);
+        plan.ShouldCompact = !plan.BlockedByPendingFrees &&
+            !plan.Relocations.empty() &&
+            plan.RecoverableBytes >= desc.MinRecoverableBytes &&
+            maxFragmentation >= desc.MinFragmentationRatio;
+        return plan;
+    }
+
+    GpuWorld::CompactionResult GpuWorld::ApplyManagedBufferCompaction(const CompactionPlan& plan)
+    {
+        CompactionResult result{};
+        result.RelocationCount = static_cast<std::uint32_t>(plan.Relocations.size());
+        result.BytesMoved = plan.BytesToMove;
+
+        if (!plan.Enabled || !plan.ShouldCompact)
+        {
+            result.Skipped = true;
+            return result;
+        }
+
+        for (const auto& relocation : plan.Relocations)
+        {
+            if (!m_Impl->GeometrySlots.Resolve(relocation.Geometry) ||
+                relocation.Geometry.Index >= m_Impl->GeometryAllocations.size())
+            {
+                ++result.StaleRelocationCount;
+                continue;
+            }
+
+            const auto& allocation = m_Impl->GeometryAllocations[relocation.Geometry.Index];
+            if (!allocation.Live ||
+                allocation.Generation != relocation.Geometry.Generation ||
+                allocation.VertexByteOffset != relocation.OldVertexByteOffset ||
+                allocation.VertexByteCount != relocation.VertexByteCount ||
+                allocation.IndexByteOffset != relocation.OldIndexByteOffset ||
+                allocation.IndexByteCount() != relocation.IndexByteCount)
+            {
+                ++result.StaleRelocationCount;
+            }
+        }
+
+        if (result.StaleRelocationCount > 0u)
+        {
+            result.RejectedStaleRelocations = true;
+            m_Impl->StaleCompactionRelocationCount += result.StaleRelocationCount;
+            return result;
+        }
+
+        std::uint64_t vertexHighWater = 0;
+        std::uint64_t indexHighWater = 0;
+        for (const auto& relocation : plan.Relocations)
+        {
+            auto& allocation = m_Impl->GeometryAllocations[relocation.Geometry.Index];
+            allocation.VertexByteOffset = relocation.NewVertexByteOffset;
+            allocation.IndexByteOffset = relocation.NewIndexByteOffset;
+            m_Impl->ReplayManagedUpload(allocation);
+            m_Impl->RewriteGeometryRecord(relocation.Geometry.Index);
+        }
+
+        for (const auto& allocation : m_Impl->GeometryAllocations)
+        {
+            if (!allocation.Live)
+            {
+                continue;
+            }
+            vertexHighWater = std::max(vertexHighWater, allocation.VertexByteOffset + allocation.VertexByteCount);
+            indexHighWater = std::max(indexHighWater, allocation.IndexByteOffset + allocation.IndexByteCount());
+        }
+
+        m_Impl->VertexBumpOffset = vertexHighWater;
+        m_Impl->IndexBumpOffset = indexHighWater;
+        m_Impl->ManagedCompactionBytesMoved += result.BytesMoved;
+        ++m_Impl->ManagedCompactionCount;
+        result.Applied = true;
+        return result;
+    }
+
     void GpuWorld::SyncFrame()
     {
         ++m_Impl->FrameIndex;
@@ -765,6 +1077,17 @@ namespace Extrinsic::Graphics
             .IndexOverflowCount = m_Impl->IndexOverflowCount,
             .LightOverflowCount = m_Impl->LightOverflowCount,
             .NullDevice = m_Impl->Device != nullptr && !m_Impl->Device->IsOperational(),
+        };
+    }
+
+    GpuWorld::ManagedBufferDiagnostics GpuWorld::GetManagedBufferDiagnostics() const noexcept
+    {
+        return ManagedBufferDiagnostics{
+            .Vertex = m_Impl->VertexFragmentation(),
+            .Index = m_Impl->IndexFragmentation(),
+            .CompactionBytesMoved = m_Impl->ManagedCompactionBytesMoved,
+            .CompactionCount = m_Impl->ManagedCompactionCount,
+            .StaleRelocationCount = m_Impl->StaleCompactionRelocationCount,
         };
     }
 }
