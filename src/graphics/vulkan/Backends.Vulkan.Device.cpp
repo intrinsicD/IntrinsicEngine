@@ -5,6 +5,7 @@ module;
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #ifndef GLFW_INCLUDE_NONE
@@ -57,6 +58,9 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
 void VulkanDevice::Shutdown()
 {
     WaitIdle();
+
+    for (uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
+        FlushDeletionQueue(frameSlot);
 
     m_TransferQueue.reset();
     m_Profiler.reset();
@@ -167,6 +171,9 @@ RHI::ICommandContext& VulkanDevice::GetGraphicsContext(uint32_t frameIndex)
 
 RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
 {
+    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || desc.SizeBytes == 0)
+        return {};
+
     VkBufferCreateInfo bci{};
     bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bci.size  = desc.SizeBytes;
@@ -230,6 +237,9 @@ void VulkanDevice::DestroyBuffer(RHI::BufferHandle handle)
 
     // Defer the actual VMA destroy until this frame's resources are safe to release.
     VmaAllocator vma = m_Vma;
+    if (vma == VK_NULL_HANDLE || vkBuf == VK_NULL_HANDLE || vkAlloc == VK_NULL_HANDLE)
+        return;
+
     DeferDelete([vma, vkBuf, vkAlloc]() mutable
     {
         vmaDestroyBuffer(vma, vkBuf, vkAlloc);
@@ -239,6 +249,9 @@ void VulkanDevice::DestroyBuffer(RHI::BufferHandle handle)
 void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
                                 uint64_t size, uint64_t offset)
 {
+    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE)
+        return;
+
     if (!data || size == 0) return;
     VulkanBuffer* buf = m_Buffers.GetIfValid(handle);
     if (!buf) return;
@@ -294,6 +307,11 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
 
     // 3. Record and submit a one-shot vkCmdCopyBuffer.
     VkCommandBuffer cmd = BeginOneShot();
+    if (cmd == VK_NULL_HANDLE)
+    {
+        vmaDestroyBuffer(m_Vma, stagingBuf, stagingAlloc);
+        return;
+    }
     VkBufferCopy region{};
     region.srcOffset = 0;
     region.dstOffset = offset;
@@ -307,6 +325,9 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
 
 uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const
 {
+    if (!m_Operational || m_Device == VK_NULL_HANDLE)
+        return 0;
+
     const VulkanBuffer* buf = m_Buffers.GetIfValid(handle);
     if (!buf || !buf->HasBDA) return 0;
 
@@ -314,6 +335,196 @@ uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const
     info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
     info.buffer = buf->Buffer;
     return vkGetBufferDeviceAddress(m_Device, &info);
+}
+
+RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
+{
+    (void)desc;
+    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE)
+        return {};
+
+    // Real image allocation/import remains a later GRAPHICS-018 slice. Until
+    // then, fail closed instead of manufacturing an unusable texture handle.
+    return {};
+}
+
+void VulkanDevice::DestroyTexture(RHI::TextureHandle handle)
+{
+    VulkanImage* image = m_Images.GetIfValid(handle);
+    if (!image)
+        return;
+
+    const VkDevice device = m_Device;
+    const VmaAllocator vma = m_Vma;
+    const VkImage vkImage = image->Image;
+    const VkImageView view = image->View;
+    const VmaAllocation allocation = image->Allocation;
+    const bool ownsMemory = image->OwnsMemory;
+
+    image->Image = VK_NULL_HANDLE;
+    image->View = VK_NULL_HANDLE;
+    image->Allocation = VK_NULL_HANDLE;
+    m_Images.Remove(handle, m_GlobalFrameNumber);
+
+    if (device == VK_NULL_HANDLE)
+        return;
+
+    DeferDelete([device, vma, vkImage, view, allocation, ownsMemory]() mutable
+    {
+        if (view != VK_NULL_HANDLE)
+            vkDestroyImageView(device, view, nullptr);
+        if (ownsMemory && vma != VK_NULL_HANDLE && vkImage != VK_NULL_HANDLE && allocation != VK_NULL_HANDLE)
+            vmaDestroyImage(vma, vkImage, allocation);
+    });
+}
+
+void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
+                                const void* data,
+                                uint64_t dataSizeBytes,
+                                uint32_t mipLevel,
+                                uint32_t arrayLayer)
+{
+    (void)handle;
+    (void)data;
+    (void)dataSizeBytes;
+    (void)mipLevel;
+    (void)arrayLayer;
+    if (!m_Operational)
+        return;
+
+    // Texture upload is intentionally fail-closed until real Vulkan image
+    // staging/layout transition support is wired through GRAPHICS-018.
+}
+
+RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)
+{
+    (void)desc;
+    if (!m_Operational || m_Device == VK_NULL_HANDLE)
+        return {};
+
+    // Real sampler creation remains part of the Vulkan resource bring-up slice.
+    return {};
+}
+
+void VulkanDevice::DestroySampler(RHI::SamplerHandle handle)
+{
+    VulkanSampler* sampler = m_Samplers.GetIfValid(handle);
+    if (!sampler)
+        return;
+
+    const VkDevice device = m_Device;
+    const VkSampler vkSampler = sampler->Sampler;
+    sampler->Sampler = VK_NULL_HANDLE;
+    m_Samplers.Remove(handle, m_GlobalFrameNumber);
+
+    if (device == VK_NULL_HANDLE || vkSampler == VK_NULL_HANDLE)
+        return;
+
+    DeferDelete([device, vkSampler]() mutable
+    {
+        vkDestroySampler(device, vkSampler, nullptr);
+    });
+}
+
+RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
+{
+    (void)desc;
+    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_GlobalPipelineLayout == VK_NULL_HANDLE)
+        return {};
+
+    // Shader-module and pipeline construction remains a later GRAPHICS-018 slice.
+    return {};
+}
+
+void VulkanDevice::DestroyPipeline(RHI::PipelineHandle handle)
+{
+    VulkanPipeline* pipeline = m_Pipelines.GetIfValid(handle);
+    if (!pipeline)
+        return;
+
+    const VkDevice device = m_Device;
+    const VkPipeline vkPipeline = pipeline->Pipeline;
+    const VkPipelineLayout layout = pipeline->Layout;
+    const bool ownsLayout = pipeline->OwnsLayout;
+    pipeline->Pipeline = VK_NULL_HANDLE;
+    pipeline->Layout = VK_NULL_HANDLE;
+    m_Pipelines.Remove(handle, m_GlobalFrameNumber);
+
+    if (device == VK_NULL_HANDLE)
+        return;
+
+    DeferDelete([device, vkPipeline, layout, ownsLayout]() mutable
+    {
+        if (vkPipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(device, vkPipeline, nullptr);
+        if (ownsLayout && layout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(device, layout, nullptr);
+    });
+}
+
+VkCommandBuffer VulkanDevice::BeginOneShot()
+{
+    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_FrameSlot >= kMaxFramesInFlight)
+        return VK_NULL_HANDLE;
+
+    const VkCommandBuffer cmd = m_Frames[m_FrameSlot].CmdBuffer;
+    if (cmd == VK_NULL_HANDLE)
+        return VK_NULL_HANDLE;
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    if (vkBeginCommandBuffer(cmd, &beginInfo) != VK_SUCCESS)
+        return VK_NULL_HANDLE;
+    return cmd;
+}
+
+void VulkanDevice::EndOneShot(VkCommandBuffer cmd)
+{
+    if (!m_Operational || m_Device == VK_NULL_HANDLE || cmd == VK_NULL_HANDLE)
+        return;
+
+    if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
+        return;
+
+    VkSubmitInfo submit{};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &cmd;
+
+    if (m_GraphicsQueue != VK_NULL_HANDLE)
+    {
+        vkQueueSubmit(m_GraphicsQueue, 1, &submit, VK_NULL_HANDLE);
+        vkQueueWaitIdle(m_GraphicsQueue);
+    }
+}
+
+void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
+{
+    if (!fn)
+        return;
+
+    if (!m_Operational || m_FrameSlot >= kMaxFramesInFlight)
+    {
+        fn();
+        return;
+    }
+
+    m_Frames[m_FrameSlot].DeletionQueue.push_back(std::move(fn));
+}
+
+void VulkanDevice::FlushDeletionQueue(uint32_t frameSlot)
+{
+    if (frameSlot >= kMaxFramesInFlight)
+        return;
+
+    auto& queue = m_Frames[frameSlot].DeletionQueue;
+    for (auto& fn : queue)
+    {
+        if (fn)
+            fn();
+    }
+    queue.clear();
 }
 
 } // namespace Extrinsic::Backends::Vulkan

@@ -126,6 +126,36 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedDeviceLifecycle)
         EXPECT_NE(content.find(definition), std::string::npos) << definition;
 }
 
+TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedResourceSurface)
+{
+    const auto deviceSource = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp";
+    const auto content = ReadFile(deviceSource);
+
+    const std::vector<std::string> requiredDefinitions{
+        "RHI::BufferHandle VulkanDevice::CreateBuffer(",
+        "void VulkanDevice::DestroyBuffer(",
+        "void VulkanDevice::WriteBuffer(",
+        "uint64_t VulkanDevice::GetBufferDeviceAddress(",
+        "RHI::TextureHandle VulkanDevice::CreateTexture(",
+        "void VulkanDevice::DestroyTexture(",
+        "void VulkanDevice::WriteTexture(",
+        "RHI::SamplerHandle VulkanDevice::CreateSampler(",
+        "void VulkanDevice::DestroySampler(",
+        "RHI::PipelineHandle VulkanDevice::CreatePipeline(",
+        "void VulkanDevice::DestroyPipeline(",
+        "VkCommandBuffer VulkanDevice::BeginOneShot()",
+        "void VulkanDevice::EndOneShot(",
+        "void VulkanDevice::DeferDelete(",
+        "void VulkanDevice::FlushDeletionQueue(",
+    };
+
+    for (const auto& definition : requiredDefinitions)
+        EXPECT_NE(content.find(definition), std::string::npos) << definition;
+
+    EXPECT_NE(content.find("if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE"),
+              std::string::npos);
+}
+
 TEST(RendererRhiBoundary, VulkanBackendProvidesFailClosedServiceFallbacks)
 {
     const auto deviceInterface = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cppm";

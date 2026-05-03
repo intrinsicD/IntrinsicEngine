@@ -147,22 +147,6 @@ namespace Extrinsic::Backends::Vulkan
             void CollectCompleted() override {}
         };
 
-        void CreateInstance(const Core::Config::RenderConfig& cfg);
-        void CreateSurface(Platform::IWindow& window);
-        void PickPhysicalDevice();
-        void CreateLogicalDevice();
-        void CreateVma();
-        void CreateSwapchain(uint32_t width, uint32_t height);
-        void DestroySwapchain();
-        void RegisterSwapchainImages();
-        void CreatePerFrameResources();
-        void DestroyPerFrameResources();
-        void CreateGlobalPipelineLayout();
-        void CreateDefaultSampler();
-
-        [[nodiscard]] uint32_t FindMemoryType(uint32_t typeBits, VkMemoryPropertyFlags props) const;
-        [[nodiscard]] VkFormat FindDepthFormat() const;
-        [[nodiscard]] bool     SupportsFormat(VkFormat fmt, VkFormatFeatureFlags feats) const;
 
         [[nodiscard]] VkCommandBuffer BeginOneShot();
         void EndOneShot(VkCommandBuffer cmd);
