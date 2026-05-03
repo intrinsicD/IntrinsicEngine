@@ -28,6 +28,13 @@ export namespace Extrinsic::Graphics
         LabelUint32,
     };
 
+    enum class VisualizationFragmentBakeMapping : std::uint8_t
+    {
+        ExistingTexcoords = 0,
+        ExistingHtex,
+        RecreateHtex,
+    };
+
     struct VisualizationAttributeBufferPacket
     {
         std::string Name{};
@@ -86,6 +93,18 @@ export namespace Extrinsic::Graphics
         std::uint32_t AtlasHeight{0u};
     };
 
+    struct FragmentBakeAtlasPacket
+    {
+        std::string Name{};
+        std::string SourceAttributeName{};
+        VisualizationFragmentBakeMapping Mapping{VisualizationFragmentBakeMapping::ExistingTexcoords};
+        bool MeshHasTexcoords{false};
+        std::uint32_t FaceCount{0u};
+        std::uint32_t AtlasWidth{0u};
+        std::uint32_t AtlasHeight{0u};
+        std::uint64_t TexcoordBufferBDA{0u};
+    };
+
     struct VisualizationPacketBatch
     {
         std::span<const VisualizationAttributeBufferPacket> AttributeBuffers{};
@@ -94,6 +113,7 @@ export namespace Extrinsic::Graphics
         std::span<const VectorFieldOverlayPacket> VectorFields{};
         std::span<const IsolineOverlayPacket> Isolines{};
         std::span<const HtexPatchPreviewAtlasPacket> HtexAtlases{};
+        std::span<const FragmentBakeAtlasPacket> FragmentBakeAtlases{};
         bool EnforceDomain{false};
         VisualizationAttributeDomain ExpectedDomain{VisualizationAttributeDomain::Vertex};
     };
@@ -107,6 +127,8 @@ export namespace Extrinsic::Graphics
         std::uint32_t InvalidRangeCount{0u};
         std::uint32_t UnsupportedColormapCount{0u};
         std::uint32_t InvalidResourceCount{0u};
+        std::uint32_t MissingTexcoordCount{0u};
+        std::uint32_t HtexRecreateRequestCount{0u};
         std::uint32_t TextureResidencyDeferredCount{0u};
         bool HasErrors{false};
     };
@@ -118,6 +140,9 @@ export namespace Extrinsic::Graphics
         std::uint32_t IsolineLayerCount{0u};
         std::uint32_t IsolineValueCount{0u};
         std::uint32_t HtexAtlasDescriptorCount{0u};
+        std::uint32_t UvBakeAtlasDescriptorCount{0u};
+        std::uint32_t HtexBakeAtlasDescriptorCount{0u};
+        std::uint32_t HtexRecreateRequestCount{0u};
         bool RequiresTextureResidency{false};
     };
 

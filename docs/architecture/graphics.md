@@ -34,9 +34,13 @@ Graphics is organized into explicit sublayers:
   editor state.
 - `Extrinsic.Graphics.VisualizationPackets` is the promoted data-only seam for
   scalar/color/vector attribute buffers, vector-field overlays, isoline overlays,
-  and Htex patch-preview atlas descriptors. It validates domains, ranges,
-  colormap IDs, buffer-address seams, and missing resources without importing
-  geometry algorithms, ECS ownership, or texture residency. Htex atlas texture
+  UV-backed fragment-bake atlas descriptors, and Htex patch-preview/bake atlas
+  descriptors. Existing mesh texcoords may be used for per-fragment bakes such
+  as label/colormap visualization; Htex remains an always-recreatable alternate
+  mapping for meshes without texcoords or when explicitly selected by the user.
+  The packet layer validates domains, ranges, colormap IDs, buffer-address seams,
+  missing texcoords/resources, and Htex recreation requests without importing
+  geometry algorithms, ECS ownership, or texture residency. Htex/UV atlas texture
   allocation remains deferred to graphics asset/residency work.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.

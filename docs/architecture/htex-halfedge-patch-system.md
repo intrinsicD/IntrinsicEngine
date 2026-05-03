@@ -2,7 +2,7 @@
 
 This document describes a proposed **float-render-target-first** patch system for IntrinsicEngine, inspired by Htex but adapted to the engine’s existing halfedge, PropertySet, and bindless-texture architecture.
 
-The goal is to make **undirected edges** the storage primitive for surface-space render targets while keeping the implementation compatible with the current geometry kernel and render graph.
+The goal is to make **undirected edges** the storage primitive for surface-space render targets while keeping the implementation compatible with the current geometry kernel and render graph. Htex is a complement to regular mesh UVs, not a replacement: if a mesh already has usable texcoords, per-fragment visualization bakes may use those texcoords directly; Htex provides an always-available alternate mapping for meshes without UVs and for cases where the user explicitly wants to recreate/use an Htex atlas instead.
 
 ## 1. Mathematical / Topological Model
 

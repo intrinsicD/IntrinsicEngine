@@ -62,7 +62,8 @@ namespace Extrinsic::Graphics
                                                                   batch.Colors.size() +
                                                                   batch.VectorFields.size() +
                                                                   batch.Isolines.size() +
-                                                                  batch.HtexAtlases.size());
+                                                                  batch.HtexAtlases.size() +
+                                                                  batch.FragmentBakeAtlases.size());
 
         for (const VisualizationAttributeBufferPacket& packet : batch.AttributeBuffers)
         {
@@ -155,6 +156,38 @@ namespace Extrinsic::Graphics
             AcceptOrError(valid, diagnostics);
         }
 
+        for (const FragmentBakeAtlasPacket& packet : batch.FragmentBakeAtlases)
+        {
+            bool valid = !packet.Name.empty() && !packet.SourceAttributeName.empty() &&
+                         packet.FaceCount > 0u && packet.AtlasWidth > 0u && packet.AtlasHeight > 0u;
+            if (!valid)
+            {
+                ++diagnostics.InvalidResourceCount;
+            }
+
+            switch (packet.Mapping)
+            {
+            case VisualizationFragmentBakeMapping::ExistingTexcoords:
+                if (!packet.MeshHasTexcoords || packet.TexcoordBufferBDA == 0u)
+                {
+                    valid = false;
+                    ++diagnostics.MissingTexcoordCount;
+                }
+                break;
+            case VisualizationFragmentBakeMapping::ExistingHtex:
+                break;
+            case VisualizationFragmentBakeMapping::RecreateHtex:
+                ++diagnostics.HtexRecreateRequestCount;
+                break;
+            }
+
+            if (valid)
+            {
+                ++diagnostics.TextureResidencyDeferredCount;
+            }
+            AcceptOrError(valid, diagnostics);
+        }
+
         diagnostics.HasErrors = diagnostics.HasErrors || diagnostics.DomainMismatchCount > 0u;
         return diagnostics;
     }
@@ -184,6 +217,35 @@ namespace Extrinsic::Graphics
             {
                 ++summary.HtexAtlasDescriptorCount;
                 summary.RequiresTextureResidency = true;
+            }
+        }
+        for (const FragmentBakeAtlasPacket& packet : batch.FragmentBakeAtlases)
+        {
+            const bool validShape = !packet.Name.empty() && !packet.SourceAttributeName.empty() &&
+                                    packet.FaceCount > 0u && packet.AtlasWidth > 0u && packet.AtlasHeight > 0u;
+            if (!validShape)
+            {
+                continue;
+            }
+
+            switch (packet.Mapping)
+            {
+            case VisualizationFragmentBakeMapping::ExistingTexcoords:
+                if (packet.MeshHasTexcoords && packet.TexcoordBufferBDA != 0u)
+                {
+                    ++summary.UvBakeAtlasDescriptorCount;
+                    summary.RequiresTextureResidency = true;
+                }
+                break;
+            case VisualizationFragmentBakeMapping::ExistingHtex:
+                ++summary.HtexBakeAtlasDescriptorCount;
+                summary.RequiresTextureResidency = true;
+                break;
+            case VisualizationFragmentBakeMapping::RecreateHtex:
+                ++summary.HtexBakeAtlasDescriptorCount;
+                ++summary.HtexRecreateRequestCount;
+                summary.RequiresTextureResidency = true;
+                break;
             }
         }
         return summary;

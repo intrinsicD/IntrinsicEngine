@@ -5,6 +5,7 @@
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-013C` completion.
 - Current slice: data-only visualization packet contracts and diagnostics; texture/atlas residency remains deferred to `GRAPHICS-015`.
+- Clarification: existing mesh UVs/texcoords must be usable for per-fragment visualization bakes (for example KMeans labels), and Htex must remain an always-recreatable alternate mapping for any mesh, including meshes that already have UVs.
 
 ## Goal
 - Complete visualization attribute upload, colormap, isoline, vector-field, Htex patch-preview atlas, and overlay rendering contracts through graphics snapshots.
@@ -19,6 +20,7 @@
 ## Required changes
 - Define scalar/color/vector attribute packet contracts and GPU upload/update seams.
 - Define auxiliary GPU resource descriptors for per-domain attribute buffers, centroid/label data, vector-field/isoline output packets, and Htex patch-preview atlas textures.
+- Define per-fragment bake descriptors that can target either existing mesh texcoords or an Htex patch atlas. UV-backed bakes require texcoord data; Htex-backed bakes must be possible even when UVs are present and may request Htex regeneration.
 - Complete colormap system, isoline packet generation, vector-field overlay packets, and overlay snapshot interfaces.
 - Add diagnostics for missing attributes, mismatched domains, invalid ranges, and unsupported colormap IDs.
 ## Tests

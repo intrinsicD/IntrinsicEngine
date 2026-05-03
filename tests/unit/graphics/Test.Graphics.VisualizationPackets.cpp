@@ -198,3 +198,91 @@ TEST(GraphicsVisualizationPackets, InvalidHtexAtlasDescriptorsRemainDataOnlyDiag
     EXPECT_TRUE(diagnostics.HasErrors);
 }
 
+TEST(GraphicsVisualizationPackets, FragmentBakesCanUseExistingTexcoordsOrForcedHtex)
+{
+    const std::array<Graphics::FragmentBakeAtlasPacket, 3> bakes{{
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "kmeans_labels_uv_bake",
+            .SourceAttributeName = "kmeans_label_rgba",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 24u,
+            .AtlasWidth = 512u,
+            .AtlasHeight = 512u,
+            .TexcoordBufferBDA = 0xCAFEu,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "kmeans_labels_htex_bake",
+            .SourceAttributeName = "kmeans_label_rgba",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::RecreateHtex,
+            .MeshHasTexcoords = true,
+            .FaceCount = 24u,
+            .AtlasWidth = 512u,
+            .AtlasHeight = 512u,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "existing_htex_bake",
+            .SourceAttributeName = "curvature",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingHtex,
+            .MeshHasTexcoords = false,
+            .FaceCount = 24u,
+            .AtlasWidth = 256u,
+            .AtlasHeight = 256u,
+        },
+    }};
+
+    const Graphics::VisualizationPacketBatch batch{.FragmentBakeAtlases = bakes};
+    const Graphics::VisualizationDiagnostics diagnostics = Graphics::ValidateVisualizationPackets(batch);
+    EXPECT_EQ(diagnostics.InputPacketCount, 3u);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 3u);
+    EXPECT_EQ(diagnostics.MissingTexcoordCount, 0u);
+    EXPECT_EQ(diagnostics.HtexRecreateRequestCount, 1u);
+    EXPECT_EQ(diagnostics.TextureResidencyDeferredCount, 3u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+
+    const Graphics::VisualizationOverlaySummary summary = Graphics::BuildVisualizationOverlaySummary(batch);
+    EXPECT_EQ(summary.UvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.HtexBakeAtlasDescriptorCount, 2u);
+    EXPECT_EQ(summary.HtexRecreateRequestCount, 1u);
+    EXPECT_TRUE(summary.RequiresTextureResidency);
+}
+
+TEST(GraphicsVisualizationPackets, TexcoordBakesRequireExistingUvData)
+{
+    const std::array<Graphics::FragmentBakeAtlasPacket, 2> bakes{{
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "missing_uv_mesh",
+            .SourceAttributeName = "kmeans_label_rgba",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = false,
+            .FaceCount = 12u,
+            .AtlasWidth = 256u,
+            .AtlasHeight = 256u,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "invalid_shape",
+            .SourceAttributeName = "kmeans_label_rgba",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 12u,
+            .AtlasWidth = 0u,
+            .AtlasHeight = 256u,
+            .TexcoordBufferBDA = 0x1234u,
+        },
+    }};
+
+    const Graphics::VisualizationDiagnostics diagnostics = Graphics::ValidateVisualizationPackets(
+        Graphics::VisualizationPacketBatch{.FragmentBakeAtlases = bakes});
+    EXPECT_EQ(diagnostics.InputPacketCount, 2u);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 0u);
+    EXPECT_EQ(diagnostics.MissingTexcoordCount, 1u);
+    EXPECT_EQ(diagnostics.InvalidResourceCount, 1u);
+    EXPECT_EQ(diagnostics.TextureResidencyDeferredCount, 0u);
+    EXPECT_TRUE(diagnostics.HasErrors);
+
+    const Graphics::VisualizationOverlaySummary summary = Graphics::BuildVisualizationOverlaySummary(
+        Graphics::VisualizationPacketBatch{.FragmentBakeAtlases = bakes});
+    EXPECT_EQ(summary.UvBakeAtlasDescriptorCount, 0u);
+    EXPECT_EQ(summary.HtexBakeAtlasDescriptorCount, 0u);
+}
+
