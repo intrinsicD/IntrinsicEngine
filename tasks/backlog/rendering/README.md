@@ -66,9 +66,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   depends on GRAPHICS-002, GRAPHICS-003, and GRAPHICS-007.
 - [GRAPHICS-010Q — Transient debug backend clarification follow-ups](GRAPHICS-010Q-transient-debug-backend-clarifications.md):
   nonblocking docs-only follow-up for transient debug packet upload/routing, debug triangle backend path, overlay bucket policy, and excessive-count diagnostics.
-- [GRAPHICS-011 — Spatial debug visualizers](../../active/GRAPHICS-011-spatial-debug-visualizers.md):
+- [GRAPHICS-011 — Spatial debug visualizers](../../done/GRAPHICS-011-spatial-debug-visualizers.md):
   depends on GRAPHICS-010.
-- [GRAPHICS-012 — Picking, selection, and outline](GRAPHICS-012-picking-selection-outline.md):
+- [GRAPHICS-011Q — Spatial debug adapter clarification follow-ups](GRAPHICS-011Q-spatial-debug-adapter-clarifications.md):
+  nonblocking docs-only follow-up for concrete BVH/KD-tree/octree/convex-hull adapter ownership and diagnostics handoff.
+- [GRAPHICS-012 — Picking, selection, and outline](../../active/GRAPHICS-012-picking-selection-outline.md):
   depends on GRAPHICS-002, GRAPHICS-007, GRAPHICS-008, and GRAPHICS-010. Owns
   the logical `PickingPass` stage (split source modules
   `Pass.Selection.EntityId`/`FaceId`/`EdgeId`/`PointId`) and the

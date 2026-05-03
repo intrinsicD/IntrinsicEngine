@@ -1,10 +1,13 @@
 # GRAPHICS-011 — Spatial debug visualizers
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-010` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Completed: 2026-05-03.
+- PR/commit: pending local commit.
+- Completed slice: added `Extrinsic.Graphics.SpatialDebugVisualizers`, deterministic data-only bounds/hierarchy/split-plane/convex-hull/point packet builders, diagnostics/budget limits, docs, and CPU unit tests.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md`.
 
 ## Goal
 - Reimplement BVH, bounding volume, KD-tree, octree, convex-hull, and similar spatial debug visualizers as snapshot-producing helpers for graphics debug primitives.
@@ -32,8 +35,8 @@
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicGraphicsRendererCpuUnitTests -j 4
+ctest --test-dir build/ci --output-on-failure -R 'GraphicsSpatialDebugVisualizers' --timeout 60
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
