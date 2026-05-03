@@ -127,6 +127,70 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::DebugViewRGBA));
 }
 
+TEST(FrameRecipeContract, LightingPathControlsGBufferResourcesAndComposition)
+{
+    FrameRecipeFeatures forwardFeatures{};
+    forwardFeatures.LightingPath = FrameRecipeLightingPath::Forward;
+    const FrameRecipeIntrospection forward = DescribeDefaultFrameRecipe(forwardFeatures);
+    EXPECT_FALSE(HasEnabledResource(forward, FrameRecipeResourceKind::SceneNormal));
+    EXPECT_FALSE(HasEnabledResource(forward, FrameRecipeResourceKind::Albedo));
+    EXPECT_FALSE(HasEnabledResource(forward, FrameRecipeResourceKind::Material0));
+    const auto* forwardComposition = FindPass(forward, FrameRecipePassKind::Composition);
+    ASSERT_NE(forwardComposition, nullptr);
+    EXPECT_FALSE(forwardComposition->Enabled);
+    const auto* forwardSurface = FindPass(forward, FrameRecipePassKind::Surface);
+    ASSERT_NE(forwardSurface, nullptr);
+    EXPECT_TRUE(Contains(forwardSurface->Writes, "SceneColorHDR"));
+    EXPECT_TRUE(Contains(forwardSurface->Writes, "SceneDepth"));
+
+    for (const FrameRecipeLightingPath path : {FrameRecipeLightingPath::Deferred, FrameRecipeLightingPath::Hybrid})
+    {
+        FrameRecipeFeatures features{};
+        features.LightingPath = path;
+        const FrameRecipeIntrospection deferredLike = DescribeDefaultFrameRecipe(features);
+        EXPECT_TRUE(HasEnabledResource(deferredLike, FrameRecipeResourceKind::SceneNormal));
+        EXPECT_TRUE(HasEnabledResource(deferredLike, FrameRecipeResourceKind::Albedo));
+        EXPECT_TRUE(HasEnabledResource(deferredLike, FrameRecipeResourceKind::Material0));
+        const auto* composition = FindPass(deferredLike, FrameRecipePassKind::Composition);
+        ASSERT_NE(composition, nullptr);
+        EXPECT_TRUE(composition->Enabled);
+        const auto* surface = FindPass(deferredLike, FrameRecipePassKind::Surface);
+        ASSERT_NE(surface, nullptr);
+        EXPECT_TRUE(Contains(surface->Writes, "SceneNormal"));
+        EXPECT_TRUE(Contains(surface->Writes, "Albedo"));
+        EXPECT_TRUE(Contains(surface->Writes, "Material0"));
+    }
+}
+
+TEST(FrameRecipeContract, DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership)
+{
+    FrameRecipeFeatures features{};
+    features.EnableDepthPrepass = false;
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features);
+    const auto* depth = FindPass(description, FrameRecipePassKind::DepthPrepass);
+    ASSERT_NE(depth, nullptr);
+    EXPECT_FALSE(depth->Enabled);
+
+    const auto* surface = FindPass(description, FrameRecipePassKind::Surface);
+    ASSERT_NE(surface, nullptr);
+    EXPECT_TRUE(Contains(surface->Writes, "SceneDepth"));
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
+    EXPECT_EQ(std::ranges::find(passNames, "DepthPrepass"), passNames.end());
+    EXPECT_NE(std::ranges::find(passNames, "SurfacePass"), passNames.end());
+}
+
 TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)
 {
     const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});

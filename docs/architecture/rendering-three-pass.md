@@ -143,6 +143,12 @@ The current `GpuCullBucketTable` contains eight bucket outputs:
 
 Selection participation is explicit via `GpuRender_Selectable`; the culling shader mirrors otherwise visible surface/line/point renderables into the matching selection bucket. Invalid geometry slots, out-of-range geometry slots, zero-sized geometry ranges, non-positive world-sphere radii, invisible instances, and frustum-culled instances produce no bucket writes. CPU-side generation checks in `GpuWorld` keep stale freed geometry from remaining in instance records before this shader path runs.
 
+### Depth, surface, and G-buffer command contract
+
+`DepthPrepass`, forward `SurfacePass`, and deferred `GBufferPass` consume the `SurfaceOpaque` bucket produced by `CullingPass`. Each pass binds its configured graphics pipeline, binds the managed index buffer from `GpuWorld`, pushes `GpuScenePushConstants`, and records `DrawIndexedIndirectCount` with the bucket's indexed-args buffer, count buffer, and capacity. `GpuScenePushConstants::SceneTableBDA` is the canonical binding seam for the scene table and the SSBOs reachable through it; these passes must not grow pass-specific push constants to carry renderable-instance, transform, material, geometry, or bounds/culling data.
+
+Forward lighting writes `SceneColorHDR` and owns `SceneDepth` when the depth prepass is disabled. Deferred and hybrid lighting paths write `SceneNormal`, `Albedo`, and `Material0` from `SurfacePass`, then resolve through `CompositionPass`; hybrid remains deferred-backed until `GRAPHICS-025` adds its transparent/special-material forward overlay. The CPU/null contract requires these command sequences to be testable without Vulkan and to skip recording when the owning system, pipeline, or surface bucket handles are not valid.
+
 ### Legacy feature coverage classification
 
 The canonical GPU scene covers renderable identity and per-instance state. Legacy-inspired features that need different ownership attach through declared auxiliary resources or remain outside graphics ownership.
@@ -241,7 +247,7 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 - Skip degenerate triangles.
 - Clamp line widths and point radii to safe ranges.
 - Condition EWA covariance (when active) and fall back safely if ill-conditioned.
-- Keep push constants within device limits (compile/runtime checks). `RHI::MeshPushConstants` is currently 120 bytes, leaving only 8 bytes before Vulkan's 128-byte guaranteed minimum. Treat mesh push constants as budget-constrained: additional mesh-draw data should move to a UBO/SSBO or other descriptor-backed payload rather than growing the push-constant block further.
+- Keep push constants within device limits (compile/runtime checks). `RHI::GpuScenePushConstants` carries the scene-table BDA, frame index, and draw-bucket selector for GPU-driven depth/surface/G-buffer draws and must remain within Vulkan's 128-byte guaranteed minimum. Legacy `RHI::MeshPushConstants` is currently 120 bytes, leaving only 8 bytes before that limit; treat mesh push constants as budget-constrained and move additional mesh-draw data to a UBO/SSBO or other descriptor-backed payload rather than growing push constants further.
 - Keep backbuffer ownership explicit: only `FrameSetup` imports it, only `Present` finalizes it when `SceneColorLDR` exists.
 
 ## Performance Intent

@@ -244,10 +244,20 @@ namespace Extrinsic::Graphics
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"SceneDepth"});
         AddPass(out, FrameRecipePassKind::Shadow, "ShadowPass", features.EnableShadows, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"ShadowAtlas"});
-        AddPass(out, FrameRecipePassKind::Surface, "SurfacePass", true, false,
-                {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth", "ShadowAtlas"},
-                usesDeferred ? std::initializer_list<std::string_view>{"SceneNormal", "Albedo", "Material0"}
-                             : std::initializer_list<std::string_view>{"SceneColorHDR", "SceneDepth"});
+        if (usesDeferred)
+        {
+            AddPass(out, FrameRecipePassKind::Surface, "SurfacePass", true, false,
+                    {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth", "ShadowAtlas"},
+                    features.EnableDepthPrepass
+                        ? std::initializer_list<std::string_view>{"SceneNormal", "Albedo", "Material0"}
+                        : std::initializer_list<std::string_view>{"SceneNormal", "Albedo", "Material0", "SceneDepth"});
+        }
+        else
+        {
+            AddPass(out, FrameRecipePassKind::Surface, "SurfacePass", true, false,
+                    {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth", "ShadowAtlas"},
+                    {"SceneColorHDR", "SceneDepth"});
+        }
         AddPass(out, FrameRecipePassKind::Composition, "CompositionPass", usesDeferred, false,
                 {"SceneNormal", "Albedo", "Material0", "SceneDepth", "GpuWorld.Lights", "ShadowAtlas"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Line, "LinePass", true, false, {"SceneDepth"}, {"SceneColorHDR"});
