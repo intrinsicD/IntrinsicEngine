@@ -125,6 +125,12 @@ and renderer/render-graph orchestration.
   line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
   `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /
   `Cull.Points.Count`.
+- `PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain settings,
+  deterministic stage description, sanitized diagnostics, and push-constant
+  packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. Frame
+  recipe resources `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
+  `PostProcess.AATemp` are transient postprocess-owned intermediates; concrete
+  Vulkan descriptors/shaders remain backend follow-ups.
 - `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and

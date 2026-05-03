@@ -69,6 +69,9 @@ namespace Extrinsic::Graphics
         PointsNonIndexedArgs,
         PointsCount,
         PickingReadback,
+        PostProcessBloomScratch,
+        PostProcessHistogram,
+        PostProcessAATemp,
     };
 
     export struct FrameRecipeFeatures
@@ -273,7 +276,7 @@ namespace Extrinsic::Graphics
         AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false,
                 {"SceneDepth", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::PostProcess, "PostProcessPass", features.EnablePostProcess, false,
-                {"SceneColorHDR"}, {"SceneColorLDR"});
+                {"SceneColorHDR"}, {"PostProcess.BloomScratch", "PostProcess.Histogram", "PostProcess.AATemp", "SceneColorLDR"});
         AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", features.EnableSelectionOutline, false,
                 {"FrameRecipe.PresentSource", "EntityId", "SceneDepth"}, {"SelectionOutline"});
         AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
@@ -291,6 +294,9 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::SceneColorHDR, "SceneColorHDR", true);
         AddResource(out, FrameRecipeResourceKind::ShadowAtlas, "ShadowAtlas", features.EnableShadows, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneColorLDR, "SceneColorLDR", features.EnablePostProcess, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessBloomScratch, "PostProcess.BloomScratch", features.EnablePostProcess, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessHistogram, "PostProcess.Histogram", features.EnablePostProcess, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessAATemp, "PostProcess.AATemp", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SelectionOutline, "SelectionOutline", features.EnableSelectionOutline, false, false, true);
         AddResource(out, FrameRecipeResourceKind::DebugViewRGBA, "DebugViewRGBA", features.EnableDebugView, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
@@ -354,8 +360,11 @@ namespace Extrinsic::Graphics
         TextureRef material0{};
         TextureRef shadowAtlas{};
         TextureRef ldr{};
+        TextureRef postProcessBloomScratch{};
+        TextureRef postProcessAATemp{};
         TextureRef selectionOutline{};
         TextureRef debugView{};
+        BufferRef postProcessHistogram{};
         BufferRef pickingReadback{};
 
         if (features.EnablePicking || features.EnableSelectionOutline)
@@ -384,6 +393,13 @@ namespace Extrinsic::Graphics
         if (features.EnablePostProcess)
         {
             ldr = graph.CreateTexture("SceneColorLDR", ColorTargetDesc(width, height, sizing.BackbufferFormat, "SceneColorLDR"));
+            postProcessBloomScratch = graph.CreateTexture("PostProcess.BloomScratch", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "PostProcess.BloomScratch"));
+            postProcessAATemp = graph.CreateTexture("PostProcess.AATemp", ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp"));
+            postProcessHistogram = graph.CreateBuffer("PostProcess.Histogram", RHI::BufferDesc{
+                .SizeBytes = 256u * sizeof(std::uint32_t),
+                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc,
+                .DebugName = "PostProcess.Histogram",
+            });
         }
         if (features.EnableSelectionOutline)
         {
@@ -526,6 +542,9 @@ namespace Extrinsic::Graphics
         {
             addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(hdr, TextureUsage::ShaderRead);
+                builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
+                builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
+                builder.Write(postProcessAATemp, TextureUsage::ColorAttachmentWrite);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
             });
             presentSource = ldr;

@@ -38,6 +38,9 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `SceneColorHDR` | `R16G16B16A16_SFLOAT` | Frame transient | Geometry/lighting output |
 | `ShadowAtlas` | `D32_SFLOAT` | Frame transient | Cascade shadow depth atlas (horizontal strip, one cascade per column block). Produced by `ShadowPass`, sampled by `SurfacePass` (forward) and `CompositionPass` (deferred) |
 | `SceneColorLDR` | Swapchain format | Frame transient | Post-process + overlay composition target |
+| `PostProcess.BloomScratch` | `R16G16B16A16_SFLOAT` | Frame transient | Optional bloom intermediate owned by `PostProcessPass` |
+| `PostProcess.Histogram` | storage buffer | Frame transient | Optional luminance histogram diagnostics owned by `PostProcessPass` |
+| `PostProcess.AATemp` | Swapchain format | Frame transient | Optional anti-aliasing intermediate owned by `PostProcessPass` |
 | `SelectionMask` | `R8_UNORM` | Frame transient | Reserved for future outline mask split |
 | `SelectionOutline` | Swapchain format | Frame transient | Reserved for future standalone outline target |
 | `Backbuffer` | Swapchain format | Imported | Final presentation destination only |
@@ -74,7 +77,7 @@ The imported `Backbuffer` is declared once and finalized only by the `Present` d
 | `CompositionPass` | deferred: `SceneNormal`, `Albedo`, `Material0`, `SceneDepth`, `ShadowAtlas` (sampled via global set 1) | deferred: `SceneColorHDR` | Fullscreen deferred lighting with PCF shadow sampling from cascade atlas. No-op in forward mode |
 | `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for wireframe/graph/debug lines; accumulates via `LOAD` |
 | `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for point clouds/debug points; accumulates via `LOAD` |
-| `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR` | Initializes LDR target; internal temp when FXAA enabled |
+| `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp` | Backend-agnostic HDR-to-LDR chain. `PostProcessSystem` describes deterministic stages in order: optional `Histogram`, optional `Bloom`, required enabled-chain `ToneMap`, then optional `FXAA` or `SMAA`. Invalid numeric settings are sanitized and unsupported AA enum values are diagnosed without Vulkan |
 | `SelectionOutlinePass` | `EntityId`, presentation target | presentation target | Alpha-blends via `LOAD`; outlines the **union stencil** of selected/hovered renderable PickIDs across surface, line, and point lanes (including mesh/graph/cloud point modes such as sphere impostors). Source module: `Pass.Selection.Outline` (`SelectionOutlinePass`). Conceptually paired with `PickingPass` but scheduled later in the pipeline so it can read overlay results |
 | `DebugViewPass` | selected sampled resource | `DebugViewRGBA`, optional presentation target | Writes preview image, optional viewport composite |
 | `ImGuiPass` | presentation target | presentation target | UI overlay via `LOAD` |
@@ -170,6 +173,12 @@ The global camera-light packet now carries shadow cascade matrices, split/count 
 `ForwardLinePass` and `ForwardPointPass` consume draw buckets produced by `CullingPass` and never query live ECS/editor/debug ownership. The frame recipe imports explicit line and point bucket resources: `Cull.Lines.IndexedArgs`, `Cull.Lines.Count`, `Cull.Points.NonIndexedArgs`, and `Cull.Points.Count`. `ForwardLinePass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid indexed `Lines` bucket before it binds the managed index buffer, pushes `GpuScenePushConstants`, and records `DrawIndexedIndirectCount`. `ForwardPointPass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid non-indexed `Points` bucket before it pushes `GpuScenePushConstants` and records `DrawIndirectCount`. Invalid or empty buckets are deterministic no-ops so CPU/null tests can validate the contract without Vulkan.
 
 Transient debug primitive packets are frame-local submissions owned by runtime extraction/debug tooling and copied into `RenderWorld`. They are not persistent editor overlay entities and do not create ECS ownership inside graphics. Concrete GPU expansion of transient packets into line/point/surface draw buckets is a backend/runtime upload concern; the promoted contract guarantees packet shape, sanitization, counts, and line/point overlay resource scheduling.
+
+### Postprocess chain contract
+
+`PostProcessSystem` owns backend-agnostic postprocess settings, deterministic chain description, push-constant data, and diagnostics. The promoted chain is data-only and CPU/null-testable: when enabled it always contains `ToneMap` to transform `SceneColorHDR` into `SceneColorLDR`; `Histogram` and `Bloom` are optional pre-tonemap stages; `FXAA` and `SMAA` are mutually exclusive typed anti-aliasing choices after tonemapping. Disabling the chain produces no stages and no `SceneColorLDR` write in the system description; the frame recipe likewise gates `SceneColorLDR` and postprocess intermediates behind `FrameRecipeFeatures::EnablePostProcess`.
+
+The split source modules (`Pass.PostProcess.Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`) are command-contract shims. Each pass records no commands unless `PostProcessSystem` is initialized, its stage is enabled, and a valid pipeline has been configured. Enabled fullscreen stages bind their pipeline, push `PostProcessPushConstants`, and draw a fullscreen triangle; the histogram diagnostics stage binds its pipeline, pushes the same packet, and dispatches a compute-style diagnostics workload. Concrete descriptor binding, shader kernels, downsample pyramids, exposure adaptation history, and Vulkan-specific layout choices are backend follow-ups, not GRAPHICS-013A ownership.
 
 ### Legacy feature coverage classification
 

@@ -3,6 +3,7 @@ module;
 export module Extrinsic.Graphics.Pass.PostProcess.SMAA;
 
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
 import Extrinsic.Graphics.PostProcessSystem;
 
@@ -16,10 +17,12 @@ namespace Extrinsic::Graphics
 		PostProcessSMAAPass(const PostProcessSMAAPass&)            = delete;
 		PostProcessSMAAPass& operator=(const PostProcessSMAAPass&) = delete;
 
+		void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 
 	private:
 		PostProcessSystem& m_PostProcessSystem;
+		RHI::PipelineHandle m_Pipeline{};
 	};
 }
 
