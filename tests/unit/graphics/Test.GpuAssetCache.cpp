@@ -17,6 +17,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
@@ -82,6 +83,7 @@ namespace
         MockDevice                  Device;
         RHI::BufferManager          BufferMgr;
         RHI::TextureManager         TextureMgr;
+        RHI::SamplerManager         SamplerMgr;
         ControllableTransferQueue   Transfer;
         Graphics::GpuAssetCache     Cache;
 
@@ -89,8 +91,9 @@ namespace
             : Device()
             , BufferMgr(Device)
             , TextureMgr(Device, Device.Bindless)
+            , SamplerMgr(Device)
             , Transfer()
-            , Cache(BufferMgr, TextureMgr, Transfer)
+            , Cache(BufferMgr, TextureMgr, SamplerMgr, Transfer)
         {
         }
     };
@@ -124,6 +127,19 @@ namespace
     }
 
     RHI::SamplerHandle AnySampler() { return RHI::SamplerHandle{42u, 1u}; }
+
+    RHI::SamplerDesc AnySamplerDesc()
+    {
+        return RHI::SamplerDesc{
+            .MagFilter = RHI::FilterMode::Linear,
+            .MinFilter = RHI::FilterMode::Linear,
+            .MipFilter = RHI::MipmapMode::Nearest,
+            .AddressU = RHI::AddressMode::ClampToEdge,
+            .AddressV = RHI::AddressMode::ClampToEdge,
+            .AddressW = RHI::AddressMode::ClampToEdge,
+            .DebugName = "test-sampler",
+        };
+    }
 
     std::array<std::byte, 64> ZeroBytes64{};
 }
@@ -178,6 +194,7 @@ TEST(GpuAssetCache, TextureRequestPopulatesBindlessIndex)
     EXPECT_TRUE(view->Texture.IsValid());
     EXPECT_NE(view->BindlessIdx, RHI::kInvalidBindlessIndex)
         << "TextureManager allocates a bindless slot when a sampler is given.";
+    EXPECT_EQ(view->Sampler, AnySampler());
 }
 
 // -----------------------------------------------------------------------------
@@ -378,3 +395,159 @@ TEST(GpuAssetCache, RequestUploadWhileGpuUploadingReturnsConflict)
     EXPECT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), Core::ErrorCode::ResourceBusy);
 }
+
+TEST(GpuAssetCache, TextureRequestCanOwnSamplerFromDescriptor)
+{
+    CacheFixture fx;
+    const auto id = MakeAssetId(10);
+
+    auto r = fx.Cache.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = id,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    });
+    ASSERT_TRUE(r.has_value()) << static_cast<int>(r.error());
+    EXPECT_EQ(fx.Device.CreateSamplerCount, 1);
+
+    fx.Cache.Tick(0, 2);
+
+    auto view = fx.Cache.GetView(id);
+    ASSERT_TRUE(view.has_value());
+    EXPECT_EQ(view->Kind, Graphics::GpuAssetKind::Texture);
+    EXPECT_TRUE(view->Sampler.IsValid());
+    EXPECT_NE(view->BindlessIdx, RHI::kInvalidBindlessIndex);
+}
+
+TEST(GpuAssetCache, FallbackTextureResolvesMissingPendingAndFailedAssets)
+{
+    CacheFixture fx;
+    const auto missingId = MakeAssetId(11);
+    const auto pendingId = MakeAssetId(12);
+    const auto failedId = MakeAssetId(13);
+
+    ASSERT_TRUE(fx.Cache.InitializeFallbackTexture(Graphics::GpuTextureFallbackDesc{
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+
+    auto missing = fx.Cache.GetViewOrFallback(missingId);
+    ASSERT_TRUE(missing.has_value());
+    EXPECT_TRUE(missing->UsedFallback);
+    EXPECT_EQ(missing->FallbackReason, Graphics::GpuAssetFallbackReason::Missing);
+    EXPECT_EQ(missing->RequestedState, Graphics::GpuAssetState::NotRequested);
+    EXPECT_TRUE(missing->View.Texture.IsValid());
+    EXPECT_NE(missing->View.BindlessIdx, RHI::kInvalidBindlessIndex);
+
+    fx.Transfer.AlwaysComplete = false;
+    ASSERT_TRUE(fx.Cache.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = pendingId,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    auto pending = fx.Cache.GetViewOrFallback(pendingId);
+    ASSERT_TRUE(pending.has_value());
+    EXPECT_TRUE(pending->UsedFallback);
+    EXPECT_EQ(pending->FallbackReason, Graphics::GpuAssetFallbackReason::Pending);
+    EXPECT_EQ(pending->RequestedState, Graphics::GpuAssetState::GpuUploading);
+
+    fx.Cache.NotifyFailed(failedId);
+    auto failed = fx.Cache.GetViewOrFallback(failedId);
+    ASSERT_TRUE(failed.has_value());
+    EXPECT_TRUE(failed->UsedFallback);
+    EXPECT_EQ(failed->FallbackReason, Graphics::GpuAssetFallbackReason::Failed);
+    EXPECT_EQ(failed->RequestedState, Graphics::GpuAssetState::Failed);
+
+    const auto diagnostics = fx.Cache.GetDiagnostics();
+    EXPECT_TRUE(diagnostics.FallbackTextureReady);
+    EXPECT_EQ(diagnostics.FallbackHits, 3u);
+    EXPECT_TRUE(diagnostics.NonEvictingCache);
+}
+
+TEST(GpuAssetCache, ReadyTextureBypassesFallback)
+{
+    CacheFixture fx;
+    const auto id = MakeAssetId(14);
+
+    ASSERT_TRUE(fx.Cache.InitializeFallbackTexture(Graphics::GpuTextureFallbackDesc{
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    ASSERT_TRUE(fx.Cache.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = id,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    fx.Cache.Tick(0, 2);
+
+    auto resolved = fx.Cache.GetViewOrFallback(id);
+    ASSERT_TRUE(resolved.has_value());
+    EXPECT_FALSE(resolved->UsedFallback);
+    EXPECT_EQ(resolved->FallbackReason, Graphics::GpuAssetFallbackReason::None);
+    EXPECT_EQ(resolved->RequestedState, Graphics::GpuAssetState::Ready);
+    EXPECT_EQ(resolved->View.Kind, Graphics::GpuAssetKind::Texture);
+}
+
+TEST(GpuAssetCache, TextureCreateAndSamplerCreateFailuresAreDiagnosed)
+{
+    CacheFixture fx;
+    const auto textureFailId = MakeAssetId(15);
+    const auto samplerFailId = MakeAssetId(16);
+
+    fx.Device.FailNextTextureCreate = true;
+    auto textureFail = fx.Cache.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = textureFailId,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .Sampler = AnySampler(),
+    });
+    EXPECT_FALSE(textureFail.has_value());
+    EXPECT_EQ(textureFail.error(), Core::ErrorCode::OutOfDeviceMemory);
+    EXPECT_EQ(fx.Cache.GetState(textureFailId), Graphics::GpuAssetState::Failed);
+
+    fx.Device.FailNextSamplerCreate = true;
+    auto samplerFail = fx.Cache.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = samplerFailId,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    });
+    EXPECT_FALSE(samplerFail.has_value());
+    EXPECT_EQ(samplerFail.error(), Core::ErrorCode::OutOfDeviceMemory);
+    EXPECT_EQ(fx.Cache.GetState(samplerFailId), Graphics::GpuAssetState::Failed);
+
+    const auto diagnostics = fx.Cache.GetDiagnostics();
+    EXPECT_EQ(diagnostics.UploadFailures, 2u);
+    EXPECT_EQ(diagnostics.TextureCreateFailures, 1u);
+    EXPECT_EQ(diagnostics.SamplerCreateFailures, 1u);
+    EXPECT_EQ(diagnostics.TextureUploadRequests, 2u);
+}
+
+TEST(GpuAssetCache, NonOperationalBackendReportsDeterministicFallbackMiss)
+{
+    MockDevice device;
+    device.Operational = false;
+    RHI::BufferManager buffers(device);
+    RHI::TextureManager textures(device, device.Bindless);
+    RHI::SamplerManager samplers(device);
+    ControllableTransferQueue transfer;
+    Graphics::GpuAssetCache cache(buffers, textures, samplers, transfer);
+
+    auto fallback = cache.InitializeFallbackTexture(Graphics::GpuTextureFallbackDesc{
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    });
+    EXPECT_FALSE(fallback.has_value());
+    EXPECT_EQ(fallback.error(), Core::ErrorCode::DeviceNotOperational);
+
+    auto resolved = cache.GetViewOrFallback(MakeAssetId(17));
+    EXPECT_FALSE(resolved.has_value());
+    EXPECT_EQ(resolved.error(), Core::ErrorCode::ResourceNotFound);
+    EXPECT_EQ(cache.GetDiagnostics().FallbackMisses, 1u);
+}
+

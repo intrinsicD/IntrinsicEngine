@@ -13,6 +13,7 @@ import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.TransferQueue;
 
@@ -50,6 +51,16 @@ import Extrinsic.RHI.TransferQueue;
 //   must run on the render thread because Lease destruction calls
 //   the manager's Release() path, which may reach into IDevice.
 //   GetState / GetView are lock-protected reads.
+//
+// Texture residency slice:
+//   Texture uploads may carry an externally owned sampler handle or a
+//   sampler descriptor.  When a SamplerManager is provided to the cache,
+//   descriptor-backed requests retain a deduplicated sampler lease alongside
+//   the texture lease.  A single deterministic fallback texture can be
+//   initialized and queried through GetViewOrFallback() for missing, pending,
+//   or failed texture assets.  The current cache is explicitly non-evicting;
+//   diagnostics expose this policy until a later capacity task introduces
+//   bounded eviction semantics.
 // ============================================================
 
 export namespace Extrinsic::Graphics
@@ -75,7 +86,41 @@ export namespace Extrinsic::Graphics
         RHI::BufferHandle  Buffer{};
         RHI::TextureHandle Texture{};
         RHI::BindlessIndex BindlessIdx = RHI::kInvalidBindlessIndex;
+        RHI::SamplerHandle Sampler{};
         std::uint64_t      Generation  = 0;
+    };
+
+    enum class GpuAssetFallbackReason : std::uint8_t
+    {
+        None,
+        InvalidId,
+        Missing,
+        Pending,
+        Failed,
+        Unavailable,
+    };
+
+    struct GpuAssetResolvedView
+    {
+        GpuAssetView View{};
+        GpuAssetState RequestedState = GpuAssetState::NotRequested;
+        GpuAssetFallbackReason FallbackReason = GpuAssetFallbackReason::None;
+        bool UsedFallback = false;
+    };
+
+    struct GpuAssetCacheDiagnostics
+    {
+        std::size_t TrackedAssets = 0;
+        std::size_t PendingRetireRecords = 0;
+        std::uint64_t UploadRequests = 0;
+        std::uint64_t TextureUploadRequests = 0;
+        std::uint64_t UploadFailures = 0;
+        std::uint64_t TextureCreateFailures = 0;
+        std::uint64_t SamplerCreateFailures = 0;
+        std::uint64_t FallbackHits = 0;
+        std::uint64_t FallbackMisses = 0;
+        bool FallbackTextureReady = false;
+        bool NonEvictingCache = true;
     };
 
     struct GpuBufferRequest
@@ -90,6 +135,30 @@ export namespace Extrinsic::Graphics
         Assets::AssetId Id{};
         std::span<const std::byte> Bytes{};
         RHI::TextureDesc Desc{};
+        RHI::SamplerDesc SamplerDesc{};
+        RHI::SamplerHandle Sampler{};
+    };
+
+    struct GpuTextureFallbackDesc
+    {
+        std::span<const std::byte> Bytes{};
+        RHI::TextureDesc Desc{
+            .Width = 1,
+            .Height = 1,
+            .MipLevels = 1,
+            .Fmt = RHI::Format::RGBA8_UNORM,
+            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
+            .DebugName = "gpu-asset-fallback-texture",
+        };
+        RHI::SamplerDesc SamplerDesc{
+            .MagFilter = RHI::FilterMode::Nearest,
+            .MinFilter = RHI::FilterMode::Nearest,
+            .MipFilter = RHI::MipmapMode::Nearest,
+            .AddressU = RHI::AddressMode::ClampToEdge,
+            .AddressV = RHI::AddressMode::ClampToEdge,
+            .AddressW = RHI::AddressMode::ClampToEdge,
+            .DebugName = "gpu-asset-fallback-sampler",
+        };
         RHI::SamplerHandle Sampler{};
     };
 
@@ -98,6 +167,10 @@ export namespace Extrinsic::Graphics
     public:
         GpuAssetCache(RHI::BufferManager&  buffers,
                       RHI::TextureManager& textures,
+                      RHI::ITransferQueue& transfer);
+        GpuAssetCache(RHI::BufferManager&  buffers,
+                      RHI::TextureManager& textures,
+                      RHI::SamplerManager& samplers,
                       RHI::ITransferQueue& transfer);
         ~GpuAssetCache();
 
@@ -112,6 +185,7 @@ export namespace Extrinsic::Graphics
         //   InvalidArgument   — Id is not valid.
         Core::Result RequestUpload(const GpuBufferRequest&  req);
         Core::Result RequestUpload(const GpuTextureRequest& req);
+        Core::Result InitializeFallbackTexture(const GpuTextureFallbackDesc& desc = {});
 
         // Force CpuPending (no GPU work yet).  Idempotent for an entry that
         // is already in a non-Ready state; on a Ready entry it is a no-op
@@ -138,9 +212,11 @@ export namespace Extrinsic::Graphics
 
         [[nodiscard]] GpuAssetState                GetState(Assets::AssetId id) const;
         [[nodiscard]] Core::Expected<GpuAssetView> GetView (Assets::AssetId id) const;
+        [[nodiscard]] Core::Expected<GpuAssetResolvedView> GetViewOrFallback(Assets::AssetId id);
 
         [[nodiscard]] std::size_t TrackedCount()       const;
         [[nodiscard]] std::size_t PendingRetireCount() const;
+        [[nodiscard]] GpuAssetCacheDiagnostics GetDiagnostics() const;
 
     private:
         struct Impl;

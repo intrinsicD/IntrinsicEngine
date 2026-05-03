@@ -55,6 +55,29 @@ Graphics is organized into explicit sublayers:
   flight.
 - Heavy CPU scene data lives in the owning subsystem or runtime extraction pools; canonical ECS components keep source data/IDs, not graphics backend resources.
 
+## Graphics asset residency
+
+- `src/graphics/assets/Graphics.GpuAssetCache.cppm` maps promoted
+  `Assets::AssetId` values to graphics-owned GPU buffer/texture leases. It uses
+  only Asset Registry identity types plus RHI managers; runtime remains
+  responsible for translating asset events into `Reserve`, `RequestUpload`,
+  `NotifyFailed`, `NotifyReloaded`, and `NotifyDestroyed` calls.
+- Texture uploads use `GpuTextureRequest` (`AssetId`, CPU bytes, `TextureDesc`,
+  and either an externally owned sampler handle or a sampler descriptor owned
+  through `RHI::SamplerManager`). Ready texture views expose texture handle,
+  bindless index, sampler handle, generation, and kind.
+- Missing, pending, or failed texture assets resolve deterministically through
+  `InitializeFallbackTexture()` plus `GetViewOrFallback()`. The resolved view
+  records whether fallback was used and why (`Missing`, `Pending`, or `Failed`),
+  keeping material/pass code CPU-testable without Vulkan.
+- The current cache is explicitly non-evicting. Hot reloads keep old leases alive
+  through a frame-anchored retire queue so immutable renderer snapshots can keep
+  using old views for at least `framesInFlight` frames. Future capacity/eviction
+  policy must be a separate semantic task.
+- `GpuAssetCacheDiagnostics` reports upload requests, texture upload requests,
+  texture/sampler allocation failures, fallback hits/misses, tracked assets,
+  pending retire records, fallback readiness, and the non-eviction policy.
+
 ## Pipeline and shader registry contract
 
 - `Extrinsic.RHI.PipelineRegistry` is the promoted CPU-testable cache layer for

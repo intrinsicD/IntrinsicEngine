@@ -18,6 +18,7 @@ import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
@@ -33,6 +34,8 @@ namespace Extrinsic::Graphics
             // duration of an in-flight reload.
             RHI::BufferManager::BufferLease   CurrentBuffer{};
             RHI::TextureManager::TextureLease CurrentTexture{};
+            RHI::SamplerManager::SamplerLease CurrentSampler{};
+            RHI::SamplerHandle                CurrentSamplerHandle{};
             RHI::BindlessIndex                CurrentBindless = RHI::kInvalidBindlessIndex;
             std::uint64_t                     CurrentGeneration = 0;
 
@@ -40,6 +43,8 @@ namespace Extrinsic::Graphics
             // the transfer token completes during Tick().
             RHI::BufferManager::BufferLease   PendingBuffer{};
             RHI::TextureManager::TextureLease PendingTexture{};
+            RHI::SamplerManager::SamplerLease PendingSampler{};
+            RHI::SamplerHandle                PendingSamplerHandle{};
             RHI::BindlessIndex                PendingBindless = RHI::kInvalidBindlessIndex;
             std::uint64_t                     PendingGeneration = 0;
             RHI::TransferToken                InFlight{};
@@ -55,6 +60,7 @@ namespace Extrinsic::Graphics
         {
             RHI::BufferManager::BufferLease   Buffer{};
             RHI::TextureManager::TextureLease Texture{};
+            RHI::SamplerManager::SamplerLease Sampler{};
             std::uint64_t Deadline    = 0;
             bool          DeadlineSet = false;
         };
@@ -64,15 +70,22 @@ namespace Extrinsic::Graphics
     {
         RHI::BufferManager&  Buffers;
         RHI::TextureManager& Textures;
+        RHI::SamplerManager* Samplers = nullptr;
         RHI::ITransferQueue& Transfer;
 
         mutable std::mutex Mutex{};
         std::unordered_map<Assets::AssetId, Slot, Assets::AssetIdHash> Slots{};
         std::vector<RetireRecord> Retire{};
         std::uint64_t NextGeneration = 1;
+        RHI::TextureManager::TextureLease FallbackTexture{};
+        RHI::SamplerManager::SamplerLease FallbackSampler{};
+        RHI::SamplerHandle FallbackSamplerHandle{};
+        RHI::BindlessIndex FallbackBindless = RHI::kInvalidBindlessIndex;
+        std::uint64_t FallbackGeneration = 0;
+        GpuAssetCacheDiagnostics Diagnostics{};
 
-        Impl(RHI::BufferManager& b, RHI::TextureManager& t, RHI::ITransferQueue& q)
-            : Buffers(b), Textures(t), Transfer(q)
+        Impl(RHI::BufferManager& b, RHI::TextureManager& t, RHI::SamplerManager* s, RHI::ITransferQueue& q)
+            : Buffers(b), Textures(t), Samplers(s), Transfer(q)
         {
         }
 
@@ -86,9 +99,11 @@ namespace Extrinsic::Graphics
             RetireRecord rec{};
             rec.Buffer  = std::move(slot.CurrentBuffer);
             rec.Texture = std::move(slot.CurrentTexture);
+            rec.Sampler = std::move(slot.CurrentSampler);
             Retire.push_back(std::move(rec));
 
             slot.CurrentBindless   = RHI::kInvalidBindlessIndex;
+            slot.CurrentSamplerHandle = {};
             slot.CurrentGeneration = 0;
         }
 
@@ -100,18 +115,61 @@ namespace Extrinsic::Graphics
             RetireRecord rec{};
             rec.Buffer  = std::move(slot.PendingBuffer);
             rec.Texture = std::move(slot.PendingTexture);
+            rec.Sampler = std::move(slot.PendingSampler);
             Retire.push_back(std::move(rec));
 
             slot.PendingBindless   = RHI::kInvalidBindlessIndex;
+            slot.PendingSamplerHandle = {};
             slot.PendingGeneration = 0;
             slot.InFlight          = {};
+        }
+
+        [[nodiscard]] Core::Expected<RHI::SamplerManager::SamplerLease> CreateSamplerLease(
+            const RHI::SamplerDesc& desc)
+        {
+            if (Samplers == nullptr)
+                return Core::Err<RHI::SamplerManager::SamplerLease>(Core::ErrorCode::InvalidState);
+
+            auto samplerOr = Samplers->GetOrCreate(desc);
+            if (!samplerOr.has_value())
+            {
+                ++Diagnostics.SamplerCreateFailures;
+                return Core::Err<RHI::SamplerManager::SamplerLease>(samplerOr.error());
+            }
+            return samplerOr;
+        }
+
+        [[nodiscard]] bool HasFallback() const noexcept
+        {
+            return FallbackTexture.IsValid();
+        }
+
+        [[nodiscard]] GpuAssetView FallbackView() const noexcept
+        {
+            return GpuAssetView{
+                .Kind = GpuAssetKind::Texture,
+                .Texture = FallbackTexture.GetHandle(),
+                .BindlessIdx = FallbackBindless,
+                .Sampler = FallbackSampler.IsValid()
+                    ? FallbackSampler.GetHandle()
+                    : FallbackSamplerHandle,
+                .Generation = FallbackGeneration,
+            };
         }
     };
 
     GpuAssetCache::GpuAssetCache(RHI::BufferManager&  buffers,
                                  RHI::TextureManager& textures,
                                  RHI::ITransferQueue& transfer)
-        : m_Impl(std::make_unique<Impl>(buffers, textures, transfer))
+        : m_Impl(std::make_unique<Impl>(buffers, textures, nullptr, transfer))
+    {
+    }
+
+    GpuAssetCache::GpuAssetCache(RHI::BufferManager&  buffers,
+                                 RHI::TextureManager& textures,
+                                 RHI::SamplerManager& samplers,
+                                 RHI::ITransferQueue& transfer)
+        : m_Impl(std::make_unique<Impl>(buffers, textures, &samplers, transfer))
     {
     }
 
@@ -123,6 +181,7 @@ namespace Extrinsic::Graphics
             return Core::Err(Core::ErrorCode::InvalidArgument);
 
         std::lock_guard guard(m_Impl->Mutex);
+        ++m_Impl->Diagnostics.UploadRequests;
 
         Slot& slot = m_Impl->Slots[req.Id];
 
@@ -138,6 +197,7 @@ namespace Extrinsic::Graphics
             // tear down any old pending so we don't leak an in-flight token.
             m_Impl->RetirePending(slot);
             slot.State = GpuAssetState::Failed;
+            ++m_Impl->Diagnostics.UploadFailures;
             return Core::Err(leaseOr.error());
         }
 
@@ -164,6 +224,8 @@ namespace Extrinsic::Graphics
             return Core::Err(Core::ErrorCode::InvalidArgument);
 
         std::lock_guard guard(m_Impl->Mutex);
+        ++m_Impl->Diagnostics.UploadRequests;
+        ++m_Impl->Diagnostics.TextureUploadRequests;
 
         Slot& slot = m_Impl->Slots[req.Id];
 
@@ -172,11 +234,29 @@ namespace Extrinsic::Graphics
 
         slot.Kind = GpuAssetKind::Texture;
 
-        auto leaseOr = m_Impl->Textures.Create(req.Desc, req.Sampler);
+        RHI::SamplerManager::SamplerLease samplerLease{};
+        RHI::SamplerHandle sampler = req.Sampler;
+        if (!sampler.IsValid() && m_Impl->Samplers != nullptr)
+        {
+            auto samplerOr = m_Impl->CreateSamplerLease(req.SamplerDesc);
+            if (!samplerOr.has_value())
+            {
+                m_Impl->RetirePending(slot);
+                slot.State = GpuAssetState::Failed;
+                ++m_Impl->Diagnostics.UploadFailures;
+                return Core::Err(samplerOr.error());
+            }
+            samplerLease = std::move(*samplerOr);
+            sampler = samplerLease.GetHandle();
+        }
+
+        auto leaseOr = m_Impl->Textures.Create(req.Desc, sampler);
         if (!leaseOr.has_value())
         {
             m_Impl->RetirePending(slot);
             slot.State = GpuAssetState::Failed;
+            ++m_Impl->Diagnostics.UploadFailures;
+            ++m_Impl->Diagnostics.TextureCreateFailures;
             return Core::Err(leaseOr.error());
         }
 
@@ -189,12 +269,55 @@ namespace Extrinsic::Graphics
 
         m_Impl->RetirePending(slot);
 
-        slot.PendingTexture    = std::move(*leaseOr);
-        slot.PendingBuffer     = {};
-        slot.PendingBindless   = bindless;
-        slot.PendingGeneration = m_Impl->NextGeneration++;
-        slot.InFlight          = token;
-        slot.State             = GpuAssetState::GpuUploading;
+        slot.PendingTexture       = std::move(*leaseOr);
+        slot.PendingSampler       = std::move(samplerLease);
+        slot.PendingSamplerHandle = sampler;
+        slot.PendingBuffer        = {};
+        slot.PendingBindless      = bindless;
+        slot.PendingGeneration    = m_Impl->NextGeneration++;
+        slot.InFlight             = token;
+        slot.State                = GpuAssetState::GpuUploading;
+        return Core::Ok();
+    }
+
+    Core::Result GpuAssetCache::InitializeFallbackTexture(const GpuTextureFallbackDesc& desc)
+    {
+        std::lock_guard guard(m_Impl->Mutex);
+
+        RHI::SamplerManager::SamplerLease samplerLease{};
+        RHI::SamplerHandle sampler = desc.Sampler;
+        if (!sampler.IsValid())
+        {
+            auto samplerOr = m_Impl->CreateSamplerLease(desc.SamplerDesc);
+            if (!samplerOr.has_value())
+                return Core::Err(samplerOr.error());
+            samplerLease = std::move(*samplerOr);
+            sampler = samplerLease.GetHandle();
+        }
+
+        auto textureOr = m_Impl->Textures.Create(desc.Desc, sampler);
+        if (!textureOr.has_value())
+        {
+            ++m_Impl->Diagnostics.TextureCreateFailures;
+            return Core::Err(textureOr.error());
+        }
+
+        const RHI::TextureHandle handle = textureOr->GetHandle();
+        if (!desc.Bytes.empty())
+        {
+            (void)m_Impl->Transfer.UploadTexture(
+                handle,
+                desc.Bytes.data(),
+                static_cast<std::uint64_t>(desc.Bytes.size()),
+                /*mipLevel=*/0,
+                /*arrayLayer=*/0);
+        }
+
+        m_Impl->FallbackTexture = std::move(*textureOr);
+        m_Impl->FallbackSampler = std::move(samplerLease);
+        m_Impl->FallbackSamplerHandle = sampler;
+        m_Impl->FallbackBindless = m_Impl->Textures.GetBindlessIndex(handle);
+        m_Impl->FallbackGeneration = m_Impl->NextGeneration++;
         return Core::Ok();
     }
 
@@ -249,8 +372,9 @@ namespace Extrinsic::Graphics
         std::lock_guard guard(m_Impl->Mutex);
 
         // 1. Promote completed pending uploads to current.
-        for (auto& [id, slot] : m_Impl->Slots)
+        for (auto& entry : m_Impl->Slots)
         {
+            Slot& slot = entry.second;
             if (slot.State != GpuAssetState::GpuUploading)
                 continue;
             if (!m_Impl->Transfer.IsComplete(slot.InFlight))
@@ -259,14 +383,17 @@ namespace Extrinsic::Graphics
             // Move old current (if any) to retire queue first.
             m_Impl->RetireCurrent(slot);
 
-            slot.CurrentBuffer     = std::move(slot.PendingBuffer);
-            slot.CurrentTexture    = std::move(slot.PendingTexture);
-            slot.CurrentBindless   = slot.PendingBindless;
-            slot.CurrentGeneration = slot.PendingGeneration;
-            slot.PendingBindless   = RHI::kInvalidBindlessIndex;
-            slot.PendingGeneration = 0;
-            slot.InFlight          = {};
-            slot.State             = GpuAssetState::Ready;
+            slot.CurrentBuffer        = std::move(slot.PendingBuffer);
+            slot.CurrentTexture       = std::move(slot.PendingTexture);
+            slot.CurrentSampler       = std::move(slot.PendingSampler);
+            slot.CurrentSamplerHandle = slot.PendingSamplerHandle;
+            slot.CurrentBindless      = slot.PendingBindless;
+            slot.CurrentGeneration    = slot.PendingGeneration;
+            slot.PendingBindless      = RHI::kInvalidBindlessIndex;
+            slot.PendingSamplerHandle = {};
+            slot.PendingGeneration    = 0;
+            slot.InFlight             = {};
+            slot.State                = GpuAssetState::Ready;
         }
 
         // 2. Anchor deadlines for any newly-retired records.
@@ -318,8 +445,61 @@ namespace Extrinsic::Graphics
         view.Buffer      = slot.CurrentBuffer.GetHandle();
         view.Texture     = slot.CurrentTexture.GetHandle();
         view.BindlessIdx = slot.CurrentBindless;
+        view.Sampler     = slot.CurrentSampler.IsValid()
+            ? slot.CurrentSampler.GetHandle()
+            : slot.CurrentSamplerHandle;
         view.Generation  = slot.CurrentGeneration;
         return view;
+    }
+
+    Core::Expected<GpuAssetResolvedView> GpuAssetCache::GetViewOrFallback(Assets::AssetId id)
+    {
+        if (!id.IsValid())
+            return Core::Err<GpuAssetResolvedView>(Core::ErrorCode::InvalidArgument);
+
+        std::lock_guard guard(m_Impl->Mutex);
+
+        GpuAssetResolvedView resolved{};
+        auto it = m_Impl->Slots.find(id);
+        if (it == m_Impl->Slots.end())
+        {
+            resolved.RequestedState = GpuAssetState::NotRequested;
+            resolved.FallbackReason = GpuAssetFallbackReason::Missing;
+        }
+        else
+        {
+            const Slot& slot = it->second;
+            resolved.RequestedState = slot.State;
+            const bool hasCurrent = slot.CurrentBuffer.IsValid() || slot.CurrentTexture.IsValid();
+            if (hasCurrent && slot.State == GpuAssetState::Ready)
+            {
+                resolved.View = GpuAssetView{
+                    .Kind = slot.Kind,
+                    .Buffer = slot.CurrentBuffer.GetHandle(),
+                    .Texture = slot.CurrentTexture.GetHandle(),
+                    .BindlessIdx = slot.CurrentBindless,
+                    .Sampler = slot.CurrentSampler.IsValid()
+                        ? slot.CurrentSampler.GetHandle()
+                        : slot.CurrentSamplerHandle,
+                    .Generation = slot.CurrentGeneration,
+                };
+                return resolved;
+            }
+            resolved.FallbackReason = slot.State == GpuAssetState::Failed
+                ? GpuAssetFallbackReason::Failed
+                : GpuAssetFallbackReason::Pending;
+        }
+
+        if (!m_Impl->HasFallback())
+        {
+            ++m_Impl->Diagnostics.FallbackMisses;
+            return Core::Err<GpuAssetResolvedView>(Core::ErrorCode::ResourceNotFound);
+        }
+
+        ++m_Impl->Diagnostics.FallbackHits;
+        resolved.View = m_Impl->FallbackView();
+        resolved.UsedFallback = true;
+        return resolved;
     }
 
     std::size_t GpuAssetCache::TrackedCount() const
@@ -332,5 +512,16 @@ namespace Extrinsic::Graphics
     {
         std::lock_guard guard(m_Impl->Mutex);
         return m_Impl->Retire.size();
+    }
+
+    GpuAssetCacheDiagnostics GpuAssetCache::GetDiagnostics() const
+    {
+        std::lock_guard guard(m_Impl->Mutex);
+        GpuAssetCacheDiagnostics diagnostics = m_Impl->Diagnostics;
+        diagnostics.TrackedAssets = m_Impl->Slots.size();
+        diagnostics.PendingRetireRecords = m_Impl->Retire.size();
+        diagnostics.FallbackTextureReady = m_Impl->HasFallback();
+        diagnostics.NonEvictingCache = true;
+        return diagnostics;
     }
 }

@@ -8,7 +8,28 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   refcounted `BufferLease` / `TextureLease`, with a small state machine
   (`NotRequested`, `CpuPending`, `GpuUploading`, `Ready`, `Failed`) and a
   frame-anchored retire queue that preserves old GPU views across hot
-  reloads for `framesInFlight` frames.
+  reloads for `framesInFlight` frames. Texture requests may provide either an
+  externally owned `SamplerHandle` or a `SamplerDesc`; when constructed with a
+  `RHI::SamplerManager`, the cache owns the deduplicated sampler lease for the
+  lifetime of the texture lease.
+
+## Texture residency and fallback policy
+
+- `GpuTextureRequest` owns the promoted graphics-side texture upload seam:
+  `AssetId`, CPU bytes, `TextureDesc`, and sampler policy. The cache allocates
+  a `TextureLease`, queues transfer work, publishes a bindless index when a
+  sampler is available, and transitions to `Ready` after `Tick()` observes the
+  transfer token complete.
+- `InitializeFallbackTexture()` installs one deterministic sampled fallback
+  texture. `GetViewOrFallback()` returns the requested ready view when present,
+  or the fallback view for missing, pending, or failed texture assets while
+  reporting the `GpuAssetFallbackReason`.
+- `GpuAssetCacheDiagnostics` records upload counts, texture/sampler allocation
+  failures, fallback hits/misses, retire-queue size, and the explicit
+  non-evicting cache policy used for this first residency slice.
+- The cache does not evict ready assets yet. Capacity/eviction work must be a
+  later semantic task; callers can still observe deterministic diagnostics and
+  retire-queue behavior today.
 
 ## Layering
 
