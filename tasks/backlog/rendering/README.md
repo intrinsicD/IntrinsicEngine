@@ -40,12 +40,12 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-005 — GPU-world compaction](../../done/GRAPHICS-005-gpu-world-compaction.md):
   completed managed-buffer fragmentation, opt-in compaction planning, and
   relocation reporting gate; depends on GRAPHICS-004.
-- [GRAPHICS-006 — Material/shader/pipeline registry](../../active/GRAPHICS-006-material-shader-pipeline-registry.md):
+- [GRAPHICS-006 — Material/shader/pipeline registry](../../done/GRAPHICS-006-material-shader-pipeline-registry.md):
   depends on GRAPHICS-002.
-- [GRAPHICS-006Q — Material registry clarification backlog](GRAPHICS-006Q-material-registry-clarifications.md):
-  clarification-only follow-up for unresolved GRAPHICS-006 material-slot,
+- [GRAPHICS-006Q — Material registry clarification backlog](../../done/GRAPHICS-006Q-material-registry-clarifications.md):
+  completed clarification-only follow-up for GRAPHICS-006 material-slot,
   material-layout, and shader-asset identity decisions.
-- [GRAPHICS-007 — Culling and draw buckets](GRAPHICS-007-culling-and-draw-buckets.md):
+- [GRAPHICS-007 — Culling and draw buckets](../../active/GRAPHICS-007-culling-and-draw-buckets.md):
   depends on GRAPHICS-002 and GRAPHICS-004. Owns `CullingPass`
   (source module `Extrinsic.Graphics.Pass.Culling`) command contracts and the
   GPU draw-bucket contracts consumed by the surface, line, point, shadow, and

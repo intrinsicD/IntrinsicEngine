@@ -1,4 +1,11 @@
 # GRAPHICS-007 — Culling and draw-bucket contracts
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-006` completion.
+- Current slice: next task selected; implementation not started in this handoff.
+
 ## Goal
 - Complete non-legacy culling and draw-bucket contracts for surface, line, point, alpha-mask, shadow, and selection lanes.
 ## Non-goals

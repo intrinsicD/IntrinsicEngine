@@ -1,5 +1,19 @@
 # GRAPHICS-006Q — Material registry clarification backlog
 
+## Status
+- State: done.
+- Owner/agent: local agent workflow.
+- Completed: 2026-05-03.
+- Implementation commit: `a959114` (`GRAPHICS-006 material registry contracts`).
+- Task-state commit: pending local agent workflow handoff.
+- Resolution: folded into `GRAPHICS-006` material registry completion and `docs/architecture/graphics.md`.
+
+## Decisions
+- Promoted material-slot allocation lives in `Extrinsic.Graphics.MaterialSystem` in the renderer layer.
+- Canonical material layout version `1` is a 128-byte `RHI::GpuMaterialSlot` with four custom `vec4` slots and four bindless texture references.
+- Shader identity remains path/generation based for `RHI.PipelineRegistry`; any asset-ID migration is deferred to later assets/hot-reload work.
+- GPU texture residency and asset-ID-to-bindless resolution remain tracked by `GRAPHICS-015` and `GRAPHICS-023` follow-ups.
+
 ## Goal
 Track open clarification questions that should be resolved before completing the remaining `GRAPHICS-006` material-slot and shader-asset ownership slices.
 

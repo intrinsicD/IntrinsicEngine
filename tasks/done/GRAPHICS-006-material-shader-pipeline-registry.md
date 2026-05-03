@@ -1,11 +1,16 @@
 # GRAPHICS-006 — Material, shader, and pipeline registry
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-005` completion.
-- Current slice: CPU-only `Extrinsic.RHI.PipelineRegistry` key/cache/invalidation diagnostics implemented and under verification.
-- Remaining next step: define graphics material-slot/layout contracts and renderer-facing material registry seams without ECS ownership.
+- Completed: 2026-05-03.
+- Follow-up task: `GRAPHICS-007 — Culling and draw-bucket contracts` promoted to `tasks/active/`.
+
+## Completion metadata
+- Implementation commit: `a959114` (`GRAPHICS-006 material registry contracts`).
+- Task-state commit: pending local agent workflow handoff.
+- Verification: focused CPU material tests passed; broader structural/default CPU gates recorded below.
 
 ## Implementation note (2026-05-03)
 - Added `Extrinsic.RHI.PipelineRegistry` as a promoted CPU-testable cache layer over `RHI::PipelineManager`.
@@ -13,10 +18,16 @@
 - Added explicit shader-path invalidation for reload handoff, cache hit/miss diagnostics, missing shader diagnostics, invalid key diagnostics, and pipeline creation failure diagnostics.
 - Added `Test.RHI.PipelineRegistry.cpp` in a CPU-only `unit;graphics` target.
 
+## Implementation note (2026-05-03 material registry completion)
+- Kept promoted material-slot allocation in `Extrinsic.Graphics.MaterialSystem`, not RHI, so renderer-owned GPU material slots remain outside canonical ECS components.
+- Added canonical material layout metadata (`kMaterialLayoutVersion == 1`, default slot `0`, 128-byte `RHI::GpuMaterialSlot`, four custom `vec4` slots, and four bindless texture references).
+- Added `MaterialSystemDiagnostics` for duplicate type names, incompatible layouts, invalid create types, capacity failures, fallback-slot resolves, dirty-slot counts, and coalesced upload ranges.
+- Added CPU-only `Test.Graphics.MaterialSystem.cpp` coverage and a `IntrinsicGraphicsRendererCpuUnitTests` target labeled `unit;graphics`.
+
 ## Upcoming questions to clarify
-- Which promoted graphics module should own material-slot allocation beyond the current `Graphics.MaterialSystem` slice: a renderer-level registry or an RHI-adjacent layout helper?
-- What is the canonical material parameter layout versioning policy for texture/bindless references before `GRAPHICS-015` GPU texture residency lands?
-- Should shader asset identity remain path-based for the promoted registry, or should a later task migrate it to `Asset.Registry` IDs after asset hot-reload ownership is finalized?
+- Resolved for this task: `Graphics.MaterialSystem` owns renderer material slots; RHI owns low-level buffers/pipelines only.
+- Resolved for this task: layout version `1` uses four bindless texture references in `MaterialParams`; asset-ID-to-residency resolution remains a `GRAPHICS-015` follow-up.
+- Resolved for this task: shader identity remains path/generation based in `RHI.PipelineRegistry`; asset-ID migration, if needed, belongs to a later hot-reload/assets task.
 
 ## Goal
 - Promote non-legacy material, shader, and pipeline registry APIs so passes can request pipelines and material state through explicit graphics contracts.
@@ -66,6 +77,14 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 cmake --build --preset ci --target IntrinsicTests -j1
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 --quiet
+```
+
+Focused material completion verified on 2026-05-03:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicGraphicsRendererCpuUnitTests -j1
+ctest --test-dir build/ci --output-on-failure -R 'GraphicsMaterialSystem' --timeout 60
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
