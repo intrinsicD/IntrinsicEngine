@@ -1,10 +1,13 @@
 # GRAPHICS-013C — ImGui overlay and present/finalization
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-013B` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Completed: 2026-05-03.
+- PR/commit: f199b21.
+- Completed slice: CPU/null ImGui overlay draw-data summary import, deterministic overlay/present diagnostics, guarded `ImGuiPass` and `PresentPass` command contracts, render-graph rejection of non-present backbuffer writes, docs, tests, and regenerated module inventory.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-013CQ-imgui-present-backend-clarifications.md`.
 
 ## Goal
 - Define and implement ImGui draw-data import, overlay composition policy, and final present/finalization backbuffer ownership.
@@ -39,6 +42,7 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+- Verified locally with targeted graphics ImGui/present/frame-recipe tests and the default CPU-supported correctness gate on 2026-05-03.
 ## Forbidden changes
 - Introducing unrelated render effects or platform ownership changes.
 - Mixing mechanical file moves with semantic refactors.

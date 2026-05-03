@@ -89,9 +89,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   depends on GRAPHICS-013A.
 - [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](GRAPHICS-013BQ-debug-view-backend-clarifications.md):
   nonblocking docs-only follow-up for shader visualization modes, selected-resource descriptors, UI resource-name mapping, and buffer inspection policy.
-- [GRAPHICS-013C — ImGui overlay and present/finalization](../../active/GRAPHICS-013C-imgui-overlay-and-present.md):
+- [GRAPHICS-013C — ImGui overlay and present/finalization](../../done/GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.
-- [GRAPHICS-014 — Visualization attributes and overlays](GRAPHICS-014-visualization-attributes-overlays.md):
+- [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
+  nonblocking docs-only follow-up for ImGui draw-data translation, overlay upload/descriptor policy, present finalization strategy, and platform/backend ownership boundaries.
+- [GRAPHICS-014 — Visualization attributes and overlays](../../active/GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever
   texture/atlas resources are required.
 - [GRAPHICS-015 — GPU assets, textures, and residency](GRAPHICS-015-gpu-assets-textures-residency.md):
