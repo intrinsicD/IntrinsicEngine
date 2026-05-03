@@ -14,6 +14,8 @@ Capture nonblocking Vulkan renderer integration questions that should not block 
 ## Required changes
 - Decide the platform/window fixture policy for opt-in swapchain smoke tests, including headless CI behavior and skip diagnostics when no surface-capable device is available.
 - Define shader source packaging and pipeline asset path policy for real pass rendering in Vulkan smoke tests.
+- Decide the promoted depth-prepass shader asset path/packaging policy and whether a dedicated depth-only shader should be introduced before enabling real Vulkan depth-prepass smoke rendering.
+- Decide ownership of dynamic-rendering attachment scope and transient texture materialization for `DepthPrepass`, `SurfacePass`, and downstream real pass command bodies.
 - Define resize, acquire, present, and device-loss diagnostic taxonomy, including which diagnostics belong in `GRAPHICS-018` versus rendergraph validation hardening in `GRAPHICS-022`.
 
 ## Tests

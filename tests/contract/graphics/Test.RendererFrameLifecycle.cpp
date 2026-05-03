@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -29,6 +30,20 @@ namespace
             }
         }
         return false;
+    }
+
+    [[nodiscard]] int FindEventIndex(const Extrinsic::Tests::MockCommandContext& context,
+                                     const Extrinsic::Tests::MockCommandContext::EventKind kind,
+                                     const int start = 0)
+    {
+        for (int i = start; i < static_cast<int>(context.Events.size()); ++i)
+        {
+            if (context.Events[static_cast<std::size_t>(i)] == kind)
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 }
 
@@ -64,13 +79,26 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
     EXPECT_TRUE(ContainsTextureBarrier(device.CommandContext, device.BackbufferHandle));
     EXPECT_GE(device.CommandContext.FillBufferCalls, 8);
-    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 1);
-    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 1);
-    EXPECT_EQ(device.CommandContext.LastPushConstantSize, sizeof(Extrinsic::RHI::GpuCullPushConstants));
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 2);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 2);
+    ASSERT_EQ(device.CommandContext.PushConstantSizes.size(), 2u);
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[1], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.LastDispatch.X, 1563u);
     EXPECT_EQ(device.CommandContext.LastDispatch.Y, 1u);
     EXPECT_EQ(device.CommandContext.LastDispatch.Z, 1u);
+    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 1);
+    EXPECT_EQ(device.CommandContext.LastMaxDrawCount, 100000u);
+
+    const int dispatchEvent = FindEventIndex(device.CommandContext,
+        Extrinsic::Tests::MockCommandContext::EventKind::Dispatch);
+    const int drawEvent = FindEventIndex(device.CommandContext,
+        Extrinsic::Tests::MockCommandContext::EventKind::DrawIndexedIndirectCount);
+    ASSERT_GE(dispatchEvent, 0);
+    ASSERT_GE(drawEvent, 0);
+    EXPECT_LT(dispatchEvent, drawEvent);
 
     const std::uint64_t completedFrame = renderer->EndFrame(frame);
     EXPECT_EQ(completedFrame, 1u);
@@ -137,6 +165,8 @@ TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutes
     EXPECT_EQ(device.CommandContext.BindPipelineCalls, 0);
     EXPECT_EQ(device.CommandContext.PushConstantsCalls, 0);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
+    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 0);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
 
     renderer->Shutdown();
 }

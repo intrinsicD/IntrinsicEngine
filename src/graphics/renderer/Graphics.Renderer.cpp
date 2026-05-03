@@ -36,6 +36,7 @@ import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
+import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -214,6 +215,25 @@ namespace Extrinsic::Graphics
                     *m_PipelineManager,
                     "assets/shaders/instance_cull.comp");
                 m_CullingInitialized = true;
+
+                RHI::PipelineDesc depthPrepassDesc{};
+                depthPrepassDesc.VertexShaderPath = "assets/shaders/depth_prepass.vert";
+                depthPrepassDesc.ColorTargetCount = 0u;
+                depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+                depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+                depthPrepassDesc.DebugName = "Renderer.DepthPrepass";
+                auto depthPipeline = m_PipelineManager->Create(depthPrepassDesc);
+                if (depthPipeline.has_value())
+                {
+                    m_DepthPrepassPipelineLease.emplace(std::move(*depthPipeline));
+                    m_DepthPrepassPass.SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
+                }
+                else
+                {
+                    Core::Log::Warn("[Graphics] DepthPrepass pipeline unavailable; pass commands will be skipped: error={}",
+                                    static_cast<int>(depthPipeline.error()));
+                }
             }
             m_LightSystem    .emplace();
             m_LightSystem->Initialize();
@@ -259,6 +279,7 @@ namespace Extrinsic::Graphics
             m_ColormapSystem .reset();
             m_GpuWorld       .reset();
             m_MaterialSystem .reset();
+            m_DepthPrepassPipelineLease.reset();
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -687,11 +708,15 @@ namespace Extrinsic::Graphics
             const auto executeResult = m_RenderGraphExecutor.Execute(
                 *compiled,
                 {},
-                [this, &graphicsContext, &passNameByIndex, &camera](const std::uint32_t passIndex)
+                [this, &graphicsContext, &passNameByIndex, &camera, &frame](const std::uint32_t passIndex)
                 {
                     if (passIndex < passNameByIndex.size() && passNameByIndex[passIndex] == std::string_view{"CullingPass"})
                     {
                         RecordCullingPass(graphicsContext, camera);
+                    }
+                    else if (passIndex < passNameByIndex.size() && passNameByIndex[passIndex] == std::string_view{"DepthPrepass"})
+                    {
+                        RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
                     }
                 },
                 [&graphicsContext, &compiled](const BarrierPacket& packet)
@@ -835,6 +860,21 @@ namespace Extrinsic::Graphics
             m_CullingSystem->DispatchCull(cmd, camera, *m_GpuWorld);
         }
 
+        void RecordDepthPrepass(RHI::ICommandContext& cmd,
+                                const RHI::CameraUBO& camera,
+                                const std::uint32_t frameIndex)
+        {
+            if (!m_CullingInitialized || m_Device == nullptr || !m_Device->IsOperational() ||
+                !m_DepthPrepassPipelineLease.has_value() || !m_DepthPrepassPipelineLease->IsValid())
+            {
+                return;
+            }
+
+            m_DepthPrepassPass.SetPipeline(
+                m_PipelineManager->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
+            m_DepthPrepassPass.Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -855,6 +895,8 @@ namespace Extrinsic::Graphics
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
+        DepthPrepassPass                     m_DepthPrepassPass;
+        std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

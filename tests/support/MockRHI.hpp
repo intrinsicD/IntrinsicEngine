@@ -114,6 +114,18 @@ namespace Extrinsic::Tests
     class MockCommandContext final : public RHI::ICommandContext
     {
     public:
+        enum class EventKind
+        {
+            Begin,
+            End,
+            FillBuffer,
+            BindPipeline,
+            PushConstants,
+            Dispatch,
+            BindIndexBuffer,
+            DrawIndexedIndirectCount,
+        };
+
         struct TextureBarrierRecord
         {
             RHI::TextureHandle Texture{};
@@ -135,8 +147,8 @@ namespace Extrinsic::Tests
             std::uint32_t Z = 0;
         };
 
-        void Begin() override { ++BeginCalls; }
-        void End()   override { ++EndCalls; }
+        void Begin() override { ++BeginCalls; Events.push_back(EventKind::Begin); }
+        void End()   override { ++EndCalls; Events.push_back(EventKind::End); }
         void BeginRenderPass(const RHI::RenderPassDesc&) override {}
         void EndRenderPass() override {}
         void SetViewport(float, float, float, float, float, float) override {}
@@ -145,26 +157,42 @@ namespace Extrinsic::Tests
         {
             ++BindPipelineCalls;
             LastBoundPipeline = handle;
+            Events.push_back(EventKind::BindPipeline);
         }
-        void BindIndexBuffer(RHI::BufferHandle, std::uint64_t, RHI::IndexType) override {}
+        void BindIndexBuffer(RHI::BufferHandle buffer, std::uint64_t offset, RHI::IndexType type) override
+        {
+            ++BindIndexBufferCalls;
+            LastIndexBuffer = buffer;
+            LastIndexBufferOffset = offset;
+            LastIndexType = type;
+            Events.push_back(EventKind::BindIndexBuffer);
+        }
         void PushConstants(const void*, std::uint32_t size, std::uint32_t offset) override
         {
             ++PushConstantsCalls;
             LastPushConstantSize = size;
             LastPushConstantOffset = offset;
+            PushConstantSizes.push_back(size);
+            Events.push_back(EventKind::PushConstants);
         }
         void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
         void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
-                                      std::uint64_t, std::uint32_t) override {}
+                                      std::uint64_t, std::uint32_t maxDrawCount) override
+        {
+            ++DrawIndexedIndirectCountCalls;
+            LastMaxDrawCount = maxDrawCount;
+            Events.push_back(EventKind::DrawIndexedIndirectCount);
+        }
         void DrawIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
                                std::uint64_t, std::uint32_t) override {}
         void Dispatch(std::uint32_t x, std::uint32_t y, std::uint32_t z) override
         {
             ++DispatchCalls;
             LastDispatch = DispatchRecord{.X = x, .Y = y, .Z = z};
+            Events.push_back(EventKind::Dispatch);
         }
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
         void TextureBarrier(RHI::TextureHandle texture, RHI::TextureLayout before, RHI::TextureLayout after) override
@@ -176,7 +204,11 @@ namespace Extrinsic::Tests
         {
             BufferBarrierCalls.push_back({buffer, before, after});
         }
-        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override { ++FillBufferCalls; }
+        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override
+        {
+            ++FillBufferCalls;
+            Events.push_back(EventKind::FillBuffer);
+        }
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle,
                         std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,
@@ -184,16 +216,24 @@ namespace Extrinsic::Tests
 
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
+        std::vector<EventKind> Events{};
+        std::vector<std::uint32_t> PushConstantSizes{};
         int BeginCalls = 0;
         int EndCalls = 0;
         int FillBufferCalls = 0;
         int BindPipelineCalls = 0;
+        int BindIndexBufferCalls = 0;
         int PushConstantsCalls = 0;
         int DispatchCalls = 0;
+        int DrawIndexedIndirectCountCalls = 0;
         std::uint32_t LastPushConstantSize = 0;
         std::uint32_t LastPushConstantOffset = 0;
         DispatchRecord LastDispatch{};
         RHI::PipelineHandle LastBoundPipeline{};
+        RHI::BufferHandle LastIndexBuffer{};
+        std::uint64_t LastIndexBufferOffset = 0;
+        RHI::IndexType LastIndexType = RHI::IndexType::Uint32;
+        std::uint32_t LastMaxDrawCount = 0;
     };
 
     // -----------------------------------------------------------------------
