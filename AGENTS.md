@@ -177,15 +177,17 @@ Undocumented exceptions are policy violations.
 
 ## Related expanded docs
 
-Use the expanded procedure docs under `docs/agent/`:
+Read this `AGENTS.md` file at the start of every session/task; it is the authoritative contract. Read expanded `docs/agent/` procedures when their trigger applies rather than reading every specialized guide for every task:
 
-- `docs/agent/contract.md`
-- `docs/agent/task-format.md`
-- `docs/agent/review-checklist.md`
-- `docs/agent/architecture-review-checklist.md`
-- `docs/agent/method-workflow.md`
-- `docs/agent/method-review-checklist.md`
-- `docs/agent/benchmark-workflow.md`
-- `docs/agent/benchmark-review-checklist.md`
-- `docs/agent/docs-sync-policy.md`
-- `docs/agent/roles.md`
+| Document | Read when |
+| --- | --- |
+| `docs/agent/contract.md` | You need expanded rationale or detail for this contract, especially during onboarding or policy edits. |
+| `docs/agent/task-format.md` | Creating, promoting, retiring, or materially updating files under `tasks/`. |
+| `docs/agent/review-checklist.md` | Before committing or reporting completion for any non-trivial change. |
+| `docs/agent/architecture-review-checklist.md` | Changing dependency boundaries, module ownership, source layout, runtime wiring, or architecture docs. |
+| `docs/agent/method-workflow.md` | Implementing or modifying paper/method work under `methods/` or method-backed integrations. |
+| `docs/agent/method-review-checklist.md` | Reviewing method/paper changes before commit or PR. |
+| `docs/agent/benchmark-workflow.md` | Adding, changing, or running benchmark harnesses, manifests, datasets, baselines, or reports. |
+| `docs/agent/benchmark-review-checklist.md` | Reviewing benchmark changes or performance claims before commit or PR. |
+| `docs/agent/docs-sync-policy.md` | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed. |
+| `docs/agent/roles.md` | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions. |
