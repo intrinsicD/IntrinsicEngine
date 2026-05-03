@@ -26,7 +26,31 @@ Graphics is organized into explicit sublayers:
   diagnostics. Runtime-submitted batches are copied by the renderer before
   these spans are exposed, so no live ECS storage is retained by graphics.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
+- `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.
+  Managed-buffer compaction is explicit and opt-in: callers first request a
+  `PlanManagedBufferCompaction()` result, then may pass that exact generation-
+  checked plan to `ApplyManagedBufferCompaction()`. The relocation table reports
+  old/new geometry byte offsets and shader-visible vertex/index units so runtime
+  sidecars can refresh extracted caches without graphics importing runtime or
+  live ECS ownership. Compaction is skipped when disabled or below threshold and
+  is blocked by default while deferred frees are still pending for frames in
+  flight.
 - Heavy CPU scene data lives in the owning subsystem or runtime extraction pools; canonical ECS components keep source data/IDs, not graphics backend resources.
+
+## Pipeline and shader registry contract
+
+- `Extrinsic.RHI.PipelineRegistry` is the promoted CPU-testable cache layer for
+  deterministic shader/pipeline identities. It builds `PipelineKey` values from
+  shader paths, shader generations, and the RHI `PipelineDesc` render state;
+  matching keys return the same graphics-owned pipeline handle without requiring
+  Vulkan shader compilation in the default CPU gate.
+- Shader reload is represented as explicit invalidation by shader path. The
+  registry drops affected cached leases and reports reload invalidation counts;
+  callers request a new key with an updated shader generation to recreate the
+  pipeline through `RHI::PipelineManager`.
+- Missing shader IDs, key/descriptor mismatches, and backend pipeline creation
+  failures are deterministic diagnostics. Backend-specific shader compilation
+  remains behind RHI/backend integration and stays opt-in for GPU/Vulkan tests.
 
 ## Related references
 

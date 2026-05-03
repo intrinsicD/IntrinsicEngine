@@ -19,11 +19,13 @@ target_sources(${target_name}
         RHI.TextureManager.cppm
         RHI.SamplerManager.cppm
         RHI.PipelineManager.cppm
+        RHI.PipelineRegistry.cppm
         PRIVATE
         RHI.BufferManager.cpp
         RHI.TextureManager.cpp
         RHI.SamplerManager.cpp
         RHI.PipelineManager.cpp
+        RHI.PipelineRegistry.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

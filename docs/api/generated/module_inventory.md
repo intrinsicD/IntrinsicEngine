@@ -16,7 +16,7 @@ Root scanned: `src`
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 44 |
-| `graphics/rhi` | 15 |
+| `graphics/rhi` | 16 |
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
 | `platform` | 5 |
@@ -223,6 +223,7 @@ Root scanned: `src`
 | `Extrinsic.RHI.FrameHandle` | `src/graphics/rhi/RHI.FrameHandle.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Handles` | `src/graphics/rhi/RHI.Handles.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.PipelineManager` | `src/graphics/rhi/RHI.PipelineManager.cppm` | `graphics/rhi` |
+| `Extrinsic.RHI.PipelineRegistry` | `src/graphics/rhi/RHI.PipelineRegistry.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Profiler` | `src/graphics/rhi/RHI.Profiler.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.SamplerManager` | `src/graphics/rhi/RHI.SamplerManager.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.TextureManager` | `src/graphics/rhi/RHI.TextureManager.cppm` | `graphics/rhi` |
@@ -434,4 +435,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **407**
+Total modules: **408**
