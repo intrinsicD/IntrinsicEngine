@@ -35,7 +35,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   downstream pass work.
 - [GRAPHICS-003 — Frame recipe and default pipeline](../../done/GRAPHICS-003-frame-recipe-pipeline.md):
   completed reusable default frame recipe and canonical graph-construction gate.
-- [GRAPHICS-004 — GPU-world allocation and lifetime](GRAPHICS-004-gpu-world-allocation-lifetime.md):
+- [GRAPHICS-004 — GPU-world allocation and lifetime](../../active/GRAPHICS-004-gpu-world-allocation-lifetime.md):
   depends on GRAPHICS-002.
 - [GRAPHICS-005 — GPU-world compaction](GRAPHICS-005-gpu-world-compaction.md):
   depends on GRAPHICS-004.
