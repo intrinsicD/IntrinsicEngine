@@ -6,7 +6,7 @@
 
 Runtime-owned transform/light/visualization extraction and renderer handoff are
 implemented. Downstream packet expansion and value-only snapshot cleanup remain
-tracked in `tasks/active/GRAPHICS-002-render-world-contract.md`.
+tracked in `tasks/done/GRAPHICS-002-render-world-contract.md`.
 
 ## Goal
 - Define runtime-owned CPU scene composition and ECS-to-graphics extraction so promoted graphics systems consume immutable snapshots/views only.

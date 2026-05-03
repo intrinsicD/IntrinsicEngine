@@ -1,4 +1,9 @@
 # GRAPHICS-002 — Render world and frame input contract
+
+- Status: completed
+- Completion date: 2026-05-03
+- Commit / PR: local split commit 8143289; remote PR reference TBD.
+
 ## Goal
 - Expand `RenderWorld` and `RenderFrameInput` into the immutable graphics snapshot contract consumed by renderer passes.
 ## Non-goals
@@ -39,8 +44,31 @@
 - The contract defines one canonical instance-slot identity shared by renderable records, transforms, bounds/culling data, material references, picking IDs, and draw buckets.
 - Contract tests document expected defaults and invalid states.
 ## Verification
+Completed checks:
+
+```bash
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root . --strict
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+```
+
+Additional boundary/editor checks:
+
+```bash
+grep -R "entt\|Extrinsic.ECS\|Runtime\." -n src/graphics/renderer --include='*.cpp' --include='*.cppm'
+```
+
+No graphics renderer live-ECS/runtime imports were found, and editor diagnostics
+reported no errors for the touched graphics/runtime/test files.
+
+Attempted but blocked before project compilation by the existing Draco
+FetchContent cache clone failure under `external/cache/draco-src`:
+
 ```bash
 cmake --preset ci
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests IntrinsicRuntimeGraphicsCpuTests -j1
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
