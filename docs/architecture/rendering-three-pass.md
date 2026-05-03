@@ -142,7 +142,7 @@ Runtime owns ECS access, dirty-domain interpretation, deletion events, and sidec
 
 ### Culling and draw-bucket contract
 
-`CullingPass` records the culling command sequence in a fixed order: reset every bucket counter, publish the `GpuCullBucketTable`, barrier that table for shader reads, bind the cull pipeline, push `GpuCullPushConstants`, dispatch over canonical instance slots, then barrier every indirect-args/count buffer for indirect reads. Bucket outputs are indexed by canonical GPU instance slot through each indirect command's `firstInstance`; compacted visible lists are not a second entity identity source.
+`CullingPass` records the culling command sequence in a fixed order on operational RHI devices: reset every bucket counter, publish the `GpuCullBucketTable`, barrier that table for shader reads, bind the cull pipeline, push `GpuCullPushConstants`, dispatch over canonical instance slots, then barrier every indirect-args/count buffer for indirect reads. Stub/null devices still compile and execute the backend-independent render graph but skip the culling commands. Bucket outputs are indexed by canonical GPU instance slot through each indirect command's `firstInstance`; compacted visible lists are not a second entity identity source.
 
 The current `GpuCullBucketTable` contains eight bucket outputs:
 

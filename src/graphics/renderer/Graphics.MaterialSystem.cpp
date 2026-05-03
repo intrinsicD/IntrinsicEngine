@@ -165,6 +165,18 @@ namespace Extrinsic::Graphics
 
             const std::uint32_t newCap =
                 std::max(needed, GpuCapacity * kGrowthFactor);
+            if (!Device || !BufferMgr)
+            {
+                return false;
+            }
+            if (!Device->IsOperational())
+            {
+                GpuCapacity = newCap;
+                GpuSlots.resize(newCap, RHI::GpuMaterialSlot{});
+                DirtySet.assign(newCap, false);
+                return true;
+            }
+
             const std::uint64_t newSizeBytes =
                 newCap * static_cast<std::uint64_t>(sizeof(RHI::GpuMaterialSlot));
 

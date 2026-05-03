@@ -63,6 +63,14 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(device.CommandContext.BeginCalls, 1);
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
     EXPECT_TRUE(ContainsTextureBarrier(device.CommandContext, device.BackbufferHandle));
+    EXPECT_GE(device.CommandContext.FillBufferCalls, 8);
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 1);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 1);
+    EXPECT_EQ(device.CommandContext.LastPushConstantSize, sizeof(Extrinsic::RHI::GpuCullPushConstants));
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
+    EXPECT_EQ(device.CommandContext.LastDispatch.X, 1563u);
+    EXPECT_EQ(device.CommandContext.LastDispatch.Y, 1u);
+    EXPECT_EQ(device.CommandContext.LastDispatch.Z, 1u);
 
     const std::uint64_t completedFrame = renderer->EndFrame(frame);
     EXPECT_EQ(completedFrame, 1u);
@@ -97,6 +105,38 @@ TEST(RendererFrameLifecycle, InvalidDeviceBackbufferReportsRecipeDiagnostic)
     EXPECT_EQ(device.GetBackbufferHandleCount, 1);
     EXPECT_EQ(device.CommandContext.BeginCalls, 0);
     EXPECT_EQ(device.CommandContext.EndCalls, 0);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutesGraph)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = false;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{91u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.CompileSucceeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.ExecuteSucceeded) << stats.Diagnostic;
+    EXPECT_EQ(device.CommandContext.BeginCalls, 1);
+    EXPECT_EQ(device.CommandContext.EndCalls, 1);
+    EXPECT_EQ(device.CommandContext.FillBufferCalls, 0);
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 0);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 0);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
 
     renderer->Shutdown();
 }

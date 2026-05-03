@@ -128,15 +128,31 @@ namespace Extrinsic::Tests
             RHI::MemoryAccess After = RHI::MemoryAccess::None;
         };
 
+        struct DispatchRecord
+        {
+            std::uint32_t X = 0;
+            std::uint32_t Y = 0;
+            std::uint32_t Z = 0;
+        };
+
         void Begin() override { ++BeginCalls; }
         void End()   override { ++EndCalls; }
         void BeginRenderPass(const RHI::RenderPassDesc&) override {}
         void EndRenderPass() override {}
         void SetViewport(float, float, float, float, float, float) override {}
         void SetScissor(std::int32_t, std::int32_t, std::uint32_t, std::uint32_t) override {}
-        void BindPipeline(RHI::PipelineHandle) override {}
+        void BindPipeline(RHI::PipelineHandle handle) override
+        {
+            ++BindPipelineCalls;
+            LastBoundPipeline = handle;
+        }
         void BindIndexBuffer(RHI::BufferHandle, std::uint64_t, RHI::IndexType) override {}
-        void PushConstants(const void*, std::uint32_t, std::uint32_t) override {}
+        void PushConstants(const void*, std::uint32_t size, std::uint32_t offset) override
+        {
+            ++PushConstantsCalls;
+            LastPushConstantSize = size;
+            LastPushConstantOffset = offset;
+        }
         void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
         void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
         void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
@@ -145,7 +161,11 @@ namespace Extrinsic::Tests
                                       std::uint64_t, std::uint32_t) override {}
         void DrawIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
                                std::uint64_t, std::uint32_t) override {}
-        void Dispatch(std::uint32_t, std::uint32_t, std::uint32_t) override {}
+        void Dispatch(std::uint32_t x, std::uint32_t y, std::uint32_t z) override
+        {
+            ++DispatchCalls;
+            LastDispatch = DispatchRecord{.X = x, .Y = y, .Z = z};
+        }
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
         void TextureBarrier(RHI::TextureHandle texture, RHI::TextureLayout before, RHI::TextureLayout after) override
         {
@@ -156,7 +176,7 @@ namespace Extrinsic::Tests
         {
             BufferBarrierCalls.push_back({buffer, before, after});
         }
-        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
+        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override { ++FillBufferCalls; }
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle,
                         std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t,
@@ -166,6 +186,14 @@ namespace Extrinsic::Tests
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
         int BeginCalls = 0;
         int EndCalls = 0;
+        int FillBufferCalls = 0;
+        int BindPipelineCalls = 0;
+        int PushConstantsCalls = 0;
+        int DispatchCalls = 0;
+        std::uint32_t LastPushConstantSize = 0;
+        std::uint32_t LastPushConstantOffset = 0;
+        DispatchRecord LastDispatch{};
+        RHI::PipelineHandle LastBoundPipeline{};
     };
 
     // -----------------------------------------------------------------------

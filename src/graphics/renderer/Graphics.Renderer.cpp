@@ -6,9 +6,11 @@ module;
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 module Extrinsic.Graphics.Renderer;
 
@@ -172,6 +174,12 @@ namespace Extrinsic::Graphics
                    IsFinite(gizmo.XAxisColor) && IsFinite(gizmo.YAxisColor) && IsFinite(gizmo.ZAxisColor) &&
                    std::isfinite(gizmo.AxisLength) && gizmo.AxisLength > 0.f;
         }
+
+        [[nodiscard]] bool IsInvertibleFiniteMatrix(const glm::mat4& value) noexcept
+        {
+            const float determinant = glm::determinant(value);
+            return IsFinite(value) && std::isfinite(determinant) && std::abs(determinant) > 0.000001f;
+        }
     }
 
     class NullRenderer final : public IRenderer
@@ -198,6 +206,15 @@ namespace Extrinsic::Graphics
                 m_MaterialSystem->GetBuffer(),
                 m_MaterialSystem->GetCapacity());
             m_CullingSystem  .emplace();
+            if (device.IsOperational())
+            {
+                m_CullingSystem->Initialize(
+                    device,
+                    *m_BufferManager,
+                    *m_PipelineManager,
+                    "assets/shaders/instance_cull.comp");
+                m_CullingInitialized = true;
+            }
             m_LightSystem    .emplace();
             m_LightSystem->Initialize();
             m_SelectionSystem.emplace();
@@ -246,6 +263,7 @@ namespace Extrinsic::Graphics
             m_TextureManager .reset();
             m_SamplerManager .reset();
             m_BufferManager  .reset();
+            m_CullingInitialized = false;
         }
 
         void Resize(std::uint32_t, std::uint32_t) override
@@ -654,11 +672,28 @@ namespace Extrinsic::Graphics
 
             const auto executeBegin = std::chrono::steady_clock::now();
             auto& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
+            std::vector<std::string_view> passNameByIndex(compiled->PassDeclarations.size());
+            for (std::size_t orderIndex = 0; orderIndex < compiled->TopologicalOrder.size(); ++orderIndex)
+            {
+                const std::uint32_t passIndex = compiled->TopologicalOrder[orderIndex];
+                if (passIndex < passNameByIndex.size() && orderIndex < compiled->PassNames.size())
+                {
+                    passNameByIndex[passIndex] = compiled->PassNames[orderIndex];
+                }
+            }
+
+            const RHI::CameraUBO camera = BuildCameraUbo(renderWorld, frame.FrameIndex);
             graphicsContext.Begin();
             const auto executeResult = m_RenderGraphExecutor.Execute(
                 *compiled,
                 {},
-                {},
+                [this, &graphicsContext, &passNameByIndex, &camera](const std::uint32_t passIndex)
+                {
+                    if (passIndex < passNameByIndex.size() && passNameByIndex[passIndex] == std::string_view{"CullingPass"})
+                    {
+                        RecordCullingPass(graphicsContext, camera);
+                    }
+                },
                 [&graphicsContext, &compiled](const BarrierPacket& packet)
                 {
                     SubmitBarrierPacket(graphicsContext, *compiled, packet);
@@ -751,6 +786,55 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats = {};
         }
 
+        [[nodiscard]] RHI::CameraUBO BuildCameraUbo(const RenderWorld& world,
+                                                    const std::uint32_t frameIndex) const
+        {
+            RHI::CameraUBO camera{};
+            camera.View = world.Camera.View;
+            camera.Proj = world.Camera.Projection;
+            camera.ViewProj = world.Camera.ViewProjection;
+            camera.CameraPosition = glm::vec4{world.Camera.Position, 0.f};
+            camera.CameraDirection = glm::vec4{world.Camera.Forward, 0.f};
+            camera.ViewportWidth = world.Viewport.Width > 0 ? static_cast<float>(world.Viewport.Width) : 0.f;
+            camera.ViewportHeight = world.Viewport.Height > 0 ? static_cast<float>(world.Viewport.Height) : 0.f;
+            camera.NearPlane = world.Camera.NearPlane;
+            camera.FarPlane = world.Camera.FarPlane;
+            camera.FrameIndex = frameIndex;
+
+            if (world.Camera.Valid)
+            {
+                if (IsInvertibleFiniteMatrix(world.Camera.View))
+                {
+                    camera.InvView = glm::inverse(world.Camera.View);
+                }
+                if (IsInvertibleFiniteMatrix(world.Camera.Projection))
+                {
+                    camera.InvProj = glm::inverse(world.Camera.Projection);
+                }
+            }
+
+            if (m_LightSystem)
+            {
+                m_LightSystem->ApplyTo(camera);
+            }
+            if (m_ShadowSystem)
+            {
+                m_ShadowSystem->ApplyTo(camera);
+            }
+            return camera;
+        }
+
+        void RecordCullingPass(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+        {
+            if (!m_CullingInitialized || m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return;
+            }
+
+            m_CullingSystem->ResetCounters(cmd);
+            m_CullingSystem->DispatchCull(cmd, camera, *m_GpuWorld);
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -790,6 +874,7 @@ namespace Extrinsic::Graphics
         std::vector<RenderableSnapshot>      m_RenderableSnapshots;
         std::uint32_t                        m_InvalidSnapshotRecordCount{0};
         bool                                 m_EnableRenderPrepTaskGraph{true};
+        bool                                 m_CullingInitialized{false};
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};
         RenderGraphFrameStats                m_LastRenderGraphStats;
