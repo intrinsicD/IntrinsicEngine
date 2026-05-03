@@ -1,4 +1,9 @@
 # GRAPHICS-003 — Frame recipe and default pipeline
+
+- Status: completed
+- Completion date: 2026-05-03
+- Commit / PR: local split commit 754e23b; remote PR reference TBD.
+
 ## Goal
 - Add a reusable default frame recipe that declares canonical resources and schedules renderer passes without hard-coded one-off graph construction.
 ## Non-goals

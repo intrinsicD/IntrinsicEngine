@@ -33,8 +33,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-002 — Render-world / frame-input snapshot contract](../../done/GRAPHICS-002-render-world-contract.md):
   completed immutable render-world/frame-input snapshot contract gate for
   downstream pass work.
-- [GRAPHICS-003 — Frame recipe and default pipeline](../../active/GRAPHICS-003-frame-recipe-pipeline.md):
-  depends on GRAPHICS-002.
+- [GRAPHICS-003 — Frame recipe and default pipeline](../../done/GRAPHICS-003-frame-recipe-pipeline.md):
+  completed reusable default frame recipe and canonical graph-construction gate.
 - [GRAPHICS-004 — GPU-world allocation and lifetime](GRAPHICS-004-gpu-world-allocation-lifetime.md):
   depends on GRAPHICS-002.
 - [GRAPHICS-005 — GPU-world compaction](GRAPHICS-005-gpu-world-compaction.md):
