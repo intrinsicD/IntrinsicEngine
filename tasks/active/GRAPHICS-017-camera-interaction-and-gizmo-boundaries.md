@@ -1,4 +1,11 @@
 # GRAPHICS-017 — Camera, interaction, and gizmo boundaries
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-015` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff. Prefer CPU/null snapshot contracts before runtime/platform integration.
+
 ## Goal
 - Re-home or reimplement camera, interaction helper, and transform-gizmo behavior behind architecture-compliant runtime/platform/graphics boundaries.
 ## Non-goals

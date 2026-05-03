@@ -98,9 +98,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   texture/atlas resources are required.
 - [GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups](GRAPHICS-014Q-visualization-runtime-backend-clarifications.md):
   nonblocking docs-only follow-up for runtime/geometry visualization packet producers, invalid-packet handling, overlay upload strategy, and UV/Htex bake selection policy.
-- [GRAPHICS-015 — GPU assets, textures, and residency](../../active/GRAPHICS-015-gpu-assets-textures-residency.md):
+- [GRAPHICS-015 — GPU assets, textures, and residency](../../done/GRAPHICS-015-gpu-assets-textures-residency.md):
   depends on GRAPHICS-006 wherever material texture references are involved.
-- [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
+- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](GRAPHICS-015Q-texture-residency-backend-clarifications.md):
+  nonblocking docs-only follow-up for cache capacity/eviction, streaming mips, fallback texture content, bindless descriptor flush cadence, and runtime upload scheduling policy.
+- [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](../../active/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
   depends on GRAPHICS-012 for picking handoff. Camera packet contracts may be
   defined earlier without blocking.
 - [GRAPHICS-018 — Vulkan renderer integration](GRAPHICS-018-vulkan-renderer-integration.md):

@@ -1,11 +1,14 @@
 # GRAPHICS-015 — GPU assets, textures, and residency
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-014` completion.
 - Current slice: CPU/null-testable GPU asset cache texture residency, sampler descriptor ownership, deterministic fallback texture resolution, material texture AssetId binding resolution, and explicit non-eviction diagnostics. Must preserve `GRAPHICS-014` UV/Htex visualization bake packet contracts while adding texture/residency seams.
 - Completed slices in active work: texture requests with sampler descriptors, `GetViewOrFallback()` deterministic fallback views, fallback residency diagnostics, sampler/texture allocation failure diagnostics, `MaterialSystem::ResolveTextureAssetBindings()` for bindless material params, and unit coverage for null/mock backends.
+- Completed: 2026-05-03.
+- PR/commit: 0ecd57a, 228e263.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-015Q-texture-residency-backend-clarifications.md`.
 
 ## Goal
 - Promote graphics-side GPU asset cache, texture loading/upload, sampler policy, and residency tracking needed by materials and passes.
@@ -35,6 +38,7 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+- Verified locally with targeted `GpuAssetCache`/`GraphicsMaterialSystem` tests and the default CPU-supported correctness gate on 2026-05-03.
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
