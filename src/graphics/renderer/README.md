@@ -106,10 +106,18 @@ and renderer/render-graph orchestration.
   `ExtractRenderWorld()`/`PrepareFrame()` consume them; it does not retain ECS
   registry references.
 - `RenderWorld` exposes immutable spans of renderer-owned `RenderableSnapshot`
-  and `LightSnapshot` values, defaulted optional packets for picking,
-  selection, shadows, debug primitives, postprocess/readback, and invalid-record
-  diagnostics. These records are valid for the frame and never reference live
-  ECS storage.
+  and `LightSnapshot` values, sanitized transient debug line/point/triangle
+  packet spans, defaulted optional packets for picking, selection, shadows,
+  postprocess/readback, and invalid-record diagnostics. These records are valid
+  for the frame and never reference live ECS storage.
+- Transient debug packets are frame-local runtime submissions, not persistent
+  editor overlay entities. The renderer rejects non-finite coordinates/colors,
+  clamps line widths to `[0.5, 32]`, clamps point radii to `[0.0001, 1]`, and
+  reports rejected records through `InvalidSnapshotRecordCount`.
+- `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
+  line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
+  `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /
+  `Cull.Points.Count`.
 - `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and

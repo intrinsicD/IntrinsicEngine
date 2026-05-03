@@ -28,6 +28,10 @@ namespace
             .MaterialBuffer = Extrinsic::RHI::BufferHandle{9u, 1u},
             .SurfaceOpaqueIndexedArgs = Extrinsic::RHI::BufferHandle{10u, 1u},
             .SurfaceOpaqueCount = Extrinsic::RHI::BufferHandle{11u, 1u},
+            .LinesIndexedArgs = Extrinsic::RHI::BufferHandle{12u, 1u},
+            .LinesCount = Extrinsic::RHI::BufferHandle{13u, 1u},
+            .PointsNonIndexedArgs = Extrinsic::RHI::BufferHandle{14u, 1u},
+            .PointsCount = Extrinsic::RHI::BufferHandle{15u, 1u},
         };
     }
 
@@ -248,6 +252,22 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     ASSERT_NE(culling, nullptr);
     EXPECT_TRUE(Contains(culling->Reads, "GpuWorld.SceneTable"));
     EXPECT_TRUE(Contains(culling->Writes, "Cull.SurfaceOpaque.IndexedArgs"));
+    EXPECT_TRUE(Contains(culling->Writes, "Cull.Lines.IndexedArgs"));
+    EXPECT_TRUE(Contains(culling->Writes, "Cull.Points.NonIndexedArgs"));
+
+    const auto* line = FindPass(description, FrameRecipePassKind::Line);
+    ASSERT_NE(line, nullptr);
+    EXPECT_TRUE(Contains(line->Reads, "SceneDepth"));
+    EXPECT_TRUE(Contains(line->Reads, "Cull.Lines.IndexedArgs"));
+    EXPECT_TRUE(Contains(line->Reads, "Cull.Lines.Count"));
+    EXPECT_TRUE(Contains(line->Writes, "SceneColorHDR"));
+
+    const auto* point = FindPass(description, FrameRecipePassKind::Point);
+    ASSERT_NE(point, nullptr);
+    EXPECT_TRUE(Contains(point->Reads, "SceneDepth"));
+    EXPECT_TRUE(Contains(point->Reads, "Cull.Points.NonIndexedArgs"));
+    EXPECT_TRUE(Contains(point->Reads, "Cull.Points.Count"));
+    EXPECT_TRUE(Contains(point->Writes, "SceneColorHDR"));
 
     const auto* picking = FindPass(description, FrameRecipePassKind::Picking);
     ASSERT_NE(picking, nullptr);

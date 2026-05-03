@@ -52,6 +52,9 @@ namespace Extrinsic::Graphics
         std::span<const TransformSyncRecord>     Transforms{};
         std::span<const LightSnapshot>           Lights{};
         std::span<const VisualizationSyncRecord> Visualizations{};
+        std::span<const DebugLinePacket>         DebugLines{};
+        std::span<const DebugPointPacket>        DebugPoints{};
+        std::span<const DebugTrianglePacket>     DebugTriangles{};
     };
 
     export class IRenderer

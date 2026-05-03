@@ -1,5 +1,6 @@
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -61,10 +62,42 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
         },
     }};
 
+    const std::array<Graphics::DebugLinePacket, 1> debugLines{{
+        Graphics::DebugLinePacket{
+            .Start = {0.f, 0.f, 0.f},
+            .End = {1.f, 0.f, 0.f},
+            .Color = {1.f, 0.f, 0.f, 1.f},
+            .Width = 100.f,
+        },
+    }};
+    const std::array<Graphics::DebugPointPacket, 2> debugPoints{{
+        Graphics::DebugPointPacket{
+            .Position = {0.f, 1.f, 0.f},
+            .Color = {0.f, 1.f, 0.f, 1.f},
+            .Radius = 0.00001f,
+        },
+        Graphics::DebugPointPacket{
+            .Position = {std::numeric_limits<float>::infinity(), 0.f, 0.f},
+            .Color = {1.f, 1.f, 1.f, 1.f},
+            .Radius = 0.1f,
+        },
+    }};
+    const std::array<Graphics::DebugTrianglePacket, 1> debugTriangles{{
+        Graphics::DebugTrianglePacket{
+            .A = {0.f, 0.f, 0.f},
+            .B = {0.f, 1.f, 0.f},
+            .C = {1.f, 0.f, 0.f},
+            .Color = {0.f, 0.f, 1.f, 1.f},
+        },
+    }};
+
     renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
         .Transforms = transforms,
         .Lights = lights,
         .Visualizations = {},
+        .DebugLines = debugLines,
+        .DebugPoints = debugPoints,
+        .DebugTriangles = debugTriangles,
     });
 
     const Graphics::RenderWorld world = renderer->ExtractRenderWorld(Graphics::RenderFrameInput{
@@ -86,7 +119,7 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
     ASSERT_EQ(world.Lights.size(), 1u);
     EXPECT_EQ(world.Lights[0].LightType, Graphics::LightSnapshot::Type::Point);
     EXPECT_EQ(world.Lights[0].Range, 8.f);
-    EXPECT_EQ(world.InvalidSnapshotRecordCount, 1u);
+    EXPECT_EQ(world.InvalidSnapshotRecordCount, 2u);
     EXPECT_TRUE(world.HasPendingPick);
     EXPECT_TRUE(world.DebugOverlayEnabled);
     EXPECT_TRUE(world.PickRequest.Pending);
@@ -94,6 +127,15 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
     EXPECT_TRUE(world.Selection.SelectedStableIds.empty());
     EXPECT_FALSE(world.Shadows.Enabled);
     EXPECT_TRUE(world.DebugPrimitives.HasTransientDebug);
+    EXPECT_EQ(world.DebugPrimitives.LineCount, 1u);
+    EXPECT_EQ(world.DebugPrimitives.PointCount, 1u);
+    EXPECT_EQ(world.DebugPrimitives.TriangleCount, 1u);
+    ASSERT_EQ(world.DebugPrimitives.Lines.size(), 1u);
+    ASSERT_EQ(world.DebugPrimitives.Points.size(), 1u);
+    ASSERT_EQ(world.DebugPrimitives.Triangles.size(), 1u);
+    EXPECT_FLOAT_EQ(world.DebugPrimitives.Lines[0].Width, 32.f);
+    EXPECT_FLOAT_EQ(world.DebugPrimitives.Points[0].Radius, 0.0001f);
+    EXPECT_EQ(world.DebugPrimitives.Triangles[0].Color, glm::vec4(0.f, 0.f, 1.f, 1.f));
     EXPECT_TRUE(world.PostProcess.Enabled);
     EXPECT_FALSE(world.PostProcess.RequiresReadback);
     EXPECT_EQ(world.Viewport.Width, 1280u);
@@ -130,6 +172,12 @@ TEST(RenderWorldContract, BeginFrameClearsPreviousRuntimeSnapshots)
     EXPECT_FALSE(emptyWorld.Selection.HasHovered);
     EXPECT_FALSE(emptyWorld.Shadows.Enabled);
     EXPECT_FALSE(emptyWorld.DebugPrimitives.HasTransientDebug);
+    EXPECT_TRUE(emptyWorld.DebugPrimitives.Lines.empty());
+    EXPECT_TRUE(emptyWorld.DebugPrimitives.Points.empty());
+    EXPECT_TRUE(emptyWorld.DebugPrimitives.Triangles.empty());
+    EXPECT_EQ(emptyWorld.DebugPrimitives.LineCount, 0u);
+    EXPECT_EQ(emptyWorld.DebugPrimitives.PointCount, 0u);
+    EXPECT_EQ(emptyWorld.DebugPrimitives.TriangleCount, 0u);
     EXPECT_FALSE(emptyWorld.PostProcess.Enabled);
     EXPECT_EQ(emptyWorld.InvalidSnapshotRecordCount, 0u);
 

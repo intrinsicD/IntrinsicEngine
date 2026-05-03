@@ -98,6 +98,12 @@ spans from `RenderWorld`:
   `DebugPrimitiveSnapshot`, and `PostProcessSnapshot`: optional frame-feature
   packets with explicit default states. Runtime/pass tasks populate these as
   GRAPHICS-012, GRAPHICS-009, GRAPHICS-010/011/014, and GRAPHICS-013A/B/C land.
+- `DebugPrimitiveSnapshot`: sanitized transient debug line, point, and triangle
+  packet spans. Runtime submits packet spans through
+  `IRenderer::SubmitRuntimeSnapshots()`; graphics copies and sanitizes them into
+  renderer-owned frame storage. Non-finite coordinates/colors are rejected,
+  line widths are clamped to `[0.5, 32]`, point radii are clamped to
+  `[0.0001, 1]`, and rejected records increment `InvalidSnapshotRecordCount`.
 - `InvalidSnapshotRecordCount`: deterministic diagnostics for malformed runtime
   records dropped while building the immutable snapshot.
 
@@ -161,9 +167,9 @@ The global camera-light packet now carries shadow cascade matrices, split/count 
 
 ### Line and point command contract
 
-`ForwardLinePass` and `ForwardPointPass` consume draw buckets produced by `CullingPass` and never query live ECS/editor/debug ownership. `ForwardLinePass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid indexed `Lines` bucket before it binds the managed index buffer, pushes `GpuScenePushConstants`, and records `DrawIndexedIndirectCount`. `ForwardPointPass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid non-indexed `Points` bucket before it pushes `GpuScenePushConstants` and records `DrawIndirectCount`. Invalid or empty buckets are deterministic no-ops so CPU/null tests can validate the contract without Vulkan.
+`ForwardLinePass` and `ForwardPointPass` consume draw buckets produced by `CullingPass` and never query live ECS/editor/debug ownership. The frame recipe imports explicit line and point bucket resources: `Cull.Lines.IndexedArgs`, `Cull.Lines.Count`, `Cull.Points.NonIndexedArgs`, and `Cull.Points.Count`. `ForwardLinePass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid indexed `Lines` bucket before it binds the managed index buffer, pushes `GpuScenePushConstants`, and records `DrawIndexedIndirectCount`. `ForwardPointPass` requires an initialized `ForwardSystem`, a configured pipeline, and a valid non-indexed `Points` bucket before it pushes `GpuScenePushConstants` and records `DrawIndirectCount`. Invalid or empty buckets are deterministic no-ops so CPU/null tests can validate the contract without Vulkan.
 
-Transient debug primitive packet APIs are still a `GRAPHICS-010` follow-up slice: until line/point/triangle packet spans are added to the render snapshot, transient debug ownership remains documented as counts/flags only and concrete pass command tests cover retained GPU-driven line/point buckets.
+Transient debug primitive packets are frame-local submissions owned by runtime extraction/debug tooling and copied into `RenderWorld`. They are not persistent editor overlay entities and do not create ECS ownership inside graphics. Concrete GPU expansion of transient packets into line/point/surface draw buckets is a backend/runtime upload concern; the promoted contract guarantees packet shape, sanitization, counts, and line/point overlay resource scheduling.
 
 ### Legacy feature coverage classification
 

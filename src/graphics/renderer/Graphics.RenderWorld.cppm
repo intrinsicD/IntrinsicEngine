@@ -60,10 +60,40 @@ namespace Extrinsic::Graphics
         std::uint32_t AtlasResolution{2048u};
     };
 
+    export struct DebugLinePacket
+    {
+        glm::vec3 Start{0.f};
+        glm::vec3 End{0.f};
+        glm::vec4 Color{1.f};
+        float Width{1.f};
+        bool DepthTested{true};
+    };
+
+    export struct DebugPointPacket
+    {
+        glm::vec3 Position{0.f};
+        glm::vec4 Color{1.f};
+        float Radius{0.01f};
+        bool DepthTested{true};
+    };
+
+    export struct DebugTrianglePacket
+    {
+        glm::vec3 A{0.f};
+        glm::vec3 B{0.f};
+        glm::vec3 C{0.f};
+        glm::vec4 Color{1.f};
+        bool DepthTested{true};
+    };
+
     export struct DebugPrimitiveSnapshot
     {
+        std::span<const DebugLinePacket> Lines{};
+        std::span<const DebugPointPacket> Points{};
+        std::span<const DebugTrianglePacket> Triangles{};
         std::uint32_t LineCount{0u};
         std::uint32_t PointCount{0u};
+        std::uint32_t TriangleCount{0u};
         bool HasTransientDebug{false};
     };
 

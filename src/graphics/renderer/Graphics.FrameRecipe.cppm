@@ -64,6 +64,10 @@ namespace Extrinsic::Graphics
         MaterialBuffer,
         SurfaceOpaqueIndexedArgs,
         SurfaceOpaqueCount,
+        LinesIndexedArgs,
+        LinesCount,
+        PointsNonIndexedArgs,
+        PointsCount,
         PickingReadback,
     };
 
@@ -100,6 +104,10 @@ namespace Extrinsic::Graphics
         RHI::BufferHandle MaterialBuffer{};
         RHI::BufferHandle SurfaceOpaqueIndexedArgs{};
         RHI::BufferHandle SurfaceOpaqueCount{};
+        RHI::BufferHandle LinesIndexedArgs{};
+        RHI::BufferHandle LinesCount{};
+        RHI::BufferHandle PointsNonIndexedArgs{};
+        RHI::BufferHandle PointsCount{};
     };
 
     export struct FrameRecipePassDeclaration
@@ -236,7 +244,7 @@ namespace Extrinsic::Graphics
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
                 {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.EntityConfig", "GpuWorld.GeometryRecords", "GpuWorld.Bounds", "Material.Buffer", "GpuWorld.Lights"},
-                {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"});
+                {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"});
         AddPass(out, FrameRecipePassKind::Picking, "PickingPass", features.EnablePicking, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"},
                 {"EntityId", "PrimitiveId", "Picking.Readback"});
@@ -260,8 +268,10 @@ namespace Extrinsic::Graphics
         }
         AddPass(out, FrameRecipePassKind::Composition, "CompositionPass", usesDeferred, false,
                 {"SceneNormal", "Albedo", "Material0", "SceneDepth", "GpuWorld.Lights", "ShadowAtlas"}, {"SceneColorHDR"});
-        AddPass(out, FrameRecipePassKind::Line, "LinePass", true, false, {"SceneDepth"}, {"SceneColorHDR"});
-        AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false, {"SceneDepth"}, {"SceneColorHDR"});
+        AddPass(out, FrameRecipePassKind::Line, "LinePass", true, false,
+                {"SceneDepth", "Cull.Lines.IndexedArgs", "Cull.Lines.Count"}, {"SceneColorHDR"});
+        AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false,
+                {"SceneDepth", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::PostProcess, "PostProcessPass", features.EnablePostProcess, false,
                 {"SceneColorHDR"}, {"SceneColorLDR"});
         AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", features.EnableSelectionOutline, false,
@@ -293,6 +303,10 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::MaterialBuffer, "Material.Buffer", true, true);
         AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs, "Cull.SurfaceOpaque.IndexedArgs", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueCount, "Cull.SurfaceOpaque.Count", true, true, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::LinesIndexedArgs, "Cull.Lines.IndexedArgs", true, true, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::LinesCount, "Cull.Lines.Count", true, true, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PointsNonIndexedArgs, "Cull.Points.NonIndexedArgs", true, true, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PointsCount, "Cull.Points.Count", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PickingReadback, "Picking.Readback", features.EnablePicking, false, false, true);
         return out;
     }
@@ -326,6 +340,10 @@ namespace Extrinsic::Graphics
         const auto materialBuffer = graph.ImportBuffer("Material.Buffer", imports.MaterialBuffer, BufferState::ShaderRead, BufferState::ShaderRead);
         const auto drawIndirect = graph.ImportBuffer("Cull.SurfaceOpaque.IndexedArgs", imports.SurfaceOpaqueIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead);
         const auto drawCount = graph.ImportBuffer("Cull.SurfaceOpaque.Count", imports.SurfaceOpaqueCount, BufferState::ShaderWrite, BufferState::IndirectRead);
+        const auto lineDrawIndirect = graph.ImportBuffer("Cull.Lines.IndexedArgs", imports.LinesIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead);
+        const auto lineDrawCount = graph.ImportBuffer("Cull.Lines.Count", imports.LinesCount, BufferState::ShaderWrite, BufferState::IndirectRead);
+        const auto pointDrawIndirect = graph.ImportBuffer("Cull.Points.NonIndexedArgs", imports.PointsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead);
+        const auto pointDrawCount = graph.ImportBuffer("Cull.Points.Count", imports.PointsCount, BufferState::ShaderWrite, BufferState::IndirectRead);
 
         const auto depth = graph.CreateTexture("SceneDepth", DepthTargetDesc(width, height, sizing.DepthFormat, "SceneDepth"));
         const auto hdr = graph.CreateTexture("SceneColorHDR", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"));
@@ -401,6 +419,10 @@ namespace Extrinsic::Graphics
             builder.Read(lights, BufferUsage::ShaderRead);
             builder.Write(drawIndirect, BufferUsage::ShaderWrite);
             builder.Write(drawCount, BufferUsage::ShaderWrite);
+            builder.Write(lineDrawIndirect, BufferUsage::ShaderWrite);
+            builder.Write(lineDrawCount, BufferUsage::ShaderWrite);
+            builder.Write(pointDrawIndirect, BufferUsage::ShaderWrite);
+            builder.Write(pointDrawCount, BufferUsage::ShaderWrite);
         });
 
         if (features.EnablePicking)
@@ -483,11 +505,15 @@ namespace Extrinsic::Graphics
 
         addOrderedPass("LinePass", [=](RenderGraphBuilder& builder) {
             builder.Read(depth, TextureUsage::DepthRead);
+            builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
+            builder.Read(lineDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
         });
 
         addOrderedPass("PointPass", [=](RenderGraphBuilder& builder) {
             builder.Read(depth, TextureUsage::DepthRead);
+            builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
+            builder.Read(pointDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
         });
 

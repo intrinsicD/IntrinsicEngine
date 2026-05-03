@@ -1,10 +1,14 @@
 module;
 
 #include <cstdint>
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 module Extrinsic.Graphics.Renderer;
 
@@ -119,6 +123,40 @@ namespace Extrinsic::Graphics
         struct PrepTransformSyncTag {};
         struct PrepLightSyncTag {};
         struct PrepGpuWorldSyncTag {};
+
+        constexpr float kMinLineWidth = 0.5f;
+        constexpr float kMaxLineWidth = 32.0f;
+        constexpr float kMinPointRadius = 0.0001f;
+        constexpr float kMaxPointRadius = 1.0f;
+
+        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec4 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) &&
+                   std::isfinite(value.z) && std::isfinite(value.w);
+        }
+
+        [[nodiscard]] bool IsValidDebugLine(const DebugLinePacket& line) noexcept
+        {
+            return IsFinite(line.Start) && IsFinite(line.End) && IsFinite(line.Color) &&
+                   std::isfinite(line.Width) && line.Width > 0.f;
+        }
+
+        [[nodiscard]] bool IsValidDebugPoint(const DebugPointPacket& point) noexcept
+        {
+            return IsFinite(point.Position) && IsFinite(point.Color) &&
+                   std::isfinite(point.Radius) && point.Radius > 0.f;
+        }
+
+        [[nodiscard]] bool IsValidDebugTriangle(const DebugTrianglePacket& triangle) noexcept
+        {
+            return IsFinite(triangle.A) && IsFinite(triangle.B) &&
+                   IsFinite(triangle.C) && IsFinite(triangle.Color);
+        }
     }
 
     class NullRenderer final : public IRenderer
@@ -210,6 +248,9 @@ namespace Extrinsic::Graphics
             m_VisualizationSyncRecords.clear();
             m_TransformSyncRecords.clear();
             m_LightSnapshots.clear();
+            m_DebugLinePackets.clear();
+            m_DebugPointPackets.clear();
+            m_DebugTrianglePackets.clear();
             m_RenderableSnapshots.clear();
             m_InvalidSnapshotRecordCount = 0;
             m_HasExtractedRenderWorld = false;
@@ -222,10 +263,49 @@ namespace Extrinsic::Graphics
             m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());
             m_LightSnapshots.assign(snapshots.Lights.begin(), snapshots.Lights.end());
             m_VisualizationSyncRecords.assign(snapshots.Visualizations.begin(), snapshots.Visualizations.end());
+            m_InvalidSnapshotRecordCount = 0;
+
+            m_DebugLinePackets.clear();
+            m_DebugPointPackets.clear();
+            m_DebugTrianglePackets.clear();
+            m_DebugLinePackets.reserve(snapshots.DebugLines.size());
+            m_DebugPointPackets.reserve(snapshots.DebugPoints.size());
+            m_DebugTrianglePackets.reserve(snapshots.DebugTriangles.size());
+
+            for (DebugLinePacket line : snapshots.DebugLines)
+            {
+                if (!IsValidDebugLine(line))
+                {
+                    ++m_InvalidSnapshotRecordCount;
+                    continue;
+                }
+                line.Width = std::clamp(line.Width, kMinLineWidth, kMaxLineWidth);
+                m_DebugLinePackets.push_back(line);
+            }
+
+            for (DebugPointPacket point : snapshots.DebugPoints)
+            {
+                if (!IsValidDebugPoint(point))
+                {
+                    ++m_InvalidSnapshotRecordCount;
+                    continue;
+                }
+                point.Radius = std::clamp(point.Radius, kMinPointRadius, kMaxPointRadius);
+                m_DebugPointPackets.push_back(point);
+            }
+
+            for (const DebugTrianglePacket& triangle : snapshots.DebugTriangles)
+            {
+                if (!IsValidDebugTriangle(triangle))
+                {
+                    ++m_InvalidSnapshotRecordCount;
+                    continue;
+                }
+                m_DebugTrianglePackets.push_back(triangle);
+            }
 
             m_RenderableSnapshots.clear();
             m_RenderableSnapshots.reserve(m_TransformSyncRecords.size());
-            m_InvalidSnapshotRecordCount = 0;
             for (const TransformSyncRecord& record : m_TransformSyncRecords)
             {
                 if (!record.Instance.IsValid())
@@ -261,7 +341,16 @@ namespace Extrinsic::Graphics
                     .Pending = input.HasPendingPick,
                 },
                 .DebugPrimitives = DebugPrimitiveSnapshot{
-                    .HasTransientDebug = input.DebugOverlayEnabled,
+                    .Lines = m_DebugLinePackets,
+                    .Points = m_DebugPointPackets,
+                    .Triangles = m_DebugTrianglePackets,
+                    .LineCount = static_cast<std::uint32_t>(m_DebugLinePackets.size()),
+                    .PointCount = static_cast<std::uint32_t>(m_DebugPointPackets.size()),
+                    .TriangleCount = static_cast<std::uint32_t>(m_DebugTrianglePackets.size()),
+                    .HasTransientDebug = input.DebugOverlayEnabled ||
+                        !m_DebugLinePackets.empty() ||
+                        !m_DebugPointPackets.empty() ||
+                        !m_DebugTrianglePackets.empty(),
                 },
                 .PostProcess = PostProcessSnapshot{
                     .Enabled = input.DebugOverlayEnabled,
@@ -434,6 +523,8 @@ namespace Extrinsic::Graphics
             }
             m_RenderGraph.Reset();
             const auto& surfaceOpaque = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
+            const auto& lines = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Lines);
+            const auto& points = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Points);
             const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(
                 m_RenderGraph,
                 DeriveDefaultFrameRecipeFeatures(renderWorld),
@@ -449,6 +540,10 @@ namespace Extrinsic::Graphics
                     .MaterialBuffer = m_MaterialSystem->GetBuffer(),
                     .SurfaceOpaqueIndexedArgs = surfaceOpaque.IndexedArgsBuffer,
                     .SurfaceOpaqueCount = surfaceOpaque.CountBuffer,
+                    .LinesIndexedArgs = lines.IndexedArgsBuffer,
+                    .LinesCount = lines.CountBuffer,
+                    .PointsNonIndexedArgs = points.NonIndexedArgsBuffer,
+                    .PointsCount = points.CountBuffer,
                 },
                 FrameRecipeSizing{
                     .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
@@ -580,6 +675,9 @@ namespace Extrinsic::Graphics
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<TransformSyncRecord>     m_TransformSyncRecords;
         std::vector<LightSnapshot>           m_LightSnapshots;
+        std::vector<DebugLinePacket>         m_DebugLinePackets;
+        std::vector<DebugPointPacket>        m_DebugPointPackets;
+        std::vector<DebugTrianglePacket>     m_DebugTrianglePackets;
         std::vector<RenderableSnapshot>      m_RenderableSnapshots;
         std::uint32_t                        m_InvalidSnapshotRecordCount{0};
         bool                                 m_EnableRenderPrepTaskGraph{true};
