@@ -22,6 +22,7 @@ Graphics is organized into explicit sublayers:
 - `IRenderer::ExecuteFrame()` imports the frame backbuffer from `RHI::IDevice::GetBackbufferHandle(frame)` when building the default frame recipe, then brackets render-graph barrier/command recording with `ICommandContext::Begin()` / `End()` on the frame graphics context.
 - The default renderer records the canonical `CullingPass` command sequence through `CullingSystem` when the injected device is operational. Stub/null devices still compile and execute the backend-independent graph but skip culling commands so the default CPU gate remains Vulkan-free.
 - When the injected backend provides a ready depth-prepass pipeline, the default renderer records `DepthPrepass` after culling using the surface-opaque indirect bucket. Missing pipeline creation leaves the graph execution intact and skips only the pass command body.
+- `RenderGraphFrameStats` exposes command-recording counters for routed pass bodies, including recorded, skipped-non-operational, and skipped-unavailable outcomes. These diagnostics are the CPU-testable seam for backend readiness while Vulkan smoke tests remain opt-in.
 - `IRenderer::EndFrame()` delegates to `RHI::IDevice::EndFrame()` and reports the device global frame number for maintenance callers. Runtime remains the composition owner for presentation and calls `IDevice::Present(frame)` after the renderer frame has ended.
 
 ## GPU scene ownership

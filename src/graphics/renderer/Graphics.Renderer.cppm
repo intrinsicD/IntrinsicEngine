@@ -44,6 +44,13 @@ namespace Extrinsic::Graphics
         std::uint64_t TransientMemoryEstimateBytes = 0;
         std::uint64_t CompileTimeMicros = 0;
         std::uint64_t ExecuteTimeMicros = 0;
+        std::uint32_t CommandPassesRecorded = 0;
+        std::uint32_t CommandPassesSkipped = 0;
+        std::uint32_t CommandPassesSkippedNonOperational = 0;
+        std::uint32_t CommandPassesSkippedUnavailable = 0;
+        std::uint32_t CullingPassCommandsRecorded = 0;
+        std::uint32_t DepthPrepassCommandsRecorded = 0;
+        bool DeviceOperationalDuringExecute = false;
         std::string DebugDump{};
         std::string Diagnostic{};
     };

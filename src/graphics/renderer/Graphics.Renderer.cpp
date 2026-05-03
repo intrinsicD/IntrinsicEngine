@@ -129,6 +129,13 @@ namespace Extrinsic::Graphics
         struct PrepLightSyncTag {};
         struct PrepGpuWorldSyncTag {};
 
+        enum class CommandRecordStatus : std::uint8_t
+        {
+            Recorded,
+            SkippedNonOperational,
+            SkippedUnavailable,
+        };
+
         constexpr float kMinLineWidth = 0.5f;
         constexpr float kMaxLineWidth = 32.0f;
         constexpr float kMinPointRadius = 0.0001f;
@@ -690,6 +697,7 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.BarrierCount = static_cast<std::uint32_t>(compiled->BarrierPackets.size());
             m_LastRenderGraphStats.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
             m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
+            m_LastRenderGraphStats.DeviceOperationalDuringExecute = m_Device->IsOperational();
 
             const auto executeBegin = std::chrono::steady_clock::now();
             auto& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
@@ -712,11 +720,21 @@ namespace Extrinsic::Graphics
                 {
                     if (passIndex < passNameByIndex.size() && passNameByIndex[passIndex] == std::string_view{"CullingPass"})
                     {
-                        RecordCullingPass(graphicsContext, camera);
+                        const CommandRecordStatus status = RecordCullingPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(status);
+                        if (status == CommandRecordStatus::Recorded)
+                        {
+                            ++m_LastRenderGraphStats.CullingPassCommandsRecorded;
+                        }
                     }
                     else if (passIndex < passNameByIndex.size() && passNameByIndex[passIndex] == std::string_view{"DepthPrepass"})
                     {
-                        RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
+                        const CommandRecordStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(status);
+                        if (status == CommandRecordStatus::Recorded)
+                        {
+                            ++m_LastRenderGraphStats.DepthPrepassCommandsRecorded;
+                        }
                     }
                 },
                 [&graphicsContext, &compiled](const BarrierPacket& packet)
@@ -849,30 +867,58 @@ namespace Extrinsic::Graphics
             return camera;
         }
 
-        void RecordCullingPass(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+        void AccumulateCommandRecordStatus(const CommandRecordStatus status)
         {
-            if (!m_CullingInitialized || m_Device == nullptr || !m_Device->IsOperational())
+            switch (status)
             {
-                return;
+            case CommandRecordStatus::Recorded:
+                ++m_LastRenderGraphStats.CommandPassesRecorded;
+                break;
+            case CommandRecordStatus::SkippedNonOperational:
+                ++m_LastRenderGraphStats.CommandPassesSkipped;
+                ++m_LastRenderGraphStats.CommandPassesSkippedNonOperational;
+                break;
+            case CommandRecordStatus::SkippedUnavailable:
+                ++m_LastRenderGraphStats.CommandPassesSkipped;
+                ++m_LastRenderGraphStats.CommandPassesSkippedUnavailable;
+                break;
+            }
+        }
+
+        [[nodiscard]] CommandRecordStatus RecordCullingPass(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return CommandRecordStatus::SkippedNonOperational;
+            }
+            if (!m_CullingInitialized)
+            {
+                return CommandRecordStatus::SkippedUnavailable;
             }
 
             m_CullingSystem->ResetCounters(cmd);
             m_CullingSystem->DispatchCull(cmd, camera, *m_GpuWorld);
+            return CommandRecordStatus::Recorded;
         }
 
-        void RecordDepthPrepass(RHI::ICommandContext& cmd,
-                                const RHI::CameraUBO& camera,
-                                const std::uint32_t frameIndex)
+        [[nodiscard]] CommandRecordStatus RecordDepthPrepass(RHI::ICommandContext& cmd,
+                                                             const RHI::CameraUBO& camera,
+                                                             const std::uint32_t frameIndex)
         {
-            if (!m_CullingInitialized || m_Device == nullptr || !m_Device->IsOperational() ||
-                !m_DepthPrepassPipelineLease.has_value() || !m_DepthPrepassPipelineLease->IsValid())
+            if (m_Device == nullptr || !m_Device->IsOperational())
             {
-                return;
+                return CommandRecordStatus::SkippedNonOperational;
+            }
+            if (!m_CullingInitialized || !m_DepthPrepassPipelineLease.has_value() ||
+                !m_DepthPrepassPipelineLease->IsValid())
+            {
+                return CommandRecordStatus::SkippedUnavailable;
             }
 
             m_DepthPrepassPass.SetPipeline(
                 m_PipelineManager->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
             m_DepthPrepassPass.Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return CommandRecordStatus::Recorded;
         }
 
         std::optional<RHI::BufferManager>   m_BufferManager;

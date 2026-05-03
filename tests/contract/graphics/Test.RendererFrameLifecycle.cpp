@@ -72,6 +72,13 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.CompileSucceeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.ExecuteSucceeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.DeviceOperationalDuringExecute);
+    EXPECT_EQ(stats.CommandPassesRecorded, 2u);
+    EXPECT_EQ(stats.CommandPassesSkipped, 0u);
+    EXPECT_EQ(stats.CommandPassesSkippedNonOperational, 0u);
+    EXPECT_EQ(stats.CommandPassesSkippedUnavailable, 0u);
+    EXPECT_EQ(stats.CullingPassCommandsRecorded, 1u);
+    EXPECT_EQ(stats.DepthPrepassCommandsRecorded, 1u);
     EXPECT_EQ(device.GetBackbufferHandleCount, 1);
     EXPECT_EQ(device.LastBackbufferFrame.FrameIndex, frame.FrameIndex);
     EXPECT_EQ(device.LastBackbufferFrame.SwapchainImageIndex, frame.SwapchainImageIndex);
@@ -159,6 +166,13 @@ TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutes
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.CompileSucceeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.ExecuteSucceeded) << stats.Diagnostic;
+    EXPECT_FALSE(stats.DeviceOperationalDuringExecute);
+    EXPECT_EQ(stats.CommandPassesRecorded, 0u);
+    EXPECT_EQ(stats.CommandPassesSkipped, 2u);
+    EXPECT_EQ(stats.CommandPassesSkippedNonOperational, 2u);
+    EXPECT_EQ(stats.CommandPassesSkippedUnavailable, 0u);
+    EXPECT_EQ(stats.CullingPassCommandsRecorded, 0u);
+    EXPECT_EQ(stats.DepthPrepassCommandsRecorded, 0u);
     EXPECT_EQ(device.CommandContext.BeginCalls, 1);
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
     EXPECT_EQ(device.CommandContext.FillBufferCalls, 0);
