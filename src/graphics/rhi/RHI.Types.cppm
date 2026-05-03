@@ -18,6 +18,8 @@ export module Extrinsic.RHI.Types;
 export namespace Extrinsic::RHI
 {
 
+    inline constexpr std::uint32_t kMaxShadowCascades = 4u;
+
     enum class IndexType : std::uint8_t
     {
         Uint16,
@@ -251,6 +253,14 @@ export namespace Extrinsic::RHI
         alignas(16) glm::vec4 LightDirAndIntensity{0.f, -1.f, 0.f, 1.f};
         alignas(16) glm::vec4 LightColor{1.f};            // xyz = RGB, w = unused
         alignas(16) glm::vec4 AmbientColorAndIntensity{0.2f, 0.2f, 0.2f, 1.f};
+
+        // Shadow contract shared by forward/deferred lighting.
+        // ShadowCascadeSplitsAndCount.xyz/w = first three split distances, cascade count.
+        // ShadowBiasAndFilter.xyzw = depth bias, normal bias, PCF radius, split lambda.
+        alignas(16) glm::mat4 ShadowCascadeMatrices[kMaxShadowCascades]{};
+        alignas(16) glm::vec4 ShadowCascadeSplitsAndCount{0.f};
+        alignas(16) glm::vec4 ShadowBiasAndFilter{0.001f, 0.01f, 1.f, 0.5f};
+        alignas(16) glm::vec4 ShadowAtlasSizeAndFlags{0.f}; // x/y = atlas size, z = enabled, w = reserved
 
         // Viewport
         float ViewportWidth  = 0.f;

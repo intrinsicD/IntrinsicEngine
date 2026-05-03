@@ -18,12 +18,17 @@ namespace Extrinsic::Graphics
                              const std::uint32_t   frameIndex)
     {
         (void)camera;
-        if (!m_ShadowSystem.IsInitialized() || !m_Pipeline.IsValid())
+        if (!m_ShadowSystem.IsEnabled() || !m_Pipeline.IsValid())
         {
             return;
         }
 
         const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::ShadowOpaque);
+        if (!bucket.Indexed || !bucket.IndexedArgsBuffer.IsValid() ||
+            !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
+        {
+            return;
+        }
 
         cmd.BindPipeline(m_Pipeline);
         cmd.BindIndexBuffer(gpuWorld.GetManagedIndexBuffer(), 0, RHI::IndexType::Uint32);

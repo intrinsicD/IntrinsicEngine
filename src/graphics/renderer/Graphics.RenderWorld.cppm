@@ -57,6 +57,7 @@ namespace Extrinsic::Graphics
     {
         bool Enabled{false};
         std::uint32_t CascadeCount{0u};
+        std::uint32_t AtlasResolution{2048u};
     };
 
     export struct DebugPrimitiveSnapshot

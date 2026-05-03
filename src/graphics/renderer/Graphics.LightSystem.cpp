@@ -17,6 +17,7 @@ namespace Extrinsic::Graphics
 	struct LightSystem::Impl
 	{
 		LightState State{};
+		LightSyncDiagnostics Diagnostics{};
 		bool       Initialized{false};
 	};
 
@@ -30,9 +31,9 @@ namespace Extrinsic::Graphics
 			return glm::normalize(direction);
 		}
 
-        constexpr float kDirectionalType = 0.0f;
-        constexpr float kPointType       = 1.0f;
-        constexpr float kSpotType        = 2.0f;
+		constexpr float kDirectionalType = 0.0f;
+		constexpr float kPointType       = 1.0f;
+		constexpr float kSpotType        = 2.0f;
 	}
 
 	LightSystem::LightSystem()
@@ -87,6 +88,37 @@ namespace Extrinsic::Graphics
 		camera.AmbientColorAndIntensity  = {state.AmbientColor, state.AmbientIntensity};
 	}
 
+	LightEnvironmentPacket LightSystem::BuildEnvironmentPacket(std::span<const LightSnapshot> snapshots) const
+	{
+		LightEnvironmentPacket packet{};
+		packet.State = m_Impl->State;
+
+		for (const LightSnapshot& snapshot : snapshots)
+		{
+			switch (snapshot.LightType)
+			{
+			case LightSnapshot::Type::Directional:
+				++packet.DirectionalLightCount;
+				++packet.UploadedLightCount;
+				break;
+			case LightSnapshot::Type::Point:
+			case LightSnapshot::Type::Spot:
+				++packet.UploadedLightCount;
+				break;
+			default:
+				++packet.UnsupportedLightCount;
+				break;
+			}
+		}
+
+		packet.UsedFallbackDirectional = packet.DirectionalLightCount == 0u;
+		if (packet.UsedFallbackDirectional)
+		{
+			++packet.UploadedLightCount;
+		}
+		return packet;
+	}
+
     void LightSystem::SyncGpuBuffer(std::span<const LightSnapshot> snapshots, GpuWorld& gpuWorld)
     {
         if (!m_Impl->Initialized)
@@ -94,8 +126,9 @@ namespace Extrinsic::Graphics
             return;
         }
 
+        const LightEnvironmentPacket packet = BuildEnvironmentPacket(snapshots);
         std::vector<RHI::GpuLight> lights;
-        lights.reserve(snapshots.size() + 1u);
+        lights.reserve(packet.UploadedLightCount);
 
         bool directionalFromSnapshots = false;
         for (const LightSnapshot& snapshot : snapshots)
@@ -118,6 +151,8 @@ namespace Extrinsic::Graphics
                 light.Direction_Type  = glm::vec4(NormalizeOrFallback(snapshot.Direction), kSpotType);
                 light.Params          = glm::vec4(snapshot.InnerConeCos, snapshot.OuterConeCos, 0.f, 0.f);
                 break;
+	  default:
+		continue;
             }
 
             light.Color_Intensity = glm::vec4(snapshot.Color, snapshot.Intensity);
@@ -133,7 +168,17 @@ namespace Extrinsic::Graphics
         }
 
         gpuWorld.SetLights(lights);
+		m_Impl->Diagnostics = LightSyncDiagnostics{
+			.UploadedLightCount = static_cast<std::uint32_t>(lights.size()),
+			.UnsupportedLightCount = packet.UnsupportedLightCount,
+			.UsedFallbackDirectional = !directionalFromSnapshots,
+		};
     }
+
+  LightSyncDiagnostics LightSystem::GetDiagnostics() const noexcept
+  {
+	return m_Impl->Diagnostics;
+  }
 
 	bool LightSystem::IsInitialized() const noexcept
 	{

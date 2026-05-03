@@ -43,6 +43,22 @@ export namespace Extrinsic::Graphics
 		float     OuterConeCos{0.65f};
 	};
 
+	struct LightEnvironmentPacket
+	{
+		LightState State{};
+		std::uint32_t UploadedLightCount{0u};
+		std::uint32_t DirectionalLightCount{0u};
+		std::uint32_t UnsupportedLightCount{0u};
+		bool UsedFallbackDirectional{false};
+	};
+
+	struct LightSyncDiagnostics
+	{
+		std::uint32_t UploadedLightCount{0u};
+		std::uint32_t UnsupportedLightCount{0u};
+		bool UsedFallbackDirectional{false};
+	};
+
 	class LightSystem
 	{
 	public:
@@ -65,7 +81,9 @@ export namespace Extrinsic::Graphics
 		void SetAmbientLight(glm::vec3 color, float intensity) noexcept;
 
 		void ApplyTo(RHI::CameraUBO& camera) const noexcept;
+		[[nodiscard]] LightEnvironmentPacket BuildEnvironmentPacket(std::span<const LightSnapshot> lights) const;
 		void SyncGpuBuffer(std::span<const LightSnapshot> lights, GpuWorld& gpuWorld);
+		[[nodiscard]] LightSyncDiagnostics GetDiagnostics() const noexcept;
 
 		[[nodiscard]] bool IsInitialized() const noexcept;
 

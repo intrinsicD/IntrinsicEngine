@@ -186,6 +186,8 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] std::uint32_t GetInstanceCapacity() const noexcept;
         [[nodiscard]] std::uint32_t GetLiveGeometryCount() const noexcept;
         [[nodiscard]] std::uint32_t GetGeometryCapacity() const noexcept;
+        [[nodiscard]] std::uint32_t GetLightCount() const noexcept;
+        [[nodiscard]] std::uint32_t GetLightCapacity() const noexcept;
         [[nodiscard]] Diagnostics GetDiagnostics() const noexcept;
         [[nodiscard]] ManagedBufferDiagnostics GetManagedBufferDiagnostics() const noexcept;
 
