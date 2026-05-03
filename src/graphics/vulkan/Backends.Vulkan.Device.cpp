@@ -38,6 +38,106 @@ std::unique_ptr<RHI::IDevice> CreateVulkanDevice()
 
 VulkanDevice::~VulkanDevice() = default;
 
+void VulkanDevice::Initialize(Platform::IWindow& window,
+                              const Core::Config::RenderConfig& config)
+{
+    (void)window;
+
+    m_ValidationEnabled = config.EnableValidation;
+    m_Operational       = false;
+    m_NeedsResize       = false;
+    m_FrameSlot         = 0;
+    m_GlobalFrameNumber = 0;
+
+    std::fprintf(stderr,
+                 "[VulkanDevice::Initialize] Promoted Vulkan device lifecycle is present but "
+                 "swapchain/device bring-up is not complete; device remains non-operational.\n");
+}
+
+void VulkanDevice::Shutdown()
+{
+    WaitIdle();
+
+    m_TransferQueue.reset();
+    m_Profiler.reset();
+    m_BindlessHeap.reset();
+    m_SwapchainHandles.clear();
+    m_SwapchainViews.clear();
+    m_SwapchainImages.clear();
+    m_Swapchain        = VK_NULL_HANDLE;
+    m_SwapchainFormat  = VK_FORMAT_UNDEFINED;
+    m_SwapchainExtent  = {};
+    m_DefaultSamplerHandle = {};
+    m_GlobalPipelineLayout = VK_NULL_HANDLE;
+    m_Operational      = false;
+    m_NeedsResize      = false;
+}
+
+void VulkanDevice::WaitIdle()
+{
+    if (m_Device != VK_NULL_HANDLE)
+        vkDeviceWaitIdle(m_Device);
+}
+
+bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
+{
+    outFrame = {};
+
+    if (!m_Operational || m_Swapchain == VK_NULL_HANDLE || m_SwapchainHandles.empty())
+        return false;
+
+    outFrame.FrameIndex = m_FrameSlot;
+    outFrame.SwapchainImageIndex = m_FrameSlot % static_cast<std::uint32_t>(m_SwapchainHandles.size());
+    return true;
+}
+
+void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
+{
+    if (!m_Operational)
+        return;
+
+    m_FrameSlot = (frame.FrameIndex + 1u) % kMaxFramesInFlight;
+    ++m_GlobalFrameNumber;
+}
+
+void VulkanDevice::Present(const RHI::FrameHandle& frame)
+{
+    (void)frame;
+    if (!m_Operational)
+        return;
+}
+
+void VulkanDevice::Resize(uint32_t width, uint32_t height)
+{
+    m_SwapchainExtent = VkExtent2D{.width = width, .height = height};
+    m_NeedsResize = true;
+}
+
+Platform::Extent2D VulkanDevice::GetBackbufferExtent() const
+{
+    return Platform::Extent2D{.Width = static_cast<int>(m_SwapchainExtent.width),
+                              .Height = static_cast<int>(m_SwapchainExtent.height)};
+}
+
+void VulkanDevice::SetPresentMode(RHI::PresentMode mode)
+{
+    m_PresentMode = mode;
+    m_NeedsResize = true;
+}
+
+RHI::TextureHandle VulkanDevice::GetBackbufferHandle(const RHI::FrameHandle& frame) const
+{
+    if (frame.SwapchainImageIndex >= m_SwapchainHandles.size())
+        return {};
+
+    return m_SwapchainHandles[frame.SwapchainImageIndex];
+}
+
+RHI::ICommandContext& VulkanDevice::GetGraphicsContext(uint32_t frameIndex)
+{
+    return m_CmdContexts[frameIndex % kMaxFramesInFlight];
+}
+
 // =============================================================================
 // §11a  VulkanDevice — buffer subsystem
 //

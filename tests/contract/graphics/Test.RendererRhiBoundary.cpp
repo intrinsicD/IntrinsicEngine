@@ -103,5 +103,28 @@ TEST(RendererRhiBoundary, RhiLayerDoesNotImportVulkan)
     }
 }
 
+TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedDeviceLifecycle)
+{
+    const auto deviceSource = RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp";
+    const auto content = ReadFile(deviceSource);
+
+    const std::vector<std::string> requiredDefinitions{
+        "void VulkanDevice::Initialize(",
+        "void VulkanDevice::Shutdown()",
+        "void VulkanDevice::WaitIdle()",
+        "bool VulkanDevice::BeginFrame(",
+        "void VulkanDevice::EndFrame(",
+        "void VulkanDevice::Present(",
+        "void VulkanDevice::Resize(",
+        "Platform::Extent2D VulkanDevice::GetBackbufferExtent() const",
+        "void VulkanDevice::SetPresentMode(",
+        "RHI::TextureHandle VulkanDevice::GetBackbufferHandle(",
+        "RHI::ICommandContext& VulkanDevice::GetGraphicsContext(",
+    };
+
+    for (const auto& definition : requiredDefinitions)
+        EXPECT_NE(content.find(definition), std::string::npos) << definition;
+}
+
 
 
