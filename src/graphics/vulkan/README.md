@@ -20,6 +20,10 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 - `Initialize()` currently reports that promoted swapchain/device bring-up is not
   complete and keeps `IsOperational() == false`; renderers must continue to gate
   GPU command recording on `IDevice::IsOperational()`.
+- Non-operational instances still return valid service references for
+  `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
+  not allocate GPU slots or upload data; they return invalid indices/tokens and
+  make maintenance calls no-ops so callers never dereference null backend state.
 - Completing real Vulkan execution remains in `GRAPHICS-018`: create instance,
   surface, logical device, swapchain images, per-frame command buffers/sync, and
   presentation diagnostics before enabling opt-in `gpu;vulkan` smoke tests.

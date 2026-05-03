@@ -24,7 +24,7 @@ Graphics is organized into explicit sublayers:
 - When the injected backend provides a ready depth-prepass pipeline, the default renderer records `DepthPrepass` after culling using the surface-opaque indirect bucket. Missing pipeline creation leaves the graph execution intact and skips only the pass command body.
 - `RenderGraphFrameStats` exposes command-recording counters for routed pass bodies, including recorded, skipped-non-operational, and skipped-unavailable outcomes. These diagnostics are the CPU-testable seam for backend readiness while Vulkan smoke tests remain opt-in.
 - `IRenderer::EndFrame()` delegates to `RHI::IDevice::EndFrame()` and reports the device global frame number for maintenance callers. Runtime remains the composition owner for presentation and calls `IDevice::Present(frame)` after the renderer frame has ended.
-- The promoted Vulkan backend defines the same `IDevice` lifecycle surface behind the RHI seam. Until full Vulkan device/swapchain bring-up lands, its initialization path fails closed by leaving the device non-operational and `BeginFrame()` returns `false`; callers must not special-case Vulkan in renderer code.
+- The promoted Vulkan backend defines the same `IDevice` lifecycle surface behind the RHI seam. Until full Vulkan device/swapchain bring-up lands, its initialization path fails closed by leaving the device non-operational, `BeginFrame()` returns `false`, and bindless/transfer service accessors return no-op fallbacks instead of null state; callers must not special-case Vulkan in renderer code.
 
 ## GPU scene ownership
 
