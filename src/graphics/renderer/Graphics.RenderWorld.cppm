@@ -7,6 +7,7 @@ module;
 
 export module Extrinsic.Graphics.RenderWorld;
 
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.VisualizationPackets;
@@ -45,6 +46,9 @@ namespace Extrinsic::Graphics
         bool Pending{false};
         std::uint32_t X{0u};
         std::uint32_t Y{0u};
+        glm::vec3 RayOrigin{0.f};
+        glm::vec3 RayDirection{0.f, 0.f, -1.f};
+        bool HasRay{false};
     };
 
     export struct SelectionSnapshot
@@ -98,6 +102,26 @@ namespace Extrinsic::Graphics
         bool HasTransientDebug{false};
     };
 
+    export struct TransformGizmoRenderPacket
+    {
+        std::uint32_t StableId{0u};
+        glm::mat4 Transform{1.f};
+        float AxisLength{1.f};
+        glm::vec4 XAxisColor{1.f, 0.f, 0.f, 1.f};
+        glm::vec4 YAxisColor{0.f, 1.f, 0.f, 1.f};
+        glm::vec4 ZAxisColor{0.f, 0.25f, 1.f, 1.f};
+        bool ShowTranslate{true};
+        bool ShowRotate{false};
+        bool ShowScale{false};
+    };
+
+    export struct GizmoRenderSnapshot
+    {
+        std::span<const TransformGizmoRenderPacket> TransformGizmos{};
+        std::uint32_t TransformGizmoCount{0u};
+        bool HasGizmos{false};
+    };
+
     export struct VisualizationSnapshot
     {
         std::span<const VisualizationAttributeBufferPacket> AttributeBuffers{};
@@ -133,6 +157,8 @@ namespace Extrinsic::Graphics
         /// Enables optional overlay/debug visualization chain.
         bool DebugOverlayEnabled{false};
 
+        CameraViewSnapshot Camera{};
+
         /// Runtime-submitted renderable values copied by the renderer before
         /// extraction. These spans never reference ECS storage.
         std::span<const RenderableSnapshot> Renderables{};
@@ -144,6 +170,7 @@ namespace Extrinsic::Graphics
         SelectionSnapshot       Selection{};
         ShadowSnapshot          Shadows{};
         DebugPrimitiveSnapshot  DebugPrimitives{};
+        GizmoRenderSnapshot     Gizmos{};
         VisualizationSnapshot   Visualization{};
         PostProcessSnapshot     PostProcess{};
 

@@ -36,6 +36,7 @@ import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Core.Dag.TaskGraph;
@@ -158,6 +159,19 @@ namespace Extrinsic::Graphics
             return IsFinite(triangle.A) && IsFinite(triangle.B) &&
                    IsFinite(triangle.C) && IsFinite(triangle.Color);
         }
+
+        [[nodiscard]] bool IsFinite(const glm::mat4& value) noexcept
+        {
+            return IsFinite(value[0]) && IsFinite(value[1]) &&
+                   IsFinite(value[2]) && IsFinite(value[3]);
+        }
+
+        [[nodiscard]] bool IsValidTransformGizmo(const TransformGizmoRenderPacket& gizmo) noexcept
+        {
+            return IsFinite(gizmo.Transform) &&
+                   IsFinite(gizmo.XAxisColor) && IsFinite(gizmo.YAxisColor) && IsFinite(gizmo.ZAxisColor) &&
+                   std::isfinite(gizmo.AxisLength) && gizmo.AxisLength > 0.f;
+        }
     }
 
     class NullRenderer final : public IRenderer
@@ -261,6 +275,7 @@ namespace Extrinsic::Graphics
             m_DebugLinePackets.clear();
             m_DebugPointPackets.clear();
             m_DebugTrianglePackets.clear();
+            m_TransformGizmoPackets.clear();
             m_RenderableSnapshots.clear();
             m_InvalidSnapshotRecordCount = 0;
             m_HasExtractedRenderWorld = false;
@@ -296,9 +311,11 @@ namespace Extrinsic::Graphics
             m_DebugLinePackets.clear();
             m_DebugPointPackets.clear();
             m_DebugTrianglePackets.clear();
+            m_TransformGizmoPackets.clear();
             m_DebugLinePackets.reserve(snapshots.DebugLines.size());
             m_DebugPointPackets.reserve(snapshots.DebugPoints.size());
             m_DebugTrianglePackets.reserve(snapshots.DebugTriangles.size());
+            m_TransformGizmoPackets.reserve(snapshots.TransformGizmos.size());
 
             for (DebugLinePacket line : snapshots.DebugLines)
             {
@@ -332,6 +349,17 @@ namespace Extrinsic::Graphics
                 m_DebugTrianglePackets.push_back(triangle);
             }
 
+            for (TransformGizmoRenderPacket gizmo : snapshots.TransformGizmos)
+            {
+                if (!IsValidTransformGizmo(gizmo))
+                {
+                    ++m_InvalidSnapshotRecordCount;
+                    continue;
+                }
+                gizmo.AxisLength = std::clamp(gizmo.AxisLength, 0.001f, 10000.f);
+                m_TransformGizmoPackets.push_back(gizmo);
+            }
+
             m_RenderableSnapshots.clear();
             m_RenderableSnapshots.reserve(m_TransformSyncRecords.size());
             for (const TransformSyncRecord& record : m_TransformSyncRecords)
@@ -358,15 +386,25 @@ namespace Extrinsic::Graphics
         {
             m_HasExtractedRenderWorld = true;
             m_HasPreparedFrame = false;
+            const PickPixelRequest pick = input.Pick.Pending
+                ? input.Pick
+                : PickPixelRequest{.X = 0u, .Y = 0u, .Pending = input.HasPendingPick};
+            const CameraViewSnapshot camera = BuildCameraViewSnapshot(input.Camera, input.Viewport, pick);
             return RenderWorld{
                 .Viewport       = input.Viewport,
                 .Alpha          = input.Alpha,
                 .HasPendingPick = input.HasPendingPick,
                 .DebugOverlayEnabled = input.DebugOverlayEnabled,
+                .Camera = camera,
                 .Renderables = m_RenderableSnapshots,
                 .Lights = m_LightSnapshots,
                 .PickRequest = PickRequestSnapshot{
-                    .Pending = input.HasPendingPick,
+                    .Pending = input.HasPendingPick || input.Pick.Pending,
+                    .X = pick.X,
+                    .Y = pick.Y,
+                    .RayOrigin = camera.PickRayOrigin,
+                    .RayDirection = camera.PickRayDirection,
+                    .HasRay = camera.HasPickRay,
                 },
                 .DebugPrimitives = DebugPrimitiveSnapshot{
                     .Lines = m_DebugLinePackets,
@@ -379,6 +417,11 @@ namespace Extrinsic::Graphics
                         !m_DebugLinePackets.empty() ||
                         !m_DebugPointPackets.empty() ||
                         !m_DebugTrianglePackets.empty(),
+                },
+                .Gizmos = GizmoRenderSnapshot{
+                    .TransformGizmos = m_TransformGizmoPackets,
+                    .TransformGizmoCount = static_cast<std::uint32_t>(m_TransformGizmoPackets.size()),
+                    .HasGizmos = !m_TransformGizmoPackets.empty(),
                 },
                 .Visualization = VisualizationSnapshot{
                     .AttributeBuffers = m_VisualizationAttributeBuffers,
@@ -727,6 +770,7 @@ namespace Extrinsic::Graphics
         std::vector<DebugLinePacket>         m_DebugLinePackets;
         std::vector<DebugPointPacket>        m_DebugPointPackets;
         std::vector<DebugTrianglePacket>     m_DebugTrianglePackets;
+        std::vector<TransformGizmoRenderPacket> m_TransformGizmoPackets;
         std::vector<RenderableSnapshot>      m_RenderableSnapshots;
         std::uint32_t                        m_InvalidSnapshotRecordCount{0};
         bool                                 m_EnableRenderPrepTaskGraph{true};

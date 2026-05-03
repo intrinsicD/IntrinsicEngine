@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 76 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 49 |
+| `graphics/renderer` | 50 |
 | `graphics/rhi` | 16 |
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
@@ -175,6 +175,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Component.Material` | `src/graphics/renderer/Components/Graphics.Component.Material.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Component.RenderGeometry` | `src/graphics/renderer/Components/Graphics.Component.RenderGeometry.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Component.VisualizationConfig` | `src/graphics/renderer/Components/Graphics.Component.VisualizationConfig.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.CameraSnapshots` | `src/graphics/renderer/Graphics.CameraSnapshots.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Colormap` | `src/graphics/renderer/Graphics.Colormap.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ColormapSystem` | `src/graphics/renderer/Graphics.ColormapSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.CullingSystem` | `src/graphics/renderer/Graphics.CullingSystem.cppm` | `graphics/renderer` |
@@ -440,4 +441,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **413**
+Total modules: **414**

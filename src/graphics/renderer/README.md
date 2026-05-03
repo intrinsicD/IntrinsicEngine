@@ -112,10 +112,15 @@ and renderer/render-graph orchestration.
   registry references.
 - `RenderWorld` exposes immutable spans of renderer-owned `RenderableSnapshot`
   and `LightSnapshot` values, sanitized transient debug line/point/triangle
-  packet spans, `VisualizationSnapshot` packet spans/diagnostics, defaulted
-  optional packets for picking, selection, shadows, postprocess/readback, and
+  packet spans, transform-gizmo render packet spans, `VisualizationSnapshot`
+  packet spans/diagnostics, camera/view/frustum snapshots, defaulted optional
+  packets for picking, selection, shadows, postprocess/readback, and
   invalid-record diagnostics. These records are valid for the frame and never
   reference live ECS storage.
+- `Graphics.CameraSnapshots` is data-only: it validates view/projection
+  matrices, extracts frustum planes, and derives pick rays from immutable pixel
+  requests. Camera motion, input polling, gizmo hit testing, and transform
+  mutation remain runtime/platform/editor responsibilities.
 - Transient debug packets are frame-local runtime submissions, not persistent
   editor overlay entities. The renderer rejects non-finite coordinates/colors,
   clamps line widths to `[0.5, 32]`, clamps point radii to `[0.0001, 1]`, and

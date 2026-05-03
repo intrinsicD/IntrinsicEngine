@@ -49,6 +49,10 @@ branching logic.
 `Extrinsic.Runtime.RenderExtraction` is the only promoted runtime owner for live
 ECS render queries. It stores entity-to-graphics sidecars outside canonical ECS
 components, allocates/frees `GpuWorld` instance handles through the renderer,
-builds transform/light/visualization snapshot records, and submits those records
-to graphics through `IRenderer::SubmitRuntimeSnapshots()`.
+builds transform/light/visualization/gizmo snapshot records, and submits those
+records to graphics through `IRenderer::SubmitRuntimeSnapshots()`.
+
+Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
+and transform application. Graphics receives only immutable `CameraViewInput`,
+`PickPixelRequest`, and transform-gizmo render packets during extraction.
 

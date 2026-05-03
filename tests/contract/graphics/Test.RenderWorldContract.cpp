@@ -5,7 +5,9 @@
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -91,6 +93,19 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
             .Color = {0.f, 0.f, 1.f, 1.f},
         },
     }};
+    const std::array<Graphics::TransformGizmoRenderPacket, 2> transformGizmos{{
+        Graphics::TransformGizmoRenderPacket{
+            .StableId = 77u,
+            .Transform = glm::mat4{1.f},
+            .AxisLength = 2.f,
+            .ShowTranslate = true,
+        },
+        Graphics::TransformGizmoRenderPacket{
+            .StableId = 88u,
+            .Transform = glm::mat4{1.f},
+            .AxisLength = -1.f,
+        },
+    }};
     const std::array<Graphics::ScalarAttributePacket, 1> visualizationScalars{{
         Graphics::ScalarAttributePacket{
             .Name = "temperature",
@@ -132,12 +147,26 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
         .DebugLines = debugLines,
         .DebugPoints = debugPoints,
         .DebugTriangles = debugTriangles,
+        .TransformGizmos = transformGizmos,
     });
 
+    const glm::mat4 view = glm::lookAt(glm::vec3{0.f, 0.f, -5.f}, glm::vec3{0.f, 0.f, 0.f}, glm::vec3{0.f, 1.f, 0.f});
+    const glm::mat4 projection = glm::perspective(glm::radians(60.f), 1280.f / 720.f, 0.1f, 100.f);
     const Graphics::RenderWorld world = renderer->ExtractRenderWorld(Graphics::RenderFrameInput{
         .Alpha = 0.25,
         .Viewport = {1280u, 720u},
         .HasPendingPick = true,
+        .Pick = Graphics::PickPixelRequest{.X = 640u, .Y = 360u, .Pending = true},
+        .Camera = Graphics::CameraViewInput{
+            .View = view,
+            .Projection = projection,
+            .Position = {0.f, 0.f, -5.f},
+            .Forward = {0.f, 0.f, 1.f},
+            .Up = {0.f, 1.f, 0.f},
+            .NearPlane = 0.1f,
+            .FarPlane = 100.f,
+            .Valid = true,
+        },
         .DebugOverlayEnabled = true,
     });
 
@@ -153,10 +182,17 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
     ASSERT_EQ(world.Lights.size(), 1u);
     EXPECT_EQ(world.Lights[0].LightType, Graphics::LightSnapshot::Type::Point);
     EXPECT_EQ(world.Lights[0].Range, 8.f);
-    EXPECT_EQ(world.InvalidSnapshotRecordCount, 2u);
+    EXPECT_EQ(world.InvalidSnapshotRecordCount, 3u);
     EXPECT_TRUE(world.HasPendingPick);
     EXPECT_TRUE(world.DebugOverlayEnabled);
     EXPECT_TRUE(world.PickRequest.Pending);
+    EXPECT_EQ(world.PickRequest.X, 640u);
+    EXPECT_EQ(world.PickRequest.Y, 360u);
+    EXPECT_TRUE(world.PickRequest.HasRay);
+    EXPECT_TRUE(world.Camera.Valid);
+    EXPECT_TRUE(world.Camera.HasPickRay);
+    EXPECT_TRUE(world.Camera.FrustumPlanes[static_cast<std::uint32_t>(Graphics::FrustumPlaneIndex::Left)].Valid);
+    EXPECT_NEAR(glm::length(world.PickRequest.RayDirection), 1.f, 0.0001f);
     EXPECT_FALSE(world.Selection.HasHovered);
     EXPECT_TRUE(world.Selection.SelectedStableIds.empty());
     EXPECT_FALSE(world.Shadows.Enabled);
@@ -170,6 +206,11 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
     EXPECT_FLOAT_EQ(world.DebugPrimitives.Lines[0].Width, 32.f);
     EXPECT_FLOAT_EQ(world.DebugPrimitives.Points[0].Radius, 0.0001f);
     EXPECT_EQ(world.DebugPrimitives.Triangles[0].Color, glm::vec4(0.f, 0.f, 1.f, 1.f));
+    EXPECT_TRUE(world.Gizmos.HasGizmos);
+    ASSERT_EQ(world.Gizmos.TransformGizmos.size(), 1u);
+    EXPECT_EQ(world.Gizmos.TransformGizmoCount, 1u);
+    EXPECT_EQ(world.Gizmos.TransformGizmos[0].StableId, 77u);
+    EXPECT_FLOAT_EQ(world.Gizmos.TransformGizmos[0].AxisLength, 2.f);
     EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
     ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
     ASSERT_EQ(world.Visualization.FragmentBakeAtlases.size(), 2u);
@@ -216,9 +257,13 @@ TEST(RenderWorldContract, BeginFrameClearsPreviousRuntimeSnapshots)
     EXPECT_TRUE(emptyWorld.Renderables.empty());
     EXPECT_TRUE(emptyWorld.Lights.empty());
     EXPECT_FALSE(emptyWorld.PickRequest.Pending);
+    EXPECT_FALSE(emptyWorld.PickRequest.HasRay);
+    EXPECT_FALSE(emptyWorld.Camera.Valid);
     EXPECT_FALSE(emptyWorld.Selection.HasHovered);
     EXPECT_FALSE(emptyWorld.Shadows.Enabled);
     EXPECT_FALSE(emptyWorld.DebugPrimitives.HasTransientDebug);
+    EXPECT_FALSE(emptyWorld.Gizmos.HasGizmos);
+    EXPECT_TRUE(emptyWorld.Gizmos.TransformGizmos.empty());
     EXPECT_TRUE(emptyWorld.DebugPrimitives.Lines.empty());
     EXPECT_TRUE(emptyWorld.DebugPrimitives.Points.empty());
     EXPECT_TRUE(emptyWorld.DebugPrimitives.Triangles.empty());

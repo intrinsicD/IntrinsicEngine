@@ -63,6 +63,7 @@ namespace Extrinsic::Graphics
         std::span<const DebugLinePacket>         DebugLines{};
         std::span<const DebugPointPacket>        DebugPoints{};
         std::span<const DebugTrianglePacket>     DebugTriangles{};
+        std::span<const TransformGizmoRenderPacket> TransformGizmos{};
     };
 
     export class IRenderer

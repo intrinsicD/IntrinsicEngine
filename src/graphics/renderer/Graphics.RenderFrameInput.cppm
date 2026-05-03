@@ -2,6 +2,7 @@ module;
 
 export module Extrinsic.Graphics.RenderFrameInput;
 
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Platform.Window;
 
 // ============================================================
@@ -32,6 +33,14 @@ namespace Extrinsic::Graphics
         /// when this is set.
         bool HasPendingPick{false};
 
+        /// Pixel-space pick request owned by runtime/platform input handling.
+        /// Graphics consumes it only as immutable data and may derive a world
+        /// ray when a valid camera snapshot is present.
+        PickPixelRequest Pick{};
+
+        /// Interpolated camera/view data produced outside graphics.
+        CameraViewInput Camera{};
+
         /// Enables debug/overlay post chain in the null renderer path.
         /// When false (default), presentation samples the selection output
         /// directly so optional debug visualization passes are culled.
@@ -40,6 +49,5 @@ namespace Extrinsic::Graphics
         // Future expansion slots (zero-cost when unused):
         //   WorldSnapshot  World{};        — authoritative ECS snapshot
         //   InputSnapshot  Input{};        — input state at extraction time
-        //   CameraParams   Camera{};       — interpolated camera
     };
 }

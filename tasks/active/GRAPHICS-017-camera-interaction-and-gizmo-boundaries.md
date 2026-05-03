@@ -4,7 +4,8 @@
 - State: in-progress.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-015` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff. Prefer CPU/null snapshot contracts before runtime/platform integration.
+- Current slice: CPU/null camera/view snapshot contracts, frustum-plane extraction, pick-ray derivation, and data-only transform-gizmo render packets. Prefer snapshot contracts before runtime/platform integration.
+- Completed slices in active work: `Graphics.CameraSnapshots`, `RenderFrameInput` camera/pick data, `RenderWorld` camera/gizmo snapshots, null-renderer handoff, and contract tests.
 
 ## Goal
 - Re-home or reimplement camera, interaction helper, and transform-gizmo behavior behind architecture-compliant runtime/platform/graphics boundaries.

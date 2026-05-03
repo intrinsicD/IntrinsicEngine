@@ -55,3 +55,8 @@ helpers.
 The interface/backend split is deliberate: headless tests and alternative
 platforms (Windows/macOS/Wayland) plug in by adding a sibling backend directory
 under `backends/` without touching the interface modules.
+
+Platform owns window/input ports only. It exposes input state/events to runtime;
+it does not create graphics camera snapshots, pick requests, gizmo packets, or
+transform mutations directly.
+
