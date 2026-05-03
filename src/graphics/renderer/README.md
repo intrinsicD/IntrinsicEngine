@@ -9,6 +9,7 @@ and renderer/render-graph orchestration.
 ### Renderer and graph
 
 - `Extrinsic.Graphics.Renderer`
+- `Extrinsic.Graphics.FrameRecipe`
 - `Extrinsic.Graphics.RenderGraph`
 
 `Extrinsic.Graphics.RenderGraph` re-exports:
@@ -93,6 +94,9 @@ and renderer/render-graph orchestration.
 - `Graphics` consumes immutable snapshots/views supplied by runtime and owns GPU
   resource/state transitions and pass-level scheduling through
   `Graphics.RenderGraph`.
+- `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
+  gates, canonical resource declarations, pass-order introspection, and the
+  backend-agnostic graph construction path used by the null renderer.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is

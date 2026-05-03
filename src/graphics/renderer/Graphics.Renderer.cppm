@@ -27,6 +27,7 @@ import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 
 namespace Extrinsic::Graphics

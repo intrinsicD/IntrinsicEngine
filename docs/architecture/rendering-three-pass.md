@@ -42,7 +42,15 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `SelectionOutline` | Swapchain format | Frame transient | Reserved for future standalone outline target |
 | `Backbuffer` | Swapchain format | Imported | Final presentation destination only |
 
-`FrameRecipe` determines which of these are allocated for a frame. Unused optional resources are not created.
+`FrameRecipe` determines which of these are allocated for a frame. Unused optional resources are not created. The promoted implementation lives in `Extrinsic.Graphics.FrameRecipe`; it declares typed feature gates, canonical resource names, pass-order introspection, and the backend-agnostic graph construction helper consumed by the null renderer.
+
+Default feature gates:
+
+- Always active: `CullingPass`, `SurfacePass`, `LinePass`, `PointPass`, `Present`, `SceneDepth`, `SceneColorHDR`, GPU scene buffers, material buffer, and surface-opaque draw bucket buffers.
+- Default active but explicitly gateable: `DepthPrepass`, deferred/hybrid `CompositionPass`, `PostProcessPass`, and `ImGuiPass`.
+- Optional: `PickingPass` (`EntityId`, `PrimitiveId`, `Picking.Readback`), `ShadowPass` (`ShadowAtlas`), `SelectionOutlinePass` (`SelectionOutline`), and `DebugViewPass` (`DebugViewRGBA`).
+
+The imported `Backbuffer` is declared once and finalized only by the `Present` declaration; intermediate passes write transient recipe resources instead of taking backbuffer ownership.
 
 ## Picking and sub-element selection contract
 
@@ -154,6 +162,8 @@ Per-frame lighting is carried by `LightEnvironmentPacket` and includes direction
 11. `DebugViewPass`
 12. `ImGuiPass`
 13. `Present`
+
+`Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this pass order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`.
 
 ### Pass module naming
 

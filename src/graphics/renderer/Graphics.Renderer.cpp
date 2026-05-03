@@ -31,6 +31,7 @@ import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
@@ -432,233 +433,35 @@ namespace Extrinsic::Graphics
                 return;
             }
             m_RenderGraph.Reset();
-            const auto backbuffer = m_RenderGraph.ImportBackbuffer("Null.Backbuffer", RHI::TextureHandle{0u, 1u});
-            const auto sceneTable = m_RenderGraph.ImportBuffer(
-                "GpuWorld.SceneTable",
-                m_GpuWorld->GetSceneTableBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto instanceStatic = m_RenderGraph.ImportBuffer(
-                "GpuWorld.InstanceStatic",
-                m_GpuWorld->GetInstanceStaticBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto instanceDynamic = m_RenderGraph.ImportBuffer(
-                "GpuWorld.InstanceDynamic",
-                m_GpuWorld->GetInstanceDynamicBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto entityConfig = m_RenderGraph.ImportBuffer(
-                "GpuWorld.EntityConfig",
-                m_GpuWorld->GetEntityConfigBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto geometryRecords = m_RenderGraph.ImportBuffer(
-                "GpuWorld.GeometryRecords",
-                m_GpuWorld->GetGeometryRecordBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto bounds = m_RenderGraph.ImportBuffer(
-                "GpuWorld.Bounds",
-                m_GpuWorld->GetBoundsBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto lights = m_RenderGraph.ImportBuffer(
-                "GpuWorld.Lights",
-                m_GpuWorld->GetLightBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto materialBuffer = m_RenderGraph.ImportBuffer(
-                "Material.Buffer",
-                m_MaterialSystem->GetBuffer(),
-                BufferState::ShaderRead,
-                BufferState::ShaderRead);
-            const auto drawIndirect = m_RenderGraph.ImportBuffer(
-                "Cull.SurfaceOpaque.IndexedArgs",
-                m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque).IndexedArgsBuffer,
-                BufferState::ShaderWrite,
-                BufferState::IndirectRead);
-            const auto drawCount = m_RenderGraph.ImportBuffer(
-                "Cull.SurfaceOpaque.Count",
-                m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque).CountBuffer,
-                BufferState::ShaderWrite,
-                BufferState::IndirectRead);
-            const auto depth = m_RenderGraph.CreateTexture("Null.Depth",
-                                                           RHI::TextureDesc{
-                                                               .Width = 1u,
-                                                               .Height = 1u,
-                                                               .Fmt = RHI::Format::D32_FLOAT,
-                                                               .Usage = RHI::TextureUsage::DepthTarget,
-                                                           });
-            const auto gbuffer = m_RenderGraph.CreateTexture("Null.GBufferA",
-                                                             RHI::TextureDesc{
-                                                                 .Width = 1u,
-                                                                 .Height = 1u,
-                                                                 .Fmt = RHI::Format::RGBA16_FLOAT,
-                                                                 .Usage = RHI::TextureUsage::ColorTarget |
-                                                                          RHI::TextureUsage::Sampled,
-                                                             });
-            const auto entityId = m_RenderGraph.CreateTexture("Null.EntityId",
-                                                              RHI::TextureDesc{
-                                                                  .Width = 1u,
-                                                                  .Height = 1u,
-                                                                  .Fmt = RHI::Format::R32_UINT,
-                                                                  .Usage = RHI::TextureUsage::ColorTarget |
-                                                                           RHI::TextureUsage::Sampled,
-                                                              });
-            const auto lit = m_RenderGraph.CreateTexture("Null.Lit",
-                                                         RHI::TextureDesc{
-                                                             .Width = 1u,
-                                                             .Height = 1u,
-                                                             .Fmt = RHI::Format::RGBA16_FLOAT,
-                                                             .Usage = RHI::TextureUsage::ColorTarget |
-                                                                      RHI::TextureUsage::Sampled,
-                                                         });
-            const auto postBloom = m_RenderGraph.CreateTexture("Null.PostBloom",
-                                                          RHI::TextureDesc{
-                                                              .Width = 1u,
-                                                              .Height = 1u,
-                                                              .Fmt = RHI::Format::RGBA16_FLOAT,
-                                                              .Usage = RHI::TextureUsage::ColorTarget |
-                                                                       RHI::TextureUsage::Sampled,
-                                                          });
-            const auto postTonemap = m_RenderGraph.CreateTexture("Null.PostTonemap",
-                                                                  RHI::TextureDesc{
-                                                                      .Width = 1u,
-                                                                      .Height = 1u,
-                                                                      .Fmt = RHI::Format::RGBA16_FLOAT,
-                                                                      .Usage = RHI::TextureUsage::ColorTarget |
-                                                                               RHI::TextureUsage::Sampled,
-                                                                  });
-            const auto postFxaa = m_RenderGraph.CreateTexture("Null.PostFxaa",
-                                                               RHI::TextureDesc{
-                                                                   .Width = 1u,
-                                                                   .Height = 1u,
-                                                                   .Fmt = RHI::Format::RGBA16_FLOAT,
-                                                                   .Usage = RHI::TextureUsage::ColorTarget |
-                                                                            RHI::TextureUsage::Sampled,
-                                                               });
-            const auto postSelection = m_RenderGraph.CreateTexture("Null.PostSelection",
-                                                                    RHI::TextureDesc{
-                                                                        .Width = 1u,
-                                                                        .Height = 1u,
-                                                                        .Fmt = RHI::Format::RGBA16_FLOAT,
-                                                                        .Usage = RHI::TextureUsage::ColorTarget |
-                                                                                 RHI::TextureUsage::Sampled,
-                                                                    });
-            const auto postOverlay = m_RenderGraph.CreateTexture("Null.PostOverlay",
-                                                                  RHI::TextureDesc{
-                                                                      .Width = 1u,
-                                                                      .Height = 1u,
-                                                                      .Fmt = RHI::Format::RGBA16_FLOAT,
-                                                                      .Usage = RHI::TextureUsage::ColorTarget |
-                                                                               RHI::TextureUsage::Sampled,
-                                                                  });
-            const auto postDebug = m_RenderGraph.CreateTexture("Null.PostDebug",
-                                                                   RHI::TextureDesc{
-                                                                       .Width = 1u,
-                                                                       .Height = 1u,
-                                                                       .Fmt = RHI::Format::RGBA8_UNORM,
-                                                                       .Usage = RHI::TextureUsage::ColorTarget |
-                                                                                RHI::TextureUsage::Sampled,
-                                                                   });
-            const auto picking = m_RenderGraph.CreateBuffer(
-                "Null.Picking",
-                RHI::BufferDesc{
-                    .SizeBytes = sizeof(std::uint32_t),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc,
-                    .DebugName = "Null.Picking",
+            const auto& surfaceOpaque = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
+            const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(
+                m_RenderGraph,
+                DeriveDefaultFrameRecipeFeatures(renderWorld),
+                FrameRecipeImports{
+                    .Backbuffer = RHI::TextureHandle{0u, 1u},
+                    .SceneTable = m_GpuWorld->GetSceneTableBuffer(),
+                    .InstanceStatic = m_GpuWorld->GetInstanceStaticBuffer(),
+                    .InstanceDynamic = m_GpuWorld->GetInstanceDynamicBuffer(),
+                    .EntityConfig = m_GpuWorld->GetEntityConfigBuffer(),
+                    .GeometryRecords = m_GpuWorld->GetGeometryRecordBuffer(),
+                    .Bounds = m_GpuWorld->GetBoundsBuffer(),
+                    .Lights = m_GpuWorld->GetLightBuffer(),
+                    .MaterialBuffer = m_MaterialSystem->GetBuffer(),
+                    .SurfaceOpaqueIndexedArgs = surfaceOpaque.IndexedArgsBuffer,
+                    .SurfaceOpaqueCount = surfaceOpaque.CountBuffer,
+                },
+                FrameRecipeSizing{
+                    .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
+                    .Height = renderWorld.Viewport.Height > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Height) : 1u,
+                    .BackbufferFormat = RHI::Format::RGBA8_UNORM,
+                    .DepthFormat = RHI::Format::D32_FLOAT,
                 });
-
-            [[maybe_unused]] const auto passCompute = m_RenderGraph.AddPass("Null.Compute.Prologue", [sceneTable, instanceStatic, instanceDynamic, entityConfig, geometryRecords, bounds, materialBuffer, lights, drawIndirect, drawCount, picking](RenderGraphBuilder& builder) {
-                builder.Read(sceneTable, BufferUsage::ShaderRead);
-                builder.Read(instanceStatic, BufferUsage::ShaderRead);
-                builder.Read(instanceDynamic, BufferUsage::ShaderRead);
-                builder.Read(entityConfig, BufferUsage::ShaderRead);
-                builder.Read(geometryRecords, BufferUsage::ShaderRead);
-                builder.Read(bounds, BufferUsage::ShaderRead);
-                builder.Read(materialBuffer, BufferUsage::ShaderRead);
-                builder.Read(lights, BufferUsage::ShaderRead);
-                builder.Write(drawIndirect, BufferUsage::ShaderWrite);
-                builder.Write(drawCount, BufferUsage::ShaderWrite);
-                builder.Write(picking, BufferUsage::TransferDst);
-            });
-            [[maybe_unused]] const auto passCulling = m_RenderGraph.AddPass("Null.Culling", [drawIndirect, drawCount, picking](RenderGraphBuilder& builder) {
-                builder.Read(drawIndirect, BufferUsage::IndirectRead);
-                builder.Read(drawCount, BufferUsage::IndirectRead);
-                builder.Read(picking, BufferUsage::ShaderRead);
-                builder.SideEffect();
-            });
-            if (renderWorld.HasPendingPick)
+            if (!recipe.Succeeded)
             {
-                [[maybe_unused]] const auto passPicking = m_RenderGraph.AddPass("Null.Picking", [picking](RenderGraphBuilder& builder) {
-                    builder.Write(picking, BufferUsage::ShaderWrite);
-                    builder.SideEffect();
-                });
+                m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
+                Core::Log::Error("[Graphics] FrameRecipe build failed: diagnostic={}", recipe.Diagnostic);
+                return;
             }
-            [[maybe_unused]] const auto passDepth = m_RenderGraph.AddPass("Null.DepthPrepass", [depth](RenderGraphBuilder& builder) {
-                builder.Write(depth, TextureUsage::DepthWrite);
-            });
-            [[maybe_unused]] const auto passGBuffer = m_RenderGraph.AddPass("Null.GBuffer", [gbuffer, entityId, depth](RenderGraphBuilder& builder) {
-                builder.Write(gbuffer, TextureUsage::ColorAttachmentWrite);
-                builder.Write(entityId, TextureUsage::ColorAttachmentWrite);
-                builder.Read(depth, TextureUsage::DepthRead);
-            });
-            [[maybe_unused]] const auto passDeferred = m_RenderGraph.AddPass("Null.DeferredLighting", [gbuffer, lit, lights](RenderGraphBuilder& builder) {
-                builder.Read(gbuffer, TextureUsage::ShaderRead);
-                builder.Read(lights, BufferUsage::ShaderRead);
-                builder.Write(lit, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passForwardSurface = m_RenderGraph.AddPass("Null.ForwardSurface", [lit, depth](RenderGraphBuilder& builder) {
-                builder.Read(depth, TextureUsage::DepthRead);
-                builder.Write(lit, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passForwardLine = m_RenderGraph.AddPass("Null.ForwardLine", [lit](RenderGraphBuilder& builder) {
-                builder.Write(lit, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passForwardPoint = m_RenderGraph.AddPass("Null.ForwardPoint", [lit](RenderGraphBuilder& builder) {
-                builder.Write(lit, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passBloom = m_RenderGraph.AddPass("Null.Bloom", [lit, postBloom](RenderGraphBuilder& builder) {
-                builder.Read(lit, TextureUsage::ShaderRead);
-                builder.Write(postBloom, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passToneMap = m_RenderGraph.AddPass("Null.ToneMap", [postBloom, postTonemap](RenderGraphBuilder& builder) {
-                builder.Read(postBloom, TextureUsage::ShaderRead);
-                builder.Write(postTonemap, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passFxaa = m_RenderGraph.AddPass("Null.FXAA", [postTonemap, postFxaa](RenderGraphBuilder& builder) {
-                builder.Read(postTonemap, TextureUsage::ShaderRead);
-                builder.Write(postFxaa, TextureUsage::ColorAttachmentWrite);
-            });
-            [[maybe_unused]] const auto passSelection = m_RenderGraph.AddPass("Null.SelectionOutline", [postFxaa, postSelection, entityId, depth](RenderGraphBuilder& builder) {
-                builder.Read(postFxaa, TextureUsage::ShaderRead);
-                builder.Read(entityId, TextureUsage::ShaderRead);
-                builder.Read(depth, TextureUsage::DepthRead);
-                builder.Write(postSelection, TextureUsage::ColorAttachmentWrite);
-            });
-            auto presentSource = postSelection;
-            if (renderWorld.DebugOverlayEnabled)
-            {
-                [[maybe_unused]] const auto passOverlay = m_RenderGraph.AddPass("Null.OverlaySurface", [postSelection, postOverlay](RenderGraphBuilder& builder) {
-                    builder.Read(postSelection, TextureUsage::ShaderRead);
-                    builder.Write(postOverlay, TextureUsage::ColorAttachmentWrite);
-                });
-                [[maybe_unused]] const auto passDebug = m_RenderGraph.AddPass("Null.DebugView", [postOverlay, postDebug](RenderGraphBuilder& builder) {
-                    builder.Read(postOverlay, TextureUsage::ShaderRead);
-                    builder.Write(postDebug, TextureUsage::ColorAttachmentWrite);
-                });
-                presentSource = postDebug;
-            }
-            [[maybe_unused]] const auto passImGui = m_RenderGraph.AddPass("Null.ImGui", [presentSource](RenderGraphBuilder& builder) {
-                builder.Read(presentSource, TextureUsage::ShaderRead);
-                builder.SideEffect();
-            });
-            [[maybe_unused]] const auto passPresent = m_RenderGraph.AddPass("Null.Present", [backbuffer, presentSource](RenderGraphBuilder& builder) {
-                builder.Read(presentSource, TextureUsage::ShaderRead);
-                builder.Read(backbuffer, TextureUsage::Present);
-                builder.SideEffect();
-            });
 
             const auto compileBegin = std::chrono::steady_clock::now();
             auto compiled = m_RenderGraph.Compile();

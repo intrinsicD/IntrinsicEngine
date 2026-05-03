@@ -364,6 +364,7 @@ intrinsic_test_object_lib(GraphicsContractTestObjs
 )
 
 set(_graphics_contract_cpu_test_files
+    Test.FrameRecipeContract.cpp
     Test.RenderWorldContract.cpp
 )
 intrinsic_resolve_test_sources(_graphics_contract_cpu_test_sources
