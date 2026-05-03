@@ -18,7 +18,8 @@ Capture nonblocking Vulkan renderer integration questions that should not block 
 - Decide ownership of dynamic-rendering attachment scope and transient texture materialization for `DepthPrepass`, `SurfacePass`, and downstream real pass command bodies.
 - Define resize, acquire, present, and device-loss diagnostic taxonomy, including which diagnostics belong in `GRAPHICS-018` versus rendergraph validation hardening in `GRAPHICS-022`.
 - Decide the exact opt-in smoke-test assertion boundary between the promoted Vulkan lifecycle fail-closed path (`Initialize()` leaves `IsOperational() == false`) and the later real swapchain/device bring-up path (`BeginFrame()` succeeds with a valid backbuffer handle).
-- Decide whether concrete Vulkan texture/pipeline creation should land before or after swapchain bring-up, including the minimal CPU-testable diagnostics for currently fail-closed `CreateTexture`, `CreateSampler`, `CreatePipeline`, and upload paths.
+- Decide whether concrete Vulkan texture/pipeline creation should land before or after swapchain bring-up, including the minimal CPU-testable diagnostics for currently fail-closed `CreateTexture`, `CreatePipeline`, and upload paths.
+- Decide sampler feature policy for opt-in Vulkan smoke coverage, including anisotropy feature negotiation, maximum supported anisotropy clamping, and border-color defaults for `RHI::AddressMode::ClampToBorder`.
 
 ## Tests
 - Documentation/link checks only when this clarification task is edited.
