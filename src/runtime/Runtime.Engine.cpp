@@ -435,7 +435,7 @@ namespace Extrinsic::Runtime
             bool BeginFrame() override { return Renderer.BeginFrame(Frame); }
             void ExtractRenderWorld() override
             {
-                Extraction.ExtractAndSubmit(Scene, Renderer);
+                [[maybe_unused]] const RuntimeRenderExtractionStats stats = Extraction.ExtractAndSubmit(Scene, Renderer);
                 World = Renderer.ExtractRenderWorld(Input);
             }
             void PrepareFrame() override { Renderer.PrepareFrame(World); }

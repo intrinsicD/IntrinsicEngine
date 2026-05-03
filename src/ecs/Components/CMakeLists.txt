@@ -6,6 +6,7 @@ target_sources(${target_name}
         ECS.Component.Culling.Local.cppm
         ECS.Component.Culling.World.cppm
         ECS.Component.Culling.Proxy.cppm
+        ECS.Component.DirtyTags.cppm
         ECS.Component.GeometrySources.cppm
         ECS.Component.Hierarchy.cppm
         ECS.Component.Light.cppm
