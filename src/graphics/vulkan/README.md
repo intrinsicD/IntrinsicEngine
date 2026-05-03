@@ -24,9 +24,14 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
   not allocate GPU slots or upload data; they return invalid indices/tokens and
   make maintenance calls no-ops so callers never dereference null backend state.
+- Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
+  in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state
+  and currently return invalid handles for texture/sampler/pipeline creation
+  until real Vulkan allocation/upload/pipeline construction is wired.
 - Completing real Vulkan execution remains in `GRAPHICS-018`: create instance,
-  surface, logical device, swapchain images, per-frame command buffers/sync, and
-  presentation diagnostics before enabling opt-in `gpu;vulkan` smoke tests.
+  surface, logical device, swapchain images, per-frame command buffers/sync,
+  concrete resource creation/upload, pipeline creation, and presentation
+  diagnostics before enabling opt-in `gpu;vulkan` smoke tests.
 
 ## Module surface
 
