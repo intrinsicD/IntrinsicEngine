@@ -1,10 +1,13 @@
 # GRAPHICS-009 — Deferred lighting and shadows
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-008` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff.
+- Completed: 2026-05-03.
+- PR/commit: pending local commit.
+- Completed slice: CPU/null-testable light environment diagnostics, shadow params/cascade/atlas metadata, shadow-pass command gating, deferred fullscreen lighting command contract, docs, and contract tests.
+- Follow-up questions: `tasks/backlog/rendering/GRAPHICS-009Q-lighting-shadow-clarifications.md`.
 
 ## Goal
 - Complete non-legacy lighting environment, shadow atlas, shadow pass, and deferred lighting pass contracts.
@@ -35,8 +38,8 @@
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests -j 4
+ctest --test-dir build/ci --output-on-failure -R 'GraphicsLightingShadowContracts|GraphicsSurfacePassContracts|GraphicsCullingContracts|FrameRecipeContract|RenderWorldContract' --timeout 60
 # Optional when hardware/driver support is available:
 ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
 ```

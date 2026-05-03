@@ -58,9 +58,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-008Q — Surface pass clarification follow-ups](GRAPHICS-008Q-surface-pass-clarifications.md):
   clarification-only backlog for alpha-mask depth/G-buffer policy, descriptor
   bind seams, renderpass attachment ownership, and empty-bucket diagnostics.
-- [GRAPHICS-009 — Deferred lighting and shadows](../../active/GRAPHICS-009-deferred-lighting-and-shadows.md):
+- [GRAPHICS-009 — Deferred lighting and shadows](../../done/GRAPHICS-009-deferred-lighting-and-shadows.md):
   depends on GRAPHICS-008.
-- [GRAPHICS-010 — Lines, points, and debug primitives](GRAPHICS-010-lines-points-debug-primitives.md):
+- [GRAPHICS-009Q — Lighting and shadow clarification follow-ups](GRAPHICS-009Q-lighting-shadow-clarifications.md):
+  nonblocking docs-only follow-up for shadow atlas sizing input, backend sampler binding, cascade extraction ownership, and deferred-lighting debug mode seams. It must not be mixed with C++ behavior work.
+- [GRAPHICS-010 — Lines, points, and debug primitives](../../active/GRAPHICS-010-lines-points-debug-primitives.md):
   depends on GRAPHICS-002, GRAPHICS-003, and GRAPHICS-007.
 - [GRAPHICS-011 — Spatial debug visualizers](GRAPHICS-011-spatial-debug-visualizers.md):
   depends on GRAPHICS-010.

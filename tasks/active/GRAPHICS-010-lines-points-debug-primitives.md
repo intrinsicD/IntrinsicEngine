@@ -1,4 +1,11 @@
 # GRAPHICS-010 — Lines, points, and transient debug primitives
+
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-03 after `GRAPHICS-009` completion.
+- Current slice: promoted from backlog; implementation not started in this handoff.
+
 ## Goal
 - Complete line, point, and transient debug primitive rendering contracts through non-legacy pass APIs.
 ## Non-goals
