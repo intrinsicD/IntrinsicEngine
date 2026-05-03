@@ -255,32 +255,16 @@ namespace Extrinsic::Graphics
 
         // ── Per-frame phases ──────────────────────────────────────────────
 
-        bool BeginFrame(RHI::FrameHandle&) override
+        bool BeginFrame(RHI::FrameHandle& outFrame) override
         {
-            // NullRenderer has no swapchain; always reports "frame available"
-            // so the rest of the loop exercises the extraction/prepare/execute
-            // seams even without a real GPU backend.
-            m_VisualizationSyncRecords.clear();
-            m_VisualizationAttributeBuffers.clear();
-            m_VisualizationScalars.clear();
-            m_VisualizationColors.clear();
-            m_VisualizationVectorFields.clear();
-            m_VisualizationIsolines.clear();
-            m_VisualizationHtexAtlases.clear();
-            m_VisualizationFragmentBakeAtlases.clear();
-            m_VisualizationDiagnostics = {};
-            m_VisualizationOverlaySummary = {};
-            m_TransformSyncRecords.clear();
-            m_LightSnapshots.clear();
-            m_DebugLinePackets.clear();
-            m_DebugPointPackets.clear();
-            m_DebugTrianglePackets.clear();
-            m_TransformGizmoPackets.clear();
-            m_RenderableSnapshots.clear();
-            m_InvalidSnapshotRecordCount = 0;
-            m_HasExtractedRenderWorld = false;
-            m_HasPreparedFrame = false;
-            return true;
+            ResetFrameState();
+            if (m_Device == nullptr)
+            {
+                m_LastRenderGraphStats.Diagnostic = "BeginFrame requires a live device.";
+                Core::Log::Error("[Graphics] BeginFrame failed: device missing");
+                return false;
+            }
+            return m_Device->BeginFrame(outFrame);
         }
 
         void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) override
@@ -604,6 +588,12 @@ namespace Extrinsic::Graphics
                 Core::Log::Warn("[Graphics] ExecuteFrame called before successful PrepareFrame");
                 return;
             }
+            if (m_Device == nullptr)
+            {
+                m_LastRenderGraphStats.Diagnostic = "RenderGraph execute requires a live device.";
+                Core::Log::Error("[Graphics] RenderGraph Execute() failed: device missing");
+                return;
+            }
             m_RenderGraph.Reset();
             const auto& surfaceOpaque = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
             const auto& lines = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Lines);
@@ -612,7 +602,7 @@ namespace Extrinsic::Graphics
                 m_RenderGraph,
                 DeriveDefaultFrameRecipeFeatures(renderWorld),
                 FrameRecipeImports{
-                    .Backbuffer = RHI::TextureHandle{0u, 1u},
+                    .Backbuffer = m_Device->GetBackbufferHandle(frame),
                     .SceneTable = m_GpuWorld->GetSceneTableBuffer(),
                     .InstanceStatic = m_GpuWorld->GetInstanceStaticBuffer(),
                     .InstanceDynamic = m_GpuWorld->GetInstanceDynamicBuffer(),
@@ -663,14 +653,8 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
 
             const auto executeBegin = std::chrono::steady_clock::now();
-            if (m_Device == nullptr)
-            {
-                m_LastRenderGraphStats.Diagnostic = "RenderGraph execute requires a live device.";
-                Core::Log::Error("[Graphics] RenderGraph Execute() failed: device missing");
-                return;
-            }
-
             auto& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
+            graphicsContext.Begin();
             const auto executeResult = m_RenderGraphExecutor.Execute(
                 *compiled,
                 {},
@@ -679,6 +663,7 @@ namespace Extrinsic::Graphics
                 {
                     SubmitBarrierPacket(graphicsContext, *compiled, packet);
                 });
+            graphicsContext.End();
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.ExecuteTimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
@@ -707,11 +692,17 @@ namespace Extrinsic::Graphics
             // Null backend records no commands.
         }
 
-        std::uint64_t EndFrame(const RHI::FrameHandle&) override
+        std::uint64_t EndFrame(const RHI::FrameHandle& frame) override
         {
-            // No GPU timeline — report zero so maintenance callers
-            // never block waiting for a value that will never arrive.
-            return 0;
+            if (m_Device == nullptr)
+            {
+                m_LastRenderGraphStats.Diagnostic = "EndFrame requires a live device.";
+                Core::Log::Error("[Graphics] EndFrame failed: device missing");
+                return 0;
+            }
+
+            m_Device->EndFrame(frame);
+            return m_Device->GetGlobalFrameNumber();
         }
 
         // ── Resource managers ─────────────────────────────────────────────
@@ -735,6 +726,31 @@ namespace Extrinsic::Graphics
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
 
     private:
+        void ResetFrameState()
+        {
+            m_VisualizationSyncRecords.clear();
+            m_VisualizationAttributeBuffers.clear();
+            m_VisualizationScalars.clear();
+            m_VisualizationColors.clear();
+            m_VisualizationVectorFields.clear();
+            m_VisualizationIsolines.clear();
+            m_VisualizationHtexAtlases.clear();
+            m_VisualizationFragmentBakeAtlases.clear();
+            m_VisualizationDiagnostics = {};
+            m_VisualizationOverlaySummary = {};
+            m_TransformSyncRecords.clear();
+            m_LightSnapshots.clear();
+            m_DebugLinePackets.clear();
+            m_DebugPointPackets.clear();
+            m_DebugTrianglePackets.clear();
+            m_TransformGizmoPackets.clear();
+            m_RenderableSnapshots.clear();
+            m_InvalidSnapshotRecordCount = 0;
+            m_HasExtractedRenderWorld = false;
+            m_HasPreparedFrame = false;
+            m_LastRenderGraphStats = {};
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;

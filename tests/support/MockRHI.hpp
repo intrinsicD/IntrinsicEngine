@@ -128,8 +128,8 @@ namespace Extrinsic::Tests
             RHI::MemoryAccess After = RHI::MemoryAccess::None;
         };
 
-        void Begin() override {}
-        void End()   override {}
+        void Begin() override { ++BeginCalls; }
+        void End()   override { ++EndCalls; }
         void BeginRenderPass(const RHI::RenderPassDesc&) override {}
         void EndRenderPass() override {}
         void SetViewport(float, float, float, float, float, float) override {}
@@ -164,6 +164,8 @@ namespace Extrinsic::Tests
 
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
+        int BeginCalls = 0;
+        int EndCalls = 0;
     };
 
     // -----------------------------------------------------------------------
@@ -198,6 +200,10 @@ namespace Extrinsic::Tests
         bool FailNextTextureCreate  = false;
         bool FailNextSamplerCreate  = false;
         bool FailNextPipelineCreate = false;
+        bool BeginFrameResult       = true;
+        RHI::FrameHandle NextFrame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
+        RHI::TextureHandle BackbufferHandle{100u, 1u};
+        std::uint64_t GlobalFrameNumber = 0;
 
         // ---- Counters ------------------------------------------------------
         int CreateBufferCount    = 0;
@@ -208,6 +214,12 @@ namespace Extrinsic::Tests
         int DestroySamplerCount  = 0;
         int CreatePipelineCount  = 0;
         int DestroyPipelineCount = 0;
+        int BeginFrameCount      = 0;
+        int EndFrameCount        = 0;
+        int PresentCount         = 0;
+        int ResizeCount          = 0;
+        mutable int GetBackbufferHandleCount = 0;
+        mutable RHI::FrameHandle LastBackbufferFrame{};
         std::vector<BufferWriteRecord> BufferWrites;
 
         MockBindlessHeap   Bindless;
@@ -221,13 +233,27 @@ namespace Extrinsic::Tests
         void Shutdown() override {}
         void WaitIdle() override {}
 
-        bool BeginFrame(RHI::FrameHandle& out) override { out = {}; return true; }
-        void EndFrame(const RHI::FrameHandle&) override {}
-        void Present(const RHI::FrameHandle&) override {}
-        void Resize(std::uint32_t, std::uint32_t) override {}
+        bool BeginFrame(RHI::FrameHandle& out) override
+        {
+            ++BeginFrameCount;
+            out = NextFrame;
+            return BeginFrameResult;
+        }
+        void EndFrame(const RHI::FrameHandle&) override
+        {
+            ++EndFrameCount;
+            ++GlobalFrameNumber;
+        }
+        void Present(const RHI::FrameHandle&) override { ++PresentCount; }
+        void Resize(std::uint32_t, std::uint32_t) override { ++ResizeCount; }
         void SetPresentMode(RHI::PresentMode) override {}
         [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return RHI::PresentMode::VSync; }
-        [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle&) const override { return {}; }
+        [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle& frame) const override
+        {
+            ++GetBackbufferHandleCount;
+            LastBackbufferFrame = frame;
+            return BackbufferHandle;
+        }
         Platform::Extent2D GetBackbufferExtent() const override { return {}; }
 
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override { return CommandContext; }
@@ -284,7 +310,7 @@ namespace Extrinsic::Tests
         RHI::IProfiler* GetProfiler() override { return nullptr; }
 
         [[nodiscard]] std::uint32_t GetFramesInFlight()    const override { return 2; }
-        [[nodiscard]] std::uint64_t GetGlobalFrameNumber() const override { return 0; }
+        [[nodiscard]] std::uint64_t GetGlobalFrameNumber() const override { return GlobalFrameNumber; }
 
     private:
         std::uint32_t m_NextBuffer   = 1; // 0 is reserved / invalid
