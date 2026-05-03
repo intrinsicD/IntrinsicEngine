@@ -4,7 +4,8 @@
 - State: in-progress.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-017` completion.
-- Current slice: promoted from backlog; implementation not started in this handoff. Keep Vulkan opt-in and preserve the CPU/null correctness gate.
+- Current slice: renderer frame lifecycle now delegates `BeginFrame`/`EndFrame` and backbuffer import through `RHI::IDevice`, brackets render-graph execution with the frame graphics command context, and has CPU/mock contract coverage. Keep Vulkan opt-in and preserve the CPU/null correctness gate.
+- Nonblocking questions: tracked in `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`.
 
 ## Goal
 - Wire concrete Vulkan backend execution behind the promoted graphics interfaces and default frame recipe.

@@ -16,6 +16,12 @@ Graphics is organized into explicit sublayers:
 - Runtime extraction is implemented by `Extrinsic.Runtime.RenderExtraction`, which queries live ECS, maintains entity-to-graphics sidecars outside canonical ECS components, and submits `RuntimeRenderSnapshotBatch` records through `IRenderer::SubmitRuntimeSnapshots()`.
 - Backend code depends on RHI + allowed platform abstractions only.
 
+## Renderer/RHI frame lifecycle
+
+- `IRenderer::BeginFrame()` delegates acquisition to `RHI::IDevice::BeginFrame()` and clears renderer-owned per-frame snapshot storage before extraction.
+- `IRenderer::ExecuteFrame()` imports the frame backbuffer from `RHI::IDevice::GetBackbufferHandle(frame)` when building the default frame recipe, then brackets render-graph barrier/command recording with `ICommandContext::Begin()` / `End()` on the frame graphics context.
+- `IRenderer::EndFrame()` delegates to `RHI::IDevice::EndFrame()` and reports the device global frame number for maintenance callers. Runtime remains the composition owner for presentation and calls `IDevice::Present(frame)` after the renderer frame has ended.
+
 ## GPU scene ownership
 
 - Runtime composes the CPU render scene from ECS, assets, geometry, transforms, materials, lights, selection, camera, and debug inputs.

@@ -1,0 +1,38 @@
+# GRAPHICS-018Q — Vulkan integration clarification follow-ups
+
+## Goal
+Capture nonblocking Vulkan renderer integration questions that should not block the current `GRAPHICS-018` implementation slices.
+
+## Non-goals
+- No C++ behavior changes.
+- No Vulkan smoke-test implementation.
+- No changes to renderer/RHI ownership policy beyond documenting decisions.
+
+## Context
+`GRAPHICS-018` is active for wiring concrete Vulkan execution behind promoted graphics interfaces. The current implementation can proceed with CPU/null contract coverage while several environment- and backend-specific details remain open.
+
+## Required changes
+- Decide the platform/window fixture policy for opt-in swapchain smoke tests, including headless CI behavior and skip diagnostics when no surface-capable device is available.
+- Define shader source packaging and pipeline asset path policy for real pass rendering in Vulkan smoke tests.
+- Define resize, acquire, present, and device-loss diagnostic taxonomy, including which diagnostics belong in `GRAPHICS-018` versus rendergraph validation hardening in `GRAPHICS-022`.
+
+## Tests
+- Documentation/link checks only when this clarification task is edited.
+
+## Docs
+- Update `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, or GPU verification docs with any finalized policy.
+
+## Acceptance criteria
+- Each question above is either resolved in docs or split into a concrete implementation task.
+- Clarifications do not require Vulkan in the default CPU correctness gate.
+
+## Verification
+```bash
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_task_policy.py --root . --strict
+```
+
+## Forbidden changes
+- Do not mix this docs-only clarification task with C++ behavior work.
+- Do not make Vulkan/GPU tests mandatory in the default CPU gate.
+
