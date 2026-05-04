@@ -88,3 +88,31 @@ TEST(VulkanFailClosedContract, CreatePipelineIncrementsCreationCounter)
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
               before + 2u);
 }
+
+TEST(VulkanFailClosedContract, CreatePipelineReportsPreBringUpReason)
+{
+    // A freshly constructed VulkanDevice has not been Initialize()d, so the
+    // global pipeline layout is missing and m_Operational is false. The
+    // fail-closed CreatePipeline guard must report PreBringUp rather than the
+    // ShaderMissing reason that only fires on operational devices.
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
+              Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+}
+
+// ShaderMissing requires an operational VulkanDevice, which the CPU-only
+// contract surface cannot reach until real swapchain/device bring-up lands.
+// The enum value is asserted here so accidental renames keep the contract
+// stable for the future operational-path test in
+// `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`.
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::FallbackPipelineReason::None) == 0u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::FallbackPipelineReason::ShaderMissing) == 2u);

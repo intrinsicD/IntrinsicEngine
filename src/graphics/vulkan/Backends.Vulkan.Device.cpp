@@ -27,6 +27,8 @@ namespace
     std::atomic<std::uint64_t> g_FallbackBindlessAllocationAttempts{0};
     std::atomic<std::uint64_t> g_FallbackTransferUploadAttempts{0};
     std::atomic<std::uint64_t> g_FallbackPipelineCreationAttempts{0};
+    std::atomic<std::uint8_t>  g_LastFallbackPipelineReason{
+        static_cast<std::uint8_t>(FallbackPipelineReason::None)};
 
     [[nodiscard]] bool HasImageUsage(const VkImageUsageFlags usage, const VkImageUsageFlags bit) noexcept
     {
@@ -59,14 +61,22 @@ std::uint64_t GetFallbackTransferUploadAttemptCount() noexcept
     return g_FallbackTransferUploadAttempts.load(std::memory_order_relaxed);
 }
 
-void NoteFallbackPipelineCreationAttempt()
+void NoteFallbackPipelineCreationAttempt(FallbackPipelineReason reason)
 {
     g_FallbackPipelineCreationAttempts.fetch_add(1, std::memory_order_relaxed);
+    g_LastFallbackPipelineReason.store(static_cast<std::uint8_t>(reason),
+                                       std::memory_order_relaxed);
 }
 
 std::uint64_t GetFallbackPipelineCreationAttemptCount() noexcept
 {
     return g_FallbackPipelineCreationAttempts.load(std::memory_order_relaxed);
+}
+
+FallbackPipelineReason GetLastFallbackPipelineReason() noexcept
+{
+    return static_cast<FallbackPipelineReason>(
+        g_LastFallbackPipelineReason.load(std::memory_order_relaxed));
 }
 
 // =============================================================================
@@ -921,13 +931,13 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
     (void)desc;
     if (!m_Operational || m_Device == VK_NULL_HANDLE || m_GlobalPipelineLayout == VK_NULL_HANDLE)
     {
-        NoteFallbackPipelineCreationAttempt();
+        NoteFallbackPipelineCreationAttempt(FallbackPipelineReason::PreBringUp);
         Core::Log::Warn("[VulkanDevice] CreatePipeline rejected; device is non-operational or global pipeline layout missing");
         return {};
     }
 
     // Shader-module and pipeline construction remains a later GRAPHICS-018 slice.
-    NoteFallbackPipelineCreationAttempt();
+    NoteFallbackPipelineCreationAttempt(FallbackPipelineReason::ShaderMissing);
     Core::Log::Warn("[VulkanDevice] CreatePipeline reached operational guard but shader/pipeline construction is not yet implemented");
     return {};
 }
