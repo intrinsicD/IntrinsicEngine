@@ -123,6 +123,44 @@ namespace
         Trace& m_Trace;
     };
 
+    class FakeOperationalTransitionHooks final : public Extrinsic::Runtime::IRuntimeOperationalTransitionHooks
+    {
+    public:
+        explicit FakeOperationalTransitionHooks(Trace& trace)
+            : m_Trace(trace)
+        {
+        }
+
+        [[nodiscard]] bool IsDeviceOperational() const override
+        {
+            m_Trace.emplace_back("operational:device_query");
+            return DeviceOperational;
+        }
+        [[nodiscard]] bool IsRendererOperational() const override
+        {
+            m_Trace.emplace_back("operational:renderer_query");
+            return RendererOperational;
+        }
+        void WaitDeviceIdle() override { m_Trace.emplace_back("operational:wait_idle"); }
+        [[nodiscard]] bool RebuildRendererOperationalResources() override
+        {
+            m_Trace.emplace_back("operational:renderer_rebuild");
+            return RebuildSucceeds;
+        }
+        void MarkRendererOperational() override
+        {
+            RendererOperational = true;
+            m_Trace.emplace_back("operational:mark_renderer_operational");
+        }
+
+        bool DeviceOperational{false};
+        bool RendererOperational{false};
+        bool RebuildSucceeds{true};
+
+    private:
+        Trace& m_Trace;
+    };
+
     class FakeShutdownHooks final : public Extrinsic::Runtime::IRuntimeShutdownHooks
     {
     public:
@@ -224,6 +262,56 @@ TEST(RuntimeFrameLoopContract, MaintenanceOrdersTransferStreamingAssetHooks)
                          "assets:tick",
                          "streaming:submit_frame_work",
                          "streaming:pump_background",
+                     }));
+}
+
+TEST(RuntimeFrameLoopContract, OperationalTransitionWaitsIdleThenRebuildsRendererOnce)
+{
+    Trace trace;
+    FakeOperationalTransitionHooks hooks(trace);
+    hooks.DeviceOperational = true;
+
+    const bool transitioned = Extrinsic::Runtime::ExecuteRuntimeOperationalTransitionContract(hooks);
+
+    EXPECT_TRUE(transitioned);
+    EXPECT_TRUE(hooks.RendererOperational);
+    EXPECT_EQ(trace, (Trace{
+                         "operational:device_query",
+                         "operational:renderer_query",
+                         "operational:wait_idle",
+                         "operational:renderer_rebuild",
+                         "operational:mark_renderer_operational",
+                     }));
+}
+
+TEST(RuntimeFrameLoopContract, OperationalTransitionNoOpsUntilDeviceBecomesOperational)
+{
+    Trace trace;
+    FakeOperationalTransitionHooks hooks(trace);
+
+    const bool transitioned = Extrinsic::Runtime::ExecuteRuntimeOperationalTransitionContract(hooks);
+
+    EXPECT_FALSE(transitioned);
+    EXPECT_FALSE(hooks.RendererOperational);
+    EXPECT_EQ(trace, Trace{"operational:device_query"});
+}
+
+TEST(RuntimeFrameLoopContract, OperationalTransitionDoesNotMarkRendererWhenRebuildFails)
+{
+    Trace trace;
+    FakeOperationalTransitionHooks hooks(trace);
+    hooks.DeviceOperational = true;
+    hooks.RebuildSucceeds = false;
+
+    const bool transitioned = Extrinsic::Runtime::ExecuteRuntimeOperationalTransitionContract(hooks);
+
+    EXPECT_FALSE(transitioned);
+    EXPECT_FALSE(hooks.RendererOperational);
+    EXPECT_EQ(trace, (Trace{
+                         "operational:device_query",
+                         "operational:renderer_query",
+                         "operational:wait_idle",
+                         "operational:renderer_rebuild",
                      }));
 }
 

@@ -212,30 +212,7 @@ namespace Extrinsic::Graphics
             m_CullingSystem  .emplace();
             if (device.IsOperational())
             {
-                m_CullingOutputAvailable = m_CullingSystem->Initialize(
-                    device,
-                    *m_BufferManager,
-                    *m_PipelineManager,
-                    "assets/shaders/instance_cull.comp");
-
-                RHI::PipelineDesc depthPrepassDesc{};
-                depthPrepassDesc.VertexShaderPath = "assets/shaders/depth_prepass.vert";
-                depthPrepassDesc.ColorTargetCount = 0u;
-                depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
-                depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
-                depthPrepassDesc.DebugName = "Renderer.DepthPrepass";
-                auto depthPipeline = m_PipelineManager->Create(depthPrepassDesc);
-                if (depthPipeline.has_value())
-                {
-                    m_DepthPrepassPipelineLease.emplace(std::move(*depthPipeline));
-                    m_DepthPrepassPass.SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
-                }
-                else
-                {
-                    Core::Log::Warn("[Graphics] DepthPrepass pipeline unavailable; pass commands will be skipped: error={}",
-                                    static_cast<int>(depthPipeline.error()));
-                }
+                [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
             }
             m_LightSystem    .emplace();
             m_LightSystem->Initialize();
@@ -251,6 +228,50 @@ namespace Extrinsic::Graphics
             m_ShadowSystem->Initialize();
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
+        }
+
+        bool RebuildOperationalResources(RHI::IDevice& device) override
+        {
+            m_Device = &device;
+            if (!device.IsOperational())
+            {
+                m_CullingOutputAvailable = false;
+                m_LastRenderGraphStats.LifecycleDiagnostic =
+                    "Renderer operational-resource rebuild requires an operational device.";
+                return false;
+            }
+            if (!m_BufferManager || !m_PipelineManager || !m_MaterialSystem ||
+                !m_GpuWorld || !m_CullingSystem)
+            {
+                m_LastRenderGraphStats.LifecycleDiagnostic =
+                    "Renderer operational-resource rebuild requires initialized renderer systems.";
+                return false;
+            }
+
+            if (!m_MaterialSystem->RebuildGpuResources(device, *m_BufferManager))
+            {
+                m_LastRenderGraphStats.LifecycleDiagnostic =
+                    "Renderer operational-resource rebuild failed while recreating material buffers.";
+                return false;
+            }
+            if (!m_GpuWorld->RebuildGpuResources(device, *m_BufferManager))
+            {
+                m_LastRenderGraphStats.LifecycleDiagnostic =
+                    "Renderer operational-resource rebuild failed while recreating GpuWorld buffers.";
+                return false;
+            }
+            m_GpuWorld->SetMaterialBuffer(
+                m_MaterialSystem->GetBuffer(),
+                m_MaterialSystem->GetCapacity());
+            m_MaterialSystem->SyncGpuBuffer();
+            m_GpuWorld->SyncFrame();
+
+            const bool passResourcesReady = InitializeOperationalPassResources(device);
+            m_RenderGraph.Reset();
+            m_LastRenderGraphStats.LifecycleDiagnostic = m_CullingOutputAvailable
+                ? std::string{}
+                : std::string{"Renderer operational-resource rebuild completed with culling unavailable."};
+            return passResourcesReady;
         }
 
         void Shutdown() override
@@ -805,6 +826,45 @@ namespace Extrinsic::Graphics
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
 
     private:
+        [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
+        {
+            if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
+            {
+                m_CullingOutputAvailable = false;
+                return false;
+            }
+
+            m_CullingSystem->Shutdown();
+            m_CullingOutputAvailable = m_CullingSystem->Initialize(
+                device,
+                *m_BufferManager,
+                *m_PipelineManager,
+                "assets/shaders/instance_cull.comp");
+
+            m_DepthPrepassPipelineLease.reset();
+            RHI::PipelineDesc depthPrepassDesc{};
+            depthPrepassDesc.VertexShaderPath = "assets/shaders/depth_prepass.vert";
+            depthPrepassDesc.ColorTargetCount = 0u;
+            depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            depthPrepassDesc.DebugName = "Renderer.DepthPrepass";
+            auto depthPipeline = m_PipelineManager->Create(depthPrepassDesc);
+            if (depthPipeline.has_value())
+            {
+                m_DepthPrepassPipelineLease.emplace(std::move(*depthPipeline));
+                m_DepthPrepassPass.SetPipeline(
+                    m_PipelineManager->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] DepthPrepass pipeline unavailable; pass commands will be skipped: error={}",
+                                static_cast<int>(depthPipeline.error()));
+            }
+
+            return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
+                m_DepthPrepassPipelineLease->IsValid();
+        }
+
         void ResetFrameState()
         {
             m_VisualizationSyncRecords.clear();

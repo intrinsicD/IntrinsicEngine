@@ -181,5 +181,6 @@ namespace Extrinsic::Runtime
 
         bool m_Initialized{false};
         bool m_Running{false};
+        bool m_RendererOperational{false};
     };
 }

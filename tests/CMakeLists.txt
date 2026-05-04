@@ -439,9 +439,10 @@ intrinsic_test_object_lib(GraphicsContractCpuTestObjs
 
 set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
+    Test.RuntimeFrameLoopContract.cpp
 )
 intrinsic_resolve_test_sources(_runtime_graphics_cpu_test_sources
-    SEARCH_DIRS integration/runtime
+    SEARCH_DIRS integration/runtime contract/runtime
     FILES ${_runtime_graphics_cpu_test_files}
 )
 intrinsic_test_object_lib(RuntimeGraphicsCpuTestObjs

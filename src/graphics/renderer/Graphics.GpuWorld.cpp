@@ -286,6 +286,96 @@ namespace Extrinsic::Graphics
             return true;
         }
 
+        [[nodiscard]] bool AllocateGpuResources()
+        {
+            if (!Device || !Buffers || !Device->IsOperational())
+            {
+                return false;
+            }
+
+            if (!AllocateBuffer(InstanceStaticLease, {
+                    .SizeBytes = static_cast<std::uint64_t>(Desc.MaxInstances) * sizeof(RHI::GpuInstanceStatic),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.InstanceStatic",
+                })) return false;
+            if (!AllocateBuffer(InstanceDynamicLease, {
+                    .SizeBytes = static_cast<std::uint64_t>(Desc.MaxInstances) * sizeof(RHI::GpuInstanceDynamic),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.InstanceDynamic",
+                })) return false;
+            if (!AllocateBuffer(EntityConfigLease, {
+                    .SizeBytes = static_cast<std::uint64_t>(Desc.MaxInstances) * sizeof(RHI::GpuEntityConfig),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.EntityConfig",
+                })) return false;
+            if (!AllocateBuffer(GeometryRecordLease, {
+                    .SizeBytes = static_cast<std::uint64_t>(Desc.MaxGeometryRecords) * sizeof(RHI::GpuGeometryRecord),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.GeometryRecords",
+                })) return false;
+            if (!AllocateBuffer(BoundsLease, {
+                    .SizeBytes = static_cast<std::uint64_t>(Desc.MaxInstances) * sizeof(RHI::GpuBounds),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.Bounds",
+                })) return false;
+            if (!AllocateBuffer(LightLease, {
+                    .SizeBytes = static_cast<std::uint64_t>(Desc.MaxLights) * sizeof(RHI::GpuLight),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.Lights",
+                })) return false;
+            if (!AllocateBuffer(SceneTableLease, {
+                    .SizeBytes = sizeof(RHI::GpuSceneTable),
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.SceneTable",
+                })) return false;
+            if (!AllocateBuffer(ManagedVertexLease, {
+                    .SizeBytes = Desc.VertexBufferBytes,
+                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.ManagedVertexBuffer0",
+                })) return false;
+            if (!AllocateBuffer(ManagedIndexLease, {
+                    .SizeBytes = Desc.IndexBufferBytes,
+                    .Usage = RHI::BufferUsage::Index | RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName = "GpuWorld.ManagedIndexBuffer0",
+                })) return false;
+
+            RefreshSceneTable();
+            return true;
+        }
+
+        void ReleaseGpuResources()
+        {
+            InstanceStaticLease = {};
+            InstanceDynamicLease = {};
+            EntityConfigLease = {};
+            GeometryRecordLease = {};
+            BoundsLease = {};
+            LightLease = {};
+            SceneTableLease = {};
+            ManagedVertexLease = {};
+            ManagedIndexLease = {};
+        }
+
+        void MarkAllDirty()
+        {
+            std::fill(DirtyInstanceStatic.begin(), DirtyInstanceStatic.end(), true);
+            std::fill(DirtyInstanceDynamic.begin(), DirtyInstanceDynamic.end(), true);
+            std::fill(DirtyEntityConfig.begin(), DirtyEntityConfig.end(), true);
+            std::fill(DirtyGeometryRecord.begin(), DirtyGeometryRecord.end(), true);
+            std::fill(DirtyBounds.begin(), DirtyBounds.end(), true);
+            DirtyLights = true;
+            DirtySceneTable = true;
+        }
+
         void RefreshSceneTable()
         {
             if (!Device)
@@ -465,64 +555,9 @@ namespace Extrinsic::Graphics
         m_Impl->DirtyGeometryRecord.assign(desc.MaxGeometryRecords, true);
         m_Impl->DirtyLights = true;
 
-        if (device.IsOperational())
+        if (device.IsOperational() && !m_Impl->AllocateGpuResources())
         {
-            if (!m_Impl->AllocateBuffer(m_Impl->InstanceStaticLease, {
-                    .SizeBytes = static_cast<std::uint64_t>(desc.MaxInstances) * sizeof(RHI::GpuInstanceStatic),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.InstanceStatic",
-                })) return false;
-            if (!m_Impl->AllocateBuffer(m_Impl->InstanceDynamicLease, {
-                    .SizeBytes = static_cast<std::uint64_t>(desc.MaxInstances) * sizeof(RHI::GpuInstanceDynamic),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.InstanceDynamic",
-                })) return false;
-            if (!m_Impl->AllocateBuffer(m_Impl->EntityConfigLease, {
-                    .SizeBytes = static_cast<std::uint64_t>(desc.MaxInstances) * sizeof(RHI::GpuEntityConfig),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.EntityConfig",
-                })) return false;
-            if (!m_Impl->AllocateBuffer(m_Impl->GeometryRecordLease, {
-                    .SizeBytes = static_cast<std::uint64_t>(desc.MaxGeometryRecords) * sizeof(RHI::GpuGeometryRecord),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.GeometryRecords",
-                })) return false;
-            if (!m_Impl->AllocateBuffer(m_Impl->BoundsLease, {
-                    .SizeBytes = static_cast<std::uint64_t>(desc.MaxInstances) * sizeof(RHI::GpuBounds),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.Bounds",
-                })) return false;
-            if (!m_Impl->AllocateBuffer(m_Impl->LightLease, {
-                    .SizeBytes = static_cast<std::uint64_t>(desc.MaxLights) * sizeof(RHI::GpuLight),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.Lights",
-                })) return false;
-            if (!m_Impl->AllocateBuffer(m_Impl->SceneTableLease, {
-                    .SizeBytes = sizeof(RHI::GpuSceneTable),
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.SceneTable",
-                })) return false;
-            // TODO: extend to multiple managed buffers and background compaction.
-            if (!m_Impl->AllocateBuffer(m_Impl->ManagedVertexLease, {
-                    .SizeBytes = desc.VertexBufferBytes,
-                    .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.ManagedVertexBuffer0",
-                })) return false;
-            // TODO: extend to multiple managed buffers and background compaction.
-            if (!m_Impl->AllocateBuffer(m_Impl->ManagedIndexLease, {
-                    .SizeBytes = desc.IndexBufferBytes,
-                    .Usage = RHI::BufferUsage::Index | RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
-                    .HostVisible = false,
-                    .DebugName = "GpuWorld.ManagedIndexBuffer0",
-                })) return false;
+            return false;
         }
 
         m_Impl->Initialized = true;
@@ -535,6 +570,36 @@ namespace Extrinsic::Graphics
         return Initialize(device, buffers, InitDesc{});
     }
 
+    bool GpuWorld::RebuildGpuResources(RHI::IDevice& device, RHI::BufferManager& buffers)
+    {
+        if (!m_Impl->Initialized || !device.IsOperational())
+        {
+            return false;
+        }
+
+        m_Impl->Device = &device;
+        m_Impl->Buffers = &buffers;
+        m_Impl->ReleaseGpuResources();
+        if (!m_Impl->AllocateGpuResources())
+        {
+            return false;
+        }
+
+        for (std::uint32_t slot = 0; slot < m_Impl->GeometryAllocations.size(); ++slot)
+        {
+            auto& allocation = m_Impl->GeometryAllocations[slot];
+            if (!allocation.Live)
+            {
+                continue;
+            }
+            m_Impl->ReplayManagedUpload(allocation);
+            m_Impl->RewriteGeometryRecord(slot);
+        }
+
+        m_Impl->MarkAllDirty();
+        return true;
+    }
+
     void GpuWorld::Shutdown()
     {
         if (!m_Impl->Initialized)
@@ -542,15 +607,7 @@ namespace Extrinsic::Graphics
             return;
         }
 
-        m_Impl->InstanceStaticLease = {};
-        m_Impl->InstanceDynamicLease = {};
-        m_Impl->EntityConfigLease = {};
-        m_Impl->GeometryRecordLease = {};
-        m_Impl->BoundsLease = {};
-        m_Impl->LightLease = {};
-        m_Impl->SceneTableLease = {};
-        m_Impl->ManagedVertexLease = {};
-        m_Impl->ManagedIndexLease = {};
+        m_Impl->ReleaseGpuResources();
 
         m_Impl->InstanceStaticCpu.clear();
         m_Impl->InstanceDynamicCpu.clear();

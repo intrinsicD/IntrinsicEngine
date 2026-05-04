@@ -212,6 +212,46 @@ namespace Extrinsic::Graphics
             DirtySet .assign(newCap, false);
             return true;
         }
+
+        bool RecreateGpuBuffer(std::uint32_t capacity)
+        {
+            if (!Device || !BufferMgr || !Device->IsOperational())
+            {
+                return false;
+            }
+
+            capacity = std::max(capacity, kInitialCapacity);
+            const std::uint64_t newSizeBytes =
+                capacity * static_cast<std::uint64_t>(sizeof(RHI::GpuMaterialSlot));
+
+            auto newBufferOr = BufferMgr->Create({
+                .SizeBytes = newSizeBytes,
+                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                .HostVisible = false,
+                .DebugName = "MaterialSSBO",
+            });
+            if (!newBufferOr.has_value())
+            {
+                return false;
+            }
+
+            if (GpuSlots.size() < capacity)
+            {
+                GpuSlots.resize(capacity, RHI::GpuMaterialSlot{});
+            }
+
+            auto newBuffer = std::move(*newBufferOr);
+            Device->WriteBuffer(newBuffer.GetHandle(),
+                                GpuSlots.data(),
+                                static_cast<std::uint64_t>(GpuSlots.size() * sizeof(RHI::GpuMaterialSlot)),
+                                0);
+            Buffer = std::move(newBuffer);
+            GpuCapacity = capacity;
+            DirtySet.assign(capacity, false);
+            Diagnostics.LastUploadRangeCount = GpuSlots.empty() ? 0u : 1u;
+            Diagnostics.LastUploadedSlotCount = static_cast<std::uint32_t>(GpuSlots.size());
+            return true;
+        }
     };
 
     // -----------------------------------------------------------------
@@ -252,6 +292,16 @@ namespace Extrinsic::Graphics
         // Pack the default slot on the CPU side and mark dirty.
         Impl::PackSlot(m_Impl->GpuSlots[0], MaterialParams{}, 0);
         m_Impl->DirtySet[0] = true;
+    }
+
+    bool MaterialSystem::RebuildGpuResources(RHI::IDevice& device, RHI::BufferManager& bufferMgr)
+    {
+        m_Impl->Device = &device;
+        m_Impl->BufferMgr = &bufferMgr;
+        const std::uint32_t capacity = std::max<std::uint32_t>(
+            m_Impl->GpuCapacity,
+            static_cast<std::uint32_t>(m_Impl->GpuSlots.size()));
+        return m_Impl->RecreateGpuBuffer(capacity);
     }
 
     // -----------------------------------------------------------------

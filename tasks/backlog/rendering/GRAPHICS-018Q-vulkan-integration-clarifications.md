@@ -15,7 +15,7 @@ Capture Vulkan renderer integration questions that should not be implemented ins
 
 ### Blocks next operational Vulkan slice
 
-- Implement the renderer/runtime operational-transition reset tracked by `GRAPHICS-018R` before `VulkanDevice::IsOperational()` can become true.
+- Reconcile fail-closed fallback bindless heap and transfer queue behavior with real Vulkan services before `VulkanDevice::IsOperational()` can become true; the renderer/runtime reset prerequisite is complete in `tasks/done/GRAPHICS-018R-operational-transition.md`.
 - Define shader source packaging and pipeline asset path policy for real pass rendering in Vulkan smoke tests.
 - Decide the promoted depth-prepass shader asset path/packaging policy and whether a dedicated depth-only shader should be introduced before enabling real Vulkan depth-prepass smoke rendering.
 - Decide ownership of dynamic-rendering attachment scope and transient texture materialization for `DepthPrepass`, `SurfacePass`, and downstream real pass command bodies.

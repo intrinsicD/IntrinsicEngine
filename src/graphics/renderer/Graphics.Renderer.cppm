@@ -110,6 +110,13 @@ namespace Extrinsic::Graphics
         // ── Subsystem lifecycle ───────────────────────────────────────────
 
         virtual void Initialize(RHI::IDevice& device) = 0;
+
+        // Runtime calls this after a device that was initialized in a
+        // fail-closed/non-operational state becomes operational. Implementations
+        // must rebuild GPU-only state through RHI managers without importing or
+        // special-casing concrete backends.
+        [[nodiscard]] virtual bool RebuildOperationalResources(RHI::IDevice& device) = 0;
+
         virtual void Shutdown() = 0;
 
         virtual void Resize(std::uint32_t width, std::uint32_t height) = 0;

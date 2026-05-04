@@ -143,6 +143,7 @@ export namespace Extrinsic::Graphics
 
         bool Initialize(RHI::IDevice& device, RHI::BufferManager& buffers, const InitDesc& desc);
         bool Initialize(RHI::IDevice& device, RHI::BufferManager& buffers);
+        [[nodiscard]] bool RebuildGpuResources(RHI::IDevice& device, RHI::BufferManager& buffers);
         void Shutdown();
 
         [[nodiscard]] bool IsInitialized() const noexcept;

@@ -133,6 +133,36 @@ namespace Extrinsic::Runtime
         streaming.PumpBackground(maxStreamingLaunches);
     }
 
+    export class IRuntimeOperationalTransitionHooks
+    {
+    public:
+        virtual ~IRuntimeOperationalTransitionHooks() = default;
+
+        [[nodiscard]] virtual bool IsDeviceOperational() const = 0;
+        [[nodiscard]] virtual bool IsRendererOperational() const = 0;
+        virtual void WaitDeviceIdle() = 0;
+        [[nodiscard]] virtual bool RebuildRendererOperationalResources() = 0;
+        virtual void MarkRendererOperational() = 0;
+    };
+
+    export [[nodiscard]] inline bool ExecuteRuntimeOperationalTransitionContract(
+        IRuntimeOperationalTransitionHooks& hooks)
+    {
+        if (!hooks.IsDeviceOperational() || hooks.IsRendererOperational())
+        {
+            return false;
+        }
+
+        hooks.WaitDeviceIdle();
+        if (!hooks.RebuildRendererOperationalResources())
+        {
+            return false;
+        }
+
+        hooks.MarkRendererOperational();
+        return true;
+    }
+
     export class IRuntimeShutdownHooks
     {
     public:

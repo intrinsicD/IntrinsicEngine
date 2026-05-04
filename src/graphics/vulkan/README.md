@@ -20,6 +20,12 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 - `Initialize()` currently reports that promoted swapchain/device bring-up is not
   complete and keeps `IsOperational() == false`; renderers must continue to gate
   GPU command recording on `IDevice::IsOperational()`.
+- Runtime now has a backend-neutral operational-transition seam for future
+  Vulkan bring-up: when a device moves from non-operational to operational,
+  runtime waits idle and calls `IRenderer::RebuildOperationalResources()` to
+  rebuild renderer-owned material, `GpuWorld`, culling, and depth-prepass state
+  through RHI managers. Vulkan still remains non-operational in this directory;
+  no swapchain, surface, or presentation path is enabled by that seam.
 - Non-operational instances still return valid service references for
   `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
   not allocate GPU slots or upload data; they return invalid indices/tokens and
@@ -44,7 +50,10 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 - Completing real Vulkan execution remains in `GRAPHICS-018`: create instance,
   surface, logical device, swapchain images, per-frame command buffers/sync,
   concrete resource creation/upload, pipeline creation, and presentation
-  diagnostics before enabling opt-in `gpu;vulkan` smoke tests.
+  diagnostics before enabling opt-in `gpu;vulkan` smoke tests. The completed
+  renderer reset seam removes one prior blocker, but Vulkan may not report
+  operational until fallback bindless/transfer behavior and real backend
+  resources are reconciled behind the same RHI interfaces.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 

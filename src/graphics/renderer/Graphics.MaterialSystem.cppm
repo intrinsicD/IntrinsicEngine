@@ -110,6 +110,12 @@ export namespace Extrinsic::Graphics
         /// the default StandardPBR type (TypeID = 0, slot 0).
         void Initialize(RHI::IDevice& device, RHI::BufferManager& bufferMgr);
 
+        /// Recreate the material SSBO after a previously non-operational
+        /// device becomes operational. Preserves CPU material/type/slot state
+        /// and uploads the current mirror into the new GPU buffer.
+        [[nodiscard]] bool RebuildGpuResources(RHI::IDevice& device,
+                                               RHI::BufferManager& bufferMgr);
+
         /// Release the SSBO lease and all instance slots.
         void Shutdown();
 

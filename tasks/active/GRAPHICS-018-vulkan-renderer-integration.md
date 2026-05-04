@@ -12,12 +12,14 @@
   - Promoted Vulkan `IDevice` lifecycle/services/resource overrides are symbol-complete and fail-closed until full device/swapchain/resource bring-up lands.
   - Guarded Vulkan texture allocation/view/upload and `VkSampler` creation paths exist for future operational devices.
   - Live backend resource pools are drained during shutdown.
+  - Runtime now owns a CPU-tested operational-transition check that waits idle and calls `IRenderer::RebuildOperationalResources()` when a fail-closed device becomes operational; the renderer rebuilds material GPU buffers, `GpuWorld` scene bindings, culling output resources, and the depth-prepass pipeline through RHI seams.
   - Keep Vulkan opt-in and preserve the CPU/null correctness gate.
 - Nonblocking questions: tracked in `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`.
-- Blocking follow-up before marking Vulkan operational: `tasks/backlog/rendering/GRAPHICS-018R-operational-transition.md`.
+- Completed prerequisite: `tasks/done/GRAPHICS-018R-operational-transition.md`.
+- Remaining blockers before marking Vulkan operational: real swapchain/surface/device bring-up, concrete pipeline creation, presentation diagnostics, and reconciliation of fail-closed fallback bindless/transfer behavior.
 - Temporary fail-closed shim removal/reconciliation timeline:
-  - Fallback bindless heap and fallback transfer queue: reconcile/remove under `GRAPHICS-018R` before any slice marks Vulkan operational.
-  - Empty-handle `Create*` paths for non-operational devices: keep as fail-closed guards; operational-path replacement is owned by `GRAPHICS-018` bring-up, with renderer reset gated by `GRAPHICS-018R`.
+  - Fallback bindless heap and fallback transfer queue: reconcile/remove in a future `GRAPHICS-018` operational bring-up slice before `VulkanDevice::IsOperational()` can become true.
+  - Empty-handle `Create*` paths for non-operational devices: keep as fail-closed guards; operational-path replacement is owned by `GRAPHICS-018` bring-up, now able to call the renderer reset seam completed by `GRAPHICS-018R`.
   - Hard-coded sampler border color: `tasks/backlog/rendering/GRAPHICS-018S-sampler-border-color.md`, before non-black border colors are relied on by renderer/material behavior.
   - One-subresource blocking texture upload path: `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`, before multi-mip/layer Vulkan texture smoke tests.
 

@@ -209,6 +209,61 @@ TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutes
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecordsRoutedCommands)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = false;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{93u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    EXPECT_FALSE(renderer->GetMaterialSystem().GetBuffer().IsValid());
+    EXPECT_FALSE(renderer->GetGpuWorld().GetSceneTableBuffer().IsValid());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 160, .Height = 90},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    const Extrinsic::Graphics::RenderGraphFrameStats& nonOperationalStats =
+        renderer->GetLastRenderGraphStats();
+    EXPECT_EQ(nonOperationalStats.CommandRecords.SkippedNonOperational, 2u);
+
+    device.Operational = true;
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    EXPECT_TRUE(renderer->GetMaterialSystem().GetBuffer().IsValid());
+    EXPECT_TRUE(renderer->GetGpuWorld().GetSceneTableBuffer().IsValid());
+    EXPECT_EQ(renderer->GetMaterialSystem().GetDiagnostics().Capacity, 256u);
+
+    device.CommandContext = Extrinsic::Tests::MockCommandContext{};
+    frame = {};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, 0u);
+    ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 1);
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandPass)
 {
     Extrinsic::Tests::MockDevice device;

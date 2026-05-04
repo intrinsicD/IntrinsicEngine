@@ -146,6 +146,7 @@ namespace Extrinsic::Runtime
         m_Device->Initialize(*m_Window, m_Config.Render);
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
+        m_RendererOperational = m_Device->IsOperational();
 
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
         m_FrameGraph = std::make_unique<Core::FrameGraph>();
@@ -355,6 +356,34 @@ namespace Extrinsic::Runtime
             }
             m_Window->AcknowledgeResize();
         }
+
+        struct OperationalTransitionHooks final : IRuntimeOperationalTransitionHooks
+        {
+            RHI::IDevice& Device;
+            Graphics::IRenderer& Renderer;
+            bool& RendererOperational;
+
+            OperationalTransitionHooks(RHI::IDevice& device,
+                                       Graphics::IRenderer& renderer,
+                                       bool& rendererOperational)
+                : Device(device)
+                , Renderer(renderer)
+                , RendererOperational(rendererOperational)
+            {
+            }
+
+            [[nodiscard]] bool IsDeviceOperational() const override { return Device.IsOperational(); }
+            [[nodiscard]] bool IsRendererOperational() const override { return RendererOperational; }
+            void WaitDeviceIdle() override { Device.WaitIdle(); }
+            [[nodiscard]] bool RebuildRendererOperationalResources() override
+            {
+                return Renderer.RebuildOperationalResources(Device);
+            }
+            void MarkRendererOperational() override { RendererOperational = true; }
+        };
+
+        OperationalTransitionHooks operationalHooks(*m_Device, *m_Renderer, m_RendererOperational);
+        (void)ExecuteRuntimeOperationalTransitionContract(operationalHooks);
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: app adds FrameGraph passes → Engine compiles and executes
