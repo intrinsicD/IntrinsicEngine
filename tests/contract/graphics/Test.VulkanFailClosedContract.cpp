@@ -6,6 +6,9 @@
 #include <span>
 
 import Extrinsic.Backends.Vulkan;
+import Extrinsic.Core.Config.Render;
+import Extrinsic.Core.Config.Window;
+import Extrinsic.Platform.Backend.Null;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -101,6 +104,90 @@ TEST(VulkanFailClosedContract, CreatePipelineReportsPreBringUpReason)
 
     EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
 
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
+              Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+}
+
+TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitializeShutdownCycles)
+{
+    // GRAPHICS-018Q nonblocking clarification: fail-closed fallback counters
+    // must remain process-monotonic across full Initialize/Shutdown cycles
+    // (and across destruction/re-creation of VulkanDevice instances) so that
+    // diagnostics spanning full-engine restarts of the Vulkan backend stay
+    // accurate. The pipeline reason must also persist across Shutdown so the
+    // last observed reason is queryable after a backend tear-down.
+    const std::uint64_t beforeBindless =
+        Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount();
+    const std::uint64_t beforeTransfer =
+        Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
+    const std::uint64_t beforePipeline =
+        Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount();
+
+    Extrinsic::Core::Config::WindowConfig windowConfig{};
+    Extrinsic::Core::Config::RenderConfig renderConfig{};
+
+    auto fireFallbackPaths = [](Extrinsic::RHI::IDevice& device)
+    {
+        EXPECT_EQ(device.GetBindlessHeap().AllocateTextureSlot({}, {}),
+                  Extrinsic::RHI::kInvalidBindlessIndex);
+        const Extrinsic::RHI::TransferToken token =
+            device.GetTransferQueue().UploadBuffer({}, nullptr, 0u, 0u);
+        EXPECT_FALSE(token.IsValid());
+        EXPECT_FALSE(device.CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+    };
+
+    {
+        Extrinsic::Platform::Backends::Null::NullWindow window{windowConfig};
+        std::unique_ptr<Extrinsic::RHI::IDevice> device =
+            Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+        ASSERT_NE(device, nullptr);
+
+        device->Initialize(window, renderConfig);
+        ASSERT_FALSE(device->IsOperational());
+        fireFallbackPaths(*device);
+        device->Shutdown();
+        ASSERT_FALSE(device->IsOperational());
+
+        // Counters and the last pipeline reason must survive Shutdown without
+        // being reset to None or zero by the lifecycle transition.
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount(),
+                  beforeBindless + 1u);
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
+                  beforeTransfer + 1u);
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
+                  beforePipeline + 1u);
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
+                  Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+    }
+
+    // First device fully destroyed; counters must persist across instances.
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount(),
+              beforeBindless + 1u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
+              beforeTransfer + 1u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
+              beforePipeline + 1u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
+              Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+
+    {
+        Extrinsic::Platform::Backends::Null::NullWindow window{windowConfig};
+        std::unique_ptr<Extrinsic::RHI::IDevice> device =
+            Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+        ASSERT_NE(device, nullptr);
+
+        device->Initialize(window, renderConfig);
+        ASSERT_FALSE(device->IsOperational());
+        fireFallbackPaths(*device);
+        device->Shutdown();
+    }
+
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount(),
+              beforeBindless + 2u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
+              beforeTransfer + 2u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
+              beforePipeline + 2u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 }
