@@ -27,6 +27,14 @@ namespace Extrinsic::Backends::Vulkan
     // pipeline layout is not yet created.
     export std::uint64_t GetFallbackPipelineCreationAttemptCount() noexcept;
 
+    // Debug breadcrumb for fail-closed non-operational BeginFrame attempts.
+    // Increments for every VulkanDevice::BeginFrame call that returns false
+    // because the device is non-operational or the swapchain is not yet
+    // brought up. Lets CPU diagnostics catch a runtime/renderer frame loop
+    // that is silently driving frames against a fail-closed Vulkan device,
+    // mirroring the bindless/transfer/pipeline counters.
+    export std::uint64_t GetFallbackBeginFrameAttemptCount() noexcept;
+
     // Structured reason for the most recent fail-closed CreatePipeline call.
     // Exposed for CPU diagnostics that need to distinguish "device or layout
     // not yet brought up" from "operational guard reached but shader/pipeline
@@ -49,17 +57,18 @@ namespace Extrinsic::Backends::Vulkan
     // observed pipeline reason. Each field equals the corresponding individual
     // accessor at the moment it is read. The aggregate read is not a tear-free
     // transaction across fields — each field is loaded with relaxed atomics in
-    // order (bindless, transfer, pipeline-count, last-pipeline-reason); a
-    // concurrent fallback fire on another thread may land between two field
-    // loads. CPU contract tests run single-threaded so this is fine, and the
-    // ordering is documented so future operational tests do not assume
-    // cross-field atomicity.
+    // order (bindless, transfer, pipeline-count, last-pipeline-reason,
+    // begin-frame-count); a concurrent fallback fire on another thread may land
+    // between two field loads. CPU contract tests run single-threaded so this
+    // is fine, and the ordering is documented so future operational tests do
+    // not assume cross-field atomicity.
     export struct FallbackDiagnosticsSnapshot
     {
         std::uint64_t          BindlessAllocationAttempts = 0;
         std::uint64_t          TransferUploadAttempts     = 0;
         std::uint64_t          PipelineCreationAttempts   = 0;
         FallbackPipelineReason LastPipelineReason         = FallbackPipelineReason::None;
+        std::uint64_t          BeginFrameAttempts         = 0;
     };
     export [[nodiscard]] FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept;
 }

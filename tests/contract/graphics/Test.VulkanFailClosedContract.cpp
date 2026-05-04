@@ -12,6 +12,7 @@ import Extrinsic.Platform.Backend.Null;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
@@ -92,6 +93,28 @@ TEST(VulkanFailClosedContract, CreatePipelineIncrementsCreationCounter)
               before + 2u);
 }
 
+TEST(VulkanFailClosedContract, BeginFrameOnNonOperationalDeviceIncrementsAttemptCounter)
+{
+    // GRAPHICS-018 fail-closed contract: VulkanDevice::BeginFrame must return
+    // false on a non-operational device and increment a process-monotonic
+    // attempt counter, so CPU CI surfaces accidental frame loops driving a
+    // fail-closed Vulkan device. Mirrors the bindless/transfer/pipeline
+    // counter pattern.
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    const std::uint64_t before =
+        Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount();
+
+    Extrinsic::RHI::FrameHandle frame{};
+    EXPECT_FALSE(device->BeginFrame(frame));
+    EXPECT_FALSE(device->BeginFrame(frame));
+
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount(),
+              before + 2u);
+}
+
 TEST(VulkanFailClosedContract, CreatePipelineReportsPreBringUpReason)
 {
     // A freshly constructed VulkanDevice has not been Initialize()d, so the
@@ -122,6 +145,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
         Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
     const std::uint64_t beforePipeline =
         Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount();
+    const std::uint64_t beforeBeginFrame =
+        Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount();
 
     Extrinsic::Core::Config::WindowConfig windowConfig{};
     Extrinsic::Core::Config::RenderConfig renderConfig{};
@@ -134,6 +159,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
             device.GetTransferQueue().UploadBuffer({}, nullptr, 0u, 0u);
         EXPECT_FALSE(token.IsValid());
         EXPECT_FALSE(device.CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+        Extrinsic::RHI::FrameHandle frame{};
+        EXPECT_FALSE(device.BeginFrame(frame));
     };
 
     {
@@ -156,6 +183,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
                   beforeTransfer + 1u);
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
                   beforePipeline + 1u);
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount(),
+                  beforeBeginFrame + 1u);
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
                   Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
     }
@@ -167,6 +196,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
               beforeTransfer + 1u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
               beforePipeline + 1u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount(),
+              beforeBeginFrame + 1u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 
@@ -188,6 +219,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
               beforeTransfer + 2u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
               beforePipeline + 2u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount(),
+              beforeBeginFrame + 2u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 }
@@ -220,6 +253,8 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGette
               Extrinsic::RHI::kInvalidBindlessIndex);
     EXPECT_FALSE(device->GetTransferQueue().UploadBuffer({}, nullptr, 0u, 0u).IsValid());
     EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+    Extrinsic::RHI::FrameHandle frame{};
+    EXPECT_FALSE(device->BeginFrame(frame));
 
     const Extrinsic::Backends::Vulkan::FallbackDiagnosticsSnapshot snapshot =
         Extrinsic::Backends::Vulkan::GetFallbackDiagnosticsSnapshot();
@@ -234,6 +269,8 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGette
               Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason());
     EXPECT_EQ(snapshot.LastPipelineReason,
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+    EXPECT_EQ(snapshot.BeginFrameAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount());
 }
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
@@ -258,6 +295,11 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
     EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
     EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
     EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+    Extrinsic::RHI::FrameHandle frame{};
+    EXPECT_FALSE(device->BeginFrame(frame));
+    EXPECT_FALSE(device->BeginFrame(frame));
+    EXPECT_FALSE(device->BeginFrame(frame));
+    EXPECT_FALSE(device->BeginFrame(frame));
 
     const Extrinsic::Backends::Vulkan::FallbackDiagnosticsSnapshot after =
         Extrinsic::Backends::Vulkan::GetFallbackDiagnosticsSnapshot();
@@ -265,6 +307,7 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
     EXPECT_EQ(after.BindlessAllocationAttempts - before.BindlessAllocationAttempts, 2u);
     EXPECT_EQ(after.TransferUploadAttempts - before.TransferUploadAttempts, 1u);
     EXPECT_EQ(after.PipelineCreationAttempts - before.PipelineCreationAttempts, 3u);
+    EXPECT_EQ(after.BeginFrameAttempts - before.BeginFrameAttempts, 4u);
     EXPECT_EQ(after.LastPipelineReason,
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 }
