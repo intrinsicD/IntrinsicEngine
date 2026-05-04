@@ -64,7 +64,7 @@
 - 2.6 Add a header comment to `BeginOneShot`/`EndOneShot` that this submits to the graphics queue with a `vkQueueWaitIdle`, stalling the queue. Mark as "init-time only — runtime uploads must use `ITransferQueue`" (7e09ac5, 1a5c2be).
 - 2.7 Add a documented invariant to `Shutdown` describing the relationship between the deferred-deletion queue and the resource-pool drain: "any handle still present in `m_Buffers/m_Images/m_Samplers/m_Pipelines` has not been queued for destruction." Add a debug-only assertion that the pool entries do not also appear in the deletion queue (295363e).
 - 2.8 In `CreateSampler`, comment the intentional `m_SamplerAnisotropySupported = false` default and reference the device-feature negotiation slice that will set it (5c84d9a).
-- 2.9 Follow-up filed: `GRAPHICS-018S-sampler-border-color`; `RHI::SamplerDesc::BorderColor` does not exist yet, so `CreateSampler` documents the opaque-black default until that nonblocking API slice lands (5c84d9a).
+- 2.9 Done via `tasks/done/GRAPHICS-018S-sampler-border-color.md`: `RHI::SamplerDesc::BorderColor` now exists with an opaque-black default, and `CreateSampler` maps it through the Vulkan backend before any non-black border colors are relied on by renderer/material behavior.
 - 2.10 Document the 2D-array vs 3D vs cube interpretation of `RHI::TextureDesc::DepthOrArrayLayers` and the unused `Tex2D` array path inside `CreateTexture` (7d056cf).
 - 2.11 In `WriteTexture`, assert at entry that the destination usage includes a sampled bit (`(usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0`) since the function transitions to `SHADER_READ_ONLY_OPTIMAL`; otherwise log and skip (1a5c2be).
 - 2.12 In `WriteTexture`, tighten the size check from `dataSizeBytes < requiredBytes` to `dataSizeBytes == requiredBytes`, or document why slack is permitted (1a5c2be).
@@ -91,7 +91,7 @@
 
 ## Follow-up task IDs
 - `GRAPHICS-018R-operational-transition`: blocking; owner context `runtime` + `graphics/renderer` + `graphics/vulkan`; timeline before any `GRAPHICS-018` slice marks Vulkan operational; removes/reconciles fallback bindless/transfer and non-operational renderer state shims.
-- `GRAPHICS-018S-sampler-border-color`: nonblocking; owner context `graphics/rhi` + `graphics/vulkan`; timeline before renderer/material behavior relies on non-black sampler border colors.
+- `GRAPHICS-018S-sampler-border-color`: completed in `tasks/done/`; owner context `graphics/rhi` + `graphics/vulkan`; landed before renderer/material behavior relies on non-black sampler border colors.
 - `GRAPHICS-018T-texture-upload-batching`: nonblocking; owner context `graphics/vulkan` + `graphics/assets`; timeline before multi-mip/layer/cube Vulkan texture upload smoke tests.
 
 ### 5. Project conventions

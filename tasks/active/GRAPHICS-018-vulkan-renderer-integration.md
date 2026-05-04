@@ -10,7 +10,7 @@
   - `CullingPass` and `DepthPrepass` command bodies are routed through backend-neutral renderer/RHI seams and soft-skip unavailable pipelines/resources with structured CPU/mock diagnostics.
   - `RenderGraphFrameStats` reports focused compile, execute, and name-keyed command-recording status.
   - Promoted Vulkan `IDevice` lifecycle/services/resource overrides are symbol-complete and fail-closed until full device/swapchain/resource bring-up lands.
-  - Guarded Vulkan texture allocation/view/upload and `VkSampler` creation paths exist for future operational devices.
+  - Guarded Vulkan texture allocation/view/upload and `VkSampler` creation paths exist for future operational devices; sampler creation now honors backend-neutral `RHI::SamplerDesc::BorderColor` through a Vulkan-local mapping while preserving the previous opaque-black default.
   - Fail-closed CPU diagnostics: `FallbackTransferQueue` upload paths and `VulkanDevice::CreatePipeline` increment process-monotonic counters (`GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`) and log structured breadcrumbs, mirroring the existing `GetFallbackBindlessAllocationAttemptCount()` pattern. Covered by `Test.VulkanFailClosedContract.cpp` so CPU CI surfaces accidental upload/pipeline traffic against non-operational devices.
   - Fail-closed `CreatePipeline` additionally exposes a structured `FallbackPipelineReason` enum (`None`, `PreBringUp`, `ShaderMissing`) via `GetLastFallbackPipelineReason()`, distinguishing "device/global pipeline layout not yet brought up" from "operational guard reached but shader/pipeline construction unimplemented". The `PreBringUp` reason is asserted by the CPU contract test; `ShaderMissing` is reachable only once operational bring-up lands and is locked in by `static_assert` in the contract test. Bindless and transfer-queue counters intentionally do not yet expose a reason enum because each has a single fail-closed reason today.
   - Process-monotonic accumulation of all three fail-closed counters (`GetFallbackBindlessAllocationAttemptCount`, `GetFallbackTransferUploadAttemptCount`, `GetFallbackPipelineCreationAttemptCount`) and persistence of `GetLastFallbackPipelineReason()` across `VulkanDevice::Initialize`/`Shutdown` cycles and across `VulkanDevice` instance destruction/re-creation are locked in by the CPU contract test `VulkanFailClosedContract.FallbackCountersAreProcessMonotonicAcrossInitializeShutdownCycles`, so a future refactor cannot silently demote them to instance-scoped state without breaking the gate.
@@ -23,11 +23,11 @@
   - Keep Vulkan opt-in and preserve the CPU/null correctness gate.
 - Nonblocking questions: tracked in `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`.
 - Completed prerequisite: `tasks/done/GRAPHICS-018R-operational-transition.md`.
+- Completed follow-up: `tasks/done/GRAPHICS-018S-sampler-border-color.md`.
 - Remaining blockers before marking Vulkan operational: real swapchain/surface/device bring-up, concrete pipeline creation, presentation diagnostics, and reconciliation of fail-closed fallback bindless/transfer behavior.
 - Temporary fail-closed shim removal/reconciliation timeline:
   - Fallback bindless heap and fallback transfer queue: reconcile/remove in a future `GRAPHICS-018` operational bring-up slice before `VulkanDevice::IsOperational()` can become true.
   - Empty-handle `Create*` paths for non-operational devices: keep as fail-closed guards; operational-path replacement is owned by `GRAPHICS-018` bring-up, now able to call the renderer reset seam completed by `GRAPHICS-018R`.
-  - Hard-coded sampler border color: `tasks/backlog/rendering/GRAPHICS-018S-sampler-border-color.md`, before non-black border colors are relied on by renderer/material behavior.
   - One-subresource blocking texture upload path: `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`, before multi-mip/layer Vulkan texture smoke tests.
 
 ## Goal

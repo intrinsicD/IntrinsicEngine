@@ -69,8 +69,10 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
   and sampler creation creates real `VkSampler` objects once a future device
-  bootstrap marks the backend operational; anisotropy remains disabled unless
-  device feature negotiation records support. `WriteTexture()` now has a guarded
+  bootstrap marks the backend operational, including backend-local translation
+  from `RHI::SamplerDesc::BorderColor` to Vulkan `VkBorderColor`; anisotropy
+  remains disabled unless device feature negotiation records support.
+  `WriteTexture()` now has a guarded
   synchronous staging-buffer upload path with mip/layer bounds checks, exact
   byte-size validation, sampled-usage validation, explicit depth-stencil upload
   rejection, and transfer-to-shader-read layout transitions that update tracked
