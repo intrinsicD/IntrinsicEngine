@@ -37,10 +37,12 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   Fallback bindless allocation attempts increment
   `GetFallbackBindlessAllocationAttemptCount()`, fallback transfer-queue upload
   attempts (buffer or texture) increment
-  `GetFallbackTransferUploadAttemptCount()`, and fail-closed `CreatePipeline`
-  calls increment `GetFallbackPipelineCreationAttemptCount()`. Each emits a
-  logger breadcrumb for CPU-testable diagnostics. Counters are process-monotonic
-  and never reset across `Initialize`/`Shutdown` cycles.
+  `GetFallbackTransferUploadAttemptCount()`, fail-closed `CreatePipeline`
+  calls increment `GetFallbackPipelineCreationAttemptCount()`, and fail-closed
+  `BeginFrame` calls (device non-operational or swapchain not yet brought up)
+  increment `GetFallbackBeginFrameAttemptCount()`. Each emits a logger
+  breadcrumb for CPU-testable diagnostics. Counters are process-monotonic and
+  never reset across `Initialize`/`Shutdown` cycles.
   `GetLastFallbackPipelineReason()` returns a structured
   `FallbackPipelineReason` enum (`None`, `PreBringUp`, `ShaderMissing`) so CPU
   diagnostics can distinguish "device or global pipeline layout not yet
@@ -49,13 +51,13 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   do not yet expose a reason enum — each currently has a single fail-closed
   reason and the pattern is being piloted on `CreatePipeline` first.
   `GetFallbackDiagnosticsSnapshot()` returns a `FallbackDiagnosticsSnapshot`
-  aggregate of all three counters plus the last pipeline reason in a single
-  call, so CPU diagnostics consumers do not have to combine four independent
-  free-function loads. Each field equals the corresponding individual accessor
-  at the moment of capture; the aggregate read is not a tear-free transaction
-  across fields, so concurrent fallback fires from another thread may land
-  between two field loads (CPU contract tests run single-threaded so this is
-  fine).
+  aggregate of all four counters plus the last pipeline reason in a single
+  call, so CPU diagnostics consumers do not have to combine multiple
+  independent free-function loads. Each field equals the corresponding
+  individual accessor at the moment of capture; the aggregate read is not a
+  tear-free transaction across fields, so concurrent fallback fires from
+  another thread may land between two field loads (CPU contract tests run
+  single-threaded so this is fine).
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
@@ -84,7 +86,7 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
