@@ -13,6 +13,7 @@
   - Guarded Vulkan texture allocation/view/upload and `VkSampler` creation paths exist for future operational devices.
   - Live backend resource pools are drained during shutdown.
   - Runtime now owns a CPU-tested operational-transition check that waits idle and calls `IRenderer::RebuildOperationalResources()` when a fail-closed device becomes operational; the renderer rebuilds material GPU buffers, `GpuWorld` scene bindings, culling output resources, and the depth-prepass pipeline through RHI seams.
+  - Runtime can select the promoted fail-closed Vulkan `IDevice` only when both `RenderConfig::EnablePromotedVulkanDevice` and `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` are enabled; default Vulkan config still uses the Null fallback.
   - Keep Vulkan opt-in and preserve the CPU/null correctness gate.
 - Nonblocking questions: tracked in `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`.
 - Completed prerequisite: `tasks/done/GRAPHICS-018R-operational-transition.md`.

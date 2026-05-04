@@ -6,6 +6,7 @@ module;
 export module Extrinsic.Runtime.Engine;
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.RHI.Device;
@@ -22,6 +23,31 @@ import Extrinsic.ECS.Scene.Registry;
 namespace Extrinsic::Runtime
 {
     export class Engine;
+
+    export struct RuntimeDeviceSelection
+    {
+        bool UsePromotedVulkanDevice{false};
+        bool FallsBackToNullDevice{true};
+    };
+
+    export [[nodiscard]] inline RuntimeDeviceSelection SelectRuntimeDeviceBackend(
+        const Core::Config::RenderConfig& config,
+        const bool promotedVulkanAvailable) noexcept
+    {
+        switch (config.Backend)
+        {
+        case Core::Config::GraphicsBackend::Vulkan:
+            if (config.EnablePromotedVulkanDevice && promotedVulkanAvailable)
+            {
+                return RuntimeDeviceSelection{
+                    .UsePromotedVulkanDevice = true,
+                    .FallsBackToNullDevice = false,
+                };
+            }
+            return RuntimeDeviceSelection{};
+        }
+        return RuntimeDeviceSelection{};
+    }
 
     // ============================================================
     // IApplication — the user-facing hook interface.

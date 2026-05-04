@@ -7,6 +7,9 @@ module;
 
 module Extrinsic.Runtime.Engine;
 
+#if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
+import Extrinsic.Backends.Vulkan;
+#endif
 import Extrinsic.Backends.Null;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.Scheduler;
@@ -37,18 +40,36 @@ namespace Extrinsic::Runtime
     {
         constexpr double kIdleSleepSeconds = 0.016; // ~60 Hz event wake
 
+#if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
+        constexpr bool kPromotedVulkanAvailable = true;
+#else
+        constexpr bool kPromotedVulkanAvailable = false;
+#endif
+
         std::unique_ptr<RHI::IDevice> CreateDevice(
             const Core::Config::RenderConfig& config)
         {
-            switch (config.Backend)
+            const RuntimeDeviceSelection selection = SelectRuntimeDeviceBackend(
+                config,
+                kPromotedVulkanAvailable);
+            if (selection.UsePromotedVulkanDevice)
             {
-            case Core::Config::GraphicsBackend::Vulkan:
-                // Vulkan backend is not wired yet; route through the Null stub.
-                // IDevice::IsOperational() returns false, so resource managers
-                // surface DeviceNotOperational rather than faking GPU work.
-                return Backends::Null::CreateNullDevice();
+#if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
+                Core::Log::Warn("[Runtime] Promoted Vulkan device selected; backend remains fail-closed until GRAPHICS-018 completes operational bring-up.");
+                return Backends::Vulkan::CreateVulkanDevice();
+#endif
             }
-            std::terminate();
+
+            if (config.EnablePromotedVulkanDevice && !kPromotedVulkanAvailable)
+            {
+                Core::Log::Warn("[Runtime] Promoted Vulkan device requested but not compiled into this build; using Null device fallback.");
+            }
+
+            // Vulkan execution is opt-in during GRAPHICS-018. The default path
+            // routes through the Null stub so IDevice::IsOperational() remains
+            // false and resource managers surface DeviceNotOperational rather
+            // than faking GPU work.
+            return Backends::Null::CreateNullDevice();
         }
 
         // Converts frame-recorded streaming passes into persistent executor tasks.

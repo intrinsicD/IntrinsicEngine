@@ -13,6 +13,10 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 
 - `CreateVulkanDevice()` returns an `RHI::IDevice` instance without exposing
   concrete Vulkan types across renderer/RHI boundaries.
+- Runtime selection is explicitly opt-in. `GraphicsBackend::Vulkan` continues to
+  use the Null fallback unless `RenderConfig::EnablePromotedVulkanDevice` is true
+  and the build enables `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` in a
+  configuration that builds `ExtrinsicBackendsVulkan`.
 - The promoted device lifecycle methods (`Initialize`, `Shutdown`, `WaitIdle`,
   `BeginFrame`, `EndFrame`, `Present`, `Resize`, backbuffer extent/handle access,
   present-mode selection, and graphics-context lookup) are defined in

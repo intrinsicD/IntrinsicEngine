@@ -14,6 +14,7 @@ namespace Extrinsic::Core::Config
     export struct RenderConfig
     {
         GraphicsBackend Backend{GraphicsBackend::Vulkan};
+        bool EnablePromotedVulkanDevice{false};
         bool EnableValidation{true};
         bool EnableVSync{true};
         std::uint32_t FramesInFlight{2};

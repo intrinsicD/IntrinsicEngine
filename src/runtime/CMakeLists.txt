@@ -1,6 +1,10 @@
 set(target_name ExtrinsicRuntime)
 intrinsic_add_module_library(${target_name})
 
+option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
+        "Allow runtime to instantiate the promoted fail-closed Vulkan IDevice when RenderConfig opts in"
+        OFF)
+
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
@@ -27,3 +31,15 @@ target_link_libraries(${target_name}
         EnTT::EnTT
         glm::glm
 )
+
+if(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN)
+        if(TARGET ExtrinsicBackendsVulkan)
+                target_link_libraries(${target_name} PRIVATE ExtrinsicBackendsVulkan)
+                target_compile_definitions(${target_name} PRIVATE EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN=1)
+        else()
+                message(WARNING
+                        "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON but ExtrinsicBackendsVulkan is not built; "
+                        "runtime will keep using the Null fallback.")
+        endif()
+endif()
+
