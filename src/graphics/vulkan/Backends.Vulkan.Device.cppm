@@ -41,7 +41,9 @@ namespace Extrinsic::Backends::Vulkan
 {
     void NoteFallbackBindlessAllocationAttempt();
     void NoteFallbackTransferUploadAttempt();
-    void NoteFallbackPipelineCreationAttempt();
+    // NoteFallbackPipelineCreationAttempt(FallbackPipelineReason) is defined
+    // in the implementation unit Backends.Vulkan.Device.cpp. It has no inline
+    // callers in this partition, so no forward declaration is needed here.
 
     export class VulkanDevice final : public RHI::IDevice
     {

@@ -26,5 +26,23 @@ namespace Extrinsic::Backends::Vulkan
     // invalid handle because the device is non-operational or the global
     // pipeline layout is not yet created.
     export std::uint64_t GetFallbackPipelineCreationAttemptCount() noexcept;
+
+    // Structured reason for the most recent fail-closed CreatePipeline call.
+    // Exposed for CPU diagnostics that need to distinguish "device or layout
+    // not yet brought up" from "operational guard reached but shader/pipeline
+    // construction is still unimplemented". Bindless and transfer-queue
+    // fallbacks intentionally do not yet expose a reason enum because each
+    // currently has a single fail-closed reason; revisit when a second
+    // emerges. The accessor is process-monotonic in the same sense as the
+    // counters: it reports the last observed reason and is never reset across
+    // Initialize/Shutdown cycles. `None` indicates no fail-closed
+    // CreatePipeline call has been observed since process start.
+    export enum class FallbackPipelineReason : std::uint8_t
+    {
+        None = 0,
+        PreBringUp = 1,    // device non-operational or global pipeline layout missing
+        ShaderMissing = 2, // operational guard reached but shader/pipeline construction unimplemented
+    };
+    export FallbackPipelineReason GetLastFallbackPipelineReason() noexcept;
 }
 
