@@ -13,6 +13,50 @@ namespace Extrinsic::Backends::Vulkan
     // Vulkan state.  Destroy it before the window is destroyed.
     export std::unique_ptr<RHI::IDevice> CreateVulkanDevice();
 
+    // CPU-visible status for the most recent promoted Vulkan bootstrap attempt.
+    // This is backend-specific diagnostics, not an RHI contract: renderer/runtime
+    // code must continue to use IDevice::IsOperational() and must not branch on
+    // these values. The snapshot intentionally avoids Vulkan-native types so the
+    // umbrella module does not expose Vk* handles or enums.
+    export enum class VulkanBootstrapStatus : std::uint8_t
+    {
+        NotStarted = 0,
+        SkippedNoNativeWindow = 1,
+        FailedVolkInitialize = 2,
+        FailedRequiredInstanceExtensions = 3,
+        FailedInstanceCreation = 4,
+        FailedSurfaceCreation = 5,
+        FailedPhysicalDeviceEnumeration = 6,
+        FailedNoSuitablePhysicalDevice = 7,
+        ProbedPhysicalDevice = 8,
+    };
+
+    export struct VulkanBootstrapDiagnosticsSnapshot
+    {
+        VulkanBootstrapStatus Status = VulkanBootstrapStatus::NotStarted;
+        std::int32_t LastVkResult = 0;
+        std::uint32_t RequiredInstanceExtensionCount = 0;
+        std::uint32_t PhysicalDeviceCount = 0;
+        std::uint32_t GraphicsQueueFamily = 0;
+        std::uint32_t PresentQueueFamily = 0;
+        std::uint32_t TransferQueueFamily = 0;
+        bool NativeWindowAvailable = false;
+        bool VolkInitialized = false;
+        bool ValidationRequested = false;
+        bool ValidationEnabled = false;
+        bool DebugUtilsEnabled = false;
+        bool InstanceCreated = false;
+        bool SurfaceCreated = false;
+        bool PhysicalDeviceSelected = false;
+        bool GraphicsQueueFound = false;
+        bool PresentQueueFound = false;
+        bool TransferQueueFound = false;
+        bool SwapchainExtensionSupported = false;
+        bool SwapchainSurfaceSupported = false;
+    };
+
+    export [[nodiscard]] VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept;
+
     // Debug breadcrumb for fail-closed non-operational bindless allocation attempts.
     export std::uint64_t GetFallbackBindlessAllocationAttemptCount() noexcept;
 

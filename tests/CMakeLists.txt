@@ -314,6 +314,21 @@ if(INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     )
 endif()
 
+if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    set(_graphics_vulkan_smoke_test_files
+        Test.VulkanBootstrapSmoke.cpp
+    )
+    intrinsic_resolve_test_sources(_graphics_vulkan_smoke_test_sources
+        SEARCH_DIRS gpu
+        FILES ${_graphics_vulkan_smoke_test_files}
+    )
+    intrinsic_test_object_lib(GraphicsVulkanSmokeTestObjs
+        SOURCES
+            ${_graphics_vulkan_smoke_test_sources}
+        DEPS ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+    )
+endif()
+
 set(_graphics_unit_test_files
     Test.RHI.BufferManager.cpp
     Test.RHI.PipelineManager.cpp
@@ -668,6 +683,14 @@ if(TARGET PlatformGlfwSmokeTestObjs)
         OBJECTS PlatformGlfwSmokeTestObjs
         LINK_LIBS ExtrinsicPlatform ExtrinsicCore
         LABELS integration platform glfw vulkan
+    )
+endif()
+
+if(TARGET GraphicsVulkanSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicGraphicsVulkanSmokeTests
+        OBJECTS GraphicsVulkanSmokeTestObjs
+        LINK_LIBS ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+        LABELS gpu vulkan graphics
     )
 endif()
 

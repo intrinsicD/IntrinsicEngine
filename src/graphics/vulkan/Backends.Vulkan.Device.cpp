@@ -6,14 +6,15 @@ module;
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include <vector>
 
 #ifndef GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_NONE
 #endif
-#include <GLFW/glfw3.h>
 #include "Vulkan.hpp"
+#include <GLFW/glfw3.h>
 
 module Extrinsic.Backends.Vulkan;
 
@@ -33,6 +34,162 @@ namespace
     std::atomic<std::uint64_t> g_FallbackResizeAttempts{0};
     std::atomic<std::uint8_t>  g_LastFallbackPipelineReason{
         static_cast<std::uint8_t>(FallbackPipelineReason::None)};
+    std::mutex g_BootstrapDiagnosticsMutex;
+    VulkanBootstrapDiagnosticsSnapshot g_BootstrapDiagnostics{};
+
+    constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
+
+    struct QueueFamilyProbe
+    {
+        std::uint32_t Graphics = 0;
+        std::uint32_t Present = 0;
+        std::uint32_t Transfer = 0;
+        bool GraphicsFound = false;
+        bool PresentFound = false;
+        bool TransferFound = false;
+    };
+
+    void PublishBootstrapDiagnostics(const VulkanBootstrapDiagnosticsSnapshot& snapshot) noexcept
+    {
+        std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
+        g_BootstrapDiagnostics = snapshot;
+    }
+
+    [[nodiscard]] bool HasInstanceLayer(const char* name)
+    {
+        std::uint32_t count = 0;
+        if (vkEnumerateInstanceLayerProperties(&count, nullptr) != VK_SUCCESS || count == 0)
+            return false;
+
+        std::vector<VkLayerProperties> layers(count);
+        if (vkEnumerateInstanceLayerProperties(&count, layers.data()) != VK_SUCCESS)
+            return false;
+
+        for (const VkLayerProperties& layer : layers)
+        {
+            if (std::strcmp(layer.layerName, name) == 0)
+                return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool HasInstanceExtension(const char* name)
+    {
+        std::uint32_t count = 0;
+        if (vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr) != VK_SUCCESS || count == 0)
+            return false;
+
+        std::vector<VkExtensionProperties> extensions(count);
+        if (vkEnumerateInstanceExtensionProperties(nullptr, &count, extensions.data()) != VK_SUCCESS)
+            return false;
+
+        for (const VkExtensionProperties& extension : extensions)
+        {
+            if (std::strcmp(extension.extensionName, name) == 0)
+                return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool HasDeviceExtension(VkPhysicalDevice device, const char* name)
+    {
+        std::uint32_t count = 0;
+        if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr) != VK_SUCCESS || count == 0)
+            return false;
+
+        std::vector<VkExtensionProperties> extensions(count);
+        if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.data()) != VK_SUCCESS)
+            return false;
+
+        for (const VkExtensionProperties& extension : extensions)
+        {
+            if (std::strcmp(extension.extensionName, name) == 0)
+                return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] QueueFamilyProbe ProbeQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface)
+    {
+        QueueFamilyProbe probe{};
+
+        std::uint32_t count = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &count, nullptr);
+        if (count == 0)
+            return probe;
+
+        std::vector<VkQueueFamilyProperties> families(count);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &count, families.data());
+
+        for (std::uint32_t index = 0; index < count; ++index)
+        {
+            const VkQueueFamilyProperties& family = families[index];
+            if (!probe.GraphicsFound && (family.queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
+            {
+                probe.Graphics = index;
+                probe.GraphicsFound = true;
+            }
+
+            VkBool32 presentSupported = VK_FALSE;
+            if (surface != VK_NULL_HANDLE &&
+                vkGetPhysicalDeviceSurfaceSupportKHR(device, index, surface, &presentSupported) == VK_SUCCESS &&
+                presentSupported == VK_TRUE && !probe.PresentFound)
+            {
+                probe.Present = index;
+                probe.PresentFound = true;
+            }
+
+            if (!probe.TransferFound && (family.queueFlags & VK_QUEUE_TRANSFER_BIT) != 0 &&
+                (family.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0)
+            {
+                probe.Transfer = index;
+                probe.TransferFound = true;
+            }
+        }
+
+        if (!probe.TransferFound && probe.GraphicsFound)
+        {
+            probe.Transfer = probe.Graphics;
+            probe.TransferFound = true;
+        }
+
+        return probe;
+    }
+
+    [[nodiscard]] bool HasSwapchainSurfaceSupport(VkPhysicalDevice device, VkSurfaceKHR surface)
+    {
+        if (surface == VK_NULL_HANDLE)
+            return false;
+
+        VkSurfaceCapabilitiesKHR capabilities{};
+        if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities) != VK_SUCCESS)
+            return false;
+
+        std::uint32_t formatCount = 0;
+        if (vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr) != VK_SUCCESS ||
+            formatCount == 0)
+            return false;
+
+        std::uint32_t presentModeCount = 0;
+        if (vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr) != VK_SUCCESS ||
+            presentModeCount == 0)
+            return false;
+
+        return true;
+    }
+
+    VKAPI_ATTR VkBool32 VKAPI_CALL BootstrapDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+                                                          VkDebugUtilsMessageTypeFlagsEXT,
+                                                          const VkDebugUtilsMessengerCallbackDataEXT* data,
+                                                          void*)
+    {
+        const char* message = data && data->pMessage ? data->pMessage : "<null>";
+        if ((severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0)
+            Core::Log::Error("[VulkanDevice::Bootstrap] validation: {}", message);
+        else
+            Core::Log::Warn("[VulkanDevice::Bootstrap] validation: {}", message);
+        return VK_FALSE;
+    }
 
     [[nodiscard]] bool HasImageUsage(const VkImageUsageFlags usage, const VkImageUsageFlags bit) noexcept
     {
@@ -148,6 +305,12 @@ FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept
     return snapshot;
 }
 
+VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept
+{
+    std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
+    return g_BootstrapDiagnostics;
+}
+
 // =============================================================================
 // §12  Factory
 // =============================================================================
@@ -169,15 +332,184 @@ VulkanDevice::~VulkanDevice() = default;
 void VulkanDevice::Initialize(Platform::IWindow& window,
                               const Core::Config::RenderConfig& config)
 {
-    (void)window;
-
     m_ValidationEnabled = config.EnableValidation;
     m_Operational       = false;
     m_FrameSlot         = 0;
     m_GlobalFrameNumber = 0;
 
-    Core::Log::Warn("[VulkanDevice::Initialize] Promoted Vulkan device lifecycle is present but "
-                    "swapchain/device bring-up is not complete; device remains non-operational.");
+    if (m_Instance != VK_NULL_HANDLE || m_Surface != VK_NULL_HANDLE || m_Device != VK_NULL_HANDLE ||
+        m_Swapchain != VK_NULL_HANDLE)
+    {
+        Shutdown();
+        m_ValidationEnabled = config.EnableValidation;
+        m_FrameSlot         = 0;
+        m_GlobalFrameNumber = 0;
+    }
+
+    VulkanBootstrapDiagnosticsSnapshot diagnostics{};
+    diagnostics.ValidationRequested = config.EnableValidation;
+
+    auto fail = [this, &diagnostics](const VulkanBootstrapStatus status, const VkResult result)
+    {
+        diagnostics.Status = status;
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        PublishBootstrapDiagnostics(diagnostics);
+        Shutdown();
+    };
+
+    auto* glfwWindow = static_cast<GLFWwindow*>(window.GetNativeHandle());
+    diagnostics.NativeWindowAvailable = glfwWindow != nullptr;
+    if (!glfwWindow)
+    {
+        diagnostics.Status = VulkanBootstrapStatus::SkippedNoNativeWindow;
+        PublishBootstrapDiagnostics(diagnostics);
+        Core::Log::Warn("[VulkanDevice::Initialize] No native GLFW window is available; promoted Vulkan bootstrap skipped and device remains non-operational.");
+        return;
+    }
+
+    const VkResult volkResult = volkInitialize();
+    diagnostics.VolkInitialized = volkResult == VK_SUCCESS;
+    if (volkResult != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanDevice::Initialize] volkInitialize failed; promoted Vulkan device remains non-operational.");
+        fail(VulkanBootstrapStatus::FailedVolkInitialize, volkResult);
+        return;
+    }
+
+    std::uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    diagnostics.RequiredInstanceExtensionCount = glfwExtensionCount;
+    if (glfwExtensions == nullptr || glfwExtensionCount == 0)
+    {
+        Core::Log::Error("[VulkanDevice::Initialize] GLFW did not provide required Vulkan instance extensions.");
+        fail(VulkanBootstrapStatus::FailedRequiredInstanceExtensions, VK_ERROR_EXTENSION_NOT_PRESENT);
+        return;
+    }
+
+    std::vector<const char*> instanceExtensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    if (config.EnableValidation)
+    {
+        diagnostics.ValidationEnabled = HasInstanceLayer(kValidationLayerName);
+        if (diagnostics.ValidationEnabled)
+        {
+            diagnostics.DebugUtilsEnabled = HasInstanceExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            if (diagnostics.DebugUtilsEnabled)
+                instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+        else
+        {
+            Core::Log::Warn("[VulkanDevice::Initialize] Vulkan validation requested but VK_LAYER_KHRONOS_validation is unavailable.");
+        }
+    }
+
+    VkApplicationInfo appInfo{};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "IntrinsicEngine";
+    appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
+    appInfo.pEngineName = "IntrinsicEngine";
+    appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_3;
+
+    const char* enabledLayer = kValidationLayerName;
+    VkInstanceCreateInfo instanceInfo{};
+    instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instanceInfo.pApplicationInfo = &appInfo;
+    instanceInfo.enabledExtensionCount = static_cast<std::uint32_t>(instanceExtensions.size());
+    instanceInfo.ppEnabledExtensionNames = instanceExtensions.data();
+    instanceInfo.enabledLayerCount = diagnostics.ValidationEnabled ? 1u : 0u;
+    instanceInfo.ppEnabledLayerNames = diagnostics.ValidationEnabled ? &enabledLayer : nullptr;
+
+    VkResult result = vkCreateInstance(&instanceInfo, nullptr, &m_Instance);
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanDevice::Initialize] vkCreateInstance failed; promoted Vulkan device remains non-operational.");
+        fail(VulkanBootstrapStatus::FailedInstanceCreation, result);
+        return;
+    }
+    diagnostics.InstanceCreated = true;
+    volkLoadInstance(m_Instance);
+
+    if (diagnostics.ValidationEnabled && diagnostics.DebugUtilsEnabled && vkCreateDebugUtilsMessengerEXT)
+    {
+        VkDebugUtilsMessengerCreateInfoEXT messengerInfo{};
+        messengerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        messengerInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        messengerInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        messengerInfo.pfnUserCallback = BootstrapDebugCallback;
+        if (vkCreateDebugUtilsMessengerEXT(m_Instance, &messengerInfo, nullptr, &m_Messenger) != VK_SUCCESS)
+            Core::Log::Warn("[VulkanDevice::Initialize] Failed to create Vulkan debug messenger; continuing bootstrap without it.");
+    }
+
+    result = glfwCreateWindowSurface(m_Instance, glfwWindow, nullptr, &m_Surface);
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanDevice::Initialize] glfwCreateWindowSurface failed; promoted Vulkan device remains non-operational.");
+        fail(VulkanBootstrapStatus::FailedSurfaceCreation, result);
+        return;
+    }
+    diagnostics.SurfaceCreated = true;
+
+    std::uint32_t physicalDeviceCount = 0;
+    result = vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, nullptr);
+    diagnostics.PhysicalDeviceCount = physicalDeviceCount;
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanDevice::Initialize] vkEnumeratePhysicalDevices failed; promoted Vulkan device remains non-operational.");
+        fail(VulkanBootstrapStatus::FailedPhysicalDeviceEnumeration, result);
+        return;
+    }
+
+    std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
+    if (physicalDeviceCount > 0)
+    {
+        result = vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, physicalDevices.data());
+        diagnostics.PhysicalDeviceCount = physicalDeviceCount;
+        if (result != VK_SUCCESS)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vkEnumeratePhysicalDevices failed while reading devices; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedPhysicalDeviceEnumeration, result);
+            return;
+        }
+    }
+
+    for (VkPhysicalDevice physicalDevice : physicalDevices)
+    {
+        const QueueFamilyProbe queueProbe = ProbeQueueFamilies(physicalDevice, m_Surface);
+        const bool swapchainExtensionSupported = HasDeviceExtension(physicalDevice, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        const bool swapchainSurfaceSupported = swapchainExtensionSupported &&
+                                               HasSwapchainSurfaceSupport(physicalDevice, m_Surface);
+        if (!queueProbe.GraphicsFound || !queueProbe.PresentFound || !queueProbe.TransferFound ||
+            !swapchainSurfaceSupported)
+        {
+            continue;
+        }
+
+        m_PhysDevice = physicalDevice;
+        m_GraphicsFamily = queueProbe.Graphics;
+        m_PresentFamily = queueProbe.Present;
+        m_TransferFamily = queueProbe.Transfer;
+
+        diagnostics.Status = VulkanBootstrapStatus::ProbedPhysicalDevice;
+        diagnostics.PhysicalDeviceSelected = true;
+        diagnostics.GraphicsQueueFound = queueProbe.GraphicsFound;
+        diagnostics.PresentQueueFound = queueProbe.PresentFound;
+        diagnostics.TransferQueueFound = queueProbe.TransferFound;
+        diagnostics.GraphicsQueueFamily = queueProbe.Graphics;
+        diagnostics.PresentQueueFamily = queueProbe.Present;
+        diagnostics.TransferQueueFamily = queueProbe.Transfer;
+        diagnostics.SwapchainExtensionSupported = swapchainExtensionSupported;
+        diagnostics.SwapchainSurfaceSupported = swapchainSurfaceSupported;
+        PublishBootstrapDiagnostics(diagnostics);
+
+        Core::Log::Warn("[VulkanDevice::Initialize] Phase-1 Vulkan bootstrap probed a surface-capable physical device; logical device/swapchain bring-up is still incomplete, so device remains non-operational.");
+        return;
+    }
+
+    Core::Log::Error("[VulkanDevice::Initialize] No suitable Vulkan physical device with graphics/present queues and swapchain support was found.");
+    fail(VulkanBootstrapStatus::FailedNoSuitablePhysicalDevice, VK_ERROR_INITIALIZATION_FAILED);
 }
 
 void VulkanDevice::Shutdown()
@@ -245,6 +577,18 @@ void VulkanDevice::Shutdown()
     m_Buffers.Clear();
 
     m_SwapchainHandles.clear();
+    if (device != VK_NULL_HANDLE)
+    {
+        for (VkImageView view : m_SwapchainViews)
+        {
+            if (view != VK_NULL_HANDLE)
+                vkDestroyImageView(device, view, nullptr);
+        }
+        if (m_Swapchain != VK_NULL_HANDLE)
+            vkDestroySwapchainKHR(device, m_Swapchain, nullptr);
+        if (m_GlobalPipelineLayout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(device, m_GlobalPipelineLayout, nullptr);
+    }
     m_SwapchainViews.clear();
     m_SwapchainImages.clear();
     m_Swapchain        = VK_NULL_HANDLE;
@@ -253,6 +597,32 @@ void VulkanDevice::Shutdown()
     m_DefaultSamplerHandle = {};
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
     m_SamplerAnisotropySupported = false;
+    if (m_Vma != VK_NULL_HANDLE)
+        vmaDestroyAllocator(m_Vma);
+    m_Vma = VK_NULL_HANDLE;
+
+    if (m_Device != VK_NULL_HANDLE)
+        vkDestroyDevice(m_Device, nullptr);
+    m_Device = VK_NULL_HANDLE;
+    m_GraphicsQueue = VK_NULL_HANDLE;
+    m_PresentQueue = VK_NULL_HANDLE;
+    m_TransferVkQueue = VK_NULL_HANDLE;
+    m_GraphicsFamily = 0;
+    m_PresentFamily = 0;
+    m_TransferFamily = 0;
+
+    if (m_Surface != VK_NULL_HANDLE && m_Instance != VK_NULL_HANDLE)
+        vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
+    m_Surface = VK_NULL_HANDLE;
+
+    if (m_Messenger != VK_NULL_HANDLE && m_Instance != VK_NULL_HANDLE && vkDestroyDebugUtilsMessengerEXT)
+        vkDestroyDebugUtilsMessengerEXT(m_Instance, m_Messenger, nullptr);
+    m_Messenger = VK_NULL_HANDLE;
+
+    m_PhysDevice = VK_NULL_HANDLE;
+    if (m_Instance != VK_NULL_HANDLE)
+        vkDestroyInstance(m_Instance, nullptr);
+    m_Instance = VK_NULL_HANDLE;
     m_Operational      = false;
 }
 

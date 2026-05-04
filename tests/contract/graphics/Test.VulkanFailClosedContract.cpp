@@ -49,6 +49,35 @@ TEST(VulkanFailClosedContract, DeviceConstructorIsFailClosedWithoutGpuBringup)
     EXPECT_TRUE(device->GetTransferQueue().IsComplete(token));
 }
 
+TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulkanHandles)
+{
+    Extrinsic::Core::Config::WindowConfig windowConfig{};
+    Extrinsic::Platform::Backends::Null::NullWindow window{windowConfig};
+
+    Extrinsic::Core::Config::RenderConfig renderConfig{};
+    renderConfig.EnablePromotedVulkanDevice = true;
+    renderConfig.EnableValidation = false;
+
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+
+    device->Initialize(window, renderConfig);
+    EXPECT_FALSE(device->IsOperational());
+
+    const Extrinsic::Backends::Vulkan::VulkanBootstrapDiagnosticsSnapshot diagnostics =
+        Extrinsic::Backends::Vulkan::GetVulkanBootstrapDiagnosticsSnapshot();
+    EXPECT_EQ(diagnostics.Status,
+              Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::SkippedNoNativeWindow);
+    EXPECT_FALSE(diagnostics.NativeWindowAvailable);
+    EXPECT_FALSE(diagnostics.InstanceCreated);
+    EXPECT_FALSE(diagnostics.SurfaceCreated);
+    EXPECT_FALSE(diagnostics.PhysicalDeviceSelected);
+    EXPECT_FALSE(diagnostics.SwapchainSurfaceSupported);
+
+    device->Shutdown();
+    EXPECT_FALSE(device->IsOperational());
+}
+
 TEST(VulkanFailClosedContract, FallbackTransferQueueIncrementsUploadCounter)
 {
     std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
@@ -401,6 +430,12 @@ static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp) == 1u);
 static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::FallbackPipelineReason::ShaderMissing) == 2u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::NotStarted) == 0u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::SkippedNoNativeWindow) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::ProbedPhysicalDevice) == 8u);
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGetters)
 {

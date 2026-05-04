@@ -2,12 +2,16 @@
 
 Promoted Vulkan 1.3 `IDevice` backend surface. Exports
 `Extrinsic.Backends.Vulkan` with the `CreateVulkanDevice()` factory. The current
-promoted lifecycle symbols are concrete and fail closed: until swapchain/device
-bring-up is completed, `Initialize()` leaves the device non-operational and
-`BeginFrame()` returns `false` instead of fabricating a frame. Full execution
-requires a surface-capable physical device with `VK_KHR_timeline_semaphore`,
-`VK_EXT_descriptor_indexing` (PARTIALLY_BOUND + UPDATE_AFTER_BIND), and dynamic
-rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
+promoted lifecycle symbols are concrete and fail closed: with a native GLFW
+window, `Initialize()` now performs phase-1 Vulkan bootstrap by initializing
+volk, creating a `VkInstance`, creating a window surface, and probing for a
+surface-capable physical device/queue-family/swapchain-support tuple. It still
+leaves the device non-operational until logical-device, swapchain, resource,
+pipeline, bindless, and transfer bring-up are reconciled; `BeginFrame()` returns
+`false` instead of fabricating a frame. Full execution requires a surface-capable
+physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
+(PARTIALLY_BOUND + UPDATE_AFTER_BIND), and dynamic rendering
+(`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 
 ## Frame lifecycle status
 
@@ -21,9 +25,17 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   `BeginFrame`, `EndFrame`, `Present`, `Resize`, backbuffer extent/handle access,
   present-mode selection, and graphics-context lookup) are defined in
   `Backends.Vulkan.Device.cpp`.
-- `Initialize()` currently reports that promoted swapchain/device bring-up is not
-  complete and keeps `IsOperational() == false`; renderers must continue to gate
-  GPU command recording on `IDevice::IsOperational()`.
+- `Initialize()` performs only the phase-1 bootstrap/probe listed above. It keeps
+  `IsOperational() == false`; renderers must continue to gate GPU command
+  recording on `IDevice::IsOperational()`. If the supplied window has no native
+  GLFW handle (for example the default CPU/null path), bootstrap is skipped
+  without creating Vulkan handles.
+- `GetVulkanBootstrapDiagnosticsSnapshot()` reports the most recent bootstrap
+  attempt as backend-specific CPU diagnostics: status, last Vulkan result code,
+  whether a native window/volk/validation/instance/surface/device probe was
+  reached, queue-family indices, and swapchain extension/surface support. The
+  snapshot avoids Vulkan-native types and is not an RHI/renderer branching seam;
+  renderer/runtime code must continue to use `IDevice::IsOperational()`.
 - Runtime now has a backend-neutral operational-transition seam for future
   Vulkan bring-up: when a device moves from non-operational to operational,
   runtime waits idle and calls `IRenderer::RebuildOperationalResources()` to
@@ -86,13 +98,16 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 - `Shutdown()` waits idle, flushes deferred deletes, and drains any still-live
   buffer, texture, sampler, and pipeline pool entries so partial bring-up slices
   do not leak backend resources when callers omit explicit per-resource destroys.
-- Completing real Vulkan execution remains in `GRAPHICS-018`: create instance,
-  surface, logical device, swapchain images, per-frame command buffers/sync,
-  concrete resource creation/upload, pipeline creation, and presentation
-  diagnostics before enabling opt-in `gpu;vulkan` smoke tests. The completed
-  renderer reset seam removes one prior blocker, but Vulkan may not report
-  operational until fallback bindless/transfer behavior and real backend
-  resources are reconciled behind the same RHI interfaces.
+- Completing real Vulkan execution remains in `GRAPHICS-018`: phase-1
+  instance/surface/physical-device probing is present, but logical device,
+  swapchain images, per-frame command buffers/sync, concrete resource
+  creation/upload, pipeline creation, and presentation diagnostics still need to
+  land before `IsOperational()` can become true. The opt-in
+  `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies that phase-1
+  bootstrap either probes a surface-capable device or fails/skips cleanly on
+  unsupported hosts. The completed renderer reset seam removes one prior blocker,
+  but Vulkan may not report operational until fallback bindless/transfer behavior
+  and real backend resources are reconciled behind the same RHI interfaces.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 
@@ -100,14 +115,14 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
 
 | File | Responsibility |
 |---|---|
-| `Backends.Vulkan.cppm` | Umbrella interface — exports `CreateVulkanDevice()` and fail-closed fallback diagnostics. |
+| `Backends.Vulkan.cppm` | Umbrella interface — exports `CreateVulkanDevice()`, bootstrap diagnostics, and fail-closed fallback diagnostics. |
 | `Backends.Vulkan.Device.cppm` | Non-re-exported `:Device` partition — `VulkanDevice` declaration and aggregate backend ownership. |
 | `Backends.Vulkan.Queues.cppm` | Non-re-exported `:Queues` partition — queue-family and raw queue state contracts. |
 | `Backends.Vulkan.Memory.cppm` | Non-re-exported `:Memory` partition — backend buffer/image/sampler records. |
