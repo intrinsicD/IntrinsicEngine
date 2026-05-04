@@ -19,6 +19,8 @@ export namespace Extrinsic::RHI
 {
 
     inline constexpr std::uint32_t kMaxShadowCascades = 4u;
+    inline constexpr std::uint32_t kGpuCullDispatchGroupSize = 64u;
+    inline constexpr std::uint32_t kMaxIndirectDrawCount = 100000u;
 
     enum class IndexType : std::uint8_t
     {

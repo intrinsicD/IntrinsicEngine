@@ -1,13 +1,16 @@
 # GRAPHICS-026 — Vulkan/renderer plumbing follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Branch: `claude/review-graphics-commits-ZUXOW`.
+- Commit / PR: pending local agent workflow handoff.
 - Activated: 2026-05-04 from review of recent `src/graphics/` commits (`550b0e9` … `c64bba3`).
 - Source: `GRAPHICS-018` slice review (renderer frame lifecycle through RHI + promoted Vulkan fail-closed surface).
 - Progress 2026-05-04: completed item 2.1 plus item 5.1 by replacing Vulkan implementation-file `stderr` diagnostics with `Core::Log::*`, routing `VK_CHECK_*` diagnostics through a logger bridge, and documenting the logging convention.
-- Next verification step: run the default CPU correctness gate after each grouped patch lands; confirm no `gpu|vulkan` opt-in tests are required for remaining items below.
+- Progress 2026-05-04 slice 2: completed renderer lifecycle/statistics items 1.1–1.10 and 1.12; completed Vulkan documentation/guard items 2.2–2.8 and 2.10–2.14 plus fallback bindless diagnostics for 2.16; reduced `Test.RendererRhiBoundary.cpp` to symbol/linkage guards while adding conditional constructor-only Vulkan fail-closed behavioral coverage; added CPU/mock command-pass unavailable tests for 3.2–3.3; completed docs/task hygiene items 4.1–4.4; created follow-ups `GRAPHICS-018R`, `GRAPHICS-018S`, and `GRAPHICS-018T` for remaining operational-transition/sampler/upload work.
+- Completed: 2026-05-04.
+- Verification note 2026-05-04: default `ci` preset still names unavailable local `clang-20`; final default CPU evidence used the same `ci` preset with explicit `/usr/bin/clang` and `/usr/bin/clang++` (Clang 22, C++23-capable) plus `INTRINSIC_HEADLESS_NO_GLFW=ON`. Constructor-only Vulkan fail-closed coverage was separately configured in `build/ci-vulkan-contract` with `EXTRINSIC_BACKEND=Vulkan` and explicit ImGuizmo source overrides; it builds `ExtrinsicBackendsVulkan` and runs without GPU/swapchain bring-up.
 
 ## Goal
 - Address the plumbing/quality issues identified by the review of the recent `src/graphics/` commits without expanding the slice scope of `GRAPHICS-018`.
@@ -32,6 +35,7 @@
   - `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`
   - `tests/contract/graphics/Test.RendererFrameLifecycle.cpp`
   - `tests/contract/graphics/Test.RendererRhiBoundary.cpp`
+  - `tests/contract/graphics/Test.VulkanFailClosedContract.cpp`
   - `tests/support/MockRHI.hpp`
 - Each item below cites the originating commit hash from the review.
 
@@ -48,8 +52,8 @@
 - 1.8 Export named constants from the renderer/RHI for `kMaxIndirectDrawCount` (currently `100000`) and the cull dispatch group sizing, and reference them from `Test.RendererFrameLifecycle.cpp` instead of hard-coded literals (8f7aaff, 6ce2cc8).
 - 1.9 Split `RenderGraphFrameStats` into focused sub-structs (`CompileStats`, `ExecuteStats`, `CommandRecordStats`); keep `Diagnostic` and `DebugDump` at the top level. Adjust call sites and tests (c1f130e).
 - 1.10 Promote per-pass command-recording counters to a name-keyed array (or `std::unordered_map<std::string_view, CommandRecordStatus>`) so adding new routed passes does not balloon the stats struct (c1f130e).
-- 1.11 Add a documented "device-becomes-operational" reset hook on the renderer: today `m_CullingInitialized` and `MaterialSystem::GpuCapacity` are latched at `Initialize()`. When Vulkan transitions from non-operational to operational, the renderer must re-init culling, re-allocate the material GPU buffer, and reset bindless slot accounting. Either implement the hook now or file a `GRAPHICS-018X-operational-transition` follow-up and link it from `GRAPHICS-018` (6ce2cc8).
-- 1.12 In `Graphics.MaterialSystem.cpp`, comment the non-operational shortcut explicitly (`return true` after CPU-side resize) and reference item 1.11 (6ce2cc8).
+- 1.11 Follow-up filed: `GRAPHICS-018R-operational-transition` blocks any `GRAPHICS-018` slice that marks Vulkan operational; timeline is before `VulkanDevice::IsOperational()` can become true. It owns the documented renderer reset hook for culling, material GPU buffer, and bindless accounting (6ce2cc8).
+- 1.12 Done 2026-05-04: `Graphics.MaterialSystem.cpp` comments the non-operational CPU-mirror shortcut and references `GRAPHICS-018R` (6ce2cc8).
 
 ### 2. Vulkan device surface (origin: c613b1c, 7336e67, 7e09ac5, 5c84d9a, 7d056cf, 295363e, 1a5c2be)
 - 2.1 Done 2026-05-04: replaced `stderr` diagnostics in `Backends.Vulkan.Device.cpp` with the project logger (`Core::Log::Warn`/`Core::Log::Error`). Audit: `Initialize`, `WriteBuffer`, `CreateTexture`, `WriteTexture`, `CreateSampler` (c613b1c, 5c84d9a, 7d056cf, 1a5c2be).
@@ -60,30 +64,35 @@
 - 2.6 Add a header comment to `BeginOneShot`/`EndOneShot` that this submits to the graphics queue with a `vkQueueWaitIdle`, stalling the queue. Mark as "init-time only — runtime uploads must use `ITransferQueue`" (7e09ac5, 1a5c2be).
 - 2.7 Add a documented invariant to `Shutdown` describing the relationship between the deferred-deletion queue and the resource-pool drain: "any handle still present in `m_Buffers/m_Images/m_Samplers/m_Pipelines` has not been queued for destruction." Add a debug-only assertion that the pool entries do not also appear in the deletion queue (295363e).
 - 2.8 In `CreateSampler`, comment the intentional `m_SamplerAnisotropySupported = false` default and reference the device-feature negotiation slice that will set it (5c84d9a).
-- 2.9 In `CreateSampler`, honor `RHI::SamplerDesc::BorderColor` if it exists; if not, file a `GRAPHICS-018X-sampler-border-color` follow-up. Today the border color is hard-coded `VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK` (5c84d9a).
+- 2.9 Follow-up filed: `GRAPHICS-018S-sampler-border-color`; `RHI::SamplerDesc::BorderColor` does not exist yet, so `CreateSampler` documents the opaque-black default until that nonblocking API slice lands (5c84d9a).
 - 2.10 Document the 2D-array vs 3D vs cube interpretation of `RHI::TextureDesc::DepthOrArrayLayers` and the unused `Tex2D` array path inside `CreateTexture` (7d056cf).
 - 2.11 In `WriteTexture`, assert at entry that the destination usage includes a sampled bit (`(usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0`) since the function transitions to `SHADER_READ_ONLY_OPTIMAL`; otherwise log and skip (1a5c2be).
 - 2.12 In `WriteTexture`, tighten the size check from `dataSizeBytes < requiredBytes` to `dataSizeBytes == requiredBytes`, or document why slack is permitted (1a5c2be).
 - 2.13 In `WriteTexture`, do not update `image->CurrentLayout` to `SHADER_READ_ONLY_OPTIMAL` if `EndOneShot` reports a partial failure. Either thread an error return through `EndOneShot` or only set `CurrentLayout` after a verified submit (1a5c2be).
 - 2.14 Extend `FormatBlockByteSize` to handle `D24_UNORM_S8_UINT` / `D32_SFLOAT_S8_UINT` correctly (depth-stencil aspect upload), or explicitly reject depth-stencil uploads with a logged diagnostic instead of returning 0 silently (1a5c2be).
-- 2.15 File a follow-up for batched multi-mip/multi-layer texture uploads (`GRAPHICS-018X-texture-upload-batching`) and reference it from the `GRAPHICS-018` slice line (1a5c2be).
-- 2.16 Move `FallbackBindlessHeap` and `FallbackTransferQueue` so they are at minimum reachable for testing (e.g. file-private namespace + factory used by both `VulkanDevice` and a unit test). Add a debug log + atomic counter on `FallbackBindlessHeap::AllocateTextureSlot` so silent-invalid-index returns leave a breadcrumb (7336e67).
+- 2.15 Follow-up filed: `GRAPHICS-018T-texture-upload-batching`, referenced from `GRAPHICS-018` and `GRAPHICS-018Q`; timeline is before multi-mip/layer Vulkan texture smoke tests (1a5c2be).
+- 2.16 Done 2026-05-04: fallback services are reachable through `CreateVulkanDevice()` in configurations that build `ExtrinsicBackendsVulkan`; `Test.VulkanFailClosedContract.cpp` exercises constructor-only fail-closed behavior without GPU/swapchain creation, and fallback bindless allocation now emits a log breadcrumb plus `GetFallbackBindlessAllocationAttemptCount()` (7336e67).
 
 ### 3. Test methodology (origin: c613b1c, 7336e67, 7e09ac5, 5c84d9a, 7d056cf, 295363e, 1a5c2be)
-- 3.1 Replace grep-on-source contract assertions in `Test.RendererRhiBoundary.cpp` with behavioral assertions where possible. Targets:
+- 3.1 Done 2026-05-04: `Test.RendererRhiBoundary.cpp` now keeps only minimal symbol/linkage source guards; behavioral Vulkan fail-closed assertions live in `Test.VulkanFailClosedContract.cpp` when the Vulkan backend target is configured. Targets covered:
   - Instantiate a `VulkanDevice` (constructor only — no `Initialize`), assert `IsOperational() == false`.
   - With device non-operational, call `CreateBuffer({.SizeBytes = 64})`, `CreateTexture({.Width=1, .Height=1, ...})`, `CreateSampler({})`, `CreatePipeline({})` and assert each returns an empty handle.
   - Call `GetBindlessHeap().AllocateTextureSlot({}, {})`, assert `kInvalidBindlessIndex`.
   - Call `GetTransferQueue().UploadBuffer({}, nullptr, 0, 0)`, assert returned token is invalid and `IsComplete(token) == true`.
-  - Keep the existing grep tests only for the "every promoted method is *defined*" link-time gate, and reduce them to one symbol-name assertion per method instead of full signature match.
-- 3.2 Add a CPU-side renderer test exercising the `CommandPassesSkippedUnavailable` accounting: configure a `MockDevice` with `Operational = true` but a `MockPipelineManager` that fails `Create` for the depth-prepass path; assert `stats.CommandPassesSkippedUnavailable >= 1` and `stats.DepthPrepassCommandsRecorded == 0`.
-- 3.3 Once item 1.5 settles failure policy for culling, add the corresponding `Skipped*` test for cull pipeline failure.
+  - Existing grep tests are reduced to one symbol-name assertion per promoted method rather than full-signature or implementation-body matches.
+- 3.2 Done 2026-05-04: `RendererFrameLifecycle.DepthPrepassPipelineFailureSkipsUnavailableCommandPass` covers unavailable depth-prepass accounting with name-keyed pass status.
+- 3.3 Done 2026-05-04: `RendererFrameLifecycle.CullingPipelineFailureSkipsRoutedCommandPassesUnavailable` covers unavailable culling accounting after item 1.5 settled on soft-fail policy.
 
 ### 4. Documentation and task hygiene (origin: docs commits c64bba3, 802f94c, 715fe6e, fd4a9cb, d068146, 252bd4e, 4aec951)
-- 4.1 Reformat the `GRAPHICS-018` "Current slice" line into a bulleted list (it is currently a 5-line run-on sentence) and trim duplicated phrasing.
-- 4.2 Pick a single canonical home for the Vulkan promoted-surface story. Recommendation: keep architecture-level prose in `docs/architecture/graphics.md` and have `src/graphics/vulkan/README.md` link to it instead of duplicating. Remove duplicated paragraphs from one of the two.
-- 4.3 In `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`, split entries into two sections: "Blocks next slice" (shader packaging, dynamic-rendering attachment ownership) and "Nonblocking". The current "nonblocking" label is technically true but obscures that several entries gate the next bring-up slice.
-- 4.4 For each fail-closed shim listed in `GRAPHICS-018` (fallback bindless heap, fallback transfer queue, empty-handle Create*), record an explicit removal task ID and timeline as required by the review checklist (`docs/agent/review-checklist.md` "Temporary shims") and `AGENTS.md §13`.
+- 4.1 Done 2026-05-04: `GRAPHICS-018` current slice is a bulleted status list.
+- 4.2 Done 2026-05-04: renderer/RHI behavior is canonical in `docs/architecture/graphics.md`; `src/graphics/vulkan/README.md` links there and keeps backend-specific details.
+- 4.3 Done 2026-05-04: `GRAPHICS-018Q` now separates "Blocks next operational Vulkan slice" from "Nonblocking clarifications and follow-ups".
+- 4.4 Done 2026-05-04: fail-closed shims are linked to `GRAPHICS-018R`, `GRAPHICS-018S`, and `GRAPHICS-018T` with owner context and timelines.
+
+## Follow-up task IDs
+- `GRAPHICS-018R-operational-transition`: blocking; owner context `runtime` + `graphics/renderer` + `graphics/vulkan`; timeline before any `GRAPHICS-018` slice marks Vulkan operational; removes/reconciles fallback bindless/transfer and non-operational renderer state shims.
+- `GRAPHICS-018S-sampler-border-color`: nonblocking; owner context `graphics/rhi` + `graphics/vulkan`; timeline before renderer/material behavior relies on non-black sampler border colors.
+- `GRAPHICS-018T-texture-upload-batching`: nonblocking; owner context `graphics/vulkan` + `graphics/assets`; timeline before multi-mip/layer/cube Vulkan texture upload smoke tests.
 
 ### 5. Project conventions
 - 5.1 Done 2026-05-04: `docs/architecture/graphics.md` and `src/graphics/vulkan/README.md` state that Vulkan implementation files must use `Core::Log::*`, not direct `stderr` writes. Reference from item 2.1; this slice also updated the direct `StagingBelt` diagnostics and routed `Vulkan.hpp` `VK_CHECK_*` macros through `Backends.Vulkan.DiagnosticsLogging.cpp`.
@@ -108,6 +117,47 @@
 - No new dependency edges; layering invariants from `AGENTS.md §2` preserved.
 
 ## Verification
+Final evidence (2026-05-04):
+
+```bash
+# Default preset attempt documents the local toolchain issue.
+cmake --preset ci
+# Failed locally because clang-20/clang++-20 are not on PATH.
+
+# Valid default CPU gate in the ci build tree with available C++23 Clang.
+cmake --preset ci \
+  -DCMAKE_C_COMPILER=/usr/bin/clang \
+  -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+  -DINTRINSIC_HEADLESS_NO_GLFW=ON
+cmake --build --preset ci --target IntrinsicTests -j2
+ctest --test-dir build/ci --output-on-failure -R '^Renderer(RhiBoundary|FrameLifecycle)\.' --timeout 60
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# Result: 1559/1559 default CPU tests passed; 2 SLO tests skipped by test body.
+
+# Constructor-only Vulkan fail-closed seam; no GPU/swapchain bring-up.
+cmake -S . -B build/ci-vulkan-contract -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DINTRINSIC_BUILD_SANDBOX=OFF \
+  -DINTRINSIC_BUILD_TESTS=ON \
+  -DINTRINSIC_ENABLE_CUDA=OFF \
+  -DINTRINSIC_ENABLE_SANITIZERS=ON \
+  -DEXTRINSIC_BACKEND=Vulkan \
+  -DCMAKE_C_COMPILER=/usr/bin/clang \
+  -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+  -DINTRINSIC_OFFLINE_DEPS=ON \
+  -DINTRINSIC_UPDATE_DEPS=OFF \
+  -Dimguizmo_SOURCE_DIR=/home/alex/Documents/IntrinsicEngine/external/cache/imguizmo-src/src \
+  -DFETCHCONTENT_SOURCE_DIR_IMGUIZMO=/home/alex/Documents/IntrinsicEngine/external/cache/imguizmo-src/src
+cmake --build build/ci-vulkan-contract --target IntrinsicGraphicsVulkanContractTests ExtrinsicBackendsVulkan -j2
+ctest --test-dir build/ci-vulkan-contract --output-on-failure -R '^VulkanFailClosedContract\.' --timeout 60
+# Result: 1/1 Vulkan fail-closed contract test passed.
+
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+# Result: no layering violations, 0 task findings, no broken relative links.
+```
+
 ```bash
 # Default CPU correctness gate.
 cmake --preset ci

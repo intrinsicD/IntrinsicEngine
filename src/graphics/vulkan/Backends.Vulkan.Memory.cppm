@@ -24,6 +24,7 @@ namespace Extrinsic::Backends::Vulkan
         VkImageView   View        = VK_NULL_HANDLE;
         VmaAllocation Allocation  = VK_NULL_HANDLE;
         VkFormat      Format      = VK_FORMAT_UNDEFINED;
+        VkImageUsageFlags Usage    = 0;
         uint32_t      Width       = 0;
         uint32_t      Height      = 0;
         uint32_t      Depth       = 1;

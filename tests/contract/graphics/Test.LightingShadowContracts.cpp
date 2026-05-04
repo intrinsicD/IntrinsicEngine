@@ -236,7 +236,7 @@ TEST(GraphicsLightingShadowContracts, ShadowPassSkipsDisabledShadowsAndUsesShado
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp");
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
 
     Graphics::ShadowSystem shadows;
     shadows.Initialize();

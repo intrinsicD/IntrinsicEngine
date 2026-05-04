@@ -4,8 +4,22 @@
 - State: in-progress.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-03 after `GRAPHICS-017` completion.
-- Current slice: renderer frame lifecycle now delegates `BeginFrame`/`EndFrame` and backbuffer import through `RHI::IDevice`, brackets render-graph execution with the frame graphics command context, records the canonical `CullingPass` command sequence on operational devices, routes `DepthPrepass` after culling when its pipeline is ready, reports structured command-recording diagnostics with CPU/mock contract coverage, keeps the promoted Vulkan `IDevice` lifecycle/services/resource overrides symbol-complete and fail-closed until full device/swapchain/resource bring-up lands, has guarded real texture allocation/view/upload and `VkSampler` creation paths for future operational Vulkan devices, and drains live backend resource pools during shutdown. Keep Vulkan opt-in and preserve the CPU/null correctness gate.
+- Current slice:
+  - Renderer frame lifecycle delegates `BeginFrame`/`EndFrame` and backbuffer import through `RHI::IDevice`.
+  - Render-graph execution is bracketed by the frame graphics command context.
+  - `CullingPass` and `DepthPrepass` command bodies are routed through backend-neutral renderer/RHI seams and soft-skip unavailable pipelines/resources with structured CPU/mock diagnostics.
+  - `RenderGraphFrameStats` reports focused compile, execute, and name-keyed command-recording status.
+  - Promoted Vulkan `IDevice` lifecycle/services/resource overrides are symbol-complete and fail-closed until full device/swapchain/resource bring-up lands.
+  - Guarded Vulkan texture allocation/view/upload and `VkSampler` creation paths exist for future operational devices.
+  - Live backend resource pools are drained during shutdown.
+  - Keep Vulkan opt-in and preserve the CPU/null correctness gate.
 - Nonblocking questions: tracked in `tasks/backlog/rendering/GRAPHICS-018Q-vulkan-integration-clarifications.md`.
+- Blocking follow-up before marking Vulkan operational: `tasks/backlog/rendering/GRAPHICS-018R-operational-transition.md`.
+- Temporary fail-closed shim removal/reconciliation timeline:
+  - Fallback bindless heap and fallback transfer queue: reconcile/remove under `GRAPHICS-018R` before any slice marks Vulkan operational.
+  - Empty-handle `Create*` paths for non-operational devices: keep as fail-closed guards; operational-path replacement is owned by `GRAPHICS-018` bring-up, with renderer reset gated by `GRAPHICS-018R`.
+  - Hard-coded sampler border color: `tasks/backlog/rendering/GRAPHICS-018S-sampler-border-color.md`, before non-black border colors are relied on by renderer/material behavior.
+  - One-subresource blocking texture upload path: `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`, before multi-mip/layer Vulkan texture smoke tests.
 
 ## Goal
 - Wire concrete Vulkan backend execution behind the promoted graphics interfaces and default frame recipe.

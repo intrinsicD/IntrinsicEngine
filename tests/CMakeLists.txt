@@ -394,6 +394,23 @@ intrinsic_test_object_lib(GraphicsContractTestObjs
     DEPS ExtrinsicGraphics ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
 )
 
+if(TARGET ExtrinsicBackendsVulkan)
+    # Constructor/fail-closed Vulkan coverage is CPU-only (no device, surface, or
+    # swapchain creation) but can only be compiled in configurations that build
+    # the Vulkan backend target. Keep labels contract;graphics so non-headless
+    # CPU gates exercise the seam without making gpu/vulkan runtime tests
+    # mandatory.
+    intrinsic_resolve_test_sources(_graphics_vulkan_contract_test_sources
+        SEARCH_DIRS contract/graphics
+        FILES Test.VulkanFailClosedContract.cpp
+    )
+    intrinsic_test_object_lib(GraphicsVulkanContractTestObjs
+        SOURCES
+            ${_graphics_vulkan_contract_test_sources}
+        DEPS ExtrinsicBackendsVulkan ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform glm::glm
+    )
+endif()
+
 set(_graphics_contract_cpu_test_files
     Test.CullingPassContracts.cpp
     Test.DebugViewContract.cpp
@@ -683,8 +700,16 @@ endif()
 intrinsic_test_executable(IntrinsicGraphicsContractTests
     OBJECTS GraphicsContractTestObjs
     LINK_LIBS ExtrinsicGraphics ExtrinsicRHI ExtrinsicECS ExtrinsicCore ExtrinsicPlatform
-    LABELS contract graphics gpu vulkan
+    LABELS contract graphics
 )
+
+if(TARGET GraphicsVulkanContractTestObjs)
+    intrinsic_test_executable(IntrinsicGraphicsVulkanContractTests
+        OBJECTS GraphicsVulkanContractTestObjs
+        LINK_LIBS ExtrinsicBackendsVulkan ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+        LABELS contract graphics
+    )
+endif()
 
 intrinsic_test_executable(IntrinsicGraphicsContractCpuTests
     OBJECTS GraphicsContractCpuTestObjs

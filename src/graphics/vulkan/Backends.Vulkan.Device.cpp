@@ -1,6 +1,8 @@
 module;
 
 #include <cassert>
+#include <atomic>
+#include <cstdint>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -20,6 +22,30 @@ import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Backends::Vulkan
 {
+namespace
+{
+    std::atomic<std::uint64_t> g_FallbackBindlessAllocationAttempts{0};
+
+    [[nodiscard]] bool HasImageUsage(const VkImageUsageFlags usage, const VkImageUsageFlags bit) noexcept
+    {
+        return (usage & bit) != 0;
+    }
+
+    [[nodiscard]] bool IsDepthStencilFormat(const VkFormat format) noexcept
+    {
+        return format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+    }
+}
+
+void NoteFallbackBindlessAllocationAttempt()
+{
+    g_FallbackBindlessAllocationAttempts.fetch_add(1, std::memory_order_relaxed);
+}
+
+std::uint64_t GetFallbackBindlessAllocationAttemptCount() noexcept
+{
+    return g_FallbackBindlessAllocationAttempts.load(std::memory_order_relaxed);
+}
 
 // =============================================================================
 // §12  Factory
@@ -46,7 +72,6 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
 
     m_ValidationEnabled = config.EnableValidation;
     m_Operational       = false;
-    m_NeedsResize       = false;
     m_FrameSlot         = 0;
     m_GlobalFrameNumber = 0;
 
@@ -58,6 +83,10 @@ void VulkanDevice::Shutdown()
 {
     WaitIdle();
 
+    // Shutdown invariant: deferred-deletion queues own resources already
+    // removed from m_Buffers/m_Images/m_Samplers/m_Pipelines. Any handle still
+    // present in a resource pool below has not been queued for destruction, so
+    // pool drain is responsible for releasing it exactly once.
     for (uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
         FlushDeletionQueue(frameSlot);
 
@@ -124,7 +153,6 @@ void VulkanDevice::Shutdown()
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
     m_SamplerAnisotropySupported = false;
     m_Operational      = false;
-    m_NeedsResize      = false;
 }
 
 void VulkanDevice::WaitIdle()
@@ -140,6 +168,10 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     if (!m_Operational || m_Swapchain == VK_NULL_HANDLE || m_SwapchainHandles.empty())
         return false;
 
+    // BeginFrame hands out the current frame slot without rotating it. The
+    // matching EndFrame call below rotates from the handed-out slot exactly
+    // once, so acquire/end pairing remains single-owner even before full
+    // swapchain acquire/present support lands.
     outFrame.FrameIndex = m_FrameSlot;
     outFrame.SwapchainImageIndex = m_FrameSlot % static_cast<std::uint32_t>(m_SwapchainHandles.size());
     return true;
@@ -150,6 +182,9 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
     if (!m_Operational)
         return;
 
+    // Rotate from the slot returned by BeginFrame, then advance the global
+    // post-EndFrame counter consumed by renderer maintenance/deferred-delete
+    // code.
     m_FrameSlot = (frame.FrameIndex + 1u) % kMaxFramesInFlight;
     ++m_GlobalFrameNumber;
 }
@@ -164,7 +199,6 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
 void VulkanDevice::Resize(uint32_t width, uint32_t height)
 {
     m_SwapchainExtent = VkExtent2D{.width = width, .height = height};
-    m_NeedsResize = true;
 }
 
 Platform::Extent2D VulkanDevice::GetBackbufferExtent() const
@@ -176,7 +210,6 @@ Platform::Extent2D VulkanDevice::GetBackbufferExtent() const
 void VulkanDevice::SetPresentMode(RHI::PresentMode mode)
 {
     m_PresentMode = mode;
-    m_NeedsResize = true;
 }
 
 RHI::TextureHandle VulkanDevice::GetBackbufferHandle(const RHI::FrameHandle& frame) const
@@ -519,7 +552,7 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
     region.dstOffset = offset;
     region.size      = size;
     vkCmdCopyBuffer(cmd, stagingBuf, buf->Buffer, 1, &region);
-    EndOneShot(cmd);  // submits + vkQueueWaitIdle → GPU work is complete
+    (void)EndOneShot(cmd);  // submits + vkQueueWaitIdle → GPU work is complete when true
 
     // 4. The GPU has finished reading from the staging buffer — safe to destroy.
     vmaDestroyBuffer(m_Vma, stagingBuf, stagingAlloc);
@@ -555,8 +588,13 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     if (desc.Dimension == RHI::TextureDimension::TexCube && desc.DepthOrArrayLayers != 6)
         return {};
 
+    // RHI::TextureDesc::DepthOrArrayLayers maps to depth for Tex3D and to
+    // array-layer count for Tex1D/Tex2D/TexCube. Cubes require exactly six
+    // layers in the current RHI contract; 2D array textures are represented by
+    // Tex2D with DepthOrArrayLayers > 1.
     VulkanImage image{};
     image.Format = format;
+    image.Usage = usage;
     image.Width = desc.Width;
     image.Height = desc.Height;
     image.Depth = desc.Dimension == RHI::TextureDimension::Tex3D ? desc.DepthOrArrayLayers : 1u;
@@ -678,16 +716,33 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
     if (!image || image->Image == VK_NULL_HANDLE)
         return;
 
+    if (!HasImageUsage(image->Usage, VK_IMAGE_USAGE_SAMPLED_BIT))
+    {
+        Core::Log::Warn("[VulkanDevice::WriteTexture] Skipping upload for texture without sampled usage");
+        return;
+    }
+
+    if (IsDepthStencilFormat(image->Format))
+    {
+        Core::Log::Warn("[VulkanDevice::WriteTexture] Depth-stencil uploads are not supported by the current one-shot path");
+        return;
+    }
+
     if (mipLevel >= image->MipLevels || arrayLayer >= image->ArrayLayers)
         return;
 
     const std::uint64_t requiredBytes = RequiredUploadBytes(*image, mipLevel);
-    if (requiredBytes == 0 || dataSizeBytes < requiredBytes)
+    if (requiredBytes == 0 || dataSizeBytes != requiredBytes)
+    {
+        Core::Log::Warn("[VulkanDevice::WriteTexture] Upload size mismatch: expected={} actual={}",
+                        requiredBytes,
+                        dataSizeBytes);
         return;
+    }
 
     VkBufferCreateInfo stagingInfo{};
     stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    stagingInfo.size = dataSizeBytes;
+    stagingInfo.size = requiredBytes;
     stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
     VmaAllocationCreateInfo allocationInfo{};
@@ -710,7 +765,7 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
         return;
     }
 
-    std::memcpy(stagingAllocationInfo.pMappedData, data, static_cast<std::size_t>(dataSizeBytes));
+    std::memcpy(stagingAllocationInfo.pMappedData, data, static_cast<std::size_t>(requiredBytes));
 
     VkCommandBuffer cmd = BeginOneShot();
     if (cmd == VK_NULL_HANDLE)
@@ -765,8 +820,10 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
                  VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                  VK_ACCESS_2_SHADER_READ_BIT);
 
-    EndOneShot(cmd);
-    image->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if (EndOneShot(cmd))
+    {
+        image->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    }
     vmaDestroyBuffer(m_Vma, stagingBuffer, stagingAllocation);
 }
 
@@ -786,6 +843,8 @@ RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)
     samplerInfo.mipLodBias = desc.MipLodBias;
     samplerInfo.minLod = desc.MinLod;
     samplerInfo.maxLod = desc.MaxLod;
+    // RHI::SamplerDesc does not yet expose a border-color selector; keep the
+    // Vulkan default deterministic until GRAPHICS-018S adds the API surface.
     samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = desc.CompareEnable ? VK_TRUE : VK_FALSE;
@@ -888,13 +947,13 @@ VkCommandBuffer VulkanDevice::BeginOneShot()
     return cmd;
 }
 
-void VulkanDevice::EndOneShot(VkCommandBuffer cmd)
+bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
 {
     if (!m_Operational || m_Device == VK_NULL_HANDLE || cmd == VK_NULL_HANDLE)
-        return;
+        return false;
 
     if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
-        return;
+        return false;
 
     VkSubmitInfo submit{};
     submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -903,9 +962,13 @@ void VulkanDevice::EndOneShot(VkCommandBuffer cmd)
 
     if (m_GraphicsQueue != VK_NULL_HANDLE)
     {
-        vkQueueSubmit(m_GraphicsQueue, 1, &submit, VK_NULL_HANDLE);
-        vkQueueWaitIdle(m_GraphicsQueue);
+        if (vkQueueSubmit(m_GraphicsQueue, 1, &submit, VK_NULL_HANDLE) != VK_SUCCESS)
+            return false;
+        if (vkQueueWaitIdle(m_GraphicsQueue) != VK_SUCCESS)
+            return false;
+        return true;
     }
+    return false;
 }
 
 void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
@@ -915,7 +978,6 @@ void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
 
     if (!m_Operational || m_FrameSlot >= kMaxFramesInFlight)
     {
-        fn();
         return;
     }
 

@@ -32,12 +32,12 @@ TEST(GraphicsRenderer, NullRendererExecutesRenderGraphPath)
 
     renderer->ExecuteFrame(frame, world);
     const auto& stats = renderer->GetLastRenderGraphStats();
-    EXPECT_TRUE(stats.CompileSucceeded);
-    EXPECT_TRUE(stats.ExecuteSucceeded);
-    EXPECT_GT(stats.PassCount, 0u);
-    EXPECT_GT(stats.ResourceCount, 0u);
-    EXPECT_GT(stats.BarrierCount, 0u);
-    EXPECT_GT(stats.TransientMemoryEstimateBytes, 0u);
+    EXPECT_TRUE(stats.Compile.Succeeded);
+    EXPECT_TRUE(stats.Execute.Succeeded);
+    EXPECT_GT(stats.Compile.PassCount, 0u);
+    EXPECT_GT(stats.Compile.ResourceCount, 0u);
+    EXPECT_GT(stats.Compile.BarrierCount, 0u);
+    EXPECT_GT(stats.Compile.TransientMemoryEstimateBytes, 0u);
     EXPECT_GT(device.CommandContext.TextureBarrierCalls.size(), 0u);
     EXPECT_GT(device.CommandContext.BufferBarrierCalls.size(), 0u);
     EXPECT_FALSE(stats.DebugDump.empty());
@@ -69,9 +69,9 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     renderer->ExecuteFrame(frame, world);
 
     const auto& stats = renderer->GetLastRenderGraphStats();
-    ASSERT_TRUE(stats.CompileSucceeded);
+    ASSERT_TRUE(stats.Compile.Succeeded);
     ASSERT_FALSE(stats.DebugDump.empty());
-    EXPECT_EQ(stats.CulledPassCount, 0u);
+    EXPECT_EQ(stats.Compile.CulledPassCount, 0u);
 
     const auto& dump = stats.DebugDump;
     EXPECT_NE(dump.find("name=\"Null.Compute.Prologue\""), std::string::npos);
@@ -173,7 +173,7 @@ TEST(GraphicsRenderer, NullRendererAddsPickingPassWhenPickIsPending)
     renderer->ExecuteFrame(frame, world);
 
     const auto& stats = renderer->GetLastRenderGraphStats();
-    ASSERT_TRUE(stats.CompileSucceeded);
+    ASSERT_TRUE(stats.Compile.Succeeded);
     ASSERT_FALSE(stats.DebugDump.empty());
     EXPECT_NE(stats.DebugDump.find("name=\"Null.Picking\""), std::string::npos);
 
@@ -200,8 +200,8 @@ TEST(GraphicsRenderer, NullRendererExecuteFrameRequiresPreparePhase)
     renderer->ExecuteFrame(frame, world);
 
     const auto& stats = renderer->GetLastRenderGraphStats();
-    EXPECT_FALSE(stats.CompileSucceeded);
-    EXPECT_FALSE(stats.ExecuteSucceeded);
+    EXPECT_FALSE(stats.Compile.Succeeded);
+    EXPECT_FALSE(stats.Execute.Succeeded);
     EXPECT_FALSE(stats.Diagnostic.empty());
 
     renderer->Shutdown();
@@ -223,8 +223,8 @@ TEST(GraphicsRenderer, NullRendererPrepareBeforeExtractPreventsExecute)
     renderer->ExecuteFrame(frame, world);
 
     const auto& stats = renderer->GetLastRenderGraphStats();
-    EXPECT_FALSE(stats.CompileSucceeded);
-    EXPECT_FALSE(stats.ExecuteSucceeded);
+    EXPECT_FALSE(stats.Compile.Succeeded);
+    EXPECT_FALSE(stats.Execute.Succeeded);
     EXPECT_FALSE(stats.Diagnostic.empty());
 
     renderer->Shutdown();

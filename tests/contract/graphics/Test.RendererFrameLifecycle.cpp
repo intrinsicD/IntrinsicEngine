@@ -45,6 +45,20 @@ namespace
         }
         return -1;
     }
+
+    [[nodiscard]] const Extrinsic::Graphics::RenderGraphCommandPassStats* FindCommandPass(
+        const Extrinsic::Graphics::RenderGraphFrameStats& stats,
+        const std::string& name)
+    {
+        for (const auto& pass : stats.CommandRecords.Passes)
+        {
+            if (pass.Name == name)
+            {
+                return &pass;
+            }
+        }
+        return nullptr;
+    }
 }
 
 TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext)
@@ -70,15 +84,19 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     renderer->ExecuteFrame(frame, world);
 
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
-    EXPECT_TRUE(stats.CompileSucceeded) << stats.Diagnostic;
-    EXPECT_TRUE(stats.ExecuteSucceeded) << stats.Diagnostic;
-    EXPECT_TRUE(stats.DeviceOperationalDuringExecute);
-    EXPECT_EQ(stats.CommandPassesRecorded, 2u);
-    EXPECT_EQ(stats.CommandPassesSkipped, 0u);
-    EXPECT_EQ(stats.CommandPassesSkippedNonOperational, 0u);
-    EXPECT_EQ(stats.CommandPassesSkippedUnavailable, 0u);
-    EXPECT_EQ(stats.CullingPassCommandsRecorded, 1u);
-    EXPECT_EQ(stats.DepthPrepassCommandsRecorded, 1u);
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, 0u);
+    EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
+    EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 0u);
+    ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.GetBackbufferHandleCount, 1);
     EXPECT_EQ(device.LastBackbufferFrame.FrameIndex, frame.FrameIndex);
     EXPECT_EQ(device.LastBackbufferFrame.SwapchainImageIndex, frame.SwapchainImageIndex);
@@ -92,12 +110,14 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[1], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
-    EXPECT_EQ(device.CommandContext.LastDispatch.X, 1563u);
+    EXPECT_EQ(device.CommandContext.LastDispatch.X,
+              (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
+                  Extrinsic::RHI::kGpuCullDispatchGroupSize);
     EXPECT_EQ(device.CommandContext.LastDispatch.Y, 1u);
     EXPECT_EQ(device.CommandContext.LastDispatch.Z, 1u);
     EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 1);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 1);
-    EXPECT_EQ(device.CommandContext.LastMaxDrawCount, 100000u);
+    EXPECT_EQ(device.CommandContext.LastMaxDrawCount, Extrinsic::RHI::kMaxIndirectDrawCount);
 
     const int dispatchEvent = FindEventIndex(device.CommandContext,
         Extrinsic::Tests::MockCommandContext::EventKind::Dispatch);
@@ -134,8 +154,8 @@ TEST(RendererFrameLifecycle, InvalidDeviceBackbufferReportsRecipeDiagnostic)
     renderer->ExecuteFrame(frame, world);
 
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
-    EXPECT_FALSE(stats.CompileSucceeded);
-    EXPECT_FALSE(stats.ExecuteSucceeded);
+    EXPECT_FALSE(stats.Compile.Succeeded);
+    EXPECT_FALSE(stats.Execute.Succeeded);
     EXPECT_NE(stats.Diagnostic.find("Backbuffer"), std::string::npos);
     EXPECT_EQ(device.GetBackbufferHandleCount, 1);
     EXPECT_EQ(device.CommandContext.BeginCalls, 0);
@@ -164,15 +184,19 @@ TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutes
     renderer->ExecuteFrame(frame, world);
 
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
-    EXPECT_TRUE(stats.CompileSucceeded) << stats.Diagnostic;
-    EXPECT_TRUE(stats.ExecuteSucceeded) << stats.Diagnostic;
-    EXPECT_FALSE(stats.DeviceOperationalDuringExecute);
-    EXPECT_EQ(stats.CommandPassesRecorded, 0u);
-    EXPECT_EQ(stats.CommandPassesSkipped, 2u);
-    EXPECT_EQ(stats.CommandPassesSkippedNonOperational, 2u);
-    EXPECT_EQ(stats.CommandPassesSkippedUnavailable, 0u);
-    EXPECT_EQ(stats.CullingPassCommandsRecorded, 0u);
-    EXPECT_EQ(stats.DepthPrepassCommandsRecorded, 0u);
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_FALSE(stats.Execute.DeviceOperational);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 0u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, 2u);
+    EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 2u);
+    EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 0u);
+    ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
+    ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
     EXPECT_EQ(device.CommandContext.BeginCalls, 1);
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
     EXPECT_EQ(device.CommandContext.FillBufferCalls, 0);
@@ -183,6 +207,90 @@ TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutes
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
 
     renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandPass)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.FailPipelineCreateCall = 2;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_EQ(stats.CommandRecords.Recorded, 1u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, 1u);
+    EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 1u);
+    ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnavailable)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.FailPipelineCreateCall = 1;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_EQ(stats.CommandRecords.Recorded, 0u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, 2u);
+    EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 2u);
+    ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, BeginFrameWithoutDeviceReportsLifecycleDiagnostic)
+{
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+
+    Extrinsic::RHI::FrameHandle frame{};
+    EXPECT_FALSE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_FALSE(stats.LifecycleDiagnostic.empty());
+    EXPECT_TRUE(stats.Diagnostic.empty());
 }
 
 TEST(RendererFrameLifecycle, BeginFrameSkipDoesNotRecordCommands)

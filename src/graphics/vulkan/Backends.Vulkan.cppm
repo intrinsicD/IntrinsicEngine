@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <memory>
 
 export module Extrinsic.Backends.Vulkan;
@@ -11,5 +12,8 @@ namespace Extrinsic::Backends::Vulkan
     // Call once during engine initialization; the returned device owns all
     // Vulkan state.  Destroy it before the window is destroyed.
     export std::unique_ptr<RHI::IDevice> CreateVulkanDevice();
+
+    // Debug breadcrumb for fail-closed non-operational bindless allocation attempts.
+    export std::uint64_t GetFallbackBindlessAllocationAttemptCount() noexcept;
 }
 

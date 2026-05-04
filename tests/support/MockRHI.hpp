@@ -268,6 +268,7 @@ namespace Extrinsic::Tests
         bool FailNextTextureCreate  = false;
         bool FailNextSamplerCreate  = false;
         bool FailNextPipelineCreate = false;
+        int  FailPipelineCreateCall = 0;
         bool BeginFrameResult       = true;
         RHI::FrameHandle NextFrame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
         RHI::TextureHandle BackbufferHandle{100u, 1u};
@@ -369,6 +370,10 @@ namespace Extrinsic::Tests
         RHI::PipelineHandle CreatePipeline(const RHI::PipelineDesc&) override
         {
             ++CreatePipelineCount;
+            if (FailPipelineCreateCall > 0 && CreatePipelineCount == FailPipelineCreateCall)
+            {
+                return {};
+            }
             if (FailNextPipelineCreate) { FailNextPipelineCreate = false; return {}; }
             return RHI::PipelineHandle{m_NextPipeline++, 1u};
         }

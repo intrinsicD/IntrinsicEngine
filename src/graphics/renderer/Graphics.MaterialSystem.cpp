@@ -171,6 +171,10 @@ namespace Extrinsic::Graphics
             }
             if (!Device->IsOperational())
             {
+                // Non-operational backends cannot allocate the material SSBO yet.
+                // Keep CPU-side slot mirrors/capacity coherent so extraction and
+                // default CPU tests can proceed; GRAPHICS-018R owns rebuilding
+                // this GPU buffer when a Vulkan device later becomes operational.
                 GpuCapacity = newCap;
                 GpuSlots.resize(newCap, RHI::GpuMaterialSlot{});
                 DirtySet.assign(newCap, false);

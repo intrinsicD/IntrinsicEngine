@@ -35,9 +35,12 @@ export import :Surface;
 export import :Swapchain;
 export import :Sync;
 export import :Transfer;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Backends::Vulkan
 {
+    void NoteFallbackBindlessAllocationAttempt();
+
     export class VulkanDevice final : public RHI::IDevice
     {
     public:
@@ -60,6 +63,13 @@ namespace Extrinsic::Backends::Vulkan
 
         void SetPresentMode(RHI::PresentMode mode) override;
         [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }
+
+        // TODO(GRAPHICS-018): complete operational bring-up helper surfaces:
+        // CreateInstance/CreateSurface, physical-device selection, logical
+        // device/queue creation, VMA creation, swapchain creation and image
+        // registration, per-frame resource creation/destruction, global
+        // pipeline layout/default sampler creation, memory type/depth format/
+        // format-support queries, and swapchain recreation helpers.
 
         [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle& frame) const override;
 
@@ -105,6 +115,8 @@ namespace Extrinsic::Backends::Vulkan
         public:
             [[nodiscard]] RHI::BindlessIndex AllocateTextureSlot(RHI::TextureHandle, RHI::SamplerHandle) override
             {
+                NoteFallbackBindlessAllocationAttempt();
+                Core::Log::Warn("[VulkanDevice] Fallback bindless heap rejected texture allocation; device is non-operational");
                 return RHI::kInvalidBindlessIndex;
             }
 
@@ -147,9 +159,11 @@ namespace Extrinsic::Backends::Vulkan
             void CollectCompleted() override {}
         };
 
-
+        // BeginOneShot/EndOneShot submit to the graphics queue and wait for it
+        // to become idle. These helpers are init/load-time only; runtime
+        // uploads must use IDevice::GetTransferQueue() / ITransferQueue.
         [[nodiscard]] VkCommandBuffer BeginOneShot();
-        void EndOneShot(VkCommandBuffer cmd);
+        [[nodiscard]] bool EndOneShot(VkCommandBuffer cmd);
 
         void DeferDelete(VulkanDeferredDelete fn);
         void FlushDeletionQueue(uint32_t frameSlot);
@@ -198,8 +212,9 @@ namespace Extrinsic::Backends::Vulkan
 
         RHI::PresentMode m_PresentMode  = RHI::PresentMode::VSync;
         bool             m_Operational  = false;
-        bool             m_NeedsResize  = false;
         bool             m_ValidationEnabled = false;
+        // GRAPHICS-018 will set this from device feature negotiation. Until
+        // then sampler creation intentionally leaves anisotropy disabled.
         bool             m_SamplerAnisotropySupported = false;
     };
 }

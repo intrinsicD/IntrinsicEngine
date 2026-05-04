@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cstdint>
 
 module Extrinsic.Graphics.Pass.DepthPrepass;
@@ -45,7 +46,7 @@ namespace Extrinsic::Graphics
             0,
             bucket.CountBuffer,
             0,
-            bucket.Capacity);
+            std::min(bucket.Capacity, RHI::kMaxIndirectDrawCount));
     }
 }
 

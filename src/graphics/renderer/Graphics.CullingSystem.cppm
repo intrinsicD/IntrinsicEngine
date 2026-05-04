@@ -39,7 +39,7 @@ export namespace Extrinsic::Graphics
         CullingSystem(const CullingSystem&)            = delete;
         CullingSystem& operator=(const CullingSystem&) = delete;
 
-        void Initialize(RHI::IDevice&         device,
+        [[nodiscard]] bool Initialize(RHI::IDevice&         device,
                         RHI::BufferManager&   bufferMgr,
                         RHI::PipelineManager& pipelineMgr,
                         std::string_view      cullShaderPath);

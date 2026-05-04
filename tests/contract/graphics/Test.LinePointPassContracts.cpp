@@ -152,7 +152,7 @@ TEST(GraphicsLinePointPassContracts, LinePassSkipsInvalidStateAndDrawsLineBucket
     EXPECT_TRUE(invalidBucketCmd.Events.empty());
 
     Graphics::CullingSystem culling;
-    culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp");
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
 
     RecordingCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 11u);
@@ -200,7 +200,7 @@ TEST(GraphicsLinePointPassContracts, PointPassSkipsInvalidStateAndDrawsPointBuck
     EXPECT_TRUE(invalidBucketCmd.Events.empty());
 
     Graphics::CullingSystem culling;
-    culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp");
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
 
     RecordingCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 12u);

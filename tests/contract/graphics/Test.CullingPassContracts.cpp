@@ -113,7 +113,7 @@ TEST(GraphicsCullingContracts, BucketsCoverSurfaceLinePointShadowAndSelectionDom
     RHI::PipelineManager pipelineMgr{device};
 
     Graphics::CullingSystem culling;
-    culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp");
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
 
     for (const auto kind : kIndexedBuckets)
     {
@@ -149,7 +149,7 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
     world.SyncFrame();
 
     Graphics::CullingSystem culling;
-    culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp");
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
 
     RecordingCommandContext cmd;
     RHI::CameraUBO camera{};

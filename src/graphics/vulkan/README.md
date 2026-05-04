@@ -24,14 +24,19 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
   not allocate GPU slots or upload data; they return invalid indices/tokens and
   make maintenance calls no-ops so callers never dereference null backend state.
+  Fallback bindless allocation attempts increment
+  `GetFallbackBindlessAllocationAttemptCount()` and emit a logger breadcrumb for
+  CPU-testable diagnostics.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
   and sampler creation creates real `VkSampler` objects once a future device
   bootstrap marks the backend operational; anisotropy remains disabled unless
   device feature negotiation records support. `WriteTexture()` now has a guarded
-  synchronous staging-buffer upload path with mip/layer bounds checks and
-  transfer-to-shader-read layout transitions. Pipeline creation still returns
+  synchronous staging-buffer upload path with mip/layer bounds checks, exact
+  byte-size validation, sampled-usage validation, explicit depth-stencil upload
+  rejection, and transfer-to-shader-read layout transitions that update tracked
+  layout only after one-shot submission succeeds. Pipeline creation still returns
   invalid handles until shader/pipeline construction is wired.
 - `Shutdown()` waits idle, flushes deferred deletes, and drains any still-live
   buffer, texture, sampler, and pipeline pool entries so partial bring-up slices
@@ -40,19 +45,21 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   surface, logical device, swapchain images, per-frame command buffers/sync,
   concrete resource creation/upload, pipeline creation, and presentation
   diagnostics before enabling opt-in `gpu;vulkan` smoke tests.
+- Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
+  [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 
 ## Module surface
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
 
 | File | Responsibility |
 |---|---|
-| `Backends.Vulkan.cppm` | Umbrella interface — exports `CreateVulkanDevice()` |
+| `Backends.Vulkan.cppm` | Umbrella interface — exports `CreateVulkanDevice()` and fail-closed fallback diagnostics. |
 | `Backends.Vulkan.Device.cppm` | Non-re-exported `:Device` partition — `VulkanDevice` declaration and aggregate backend ownership. |
 | `Backends.Vulkan.Queues.cppm` | Non-re-exported `:Queues` partition — queue-family and raw queue state contracts. |
 | `Backends.Vulkan.Memory.cppm` | Non-re-exported `:Memory` partition — backend buffer/image/sampler records. |
@@ -93,7 +100,8 @@ import :Transfer;       // gets StagingBelt/VulkanTransferQueue declarations
 
 The umbrella `Backends.Vulkan.cppm` does **not** `export import` any internal
 partition, so external consumers of `Extrinsic.Backends.Vulkan` see only
-`CreateVulkanDevice()` — concrete Vulkan types remain hidden.
+`CreateVulkanDevice()` plus fail-closed fallback diagnostics — concrete Vulkan
+types remain hidden.
 
 ## Diagnostics
 

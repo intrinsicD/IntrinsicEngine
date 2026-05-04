@@ -145,7 +145,7 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     transformSync.Initialize();
 
     Graphics::CullingSystem culling;
-    culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp");
+    ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
 
     const auto baseType = matSys.FindType("StandardPBR");
     ASSERT_TRUE(baseType.IsValid());
@@ -248,6 +248,7 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     culling.Shutdown();
     transformSync.Shutdown();
     visSync.Shutdown();
+    materialInstance.Lease = {};
     matSys.Shutdown();
     world.Shutdown();
 }

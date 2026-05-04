@@ -4,6 +4,7 @@ module;
 #include <memory>
 #include <span>
 #include <string>
+#include <vector>
 
 export module Extrinsic.Graphics.Renderer;
 
@@ -33,26 +34,54 @@ import Extrinsic.Graphics.RenderGraph;
 
 namespace Extrinsic::Graphics
 {
-    export struct RenderGraphFrameStats
+    export enum class RenderCommandPassStatus : std::uint8_t
     {
-        bool CompileSucceeded = false;
-        bool ExecuteSucceeded = false;
+        Recorded,
+        SkippedNonOperational,
+        SkippedUnavailable,
+    };
+
+    export struct RenderGraphCompileStats
+    {
+        bool Succeeded = false;
         std::uint32_t PassCount = 0;
         std::uint32_t CulledPassCount = 0;
         std::uint32_t ResourceCount = 0;
         std::uint32_t BarrierCount = 0;
         std::uint64_t TransientMemoryEstimateBytes = 0;
-        std::uint64_t CompileTimeMicros = 0;
-        std::uint64_t ExecuteTimeMicros = 0;
-        std::uint32_t CommandPassesRecorded = 0;
-        std::uint32_t CommandPassesSkipped = 0;
-        std::uint32_t CommandPassesSkippedNonOperational = 0;
-        std::uint32_t CommandPassesSkippedUnavailable = 0;
-        std::uint32_t CullingPassCommandsRecorded = 0;
-        std::uint32_t DepthPrepassCommandsRecorded = 0;
-        bool DeviceOperationalDuringExecute = false;
+        std::uint64_t TimeMicros = 0;
+    };
+
+    export struct RenderGraphExecuteStats
+    {
+        bool Succeeded = false;
+        bool DeviceOperational = false;
+        std::uint64_t TimeMicros = 0;
+    };
+
+    export struct RenderGraphCommandPassStats
+    {
+        std::string Name{};
+        RenderCommandPassStatus Status = RenderCommandPassStatus::SkippedUnavailable;
+    };
+
+    export struct RenderGraphCommandRecordStats
+    {
+        std::uint32_t Recorded = 0;
+        std::uint32_t Skipped = 0;
+        std::uint32_t SkippedNonOperational = 0;
+        std::uint32_t SkippedUnavailable = 0;
+        std::vector<RenderGraphCommandPassStats> Passes{};
+    };
+
+    export struct RenderGraphFrameStats
+    {
+        RenderGraphCompileStats Compile{};
+        RenderGraphExecuteStats Execute{};
+        RenderGraphCommandRecordStats CommandRecords{};
         std::string DebugDump{};
         std::string Diagnostic{};
+        std::string LifecycleDiagnostic{};
     };
 
     export struct RuntimeRenderSnapshotBatch
@@ -101,10 +130,11 @@ namespace Extrinsic::Graphics
         //  4. ExecuteFrame   — record and submit GPU command buffers.
         //
         //  5. EndFrame       — release frame-context ownership back to the
-        //                      ring.  Returns the completed GPU timeline value
-        //                      so the caller can drive deferred deletion and
-        //                      transfer GC without coupling IRenderer to the
-        //                      maintenance service.
+        //                      ring.  Returns IDevice::GetGlobalFrameNumber()
+        //                      after the device EndFrame call. This is the
+        //                      device's post-EndFrame global frame counter,
+        //                      not necessarily the just-completed
+        //                      frame.FrameIndex.
 
         [[nodiscard]] virtual bool BeginFrame(RHI::FrameHandle& outFrame) = 0;
 

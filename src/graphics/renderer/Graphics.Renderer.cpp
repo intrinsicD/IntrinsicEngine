@@ -6,6 +6,7 @@ module;
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -129,13 +130,7 @@ namespace Extrinsic::Graphics
         struct PrepLightSyncTag {};
         struct PrepGpuWorldSyncTag {};
 
-        enum class CommandRecordStatus : std::uint8_t
-        {
-            Recorded,
-            SkippedNonOperational,
-            SkippedUnavailable,
-        };
-
+        constexpr float kCameraInverseDeterminantEpsilon = 0.000001f;
         constexpr float kMinLineWidth = 0.5f;
         constexpr float kMaxLineWidth = 32.0f;
         constexpr float kMinPointRadius = 0.0001f;
@@ -186,7 +181,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] bool IsInvertibleFiniteMatrix(const glm::mat4& value) noexcept
         {
             const float determinant = glm::determinant(value);
-            return IsFinite(value) && std::isfinite(determinant) && std::abs(determinant) > 0.000001f;
+            return IsFinite(value) && std::isfinite(determinant) &&
+                   std::abs(determinant) > kCameraInverseDeterminantEpsilon;
         }
     }
 
@@ -216,12 +212,11 @@ namespace Extrinsic::Graphics
             m_CullingSystem  .emplace();
             if (device.IsOperational())
             {
-                m_CullingSystem->Initialize(
+                m_CullingOutputAvailable = m_CullingSystem->Initialize(
                     device,
                     *m_BufferManager,
                     *m_PipelineManager,
                     "assets/shaders/instance_cull.comp");
-                m_CullingInitialized = true;
 
                 RHI::PipelineDesc depthPrepassDesc{};
                 depthPrepassDesc.VertexShaderPath = "assets/shaders/depth_prepass.vert";
@@ -291,7 +286,7 @@ namespace Extrinsic::Graphics
             m_TextureManager .reset();
             m_SamplerManager .reset();
             m_BufferManager  .reset();
-            m_CullingInitialized = false;
+            m_CullingOutputAvailable = false;
         }
 
         void Resize(std::uint32_t, std::uint32_t) override
@@ -306,7 +301,7 @@ namespace Extrinsic::Graphics
             ResetFrameState();
             if (m_Device == nullptr)
             {
-                m_LastRenderGraphStats.Diagnostic = "BeginFrame requires a live device.";
+                m_LastRenderGraphStats.LifecycleDiagnostic = "BeginFrame requires a live device.";
                 Core::Log::Error("[Graphics] BeginFrame failed: device missing");
                 return false;
             }
@@ -680,7 +675,7 @@ namespace Extrinsic::Graphics
             const auto compileBegin = std::chrono::steady_clock::now();
             auto compiled = m_RenderGraph.Compile();
             const auto compileEnd = std::chrono::steady_clock::now();
-            m_LastRenderGraphStats.CompileTimeMicros = static_cast<std::uint64_t>(
+            m_LastRenderGraphStats.Compile.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(compileEnd - compileBegin).count());
             if (!compiled.has_value())
             {
@@ -690,14 +685,14 @@ namespace Extrinsic::Graphics
                                  m_LastRenderGraphStats.Diagnostic);
                 return;
             }
-            m_LastRenderGraphStats.CompileSucceeded = true;
-            m_LastRenderGraphStats.PassCount = compiled->PassCount;
-            m_LastRenderGraphStats.CulledPassCount = compiled->CulledPassCount;
-            m_LastRenderGraphStats.ResourceCount = compiled->ResourceCount;
-            m_LastRenderGraphStats.BarrierCount = static_cast<std::uint32_t>(compiled->BarrierPackets.size());
-            m_LastRenderGraphStats.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
+            m_LastRenderGraphStats.Compile.Succeeded = true;
+            m_LastRenderGraphStats.Compile.PassCount = compiled->PassCount;
+            m_LastRenderGraphStats.Compile.CulledPassCount = compiled->CulledPassCount;
+            m_LastRenderGraphStats.Compile.ResourceCount = compiled->ResourceCount;
+            m_LastRenderGraphStats.Compile.BarrierCount = static_cast<std::uint32_t>(compiled->BarrierPackets.size());
+            m_LastRenderGraphStats.Compile.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
             m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
-            m_LastRenderGraphStats.DeviceOperationalDuringExecute = m_Device->IsOperational();
+            m_LastRenderGraphStats.Execute.DeviceOperational = m_Device->IsOperational();
 
             const auto executeBegin = std::chrono::steady_clock::now();
             auto& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
@@ -718,23 +713,29 @@ namespace Extrinsic::Graphics
                 {},
                 [this, &graphicsContext, &passNameByIndex, &camera, &frame](const std::uint32_t passIndex)
                 {
-                    if (passIndex < passNameByIndex.size() && passNameByIndex[passIndex] == std::string_view{"CullingPass"})
+                    if (passIndex >= passNameByIndex.size())
                     {
-                        const CommandRecordStatus status = RecordCullingPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(status);
-                        if (status == CommandRecordStatus::Recorded)
-                        {
-                            ++m_LastRenderGraphStats.CullingPassCommandsRecorded;
-                        }
+                        Core::Log::Warn("[Graphics] Routed pass-name resolution failed during execute: passIndex={}",
+                                        passIndex);
+                        return;
                     }
-                    else if (passIndex < passNameByIndex.size() && passNameByIndex[passIndex] == std::string_view{"DepthPrepass"})
+
+                    const std::string_view passName = passNameByIndex[passIndex];
+                    if (passName.empty())
                     {
-                        const CommandRecordStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(status);
-                        if (status == CommandRecordStatus::Recorded)
-                        {
-                            ++m_LastRenderGraphStats.DepthPrepassCommandsRecorded;
-                        }
+                        Core::Log::Warn("[Graphics] Routed pass-name resolution failed during execute: passIndex={}",
+                                        passIndex);
+                        return;
+                    }
+                    if (passName == std::string_view{"CullingPass"})
+                    {
+                        const RenderCommandPassStatus status = RecordCullingPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"DepthPrepass"})
+                    {
+                        const RenderCommandPassStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
                     }
                 },
                 [&graphicsContext, &compiled](const BarrierPacket& packet)
@@ -743,7 +744,7 @@ namespace Extrinsic::Graphics
                 });
             graphicsContext.End();
             const auto executeEnd = std::chrono::steady_clock::now();
-            m_LastRenderGraphStats.ExecuteTimeMicros = static_cast<std::uint64_t>(
+            m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
             if (!executeResult.has_value())
             {
@@ -752,7 +753,7 @@ namespace Extrinsic::Graphics
                                  static_cast<int>(executeResult.error()));
                 return;
             }
-            m_LastRenderGraphStats.ExecuteSucceeded = true;
+            m_LastRenderGraphStats.Execute.Succeeded = true;
 
             // Phase 14.2 GPU order is intentionally fixed for concrete
             // backends:
@@ -774,7 +775,7 @@ namespace Extrinsic::Graphics
         {
             if (m_Device == nullptr)
             {
-                m_LastRenderGraphStats.Diagnostic = "EndFrame requires a live device.";
+                m_LastRenderGraphStats.LifecycleDiagnostic = "EndFrame requires a live device.";
                 Core::Log::Error("[Graphics] EndFrame failed: device missing");
                 return 0;
             }
@@ -867,58 +868,65 @@ namespace Extrinsic::Graphics
             return camera;
         }
 
-        void AccumulateCommandRecordStatus(const CommandRecordStatus status)
+        void AccumulateCommandRecordStatus(const std::string_view passName,
+                                           const RenderCommandPassStatus status)
         {
+            m_LastRenderGraphStats.CommandRecords.Passes.push_back(RenderGraphCommandPassStats{
+                .Name = std::string{passName},
+                .Status = status,
+            });
+
             switch (status)
             {
-            case CommandRecordStatus::Recorded:
-                ++m_LastRenderGraphStats.CommandPassesRecorded;
+            case RenderCommandPassStatus::Recorded:
+                ++m_LastRenderGraphStats.CommandRecords.Recorded;
                 break;
-            case CommandRecordStatus::SkippedNonOperational:
-                ++m_LastRenderGraphStats.CommandPassesSkipped;
-                ++m_LastRenderGraphStats.CommandPassesSkippedNonOperational;
+            case RenderCommandPassStatus::SkippedNonOperational:
+                ++m_LastRenderGraphStats.CommandRecords.Skipped;
+                ++m_LastRenderGraphStats.CommandRecords.SkippedNonOperational;
                 break;
-            case CommandRecordStatus::SkippedUnavailable:
-                ++m_LastRenderGraphStats.CommandPassesSkipped;
-                ++m_LastRenderGraphStats.CommandPassesSkippedUnavailable;
+            case RenderCommandPassStatus::SkippedUnavailable:
+                ++m_LastRenderGraphStats.CommandRecords.Skipped;
+                ++m_LastRenderGraphStats.CommandRecords.SkippedUnavailable;
                 break;
             }
         }
 
-        [[nodiscard]] CommandRecordStatus RecordCullingPass(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+        [[nodiscard]] RenderCommandPassStatus RecordCullingPass(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
-                return CommandRecordStatus::SkippedNonOperational;
+                return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_CullingInitialized)
+            if (!m_CullingOutputAvailable)
             {
-                return CommandRecordStatus::SkippedUnavailable;
+                return RenderCommandPassStatus::SkippedUnavailable;
             }
 
             m_CullingSystem->ResetCounters(cmd);
             m_CullingSystem->DispatchCull(cmd, camera, *m_GpuWorld);
-            return CommandRecordStatus::Recorded;
+            return RenderCommandPassStatus::Recorded;
         }
 
-        [[nodiscard]] CommandRecordStatus RecordDepthPrepass(RHI::ICommandContext& cmd,
-                                                             const RHI::CameraUBO& camera,
-                                                             const std::uint32_t frameIndex)
+        [[nodiscard]] RenderCommandPassStatus RecordDepthPrepass(RHI::ICommandContext& cmd,
+                                                                 const RHI::CameraUBO& camera,
+                                                                 const std::uint32_t frameIndex)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
-                return CommandRecordStatus::SkippedNonOperational;
+                return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_CullingInitialized || !m_DepthPrepassPipelineLease.has_value() ||
+            // DepthPrepass consumes the indirect draw output written by the
+            // culling pass, so the cached culling output must exist before it
+            // records commands.
+            if (!m_CullingOutputAvailable || !m_DepthPrepassPipelineLease.has_value() ||
                 !m_DepthPrepassPipelineLease->IsValid())
             {
-                return CommandRecordStatus::SkippedUnavailable;
+                return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_DepthPrepassPass.SetPipeline(
-                m_PipelineManager->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
             m_DepthPrepassPass.Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
-            return CommandRecordStatus::Recorded;
+            return RenderCommandPassStatus::Recorded;
         }
 
         std::optional<RHI::BufferManager>   m_BufferManager;
@@ -962,7 +970,7 @@ namespace Extrinsic::Graphics
         std::vector<RenderableSnapshot>      m_RenderableSnapshots;
         std::uint32_t                        m_InvalidSnapshotRecordCount{0};
         bool                                 m_EnableRenderPrepTaskGraph{true};
-        bool                                 m_CullingInitialized{false};
+        bool                                 m_CullingOutputAvailable{false};
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};
         RenderGraphFrameStats                m_LastRenderGraphStats;

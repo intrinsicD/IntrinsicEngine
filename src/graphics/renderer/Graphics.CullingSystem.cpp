@@ -20,11 +20,11 @@ import Extrinsic.RHI.PipelineManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Types;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Graphics
 {
     static constexpr std::uint32_t kInitialCapacity = 1024;
-    static constexpr std::uint32_t kCullGroupSize   = 64;
 
     namespace
     {
@@ -179,7 +179,7 @@ namespace Extrinsic::Graphics
 
     CullingSystem::~CullingSystem() = default;
 
-    void CullingSystem::Initialize(RHI::IDevice&         device,
+    bool CullingSystem::Initialize(RHI::IDevice&         device,
                                    RHI::BufferManager&   bufferMgr,
                                    RHI::PipelineManager& pipelineMgr,
                                    std::string_view      cullShaderPath)
@@ -188,8 +188,11 @@ namespace Extrinsic::Graphics
         m_Impl->BufferMgr   = &bufferMgr;
         m_Impl->PipelineMgr = &pipelineMgr;
 
-        [[maybe_unused]] const bool ok = m_Impl->AllocateGpuBuffers(kInitialCapacity);
-        assert(ok && "CullingSystem: GPU buffer allocation failed");
+        if (!m_Impl->AllocateGpuBuffers(kInitialCapacity))
+        {
+            Core::Log::Warn("[Graphics] CullingSystem GPU buffers unavailable; culling commands will be skipped");
+            return false;
+        }
 
         RHI::PipelineDesc cullDesc;
         cullDesc.ComputeShaderPath = std::string{cullShaderPath};
@@ -197,8 +200,13 @@ namespace Extrinsic::Graphics
         cullDesc.DebugName         = "CullComputeBuckets";
 
         if (auto pipelineOr = pipelineMgr.Create(cullDesc); pipelineOr.has_value())
+        {
             m_Impl->CullPipeline = std::move(*pipelineOr);
-        assert(m_Impl->CullPipeline.IsValid() && "CullingSystem: cull pipeline compile failed");
+            return true;
+        }
+
+        Core::Log::Warn("[Graphics] CullingSystem cull pipeline unavailable; culling commands will be skipped");
+        return false;
     }
 
     void CullingSystem::Shutdown()
@@ -370,7 +378,8 @@ namespace Extrinsic::Graphics
         cmd.BindPipeline(pipe);
         cmd.PushConstants(&pc, sizeof(pc));
 
-        const std::uint32_t groups = (gpuWorld.GetInstanceCapacity() + kCullGroupSize - 1) / kCullGroupSize;
+        const std::uint32_t groups = (gpuWorld.GetInstanceCapacity() + RHI::kGpuCullDispatchGroupSize - 1) /
+                                     RHI::kGpuCullDispatchGroupSize;
         if (groups > 0)
         {
             cmd.Dispatch(groups, 1, 1);
