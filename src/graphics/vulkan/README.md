@@ -41,6 +41,13 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   calls increment `GetFallbackPipelineCreationAttemptCount()`. Each emits a
   logger breadcrumb for CPU-testable diagnostics. Counters are process-monotonic
   and never reset across `Initialize`/`Shutdown` cycles.
+  `GetLastFallbackPipelineReason()` returns a structured
+  `FallbackPipelineReason` enum (`None`, `PreBringUp`, `ShaderMissing`) so CPU
+  diagnostics can distinguish "device or global pipeline layout not yet
+  brought up" from "operational guard reached but shader/pipeline construction
+  is still unimplemented". Bindless and transfer-queue fallbacks intentionally
+  do not yet expose a reason enum — each currently has a single fail-closed
+  reason and the pattern is being piloted on `CreatePipeline` first.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
@@ -69,7 +76,7 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
