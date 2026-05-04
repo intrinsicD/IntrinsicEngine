@@ -35,8 +35,12 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   not allocate GPU slots or upload data; they return invalid indices/tokens and
   make maintenance calls no-ops so callers never dereference null backend state.
   Fallback bindless allocation attempts increment
-  `GetFallbackBindlessAllocationAttemptCount()` and emit a logger breadcrumb for
-  CPU-testable diagnostics.
+  `GetFallbackBindlessAllocationAttemptCount()`, fallback transfer-queue upload
+  attempts (buffer or texture) increment
+  `GetFallbackTransferUploadAttemptCount()`, and fail-closed `CreatePipeline`
+  calls increment `GetFallbackPipelineCreationAttemptCount()`. Each emits a
+  logger breadcrumb for CPU-testable diagnostics. Counters are process-monotonic
+  and never reset across `Initialize`/`Shutdown` cycles.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
@@ -65,7 +69,7 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory

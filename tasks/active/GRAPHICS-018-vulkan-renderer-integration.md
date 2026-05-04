@@ -11,6 +11,7 @@
   - `RenderGraphFrameStats` reports focused compile, execute, and name-keyed command-recording status.
   - Promoted Vulkan `IDevice` lifecycle/services/resource overrides are symbol-complete and fail-closed until full device/swapchain/resource bring-up lands.
   - Guarded Vulkan texture allocation/view/upload and `VkSampler` creation paths exist for future operational devices.
+  - Fail-closed CPU diagnostics: `FallbackTransferQueue` upload paths and `VulkanDevice::CreatePipeline` increment process-monotonic counters (`GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`) and log structured breadcrumbs, mirroring the existing `GetFallbackBindlessAllocationAttemptCount()` pattern. Covered by `Test.VulkanFailClosedContract.cpp` so CPU CI surfaces accidental upload/pipeline traffic against non-operational devices.
   - Live backend resource pools are drained during shutdown.
   - Runtime now owns a CPU-tested operational-transition check that waits idle and calls `IRenderer::RebuildOperationalResources()` when a fail-closed device becomes operational; the renderer rebuilds material GPU buffers, `GpuWorld` scene bindings, culling output resources, and the depth-prepass pipeline through RHI seams.
   - Runtime can select the promoted fail-closed Vulkan `IDevice` only when both `RenderConfig::EnablePromotedVulkanDevice` and `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` are enabled; default Vulkan config still uses the Null fallback.

@@ -28,6 +28,9 @@ Capture Vulkan renderer integration questions that should not be implemented ins
 - Decide whether concrete Vulkan pipeline creation should land before or after swapchain bring-up, including the minimal CPU-testable diagnostics for currently fail-closed `CreatePipeline` paths.
 - Decide the texture upload policy beyond the current synchronous `WriteTexture()` path, including async transfer-queue use, per-subresource layout tracking, mip-chain/cubemap batching, and opt-in smoke-test assertions; batching implementation is tracked by `GRAPHICS-018T`.
 - Decide sampler feature policy for opt-in Vulkan smoke coverage, including anisotropy feature negotiation and maximum supported anisotropy clamping; sampler border-color API work is tracked by `GRAPHICS-018S`.
+- Decide whether fail-closed fallback counters (`GetFallbackBindlessAllocationAttemptCount`, `GetFallbackTransferUploadAttemptCount`, `GetFallbackPipelineCreationAttemptCount`) should also expose a structured "last reason" enum (extension/feature negotiation vs. device-loss vs. pre-bring-up vs. shader missing) or whether per-counter granularity plus log breadcrumbs is sufficient.
+- Decide whether per-call breadcrumb logging on fallback bindless/transfer/pipeline paths should remain (currently one warn line per call) or be rate-limited / once-only when callsites are expected to fire many times per frame before bring-up.
+- Confirm that fail-closed fallback counters should remain process-monotonic across `Initialize`/`Shutdown` cycles (current behavior) rather than being reset per device instance; required for diagnostics that span full-engine restarts of the Vulkan backend.
 
 ## Tests
 - Documentation/link checks only when this clarification task is edited.
