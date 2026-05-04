@@ -43,6 +43,16 @@ namespace
             .AddressW  = RHI::AddressMode::ClampToEdge,
         };
     }
+
+    RHI::SamplerDesc LinearSamplerWithBorderColor(RHI::SamplerBorderColor color)
+    {
+        RHI::SamplerDesc desc = LinearSampler();
+        desc.AddressU = RHI::AddressMode::ClampToBorder;
+        desc.AddressV = RHI::AddressMode::ClampToBorder;
+        desc.AddressW = RHI::AddressMode::ClampToBorder;
+        desc.BorderColor = color;
+        return desc;
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -98,6 +108,26 @@ TEST(RHISamplerManager, DifferentDescsReturnDistinctGpuObjects)
     auto nearest = *mgr.GetOrCreate(NearestClampSampler());
 
     EXPECT_NE(linear.GetHandle(), nearest.GetHandle());
+    EXPECT_EQ(dev.CreateSamplerCount, 2);
+}
+
+TEST(RHISamplerManager, DefaultSamplerBorderColorPreservesOpaqueBlack)
+{
+    const RHI::SamplerDesc desc{};
+    EXPECT_EQ(desc.BorderColor, RHI::SamplerBorderColor::OpaqueBlackFloat);
+}
+
+TEST(RHISamplerManager, BorderColorParticipatesInDedupKey)
+{
+    MockDevice dev;
+    RHI::SamplerManager mgr{dev};
+
+    auto black = *mgr.GetOrCreate(LinearSamplerWithBorderColor(RHI::SamplerBorderColor::OpaqueBlackFloat));
+    auto white = *mgr.GetOrCreate(LinearSamplerWithBorderColor(RHI::SamplerBorderColor::OpaqueWhiteFloat));
+    auto blackAgain = *mgr.GetOrCreate(LinearSamplerWithBorderColor(RHI::SamplerBorderColor::OpaqueBlackFloat));
+
+    EXPECT_NE(black.GetHandle(), white.GetHandle());
+    EXPECT_EQ(black.GetHandle(), blackAgain.GetHandle());
     EXPECT_EQ(dev.CreateSamplerCount, 2);
 }
 

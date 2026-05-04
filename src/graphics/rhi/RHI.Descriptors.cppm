@@ -135,6 +135,15 @@ export namespace Extrinsic::RHI
     enum class FilterMode : uint32_t { Nearest, Linear };
     enum class MipmapMode : uint32_t { Nearest, Linear };
     enum class AddressMode : uint32_t { Repeat, MirroredRepeat, ClampToEdge, ClampToBorder };
+    enum class SamplerBorderColor : uint32_t
+    {
+        TransparentBlackFloat,
+        OpaqueBlackFloat,
+        OpaqueWhiteFloat,
+        TransparentBlackInt,
+        OpaqueBlackInt,
+        OpaqueWhiteInt,
+    };
     enum class CompareOp   : uint32_t { Never, Less, Equal, LessEqual, Greater, NotEqual, GreaterEqual, Always };
 
     // ----------------------------------------------------------
@@ -208,6 +217,7 @@ export namespace Extrinsic::RHI
         AddressMode AddressU   = AddressMode::Repeat;
         AddressMode AddressV   = AddressMode::Repeat;
         AddressMode AddressW   = AddressMode::Repeat;
+        SamplerBorderColor BorderColor = SamplerBorderColor::OpaqueBlackFloat;
         float       MipLodBias = 0.0f;
         float       MinLod     = 0.0f;
         float       MaxLod     = 1000.0f;

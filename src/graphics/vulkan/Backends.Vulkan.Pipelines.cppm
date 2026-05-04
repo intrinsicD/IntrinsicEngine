@@ -25,6 +25,7 @@ namespace Extrinsic::Backends::Vulkan
     export [[nodiscard]] VkFilter              ToVkFilter(RHI::FilterMode m);
     export [[nodiscard]] VkSamplerMipmapMode   ToVkMipmapMode(RHI::MipmapMode m);
     export [[nodiscard]] VkSamplerAddressMode  ToVkAddressMode(RHI::AddressMode m);
+    export [[nodiscard]] VkBorderColor         ToVkBorderColor(RHI::SamplerBorderColor c);
     export [[nodiscard]] VkCompareOp           ToVkCompareOp(RHI::CompareOp o);
     export [[nodiscard]] VkPrimitiveTopology   ToVkTopology(RHI::Topology t);
     export [[nodiscard]] VkCullModeFlags       ToVkCullMode(RHI::CullMode c);

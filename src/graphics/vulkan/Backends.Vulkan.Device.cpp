@@ -926,9 +926,7 @@ RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)
     samplerInfo.mipLodBias = desc.MipLodBias;
     samplerInfo.minLod = desc.MinLod;
     samplerInfo.maxLod = desc.MaxLod;
-    // RHI::SamplerDesc does not yet expose a border-color selector; keep the
-    // Vulkan default deterministic until GRAPHICS-018S adds the API surface.
-    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    samplerInfo.borderColor = ToVkBorderColor(desc.BorderColor);
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = desc.CompareEnable ? VK_TRUE : VK_FALSE;
     samplerInfo.compareOp = ToVkCompareOp(desc.Compare);

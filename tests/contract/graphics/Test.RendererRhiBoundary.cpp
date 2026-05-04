@@ -10,6 +10,7 @@
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Types;
 
@@ -101,6 +102,27 @@ TEST(RendererRhiBoundary, RhiLayerDoesNotImportVulkan)
         EXPECT_EQ(content.find("VkDevice"), std::string::npos) << path.string();
         EXPECT_EQ(content.find("VkCommandBuffer"), std::string::npos) << path.string();
     }
+}
+
+TEST(RendererRhiBoundary, SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend)
+{
+    const Extrinsic::RHI::SamplerDesc defaultDesc{};
+    EXPECT_EQ(defaultDesc.BorderColor, Extrinsic::RHI::SamplerBorderColor::OpaqueBlackFloat);
+
+    const auto rhiDescriptors = ReadFile(RepoRoot() / "src/graphics/rhi/RHI.Descriptors.cppm");
+    EXPECT_NE(rhiDescriptors.find("enum class SamplerBorderColor"), std::string::npos);
+    EXPECT_EQ(rhiDescriptors.find("VkBorderColor"), std::string::npos);
+    EXPECT_EQ(rhiDescriptors.find("VK_BORDER_COLOR"), std::string::npos);
+
+    const auto vulkanMappings = ReadFile(RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Mappings.cpp");
+    EXPECT_NE(vulkanMappings.find("VkBorderColor ToVkBorderColor"), std::string::npos);
+    EXPECT_NE(vulkanMappings.find("VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK"), std::string::npos);
+    EXPECT_NE(vulkanMappings.find("VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE"), std::string::npos);
+    EXPECT_NE(vulkanMappings.find("VK_BORDER_COLOR_INT_TRANSPARENT_BLACK"), std::string::npos);
+
+    const auto vulkanDevice = ReadFile(RepoRoot() / "src/graphics/vulkan/Backends.Vulkan.Device.cpp");
+    EXPECT_NE(vulkanDevice.find("samplerInfo.borderColor = ToVkBorderColor(desc.BorderColor);"),
+              std::string::npos);
 }
 
 TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedSymbols)

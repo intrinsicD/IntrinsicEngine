@@ -96,6 +96,20 @@ VkSamplerAddressMode ToVkAddressMode(RHI::AddressMode m)
     return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
+VkBorderColor ToVkBorderColor(RHI::SamplerBorderColor c)
+{
+    switch (c)
+    {
+    case RHI::SamplerBorderColor::TransparentBlackFloat: return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+    case RHI::SamplerBorderColor::OpaqueBlackFloat:      return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    case RHI::SamplerBorderColor::OpaqueWhiteFloat:      return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    case RHI::SamplerBorderColor::TransparentBlackInt:   return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
+    case RHI::SamplerBorderColor::OpaqueBlackInt:        return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    case RHI::SamplerBorderColor::OpaqueWhiteInt:        return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+    }
+    return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+}
+
 VkCompareOp ToVkCompareOp(RHI::CompareOp o)
 {
     switch (o)

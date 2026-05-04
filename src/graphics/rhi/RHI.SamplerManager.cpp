@@ -62,6 +62,7 @@ namespace Extrinsic::RHI
             h = mix(h, &d.AddressU,        sizeof(d.AddressU));
             h = mix(h, &d.AddressV,        sizeof(d.AddressV));
             h = mix(h, &d.AddressW,        sizeof(d.AddressW));
+            h = mix(h, &d.BorderColor,     sizeof(d.BorderColor));
             h = mix(h, &d.MipLodBias,      sizeof(d.MipLodBias));
             h = mix(h, &d.MinLod,          sizeof(d.MinLod));
             h = mix(h, &d.MaxLod,          sizeof(d.MaxLod));
@@ -79,6 +80,7 @@ namespace Extrinsic::RHI
                 && a.AddressU      == b.AddressU
                 && a.AddressV      == b.AddressV
                 && a.AddressW      == b.AddressW
+                && a.BorderColor   == b.BorderColor
                 && a.MipLodBias    == b.MipLodBias
                 && a.MinLod        == b.MinLod
                 && a.MaxLod        == b.MaxLod
