@@ -44,5 +44,23 @@ namespace Extrinsic::Backends::Vulkan
         ShaderMissing = 2, // operational guard reached but shader/pipeline construction unimplemented
     };
     export FallbackPipelineReason GetLastFallbackPipelineReason() noexcept;
+
+    // Aggregate snapshot of all fail-closed diagnostic counters plus the last
+    // observed pipeline reason. Each field equals the corresponding individual
+    // accessor at the moment it is read. The aggregate read is not a tear-free
+    // transaction across fields — each field is loaded with relaxed atomics in
+    // order (bindless, transfer, pipeline-count, last-pipeline-reason); a
+    // concurrent fallback fire on another thread may land between two field
+    // loads. CPU contract tests run single-threaded so this is fine, and the
+    // ordering is documented so future operational tests do not assume
+    // cross-field atomicity.
+    export struct FallbackDiagnosticsSnapshot
+    {
+        std::uint64_t          BindlessAllocationAttempts = 0;
+        std::uint64_t          TransferUploadAttempts     = 0;
+        std::uint64_t          PipelineCreationAttempts   = 0;
+        FallbackPipelineReason LastPipelineReason         = FallbackPipelineReason::None;
+    };
+    export [[nodiscard]] FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept;
 }
 

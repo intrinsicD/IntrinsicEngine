@@ -79,6 +79,20 @@ FallbackPipelineReason GetLastFallbackPipelineReason() noexcept
         g_LastFallbackPipelineReason.load(std::memory_order_relaxed));
 }
 
+FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept
+{
+    FallbackDiagnosticsSnapshot snapshot{};
+    snapshot.BindlessAllocationAttempts =
+        g_FallbackBindlessAllocationAttempts.load(std::memory_order_relaxed);
+    snapshot.TransferUploadAttempts =
+        g_FallbackTransferUploadAttempts.load(std::memory_order_relaxed);
+    snapshot.PipelineCreationAttempts =
+        g_FallbackPipelineCreationAttempts.load(std::memory_order_relaxed);
+    snapshot.LastPipelineReason = static_cast<FallbackPipelineReason>(
+        g_LastFallbackPipelineReason.load(std::memory_order_relaxed));
+    return snapshot;
+}
+
 // =============================================================================
 // §12  Factory
 // =============================================================================

@@ -203,3 +203,68 @@ static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp) == 1u);
 static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::FallbackPipelineReason::ShaderMissing) == 2u);
+
+TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGetters)
+{
+    // The aggregate snapshot is the preferred CPU diagnostics surface for
+    // consumers that want all fail-closed counters and the last pipeline
+    // reason in a single call. Each field of the snapshot must agree with the
+    // corresponding individual accessor at the moment of capture, so callers
+    // can switch to the snapshot without observing drift relative to existing
+    // free-function getters.
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    EXPECT_EQ(device->GetBindlessHeap().AllocateTextureSlot({}, {}),
+              Extrinsic::RHI::kInvalidBindlessIndex);
+    EXPECT_FALSE(device->GetTransferQueue().UploadBuffer({}, nullptr, 0u, 0u).IsValid());
+    EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+
+    const Extrinsic::Backends::Vulkan::FallbackDiagnosticsSnapshot snapshot =
+        Extrinsic::Backends::Vulkan::GetFallbackDiagnosticsSnapshot();
+
+    EXPECT_EQ(snapshot.BindlessAllocationAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount());
+    EXPECT_EQ(snapshot.TransferUploadAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount());
+    EXPECT_EQ(snapshot.PipelineCreationAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount());
+    EXPECT_EQ(snapshot.LastPipelineReason,
+              Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason());
+    EXPECT_EQ(snapshot.LastPipelineReason,
+              Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+}
+
+TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
+{
+    // Snapshots taken before/after a sequence of fail-closed fires must show
+    // deltas equal to the number of fires of each kind, matching the
+    // process-monotonic guarantee already asserted on the individual
+    // counters. The aggregate accessor must not introduce any reset, scoping,
+    // or off-by-one behavior relative to the individual getters.
+    const Extrinsic::Backends::Vulkan::FallbackDiagnosticsSnapshot before =
+        Extrinsic::Backends::Vulkan::GetFallbackDiagnosticsSnapshot();
+
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    EXPECT_EQ(device->GetBindlessHeap().AllocateTextureSlot({}, {}),
+              Extrinsic::RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(device->GetBindlessHeap().AllocateTextureSlot({}, {}),
+              Extrinsic::RHI::kInvalidBindlessIndex);
+    EXPECT_FALSE(device->GetTransferQueue().UploadBuffer({}, nullptr, 0u, 0u).IsValid());
+    EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+    EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+    EXPECT_FALSE(device->CreatePipeline(Extrinsic::RHI::PipelineDesc{}).IsValid());
+
+    const Extrinsic::Backends::Vulkan::FallbackDiagnosticsSnapshot after =
+        Extrinsic::Backends::Vulkan::GetFallbackDiagnosticsSnapshot();
+
+    EXPECT_EQ(after.BindlessAllocationAttempts - before.BindlessAllocationAttempts, 2u);
+    EXPECT_EQ(after.TransferUploadAttempts - before.TransferUploadAttempts, 1u);
+    EXPECT_EQ(after.PipelineCreationAttempts - before.PipelineCreationAttempts, 3u);
+    EXPECT_EQ(after.LastPipelineReason,
+              Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+}
