@@ -29,6 +29,7 @@ namespace
     std::atomic<std::uint64_t> g_FallbackPipelineCreationAttempts{0};
     std::atomic<std::uint64_t> g_FallbackBeginFrameAttempts{0};
     std::atomic<std::uint64_t> g_FallbackEndFrameAttempts{0};
+    std::atomic<std::uint64_t> g_FallbackPresentAttempts{0};
     std::atomic<std::uint8_t>  g_LastFallbackPipelineReason{
         static_cast<std::uint8_t>(FallbackPipelineReason::None)};
 
@@ -92,6 +93,11 @@ namespace
     {
         g_FallbackEndFrameAttempts.fetch_add(1, std::memory_order_relaxed);
     }
+
+    void NoteFallbackPresentAttempt() noexcept
+    {
+        g_FallbackPresentAttempts.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
 std::uint64_t GetFallbackBeginFrameAttemptCount() noexcept
@@ -102,6 +108,11 @@ std::uint64_t GetFallbackBeginFrameAttemptCount() noexcept
 std::uint64_t GetFallbackEndFrameAttemptCount() noexcept
 {
     return g_FallbackEndFrameAttempts.load(std::memory_order_relaxed);
+}
+
+std::uint64_t GetFallbackPresentAttemptCount() noexcept
+{
+    return g_FallbackPresentAttempts.load(std::memory_order_relaxed);
 }
 
 FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept
@@ -119,6 +130,8 @@ FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept
         g_FallbackBeginFrameAttempts.load(std::memory_order_relaxed);
     snapshot.EndFrameAttempts =
         g_FallbackEndFrameAttempts.load(std::memory_order_relaxed);
+    snapshot.PresentAttempts =
+        g_FallbackPresentAttempts.load(std::memory_order_relaxed);
     return snapshot;
 }
 
@@ -275,8 +288,12 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 void VulkanDevice::Present(const RHI::FrameHandle& frame)
 {
     (void)frame;
-    if (!m_Operational)
+    if (!m_Operational || m_Swapchain == VK_NULL_HANDLE)
+    {
+        NoteFallbackPresentAttempt();
+        Core::Log::Warn("[VulkanDevice::Present] device or swapchain non-operational; skipping presentation");
         return;
+    }
 }
 
 void VulkanDevice::Resize(uint32_t width, uint32_t height)
