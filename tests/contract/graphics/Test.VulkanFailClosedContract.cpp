@@ -229,6 +229,30 @@ TEST(VulkanFailClosedContract, BeginEndPresentCountersTrackLifecycleOnNonOperati
               kFrames);
 }
 
+TEST(VulkanFailClosedContract, ResizeOnNonOperationalDeviceIncrementsAttemptCounterAndRecordsExtent)
+{
+    // GRAPHICS-018 fail-closed contract: Resize against the promoted Vulkan
+    // device before swapchain bring-up cannot recreate swapchain resources, but
+    // it must leave deterministic CPU-visible breadcrumbs and preserve the
+    // requested extent for runtime/configuration diagnostics.
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    const std::uint64_t before =
+        Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount();
+
+    device->Resize(640u, 360u);
+    device->Resize(1280u, 720u);
+
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount(),
+              before + 2u);
+
+    const auto extent = device->GetBackbufferExtent();
+    EXPECT_EQ(extent.Width, 1280);
+    EXPECT_EQ(extent.Height, 720);
+}
+
 TEST(VulkanFailClosedContract, CreatePipelineReportsPreBringUpReason)
 {
     // A freshly constructed VulkanDevice has not been Initialize()d, so the
@@ -265,6 +289,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
         Extrinsic::Backends::Vulkan::GetFallbackEndFrameAttemptCount();
     const std::uint64_t beforePresent =
         Extrinsic::Backends::Vulkan::GetFallbackPresentAttemptCount();
+    const std::uint64_t beforeResize =
+        Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount();
 
     Extrinsic::Core::Config::WindowConfig windowConfig{};
     Extrinsic::Core::Config::RenderConfig renderConfig{};
@@ -281,6 +307,7 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
         EXPECT_FALSE(device.BeginFrame(frame));
         device.EndFrame(frame);
         device.Present(frame);
+        device.Resize(800u, 600u);
     };
 
     {
@@ -309,6 +336,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
                   beforeEndFrame + 1u);
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPresentAttemptCount(),
                   beforePresent + 1u);
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount(),
+                  beforeResize + 1u);
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
                   Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
     }
@@ -326,6 +355,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
               beforeEndFrame + 1u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPresentAttemptCount(),
               beforePresent + 1u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount(),
+              beforeResize + 1u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 
@@ -353,6 +384,8 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
               beforeEndFrame + 2u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPresentAttemptCount(),
               beforePresent + 2u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount(),
+              beforeResize + 2u);
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 }
@@ -389,6 +422,7 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGette
     EXPECT_FALSE(device->BeginFrame(frame));
     device->EndFrame(frame);
     device->Present(frame);
+    device->Resize(1024u, 768u);
 
     const Extrinsic::Backends::Vulkan::FallbackDiagnosticsSnapshot snapshot =
         Extrinsic::Backends::Vulkan::GetFallbackDiagnosticsSnapshot();
@@ -409,6 +443,8 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGette
               Extrinsic::Backends::Vulkan::GetFallbackEndFrameAttemptCount());
     EXPECT_EQ(snapshot.PresentAttempts,
               Extrinsic::Backends::Vulkan::GetFallbackPresentAttemptCount());
+    EXPECT_EQ(snapshot.ResizeAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount());
 }
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
@@ -445,6 +481,9 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
     device->Present(frame);
     device->Present(frame);
     device->Present(frame);
+    device->Resize(320u, 200u);
+    device->Resize(640u, 400u);
+    device->Resize(960u, 600u);
 
     const Extrinsic::Backends::Vulkan::FallbackDiagnosticsSnapshot after =
         Extrinsic::Backends::Vulkan::GetFallbackDiagnosticsSnapshot();
@@ -455,6 +494,7 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
     EXPECT_EQ(after.BeginFrameAttempts - before.BeginFrameAttempts, 4u);
     EXPECT_EQ(after.EndFrameAttempts - before.EndFrameAttempts, 2u);
     EXPECT_EQ(after.PresentAttempts - before.PresentAttempts, 5u);
+    EXPECT_EQ(after.ResizeAttempts - before.ResizeAttempts, 3u);
     EXPECT_EQ(after.LastPipelineReason,
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 }

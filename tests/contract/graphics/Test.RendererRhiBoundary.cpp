@@ -161,6 +161,7 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedSymbols)
         "VulkanDevice::FlushDeletionQueue(",
         "GetFallbackBindlessAllocationAttemptCount()",
         "GetFallbackPresentAttemptCount()",
+        "GetFallbackResizeAttemptCount()",
     };
 
     for (const auto& symbol : requiredSymbols)

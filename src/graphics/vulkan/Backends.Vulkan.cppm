@@ -51,6 +51,12 @@ namespace Extrinsic::Backends::Vulkan
     // BeginFrame -> EndFrame -> Present lifecycle sequence.
     export std::uint64_t GetFallbackPresentAttemptCount() noexcept;
 
+    // Debug breadcrumb for fail-closed non-operational Resize attempts.
+    // Increments for every VulkanDevice::Resize call made before the device
+    // has an operational swapchain. The requested extent is still recorded so
+    // CPU/runtime callers can observe deterministic pending-size state.
+    export std::uint64_t GetFallbackResizeAttemptCount() noexcept;
+
     // Structured reason for the most recent fail-closed CreatePipeline call.
     // Exposed for CPU diagnostics that need to distinguish "device or layout
     // not yet brought up" from "operational guard reached but shader/pipeline
@@ -74,10 +80,11 @@ namespace Extrinsic::Backends::Vulkan
     // accessor at the moment it is read. The aggregate read is not a tear-free
     // transaction across fields — each field is loaded with relaxed atomics in
     // order (bindless, transfer, pipeline-count, last-pipeline-reason,
-    // begin-frame-count, end-frame-count, present-count); a concurrent
-    // fallback fire on another thread may land between two field loads. CPU
-    // contract tests run single-threaded so this is fine, and the ordering is
-    // documented so future operational tests do not assume cross-field atomicity.
+    // begin-frame-count, end-frame-count, present-count, resize-count); a
+    // concurrent fallback fire on another thread may land between two field
+    // loads. CPU contract tests run single-threaded so this is fine, and the
+    // ordering is documented so future operational tests do not assume
+    // cross-field atomicity.
     export struct FallbackDiagnosticsSnapshot
     {
         std::uint64_t          BindlessAllocationAttempts = 0;
@@ -87,6 +94,7 @@ namespace Extrinsic::Backends::Vulkan
         std::uint64_t          BeginFrameAttempts         = 0;
         std::uint64_t          EndFrameAttempts           = 0;
         std::uint64_t          PresentAttempts            = 0;
+        std::uint64_t          ResizeAttempts             = 0;
     };
     export [[nodiscard]] FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept;
 }
