@@ -40,6 +40,8 @@ import Extrinsic.Core.Logging;
 namespace Extrinsic::Backends::Vulkan
 {
     void NoteFallbackBindlessAllocationAttempt();
+    void NoteFallbackTransferUploadAttempt();
+    void NoteFallbackPipelineCreationAttempt();
 
     export class VulkanDevice final : public RHI::IDevice
     {
@@ -136,6 +138,8 @@ namespace Extrinsic::Backends::Vulkan
                                                           std::uint64_t,
                                                           std::uint64_t) override
             {
+                NoteFallbackTransferUploadAttempt();
+                Core::Log::Warn("[VulkanDevice] Fallback transfer queue rejected buffer upload; device is non-operational");
                 return {};
             }
 
@@ -143,6 +147,8 @@ namespace Extrinsic::Backends::Vulkan
                                                           std::span<const std::byte>,
                                                           std::uint64_t) override
             {
+                NoteFallbackTransferUploadAttempt();
+                Core::Log::Warn("[VulkanDevice] Fallback transfer queue rejected buffer upload; device is non-operational");
                 return {};
             }
 
@@ -152,6 +158,8 @@ namespace Extrinsic::Backends::Vulkan
                                                            std::uint32_t,
                                                            std::uint32_t) override
             {
+                NoteFallbackTransferUploadAttempt();
+                Core::Log::Warn("[VulkanDevice] Fallback transfer queue rejected texture upload; device is non-operational");
                 return {};
             }
 
