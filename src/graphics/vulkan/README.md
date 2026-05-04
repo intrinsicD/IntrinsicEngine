@@ -44,9 +44,12 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   calls (device non-operational, taking the early-return path) increment
   `GetFallbackEndFrameAttemptCount()`. Fail-closed `Present` calls (device or
   swapchain not yet operational, taking the early-return path) increment
-  `GetFallbackPresentAttemptCount()`. Each emits a logger breadcrumb for
-  CPU-testable diagnostics. Counters are process-monotonic and never reset
-  across `Initialize`/`Shutdown` cycles. The `BeginFrame`/`EndFrame` counter
+  `GetFallbackPresentAttemptCount()`. Fail-closed `Resize` calls (device or
+  swapchain not yet operational) increment `GetFallbackResizeAttemptCount()`
+  while still recording the requested extent for CPU/runtime diagnostics. Each
+  emits a logger breadcrumb for CPU-testable diagnostics. Counters are
+  process-monotonic and never reset across `Initialize`/`Shutdown` cycles. The
+  `BeginFrame`/`EndFrame` counter
   pair lets CPU diagnostics observe both halves of an unbalanced renderer
   frame loop driving a fail-closed Vulkan device, and CPU contract coverage
   asserts that paired Begin/End calls advance both counters in lockstep.
@@ -58,7 +61,7 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   intentionally do not yet expose a reason enum — each currently has a single
   fail-closed reason and the pattern is being piloted on `CreatePipeline` first.
   `GetFallbackDiagnosticsSnapshot()` returns a `FallbackDiagnosticsSnapshot`
-  aggregate of all six counters plus the last pipeline reason in a single
+  aggregate of all seven counters plus the last pipeline reason in a single
   call, so CPU diagnostics consumers do not have to combine multiple
   independent free-function loads. Each field equals the corresponding
   individual accessor at the moment of capture; the aggregate read is not a
@@ -66,7 +69,7 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
   another thread may land between two field loads (CPU contract tests run
   single-threaded so this is fine). Snapshot field load order is fixed:
   bindless, transfer, pipeline-count, last-pipeline-reason, begin-frame-count,
-  end-frame-count, present-count.
+  end-frame-count, present-count, resize-count.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
@@ -97,7 +100,7 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
