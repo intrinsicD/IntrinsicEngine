@@ -15,18 +15,35 @@
 #include <cassert>
 #include <cstdlib>
 
+namespace Extrinsic::Backends::Vulkan
+{
+    enum class VkCheckSeverity : unsigned char
+    {
+        Warning,
+        Error,
+        Fatal
+    };
+
+    void ReportVkCheckFailure(VkCheckSeverity severity,
+                              const char* expression,
+                              VkResult result,
+                              const char* file,
+                              int line);
+}
+
 // ---------------------------------------------------------------------------
 // VK_CHECK macros — callsite-aware error checking (matches src/ policy)
 // ---------------------------------------------------------------------------
-// Uses fprintf + abort instead of Core::Log to avoid a module dependency
-// inside the global module fragment.
+// Delegates diagnostics to ReportVkCheckFailure so this global-fragment header
+// does not import modules while callers still use the project logger.
 
 #define VK_CHECK_FATAL(x)                                                       \
     do {                                                                        \
         VkResult _r = (x);                                                      \
         if (_r != VK_SUCCESS) {                                                 \
-            fprintf(stderr, "[Vulkan FATAL] %s = %d  at %s:%d\n",              \
-                    #x, static_cast<int>(_r), __FILE__, __LINE__);             \
+            ::Extrinsic::Backends::Vulkan::ReportVkCheckFailure(                \
+                ::Extrinsic::Backends::Vulkan::VkCheckSeverity::Fatal,          \
+                #x, _r, __FILE__, __LINE__);                                    \
             std::abort();                                                       \
         }                                                                       \
     } while(0)
@@ -35,8 +52,9 @@
     do {                                                                        \
         VkResult _r = (x);                                                      \
         if (_r != VK_SUCCESS) {                                                 \
-            fprintf(stderr, "[Vulkan ERROR] %s = %d  at %s:%d\n",              \
-                    #x, static_cast<int>(_r), __FILE__, __LINE__);             \
+            ::Extrinsic::Backends::Vulkan::ReportVkCheckFailure(                \
+                ::Extrinsic::Backends::Vulkan::VkCheckSeverity::Error,          \
+                #x, _r, __FILE__, __LINE__);                                    \
             return retval;                                                      \
         }                                                                       \
     } while(0)
@@ -47,8 +65,9 @@
     do {                                                                        \
         VkResult _r = (x);                                                      \
         if (_r != VK_SUCCESS) {                                                 \
-            fprintf(stderr, "[Vulkan WARN] %s = %d  at %s:%d\n",               \
-                    #x, static_cast<int>(_r), __FILE__, __LINE__);             \
+            ::Extrinsic::Backends::Vulkan::ReportVkCheckFailure(                \
+                ::Extrinsic::Backends::Vulkan::VkCheckSeverity::Warning,        \
+                #x, _r, __FILE__, __LINE__);                                    \
         }                                                                       \
     } while(0)
 

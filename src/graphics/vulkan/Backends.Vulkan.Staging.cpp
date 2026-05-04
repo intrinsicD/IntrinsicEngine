@@ -1,7 +1,6 @@
 module;
 
 #include <cassert>
-#include <cstdio>
 #include <cstring>
 #include <mutex>
 
@@ -14,6 +13,7 @@ module;
 module Extrinsic.Backends.Vulkan;
 
 import :Transfer;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Backends::Vulkan
 {
@@ -59,7 +59,7 @@ StagingBelt::Allocation StagingBelt::Allocate(size_t sizeBytes, size_t alignment
         const size_t wEnd = sizeBytes;
         if (wEnd > m_Head)
         {
-            fprintf(stderr, "[StagingBelt] Out of staging memory!\n");
+            Core::Log::Error("[StagingBelt] Out of staging memory");
             return {};
         }
         m_Tail = wEnd;
@@ -71,7 +71,7 @@ StagingBelt::Allocation StagingBelt::Allocate(size_t sizeBytes, size_t alignment
 
     if (aligned < m_Head && end > m_Head)
     {
-        fprintf(stderr, "[StagingBelt] Staging belt head collision!\n");
+        Core::Log::Error("[StagingBelt] Staging belt head collision");
         return {};
     }
 

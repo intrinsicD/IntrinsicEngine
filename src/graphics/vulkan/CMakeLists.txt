@@ -18,6 +18,7 @@ target_sources(${target_name}
         Backends.Vulkan.Transfer.cppm
         PRIVATE
         Backends.Vulkan.Mappings.cpp        # §2  RHI enum → VkEnum tables
+        Backends.Vulkan.DiagnosticsLogging.cpp # §3  Vulkan check macro logging bridge
         Backends.Vulkan.Staging.cpp         # §5  StagingBelt ring-buffer
         Backends.Vulkan.Profiler.cpp        # §6  VulkanProfiler
         Backends.Vulkan.Bindless.cpp        # §7  VulkanBindlessHeap

@@ -1,7 +1,6 @@
 module;
 
 #include <cassert>
-#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -17,6 +16,7 @@ module;
 module Extrinsic.Backends.Vulkan;
 
 import :Device;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Backends::Vulkan
 {
@@ -50,9 +50,8 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
     m_FrameSlot         = 0;
     m_GlobalFrameNumber = 0;
 
-    std::fprintf(stderr,
-                 "[VulkanDevice::Initialize] Promoted Vulkan device lifecycle is present but "
-                 "swapchain/device bring-up is not complete; device remains non-operational.\n");
+    Core::Log::Warn("[VulkanDevice::Initialize] Promoted Vulkan device lifecycle is present but "
+                    "swapchain/device bring-up is not complete; device remains non-operational.");
 }
 
 void VulkanDevice::Shutdown()
@@ -501,7 +500,7 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
     if (vmaCreateBuffer(m_Vma, &stagingCI, &stagingACI,
                         &stagingBuf, &stagingAlloc, &stagingInfo) != VK_SUCCESS)
     {
-        fprintf(stderr, "[VulkanDevice::WriteBuffer] Failed to allocate staging buffer\n");
+        Core::Log::Error("[VulkanDevice::WriteBuffer] Failed to allocate staging buffer");
         return;
     }
 
@@ -590,7 +589,7 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
 
     if (vmaCreateImage(m_Vma, &imageInfo, &allocationInfo, &image.Image, &image.Allocation, nullptr) != VK_SUCCESS)
     {
-        std::fprintf(stderr, "[VulkanDevice::CreateTexture] Failed to allocate image\n");
+        Core::Log::Error("[VulkanDevice::CreateTexture] Failed to allocate image");
         return {};
     }
 
@@ -607,7 +606,7 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
 
     if (vkCreateImageView(m_Device, &viewInfo, nullptr, &image.View) != VK_SUCCESS)
     {
-        std::fprintf(stderr, "[VulkanDevice::CreateTexture] Failed to create image view\n");
+        Core::Log::Error("[VulkanDevice::CreateTexture] Failed to create image view");
         vmaDestroyImage(m_Vma, image.Image, image.Allocation);
         return {};
     }
@@ -707,7 +706,7 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
                         &stagingAllocation,
                         &stagingAllocationInfo) != VK_SUCCESS)
     {
-        std::fprintf(stderr, "[VulkanDevice::WriteTexture] Failed to allocate staging buffer\n");
+        Core::Log::Error("[VulkanDevice::WriteTexture] Failed to allocate staging buffer");
         return;
     }
 
@@ -799,7 +798,7 @@ RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)
     VulkanSampler sampler{};
     if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler.Sampler) != VK_SUCCESS)
     {
-        std::fprintf(stderr, "[VulkanDevice::CreateSampler] Failed to create sampler\n");
+        Core::Log::Error("[VulkanDevice::CreateSampler] Failed to create sampler");
         return {};
     }
 

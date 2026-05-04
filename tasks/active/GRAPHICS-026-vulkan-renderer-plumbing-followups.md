@@ -6,7 +6,8 @@
 - Branch: `claude/review-graphics-commits-ZUXOW`.
 - Activated: 2026-05-04 from review of recent `src/graphics/` commits (`550b0e9` … `c64bba3`).
 - Source: `GRAPHICS-018` slice review (renderer frame lifecycle through RHI + promoted Vulkan fail-closed surface).
-- Next verification step: run the default CPU correctness gate after each grouped patch lands; confirm no `gpu|vulkan` opt-in tests are required for any item below.
+- Progress 2026-05-04: completed item 2.1 plus item 5.1 by replacing Vulkan implementation-file `stderr` diagnostics with `Core::Log::*`, routing `VK_CHECK_*` diagnostics through a logger bridge, and documenting the logging convention.
+- Next verification step: run the default CPU correctness gate after each grouped patch lands; confirm no `gpu|vulkan` opt-in tests are required for remaining items below.
 
 ## Goal
 - Address the plumbing/quality issues identified by the review of the recent `src/graphics/` commits without expanding the slice scope of `GRAPHICS-018`.
@@ -51,7 +52,7 @@
 - 1.12 In `Graphics.MaterialSystem.cpp`, comment the non-operational shortcut explicitly (`return true` after CPU-side resize) and reference item 1.11 (6ce2cc8).
 
 ### 2. Vulkan device surface (origin: c613b1c, 7336e67, 7e09ac5, 5c84d9a, 7d056cf, 295363e, 1a5c2be)
-- 2.1 Replace every `std::fprintf(stderr, ...)` in `Backends.Vulkan.Device.cpp` with the project logger (`Core::Log::Warn`/`Core::Log::Error`). Audit: `Initialize`, `CreateSampler`, `CreateTexture`, `WriteTexture` (c613b1c, 5c84d9a, 7d056cf, 1a5c2be).
+- 2.1 Done 2026-05-04: replaced `stderr` diagnostics in `Backends.Vulkan.Device.cpp` with the project logger (`Core::Log::Warn`/`Core::Log::Error`). Audit: `Initialize`, `WriteBuffer`, `CreateTexture`, `WriteTexture`, `CreateSampler` (c613b1c, 5c84d9a, 7d056cf, 1a5c2be).
 - 2.2 Document the `BeginFrame`/`EndFrame` rotation invariant in `Backends.Vulkan.Device.cpp` (single-acquire pairing; `m_FrameSlot` is rotated in `EndFrame` based on the slot handed out in `BeginFrame`) (c613b1c).
 - 2.3 Either consume `m_NeedsResize` (in a future swapchain-recreate path) or remove the writes that set it from `Resize` and `SetPresentMode` until the consumer exists; today the writes are dead state (c613b1c).
 - 2.4 Replace removed helper declarations (`CreateInstance`, `CreateSurface`, `PickPhysicalDevice`, `CreateLogicalDevice`, `CreateVma`, `CreateSwapchain`, `RegisterSwapchainImages`, `CreatePerFrameResources`, `DestroyPerFrameResources`, `CreateGlobalPipelineLayout`, `CreateDefaultSampler`, `FindMemoryType`, `FindDepthFormat`, `SupportsFormat`) with a `// TODO(GRAPHICS-018):` comment block in `Backends.Vulkan.Device.cppm` listing the missing bring-up surface. Without breadcrumbs, future authors lose the contract (7e09ac5).
@@ -85,7 +86,7 @@
 - 4.4 For each fail-closed shim listed in `GRAPHICS-018` (fallback bindless heap, fallback transfer queue, empty-handle Create*), record an explicit removal task ID and timeline as required by the review checklist (`docs/agent/review-checklist.md` "Temporary shims") and `AGENTS.md §13`.
 
 ### 5. Project conventions
-- 5.1 Add a one-line entry to `docs/architecture/graphics.md` (or the closest project-wide convention doc) stating that Vulkan TUs must use `Core::Log::*`, not `std::fprintf(stderr, ...)`. Reference from item 2.1.
+- 5.1 Done 2026-05-04: `docs/architecture/graphics.md` and `src/graphics/vulkan/README.md` state that Vulkan implementation files must use `Core::Log::*`, not direct `stderr` writes. Reference from item 2.1; this slice also updated the direct `StagingBelt` diagnostics and routed `Vulkan.hpp` `VK_CHECK_*` macros through `Backends.Vulkan.DiagnosticsLogging.cpp`.
 
 ## Tests
 - All items above must keep `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` green.

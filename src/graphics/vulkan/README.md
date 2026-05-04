@@ -66,6 +66,7 @@ rendering (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
 | `Backends.Vulkan.Diagnostics.cppm` | Non-re-exported `:Diagnostics` partition — profiler/timestamp declaration. |
 | `Backends.Vulkan.Internal.cppm` | Retired migration stub; contains no module declaration. |
 | `Backends.Vulkan.Mappings.cpp` | §2 RHI enum → Vulkan enum conversion tables (`ToVkFormat`, `ToVkImageLayout`, `AspectFromFormat`, `ToVkBufferUsage`, etc.) |
+| `Backends.Vulkan.DiagnosticsLogging.cpp` | §3 logging bridge for `VK_CHECK_*` macros declared in `Vulkan.hpp`; routes diagnostics through `Core::Log::*` without importing modules from the header. |
 | `Backends.Vulkan.Staging.cpp` | §5 `StagingBelt` — host-visible ring-buffer for async uploads |
 | `Backends.Vulkan.Profiler.cpp` | §6 `VulkanProfiler` — `IProfiler` backed by `VkQueryPool` timestamps |
 | `Backends.Vulkan.Bindless.cpp` | §7 `VulkanBindlessHeap` — `IBindlessHeap` with `PARTIALLY_BOUND` descriptor array |
@@ -93,6 +94,15 @@ import :Transfer;       // gets StagingBelt/VulkanTransferQueue declarations
 The umbrella `Backends.Vulkan.cppm` does **not** `export import` any internal
 partition, so external consumers of `Extrinsic.Backends.Vulkan` see only
 `CreateVulkanDevice()` — concrete Vulkan types remain hidden.
+
+## Diagnostics
+
+Vulkan backend implementation files use `Core::Log::*` for warnings/errors and
+must not write directly to `stderr`. This keeps fail-closed backend diagnostics
+visible through the same logging surface as renderer/RHI contract checks. The
+`VK_CHECK_*` macros in `Vulkan.hpp` route through `ReportVkCheckFailure()` in
+`Backends.Vulkan.DiagnosticsLogging.cpp` so the header remains module-import-free
+while still using the project logger.
 
 ## Dependencies
 
