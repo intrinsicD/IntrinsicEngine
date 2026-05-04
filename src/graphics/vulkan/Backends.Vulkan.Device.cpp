@@ -27,6 +27,7 @@ namespace
     std::atomic<std::uint64_t> g_FallbackBindlessAllocationAttempts{0};
     std::atomic<std::uint64_t> g_FallbackTransferUploadAttempts{0};
     std::atomic<std::uint64_t> g_FallbackPipelineCreationAttempts{0};
+    std::atomic<std::uint64_t> g_FallbackBeginFrameAttempts{0};
     std::atomic<std::uint8_t>  g_LastFallbackPipelineReason{
         static_cast<std::uint8_t>(FallbackPipelineReason::None)};
 
@@ -79,6 +80,19 @@ FallbackPipelineReason GetLastFallbackPipelineReason() noexcept
         g_LastFallbackPipelineReason.load(std::memory_order_relaxed));
 }
 
+namespace
+{
+    void NoteFallbackBeginFrameAttempt() noexcept
+    {
+        g_FallbackBeginFrameAttempts.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+std::uint64_t GetFallbackBeginFrameAttemptCount() noexcept
+{
+    return g_FallbackBeginFrameAttempts.load(std::memory_order_relaxed);
+}
+
 FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept
 {
     FallbackDiagnosticsSnapshot snapshot{};
@@ -90,6 +104,8 @@ FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept
         g_FallbackPipelineCreationAttempts.load(std::memory_order_relaxed);
     snapshot.LastPipelineReason = static_cast<FallbackPipelineReason>(
         g_LastFallbackPipelineReason.load(std::memory_order_relaxed));
+    snapshot.BeginFrameAttempts =
+        g_FallbackBeginFrameAttempts.load(std::memory_order_relaxed);
     return snapshot;
 }
 
@@ -212,7 +228,11 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     outFrame = {};
 
     if (!m_Operational || m_Swapchain == VK_NULL_HANDLE || m_SwapchainHandles.empty())
+    {
+        NoteFallbackBeginFrameAttempt();
+        Core::Log::Warn("[VulkanDevice::BeginFrame] device non-operational; returning fail-closed (no frame produced)");
         return false;
+    }
 
     // BeginFrame hands out the current frame slot without rotating it. The
     // matching EndFrame call below rotates from the handed-out slot exactly
