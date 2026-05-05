@@ -100,6 +100,19 @@ available through the Vulkan 1.2/1.3 feature chain.
   single-threaded so this is fine). Snapshot field load order is fixed:
   bindless, transfer, pipeline-count, last-pipeline-reason, begin-frame-count,
   end-frame-count, present-count, resize-count.
+- `GetVulkanFrameLifecycleDiagnosticsSnapshot()` reports the most recent
+  promoted Vulkan frame lifecycle attempt with a backend-local structured status
+  taxonomy for `BeginFrame`, `EndFrame`, `Present`, and `Resize`. The current
+  implementation populates the fail-closed statuses (`SkippedNotOperational`,
+  `SkippedNoSwapchain`, `SkippedNoSwapchainImages`, and pending resize states)
+  plus the last frame/image indices, requested resize extent, availability
+  booleans, last Vulkan result code, and the same process-monotonic lifecycle
+  counters exposed by `FallbackDiagnosticsSnapshot`. Future acquire/submit/
+  present/recreate slices should fill the reserved operational statuses
+  (`Acquired`, `Submitted`, `Presented`, `Suboptimal`, `OutOfDate`, `Recreated`,
+  and failure variants) before `IsOperational()` can become true. The snapshot is
+  backend-specific diagnostics only; it does not expose Vulkan-native types and
+  must not become a renderer/RHI branching seam.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
@@ -137,7 +150,7 @@ available through the Vulkan 1.2/1.3 feature chain.
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
