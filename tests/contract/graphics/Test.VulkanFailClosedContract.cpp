@@ -84,6 +84,15 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     EXPECT_EQ(diagnostics.FrameImageAcquiredSemaphoreCount, 0u);
     EXPECT_EQ(diagnostics.FrameRenderDoneSemaphoreCount, 0u);
     EXPECT_FALSE(diagnostics.SwapchainSurfaceSupported);
+    EXPECT_FALSE(diagnostics.SwapchainCreated);
+    EXPECT_FALSE(diagnostics.SwapchainImagesEnumerated);
+    EXPECT_FALSE(diagnostics.SwapchainImageViewsCreated);
+    EXPECT_FALSE(diagnostics.SwapchainImagesRegistered);
+    EXPECT_EQ(diagnostics.SwapchainImageCount, 0u);
+    EXPECT_EQ(diagnostics.SwapchainImageViewCount, 0u);
+    EXPECT_EQ(diagnostics.SwapchainImageHandleCount, 0u);
+    EXPECT_EQ(diagnostics.SwapchainWidth, 0u);
+    EXPECT_EQ(diagnostics.SwapchainHeight, 0u);
 
     device->Shutdown();
     EXPECT_FALSE(device->IsOperational());
@@ -459,6 +468,16 @@ static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedPerFrameResources) == 13u);
 static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedPerFrameResourceCreation) == 14u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedSwapchain) == 15u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainCreation) == 16u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainImageEnumeration) == 17u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainImageViewCreation) == 18u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages) == 19u);
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGetters)
 {

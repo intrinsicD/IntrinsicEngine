@@ -54,6 +54,37 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 
     switch (diagnostics.Status)
     {
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_TRUE(diagnostics.PerFrameResourcesCreated);
+        EXPECT_EQ(diagnostics.FrameCommandPoolCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameCommandBufferCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameFenceCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameImageAcquiredSemaphoreCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameRenderDoneSemaphoreCount, expectedFramesInFlight);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        EXPECT_TRUE(diagnostics.SwapchainCreated);
+        EXPECT_TRUE(diagnostics.SwapchainImagesEnumerated);
+        EXPECT_TRUE(diagnostics.SwapchainImageViewsCreated);
+        EXPECT_TRUE(diagnostics.SwapchainImagesRegistered);
+        EXPECT_GT(diagnostics.SwapchainImageCount, 0u);
+        EXPECT_EQ(diagnostics.SwapchainImageViewCount, diagnostics.SwapchainImageCount);
+        EXPECT_EQ(diagnostics.SwapchainImageHandleCount, diagnostics.SwapchainImageCount);
+        EXPECT_GT(diagnostics.SwapchainWidth, 0u);
+        EXPECT_GT(diagnostics.SwapchainHeight, 0u);
+        EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
+        break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedPerFrameResources:
         EXPECT_TRUE(diagnostics.InstanceCreated);
         EXPECT_TRUE(diagnostics.SurfaceCreated);
@@ -74,6 +105,7 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_EQ(diagnostics.FrameRenderDoneSemaphoreCount, expectedFramesInFlight);
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
         EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        EXPECT_FALSE(diagnostics.SwapchainCreated);
         EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
         break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedMemoryAllocator:
@@ -184,6 +216,45 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_LE(diagnostics.FrameRenderDoneSemaphoreCount, expectedFramesInFlight);
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
         EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        break;
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedSwapchain:
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainCreation:
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainImageEnumeration:
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainImageViewCreation:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_TRUE(diagnostics.PerFrameResourcesCreated);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        EXPECT_EQ(diagnostics.FrameCommandPoolCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameCommandBufferCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameFenceCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameImageAcquiredSemaphoreCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameRenderDoneSemaphoreCount, expectedFramesInFlight);
+        if (diagnostics.Status == Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainCreation)
+        {
+            EXPECT_FALSE(diagnostics.SwapchainImagesEnumerated);
+            EXPECT_FALSE(diagnostics.SwapchainImageViewsCreated);
+            EXPECT_FALSE(diagnostics.SwapchainImagesRegistered);
+        }
+        else
+        {
+            EXPECT_TRUE(diagnostics.SwapchainCreated);
+            EXPECT_GT(diagnostics.SwapchainWidth, 0u);
+            EXPECT_GT(diagnostics.SwapchainHeight, 0u);
+            EXPECT_LE(diagnostics.SwapchainImageViewCount, diagnostics.SwapchainImageCount);
+            EXPECT_LE(diagnostics.SwapchainImageHandleCount, diagnostics.SwapchainImageCount);
+        }
+        EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
         break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedNoSuitablePhysicalDevice:
         EXPECT_TRUE(diagnostics.InstanceCreated);

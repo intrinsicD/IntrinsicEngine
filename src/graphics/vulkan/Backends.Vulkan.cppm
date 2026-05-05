@@ -35,6 +35,11 @@ namespace Extrinsic::Backends::Vulkan
         FailedMemoryAllocatorCreation = 12,
         CreatedPerFrameResources = 13,
         FailedPerFrameResourceCreation = 14,
+        CreatedSwapchain = 15,
+        FailedSwapchainCreation = 16,
+        FailedSwapchainImageEnumeration = 17,
+        FailedSwapchainImageViewCreation = 18,
+        RegisteredSwapchainImages = 19,
     };
 
     export struct VulkanBootstrapDiagnosticsSnapshot
@@ -51,6 +56,11 @@ namespace Extrinsic::Backends::Vulkan
         std::uint32_t FrameFenceCount = 0;
         std::uint32_t FrameImageAcquiredSemaphoreCount = 0;
         std::uint32_t FrameRenderDoneSemaphoreCount = 0;
+        std::uint32_t SwapchainImageCount = 0;
+        std::uint32_t SwapchainImageViewCount = 0;
+        std::uint32_t SwapchainImageHandleCount = 0;
+        std::uint32_t SwapchainWidth = 0;
+        std::uint32_t SwapchainHeight = 0;
         bool NativeWindowAvailable = false;
         bool VolkInitialized = false;
         bool ValidationRequested = false;
@@ -70,6 +80,10 @@ namespace Extrinsic::Backends::Vulkan
         bool PerFrameResourcesCreated = false;
         bool SwapchainExtensionSupported = false;
         bool SwapchainSurfaceSupported = false;
+        bool SwapchainCreated = false;
+        bool SwapchainImagesEnumerated = false;
+        bool SwapchainImageViewsCreated = false;
+        bool SwapchainImagesRegistered = false;
     };
 
     export [[nodiscard]] VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept;

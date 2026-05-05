@@ -1,10 +1,12 @@
 module;
 
+#include <algorithm>
 #include <cassert>
 #include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -176,6 +178,49 @@ namespace
             return false;
 
         return true;
+    }
+
+    [[nodiscard]] VkSurfaceFormatKHR ChooseSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats)
+    {
+        for (const VkSurfaceFormatKHR& format : formats)
+        {
+            if (format.format == VK_FORMAT_B8G8R8A8_SRGB &&
+                format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            {
+                return format;
+            }
+        }
+        return formats.empty()
+            ? VkSurfaceFormatKHR{.format = VK_FORMAT_B8G8R8A8_UNORM,
+                                 .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}
+            : formats.front();
+    }
+
+    [[nodiscard]] VkExtent2D ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities,
+                                                   const Platform::Extent2D framebufferExtent)
+    {
+        if (capabilities.currentExtent.width != std::numeric_limits<std::uint32_t>::max())
+            return capabilities.currentExtent;
+
+        const auto clampDimension = [](const int requested,
+                                       const std::uint32_t minimum,
+                                       const std::uint32_t maximum)
+        {
+            std::uint32_t value = requested > 0 ? static_cast<std::uint32_t>(requested) : minimum;
+            value = std::max(value, minimum);
+            if (maximum >= minimum)
+                value = std::min(value, maximum);
+            return value;
+        };
+
+        return VkExtent2D{
+            .width = clampDimension(framebufferExtent.Width,
+                                    capabilities.minImageExtent.width,
+                                    capabilities.maxImageExtent.width),
+            .height = clampDimension(framebufferExtent.Height,
+                                     capabilities.minImageExtent.height,
+                                     capabilities.maxImageExtent.height),
+        };
     }
 
     [[nodiscard]] std::vector<std::uint32_t> UniqueQueueFamilies(const QueueFamilyProbe& queueProbe)
@@ -719,10 +764,207 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
             diagnostics.FrameImageAcquiredSemaphoreCount == kMaxFramesInFlight &&
             diagnostics.FrameRenderDoneSemaphoreCount == kMaxFramesInFlight;
 
-        diagnostics.Status = VulkanBootstrapStatus::CreatedPerFrameResources;
+        VkSurfaceCapabilitiesKHR surfaceCapabilities{};
+        result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysDevice,
+                                                           m_Surface,
+                                                           &surfaceCapabilities);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed during swapchain bring-up; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainCreation, result);
+            return;
+        }
+
+        std::uint32_t surfaceFormatCount = 0;
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDevice,
+                                                      m_Surface,
+                                                      &surfaceFormatCount,
+                                                      nullptr);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || surfaceFormatCount == 0)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Failed to query Vulkan swapchain surface formats; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainCreation,
+                 result == VK_SUCCESS ? VK_ERROR_FORMAT_NOT_SUPPORTED : result);
+            return;
+        }
+
+        std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDevice,
+                                                      m_Surface,
+                                                      &surfaceFormatCount,
+                                                      surfaceFormats.data());
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || surfaceFormatCount == 0)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Failed to read Vulkan swapchain surface formats; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainCreation,
+                 result == VK_SUCCESS ? VK_ERROR_FORMAT_NOT_SUPPORTED : result);
+            return;
+        }
+        surfaceFormats.resize(surfaceFormatCount);
+
+        std::uint32_t presentModeCount = 0;
+        result = vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDevice,
+                                                           m_Surface,
+                                                           &presentModeCount,
+                                                           nullptr);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || presentModeCount == 0)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Failed to query Vulkan swapchain present modes; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainCreation,
+                 result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result);
+            return;
+        }
+
+        std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+        result = vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDevice,
+                                                           m_Surface,
+                                                           &presentModeCount,
+                                                           presentModes.data());
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || presentModeCount == 0)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Failed to read Vulkan swapchain present modes; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainCreation,
+                 result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result);
+            return;
+        }
+        presentModes.resize(presentModeCount);
+
+        const VkSurfaceFormatKHR surfaceFormat = ChooseSwapchainSurfaceFormat(surfaceFormats);
+        const VkPresentModeKHR presentMode = ToVkPresentMode(m_PresentMode, presentModes);
+        const VkExtent2D swapchainExtent = ChooseSwapchainExtent(surfaceCapabilities,
+                                                                 window.GetFramebufferExtent());
+
+        std::uint32_t desiredImageCount = surfaceCapabilities.minImageCount + 1u;
+        if (surfaceCapabilities.maxImageCount > 0u && desiredImageCount > surfaceCapabilities.maxImageCount)
+            desiredImageCount = surfaceCapabilities.maxImageCount;
+
+        const std::uint32_t queueFamilyIndices[] = {m_GraphicsFamily, m_PresentFamily};
+        VkSwapchainCreateInfoKHR swapchainInfo{};
+        swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        swapchainInfo.surface = m_Surface;
+        swapchainInfo.minImageCount = desiredImageCount;
+        swapchainInfo.imageFormat = surfaceFormat.format;
+        swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
+        swapchainInfo.imageExtent = swapchainExtent;
+        swapchainInfo.imageArrayLayers = 1u;
+        swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        if (m_GraphicsFamily != m_PresentFamily)
+        {
+            swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            swapchainInfo.queueFamilyIndexCount = 2u;
+            swapchainInfo.pQueueFamilyIndices = queueFamilyIndices;
+        }
+        else
+        {
+            swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
+        swapchainInfo.preTransform = surfaceCapabilities.currentTransform;
+        swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        swapchainInfo.presentMode = presentMode;
+        swapchainInfo.clipped = VK_TRUE;
+        swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        result = vkCreateSwapchainKHR(m_Device, &swapchainInfo, nullptr, &m_Swapchain);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        diagnostics.SwapchainCreated = result == VK_SUCCESS && m_Swapchain != VK_NULL_HANDLE;
+        if (!diagnostics.SwapchainCreated)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vkCreateSwapchainKHR failed; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainCreation, result);
+            return;
+        }
+
+        diagnostics.Status = VulkanBootstrapStatus::CreatedSwapchain;
+        m_SwapchainFormat = surfaceFormat.format;
+        m_SwapchainExtent = swapchainExtent;
+        diagnostics.SwapchainWidth = swapchainExtent.width;
+        diagnostics.SwapchainHeight = swapchainExtent.height;
+
+        std::uint32_t swapchainImageCount = 0;
+        result = vkGetSwapchainImagesKHR(m_Device, m_Swapchain, &swapchainImageCount, nullptr);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || swapchainImageCount == 0)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Failed to query Vulkan swapchain image count; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainImageEnumeration,
+                 result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result);
+            return;
+        }
+
+        m_SwapchainImages.resize(swapchainImageCount);
+        result = vkGetSwapchainImagesKHR(m_Device,
+                                         m_Swapchain,
+                                         &swapchainImageCount,
+                                         m_SwapchainImages.data());
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || swapchainImageCount == 0)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Failed to enumerate Vulkan swapchain images; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedSwapchainImageEnumeration,
+                 result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result);
+            return;
+        }
+        m_SwapchainImages.resize(swapchainImageCount);
+        m_SwapchainViews.reserve(swapchainImageCount);
+        m_SwapchainHandles.reserve(swapchainImageCount);
+        diagnostics.SwapchainImagesEnumerated = true;
+        diagnostics.SwapchainImageCount = swapchainImageCount;
+
+        for (VkImage swapchainImage : m_SwapchainImages)
+        {
+            VkImageView imageView = VK_NULL_HANDLE;
+            VkImageViewCreateInfo viewInfo{};
+            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image = swapchainImage;
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = m_SwapchainFormat;
+            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            viewInfo.subresourceRange.baseMipLevel = 0u;
+            viewInfo.subresourceRange.levelCount = 1u;
+            viewInfo.subresourceRange.baseArrayLayer = 0u;
+            viewInfo.subresourceRange.layerCount = 1u;
+
+            result = vkCreateImageView(m_Device, &viewInfo, nullptr, &imageView);
+            diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+            if (result != VK_SUCCESS || imageView == VK_NULL_HANDLE)
+            {
+                if (imageView != VK_NULL_HANDLE)
+                    vkDestroyImageView(m_Device, imageView, nullptr);
+                Core::Log::Error("[VulkanDevice::Initialize] vkCreateImageView failed for a Vulkan swapchain image; promoted Vulkan device remains non-operational.");
+                fail(VulkanBootstrapStatus::FailedSwapchainImageViewCreation, result);
+                return;
+            }
+
+            VulkanImage importedImage{};
+            importedImage.Image = swapchainImage;
+            importedImage.View = imageView;
+            importedImage.Format = m_SwapchainFormat;
+            importedImage.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            importedImage.Width = m_SwapchainExtent.width;
+            importedImage.Height = m_SwapchainExtent.height;
+            importedImage.Depth = 1u;
+            importedImage.MipLevels = 1u;
+            importedImage.ArrayLayers = 1u;
+            importedImage.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            importedImage.OwnsMemory = false;
+
+            m_SwapchainViews.push_back(imageView);
+            m_SwapchainHandles.push_back(m_Images.Add(std::move(importedImage)));
+            diagnostics.SwapchainImageViewCount = static_cast<std::uint32_t>(m_SwapchainViews.size());
+            diagnostics.SwapchainImageHandleCount = static_cast<std::uint32_t>(m_SwapchainHandles.size());
+        }
+
+        diagnostics.SwapchainImageViewsCreated = diagnostics.SwapchainImageViewCount == diagnostics.SwapchainImageCount;
+        diagnostics.SwapchainImagesRegistered = diagnostics.SwapchainImageHandleCount == diagnostics.SwapchainImageCount;
+        diagnostics.Status = VulkanBootstrapStatus::RegisteredSwapchainImages;
         PublishBootstrapDiagnostics(diagnostics);
 
-        Core::Log::Warn("[VulkanDevice::Initialize] Phase-1 Vulkan bootstrap created a logical device, acquired graphics/present/transfer queues, created a VMA allocator, and allocated per-frame command/sync resources; swapchain/resource bring-up is still incomplete, so device remains non-operational.");
+        Core::Log::Warn("[VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, and swapchain image/view/handle state; pipeline, bindless, transfer, presentation, and resize reconciliation remain incomplete, so device remains non-operational.");
         return;
     }
 
@@ -797,11 +1039,10 @@ void VulkanDevice::Shutdown()
     m_SwapchainHandles.clear();
     if (device != VK_NULL_HANDLE)
     {
-        for (VkImageView view : m_SwapchainViews)
-        {
-            if (view != VK_NULL_HANDLE)
-                vkDestroyImageView(device, view, nullptr);
-        }
+        // Swapchain image views are registered in m_Images as non-owning-memory
+        // VulkanImage records so the resource-pool drain above destroys each
+        // view exactly once. m_SwapchainViews is only a raw mirror for future
+        // swapchain diagnostics/acquire paths.
         if (m_Swapchain != VK_NULL_HANDLE)
             vkDestroySwapchainKHR(device, m_Swapchain, nullptr);
         if (m_GlobalPipelineLayout != VK_NULL_HANDLE)
@@ -1410,6 +1651,17 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
 
 void VulkanDevice::DestroyTexture(RHI::TextureHandle handle)
 {
+    for (const RHI::TextureHandle swapchainHandle : m_SwapchainHandles)
+    {
+        if (swapchainHandle == handle)
+        {
+            // Backbuffer handles are owned by the swapchain, not by callers of
+            // IDevice::DestroyTexture. Keep the registered image/view live until
+            // Shutdown or a future internal swapchain-recreation path drains it.
+            return;
+        }
+    }
+
     VulkanImage* image = m_Images.GetIfValid(handle);
     if (!image)
         return;
