@@ -311,6 +311,61 @@ TEST(VulkanFailClosedContract, ResizeOnNonOperationalDeviceIncrementsAttemptCoun
     EXPECT_EQ(extent.Height, 720);
 }
 
+TEST(VulkanFailClosedContract, FrameLifecycleDiagnosticsSnapshotReportsFailClosedStatuses)
+{
+    // The lifecycle diagnostics snapshot gives CPU/default CI a structured view
+    // of the last Begin/End/Present/Resize outcome before real Vulkan acquire,
+    // submit, present, and resize paths become operational. It must agree with
+    // the existing fail-closed counters while keeping status taxonomy explicit.
+    const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot before =
+        Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    EXPECT_FALSE(device->BeginFrame(frame));
+    frame.FrameIndex = 7u;
+    frame.SwapchainImageIndex = 3u;
+    device->EndFrame(frame);
+    device->Present(frame);
+    device->Resize(1920u, 1080u);
+
+    const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot after =
+        Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+
+    EXPECT_EQ(after.BeginStatus,
+              Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNotOperational);
+    EXPECT_EQ(after.EndStatus,
+              Extrinsic::Backends::Vulkan::VulkanFrameEndStatus::SkippedNotOperational);
+    EXPECT_EQ(after.PresentStatus,
+              Extrinsic::Backends::Vulkan::VulkanFramePresentStatus::SkippedNotOperational);
+    EXPECT_EQ(after.ResizeStatus,
+              Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::RecordedPendingNotOperational);
+    EXPECT_EQ(after.LastVkResult, 0);
+    EXPECT_EQ(after.LastFrameIndex, 7u);
+    EXPECT_EQ(after.LastSwapchainImageIndex, 3u);
+    EXPECT_EQ(after.LastRequestedWidth, 1920u);
+    EXPECT_EQ(after.LastRequestedHeight, 1080u);
+    EXPECT_FALSE(after.DeviceOperational);
+    EXPECT_FALSE(after.SwapchainAvailable);
+    EXPECT_FALSE(after.SwapchainImagesAvailable);
+
+    EXPECT_EQ(after.BeginFrameAttempts - before.BeginFrameAttempts, 1u);
+    EXPECT_EQ(after.EndFrameAttempts - before.EndFrameAttempts, 1u);
+    EXPECT_EQ(after.PresentAttempts - before.PresentAttempts, 1u);
+    EXPECT_EQ(after.ResizeAttempts - before.ResizeAttempts, 1u);
+    EXPECT_EQ(after.BeginFrameAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount());
+    EXPECT_EQ(after.EndFrameAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackEndFrameAttemptCount());
+    EXPECT_EQ(after.PresentAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackPresentAttemptCount());
+    EXPECT_EQ(after.ResizeAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackResizeAttemptCount());
+}
+
 TEST(VulkanFailClosedContract, CreatePipelineReportsPreBringUpReason)
 {
     // A freshly constructed VulkanDevice has not been Initialize()d, so the
@@ -487,6 +542,22 @@ static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSwapchainImageViewCreation) == 18u);
 static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages) == 19u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNotOperational) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::FailedAcquire) == 5u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFrameEndStatus::SkippedNotOperational) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFrameEndStatus::FailedSubmit) == 3u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFramePresentStatus::SkippedNotOperational) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFramePresentStatus::FailedPresent) == 6u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::RecordedPendingNotOperational) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::FailedRecreate) == 5u);
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGetters)
 {

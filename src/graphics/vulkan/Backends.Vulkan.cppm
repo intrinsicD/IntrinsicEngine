@@ -97,6 +97,75 @@ namespace Extrinsic::Backends::Vulkan
 
     export [[nodiscard]] VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept;
 
+    // Backend-local lifecycle diagnostics for the most recent promoted Vulkan
+    // BeginFrame/EndFrame/Present/Resize attempts. This is intentionally not an
+    // RHI contract and exposes no Vulkan-native types; renderer/runtime code
+    // must continue to branch only on IDevice::IsOperational(). The enum values
+    // are kept stable so opt-in Vulkan smoke tests can lock future operational
+    // acquire/submit/present/resize semantics without making Vulkan mandatory in
+    // the default CPU gate.
+    export enum class VulkanFrameBeginStatus : std::uint8_t
+    {
+        NotStarted = 0,
+        SkippedNotOperational = 1,
+        SkippedNoSwapchain = 2,
+        SkippedNoSwapchainImages = 3,
+        Acquired = 4,
+        FailedAcquire = 5,
+    };
+
+    export enum class VulkanFrameEndStatus : std::uint8_t
+    {
+        NotStarted = 0,
+        SkippedNotOperational = 1,
+        Submitted = 2,
+        FailedSubmit = 3,
+    };
+
+    export enum class VulkanFramePresentStatus : std::uint8_t
+    {
+        NotStarted = 0,
+        SkippedNotOperational = 1,
+        SkippedNoSwapchain = 2,
+        Presented = 3,
+        Suboptimal = 4,
+        OutOfDate = 5,
+        FailedPresent = 6,
+    };
+
+    export enum class VulkanFrameResizeStatus : std::uint8_t
+    {
+        NotStarted = 0,
+        RecordedPendingNotOperational = 1,
+        RecordedPendingNoSwapchain = 2,
+        RecordedPendingRecreate = 3,
+        Recreated = 4,
+        FailedRecreate = 5,
+    };
+
+    export struct VulkanFrameLifecycleDiagnosticsSnapshot
+    {
+        VulkanFrameBeginStatus BeginStatus = VulkanFrameBeginStatus::NotStarted;
+        VulkanFrameEndStatus EndStatus = VulkanFrameEndStatus::NotStarted;
+        VulkanFramePresentStatus PresentStatus = VulkanFramePresentStatus::NotStarted;
+        VulkanFrameResizeStatus ResizeStatus = VulkanFrameResizeStatus::NotStarted;
+        std::int32_t LastVkResult = 0;
+        std::uint32_t LastFrameIndex = 0;
+        std::uint32_t LastSwapchainImageIndex = 0;
+        std::uint32_t LastRequestedWidth = 0;
+        std::uint32_t LastRequestedHeight = 0;
+        std::uint64_t BeginFrameAttempts = 0;
+        std::uint64_t EndFrameAttempts = 0;
+        std::uint64_t PresentAttempts = 0;
+        std::uint64_t ResizeAttempts = 0;
+        bool DeviceOperational = false;
+        bool SwapchainAvailable = false;
+        bool SwapchainImagesAvailable = false;
+    };
+
+    export [[nodiscard]] VulkanFrameLifecycleDiagnosticsSnapshot
+    GetVulkanFrameLifecycleDiagnosticsSnapshot() noexcept;
+
     // Debug breadcrumb for fail-closed non-operational bindless allocation attempts.
     export std::uint64_t GetFallbackBindlessAllocationAttemptCount() noexcept;
 

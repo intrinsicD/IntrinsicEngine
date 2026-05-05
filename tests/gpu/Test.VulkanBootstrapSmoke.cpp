@@ -9,6 +9,7 @@ import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.FrameHandle;
 
 TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 {
@@ -307,6 +308,23 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::NotStarted:
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::SkippedNoNativeWindow:
         FAIL() << "GLFW smoke supplied a native window, so bootstrap should not remain unstarted or skip for missing native window";
+    }
+
+    Extrinsic::RHI::FrameHandle frame{};
+    EXPECT_FALSE(device->BeginFrame(frame))
+        << "guarded bootstrap must keep frame acquisition fail-closed until Vulkan is marked operational";
+
+    const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot lifecycleDiagnostics =
+        Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+    EXPECT_EQ(lifecycleDiagnostics.BeginStatus,
+              Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNotOperational);
+    EXPECT_EQ(lifecycleDiagnostics.BeginFrameAttempts,
+              Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount());
+    EXPECT_FALSE(lifecycleDiagnostics.DeviceOperational);
+    if (diagnostics.Status == Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages)
+    {
+        EXPECT_TRUE(lifecycleDiagnostics.SwapchainAvailable);
+        EXPECT_TRUE(lifecycleDiagnostics.SwapchainImagesAvailable);
     }
 
     device->Shutdown();

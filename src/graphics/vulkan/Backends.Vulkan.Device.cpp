@@ -38,6 +38,8 @@ namespace
         static_cast<std::uint8_t>(FallbackPipelineReason::None)};
     std::mutex g_BootstrapDiagnosticsMutex;
     VulkanBootstrapDiagnosticsSnapshot g_BootstrapDiagnostics{};
+    std::mutex g_FrameLifecycleDiagnosticsMutex;
+    VulkanFrameLifecycleDiagnosticsSnapshot g_FrameLifecycleDiagnostics{};
 
     constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
 
@@ -70,6 +72,22 @@ namespace
     {
         std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
         g_BootstrapDiagnostics = snapshot;
+    }
+
+    void RefreshFrameLifecycleAttemptCounters(VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    {
+        snapshot.BeginFrameAttempts = g_FallbackBeginFrameAttempts.load(std::memory_order_relaxed);
+        snapshot.EndFrameAttempts = g_FallbackEndFrameAttempts.load(std::memory_order_relaxed);
+        snapshot.PresentAttempts = g_FallbackPresentAttempts.load(std::memory_order_relaxed);
+        snapshot.ResizeAttempts = g_FallbackResizeAttempts.load(std::memory_order_relaxed);
+    }
+
+    template <typename Mutator>
+    void MutateFrameLifecycleDiagnostics(Mutator&& mutator) noexcept
+    {
+        std::scoped_lock lock{g_FrameLifecycleDiagnosticsMutex};
+        mutator(g_FrameLifecycleDiagnostics);
+        RefreshFrameLifecycleAttemptCounters(g_FrameLifecycleDiagnostics);
     }
 
     [[nodiscard]] bool HasInstanceLayer(const char* name)
@@ -487,6 +505,14 @@ VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexc
 {
     std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
     return g_BootstrapDiagnostics;
+}
+
+VulkanFrameLifecycleDiagnosticsSnapshot GetVulkanFrameLifecycleDiagnosticsSnapshot() noexcept
+{
+    std::scoped_lock lock{g_FrameLifecycleDiagnosticsMutex};
+    VulkanFrameLifecycleDiagnosticsSnapshot snapshot = g_FrameLifecycleDiagnostics;
+    RefreshFrameLifecycleAttemptCounters(snapshot);
+    return snapshot;
 }
 
 // =============================================================================
@@ -1199,6 +1225,20 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     if (!m_Operational || m_Swapchain == VK_NULL_HANDLE || m_SwapchainHandles.empty())
     {
         NoteFallbackBeginFrameAttempt();
+        MutateFrameLifecycleDiagnostics([this](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.BeginStatus = !m_Operational
+                ? VulkanFrameBeginStatus::SkippedNotOperational
+                : (m_Swapchain == VK_NULL_HANDLE
+                    ? VulkanFrameBeginStatus::SkippedNoSwapchain
+                    : VulkanFrameBeginStatus::SkippedNoSwapchainImages);
+            snapshot.LastVkResult = 0;
+            snapshot.LastFrameIndex = 0;
+            snapshot.LastSwapchainImageIndex = 0;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
         Core::Log::Warn("[VulkanDevice::BeginFrame] device non-operational; returning fail-closed (no frame produced)");
         return false;
     }
@@ -1209,6 +1249,16 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
     // swapchain acquire/present support lands.
     outFrame.FrameIndex = m_FrameSlot;
     outFrame.SwapchainImageIndex = m_FrameSlot % static_cast<std::uint32_t>(m_SwapchainHandles.size());
+    MutateFrameLifecycleDiagnostics([this, &outFrame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    {
+        snapshot.BeginStatus = VulkanFrameBeginStatus::Acquired;
+        snapshot.LastVkResult = 0;
+        snapshot.LastFrameIndex = outFrame.FrameIndex;
+        snapshot.LastSwapchainImageIndex = outFrame.SwapchainImageIndex;
+        snapshot.DeviceOperational = m_Operational;
+        snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+        snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+    });
     return true;
 }
 
@@ -1217,6 +1267,16 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
     if (!m_Operational)
     {
         NoteFallbackEndFrameAttempt();
+        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.EndStatus = VulkanFrameEndStatus::SkippedNotOperational;
+            snapshot.LastVkResult = 0;
+            snapshot.LastFrameIndex = frame.FrameIndex;
+            snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
         Core::Log::Warn("[VulkanDevice::EndFrame] device non-operational; ignoring frame end (no rotation)");
         return;
     }
@@ -1226,17 +1286,49 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
     // code.
     m_FrameSlot = (frame.FrameIndex + 1u) % kMaxFramesInFlight;
     ++m_GlobalFrameNumber;
+    MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    {
+        snapshot.EndStatus = VulkanFrameEndStatus::Submitted;
+        snapshot.LastVkResult = 0;
+        snapshot.LastFrameIndex = frame.FrameIndex;
+        snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+        snapshot.DeviceOperational = m_Operational;
+        snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+        snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+    });
 }
 
 void VulkanDevice::Present(const RHI::FrameHandle& frame)
 {
-    (void)frame;
     if (!m_Operational || m_Swapchain == VK_NULL_HANDLE)
     {
         NoteFallbackPresentAttempt();
+        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.PresentStatus = !m_Operational
+                ? VulkanFramePresentStatus::SkippedNotOperational
+                : VulkanFramePresentStatus::SkippedNoSwapchain;
+            snapshot.LastVkResult = 0;
+            snapshot.LastFrameIndex = frame.FrameIndex;
+            snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
         Core::Log::Warn("[VulkanDevice::Present] device or swapchain non-operational; skipping presentation");
         return;
     }
+
+    MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    {
+        snapshot.PresentStatus = VulkanFramePresentStatus::Presented;
+        snapshot.LastVkResult = 0;
+        snapshot.LastFrameIndex = frame.FrameIndex;
+        snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+        snapshot.DeviceOperational = m_Operational;
+        snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+        snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+    });
 }
 
 void VulkanDevice::Resize(uint32_t width, uint32_t height)
@@ -1244,7 +1336,32 @@ void VulkanDevice::Resize(uint32_t width, uint32_t height)
     if (!m_Operational || m_Swapchain == VK_NULL_HANDLE)
     {
         NoteFallbackResizeAttempt();
+        MutateFrameLifecycleDiagnostics([this, width, height](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.ResizeStatus = !m_Operational
+                ? VulkanFrameResizeStatus::RecordedPendingNotOperational
+                : VulkanFrameResizeStatus::RecordedPendingNoSwapchain;
+            snapshot.LastVkResult = 0;
+            snapshot.LastRequestedWidth = width;
+            snapshot.LastRequestedHeight = height;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
         Core::Log::Warn("[VulkanDevice::Resize] device or swapchain non-operational; recording pending extent only");
+    }
+    else
+    {
+        MutateFrameLifecycleDiagnostics([this, width, height](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.ResizeStatus = VulkanFrameResizeStatus::RecordedPendingRecreate;
+            snapshot.LastVkResult = 0;
+            snapshot.LastRequestedWidth = width;
+            snapshot.LastRequestedHeight = height;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
     }
 
     m_SwapchainExtent = VkExtent2D{.width = width, .height = height};
