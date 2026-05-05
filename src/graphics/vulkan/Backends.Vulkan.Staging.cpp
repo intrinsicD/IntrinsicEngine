@@ -25,6 +25,12 @@ namespace Extrinsic::Backends::Vulkan
 StagingBelt::StagingBelt(VkDevice device, VmaAllocator vma, size_t capacityBytes)
     : m_Device(device), m_Vma(vma), m_Capacity(capacityBytes)
 {
+    if (m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || m_Capacity == 0)
+    {
+        Core::Log::Error("[StagingBelt] Cannot create staging belt without a valid device/VMA/capacity");
+        return;
+    }
+
     VkBufferCreateInfo bci{};
     bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bci.size  = capacityBytes;
@@ -36,7 +42,17 @@ StagingBelt::StagingBelt(VkDevice device, VmaAllocator vma, size_t capacityBytes
               | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
     VmaAllocationInfo info{};
-    VK_CHECK_FATAL(vmaCreateBuffer(m_Vma, &bci, &aci, &m_Buffer, &m_Alloc, &info));
+    const VkResult result = vmaCreateBuffer(m_Vma, &bci, &aci, &m_Buffer, &m_Alloc, &info);
+    if (result != VK_SUCCESS || m_Buffer == VK_NULL_HANDLE || m_Alloc == VK_NULL_HANDLE || info.pMappedData == nullptr)
+    {
+        Core::Log::Error("[StagingBelt] vmaCreateBuffer failed; transfer staging unavailable");
+        if (m_Buffer != VK_NULL_HANDLE && m_Alloc != VK_NULL_HANDLE)
+            vmaDestroyBuffer(m_Vma, m_Buffer, m_Alloc);
+        m_Buffer = VK_NULL_HANDLE;
+        m_Alloc = VK_NULL_HANDLE;
+        m_Mapped = nullptr;
+        return;
+    }
     m_Mapped = info.pMappedData;
     assert(m_Mapped);
 }
@@ -45,6 +61,13 @@ StagingBelt::~StagingBelt()
 {
     if (m_Buffer != VK_NULL_HANDLE)
         vmaDestroyBuffer(m_Vma, m_Buffer, m_Alloc);
+}
+
+bool StagingBelt::IsValid() const noexcept
+{
+    return m_Device != VK_NULL_HANDLE && m_Vma != VK_NULL_HANDLE &&
+           m_Buffer != VK_NULL_HANDLE && m_Alloc != VK_NULL_HANDLE &&
+           m_Mapped != nullptr && m_Capacity > 0;
 }
 
 StagingBelt::Allocation StagingBelt::Allocate(size_t sizeBytes, size_t alignment)

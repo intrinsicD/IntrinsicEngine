@@ -8,6 +8,7 @@ import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Platform.Window;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 
@@ -325,6 +326,34 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
     {
         EXPECT_TRUE(lifecycleDiagnostics.SwapchainAvailable);
         EXPECT_TRUE(lifecycleDiagnostics.SwapchainImagesAvailable);
+    }
+
+    const Extrinsic::Backends::Vulkan::VulkanServiceDiagnosticsSnapshot serviceDiagnostics =
+        Extrinsic::Backends::Vulkan::GetVulkanServiceDiagnosticsSnapshot();
+    if (diagnostics.Status == Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages)
+    {
+        EXPECT_EQ(serviceDiagnostics.Status,
+                  Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::Ready);
+        EXPECT_TRUE(serviceDiagnostics.BindlessHeapCreated);
+        EXPECT_TRUE(serviceDiagnostics.GlobalPipelineLayoutCreated);
+        EXPECT_TRUE(serviceDiagnostics.TransferQueueCreated);
+        EXPECT_TRUE(serviceDiagnostics.CommandContextsRebound);
+        EXPECT_EQ(serviceDiagnostics.CommandContextRebindCount, expectedFramesInFlight);
+        EXPECT_GT(serviceDiagnostics.BindlessCapacity, 0u);
+        EXPECT_TRUE(serviceDiagnostics.PublicServicesRemainFailClosed);
+
+        const std::uint64_t beforeFallbackBindless =
+            Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount();
+        EXPECT_EQ(device->GetBindlessHeap().AllocateTextureSlot({}, {}),
+                  Extrinsic::RHI::kInvalidBindlessIndex);
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount(),
+                  beforeFallbackBindless + 1u)
+            << "live bindless service exists internally, but public access must remain fail-closed until operational";
+    }
+    else
+    {
+        EXPECT_NE(serviceDiagnostics.Status,
+                  Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::Ready);
     }
 
     device->Shutdown();

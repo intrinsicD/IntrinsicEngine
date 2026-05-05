@@ -13,6 +13,7 @@ module;
 module Extrinsic.Backends.Vulkan;
 
 import :Descriptors;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Backends::Vulkan
 {
@@ -24,6 +25,12 @@ namespace Extrinsic::Backends::Vulkan
 VulkanBindlessHeap::VulkanBindlessHeap(VkDevice device, uint32_t capacity)
     : m_Device(device), m_Capacity(capacity)
 {
+    if (m_Device == VK_NULL_HANDLE || m_Capacity == 0)
+    {
+        Core::Log::Error("[VulkanBindlessHeap] Cannot create bindless heap without a valid device/capacity");
+        return;
+    }
+
     // Descriptor pool — combined image sampler, partially bound.
     const VkDescriptorPoolSize poolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, capacity};
     VkDescriptorPoolCreateInfo poolCI{};
@@ -32,7 +39,13 @@ VulkanBindlessHeap::VulkanBindlessHeap(VkDevice device, uint32_t capacity)
     poolCI.poolSizeCount = 1;
     poolCI.pPoolSizes    = &poolSize;
     poolCI.flags         = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-    VK_CHECK_FATAL(vkCreateDescriptorPool(m_Device, &poolCI, nullptr, &m_Pool));
+    VkResult result = vkCreateDescriptorPool(m_Device, &poolCI, nullptr, &m_Pool);
+    if (result != VK_SUCCESS || m_Pool == VK_NULL_HANDLE)
+    {
+        Core::Log::Error("[VulkanBindlessHeap] vkCreateDescriptorPool failed; bindless service unavailable");
+        m_Pool = VK_NULL_HANDLE;
+        return;
+    }
 
     // Binding flags — partially bound + update-after-bind.
     const VkDescriptorBindingFlags bindFlags =
@@ -55,20 +68,43 @@ VulkanBindlessHeap::VulkanBindlessHeap(VkDevice device, uint32_t capacity)
     layoutCI.bindingCount = 1;
     layoutCI.pBindings    = &binding;
     layoutCI.flags        = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-    VK_CHECK_FATAL(vkCreateDescriptorSetLayout(m_Device, &layoutCI, nullptr, &m_Layout));
+    result = vkCreateDescriptorSetLayout(m_Device, &layoutCI, nullptr, &m_Layout);
+    if (result != VK_SUCCESS || m_Layout == VK_NULL_HANDLE)
+    {
+        Core::Log::Error("[VulkanBindlessHeap] vkCreateDescriptorSetLayout failed; bindless service unavailable");
+        vkDestroyDescriptorPool(m_Device, m_Pool, nullptr);
+        m_Pool = VK_NULL_HANDLE;
+        m_Layout = VK_NULL_HANDLE;
+        return;
+    }
 
     VkDescriptorSetAllocateInfo allocCI{};
     allocCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocCI.descriptorPool     = m_Pool;
     allocCI.descriptorSetCount = 1;
     allocCI.pSetLayouts        = &m_Layout;
-    VK_CHECK_FATAL(vkAllocateDescriptorSets(m_Device, &allocCI, &m_Set));
+    result = vkAllocateDescriptorSets(m_Device, &allocCI, &m_Set);
+    if (result != VK_SUCCESS || m_Set == VK_NULL_HANDLE)
+    {
+        Core::Log::Error("[VulkanBindlessHeap] vkAllocateDescriptorSets failed; bindless service unavailable");
+        vkDestroyDescriptorSetLayout(m_Device, m_Layout, nullptr);
+        vkDestroyDescriptorPool(m_Device, m_Pool, nullptr);
+        m_Set = VK_NULL_HANDLE;
+        m_Layout = VK_NULL_HANDLE;
+        m_Pool = VK_NULL_HANDLE;
+    }
 }
 
 VulkanBindlessHeap::~VulkanBindlessHeap()
 {
     if (m_Layout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(m_Device, m_Layout, nullptr);
     if (m_Pool   != VK_NULL_HANDLE) vkDestroyDescriptorPool(m_Device, m_Pool, nullptr);
+}
+
+bool VulkanBindlessHeap::IsValid() const noexcept
+{
+    return m_Device != VK_NULL_HANDLE && m_Pool != VK_NULL_HANDLE &&
+           m_Layout != VK_NULL_HANDLE && m_Set != VK_NULL_HANDLE && m_Capacity > 0;
 }
 
 void VulkanBindlessHeap::SetDefault(VkImageView view, VkSampler sampler)

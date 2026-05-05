@@ -16,6 +16,7 @@ module;
 module Extrinsic.Backends.Vulkan;
 
 import :Transfer;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Backends::Vulkan
 {
@@ -28,6 +29,12 @@ VulkanTransferQueue::VulkanTransferQueue(const Config& cfg)
     : m_Device(cfg.Device), m_Vma(cfg.Vma), m_Queue(cfg.Queue),
       m_QueueFamily(cfg.QueueFamily)
 {
+    if (m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || m_Queue == VK_NULL_HANDLE)
+    {
+        Core::Log::Error("[VulkanTransferQueue] Cannot create transfer queue without valid device/VMA/queue handles");
+        return;
+    }
+
     // Timeline semaphore.
     VkSemaphoreTypeCreateInfo typeCI{};
     typeCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
@@ -36,7 +43,13 @@ VulkanTransferQueue::VulkanTransferQueue(const Config& cfg)
     VkSemaphoreCreateInfo semCI{};
     semCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semCI.pNext = &typeCI;
-    VK_CHECK_FATAL(vkCreateSemaphore(m_Device, &semCI, nullptr, &m_Timeline));
+    VkResult result = vkCreateSemaphore(m_Device, &semCI, nullptr, &m_Timeline);
+    if (result != VK_SUCCESS || m_Timeline == VK_NULL_HANDLE)
+    {
+        Core::Log::Error("[VulkanTransferQueue] vkCreateSemaphore failed; transfer service unavailable");
+        m_Timeline = VK_NULL_HANDLE;
+        return;
+    }
 
     // Command pool for transfer commands.
     VkCommandPoolCreateInfo poolCI{};
@@ -44,15 +57,38 @@ VulkanTransferQueue::VulkanTransferQueue(const Config& cfg)
     poolCI.queueFamilyIndex = m_QueueFamily;
     poolCI.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT
                             | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    VK_CHECK_FATAL(vkCreateCommandPool(m_Device, &poolCI, nullptr, &m_CmdPool));
+    result = vkCreateCommandPool(m_Device, &poolCI, nullptr, &m_CmdPool);
+    if (result != VK_SUCCESS || m_CmdPool == VK_NULL_HANDLE)
+    {
+        Core::Log::Error("[VulkanTransferQueue] vkCreateCommandPool failed; transfer service unavailable");
+        vkDestroySemaphore(m_Device, m_Timeline, nullptr);
+        m_Timeline = VK_NULL_HANDLE;
+        m_CmdPool = VK_NULL_HANDLE;
+        return;
+    }
 
     m_Belt = std::make_unique<StagingBelt>(m_Device, m_Vma, cfg.StagingCapacity);
+    if (!m_Belt || !m_Belt->IsValid())
+    {
+        Core::Log::Error("[VulkanTransferQueue] Staging belt creation failed; transfer service unavailable");
+        m_Belt.reset();
+        vkDestroyCommandPool(m_Device, m_CmdPool, nullptr);
+        vkDestroySemaphore(m_Device, m_Timeline, nullptr);
+        m_CmdPool = VK_NULL_HANDLE;
+        m_Timeline = VK_NULL_HANDLE;
+    }
 }
 
 VulkanTransferQueue::~VulkanTransferQueue()
 {
     if (m_CmdPool   != VK_NULL_HANDLE) vkDestroyCommandPool(m_Device, m_CmdPool, nullptr);
     if (m_Timeline  != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, m_Timeline, nullptr);
+}
+
+bool VulkanTransferQueue::IsValid() const noexcept
+{
+    return m_Device != VK_NULL_HANDLE && m_Vma != VK_NULL_HANDLE && m_Queue != VK_NULL_HANDLE &&
+           m_Timeline != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE && m_Belt && m_Belt->IsValid();
 }
 
 uint64_t VulkanTransferQueue::QueryCompletedValue() const

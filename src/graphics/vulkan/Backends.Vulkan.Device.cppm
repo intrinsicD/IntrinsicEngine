@@ -97,13 +97,13 @@ namespace Extrinsic::Backends::Vulkan
 
         [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override
         {
-            if (m_TransferQueue)
+            if (m_Operational && m_TransferQueue)
                 return *m_TransferQueue;
             return m_FallbackTransferQueue;
         }
         [[nodiscard]] RHI::IBindlessHeap& GetBindlessHeap() override
         {
-            if (m_BindlessHeap)
+            if (m_Operational && m_BindlessHeap)
                 return *m_BindlessHeap;
             return m_FallbackBindlessHeap;
         }

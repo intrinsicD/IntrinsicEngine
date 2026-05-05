@@ -166,6 +166,35 @@ namespace Extrinsic::Backends::Vulkan
     export [[nodiscard]] VulkanFrameLifecycleDiagnosticsSnapshot
     GetVulkanFrameLifecycleDiagnosticsSnapshot() noexcept;
 
+    // Backend-local service handoff diagnostics for live Vulkan service objects
+    // created after guarded bootstrap. These diagnostics are not an RHI branch
+    // seam; public GetBindlessHeap()/GetTransferQueue() accessors remain
+    // fail-closed until IDevice::IsOperational() becomes true.
+    export enum class VulkanServiceBootstrapStatus : std::uint8_t
+    {
+        NotStarted = 0,
+        SkippedNoBootstrap = 1,
+        FailedBindlessHeapCreation = 2,
+        FailedGlobalPipelineLayoutCreation = 3,
+        FailedTransferQueueCreation = 4,
+        Ready = 5,
+    };
+
+    export struct VulkanServiceDiagnosticsSnapshot
+    {
+        VulkanServiceBootstrapStatus Status = VulkanServiceBootstrapStatus::NotStarted;
+        std::int32_t LastVkResult = 0;
+        std::uint32_t BindlessCapacity = 0;
+        std::uint32_t CommandContextRebindCount = 0;
+        bool BindlessHeapCreated = false;
+        bool GlobalPipelineLayoutCreated = false;
+        bool TransferQueueCreated = false;
+        bool CommandContextsRebound = false;
+        bool PublicServicesRemainFailClosed = true;
+    };
+
+    export [[nodiscard]] VulkanServiceDiagnosticsSnapshot GetVulkanServiceDiagnosticsSnapshot() noexcept;
+
     // Debug breadcrumb for fail-closed non-operational bindless allocation attempts.
     export std::uint64_t GetFallbackBindlessAllocationAttemptCount() noexcept;
 

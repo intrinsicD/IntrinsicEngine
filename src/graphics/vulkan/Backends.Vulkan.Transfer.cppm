@@ -47,6 +47,7 @@ namespace Extrinsic::Backends::Vulkan
         void Retire(uint64_t retireValue);
         void GarbageCollect(uint64_t completedValue);
 
+        [[nodiscard]] bool IsValid() const noexcept;
         [[nodiscard]] size_t Capacity() const noexcept { return m_Capacity; }
 
     private:
@@ -84,6 +85,7 @@ namespace Extrinsic::Backends::Vulkan
         explicit VulkanTransferQueue(const Config& cfg);
         ~VulkanTransferQueue() override;
 
+        [[nodiscard]] bool IsValid() const noexcept;
         [[nodiscard]] uint64_t QueryCompletedValue() const;
 
         [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle dst,

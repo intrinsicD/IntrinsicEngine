@@ -103,6 +103,18 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     EXPECT_EQ(diagnostics.SwapchainWidth, 0u);
     EXPECT_EQ(diagnostics.SwapchainHeight, 0u);
 
+    const Extrinsic::Backends::Vulkan::VulkanServiceDiagnosticsSnapshot serviceDiagnostics =
+        Extrinsic::Backends::Vulkan::GetVulkanServiceDiagnosticsSnapshot();
+    EXPECT_EQ(serviceDiagnostics.Status,
+              Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::SkippedNoBootstrap);
+    EXPECT_FALSE(serviceDiagnostics.BindlessHeapCreated);
+    EXPECT_FALSE(serviceDiagnostics.GlobalPipelineLayoutCreated);
+    EXPECT_FALSE(serviceDiagnostics.TransferQueueCreated);
+    EXPECT_FALSE(serviceDiagnostics.CommandContextsRebound);
+    EXPECT_TRUE(serviceDiagnostics.PublicServicesRemainFailClosed);
+    EXPECT_EQ(serviceDiagnostics.BindlessCapacity, 0u);
+    EXPECT_EQ(serviceDiagnostics.CommandContextRebindCount, 0u);
+
     device->Shutdown();
     EXPECT_FALSE(device->IsOperational());
 }
@@ -558,6 +570,14 @@ static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::RecordedPendingNotOperational) == 1u);
 static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::FailedRecreate) == 5u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::NotStarted) == 0u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::SkippedNoBootstrap) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::FailedTransferQueueCreation) == 4u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::Ready) == 5u);
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGetters)
 {

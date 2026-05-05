@@ -40,6 +40,8 @@ namespace
     VulkanBootstrapDiagnosticsSnapshot g_BootstrapDiagnostics{};
     std::mutex g_FrameLifecycleDiagnosticsMutex;
     VulkanFrameLifecycleDiagnosticsSnapshot g_FrameLifecycleDiagnostics{};
+    std::mutex g_ServiceDiagnosticsMutex;
+    VulkanServiceDiagnosticsSnapshot g_ServiceDiagnostics{};
 
     constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
 
@@ -72,6 +74,12 @@ namespace
     {
         std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
         g_BootstrapDiagnostics = snapshot;
+    }
+
+    void PublishServiceDiagnostics(const VulkanServiceDiagnosticsSnapshot& snapshot) noexcept
+    {
+        std::scoped_lock lock{g_ServiceDiagnosticsMutex};
+        g_ServiceDiagnostics = snapshot;
     }
 
     void RefreshFrameLifecycleAttemptCounters(VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
@@ -515,6 +523,12 @@ VulkanFrameLifecycleDiagnosticsSnapshot GetVulkanFrameLifecycleDiagnosticsSnapsh
     return snapshot;
 }
 
+VulkanServiceDiagnosticsSnapshot GetVulkanServiceDiagnosticsSnapshot() noexcept
+{
+    std::scoped_lock lock{g_ServiceDiagnosticsMutex};
+    return g_ServiceDiagnostics;
+}
+
 // =============================================================================
 // §12  Factory
 // =============================================================================
@@ -552,12 +566,19 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
 
     VulkanBootstrapDiagnosticsSnapshot diagnostics{};
     diagnostics.ValidationRequested = config.EnableValidation;
+    VulkanServiceDiagnosticsSnapshot serviceDiagnostics{};
+    PublishServiceDiagnostics(serviceDiagnostics);
 
-    auto fail = [this, &diagnostics](const VulkanBootstrapStatus status, const VkResult result)
+    auto fail = [this, &diagnostics, &serviceDiagnostics](const VulkanBootstrapStatus status, const VkResult result)
     {
         diagnostics.Status = status;
         diagnostics.LastVkResult = static_cast<std::int32_t>(result);
         PublishBootstrapDiagnostics(diagnostics);
+        if (serviceDiagnostics.Status == VulkanServiceBootstrapStatus::NotStarted)
+        {
+            serviceDiagnostics.Status = VulkanServiceBootstrapStatus::SkippedNoBootstrap;
+            PublishServiceDiagnostics(serviceDiagnostics);
+        }
         Shutdown();
     };
 
@@ -567,6 +588,8 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
     {
         diagnostics.Status = VulkanBootstrapStatus::SkippedNoNativeWindow;
         PublishBootstrapDiagnostics(diagnostics);
+        serviceDiagnostics.Status = VulkanServiceBootstrapStatus::SkippedNoBootstrap;
+        PublishServiceDiagnostics(serviceDiagnostics);
         Core::Log::Warn("[VulkanDevice::Initialize] No native GLFW window is available; promoted Vulkan bootstrap skipped and device remains non-operational.");
         return;
     }
@@ -1056,14 +1079,94 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
 
         diagnostics.SwapchainImageViewsCreated = diagnostics.SwapchainImageViewCount == diagnostics.SwapchainImageCount;
         diagnostics.SwapchainImagesRegistered = diagnostics.SwapchainImageHandleCount == diagnostics.SwapchainImageCount;
+
+        m_BindlessHeap = std::make_unique<VulkanBindlessHeap>(m_Device);
+        serviceDiagnostics.BindlessHeapCreated = m_BindlessHeap && m_BindlessHeap->IsValid();
+        serviceDiagnostics.BindlessCapacity = serviceDiagnostics.BindlessHeapCreated
+            ? m_BindlessHeap->GetCapacity()
+            : 0u;
+        if (!serviceDiagnostics.BindlessHeapCreated)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Vulkan bindless heap creation failed; promoted Vulkan device remains non-operational.");
+            diagnostics.Status = VulkanBootstrapStatus::CreatedSwapchain;
+            PublishBootstrapDiagnostics(diagnostics);
+            serviceDiagnostics.Status = VulkanServiceBootstrapStatus::FailedBindlessHeapCreation;
+            serviceDiagnostics.PublicServicesRemainFailClosed = !m_Operational;
+            PublishServiceDiagnostics(serviceDiagnostics);
+            Shutdown();
+            return;
+        }
+
+        const VkDescriptorSetLayout bindlessLayout = m_BindlessHeap->GetLayout();
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1u;
+        pipelineLayoutInfo.pSetLayouts = &bindlessLayout;
+
+        result = vkCreatePipelineLayout(m_Device, &pipelineLayoutInfo, nullptr, &m_GlobalPipelineLayout);
+        serviceDiagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        serviceDiagnostics.GlobalPipelineLayoutCreated = result == VK_SUCCESS &&
+                                                         m_GlobalPipelineLayout != VK_NULL_HANDLE;
+        if (!serviceDiagnostics.GlobalPipelineLayoutCreated)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Vulkan global pipeline layout creation failed; promoted Vulkan device remains non-operational.");
+            diagnostics.Status = VulkanBootstrapStatus::CreatedSwapchain;
+            PublishBootstrapDiagnostics(diagnostics);
+            serviceDiagnostics.Status = VulkanServiceBootstrapStatus::FailedGlobalPipelineLayoutCreation;
+            serviceDiagnostics.PublicServicesRemainFailClosed = !m_Operational;
+            PublishServiceDiagnostics(serviceDiagnostics);
+            Shutdown();
+            return;
+        }
+
+        VulkanTransferQueue::Config transferConfig{};
+        transferConfig.Device = m_Device;
+        transferConfig.Vma = m_Vma;
+        transferConfig.Queue = m_TransferVkQueue;
+        transferConfig.QueueFamily = m_TransferFamily;
+        m_TransferQueue = std::make_unique<VulkanTransferQueue>(transferConfig);
+        serviceDiagnostics.TransferQueueCreated = m_TransferQueue && m_TransferQueue->IsValid();
+        if (!serviceDiagnostics.TransferQueueCreated)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] Vulkan transfer queue creation failed; promoted Vulkan device remains non-operational.");
+            diagnostics.Status = VulkanBootstrapStatus::CreatedSwapchain;
+            PublishBootstrapDiagnostics(diagnostics);
+            serviceDiagnostics.Status = VulkanServiceBootstrapStatus::FailedTransferQueueCreation;
+            serviceDiagnostics.PublicServicesRemainFailClosed = !m_Operational;
+            PublishServiceDiagnostics(serviceDiagnostics);
+            Shutdown();
+            return;
+        }
+        m_TransferQueue->m_Buffers = &m_Buffers;
+        m_TransferQueue->m_Images = &m_Images;
+
+        for (std::uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
+        {
+            m_CmdContexts[frameSlot].Bind(m_Device,
+                                          m_Frames[frameSlot].CmdBuffer,
+                                          m_GlobalPipelineLayout,
+                                          m_BindlessHeap->GetSet(),
+                                          &m_Buffers,
+                                          &m_Images,
+                                          &m_Pipelines);
+            ++serviceDiagnostics.CommandContextRebindCount;
+        }
+        serviceDiagnostics.CommandContextsRebound =
+            serviceDiagnostics.CommandContextRebindCount == kMaxFramesInFlight;
+        serviceDiagnostics.PublicServicesRemainFailClosed = !m_Operational;
+        serviceDiagnostics.Status = VulkanServiceBootstrapStatus::Ready;
+        PublishServiceDiagnostics(serviceDiagnostics);
+
         diagnostics.Status = VulkanBootstrapStatus::RegisteredSwapchainImages;
         PublishBootstrapDiagnostics(diagnostics);
 
-        Core::Log::Warn("[VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, and swapchain image/view/handle state; pipeline, bindless, transfer, presentation, and resize reconciliation remain incomplete, so device remains non-operational.");
+        Core::Log::Warn("[VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; concrete pipelines, presentation, resize, and fallback reconciliation remain incomplete, so device remains non-operational.");
         return;
     }
 
     Core::Log::Error("[VulkanDevice::Initialize] No suitable Vulkan physical device with graphics/present queues and swapchain support was found.");
+    serviceDiagnostics.Status = VulkanServiceBootstrapStatus::SkippedNoBootstrap;
+    PublishServiceDiagnostics(serviceDiagnostics);
     fail(VulkanBootstrapStatus::FailedNoSuitablePhysicalDevice, VK_ERROR_INITIALIZATION_FAILED);
 }
 

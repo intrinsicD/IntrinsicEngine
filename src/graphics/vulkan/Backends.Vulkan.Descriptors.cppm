@@ -23,6 +23,7 @@ namespace Extrinsic::Backends::Vulkan
         explicit VulkanBindlessHeap(VkDevice device, uint32_t capacity = kBindlessCapacity);
         ~VulkanBindlessHeap() override;
 
+        [[nodiscard]] bool IsValid() const noexcept;
         void SetDefault(VkImageView view, VkSampler sampler);
 
         [[nodiscard]] VkDescriptorSetLayout GetLayout() const { return m_Layout; }
