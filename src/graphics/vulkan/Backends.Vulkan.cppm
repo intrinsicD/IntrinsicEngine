@@ -29,6 +29,12 @@ namespace Extrinsic::Backends::Vulkan
         FailedPhysicalDeviceEnumeration = 6,
         FailedNoSuitablePhysicalDevice = 7,
         ProbedPhysicalDevice = 8,
+        CreatedLogicalDevice = 9,
+        FailedLogicalDeviceCreation = 10,
+        CreatedMemoryAllocator = 11,
+        FailedMemoryAllocatorCreation = 12,
+        CreatedPerFrameResources = 13,
+        FailedPerFrameResourceCreation = 14,
     };
 
     export struct VulkanBootstrapDiagnosticsSnapshot
@@ -40,6 +46,11 @@ namespace Extrinsic::Backends::Vulkan
         std::uint32_t GraphicsQueueFamily = 0;
         std::uint32_t PresentQueueFamily = 0;
         std::uint32_t TransferQueueFamily = 0;
+        std::uint32_t FrameCommandPoolCount = 0;
+        std::uint32_t FrameCommandBufferCount = 0;
+        std::uint32_t FrameFenceCount = 0;
+        std::uint32_t FrameImageAcquiredSemaphoreCount = 0;
+        std::uint32_t FrameRenderDoneSemaphoreCount = 0;
         bool NativeWindowAvailable = false;
         bool VolkInitialized = false;
         bool ValidationRequested = false;
@@ -48,9 +59,15 @@ namespace Extrinsic::Backends::Vulkan
         bool InstanceCreated = false;
         bool SurfaceCreated = false;
         bool PhysicalDeviceSelected = false;
+        bool LogicalDeviceCreated = false;
         bool GraphicsQueueFound = false;
         bool PresentQueueFound = false;
         bool TransferQueueFound = false;
+        bool GraphicsQueueAcquired = false;
+        bool PresentQueueAcquired = false;
+        bool TransferQueueAcquired = false;
+        bool MemoryAllocatorCreated = false;
+        bool PerFrameResourcesCreated = false;
         bool SwapchainExtensionSupported = false;
         bool SwapchainSurfaceSupported = false;
     };

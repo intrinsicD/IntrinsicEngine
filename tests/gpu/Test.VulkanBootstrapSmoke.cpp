@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <memory>
 
 import Extrinsic.Backends.Vulkan;
@@ -9,7 +10,7 @@ import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Device;
 
-TEST(VulkanBootstrapSmoke, InitializeProbesPhysicalDeviceOrFailsCleanly)
+TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
@@ -40,7 +41,7 @@ TEST(VulkanBootstrapSmoke, InitializeProbesPhysicalDeviceOrFailsCleanly)
 
     device->Initialize(*window, renderConfig);
     EXPECT_FALSE(device->IsOperational())
-        << "phase-1 bootstrap must not mark Vulkan operational before logical device/swapchain/resource reconciliation";
+        << "phase-1 bootstrap must not mark Vulkan operational before swapchain/resource reconciliation";
 
     const Extrinsic::Backends::Vulkan::VulkanBootstrapDiagnosticsSnapshot diagnostics =
         Extrinsic::Backends::Vulkan::GetVulkanBootstrapDiagnosticsSnapshot();
@@ -49,9 +50,82 @@ TEST(VulkanBootstrapSmoke, InitializeProbesPhysicalDeviceOrFailsCleanly)
     EXPECT_TRUE(diagnostics.VolkInitialized)
         << "with a GLFW native window, bootstrap should reach the Vulkan loader before any clean failure";
 
+    const std::uint32_t expectedFramesInFlight = device->GetFramesInFlight();
+
     switch (diagnostics.Status)
     {
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedPerFrameResources:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_TRUE(diagnostics.PerFrameResourcesCreated);
+        EXPECT_EQ(diagnostics.FrameCommandPoolCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameCommandBufferCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameFenceCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameImageAcquiredSemaphoreCount, expectedFramesInFlight);
+        EXPECT_EQ(diagnostics.FrameRenderDoneSemaphoreCount, expectedFramesInFlight);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
+        break;
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedMemoryAllocator:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
+        break;
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedLogicalDevice:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
+        break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::ProbedPhysicalDevice:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_FALSE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_FALSE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_FALSE(diagnostics.PresentQueueAcquired);
+        EXPECT_FALSE(diagnostics.TransferQueueAcquired);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
+        break;
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedLogicalDeviceCreation:
         EXPECT_TRUE(diagnostics.InstanceCreated);
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
@@ -60,22 +134,80 @@ TEST(VulkanBootstrapSmoke, InitializeProbesPhysicalDeviceOrFailsCleanly)
         EXPECT_TRUE(diagnostics.TransferQueueFound);
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
         EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
-        EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
+        if (diagnostics.LogicalDeviceCreated)
+        {
+            EXPECT_FALSE(diagnostics.GraphicsQueueAcquired &&
+                         diagnostics.PresentQueueAcquired &&
+                         diagnostics.TransferQueueAcquired);
+        }
+        EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
+        break;
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedMemoryAllocatorCreation:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
+        EXPECT_EQ(diagnostics.FrameCommandPoolCount, 0u);
+        EXPECT_EQ(diagnostics.FrameCommandBufferCount, 0u);
+        EXPECT_EQ(diagnostics.FrameFenceCount, 0u);
+        EXPECT_EQ(diagnostics.FrameImageAcquiredSemaphoreCount, 0u);
+        EXPECT_EQ(diagnostics.FrameRenderDoneSemaphoreCount, 0u);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
+        break;
+    case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedPerFrameResourceCreation:
+        EXPECT_TRUE(diagnostics.InstanceCreated);
+        EXPECT_TRUE(diagnostics.SurfaceCreated);
+        EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
+        EXPECT_LE(diagnostics.FrameCommandPoolCount, expectedFramesInFlight);
+        EXPECT_LE(diagnostics.FrameCommandBufferCount, expectedFramesInFlight);
+        EXPECT_LE(diagnostics.FrameFenceCount, expectedFramesInFlight);
+        EXPECT_LE(diagnostics.FrameImageAcquiredSemaphoreCount, expectedFramesInFlight);
+        EXPECT_LE(diagnostics.FrameRenderDoneSemaphoreCount, expectedFramesInFlight);
+        EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
+        EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
         break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedNoSuitablePhysicalDevice:
         EXPECT_TRUE(diagnostics.InstanceCreated);
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_FALSE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_FALSE(diagnostics.LogicalDeviceCreated);
+        EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
         break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedSurfaceCreation:
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedPhysicalDeviceEnumeration:
         EXPECT_TRUE(diagnostics.InstanceCreated);
         EXPECT_FALSE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_FALSE(diagnostics.LogicalDeviceCreated);
+        EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
         break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedInstanceCreation:
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedRequiredInstanceExtensions:
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedVolkInitialize:
         EXPECT_FALSE(diagnostics.PhysicalDeviceSelected);
+        EXPECT_FALSE(diagnostics.LogicalDeviceCreated);
+        EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
+        EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
         break;
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::NotStarted:
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::SkippedNoNativeWindow:

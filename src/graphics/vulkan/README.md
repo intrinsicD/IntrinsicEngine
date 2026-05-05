@@ -4,11 +4,14 @@ Promoted Vulkan 1.3 `IDevice` backend surface. Exports
 `Extrinsic.Backends.Vulkan` with the `CreateVulkanDevice()` factory. The current
 promoted lifecycle symbols are concrete and fail closed: with a native GLFW
 window, `Initialize()` now performs phase-1 Vulkan bootstrap by initializing
-volk, creating a `VkInstance`, creating a window surface, and probing for a
-surface-capable physical device/queue-family/swapchain-support tuple. It still
-leaves the device non-operational until logical-device, swapchain, resource,
-pipeline, bindless, and transfer bring-up are reconciled; `BeginFrame()` returns
-`false` instead of fabricating a frame. Full execution requires a surface-capable
+volk, creating a `VkInstance`, creating a window surface, probing for a
+surface-capable physical device/queue-family/swapchain-support tuple, creating a
+logical device with `VK_KHR_swapchain`, loading device-level volk entry points,
+acquiring graphics/present/transfer `VkQueue` handles, and creating a VMA
+allocator, then allocating per-frame command pools, primary command buffers,
+fences, and acquire/render semaphores. It still leaves the device non-operational
+until swapchain, resource, pipeline, bindless, and transfer bring-up are
+reconciled; `BeginFrame()` returns `false` instead of fabricating a frame. Full execution requires a surface-capable
 physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
 (PARTIALLY_BOUND + UPDATE_AFTER_BIND), and dynamic rendering
 (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
@@ -25,16 +28,19 @@ physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
   `BeginFrame`, `EndFrame`, `Present`, `Resize`, backbuffer extent/handle access,
   present-mode selection, and graphics-context lookup) are defined in
   `Backends.Vulkan.Device.cpp`.
-- `Initialize()` performs only the phase-1 bootstrap/probe listed above. It keeps
-  `IsOperational() == false`; renderers must continue to gate GPU command
+- `Initialize()` performs only the phase-1 bootstrap/probe plus logical-device,
+  queue, allocator, and per-frame command/sync acquisition listed above. It keeps `IsOperational() == false`;
+  renderers must continue to gate GPU command
   recording on `IDevice::IsOperational()`. If the supplied window has no native
   GLFW handle (for example the default CPU/null path), bootstrap is skipped
   without creating Vulkan handles.
 - `GetVulkanBootstrapDiagnosticsSnapshot()` reports the most recent bootstrap
   attempt as backend-specific CPU diagnostics: status, last Vulkan result code,
   whether a native window/volk/validation/instance/surface/device probe was
-  reached, queue-family indices, and swapchain extension/surface support. The
-  snapshot avoids Vulkan-native types and is not an RHI/renderer branching seam;
+  reached, queue-family indices, swapchain extension/surface support, logical
+  device creation, graphics/present/transfer queue acquisition, and VMA allocator
+  creation, plus per-frame command-pool/command-buffer/fence/semaphore counts.
+  The snapshot avoids Vulkan-native types and is not an RHI/renderer branching seam;
   renderer/runtime code must continue to use `IDevice::IsOperational()`.
 - Runtime now has a backend-neutral operational-transition seam for future
   Vulkan bring-up: when a device moves from non-operational to operational,
@@ -95,19 +101,22 @@ physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
   rejection, and transfer-to-shader-read layout transitions that update tracked
   layout only after one-shot submission succeeds. Pipeline creation still returns
   invalid handles until shader/pipeline construction is wired.
-- `Shutdown()` waits idle, flushes deferred deletes, and drains any still-live
-  buffer, texture, sampler, and pipeline pool entries so partial bring-up slices
-  do not leak backend resources when callers omit explicit per-resource destroys.
+- `Shutdown()` waits idle, flushes deferred deletes, drains any still-live buffer,
+  texture, sampler, and pipeline pool entries, destroys swapchain/global objects,
+  destroys per-frame command/sync resources, then tears down VMA/device/surface/
+  instance state so partial bring-up slices do not leak backend resources when
+  callers omit explicit per-resource destroys.
 - Completing real Vulkan execution remains in `GRAPHICS-018`: phase-1
-  instance/surface/physical-device probing is present, but logical device,
-  swapchain images, per-frame command buffers/sync, concrete resource
-  creation/upload, pipeline creation, and presentation diagnostics still need to
-  land before `IsOperational()` can become true. The opt-in
+  instance/surface/physical-device probing and logical-device/queue/allocator/
+  per-frame resource acquisition are present, but swapchain images, concrete
+  resource creation/upload, pipeline creation, and presentation diagnostics still
+  need to land before `IsOperational()` can become true. The opt-in
   `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies that phase-1
-  bootstrap either probes a surface-capable device or fails/skips cleanly on
-  unsupported hosts. The completed renderer reset seam removes one prior blocker,
-  but Vulkan may not report operational until fallback bindless/transfer behavior
-  and real backend resources are reconciled behind the same RHI interfaces.
+  bootstrap either creates per-frame command/sync-ready device state or
+  fails/skips cleanly on unsupported hosts. The completed renderer reset seam removes one
+  prior blocker, but Vulkan may not report operational until fallback
+  bindless/transfer behavior and real backend resources are reconciled behind
+  the same RHI interfaces.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 

@@ -178,6 +178,81 @@ namespace
         return true;
     }
 
+    [[nodiscard]] std::vector<std::uint32_t> UniqueQueueFamilies(const QueueFamilyProbe& queueProbe)
+    {
+        std::vector<std::uint32_t> families;
+        const auto addUnique = [&families](const std::uint32_t family)
+        {
+            for (const std::uint32_t existing : families)
+            {
+                if (existing == family)
+                    return;
+            }
+            families.push_back(family);
+        };
+
+        if (queueProbe.GraphicsFound)
+            addUnique(queueProbe.Graphics);
+        if (queueProbe.PresentFound)
+            addUnique(queueProbe.Present);
+        if (queueProbe.TransferFound)
+            addUnique(queueProbe.Transfer);
+        return families;
+    }
+
+    [[nodiscard]] VkResult CreateBootstrapLogicalDevice(VkPhysicalDevice physicalDevice,
+                                                        const QueueFamilyProbe& queueProbe,
+                                                        VkDevice* outDevice,
+                                                        bool* outSamplerAnisotropySupported)
+    {
+        if (outDevice == nullptr || physicalDevice == VK_NULL_HANDLE)
+            return VK_ERROR_INITIALIZATION_FAILED;
+
+        *outDevice = VK_NULL_HANDLE;
+        if (outSamplerAnisotropySupported != nullptr)
+            *outSamplerAnisotropySupported = false;
+
+        const std::vector<std::uint32_t> uniqueFamilies = UniqueQueueFamilies(queueProbe);
+        if (uniqueFamilies.empty())
+            return VK_ERROR_INITIALIZATION_FAILED;
+
+        constexpr float kQueuePriority = 1.0f;
+        std::vector<VkDeviceQueueCreateInfo> queueInfos;
+        queueInfos.reserve(uniqueFamilies.size());
+        for (const std::uint32_t family : uniqueFamilies)
+        {
+            VkDeviceQueueCreateInfo queueInfo{};
+            queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueInfo.queueFamilyIndex = family;
+            queueInfo.queueCount = 1;
+            queueInfo.pQueuePriorities = &kQueuePriority;
+            queueInfos.push_back(queueInfo);
+        }
+
+        VkPhysicalDeviceFeatures supportedFeatures{};
+        vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
+
+        VkPhysicalDeviceFeatures enabledFeatures{};
+        if (supportedFeatures.samplerAnisotropy == VK_TRUE)
+        {
+            enabledFeatures.samplerAnisotropy = VK_TRUE;
+            if (outSamplerAnisotropySupported != nullptr)
+                *outSamplerAnisotropySupported = true;
+        }
+
+        const char* deviceExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+        VkDeviceCreateInfo deviceInfo{};
+        deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        deviceInfo.queueCreateInfoCount = static_cast<std::uint32_t>(queueInfos.size());
+        deviceInfo.pQueueCreateInfos = queueInfos.data();
+        deviceInfo.enabledExtensionCount = 1u;
+        deviceInfo.ppEnabledExtensionNames = deviceExtensions;
+        deviceInfo.pEnabledFeatures = &enabledFeatures;
+
+        return vkCreateDevice(physicalDevice, &deviceInfo, nullptr, outDevice);
+    }
+
     VKAPI_ATTR VkBool32 VKAPI_CALL BootstrapDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                                                           VkDebugUtilsMessageTypeFlagsEXT,
                                                           const VkDebugUtilsMessengerCallbackDataEXT* data,
@@ -502,9 +577,152 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         diagnostics.TransferQueueFamily = queueProbe.Transfer;
         diagnostics.SwapchainExtensionSupported = swapchainExtensionSupported;
         diagnostics.SwapchainSurfaceSupported = swapchainSurfaceSupported;
+
+        bool samplerAnisotropySupported = false;
+        result = CreateBootstrapLogicalDevice(m_PhysDevice,
+                                              queueProbe,
+                                              &m_Device,
+                                              &samplerAnisotropySupported);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        diagnostics.LogicalDeviceCreated = result == VK_SUCCESS && m_Device != VK_NULL_HANDLE;
+        if (!diagnostics.LogicalDeviceCreated)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vkCreateDevice failed for the selected Vulkan physical device; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedLogicalDeviceCreation, result);
+            return;
+        }
+
+        volkLoadDevice(m_Device);
+        m_SamplerAnisotropySupported = samplerAnisotropySupported;
+
+        vkGetDeviceQueue(m_Device, m_GraphicsFamily, 0, &m_GraphicsQueue);
+        vkGetDeviceQueue(m_Device, m_PresentFamily, 0, &m_PresentQueue);
+        vkGetDeviceQueue(m_Device, m_TransferFamily, 0, &m_TransferVkQueue);
+
+        diagnostics.GraphicsQueueAcquired = m_GraphicsQueue != VK_NULL_HANDLE;
+        diagnostics.PresentQueueAcquired = m_PresentQueue != VK_NULL_HANDLE;
+        diagnostics.TransferQueueAcquired = m_TransferVkQueue != VK_NULL_HANDLE;
+        if (!diagnostics.GraphicsQueueAcquired || !diagnostics.PresentQueueAcquired ||
+            !diagnostics.TransferQueueAcquired)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vkGetDeviceQueue did not return all required queues; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedLogicalDeviceCreation, VK_ERROR_INITIALIZATION_FAILED);
+            return;
+        }
+
+        VmaVulkanFunctions vmaFunctions{};
+        vmaFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+        vmaFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+
+        VmaAllocatorCreateInfo allocatorInfo{};
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+        allocatorInfo.physicalDevice = m_PhysDevice;
+        allocatorInfo.device = m_Device;
+        allocatorInfo.instance = m_Instance;
+        allocatorInfo.pVulkanFunctions = &vmaFunctions;
+
+        result = vmaCreateAllocator(&allocatorInfo, &m_Vma);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        diagnostics.MemoryAllocatorCreated = result == VK_SUCCESS && m_Vma != VK_NULL_HANDLE;
+        if (!diagnostics.MemoryAllocatorCreated)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vmaCreateAllocator failed; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedMemoryAllocatorCreation, result);
+            return;
+        }
+
+        for (std::uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
+        {
+            PerFrame& frame = m_Frames[frameSlot];
+
+            VkCommandPoolCreateInfo poolInfo{};
+            poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            poolInfo.queueFamilyIndex = m_GraphicsFamily;
+
+            result = vkCreateCommandPool(m_Device, &poolInfo, nullptr, &frame.CmdPool);
+            diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+            if (result != VK_SUCCESS || frame.CmdPool == VK_NULL_HANDLE)
+            {
+                Core::Log::Error("[VulkanDevice::Initialize] vkCreateCommandPool failed for per-frame Vulkan resources; promoted Vulkan device remains non-operational.");
+                fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                return;
+            }
+            ++diagnostics.FrameCommandPoolCount;
+
+            VkCommandBufferAllocateInfo commandBufferInfo{};
+            commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            commandBufferInfo.commandPool = frame.CmdPool;
+            commandBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            commandBufferInfo.commandBufferCount = 1u;
+
+            result = vkAllocateCommandBuffers(m_Device, &commandBufferInfo, &frame.CmdBuffer);
+            diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+            if (result != VK_SUCCESS || frame.CmdBuffer == VK_NULL_HANDLE)
+            {
+                Core::Log::Error("[VulkanDevice::Initialize] vkAllocateCommandBuffers failed for per-frame Vulkan resources; promoted Vulkan device remains non-operational.");
+                fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                return;
+            }
+            ++diagnostics.FrameCommandBufferCount;
+
+            VkFenceCreateInfo fenceInfo{};
+            fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+            result = vkCreateFence(m_Device, &fenceInfo, nullptr, &frame.Fence);
+            diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+            if (result != VK_SUCCESS || frame.Fence == VK_NULL_HANDLE)
+            {
+                Core::Log::Error("[VulkanDevice::Initialize] vkCreateFence failed for per-frame Vulkan resources; promoted Vulkan device remains non-operational.");
+                fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                return;
+            }
+            ++diagnostics.FrameFenceCount;
+
+            VkSemaphoreCreateInfo semaphoreInfo{};
+            semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+            result = vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &frame.ImageAcquired);
+            diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+            if (result != VK_SUCCESS || frame.ImageAcquired == VK_NULL_HANDLE)
+            {
+                Core::Log::Error("[VulkanDevice::Initialize] vkCreateSemaphore failed for image-acquired per-frame Vulkan resources; promoted Vulkan device remains non-operational.");
+                fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                return;
+            }
+            ++diagnostics.FrameImageAcquiredSemaphoreCount;
+
+            result = vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &frame.RenderDone);
+            diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+            if (result != VK_SUCCESS || frame.RenderDone == VK_NULL_HANDLE)
+            {
+                Core::Log::Error("[VulkanDevice::Initialize] vkCreateSemaphore failed for render-done per-frame Vulkan resources; promoted Vulkan device remains non-operational.");
+                fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                return;
+            }
+            ++diagnostics.FrameRenderDoneSemaphoreCount;
+
+            m_CmdContexts[frameSlot].Bind(m_Device,
+                                          frame.CmdBuffer,
+                                          m_GlobalPipelineLayout,
+                                          VK_NULL_HANDLE,
+                                          &m_Buffers,
+                                          &m_Images,
+                                          &m_Pipelines);
+        }
+
+        diagnostics.PerFrameResourcesCreated =
+            diagnostics.FrameCommandPoolCount == kMaxFramesInFlight &&
+            diagnostics.FrameCommandBufferCount == kMaxFramesInFlight &&
+            diagnostics.FrameFenceCount == kMaxFramesInFlight &&
+            diagnostics.FrameImageAcquiredSemaphoreCount == kMaxFramesInFlight &&
+            diagnostics.FrameRenderDoneSemaphoreCount == kMaxFramesInFlight;
+
+        diagnostics.Status = VulkanBootstrapStatus::CreatedPerFrameResources;
         PublishBootstrapDiagnostics(diagnostics);
 
-        Core::Log::Warn("[VulkanDevice::Initialize] Phase-1 Vulkan bootstrap probed a surface-capable physical device; logical device/swapchain bring-up is still incomplete, so device remains non-operational.");
+        Core::Log::Warn("[VulkanDevice::Initialize] Phase-1 Vulkan bootstrap created a logical device, acquired graphics/present/transfer queues, created a VMA allocator, and allocated per-frame command/sync resources; swapchain/resource bring-up is still incomplete, so device remains non-operational.");
         return;
     }
 
@@ -597,6 +815,38 @@ void VulkanDevice::Shutdown()
     m_DefaultSamplerHandle = {};
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
     m_SamplerAnisotropySupported = false;
+
+    for (std::uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
+    {
+        PerFrame& frame = m_Frames[frameSlot];
+        if (device != VK_NULL_HANDLE)
+        {
+            if (frame.RenderDone != VK_NULL_HANDLE)
+                vkDestroySemaphore(device, frame.RenderDone, nullptr);
+            if (frame.ImageAcquired != VK_NULL_HANDLE)
+                vkDestroySemaphore(device, frame.ImageAcquired, nullptr);
+            if (frame.Fence != VK_NULL_HANDLE)
+                vkDestroyFence(device, frame.Fence, nullptr);
+            if (frame.CmdPool != VK_NULL_HANDLE)
+                vkDestroyCommandPool(device, frame.CmdPool, nullptr);
+        }
+
+        frame.CmdBuffer = VK_NULL_HANDLE;
+        frame.CmdPool = VK_NULL_HANDLE;
+        frame.Fence = VK_NULL_HANDLE;
+        frame.ImageAcquired = VK_NULL_HANDLE;
+        frame.RenderDone = VK_NULL_HANDLE;
+        frame.DeletionQueue.clear();
+
+        m_CmdContexts[frameSlot].Bind(VK_NULL_HANDLE,
+                                      VK_NULL_HANDLE,
+                                      VK_NULL_HANDLE,
+                                      VK_NULL_HANDLE,
+                                      nullptr,
+                                      nullptr,
+                                      nullptr);
+    }
+
     if (m_Vma != VK_NULL_HANDLE)
         vmaDestroyAllocator(m_Vma);
     m_Vma = VK_NULL_HANDLE;

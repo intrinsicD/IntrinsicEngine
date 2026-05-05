@@ -69,11 +69,10 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }
 
         // TODO(GRAPHICS-018): complete operational bring-up helper surfaces:
-        // CreateInstance/CreateSurface, physical-device selection, logical
-        // device/queue creation, VMA creation, swapchain creation and image
-        // registration, per-frame resource creation/destruction, global
-        // pipeline layout/default sampler creation, memory type/depth format/
-        // format-support queries, and swapchain recreation helpers.
+        // swapchain creation and image registration, global pipeline
+        // layout/default sampler creation, memory type/depth format/
+        // format-support queries, bindless/transfer reconciliation, and
+        // swapchain recreation helpers.
 
         [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle& frame) const override;
 
@@ -223,8 +222,9 @@ namespace Extrinsic::Backends::Vulkan
         RHI::PresentMode m_PresentMode  = RHI::PresentMode::VSync;
         bool             m_Operational  = false;
         bool             m_ValidationEnabled = false;
-        // GRAPHICS-018 will set this from device feature negotiation. Until
-        // then sampler creation intentionally leaves anisotropy disabled.
+        // Set during logical-device feature negotiation; sampler creation still
+        // remains guarded by the non-operational device state until full
+        // swapchain/resource bring-up lands.
         bool             m_SamplerAnisotropySupported = false;
     };
 }

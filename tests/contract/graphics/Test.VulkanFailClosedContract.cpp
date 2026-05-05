@@ -72,6 +72,17 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     EXPECT_FALSE(diagnostics.InstanceCreated);
     EXPECT_FALSE(diagnostics.SurfaceCreated);
     EXPECT_FALSE(diagnostics.PhysicalDeviceSelected);
+    EXPECT_FALSE(diagnostics.LogicalDeviceCreated);
+    EXPECT_FALSE(diagnostics.GraphicsQueueAcquired);
+    EXPECT_FALSE(diagnostics.PresentQueueAcquired);
+    EXPECT_FALSE(diagnostics.TransferQueueAcquired);
+    EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
+    EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
+    EXPECT_EQ(diagnostics.FrameCommandPoolCount, 0u);
+    EXPECT_EQ(diagnostics.FrameCommandBufferCount, 0u);
+    EXPECT_EQ(diagnostics.FrameFenceCount, 0u);
+    EXPECT_EQ(diagnostics.FrameImageAcquiredSemaphoreCount, 0u);
+    EXPECT_EQ(diagnostics.FrameRenderDoneSemaphoreCount, 0u);
     EXPECT_FALSE(diagnostics.SwapchainSurfaceSupported);
 
     device->Shutdown();
@@ -436,6 +447,18 @@ static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::SkippedNoNativeWindow) == 1u);
 static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::ProbedPhysicalDevice) == 8u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedLogicalDevice) == 9u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedLogicalDeviceCreation) == 10u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedMemoryAllocator) == 11u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedMemoryAllocatorCreation) == 12u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::CreatedPerFrameResources) == 13u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::FailedPerFrameResourceCreation) == 14u);
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGetters)
 {
