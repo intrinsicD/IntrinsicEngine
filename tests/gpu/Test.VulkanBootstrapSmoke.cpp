@@ -52,6 +52,27 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 
     const std::uint32_t expectedFramesInFlight = device->GetFramesInFlight();
 
+    if (diagnostics.PhysicalDeviceSelected)
+    {
+        EXPECT_TRUE(diagnostics.DescriptorIndexingSupported);
+        EXPECT_TRUE(diagnostics.TimelineSemaphoreSupported);
+        EXPECT_TRUE(diagnostics.DynamicRenderingSupported);
+        EXPECT_TRUE(diagnostics.RequiredDeviceFeaturesSupported);
+    }
+    else
+    {
+        EXPECT_FALSE(diagnostics.DescriptorIndexingEnabled);
+        EXPECT_FALSE(diagnostics.TimelineSemaphoreEnabled);
+        EXPECT_FALSE(diagnostics.DynamicRenderingEnabled);
+    }
+
+    if (diagnostics.LogicalDeviceCreated)
+    {
+        EXPECT_TRUE(diagnostics.DescriptorIndexingEnabled);
+        EXPECT_TRUE(diagnostics.TimelineSemaphoreEnabled);
+        EXPECT_TRUE(diagnostics.DynamicRenderingEnabled);
+    }
+
     switch (diagnostics.Status)
     {
     case Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages:

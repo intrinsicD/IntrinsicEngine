@@ -51,6 +51,19 @@ namespace
         bool TransferFound = false;
     };
 
+    struct RequiredDeviceFeatureProbe
+    {
+        bool SamplerAnisotropySupported = false;
+        bool DescriptorIndexingSupported = false;
+        bool TimelineSemaphoreSupported = false;
+        bool DynamicRenderingSupported = false;
+
+        [[nodiscard]] bool AllRequiredSupported() const noexcept
+        {
+            return DescriptorIndexingSupported && TimelineSemaphoreSupported && DynamicRenderingSupported;
+        }
+    };
+
     void PublishBootstrapDiagnostics(const VulkanBootstrapDiagnosticsSnapshot& snapshot) noexcept
     {
         std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
@@ -180,6 +193,33 @@ namespace
         return true;
     }
 
+    [[nodiscard]] RequiredDeviceFeatureProbe QueryRequiredDeviceFeatures(VkPhysicalDevice physicalDevice)
+    {
+        RequiredDeviceFeatureProbe probe{};
+        if (physicalDevice == VK_NULL_HANDLE)
+            return probe;
+
+        VkPhysicalDeviceVulkan13Features features13{};
+        features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+
+        VkPhysicalDeviceVulkan12Features features12{};
+        features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        features12.pNext = &features13;
+
+        VkPhysicalDeviceFeatures2 features2{};
+        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        features2.pNext = &features12;
+        vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+
+        probe.SamplerAnisotropySupported = features2.features.samplerAnisotropy == VK_TRUE;
+        probe.DescriptorIndexingSupported =
+            features12.descriptorBindingPartiallyBound == VK_TRUE &&
+            features12.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE;
+        probe.TimelineSemaphoreSupported = features12.timelineSemaphore == VK_TRUE;
+        probe.DynamicRenderingSupported = features13.dynamicRendering == VK_TRUE;
+        return probe;
+    }
+
     [[nodiscard]] VkSurfaceFormatKHR ChooseSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats)
     {
         for (const VkSurfaceFormatKHR& format : formats)
@@ -247,6 +287,7 @@ namespace
 
     [[nodiscard]] VkResult CreateBootstrapLogicalDevice(VkPhysicalDevice physicalDevice,
                                                         const QueueFamilyProbe& queueProbe,
+                                                        const RequiredDeviceFeatureProbe& featureProbe,
                                                         VkDevice* outDevice,
                                                         bool* outSamplerAnisotropySupported)
     {
@@ -274,13 +315,26 @@ namespace
             queueInfos.push_back(queueInfo);
         }
 
-        VkPhysicalDeviceFeatures supportedFeatures{};
-        vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
+        if (!featureProbe.AllRequiredSupported())
+            return VK_ERROR_FEATURE_NOT_PRESENT;
 
-        VkPhysicalDeviceFeatures enabledFeatures{};
-        if (supportedFeatures.samplerAnisotropy == VK_TRUE)
+        VkPhysicalDeviceVulkan13Features enabled13{};
+        enabled13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+        enabled13.dynamicRendering = VK_TRUE;
+
+        VkPhysicalDeviceVulkan12Features enabled12{};
+        enabled12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        enabled12.pNext = &enabled13;
+        enabled12.descriptorBindingPartiallyBound = VK_TRUE;
+        enabled12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+        enabled12.timelineSemaphore = VK_TRUE;
+
+        VkPhysicalDeviceFeatures2 enabledFeatures{};
+        enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        enabledFeatures.pNext = &enabled12;
+        if (featureProbe.SamplerAnisotropySupported)
         {
-            enabledFeatures.samplerAnisotropy = VK_TRUE;
+            enabledFeatures.features.samplerAnisotropy = VK_TRUE;
             if (outSamplerAnisotropySupported != nullptr)
                 *outSamplerAnisotropySupported = true;
         }
@@ -293,7 +347,7 @@ namespace
         deviceInfo.pQueueCreateInfos = queueInfos.data();
         deviceInfo.enabledExtensionCount = 1u;
         deviceInfo.ppEnabledExtensionNames = deviceExtensions;
-        deviceInfo.pEnabledFeatures = &enabledFeatures;
+        deviceInfo.pNext = &enabledFeatures;
 
         return vkCreateDevice(physicalDevice, &deviceInfo, nullptr, outDevice);
     }
@@ -601,8 +655,9 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         const bool swapchainExtensionSupported = HasDeviceExtension(physicalDevice, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         const bool swapchainSurfaceSupported = swapchainExtensionSupported &&
                                                HasSwapchainSurfaceSupport(physicalDevice, m_Surface);
+        const RequiredDeviceFeatureProbe featureProbe = QueryRequiredDeviceFeatures(physicalDevice);
         if (!queueProbe.GraphicsFound || !queueProbe.PresentFound || !queueProbe.TransferFound ||
-            !swapchainSurfaceSupported)
+            !swapchainSurfaceSupported || !featureProbe.AllRequiredSupported())
         {
             continue;
         }
@@ -622,10 +677,15 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         diagnostics.TransferQueueFamily = queueProbe.Transfer;
         diagnostics.SwapchainExtensionSupported = swapchainExtensionSupported;
         diagnostics.SwapchainSurfaceSupported = swapchainSurfaceSupported;
+        diagnostics.DescriptorIndexingSupported = featureProbe.DescriptorIndexingSupported;
+        diagnostics.TimelineSemaphoreSupported = featureProbe.TimelineSemaphoreSupported;
+        diagnostics.DynamicRenderingSupported = featureProbe.DynamicRenderingSupported;
+        diagnostics.RequiredDeviceFeaturesSupported = featureProbe.AllRequiredSupported();
 
         bool samplerAnisotropySupported = false;
         result = CreateBootstrapLogicalDevice(m_PhysDevice,
                                               queueProbe,
+                                               featureProbe,
                                               &m_Device,
                                               &samplerAnisotropySupported);
         diagnostics.LastVkResult = static_cast<std::int32_t>(result);
@@ -639,6 +699,9 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
 
         volkLoadDevice(m_Device);
         m_SamplerAnisotropySupported = samplerAnisotropySupported;
+        diagnostics.DescriptorIndexingEnabled = true;
+        diagnostics.TimelineSemaphoreEnabled = true;
+        diagnostics.DynamicRenderingEnabled = true;
 
         vkGetDeviceQueue(m_Device, m_GraphicsFamily, 0, &m_GraphicsQueue);
         vkGetDeviceQueue(m_Device, m_PresentFamily, 0, &m_PresentQueue);

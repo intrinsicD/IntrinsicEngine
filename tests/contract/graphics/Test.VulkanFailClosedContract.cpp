@@ -88,6 +88,13 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     EXPECT_FALSE(diagnostics.SwapchainImagesEnumerated);
     EXPECT_FALSE(diagnostics.SwapchainImageViewsCreated);
     EXPECT_FALSE(diagnostics.SwapchainImagesRegistered);
+    EXPECT_FALSE(diagnostics.DescriptorIndexingSupported);
+    EXPECT_FALSE(diagnostics.TimelineSemaphoreSupported);
+    EXPECT_FALSE(diagnostics.DynamicRenderingSupported);
+    EXPECT_FALSE(diagnostics.RequiredDeviceFeaturesSupported);
+    EXPECT_FALSE(diagnostics.DescriptorIndexingEnabled);
+    EXPECT_FALSE(diagnostics.TimelineSemaphoreEnabled);
+    EXPECT_FALSE(diagnostics.DynamicRenderingEnabled);
     EXPECT_EQ(diagnostics.SwapchainImageCount, 0u);
     EXPECT_EQ(diagnostics.SwapchainImageViewCount, 0u);
     EXPECT_EQ(diagnostics.SwapchainImageHandleCount, 0u);

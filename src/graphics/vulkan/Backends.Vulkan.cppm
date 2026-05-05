@@ -84,6 +84,13 @@ namespace Extrinsic::Backends::Vulkan
         bool SwapchainImagesEnumerated = false;
         bool SwapchainImageViewsCreated = false;
         bool SwapchainImagesRegistered = false;
+        bool DescriptorIndexingSupported = false;
+        bool TimelineSemaphoreSupported = false;
+        bool DynamicRenderingSupported = false;
+        bool RequiredDeviceFeaturesSupported = false;
+        bool DescriptorIndexingEnabled = false;
+        bool TimelineSemaphoreEnabled = false;
+        bool DynamicRenderingEnabled = false;
     };
 
     export [[nodiscard]] VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept;
