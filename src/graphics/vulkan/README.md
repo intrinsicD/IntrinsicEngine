@@ -72,7 +72,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   `GetTransferQueue()` now route through the same predicate as
   `IDevice::IsOperational()`: live logical-device/swapchain/per-frame/service
   state must be present, and operational safety blockers for canonical renderer
-  frame execution plus resize/device-loss recovery must be cleared. The guarded
+  resource/descriptor/pass execution must be cleared. The guarded
   bootstrap currently satisfies the live-prerequisite half only, so the public
   accessors still return fail-closed fallback services even when the service
   snapshot reports `Ready`.
@@ -146,10 +146,15 @@ available through the Vulkan 1.2/1.3 feature chain.
   empty `vkAcquireNextImageKHR` -> command-buffer submit -> `vkQueuePresentKHR`
   path while `IsOperational()` remains false; those calls populate `Acquired`,
   `Submitted`, `Presented`, `Suboptimal`, `OutOfDate`, and failure variants.
-  `Resize` recreation and device-loss recovery still remain before Vulkan can be
-  marked operational. The snapshot also carries the last frame/image indices,
-  requested resize extent, availability booleans, last Vulkan result code, and
-  the same process-monotonic lifecycle counters exposed by
+  `Resize()` now records zero-sized requests as pending recreation, can recreate
+  the swapchain with safe idle synchronization and old image-view/handle
+  retirement when a nonzero extent is available, and reports `Recreated` or
+  `FailedRecreate`. Device-lost results from acquire, submit, present, recreate,
+  one-shot uploads, and resource/pipeline creation move the backend back to a
+  fail-closed state and surface `DeviceLost` in lifecycle diagnostics. The
+  snapshot also carries the last frame/image indices, requested resize extent,
+  availability booleans, pending-resize/device-lost flags, last Vulkan result
+  code, and the same process-monotonic lifecycle counters exposed by
   `FallbackDiagnosticsSnapshot`. The snapshot is backend-specific diagnostics
   only; it does not expose Vulkan-native types and must not become a renderer/RHI
   branching seam.

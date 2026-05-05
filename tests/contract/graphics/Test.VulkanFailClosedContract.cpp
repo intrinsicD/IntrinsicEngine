@@ -390,6 +390,8 @@ TEST(VulkanFailClosedContract, FrameLifecycleDiagnosticsSnapshotReportsFailClose
     EXPECT_FALSE(after.DeviceOperational);
     EXPECT_FALSE(after.SwapchainAvailable);
     EXPECT_FALSE(after.SwapchainImagesAvailable);
+    EXPECT_FALSE(after.DeviceLost);
+    EXPECT_TRUE(after.ResizePending);
 
     EXPECT_EQ(after.BeginFrameAttempts - before.BeginFrameAttempts, 1u);
     EXPECT_EQ(after.EndFrameAttempts - before.EndFrameAttempts, 1u);

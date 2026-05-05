@@ -715,10 +715,9 @@ bool VulkanDevice::HasOperationalSafetyPrerequisites() const noexcept
 {
     // GRAPHICS-018 operational promotion is intentionally stricter than guarded
     // bootstrap readiness. The live Vulkan objects above are necessary but not
-    // sufficient: canonical renderer frame execution, operational swapchain
-    // resize/recreation, and device-loss recovery must all be reconciled before
-    // runtime/renderer code may observe IsOperational() and therefore receive
-    // the live public services.
+    // sufficient: canonical renderer resource, descriptor, and pass execution
+    // prerequisites must still be reconciled before runtime/renderer code may
+    // observe IsOperational() and therefore receive the live public services.
     return false;
 }
 
@@ -2148,6 +2147,10 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
         m_HasPendingResize = true;
         m_PendingResizeExtent = m_SwapchainExtent;
     }
+    else if (presentStatus == VulkanFramePresentStatus::FailedPresent)
+    {
+        NoteDeviceLostIfNeeded(result);
+    }
 
     MutateFrameLifecycleDiagnostics([this, &frame, result, presentStatus](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
     {
@@ -2164,7 +2167,6 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
 
     if (presentStatus == VulkanFramePresentStatus::FailedPresent)
     {
-        NoteDeviceLostIfNeeded(result);
         Core::Log::Error("[VulkanDevice::Present] vkQueuePresentKHR failed for guarded Vulkan frame");
     }
 }
@@ -3310,8 +3312,12 @@ VkCommandBuffer VulkanDevice::BeginOneShot()
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    if (vkBeginCommandBuffer(cmd, &beginInfo) != VK_SUCCESS)
+    VkResult result = vkBeginCommandBuffer(cmd, &beginInfo);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
         return VK_NULL_HANDLE;
+    }
     return cmd;
 }
 
@@ -3320,8 +3326,12 @@ bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
     if (!m_Operational || m_Device == VK_NULL_HANDLE || cmd == VK_NULL_HANDLE)
         return false;
 
-    if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
+    VkResult result = vkEndCommandBuffer(cmd);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
         return false;
+    }
 
     VkSubmitInfo submit{};
     submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -3330,10 +3340,18 @@ bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
 
     if (m_GraphicsQueue != VK_NULL_HANDLE)
     {
-        if (vkQueueSubmit(m_GraphicsQueue, 1, &submit, VK_NULL_HANDLE) != VK_SUCCESS)
+        result = vkQueueSubmit(m_GraphicsQueue, 1, &submit, VK_NULL_HANDLE);
+        if (result != VK_SUCCESS)
+        {
+            NoteDeviceLostIfNeeded(result);
             return false;
-        if (vkQueueWaitIdle(m_GraphicsQueue) != VK_SUCCESS)
+        }
+        result = vkQueueWaitIdle(m_GraphicsQueue);
+        if (result != VK_SUCCESS)
+        {
+            NoteDeviceLostIfNeeded(result);
             return false;
+        }
         return true;
     }
     return false;

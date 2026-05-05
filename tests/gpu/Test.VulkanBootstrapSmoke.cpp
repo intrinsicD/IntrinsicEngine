@@ -404,6 +404,39 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
                 << "service-ready bootstrap may skip only for a structured acquire/out-of-date failure";
         }
 
+        device->Resize(0u, diagnostics.SwapchainHeight);
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot zeroResizeDiagnostics =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_EQ(zeroResizeDiagnostics.ResizeStatus,
+                  Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::RecordedPendingRecreate);
+        EXPECT_EQ(zeroResizeDiagnostics.LastRequestedWidth, 0u);
+        EXPECT_EQ(zeroResizeDiagnostics.LastRequestedHeight, diagnostics.SwapchainHeight);
+        EXPECT_TRUE(zeroResizeDiagnostics.ResizePending);
+        EXPECT_FALSE(zeroResizeDiagnostics.DeviceLost);
+        EXPECT_FALSE(zeroResizeDiagnostics.DeviceOperational);
+
+        device->Resize(diagnostics.SwapchainWidth, diagnostics.SwapchainHeight);
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot resizeDiagnostics =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_TRUE(resizeDiagnostics.ResizeStatus ==
+                        Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::Recreated ||
+                    resizeDiagnostics.ResizeStatus ==
+                        Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::FailedRecreate)
+            << "service-ready guarded resize must either recreate the swapchain or report structured failure";
+        EXPECT_EQ(resizeDiagnostics.LastRequestedWidth, diagnostics.SwapchainWidth);
+        EXPECT_EQ(resizeDiagnostics.LastRequestedHeight, diagnostics.SwapchainHeight);
+        EXPECT_FALSE(resizeDiagnostics.DeviceOperational);
+        if (resizeDiagnostics.ResizeStatus == Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::Recreated)
+        {
+            EXPECT_EQ(resizeDiagnostics.LastVkResult, 0);
+            EXPECT_TRUE(resizeDiagnostics.SwapchainAvailable);
+            EXPECT_TRUE(resizeDiagnostics.SwapchainImagesAvailable);
+            EXPECT_FALSE(resizeDiagnostics.ResizePending);
+            const Extrinsic::Platform::Extent2D recreatedExtent = device->GetBackbufferExtent();
+            EXPECT_GT(recreatedExtent.Width, 0);
+            EXPECT_GT(recreatedExtent.Height, 0);
+        }
+
         const std::uint64_t beforeFallbackBindless =
             Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount();
         EXPECT_EQ(device->GetBindlessHeap().AllocateTextureSlot({}, {}),
