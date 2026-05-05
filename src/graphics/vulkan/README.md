@@ -3,15 +3,17 @@
 Promoted Vulkan 1.3 `IDevice` backend surface. Exports
 `Extrinsic.Backends.Vulkan` with the `CreateVulkanDevice()` factory. The current
 promoted lifecycle symbols are concrete and fail closed: with a native GLFW
-window, `Initialize()` now performs phase-1 Vulkan bootstrap by initializing
+window, `Initialize()` now performs guarded Vulkan bootstrap by initializing
 volk, creating a `VkInstance`, creating a window surface, probing for a
 surface-capable physical device/queue-family/swapchain-support tuple, creating a
 logical device with `VK_KHR_swapchain`, loading device-level volk entry points,
-acquiring graphics/present/transfer `VkQueue` handles, and creating a VMA
-allocator, then allocating per-frame command pools, primary command buffers,
-fences, and acquire/render semaphores. It still leaves the device non-operational
-until swapchain, resource, pipeline, bindless, and transfer bring-up are
-reconciled; `BeginFrame()` returns `false` instead of fabricating a frame. Full execution requires a surface-capable
+acquiring graphics/present/transfer `VkQueue` handles, creating a VMA allocator,
+allocating per-frame command pools, primary command buffers, fences, and
+acquire/render semaphores, then creating a guarded swapchain with image views and
+backend-local `RHI::TextureHandle` registrations for the swapchain images. It
+still leaves the device non-operational until pipeline, bindless, transfer,
+presentation, and resize reconciliation land; `BeginFrame()` returns `false`
+instead of fabricating a frame. Full execution requires a surface-capable
 physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
 (PARTIALLY_BOUND + UPDATE_AFTER_BIND), and dynamic rendering
 (`VK_KHR_dynamic_rendering` / Vulkan 1.3 core).
@@ -28,8 +30,8 @@ physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
   `BeginFrame`, `EndFrame`, `Present`, `Resize`, backbuffer extent/handle access,
   present-mode selection, and graphics-context lookup) are defined in
   `Backends.Vulkan.Device.cpp`.
-- `Initialize()` performs only the phase-1 bootstrap/probe plus logical-device,
-  queue, allocator, and per-frame command/sync acquisition listed above. It keeps `IsOperational() == false`;
+- `Initialize()` performs only the guarded bootstrap/probe plus logical-device,
+  queue, allocator, per-frame command/sync acquisition, and swapchain image/view/handle registration listed above. It keeps `IsOperational() == false`;
   renderers must continue to gate GPU command
   recording on `IDevice::IsOperational()`. If the supplied window has no native
   GLFW handle (for example the default CPU/null path), bootstrap is skipped
@@ -38,8 +40,9 @@ physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
   attempt as backend-specific CPU diagnostics: status, last Vulkan result code,
   whether a native window/volk/validation/instance/surface/device probe was
   reached, queue-family indices, swapchain extension/surface support, logical
-  device creation, graphics/present/transfer queue acquisition, and VMA allocator
-  creation, plus per-frame command-pool/command-buffer/fence/semaphore counts.
+  device creation, graphics/present/transfer queue acquisition, VMA allocator
+  creation, per-frame command-pool/command-buffer/fence/semaphore counts, and
+  swapchain creation/image enumeration/image-view/handle-registration counts and extent.
   The snapshot avoids Vulkan-native types and is not an RHI/renderer branching seam;
   renderer/runtime code must continue to use `IDevice::IsOperational()`.
 - Runtime now has a backend-neutral operational-transition seam for future
@@ -47,7 +50,7 @@ physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
   runtime waits idle and calls `IRenderer::RebuildOperationalResources()` to
   rebuild renderer-owned material, `GpuWorld`, culling, and depth-prepass state
   through RHI managers. Vulkan still remains non-operational in this directory;
-  no swapchain, surface, or presentation path is enabled by that seam.
+  no presentation or operational frame path is enabled by that seam.
 - Non-operational instances still return valid service references for
   `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
   not allocate GPU slots or upload data; they return invalid indices/tokens and
@@ -106,13 +109,13 @@ physical device with `VK_KHR_timeline_semaphore`, `VK_EXT_descriptor_indexing`
   destroys per-frame command/sync resources, then tears down VMA/device/surface/
   instance state so partial bring-up slices do not leak backend resources when
   callers omit explicit per-resource destroys.
-- Completing real Vulkan execution remains in `GRAPHICS-018`: phase-1
-  instance/surface/physical-device probing and logical-device/queue/allocator/
-  per-frame resource acquisition are present, but swapchain images, concrete
-  resource creation/upload, pipeline creation, and presentation diagnostics still
-  need to land before `IsOperational()` can become true. The opt-in
-  `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies that phase-1
-  bootstrap either creates per-frame command/sync-ready device state or
+- Completing real Vulkan execution remains in `GRAPHICS-018`: instance/surface/
+  physical-device probing, logical-device/queue/allocator/per-frame resource
+  acquisition, and guarded swapchain image/view/handle registration are present,
+  but concrete operational resource services, pipeline creation, presentation,
+  resize, and device-loss diagnostics still need to land before `IsOperational()`
+  can become true. The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan`
+  and verifies that bootstrap either creates swapchain image/view/handle state or
   fails/skips cleanly on unsupported hosts. The completed renderer reset seam removes one
   prior blocker, but Vulkan may not report operational until fallback
   bindless/transfer behavior and real backend resources are reconciled behind
