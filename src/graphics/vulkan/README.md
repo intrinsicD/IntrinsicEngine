@@ -133,6 +133,12 @@ available through the Vulkan 1.2/1.3 feature chain.
   and failure variants) before `IsOperational()` can become true. The snapshot is
   backend-specific diagnostics only; it does not expose Vulkan-native types and
   must not become a renderer/RHI branching seam.
+- `VulkanCommandContext` is fail-closed before operational bring-up: unbound or
+  not-begun command recording calls skip with logger diagnostics instead of
+  issuing Vulkan commands against null/non-recording command-buffer state.
+  `GetFallbackCommandRecordingAttemptCount()` is a process-monotonic backend
+  diagnostic counter for those skips. It is not part of renderer branching;
+  renderer/runtime code must still gate command recording on `IDevice::IsOperational()`.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
   Texture creation now allocates VMA-backed `VkImage` objects and image views,
@@ -155,10 +161,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   physical-device probing with required Vulkan 1.2/1.3 feature negotiation,
   logical-device/queue/allocator/per-frame resource acquisition, and guarded
   swapchain image/view/handle registration are present,
-  plus guarded live bindless/global-layout/transfer service handoff and hardened
-  internal transfer invalid-token failure behavior are present, but concrete
-  pipeline creation, presentation, resize, device-loss diagnostics, and public
-  service fallback reconciliation still need to land before `IsOperational()`
+  plus guarded live bindless/global-layout/transfer service handoff, hardened
+  internal transfer invalid-token failure behavior, and nonfatal command-context
+  recording skips are present, but concrete pipeline creation, presentation,
+  resize, device-loss diagnostics, and public service fallback reconciliation still need to land before `IsOperational()`
   can become true. The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan`
   and verifies that bootstrap either creates swapchain image/view/handle state or
   fails/skips cleanly on unsupported hosts. The completed renderer reset seam removes one
@@ -172,7 +178,7 @@ available through the Vulkan 1.2/1.3 feature chain.
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
@@ -198,7 +204,7 @@ available through the Vulkan 1.2/1.3 feature chain.
 | `Backends.Vulkan.Profiler.cpp` | §6 `VulkanProfiler` — `IProfiler` backed by `VkQueryPool` timestamps |
 | `Backends.Vulkan.Bindless.cpp` | §7 `VulkanBindlessHeap` — `IBindlessHeap` with `PARTIALLY_BOUND` descriptor array |
 | `Backends.Vulkan.Transfer.cpp` | §8 `VulkanTransferQueue` — `ITransferQueue` via timeline semaphore + `StagingBelt` |
-| `Backends.Vulkan.CommandContext.cpp` | §9 `VulkanCommandContext` — `ICommandContext` (one per frame-in-flight slot) |
+| `Backends.Vulkan.CommandContext.cpp` | §9 `VulkanCommandContext` — `ICommandContext` (one per frame-in-flight slot), with fail-closed unbound/non-recording command skips and diagnostics. |
 | `Backends.Vulkan.Device.cpp` | §11 `VulkanDevice` implementations + §12 `CreateVulkanDevice()` factory |
 | `Backends.Vulkan.cpp` | *(empty placeholder — kept to avoid CMake source-list churn)* |
 | `Vma.cpp` | VMA implementation TU (`VMA_IMPLEMENTATION` guard) — compiles without modules |
