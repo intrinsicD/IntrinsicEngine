@@ -479,11 +479,19 @@ namespace
         if (isCompute)
             return desc.VertexShaderPath.empty() && desc.FragmentShaderPath.empty();
 
-        if (desc.VertexShaderPath.empty() || desc.FragmentShaderPath.empty() ||
-            desc.ColorTargetCount == 0u || desc.ColorTargetCount > RHI::MaxColorTargets)
+        if (desc.VertexShaderPath.empty() || desc.ColorTargetCount > RHI::MaxColorTargets)
         {
             return false;
         }
+
+        if (desc.ColorTargetCount == 0u)
+        {
+            return desc.DepthTargetFormat != RHI::Format::Undefined &&
+                   ToVkFormat(desc.DepthTargetFormat) != VK_FORMAT_UNDEFINED;
+        }
+
+        if (desc.FragmentShaderPath.empty())
+            return false;
 
         for (std::uint32_t i = 0; i < desc.ColorTargetCount; ++i)
         {
@@ -1229,6 +1237,7 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         allocatorInfo.device = m_Device;
         allocatorInfo.instance = m_Instance;
         allocatorInfo.pVulkanFunctions = &vmaFunctions;
+        allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
         result = vmaCreateAllocator(&allocatorInfo, &m_Vma);
         diagnostics.LastVkResult = static_cast<std::int32_t>(result);
@@ -1542,6 +1551,21 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
             Shutdown();
             return;
         }
+        m_BindlessHeap->SetTextureSamplerResolver(
+            [this](const RHI::TextureHandle texture,
+                   const RHI::SamplerHandle sampler,
+                   VkImageView& outView,
+                   VkSampler& outSampler) noexcept -> bool
+            {
+                const VulkanImage* image = m_Images.GetIfValid(texture);
+                const VulkanSampler* vkSampler = m_Samplers.GetIfValid(sampler);
+                if (!image || image->View == VK_NULL_HANDLE || !vkSampler || vkSampler->Sampler == VK_NULL_HANDLE)
+                    return false;
+
+                outView = image->View;
+                outSampler = vkSampler->Sampler;
+                return true;
+            });
 
         const VkDescriptorSetLayout bindlessLayout = m_BindlessHeap->GetLayout();
         VkPushConstantRange pushConstantRange{};
@@ -2504,7 +2528,7 @@ namespace
 
 RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE || desc.SizeBytes == 0)
+    if (!HasLiveOperationalPrerequisites() || desc.SizeBytes == 0)
         return {};
 
     VkBufferCreateInfo bci{};
@@ -2586,12 +2610,13 @@ void VulkanDevice::DestroyBuffer(RHI::BufferHandle handle)
 void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
                                 uint64_t size, uint64_t offset)
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE)
+    if (!HasLiveOperationalPrerequisites())
         return;
 
     if (!data || size == 0) return;
     VulkanBuffer* buf = m_Buffers.GetIfValid(handle);
     if (!buf) return;
+    if (offset > buf->SizeBytes || size > buf->SizeBytes - offset) return;
 
     if (buf->HostVisible)
     {
@@ -2664,7 +2689,7 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
 
 uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE)
+    if (!HasLiveOperationalPrerequisites())
         return 0;
 
     const VulkanBuffer* buf = m_Buffers.GetIfValid(handle);
@@ -2678,7 +2703,7 @@ uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const
 
 RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE)
+    if (!HasLiveOperationalPrerequisites())
         return {};
 
     const VkFormat format = ToVkFormat(desc.Fmt);
@@ -2825,7 +2850,7 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
                                 uint32_t mipLevel,
                                 uint32_t arrayLayer)
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE)
+    if (!HasLiveOperationalPrerequisites())
         return;
 
     if (!data || dataSizeBytes == 0)
@@ -2838,6 +2863,12 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
     if (!HasImageUsage(image->Usage, VK_IMAGE_USAGE_SAMPLED_BIT))
     {
         Core::Log::Warn("[VulkanDevice::WriteTexture] Skipping upload for texture without sampled usage");
+        return;
+    }
+
+    if (!HasImageUsage(image->Usage, VK_IMAGE_USAGE_TRANSFER_DST_BIT))
+    {
+        Core::Log::Warn("[VulkanDevice::WriteTexture] Skipping upload for texture without transfer-dst usage");
         return;
     }
 
@@ -2950,7 +2981,7 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
 
 RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE)
+    if (!HasLiveOperationalPrerequisites())
         return {};
 
     VkSamplerCreateInfo samplerInfo{};
@@ -3110,9 +3141,11 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
     }
 
     const SpirvReadResult vertexSpirv = ReadSpirvFile(desc.VertexShaderPath);
-    const SpirvReadResult fragmentSpirv = ReadSpirvFile(desc.FragmentShaderPath);
+    const SpirvReadResult fragmentSpirv = desc.FragmentShaderPath.empty()
+        ? SpirvReadResult{}
+        : ReadSpirvFile(desc.FragmentShaderPath);
     const std::uint64_t shaderBytes = vertexSpirv.Bytes + fragmentSpirv.Bytes;
-    if (vertexSpirv.Words.empty() || fragmentSpirv.Words.empty())
+    if (vertexSpirv.Words.empty() || (!desc.FragmentShaderPath.empty() && fragmentSpirv.Words.empty()))
     {
         NoteFallbackPipelineCreationAttempt(FallbackPipelineReason::ShaderMissing);
         publish(VulkanPipelineCreationStatus::FailedShaderRead, VK_SUCCESS, shaderBytes);
@@ -3125,9 +3158,10 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
     VkShaderModule vertexModule = VK_NULL_HANDLE;
     VkShaderModule fragmentModule = VK_NULL_HANDLE;
     VkResult result = CreateShaderModule(m_Device, vertexSpirv.Words, vertexModule);
-    if (result == VK_SUCCESS)
+    if (result == VK_SUCCESS && !desc.FragmentShaderPath.empty())
         result = CreateShaderModule(m_Device, fragmentSpirv.Words, fragmentModule);
-    if (result != VK_SUCCESS || vertexModule == VK_NULL_HANDLE || fragmentModule == VK_NULL_HANDLE)
+    if (result != VK_SUCCESS || vertexModule == VK_NULL_HANDLE ||
+        (!desc.FragmentShaderPath.empty() && fragmentModule == VK_NULL_HANDLE))
     {
         NoteDeviceLostIfNeeded(result);
         if (vertexModule != VK_NULL_HANDLE)
@@ -3144,10 +3178,15 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     stages[0].module = vertexModule;
     stages[0].pName = "main";
-    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[1].module = fragmentModule;
-    stages[1].pName = "main";
+    std::uint32_t stageCount = 1u;
+    if (fragmentModule != VK_NULL_HANDLE)
+    {
+        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragmentModule;
+        stages[1].pName = "main";
+        stageCount = 2u;
+    }
 
     VkPipelineVertexInputStateCreateInfo vertexInput{};
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -3227,7 +3266,7 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.pNext = &renderingInfo;
-    pipelineInfo.stageCount = 2u;
+    pipelineInfo.stageCount = stageCount;
     pipelineInfo.pStages = stages;
     pipelineInfo.pVertexInputState = &vertexInput;
     pipelineInfo.pInputAssemblyState = &inputAssembly;
@@ -3244,7 +3283,8 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
     pipeline.Layout = m_GlobalPipelineLayout;
     pipeline.BindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     result = vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1u, &pipelineInfo, nullptr, &pipeline.Pipeline);
-    vkDestroyShaderModule(m_Device, fragmentModule, nullptr);
+    if (fragmentModule != VK_NULL_HANDLE)
+        vkDestroyShaderModule(m_Device, fragmentModule, nullptr);
     vkDestroyShaderModule(m_Device, vertexModule, nullptr);
 
     if (result != VK_SUCCESS || pipeline.Pipeline == VK_NULL_HANDLE)
@@ -3302,7 +3342,7 @@ void VulkanDevice::DestroyPipeline(RHI::PipelineHandle handle)
 
 VkCommandBuffer VulkanDevice::BeginOneShot()
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE || m_FrameSlot >= kMaxFramesInFlight)
+    if (!HasLiveOperationalPrerequisites() || m_FrameSlot >= kMaxFramesInFlight)
         return VK_NULL_HANDLE;
 
     const VkCommandBuffer cmd = m_Frames[m_FrameSlot].CmdBuffer;
@@ -3323,7 +3363,7 @@ VkCommandBuffer VulkanDevice::BeginOneShot()
 
 bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
 {
-    if (!m_Operational || m_Device == VK_NULL_HANDLE || cmd == VK_NULL_HANDLE)
+    if (!HasLiveOperationalPrerequisites() || cmd == VK_NULL_HANDLE)
         return false;
 
     VkResult result = vkEndCommandBuffer(cmd);
@@ -3364,6 +3404,7 @@ void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
 
     if (!m_Operational || m_FrameSlot >= kMaxFramesInFlight)
     {
+        fn();
         return;
     }
 

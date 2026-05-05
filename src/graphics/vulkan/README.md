@@ -16,7 +16,8 @@ buffers, fences, and acquire/render semaphores, then creating a guarded swapchai
   swapchain images, live internal bindless/global-pipeline-layout/transfer service
   objects, rebound command contexts, and a global layout capable of the RHI
   maximum push-constant range. It still leaves the device non-operational until
-  presentation, resize, device-loss, and public service fallback reconciliation land; `BeginFrame()` returns `false`
+  canonical renderer pass command recording, synchronization/barrier validation,
+  queue-family ownership handling where needed, and public service fallback reconciliation land; guarded direct `BeginFrame()` can acquire only after service-ready bootstrap and otherwise returns `false`
 instead of fabricating a frame. Full execution requires a surface-capable
 physical device with timeline semaphores, descriptor indexing
 (PARTIALLY_BOUND + UPDATE_AFTER_BIND for sampled images), buffer device
@@ -87,8 +88,8 @@ available through the Vulkan 1.2/1.3 feature chain.
 - `VulkanDevice::CreatePipeline()` now has a guarded concrete Vulkan path once
   bootstrap has produced a logical device and global pipeline layout. It reads
   SPIR-V shader files from `RHI::PipelineDesc`, creates shader modules, and builds
-  compute pipelines or dynamic-rendering graphics pipelines with BDA-only vertex
-  input, dynamic viewport/scissor state, RHI raster/depth/blend mappings, and the
+  compute pipelines or dynamic-rendering graphics pipelines, including depth-only
+  graphics pipelines, with BDA-only vertex input, dynamic viewport/scissor state, RHI raster/depth/blend mappings, and the
   global bindless layout. `GetVulkanPipelineDiagnosticsSnapshot()` reports
   pre-bring-up skips, invalid descriptions, shader-read failures, shader-module
   failures, Vulkan pipeline-creation failures, and successful graphics/compute
@@ -165,20 +166,30 @@ available through the Vulkan 1.2/1.3 feature chain.
   diagnostic counter for those skips. It is not part of renderer branching;
   renderer/runtime code must still gate command recording on `IDevice::IsOperational()`.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
-  in `Backends.Vulkan.Device.cpp`. They guard null/non-operational backend state.
-  Texture creation now allocates VMA-backed `VkImage` objects and image views,
-  and sampler creation creates real `VkSampler` objects once a future device
-  bootstrap marks the backend operational, including backend-local translation
-  from `RHI::SamplerDesc::BorderColor` to Vulkan `VkBorderColor`; anisotropy
-  remains disabled unless device feature negotiation records support.
+  in `Backends.Vulkan.Device.cpp`. They guard null/non-live backend state and can
+  be exercised directly after service-ready bootstrap while `IsOperational()`
+  remains false; RHI managers and renderer code still cannot reach these live
+  paths until the backend-neutral operational predicate is cleared. Buffer
+  creation uses VMA with buffer-device-address allocator support and can back
+  `RHI::GpuSceneTable`, culling draw-bucket, material, geometry, transform,
+  bounds, and light SSBO patterns. Texture creation allocates VMA-backed
+  `VkImage` objects and image views for sampled textures plus depth/color dynamic
+  rendering attachments, and sampler creation creates real `VkSampler` objects
+  with backend-local translation from `RHI::SamplerDesc::BorderColor` to Vulkan
+  `VkBorderColor`; anisotropy remains disabled unless device feature negotiation
+  records support. The live internal `VulkanBindlessHeap` now resolves
+  backend-owned RHI texture/sampler handles into queued descriptor writes through
+  a Vulkan-local resolver set by `VulkanDevice`, so future public service handoff
+  does not require Vulkan handles or live ECS knowledge in renderer/RHI callers.
   `WriteTexture()` now has a guarded
   synchronous staging-buffer upload path with mip/layer bounds checks, exact
-  byte-size validation, sampled-usage validation, explicit depth-stencil upload
-  rejection, and transfer-to-shader-read layout transitions that update tracked
+  byte-size validation, sampled- and transfer-dst-usage validation, explicit
+  depth-stencil upload rejection, and transfer-to-shader-read layout transitions that update tracked
   layout only after one-shot submission succeeds. Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded
-  bootstrap has created the Vulkan device/global layout; pre-bring-up and invalid
-  shader/description paths remain fail-closed with diagnostics.
+  bootstrap has created the Vulkan device/global layout; `assets/shaders/depth_prepass.vert`
+  is the canonical depth-prepass shader source used by opt-in smoke coverage.
+  Pre-bring-up and invalid shader/description paths remain fail-closed with diagnostics.
 - `Shutdown()` waits idle, flushes deferred deletes, drains any still-live buffer,
   texture, sampler, and pipeline pool entries, destroys swapchain/global objects,
   destroys per-frame command/sync resources, then tears down VMA/device/surface/
@@ -191,9 +202,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   plus guarded live bindless/global-layout/transfer service handoff, hardened
   internal transfer invalid-token failure behavior, and nonfatal command-context
   recording skips, concrete SPIR-V pipeline creation, and a guarded direct
-  empty-frame acquire/submit/present smoke path are present, but operational
-  resize/recreate, device-loss recovery, canonical renderer pass execution, and
-  public service fallback reconciliation still need to land before
+  empty-frame acquire/submit/present smoke path, guarded resource/descriptor
+  readiness, and depth-only graphics pipeline smoke coverage are present, but
+  canonical renderer command recording/pass execution, synchronization/barrier
+  validation, queue-family ownership handling where needed, and public service
+  fallback reconciliation still need to land before
   `IsOperational()` can become true. The opt-in `VulkanBootstrapSmoke` test is
   labeled `gpu;vulkan` and verifies that bootstrap either creates swapchain
   image/view/handle state or fails/skips cleanly on unsupported hosts. When
@@ -203,7 +216,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   bindless/transfer access still returns fail-closed fallbacks. The completed
   renderer reset seam removes one
   prior blocker, but Vulkan may not report operational until fallback
-  bindless/transfer behavior and real backend resources are reconciled behind
+  bindless/transfer behavior and real backend pass execution are reconciled behind
   the same RHI interfaces.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).

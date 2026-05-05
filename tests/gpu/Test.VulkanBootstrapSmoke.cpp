@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdlib>
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +20,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.Types;
 
 namespace
 {
@@ -344,6 +346,71 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_FALSE(serviceDiagnostics.PublicServicesExposed);
         EXPECT_TRUE(serviceDiagnostics.PublicServicesRemainFailClosed);
 
+        const Extrinsic::RHI::BufferHandle sceneTableBuffer = device->CreateBuffer({
+            .SizeBytes = sizeof(Extrinsic::RHI::GpuSceneTable),
+            .Usage = Extrinsic::RHI::BufferUsage::Storage | Extrinsic::RHI::BufferUsage::TransferDst,
+            .HostVisible = false,
+            .DebugName = "VulkanBootstrapSmoke.SceneTable",
+        });
+        ASSERT_TRUE(sceneTableBuffer.IsValid())
+            << "service-ready guarded bootstrap should cover canonical scene-table storage buffers";
+        EXPECT_NE(device->GetBufferDeviceAddress(sceneTableBuffer), 0u)
+            << "scene-table buffers need BDA for canonical push-constant binding";
+
+        Extrinsic::RHI::GpuSceneTable emptySceneTable{};
+        device->WriteBuffer(sceneTableBuffer, &emptySceneTable, sizeof(emptySceneTable), 0u);
+
+        const Extrinsic::RHI::BufferHandle indirectArgsBuffer = device->CreateBuffer({
+            .SizeBytes = sizeof(Extrinsic::RHI::GpuDrawIndexedCommand),
+            .Usage = Extrinsic::RHI::BufferUsage::Storage |
+                     Extrinsic::RHI::BufferUsage::Indirect |
+                     Extrinsic::RHI::BufferUsage::TransferDst,
+            .HostVisible = false,
+            .DebugName = "VulkanBootstrapSmoke.IndirectArgs",
+        });
+        ASSERT_TRUE(indirectArgsBuffer.IsValid())
+            << "canonical culling draw-bucket indirect buffers should be creatable through the promoted backend";
+        EXPECT_NE(device->GetBufferDeviceAddress(indirectArgsBuffer), 0u);
+
+        const Extrinsic::RHI::TextureHandle depthTarget = device->CreateTexture({
+            .Width = diagnostics.SwapchainWidth,
+            .Height = diagnostics.SwapchainHeight,
+            .Fmt = Extrinsic::RHI::Format::D32_FLOAT,
+            .Usage = Extrinsic::RHI::TextureUsage::DepthTarget | Extrinsic::RHI::TextureUsage::Sampled,
+            .DebugName = "VulkanBootstrapSmoke.SceneDepth",
+        });
+        ASSERT_TRUE(depthTarget.IsValid())
+            << "canonical depth-prepass attachment textures should be creatable after service-ready bootstrap";
+
+        const Extrinsic::RHI::TextureHandle colorTarget = device->CreateTexture({
+            .Width = diagnostics.SwapchainWidth,
+            .Height = diagnostics.SwapchainHeight,
+            .Fmt = Extrinsic::RHI::Format::RGBA16_FLOAT,
+            .Usage = Extrinsic::RHI::TextureUsage::ColorTarget | Extrinsic::RHI::TextureUsage::Sampled,
+            .DebugName = "VulkanBootstrapSmoke.SceneColorHDR",
+        });
+        ASSERT_TRUE(colorTarget.IsValid())
+            << "canonical surface/deferred color attachments should be creatable after service-ready bootstrap";
+
+        const Extrinsic::RHI::TextureHandle sampledTexture = device->CreateTexture({
+            .Width = 1u,
+            .Height = 1u,
+            .Fmt = Extrinsic::RHI::Format::RGBA8_UNORM,
+            .Usage = Extrinsic::RHI::TextureUsage::Sampled | Extrinsic::RHI::TextureUsage::TransferDst,
+            .DebugName = "VulkanBootstrapSmoke.SampledTexture",
+        });
+        ASSERT_TRUE(sampledTexture.IsValid())
+            << "canonical material texture descriptors should have a creatable sampled texture path";
+
+        const Extrinsic::RHI::SamplerHandle sampler = device->CreateSampler({
+            .DebugName = "VulkanBootstrapSmoke.MaterialSampler",
+        });
+        ASSERT_TRUE(sampler.IsValid())
+            << "canonical material texture descriptors should have a creatable sampler path";
+
+        const std::array<std::uint32_t, 1u> texel{0xff'ff'ff'ffu};
+        device->WriteTexture(sampledTexture, texel.data(), sizeof(texel), 0u, 0u);
+
         const std::uint64_t beforeCommandRecordingFallback =
             Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount();
         Extrinsic::RHI::FrameHandle frame{};
@@ -460,11 +527,16 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         }
         else
         {
+            const std::filesystem::path sourceRoot = std::filesystem::path{__FILE__}
+                .parent_path()
+                .parent_path()
+                .parent_path();
             const std::filesystem::path shaderDir = std::filesystem::temp_directory_path() /
                 "intrinsic-vulkan-bootstrap-smoke";
             std::filesystem::create_directories(shaderDir);
             const std::filesystem::path computeSource = shaderDir / "pipeline_smoke.comp";
             const std::filesystem::path computeSpv = shaderDir / "pipeline_smoke.comp.spv";
+            const std::filesystem::path depthSpv = shaderDir / "depth_prepass.vert.spv";
             {
                 std::ofstream shader{computeSource};
                 ASSERT_TRUE(shader) << "failed to create temporary compute shader source";
@@ -502,7 +574,46 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
                       beforePipelineDiagnostics.SuccessfulPipelineCreations + 1u);
 
             device->DestroyPipeline(pipeline);
+
+            const std::filesystem::path shaderSourceDir = sourceRoot / "assets" / "shaders";
+            const std::string depthCompileCommand = "glslc \"" +
+                (shaderSourceDir / "depth_prepass.vert").string() + "\" -I \"" +
+                shaderSourceDir.string() + "\" -o \"" + depthSpv.string() +
+                "\" --target-env=vulkan1.3 >/dev/null 2>&1";
+            ASSERT_TRUE(CommandSucceeded(depthCompileCommand))
+                << "failed to compile canonical depth-prepass shader with glslc";
+
+            Extrinsic::RHI::PipelineDesc depthPipelineDesc{};
+            depthPipelineDesc.VertexShaderPath = depthSpv.string();
+            depthPipelineDesc.ColorTargetCount = 0u;
+            depthPipelineDesc.DepthTargetFormat = Extrinsic::RHI::Format::D32_FLOAT;
+            depthPipelineDesc.PushConstantSize = sizeof(Extrinsic::RHI::GpuScenePushConstants);
+            depthPipelineDesc.DebugName = "VulkanBootstrapSmoke.DepthPrepassPipeline";
+            const Extrinsic::RHI::PipelineHandle depthPipeline = device->CreatePipeline(depthPipelineDesc);
+            EXPECT_TRUE(depthPipeline.IsValid())
+                << "guarded service-ready bootstrap should support canonical depth-only graphics pipeline creation";
+
+            const Extrinsic::Backends::Vulkan::VulkanPipelineDiagnosticsSnapshot depthPipelineDiagnostics =
+                Extrinsic::Backends::Vulkan::GetVulkanPipelineDiagnosticsSnapshot();
+            EXPECT_EQ(depthPipelineDiagnostics.Status,
+                      Extrinsic::Backends::Vulkan::VulkanPipelineCreationStatus::CreatedGraphics);
+            EXPECT_EQ(depthPipelineDiagnostics.LastVkResult, 0);
+            EXPECT_FALSE(depthPipelineDiagnostics.DeviceOperational);
+            EXPECT_FALSE(depthPipelineDiagnostics.ComputePipeline);
+            EXPECT_EQ(depthPipelineDiagnostics.ColorTargetCount, 0u);
+            EXPECT_EQ(depthPipelineDiagnostics.PushConstantSize,
+                      sizeof(Extrinsic::RHI::GpuScenePushConstants));
+            EXPECT_GT(depthPipelineDiagnostics.ShaderBytesRead, 0u);
+
+            device->DestroyPipeline(depthPipeline);
         }
+
+        device->DestroySampler(sampler);
+        device->DestroyTexture(sampledTexture);
+        device->DestroyTexture(colorTarget);
+        device->DestroyTexture(depthTarget);
+        device->DestroyBuffer(indirectArgsBuffer);
+        device->DestroyBuffer(sceneTableBuffer);
     }
     else
     {

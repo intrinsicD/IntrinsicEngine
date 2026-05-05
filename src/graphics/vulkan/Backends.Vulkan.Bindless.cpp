@@ -1,7 +1,9 @@
 module;
 
 #include <cstdio>
+#include <functional>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 #ifndef GLFW_INCLUDE_NONE
@@ -109,6 +111,9 @@ bool VulkanBindlessHeap::IsValid() const noexcept
 
 void VulkanBindlessHeap::SetDefault(VkImageView view, VkSampler sampler)
 {
+    m_DefaultView = view;
+    m_DefaultSampler = sampler;
+
     // Slot 0 — written immediately, not via pending queue.
     VkDescriptorImageInfo imgInfo{};
     imgInfo.imageView   = view;
@@ -125,7 +130,14 @@ void VulkanBindlessHeap::SetDefault(VkImageView view, VkSampler sampler)
     vkUpdateDescriptorSets(m_Device, 1, &write, 0, nullptr);
 }
 
-RHI::BindlessIndex VulkanBindlessHeap::AllocateTextureSlot(RHI::TextureHandle, RHI::SamplerHandle)
+void VulkanBindlessHeap::SetTextureSamplerResolver(
+    std::function<bool(RHI::TextureHandle, RHI::SamplerHandle, VkImageView&, VkSampler&)> resolver)
+{
+    std::scoped_lock lock{m_Mutex};
+    m_ResolveTextureSampler = std::move(resolver);
+}
+
+RHI::BindlessIndex VulkanBindlessHeap::AllocateTextureSlot(RHI::TextureHandle texture, RHI::SamplerHandle sampler)
 {
     std::scoped_lock lock{m_Mutex};
     RHI::BindlessIndex slot = RHI::kInvalidBindlessIndex;
@@ -140,21 +152,43 @@ RHI::BindlessIndex VulkanBindlessHeap::AllocateTextureSlot(RHI::TextureHandle, R
         slot = m_NextSlot++;
     }
     m_Pending.push_back({OpType::Allocate, slot});
+    VkImageView view = VK_NULL_HANDLE;
+    VkSampler vkSampler = VK_NULL_HANDLE;
+    if (m_ResolveTextureSampler && m_ResolveTextureSampler(texture, sampler, view, vkSampler))
+    {
+        m_Pending.push_back({OpType::UpdateRaw, slot, view, vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+    }
     return slot;
 }
 
 void VulkanBindlessHeap::UpdateTextureSlot(RHI::BindlessIndex slot,
-                                            RHI::TextureHandle,
-                                            RHI::SamplerHandle)
+                                            RHI::TextureHandle texture,
+                                            RHI::SamplerHandle sampler)
 {
-    // Raw Vk handles are injected via EnqueueRawUpdate called by VulkanDevice.
-    (void)slot;
+    std::scoped_lock lock{m_Mutex};
+    if (slot == RHI::kInvalidBindlessIndex || slot >= m_NextSlot)
+        return;
+
+    VkImageView view = VK_NULL_HANDLE;
+    VkSampler vkSampler = VK_NULL_HANDLE;
+    if (m_ResolveTextureSampler && m_ResolveTextureSampler(texture, sampler, view, vkSampler))
+    {
+        m_Pending.push_back({OpType::UpdateRaw, slot, view, vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+    }
 }
 
 void VulkanBindlessHeap::FreeSlot(RHI::BindlessIndex slot)
 {
     std::scoped_lock lock{m_Mutex};
     if (slot == RHI::kInvalidBindlessIndex || slot >= m_NextSlot) return;
+    if (m_DefaultView != VK_NULL_HANDLE && m_DefaultSampler != VK_NULL_HANDLE)
+    {
+        m_Pending.push_back({OpType::UpdateRaw,
+                             slot,
+                             m_DefaultView,
+                             m_DefaultSampler,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+    }
     m_Pending.push_back({OpType::Free, slot});
 }
 
