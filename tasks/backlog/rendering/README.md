@@ -120,17 +120,17 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   must not put IO ownership into graphics.
 - [GRAPHICS-020 — Legacy graphics retirement gates](GRAPHICS-020-legacy-graphics-retirement-gates.md):
   final retirement gating after parity tasks complete.
-- [GRAPHICS-022 — Rendergraph diagnostics and validation](GRAPHICS-022-rendergraph-diagnostics-validation.md):
-  queued follow-on infrastructure hardening task; canonical ordering matches
+- [GRAPHICS-022 — Rendergraph diagnostics and validation](../../active/GRAPHICS-022-rendergraph-diagnostics-validation.md):
+  active follow-on infrastructure hardening task; canonical ordering matches
   GRAPHICS-001 and it depends on GRAPHICS-003 for frame-recipe context while
   remaining CPU/null testable (no Vulkan requirement).
 - [GRAPHICS-023 — Shader, material, and texture hot reload](GRAPHICS-023-shader-material-texture-hot-reload.md):
   depends on GRAPHICS-006 for registry/material/pipeline contracts and
   GRAPHICS-015 for GPU asset/texture residency.
-- [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](GRAPHICS-024-overlays-presentation-editor-handoff.md):
-  depends on GRAPHICS-010/011/014/017 ownership decisions where overlay,
-  visualization, picking, camera, and editor handoff overlap; informs
-  GRAPHICS-020 retirement gating.
+- [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../active/GRAPHICS-024-overlays-presentation-editor-handoff.md):
+  active planning task; depends on GRAPHICS-010/011/014/017 ownership
+  decisions where overlay, visualization, picking, camera, and editor
+  handoff overlap; informs GRAPHICS-020 retirement gating.
 - [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](GRAPHICS-025-hybrid-transparent-special-material-path.md):
   future-facing follow-up after GRAPHICS-006/007/008/009 and GRAPHICS-013A
   establish material, bucket, opaque, lighting, and postprocess contracts.
