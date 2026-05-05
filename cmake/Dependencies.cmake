@@ -282,15 +282,32 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     if("${IMGUIZMO_SOURCE_DIR}" STREQUAL "")
         set(IMGUIZMO_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/imguizmo-src")
     endif()
+    if(DEFINED INTRINSIC_IMGUIZMO_SOURCE_DIR AND NOT "${INTRINSIC_IMGUIZMO_SOURCE_DIR}" STREQUAL "")
+        set(IMGUIZMO_SOURCE_DIR "${INTRINSIC_IMGUIZMO_SOURCE_DIR}")
+    endif()
 endif()
 
 
-if(NOT INTRINSIC_HEADLESS_NO_GLFW AND (NOT IS_DIRECTORY "${IMGUIZMO_SOURCE_DIR}" OR NOT EXISTS "${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp"))
-    message(FATAL_ERROR
-        "ImGuizmo sources not found. Expected at: ${IMGUIZMO_SOURCE_DIR}\n"
-        "Missing file: ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp\n"
-        "Set -DINTRINSIC_IMGUIZMO_SOURCE_DIR=/path/to/ImGuizmo or ensure FetchContent/offline cache is populated."
-    )
+if(NOT INTRINSIC_HEADLESS_NO_GLFW)
+    set(INTRINSIC_IMGUIZMO_SOURCE_DIR "${IMGUIZMO_SOURCE_DIR}" CACHE PATH
+        "ImGuizmo checkout root or directory containing ImGuizmo.cpp" FORCE)
+    set(IMGUIZMO_INCLUDE_DIR "${IMGUIZMO_SOURCE_DIR}")
+    set(IMGUIZMO_CPP "${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp")
+
+    if(IS_DIRECTORY "${IMGUIZMO_SOURCE_DIR}" AND NOT EXISTS "${IMGUIZMO_CPP}" AND EXISTS "${IMGUIZMO_SOURCE_DIR}/src/ImGuizmo.cpp")
+        set(IMGUIZMO_INCLUDE_DIR "${IMGUIZMO_SOURCE_DIR}/src")
+        set(IMGUIZMO_CPP "${IMGUIZMO_SOURCE_DIR}/src/ImGuizmo.cpp")
+    endif()
+
+    if(NOT IS_DIRECTORY "${IMGUIZMO_SOURCE_DIR}" OR NOT EXISTS "${IMGUIZMO_CPP}")
+        message(FATAL_ERROR
+            "ImGuizmo sources not found. Expected at: ${IMGUIZMO_SOURCE_DIR}\n"
+            "Checked files:\n"
+            "  ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp\n"
+            "  ${IMGUIZMO_SOURCE_DIR}/src/ImGuizmo.cpp\n"
+            "Set -DINTRINSIC_IMGUIZMO_SOURCE_DIR=/path/to/ImGuizmo or ensure FetchContent/offline cache is populated."
+        )
+    endif()
 endif()
 
 # Create a library for ImGui to make linking easier
@@ -310,9 +327,9 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     target_link_libraries(imgui_lib PUBLIC glfw volk)
 
     add_library(imguizmo_lib STATIC
-            ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp
+            ${IMGUIZMO_CPP}
     )
-    target_include_directories(imguizmo_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends ${IMGUIZMO_SOURCE_DIR})
+    target_include_directories(imguizmo_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends ${IMGUIZMO_INCLUDE_DIR})
     target_compile_definitions(imguizmo_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
     target_link_libraries(imguizmo_lib PUBLIC imgui_lib)
 endif()
