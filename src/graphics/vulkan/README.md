@@ -160,6 +160,12 @@ available through the Vulkan 1.2/1.3 feature chain.
   same process-monotonic lifecycle counters exposed by `FallbackDiagnosticsSnapshot`.
   The snapshot is backend-specific diagnostics only; it does not expose
   Vulkan-native types and must not become a renderer/RHI branching seam.
+  CPU contract coverage in `Test.VulkanFailClosedContract.cpp`
+  (`FailClosedLifecyclePathsNeverSetDeviceLost`,
+  `DeviceLostFlagStaysFalseAcrossInitializeShutdownCyclesOnNullWindow`)
+  asserts that fail-closed lifecycle skip paths never raise `DeviceLost` and
+  that `LastVkResult` stays `0` (no Vulkan call issued) so renderer/runtime CI
+  cannot accidentally confuse "Vulkan never bootstrapped" with "Vulkan was lost".
 - `VulkanCommandContext` is fail-closed before operational bring-up: unbound or
   not-begun command recording calls skip with logger diagnostics instead of
   issuing Vulkan commands against null/non-recording command-buffer state.

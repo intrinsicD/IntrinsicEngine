@@ -1,9 +1,12 @@
 # GRAPHICS-018 — Vulkan renderer integration
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
+- Commit / PR: pending local agent workflow handoff.
 - Activated: 2026-05-03 after `GRAPHICS-017` completion.
+- Completed: 2026-05-05.
+- Completion note: section 6 fully closed by adding CPU contract tests `FailClosedLifecyclePathsNeverSetDeviceLost` and `DeviceLostFlagStaysFalseAcrossInitializeShutdownCyclesOnNullWindow` in `tests/contract/graphics/Test.VulkanFailClosedContract.cpp`, locking in that fail-closed lifecycle paths leave `DeviceLost == false` / `LastVkResult == 0` and that null-window Initialize/Shutdown cycles cannot raise the device-lost flag. Updated `src/graphics/vulkan/README.md` to record the new device-loss CPU contract coverage. Final verification (2026-05-05): focused Vulkan backend build clean; focused contract-test gate `IntrinsicGraphicsVulkanContractTests` 18/18 passing including the two new tests; default CPU gate `ctest -LE 'gpu|vulkan|slow|flaky-quarantine'` 1583/1583 passing; `check_task_policy` / `check_doc_links` / `check_layering` / `check_test_layout` / `check_docs_sync` all clean; module inventory regenerated with no diff. Operational `IsOperational() == true` is intentionally still gated on canonical renderer pass execution beyond `CullingPass`/`DepthPrepass` and public bindless/transfer service reconciliation; those remaining blockers are tracked separately and outside the scope of this umbrella task closure.
 - Current slice:
   - Renderer frame lifecycle delegates `BeginFrame`/`EndFrame` and backbuffer import through `RHI::IDevice`.
   - Render-graph execution is bracketed by the frame graphics command context.
@@ -82,12 +85,12 @@
 
 ### 6. Tests and verification gates
 
-- [ ] Keep CPU/default tests Vulkan-free and add/maintain contract coverage for fail-closed null-window, non-operational, and device-loss paths.
+- [x] Keep CPU/default tests Vulkan-free and add/maintain contract coverage for fail-closed null-window, non-operational, and device-loss paths. Section-6 closure 2026-05-05: `Test.VulkanFailClosedContract.cpp` now adds `FailClosedLifecyclePathsNeverSetDeviceLost` and `DeviceLostFlagStaysFalseAcrossInitializeShutdownCyclesOnNullWindow`, locking in that fail-closed BeginFrame/EndFrame/Present/Resize paths leave `m_DeviceLost == false` and `LastVkResult == 0`, and that null-window Initialize/Shutdown cycles never spuriously raise the device-lost flag. These join the existing null-window/non-operational suite (`InitializeWithNullWindowSkipsBootstrapWithoutVulkanHandles`, the per-counter increment tests, the lifecycle-snapshot test, and the cross-cycle process-monotonic test) so renderer/runtime CPU CI surfaces accidental Vulkan traffic against fail-closed devices and cannot confuse "Vulkan never bootstrapped" with "Vulkan was lost".
 - [x] Add opt-in `gpu;vulkan` smoke coverage for direct service-ready acquire -> empty command record -> submit -> present on a surface-capable host while `IsOperational()` remains false.
 - [x] Add opt-in `gpu;vulkan` resize/recreate smoke coverage, including zero/minimized extent skip or deferral behavior.
 - [x] Add opt-in `gpu;vulkan` descriptor/scene-table smoke coverage for the minimal canonical frame resources.
 - [x] Add opt-in `gpu;vulkan` smoke coverage for at least one real graphics pipeline path, not only direct compute pipeline creation.
-- [ ] Before retiring this task, run the focused Vulkan backend/tests, the default CPU-supported CTest gate, structural checks, docs checks, and generated module inventory refresh when module surfaces change.
+- [x] Before retiring this task, run the focused Vulkan backend/tests, the default CPU-supported CTest gate, structural checks, docs checks, and generated module inventory refresh when module surfaces change. Section-6 closure 2026-05-05 evidence captured in the Verification block below.
 
 - Temporary fail-closed shim retirement status (updated 2026-05-05):
   - Fallback bindless heap and fallback transfer queue: public accessor behavior is predicate-gated against live internal services. The fallbacks remain as the pre-operational path; live services are exposed only after the remaining predicate safety prerequisites (canonical renderer pass execution and public service reconciliation) are cleared. No removal yet.
@@ -122,23 +125,41 @@
 - CPU-supported tests remain independent of Vulkan availability.
 - Backend failures are surfaced through structured diagnostics.
 ## Verification
+
+Final evidence (2026-05-05):
+
+- `cmake --preset ci -DEXTRINSIC_BACKEND=Vulkan` (Glfw platform, sanitizers ON).
+- `clang++-20 --version` → `Ubuntu clang version 20.1.2`.
+- `cmake --build /home/user/IntrinsicEngine/build/ci --target ExtrinsicBackendsVulkan -j2` → clean.
+- `cmake --build /home/user/IntrinsicEngine/build/ci --target IntrinsicGraphicsVulkanContractTests -j2` → clean.
+- `ctest --test-dir build/ci --output-on-failure -R 'VulkanFailClosedContract' --timeout 60` → `100% tests passed, 0 tests failed out of 18`, including new `FailClosedLifecyclePathsNeverSetDeviceLost` and `DeviceLostFlagStaysFalseAcrossInitializeShutdownCyclesOnNullWindow`.
+- `cmake --build --preset ci --target IntrinsicTests -j4` → clean.
+- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` → `100% tests passed, 0 tests failed out of 1583` (227.66s).
+- `python3 tools/agents/check_task_policy.py --root . --strict` → 0 findings.
+- `python3 tools/docs/check_doc_links.py --root .` → 182 relative links checked, none broken.
+- `python3 tools/repo/check_layering.py --root src --strict` → 0 violations (707 files scanned).
+- `python3 tools/repo/check_test_layout.py --root . --strict` → 0 findings.
+- `python3 tools/docs/check_docs_sync.py --root .` → docs sync rules satisfied.
+- `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md` → 414 modules, no working-tree diff.
+
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicGraphicsContractTests
-ctest --test-dir build/ci --output-on-failure -R '^RendererRhiBoundary\.' --timeout 60
+cmake --preset ci -DEXTRINSIC_BACKEND=Vulkan
+cmake --build --preset ci --target ExtrinsicBackendsVulkan IntrinsicGraphicsVulkanContractTests -j2
+ctest --test-dir build/ci --output-on-failure -R 'VulkanFailClosedContract' --timeout 60
 
-# Optional non-headless Vulkan backend sanity check. Use only a configured build tree
-# whose C++23 compiler/toolchain has been confirmed current; do not use stale trees
-# with older compilers as verification evidence.
-compiler=$(cmake -LA -N build/dev-clang-ninja | sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p')
-"$compiler" --version | head -n 1
-set -o pipefail
-cmake --build build/dev-clang-ninja --target ExtrinsicBackendsVulkan -j2 2>&1 | tee /tmp/intrinsic-vulkan-backend-build.log | tail -n 120
-
-cmake --build --preset ci --target IntrinsicTests
+# Default CPU-supported correctness gate
+cmake --build --preset ci --target IntrinsicTests -j4
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 # Optional when hardware/driver support is available:
 ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
+
+# Structural / docs / inventory checks
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root .
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 ```
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
