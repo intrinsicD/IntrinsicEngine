@@ -12,11 +12,11 @@ rendering), creating a logical device with those features and `VK_KHR_swapchain`
 loading device-level volk entry points, acquiring graphics/present/transfer `VkQueue` handles,
 creating a VMA allocator, allocating per-frame command pools, primary command
 buffers, fences, and acquire/render semaphores, then creating a guarded swapchain
-with image views and backend-local `RHI::TextureHandle` registrations for the
-swapchain images, live internal bindless/global-pipeline-layout/transfer service
-objects, and rebound command contexts. It still leaves the device
-non-operational until concrete pipeline, presentation, resize, device-loss, and
-public service fallback reconciliation land; `BeginFrame()` returns `false`
+  with image views and backend-local `RHI::TextureHandle` registrations for the
+  swapchain images, live internal bindless/global-pipeline-layout/transfer service
+  objects, rebound command contexts, and a global layout capable of the RHI
+  maximum push-constant range. It still leaves the device non-operational until
+  presentation, resize, device-loss, and public service fallback reconciliation land; `BeginFrame()` returns `false`
 instead of fabricating a frame. Full execution requires a surface-capable
 physical device with timeline semaphores, descriptor indexing
 (PARTIALLY_BOUND + UPDATE_AFTER_BIND for sampled images), buffer device
@@ -80,6 +80,18 @@ available through the Vulkan 1.2/1.3 feature chain.
   and staging allocation before recording commands. Public transfer access still
   resolves to the fallback queue while non-operational, even when the internal
   service is `Ready`.
+- `VulkanDevice::CreatePipeline()` now has a guarded concrete Vulkan path once
+  bootstrap has produced a logical device and global pipeline layout. It reads
+  SPIR-V shader files from `RHI::PipelineDesc`, creates shader modules, and builds
+  compute pipelines or dynamic-rendering graphics pipelines with BDA-only vertex
+  input, dynamic viewport/scissor state, RHI raster/depth/blend mappings, and the
+  global bindless layout. `GetVulkanPipelineDiagnosticsSnapshot()` reports
+  pre-bring-up skips, invalid descriptions, shader-read failures, shader-module
+  failures, Vulkan pipeline-creation failures, and successful graphics/compute
+  creation counts without exposing `Vk*` handles. Renderer and RHI manager code
+  still gates on `IDevice::IsOperational()`, so this direct backend resource path
+  is an opt-in bootstrap prerequisite and does not make canonical frame execution
+  operational.
 - Non-operational instances still return valid service references for
   `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
   not allocate GPU slots or upload data; they return invalid indices/tokens and
@@ -150,8 +162,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   synchronous staging-buffer upload path with mip/layer bounds checks, exact
   byte-size validation, sampled-usage validation, explicit depth-stencil upload
   rejection, and transfer-to-shader-read layout transitions that update tracked
-  layout only after one-shot submission succeeds. Pipeline creation still returns
-  invalid handles until shader/pipeline construction is wired.
+  layout only after one-shot submission succeeds. Pipeline creation now builds
+  SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded
+  bootstrap has created the Vulkan device/global layout; pre-bring-up and invalid
+  shader/description paths remain fail-closed with diagnostics.
 - `Shutdown()` waits idle, flushes deferred deletes, drains any still-live buffer,
   texture, sampler, and pipeline pool entries, destroys swapchain/global objects,
   destroys per-frame command/sync resources, then tears down VMA/device/surface/
@@ -163,7 +177,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   swapchain image/view/handle registration are present,
   plus guarded live bindless/global-layout/transfer service handoff, hardened
   internal transfer invalid-token failure behavior, and nonfatal command-context
-  recording skips are present, but concrete pipeline creation, presentation,
+  recording skips and concrete SPIR-V pipeline creation are present, but presentation,
   resize, device-loss diagnostics, and public service fallback reconciliation still need to land before `IsOperational()`
   can become true. The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan`
   and verifies that bootstrap either creates swapchain image/view/handle state or
@@ -178,7 +192,7 @@ available through the Vulkan 1.2/1.3 feature chain.
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetVulkanPipelineDiagnosticsSnapshot()`, `VulkanPipelineCreationStatus`, `VulkanPipelineDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory

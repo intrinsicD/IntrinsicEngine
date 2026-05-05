@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <memory>
+#include <string>
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Render;
@@ -9,9 +13,19 @@ import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Bindless;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
+import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
+
+namespace
+{
+    [[nodiscard]] bool CommandSucceeded(const std::string& command)
+    {
+        return std::system(command.c_str()) == 0;
+    }
+}
 
 TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 {
@@ -359,6 +373,56 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
                   beforeFallbackTransfer + 1u)
             << "live transfer service exists internally, but public access must remain fail-closed until operational";
+
+        if (!CommandSucceeded("glslc --version >/dev/null 2>&1"))
+        {
+            SUCCEED() << "glslc is not available on PATH; skipping opt-in Vulkan pipeline creation sub-check.";
+        }
+        else
+        {
+            const std::filesystem::path shaderDir = std::filesystem::temp_directory_path() /
+                "intrinsic-vulkan-bootstrap-smoke";
+            std::filesystem::create_directories(shaderDir);
+            const std::filesystem::path computeSource = shaderDir / "pipeline_smoke.comp";
+            const std::filesystem::path computeSpv = shaderDir / "pipeline_smoke.comp.spv";
+            {
+                std::ofstream shader{computeSource};
+                ASSERT_TRUE(shader) << "failed to create temporary compute shader source";
+                shader << "#version 450\n"
+                          "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
+                          "void main() {}\n";
+            }
+
+            const std::string compileCommand = "glslc \"" + computeSource.string() + "\" -o \"" +
+                computeSpv.string() + "\" >/dev/null 2>&1";
+            ASSERT_TRUE(CommandSucceeded(compileCommand)) << "failed to compile temporary compute shader with glslc";
+
+            const Extrinsic::Backends::Vulkan::VulkanPipelineDiagnosticsSnapshot beforePipelineDiagnostics =
+                Extrinsic::Backends::Vulkan::GetVulkanPipelineDiagnosticsSnapshot();
+
+            Extrinsic::RHI::PipelineDesc pipelineDesc{};
+            pipelineDesc.ComputeShaderPath = computeSpv.string();
+            pipelineDesc.DebugName = "VulkanBootstrapSmoke.ComputePipeline";
+            const Extrinsic::RHI::PipelineHandle pipeline = device->CreatePipeline(pipelineDesc);
+            EXPECT_TRUE(pipeline.IsValid())
+                << "guarded service-ready bootstrap should support direct Vulkan compute pipeline creation "
+                   "even though renderer/manager paths remain gated by IsOperational()";
+
+            const Extrinsic::Backends::Vulkan::VulkanPipelineDiagnosticsSnapshot pipelineDiagnostics =
+                Extrinsic::Backends::Vulkan::GetVulkanPipelineDiagnosticsSnapshot();
+            EXPECT_EQ(pipelineDiagnostics.Status,
+                      Extrinsic::Backends::Vulkan::VulkanPipelineCreationStatus::CreatedCompute);
+            EXPECT_EQ(pipelineDiagnostics.LastVkResult, 0);
+            EXPECT_TRUE(pipelineDiagnostics.DeviceAvailable);
+            EXPECT_FALSE(pipelineDiagnostics.DeviceOperational);
+            EXPECT_TRUE(pipelineDiagnostics.GlobalPipelineLayoutAvailable);
+            EXPECT_TRUE(pipelineDiagnostics.ComputePipeline);
+            EXPECT_GT(pipelineDiagnostics.ShaderBytesRead, 0u);
+            EXPECT_EQ(pipelineDiagnostics.SuccessfulPipelineCreations,
+                      beforePipelineDiagnostics.SuccessfulPipelineCreations + 1u);
+
+            device->DestroyPipeline(pipeline);
+        }
     }
     else
     {

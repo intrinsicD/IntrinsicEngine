@@ -195,6 +195,40 @@ namespace Extrinsic::Backends::Vulkan
 
     export [[nodiscard]] VulkanServiceDiagnosticsSnapshot GetVulkanServiceDiagnosticsSnapshot() noexcept;
 
+    // Backend-local diagnostics for concrete Vulkan pipeline construction. The
+    // promoted renderer/RHI path still gates on IDevice::IsOperational(); this
+    // snapshot exists so CPU/null contracts can observe fail-closed pre-bring-up
+    // attempts and opt-in Vulkan smoke tests can verify direct backend pipeline
+    // creation once guarded bootstrap has created a logical device and global
+    // pipeline layout. No Vulkan-native types are exposed here.
+    export enum class VulkanPipelineCreationStatus : std::uint8_t
+    {
+        NotStarted = 0,
+        SkippedPreBringUp = 1,
+        FailedInvalidDescription = 2,
+        FailedShaderRead = 3,
+        FailedShaderModuleCreation = 4,
+        FailedPipelineCreation = 5,
+        CreatedGraphics = 6,
+        CreatedCompute = 7,
+    };
+
+    export struct VulkanPipelineDiagnosticsSnapshot
+    {
+        VulkanPipelineCreationStatus Status = VulkanPipelineCreationStatus::NotStarted;
+        std::int32_t LastVkResult = 0;
+        std::uint32_t ColorTargetCount = 0;
+        std::uint32_t PushConstantSize = 0;
+        std::uint64_t ShaderBytesRead = 0;
+        std::uint64_t SuccessfulPipelineCreations = 0;
+        bool DeviceAvailable = false;
+        bool DeviceOperational = false;
+        bool GlobalPipelineLayoutAvailable = false;
+        bool ComputePipeline = false;
+    };
+
+    export [[nodiscard]] VulkanPipelineDiagnosticsSnapshot GetVulkanPipelineDiagnosticsSnapshot() noexcept;
+
     // Debug breadcrumb for fail-closed non-operational bindless allocation attempts.
     export std::uint64_t GetFallbackBindlessAllocationAttemptCount() noexcept;
 
@@ -248,8 +282,8 @@ namespace Extrinsic::Backends::Vulkan
 
     // Structured reason for the most recent fail-closed CreatePipeline call.
     // Exposed for CPU diagnostics that need to distinguish "device or layout
-    // not yet brought up" from "operational guard reached but shader/pipeline
-    // construction is still unimplemented". Bindless and transfer-queue
+    // not yet brought up" from post-layout shader/description failures.
+    // Bindless and transfer-queue
     // fallbacks intentionally do not yet expose a reason enum because each
     // currently has a single fail-closed reason; revisit when a second
     // emerges. The accessor is process-monotonic in the same sense as the
@@ -260,7 +294,7 @@ namespace Extrinsic::Backends::Vulkan
     {
         None = 0,
         PreBringUp = 1,    // device non-operational or global pipeline layout missing
-        ShaderMissing = 2, // operational guard reached but shader/pipeline construction unimplemented
+        ShaderMissing = 2, // post-layout pipeline path rejected missing/invalid shader inputs
     };
     export FallbackPipelineReason GetLastFallbackPipelineReason() noexcept;
 

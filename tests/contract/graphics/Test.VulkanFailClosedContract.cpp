@@ -407,7 +407,8 @@ TEST(VulkanFailClosedContract, CreatePipelineReportsPreBringUpReason)
     // A freshly constructed VulkanDevice has not been Initialize()d, so the
     // global pipeline layout is missing and m_Operational is false. The
     // fail-closed CreatePipeline guard must report PreBringUp rather than the
-    // ShaderMissing reason that only fires on operational devices.
+    // ShaderMissing reason used after a guarded Vulkan layout exists but shader
+    // inputs/description validation still prevent pipeline creation.
     std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
     ASSERT_NE(device, nullptr);
     ASSERT_FALSE(device->IsOperational());
@@ -416,6 +417,16 @@ TEST(VulkanFailClosedContract, CreatePipelineReportsPreBringUpReason)
 
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetLastFallbackPipelineReason(),
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
+
+    const Extrinsic::Backends::Vulkan::VulkanPipelineDiagnosticsSnapshot pipelineDiagnostics =
+        Extrinsic::Backends::Vulkan::GetVulkanPipelineDiagnosticsSnapshot();
+    EXPECT_EQ(pipelineDiagnostics.Status,
+              Extrinsic::Backends::Vulkan::VulkanPipelineCreationStatus::SkippedPreBringUp);
+    EXPECT_EQ(pipelineDiagnostics.LastVkResult, 0);
+    EXPECT_FALSE(pipelineDiagnostics.DeviceAvailable);
+    EXPECT_FALSE(pipelineDiagnostics.DeviceOperational);
+    EXPECT_FALSE(pipelineDiagnostics.GlobalPipelineLayoutAvailable);
+    EXPECT_FALSE(pipelineDiagnostics.ComputePipeline);
 }
 
 TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitializeShutdownCycles)
@@ -602,6 +613,12 @@ static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::FailedTransferQueueCreation) == 4u);
 static_assert(static_cast<std::uint8_t>(
                   Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::Ready) == 5u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanPipelineCreationStatus::SkippedPreBringUp) == 1u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanPipelineCreationStatus::FailedPipelineCreation) == 5u);
+static_assert(static_cast<std::uint8_t>(
+                  Extrinsic::Backends::Vulkan::VulkanPipelineCreationStatus::CreatedCompute) == 7u);
 
 TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotMatchesIndividualGetters)
 {
