@@ -75,11 +75,15 @@ namespace Extrinsic::Backends::Vulkan
                                  uint32_t mipLevel, uint32_t arrayLayer) override;
 
     private:
+        [[nodiscard]] bool CanBegin() const;
+        [[nodiscard]] bool CanRecord(const char* operation) const;
+
         VkDevice         m_Device        = VK_NULL_HANDLE;
         VkCommandBuffer  m_Cmd           = VK_NULL_HANDLE;
         VkPipelineLayout m_GlobalLayout  = VK_NULL_HANDLE;
         VkDescriptorSet  m_BindlessSet   = VK_NULL_HANDLE;
         VkPipelineBindPoint m_BindPoint  = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        bool             m_Recording     = false;
 
         const Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers   = nullptr;
         const Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* m_Images    = nullptr;

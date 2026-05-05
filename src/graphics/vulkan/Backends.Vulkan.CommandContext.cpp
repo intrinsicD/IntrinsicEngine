@@ -1,6 +1,8 @@
 module;
 
 #include <algorithm>
+#include <atomic>
+#include <cstdint>
 #include <cstdio>
 #include <vector>
 
@@ -9,9 +11,24 @@ module;
 module Extrinsic.Backends.Vulkan;
 
 import :CommandPools;
+import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Backends::Vulkan
 {
+namespace
+{
+    std::atomic<std::uint64_t> g_FallbackCommandRecordingAttempts{0};
+
+    void NoteFallbackCommandRecordingAttempt() noexcept
+    {
+        g_FallbackCommandRecordingAttempts.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+std::uint64_t GetFallbackCommandRecordingAttemptCount() noexcept
+{
+    return g_FallbackCommandRecordingAttempts.load(std::memory_order_relaxed);
+}
 
 // =============================================================================
 // §9  VulkanCommandContext
@@ -32,25 +49,86 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
     m_Images        = images;
     m_Pipelines     = pipelines;
     m_BindPoint     = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    m_Recording     = false;
+}
+
+bool VulkanCommandContext::CanBegin() const
+{
+    if (m_Device == VK_NULL_HANDLE || m_Cmd == VK_NULL_HANDLE)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] Begin skipped; command context is not bound to a live command buffer");
+        return false;
+    }
+    return true;
+}
+
+bool VulkanCommandContext::CanRecord(const char* operation) const
+{
+    if (m_Cmd == VK_NULL_HANDLE)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] Command skipped; command context is not bound to a live command buffer");
+        return false;
+    }
+    if (!m_Recording)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("{}", operation ? operation : "[VulkanCommandContext] Command skipped; command context is not recording");
+        return false;
+    }
+    return true;
 }
 
 void VulkanCommandContext::Begin()
 {
     [[maybe_unused]] Core::Telemetry::ScopedTimer timer{"VulkanCommandContext::Begin", Extrinsic::Core::Telemetry::HashString("VulkanCommandContext::Begin")};
+    if (!CanBegin())
+        return;
+
     VkCommandBufferBeginInfo ci{};
     ci.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     ci.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    VK_CHECK_FATAL(vkBeginCommandBuffer(m_Cmd, &ci));
+    const VkResult result = vkBeginCommandBuffer(m_Cmd, &ci);
+    if (result != VK_SUCCESS)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Error("[VulkanCommandContext] vkBeginCommandBuffer failed; recording skipped");
+        m_Recording = false;
+        return;
+    }
+    m_Recording = true;
 }
 
 void VulkanCommandContext::End()
 {
     [[maybe_unused]] Core::Telemetry::ScopedTimer timer{"VulkanCommandContext::End", Extrinsic::Core::Telemetry::HashString("VulkanCommandContext::End")};
-    VK_CHECK_FATAL(vkEndCommandBuffer(m_Cmd));
+    if (!CanRecord("[VulkanCommandContext] End skipped; command context is not recording"))
+        return;
+
+    const VkResult result = vkEndCommandBuffer(m_Cmd);
+    if (result != VK_SUCCESS)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Error("[VulkanCommandContext] vkEndCommandBuffer failed; command buffer discarded");
+        m_Recording = false;
+        return;
+    }
+    m_Recording = false;
 }
 
 void VulkanCommandContext::BeginRenderPass(const RHI::RenderPassDesc& desc)
 {
+    if (!CanRecord("[VulkanCommandContext] BeginRenderPass skipped; command context is not recording") || !m_Images)
+    {
+        if (m_Cmd != VK_NULL_HANDLE && m_Recording && !m_Images)
+        {
+            NoteFallbackCommandRecordingAttempt();
+            Core::Log::Warn("[VulkanCommandContext] BeginRenderPass skipped; image pool is unavailable");
+        }
+        return;
+    }
+
     // Build color attachment infos.
     std::vector<VkRenderingAttachmentInfo> colorInfos;
     colorInfos.reserve(desc.ColorTargets.size());
@@ -118,12 +196,17 @@ void VulkanCommandContext::BeginRenderPass(const RHI::RenderPassDesc& desc)
 
 void VulkanCommandContext::EndRenderPass()
 {
+    if (!CanRecord("[VulkanCommandContext] EndRenderPass skipped; command context is not recording"))
+        return;
     vkCmdEndRendering(m_Cmd);
 }
 
 void VulkanCommandContext::SetViewport(float x, float y, float w, float h,
                                         float minD, float maxD)
 {
+    if (!CanRecord("[VulkanCommandContext] SetViewport skipped; command context is not recording"))
+        return;
+
     // Flip Y for Vulkan NDC (origin top-left, Y down).
     VkViewport vp{x, y + h, w, -h, minD, maxD};
     vkCmdSetViewport(m_Cmd, 0, 1, &vp);
@@ -131,14 +214,26 @@ void VulkanCommandContext::SetViewport(float x, float y, float w, float h,
 
 void VulkanCommandContext::SetScissor(int32_t x, int32_t y, uint32_t w, uint32_t h)
 {
+    if (!CanRecord("[VulkanCommandContext] SetScissor skipped; command context is not recording"))
+        return;
+
     VkRect2D sc{{x, y}, {w, h}};
     vkCmdSetScissor(m_Cmd, 0, 1, &sc);
 }
 
 void VulkanCommandContext::BindPipeline(RHI::PipelineHandle handle)
 {
+    if (!CanRecord("[VulkanCommandContext] BindPipeline skipped; command context is not recording"))
+        return;
+    if (!m_Pipelines || m_GlobalLayout == VK_NULL_HANDLE || m_BindlessSet == VK_NULL_HANDLE)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] BindPipeline skipped; pipeline pool or global bindless state is unavailable");
+        return;
+    }
+
     const auto* pip = m_Pipelines->GetIfValid(handle);
-    if (!pip) return;
+    if (!pip || pip->Pipeline == VK_NULL_HANDLE) return;
     m_BindPoint = pip->BindPoint;
     vkCmdBindPipeline(m_Cmd, m_BindPoint, pip->Pipeline);
     // Always bind the global bindless descriptor set at set 0.
@@ -148,6 +243,11 @@ void VulkanCommandContext::BindPipeline(RHI::PipelineHandle handle)
 
 void VulkanCommandContext::PushConstants(const void* data, uint32_t size, uint32_t offset)
 {
+    if (!CanRecord("[VulkanCommandContext] PushConstants skipped; command context is not recording"))
+        return;
+    if (m_GlobalLayout == VK_NULL_HANDLE || data == nullptr || size == 0u)
+        return;
+
     vkCmdPushConstants(m_Cmd, m_GlobalLayout,
                        VK_SHADER_STAGE_ALL, offset, size, data);
 }
@@ -156,14 +256,25 @@ void VulkanCommandContext::BindIndexBuffer(RHI::BufferHandle handle,
                                            uint64_t offset,
                                            RHI::IndexType indexType)
 {
+    if (!CanRecord("[VulkanCommandContext] BindIndexBuffer skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] BindIndexBuffer skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* buf = m_Buffers->GetIfValid(handle);
-    if (!buf) return;
+    if (!buf || buf->Buffer == VK_NULL_HANDLE) return;
     vkCmdBindIndexBuffer(m_Cmd, buf->Buffer, offset, ToVkIndexType(indexType));
 }
 
 void VulkanCommandContext::Draw(uint32_t vertexCount, uint32_t instanceCount,
                                  uint32_t firstVertex, uint32_t firstInstance)
 {
+    if (!CanRecord("[VulkanCommandContext] Draw skipped; command context is not recording"))
+        return;
     vkCmdDraw(m_Cmd, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
@@ -171,14 +282,25 @@ void VulkanCommandContext::DrawIndexed(uint32_t indexCount, uint32_t instanceCou
                                         uint32_t firstIndex, int32_t vertexOffset,
                                         uint32_t firstInstance)
 {
+    if (!CanRecord("[VulkanCommandContext] DrawIndexed skipped; command context is not recording"))
+        return;
     vkCmdDrawIndexed(m_Cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
 void VulkanCommandContext::DrawIndirect(RHI::BufferHandle argBuf,
                                          uint64_t offset, uint32_t drawCount)
 {
+    if (!CanRecord("[VulkanCommandContext] DrawIndirect skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] DrawIndirect skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* buf = m_Buffers->GetIfValid(argBuf);
-    if (!buf) return;
+    if (!buf || buf->Buffer == VK_NULL_HANDLE) return;
     vkCmdDrawIndirect(m_Cmd, buf->Buffer, offset, drawCount,
                       sizeof(VkDrawIndirectCommand));
 }
@@ -186,8 +308,17 @@ void VulkanCommandContext::DrawIndirect(RHI::BufferHandle argBuf,
 void VulkanCommandContext::DrawIndexedIndirect(RHI::BufferHandle argBuf,
                                                 uint64_t offset, uint32_t drawCount)
 {
+    if (!CanRecord("[VulkanCommandContext] DrawIndexedIndirect skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] DrawIndexedIndirect skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* buf = m_Buffers->GetIfValid(argBuf);
-    if (!buf) return;
+    if (!buf || buf->Buffer == VK_NULL_HANDLE) return;
     vkCmdDrawIndexedIndirect(m_Cmd, buf->Buffer, offset, drawCount,
                              sizeof(VkDrawIndexedIndirectCommand));
 }
@@ -196,9 +327,18 @@ void VulkanCommandContext::DrawIndexedIndirectCount(RHI::BufferHandle argBuf, ui
                                                      RHI::BufferHandle cntBuf, uint64_t cntOffset,
                                                      uint32_t maxDraw)
 {
+    if (!CanRecord("[VulkanCommandContext] DrawIndexedIndirectCount skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] DrawIndexedIndirectCount skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* abuf = m_Buffers->GetIfValid(argBuf);
     const auto* cbuf = m_Buffers->GetIfValid(cntBuf);
-    if (!abuf || !cbuf) return;
+    if (!abuf || !cbuf || abuf->Buffer == VK_NULL_HANDLE || cbuf->Buffer == VK_NULL_HANDLE) return;
     vkCmdDrawIndexedIndirectCount(m_Cmd, abuf->Buffer, argOffset,
                                   cbuf->Buffer, cntOffset, maxDraw,
                                   sizeof(VkDrawIndexedIndirectCommand));
@@ -208,9 +348,18 @@ void VulkanCommandContext::DrawIndirectCount(RHI::BufferHandle argBuf, uint64_t 
                                               RHI::BufferHandle cntBuf, uint64_t cntOffset,
                                               uint32_t maxDraw)
 {
+    if (!CanRecord("[VulkanCommandContext] DrawIndirectCount skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] DrawIndirectCount skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* abuf = m_Buffers->GetIfValid(argBuf);
     const auto* cbuf = m_Buffers->GetIfValid(cntBuf);
-    if (!abuf || !cbuf) return;
+    if (!abuf || !cbuf || abuf->Buffer == VK_NULL_HANDLE || cbuf->Buffer == VK_NULL_HANDLE) return;
     vkCmdDrawIndirectCount(m_Cmd, abuf->Buffer, argOffset,
                            cbuf->Buffer, cntOffset, maxDraw,
                            sizeof(VkDrawIndirectCommand));
@@ -218,13 +367,24 @@ void VulkanCommandContext::DrawIndirectCount(RHI::BufferHandle argBuf, uint64_t 
 
 void VulkanCommandContext::Dispatch(uint32_t gx, uint32_t gy, uint32_t gz)
 {
+    if (!CanRecord("[VulkanCommandContext] Dispatch skipped; command context is not recording"))
+        return;
     vkCmdDispatch(m_Cmd, gx, gy, gz);
 }
 
 void VulkanCommandContext::DispatchIndirect(RHI::BufferHandle argBuf, uint64_t offset)
 {
+    if (!CanRecord("[VulkanCommandContext] DispatchIndirect skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] DispatchIndirect skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* buf = m_Buffers->GetIfValid(argBuf);
-    if (!buf) return;
+    if (!buf || buf->Buffer == VK_NULL_HANDLE) return;
     vkCmdDispatchIndirect(m_Cmd, buf->Buffer, offset);
 }
 
@@ -232,8 +392,17 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
                                            RHI::TextureLayout before,
                                            RHI::TextureLayout after)
 {
+    if (!CanRecord("[VulkanCommandContext] TextureBarrier skipped; command context is not recording"))
+        return;
+    if (!m_Images)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] TextureBarrier skipped; image pool is unavailable");
+        return;
+    }
+
     const auto* img = m_Images->GetIfValid(tex);
-    if (!img) return;
+    if (!img || img->Image == VK_NULL_HANDLE) return;
     const VkImageLayout oldLayout = ToVkImageLayout(before);
     const VkImageLayout newLayout = ToVkImageLayout(after);
 
@@ -259,8 +428,17 @@ void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
                                           RHI::MemoryAccess before,
                                           RHI::MemoryAccess after)
 {
+    if (!CanRecord("[VulkanCommandContext] BufferBarrier skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] BufferBarrier skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* b = m_Buffers->GetIfValid(buf);
-    if (!b) return;
+    if (!b || b->Buffer == VK_NULL_HANDLE) return;
 
     VkBufferMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -281,6 +459,9 @@ void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
 
 void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
 {
+    if (!CanRecord("[VulkanCommandContext] SubmitBarriers skipped; command context is not recording"))
+        return;
+
     std::vector<VkImageMemoryBarrier2> imageBarriers{};
     std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
     std::vector<VkMemoryBarrier2> memoryBarriers{};
@@ -291,8 +472,14 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
 
     for (const RHI::TextureBarrierDesc& desc : batch.TextureBarriers)
     {
+        if (!m_Images)
+        {
+            NoteFallbackCommandRecordingAttempt();
+            Core::Log::Warn("[VulkanCommandContext] SubmitBarriers skipped texture barriers; image pool is unavailable");
+            break;
+        }
         const auto* image = m_Images->GetIfValid(desc.Texture);
-        if (!image) continue;
+        if (!image || image->Image == VK_NULL_HANDLE) continue;
 
         VkImageMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -311,8 +498,14 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
 
     for (const RHI::BufferBarrierDesc& desc : batch.BufferBarriers)
     {
+        if (!m_Buffers)
+        {
+            NoteFallbackCommandRecordingAttempt();
+            Core::Log::Warn("[VulkanCommandContext] SubmitBarriers skipped buffer barriers; buffer pool is unavailable");
+            break;
+        }
         const auto* buffer = m_Buffers->GetIfValid(desc.Buffer);
-        if (!buffer) continue;
+        if (!buffer || buffer->Buffer == VK_NULL_HANDLE) continue;
 
         VkBufferMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -360,17 +553,35 @@ void VulkanCommandContext::FillBuffer(RHI::BufferHandle handle,
                                     uint64_t size,
                                     uint32_t value)
 {
+    if (!CanRecord("[VulkanCommandContext] FillBuffer skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] FillBuffer skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* buf = m_Buffers->GetIfValid(handle);
-    if (!buf) return;
+    if (!buf || buf->Buffer == VK_NULL_HANDLE) return;
     vkCmdFillBuffer(m_Cmd, buf->Buffer, offset, size, value);
 }
 
 void VulkanCommandContext::CopyBuffer(RHI::BufferHandle src, RHI::BufferHandle dst,
                                        uint64_t srcOff, uint64_t dstOff, uint64_t size)
 {
+    if (!CanRecord("[VulkanCommandContext] CopyBuffer skipped; command context is not recording"))
+        return;
+    if (!m_Buffers)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] CopyBuffer skipped; buffer pool is unavailable");
+        return;
+    }
+
     const auto* s = m_Buffers->GetIfValid(src);
     const auto* d = m_Buffers->GetIfValid(dst);
-    if (!s || !d) return;
+    if (!s || !d || s->Buffer == VK_NULL_HANDLE || d->Buffer == VK_NULL_HANDLE) return;
     VkBufferCopy region{srcOff, dstOff, size};
     vkCmdCopyBuffer(m_Cmd, s->Buffer, d->Buffer, 1, &region);
 }
@@ -379,9 +590,19 @@ void VulkanCommandContext::CopyBufferToTexture(RHI::BufferHandle src, uint64_t s
                                                 RHI::TextureHandle dst,
                                                 uint32_t mipLevel, uint32_t arrayLayer)
 {
+    if (!CanRecord("[VulkanCommandContext] CopyBufferToTexture skipped; command context is not recording"))
+        return;
+    if (!m_Buffers || !m_Images)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] CopyBufferToTexture skipped; buffer or image pool is unavailable");
+        return;
+    }
+
     const auto* s = m_Buffers->GetIfValid(src);
     const auto* d = m_Images->GetIfValid(dst);
-    if (!s || !d) return;
+    if (!s || !d || s->Buffer == VK_NULL_HANDLE || d->Image == VK_NULL_HANDLE) return;
+    if (mipLevel >= d->MipLevels || arrayLayer >= d->ArrayLayers) return;
     VkBufferImageCopy region{};
     region.bufferOffset     = srcOff;
     region.imageSubresource = {AspectFromFormat(d->Format), mipLevel, arrayLayer, 1};

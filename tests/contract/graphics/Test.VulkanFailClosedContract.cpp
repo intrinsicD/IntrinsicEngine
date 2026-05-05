@@ -10,6 +10,7 @@ import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Null;
 import Extrinsic.RHI.Bindless;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
@@ -161,6 +162,29 @@ TEST(VulkanFailClosedContract, CreatePipelineIncrementsCreationCounter)
 
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackPipelineCreationAttemptCount(),
               before + 2u);
+}
+
+TEST(VulkanFailClosedContract, UnboundGraphicsContextRecordingIncrementsAttemptCounter)
+{
+    // GRAPHICS-018 fail-closed contract: the promoted Vulkan graphics context
+    // is returned through the RHI seam even while the device is non-operational.
+    // Unbound command recording must therefore skip with diagnostics rather than
+    // issuing Vulkan commands against null command-buffer state.
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    const std::uint64_t before =
+        Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount();
+
+    Extrinsic::RHI::ICommandContext& context = device->GetGraphicsContext(0u);
+    context.Begin();
+    context.End();
+    context.Draw(1u, 1u, 0u, 0u);
+    context.Dispatch(1u, 1u, 1u);
+
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount(),
+              before + 4u);
 }
 
 TEST(VulkanFailClosedContract, BeginFrameOnNonOperationalDeviceIncrementsAttemptCounter)

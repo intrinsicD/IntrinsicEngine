@@ -239,6 +239,13 @@ namespace Extrinsic::Backends::Vulkan
     // CPU/runtime callers can observe deterministic pending-size state.
     export std::uint64_t GetFallbackResizeAttemptCount() noexcept;
 
+    // Debug breadcrumb for fail-closed Vulkan command-context recording
+    // attempts. Increments when an unbound or not-begun VulkanCommandContext
+    // receives a command-recording call and skips instead of issuing Vulkan
+    // commands against null/non-recording state. This remains backend-local
+    // diagnostics; renderer/runtime code must still gate on IDevice::IsOperational().
+    export std::uint64_t GetFallbackCommandRecordingAttemptCount() noexcept;
+
     // Structured reason for the most recent fail-closed CreatePipeline call.
     // Exposed for CPU diagnostics that need to distinguish "device or layout
     // not yet brought up" from "operational guard reached but shader/pipeline
