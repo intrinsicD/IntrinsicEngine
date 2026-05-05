@@ -74,11 +74,11 @@
 
 ### 5. Diagnostics, docs, and temporary shim retirement
 
-- [ ] Populate all reserved operational statuses in `GetVulkanFrameLifecycleDiagnosticsSnapshot()` from the real acquire/submit/present/recreate paths.
-- [ ] Extend backend-local diagnostics for device-loss/resource-service handoff failures only as needed; keep Vulkan-native handles out of RHI/renderer public APIs.
-- [ ] Decide whether high-frequency fallback breadcrumbs need rate limiting once operational smoke tests drive frame loops.
-- [ ] Update `src/graphics/vulkan/README.md`, `docs/architecture/graphics.md`, and any GPU verification docs when the operational boundary changes.
-- [ ] Retire or rewrite the temporary fail-closed shim notes in this task once public bindless/transfer accessors and operational frame lifecycle are reconciled.
+- [x] Populate all reserved operational statuses in `GetVulkanFrameLifecycleDiagnosticsSnapshot()` from the real acquire/submit/present/recreate paths. All enum variants are now populated: fail-closed paths emit `SkippedNotOperational`/`SkippedNoSwapchain`/`SkippedNoSwapchainImages`; guarded direct paths emit `Acquired`/`Suboptimal`/`OutOfDate`/`FailedAcquire`, `Submitted`/`FailedSubmit`, `Presented`/`Suboptimal`/`OutOfDate`/`FailedPresent`, and `Recreated`/`FailedRecreate`/`RecordedPending*`; device-loss from any path sets `DeviceLost` via `NoteDeviceLostIfNeeded` and routes subsequent calls back through fail-closed paths.
+- [x] Extend backend-local diagnostics for device-loss/resource-service handoff failures only as needed; keep Vulkan-native handles out of RHI/renderer public APIs. No new diagnostics structs are required: `NoteDeviceLostIfNeeded` already propagates `m_DeviceLost` into every lifecycle snapshot; service creation failures surface through `VulkanServiceBootstrapStatus` (`FailedBindlessHeapCreation`, `FailedGlobalPipelineLayoutCreation`, `FailedTransferQueueCreation`); and resource/pipeline creation failures surface via `VulkanPipelineDiagnosticsSnapshot` and per-path log diagnostics. No Vulkan-native types are exposed through RHI/renderer public APIs.
+- [x] Decide whether high-frequency fallback breadcrumbs need rate limiting once operational smoke tests drive frame loops. Decision: frame-loop fail-closed log breadcrumbs (`BeginFrame`, `EndFrame`, `Present`) are suppressed after the first fire — counters increment on every call for diagnostic consumers but `Core::Log::Warn` is emitted only for `count == 1` to prevent log spam at 60 Hz. Resize fail-closed logs are not rate-limited (event-driven, not per-frame). Implemented in `NoteFallbackBeginFrameAttempt`/`NoteFallbackEndFrameAttempt`/`NoteFallbackPresentAttempt` by returning the new count value and gating the log at each call site.
+- [x] Update `src/graphics/vulkan/README.md`, `docs/architecture/graphics.md`, and any GPU verification docs when the operational boundary changes. Updated: lifecycle diagnostics section to document all populated enum variants and device-loss propagation; breadcrumb section to document rate-limiting decision and behavior; "Completing real Vulkan execution" paragraph rewritten to accurately describe what is present vs. still remaining; `docs/architecture/graphics.md` updated with complete lifecycle status taxonomy and current `GRAPHICS-018` completion state.
+- [x] Retire or rewrite the temporary fail-closed shim notes in this task once public bindless/transfer accessors and operational frame lifecycle are reconciled. See updated shim retirement timeline below.
 
 ### 6. Tests and verification gates
 
@@ -89,10 +89,12 @@
 - [x] Add opt-in `gpu;vulkan` smoke coverage for at least one real graphics pipeline path, not only direct compute pipeline creation.
 - [ ] Before retiring this task, run the focused Vulkan backend/tests, the default CPU-supported CTest gate, structural checks, docs checks, and generated module inventory refresh when module surfaces change.
 
-- Temporary fail-closed shim removal/reconciliation timeline:
-  - Fallback bindless heap and fallback transfer queue: public accessor behavior is now predicate-gated against live internal services. Keep the fallbacks as the pre-operational path and expose live services only when the remaining predicate safety prerequisites are cleared by the canonical frame/resize/device-loss slices.
-  - Empty-handle `Create*` paths for non-operational devices: keep as fail-closed guards; operational-path replacement is owned by `GRAPHICS-018` bring-up, now able to call the renderer reset seam completed by `GRAPHICS-018R`.
-  - One-subresource blocking texture upload path: `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`, before multi-mip/layer Vulkan texture smoke tests.
+- Temporary fail-closed shim retirement status (updated 2026-05-05):
+  - Fallback bindless heap and fallback transfer queue: public accessor behavior is predicate-gated against live internal services. The fallbacks remain as the pre-operational path; live services are exposed only after the remaining predicate safety prerequisites (canonical renderer pass execution and public service reconciliation) are cleared. No removal yet.
+  - Empty-handle `Create*` paths for non-operational devices: remain as fail-closed guards. Operational-path replacement remains in `GRAPHICS-018` scope; the renderer reset seam (`GRAPHICS-018R`) is already present and CPU-tested.
+  - One-subresource blocking texture upload path: deferred to `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`; tracked separately before multi-mip/layer Vulkan texture smoke tests.
+  - Fail-closed frame-loop log suppression (new): `BeginFrame`/`EndFrame`/`Present` breadcrumbs emit only on first fire; counters remain process-monotonic. No removal needed — this is the settled behavior for non-operational frame loops.
+  - All section 5 diagnostics/docs/shim items are complete. Remaining blockers for `IsOperational() == true` are tracked in section 6.
 
 ## Goal
 - Wire concrete Vulkan backend execution behind the promoted graphics interfaces and default frame recipe.
