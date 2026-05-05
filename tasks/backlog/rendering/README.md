@@ -107,7 +107,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   defined earlier without blocking.
 - [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
   nonblocking docs-only follow-up for runtime camera controllers, pick-request scheduling, transform-gizmo hit testing, interaction state, and transform application ownership.
-- [GRAPHICS-018 — Vulkan renderer integration](../../active/GRAPHICS-018-vulkan-renderer-integration.md):
+- [GRAPHICS-018 — Vulkan renderer integration](../../done/GRAPHICS-018-vulkan-renderer-integration.md):
   depends on stable CPU/null contracts from GRAPHICS-002, GRAPHICS-003,
   GRAPHICS-004, GRAPHICS-006, GRAPHICS-007, GRAPHICS-008, GRAPHICS-009, and
   GRAPHICS-013C.

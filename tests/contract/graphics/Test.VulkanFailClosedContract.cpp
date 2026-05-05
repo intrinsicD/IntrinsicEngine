@@ -721,3 +721,117 @@ TEST(VulkanFailClosedContract, FallbackDiagnosticsSnapshotIsProcessMonotonic)
     EXPECT_EQ(after.LastPipelineReason,
               Extrinsic::Backends::Vulkan::FallbackPipelineReason::PreBringUp);
 }
+
+TEST(VulkanFailClosedContract, FailClosedLifecyclePathsNeverSetDeviceLost)
+{
+    // GRAPHICS-018 fail-closed contract: device-loss is reachable only when a
+    // real Vulkan call returns VK_ERROR_DEVICE_LOST, which cannot happen on a
+    // CPU/null device. Every fail-closed lifecycle skip path must therefore
+    // leave m_DeviceLost == false and surface that through the lifecycle
+    // diagnostics snapshot, so renderer/runtime CPU CI cannot accidentally
+    // confuse "Vulkan never bootstrapped" with "Vulkan was lost". The same
+    // contract holds for LastVkResult — fail-closed paths populate VK_SUCCESS
+    // (0) because no Vulkan call was ever issued.
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+    ASSERT_FALSE(device->IsOperational());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    EXPECT_FALSE(device->BeginFrame(frame));
+    {
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot snapshot =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_FALSE(snapshot.DeviceLost);
+        EXPECT_EQ(snapshot.LastVkResult, 0);
+        EXPECT_EQ(snapshot.BeginStatus,
+                  Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNotOperational);
+    }
+
+    device->EndFrame(frame);
+    {
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot snapshot =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_FALSE(snapshot.DeviceLost);
+        EXPECT_EQ(snapshot.LastVkResult, 0);
+        EXPECT_EQ(snapshot.EndStatus,
+                  Extrinsic::Backends::Vulkan::VulkanFrameEndStatus::SkippedNotOperational);
+    }
+
+    device->Present(frame);
+    {
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot snapshot =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_FALSE(snapshot.DeviceLost);
+        EXPECT_EQ(snapshot.LastVkResult, 0);
+        EXPECT_EQ(snapshot.PresentStatus,
+                  Extrinsic::Backends::Vulkan::VulkanFramePresentStatus::SkippedNotOperational);
+    }
+
+    device->Resize(800u, 600u);
+    {
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot snapshot =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_FALSE(snapshot.DeviceLost);
+        EXPECT_EQ(snapshot.LastVkResult, 0);
+        EXPECT_EQ(snapshot.ResizeStatus,
+                  Extrinsic::Backends::Vulkan::VulkanFrameResizeStatus::RecordedPendingNotOperational);
+        EXPECT_TRUE(snapshot.ResizePending);
+        EXPECT_EQ(snapshot.LastRequestedWidth, 800u);
+        EXPECT_EQ(snapshot.LastRequestedHeight, 600u);
+    }
+}
+
+TEST(VulkanFailClosedContract, DeviceLostFlagStaysFalseAcrossInitializeShutdownCyclesOnNullWindow)
+{
+    // GRAPHICS-018 fail-closed contract: a non-operational backend must reset
+    // m_DeviceLost on every Initialize() and never spuriously raise it during
+    // null-window bootstrap or Shutdown teardown. CPU CI thus locks in that
+    // fresh `VulkanDevice` instances cannot inherit a stale device-lost flag
+    // and that lifecycle Initialize/Shutdown cycles on a null window do not
+    // accidentally route through the operational-only NoteDeviceLostIfNeeded
+    // path.
+    Extrinsic::Core::Config::WindowConfig windowConfig{};
+    Extrinsic::Core::Config::RenderConfig renderConfig{};
+    renderConfig.EnablePromotedVulkanDevice = true;
+    renderConfig.EnableValidation = false;
+
+    for (int cycle = 0; cycle < 3; ++cycle)
+    {
+        Extrinsic::Platform::Backends::Null::NullWindow window{windowConfig};
+        std::unique_ptr<Extrinsic::RHI::IDevice> device =
+            Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+        ASSERT_NE(device, nullptr);
+
+        // Fresh device pre-Initialize must not report device-lost state.
+        {
+            const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot snapshot =
+                Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+            // Snapshot is process-scoped so DeviceLost reflects the most-recent
+            // emitter; what we can lock in here is that the freshly-constructed
+            // device cannot drive the snapshot into DeviceLost itself.
+            EXPECT_FALSE(snapshot.DeviceOperational);
+        }
+
+        device->Initialize(window, renderConfig);
+        EXPECT_FALSE(device->IsOperational());
+
+        Extrinsic::RHI::FrameHandle frame{};
+        EXPECT_FALSE(device->BeginFrame(frame));
+        device->EndFrame(frame);
+        device->Present(frame);
+        device->Resize(640u, 480u);
+
+        // After fail-closed lifecycle attempts on a null-window non-operational
+        // device, the snapshot's DeviceLost must remain false. No real Vulkan
+        // call has been issued, so NoteDeviceLostIfNeeded must not have run.
+        {
+            const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot snapshot =
+                Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+            EXPECT_FALSE(snapshot.DeviceLost);
+            EXPECT_FALSE(snapshot.DeviceOperational);
+        }
+
+        device->Shutdown();
+        EXPECT_FALSE(device->IsOperational());
+    }
+}
