@@ -64,14 +64,18 @@ available through the Vulkan 1.2/1.3 feature chain.
   no presentation or operational frame path is enabled by that seam.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
-  queue/staging creation, command-context rebinding, bindless capacity, and clean
-  failure/skipped statuses. Constructors for these internal service objects leave
-  invalid state and log diagnostics instead of aborting when Vulkan allocation
-  fails, so the promoted backend can remain fail-closed. Even when the service
-  snapshot reports `Ready`, public `GetBindlessHeap()` and `GetTransferQueue()`
-  still return fail-closed fallback services while `IsOperational() == false`;
-  live services are internal prerequisites only until operational bring-up
-  reconciles fallback behavior.
+  queue/staging creation, command-context rebinding, bindless capacity, clean
+  failure/skipped statuses, and the backend-owned operational predicate inputs.
+  Constructors for these internal service objects leave invalid state and log
+  diagnostics instead of aborting when Vulkan allocation fails, so the promoted
+  backend can remain fail-closed. Public `GetBindlessHeap()` and
+  `GetTransferQueue()` now route through the same predicate as
+  `IDevice::IsOperational()`: live logical-device/swapchain/per-frame/service
+  state must be present, and operational safety blockers for canonical renderer
+  frame execution plus resize/device-loss recovery must be cleared. The guarded
+  bootstrap currently satisfies the live-prerequisite half only, so the public
+  accessors still return fail-closed fallback services even when the service
+  snapshot reports `Ready`.
 - The internal `VulkanTransferQueue` path is hardened for future public handoff:
   command-buffer allocation/begin/end/submit and semaphore-query failures now log
   diagnostics and return invalid `RHI::TransferToken` values instead of aborting
@@ -134,17 +138,21 @@ available through the Vulkan 1.2/1.3 feature chain.
   end-frame-count, present-count, resize-count.
 - `GetVulkanFrameLifecycleDiagnosticsSnapshot()` reports the most recent
   promoted Vulkan frame lifecycle attempt with a backend-local structured status
-  taxonomy for `BeginFrame`, `EndFrame`, `Present`, and `Resize`. The current
-  implementation populates the fail-closed statuses (`SkippedNotOperational`,
-  `SkippedNoSwapchain`, `SkippedNoSwapchainImages`, and pending resize states)
-  plus the last frame/image indices, requested resize extent, availability
-  booleans, last Vulkan result code, and the same process-monotonic lifecycle
-  counters exposed by `FallbackDiagnosticsSnapshot`. Future acquire/submit/
-  present/recreate slices should fill the reserved operational statuses
-  (`Acquired`, `Submitted`, `Presented`, `Suboptimal`, `OutOfDate`, `Recreated`,
-  and failure variants) before `IsOperational()` can become true. The snapshot is
-  backend-specific diagnostics only; it does not expose Vulkan-native types and
-  must not become a renderer/RHI branching seam.
+  taxonomy for `BeginFrame`, `EndFrame`, `Present`, and `Resize`. Fail-closed
+  paths populate `SkippedNotOperational`, `SkippedNoSwapchain`,
+  `SkippedNoSwapchainImages`, and pending resize states. After guarded bootstrap
+  has produced a logical device, swapchain, per-frame command/sync resources,
+  and live internal services, direct opt-in smoke coverage can also exercise an
+  empty `vkAcquireNextImageKHR` -> command-buffer submit -> `vkQueuePresentKHR`
+  path while `IsOperational()` remains false; those calls populate `Acquired`,
+  `Submitted`, `Presented`, `Suboptimal`, `OutOfDate`, and failure variants.
+  `Resize` recreation and device-loss recovery still remain before Vulkan can be
+  marked operational. The snapshot also carries the last frame/image indices,
+  requested resize extent, availability booleans, last Vulkan result code, and
+  the same process-monotonic lifecycle counters exposed by
+  `FallbackDiagnosticsSnapshot`. The snapshot is backend-specific diagnostics
+  only; it does not expose Vulkan-native types and must not become a renderer/RHI
+  branching seam.
 - `VulkanCommandContext` is fail-closed before operational bring-up: unbound or
   not-begun command recording calls skip with logger diagnostics instead of
   issuing Vulkan commands against null/non-recording command-buffer state.
@@ -177,11 +185,18 @@ available through the Vulkan 1.2/1.3 feature chain.
   swapchain image/view/handle registration are present,
   plus guarded live bindless/global-layout/transfer service handoff, hardened
   internal transfer invalid-token failure behavior, and nonfatal command-context
-  recording skips and concrete SPIR-V pipeline creation are present, but presentation,
-  resize, device-loss diagnostics, and public service fallback reconciliation still need to land before `IsOperational()`
-  can become true. The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan`
-  and verifies that bootstrap either creates swapchain image/view/handle state or
-  fails/skips cleanly on unsupported hosts. The completed renderer reset seam removes one
+  recording skips, concrete SPIR-V pipeline creation, and a guarded direct
+  empty-frame acquire/submit/present smoke path are present, but operational
+  resize/recreate, device-loss recovery, canonical renderer pass execution, and
+  public service fallback reconciliation still need to land before
+  `IsOperational()` can become true. The opt-in `VulkanBootstrapSmoke` test is
+  labeled `gpu;vulkan` and verifies that bootstrap either creates swapchain
+  image/view/handle state or fails/skips cleanly on unsupported hosts. When
+  service-ready bootstrap succeeds, the smoke test records an empty command
+  buffer that transitions the acquired backbuffer to present layout, submits it,
+  and presents it while asserting that `IsOperational()` remains false and public
+  bindless/transfer access still returns fail-closed fallbacks. The completed
+  renderer reset seam removes one
   prior blocker, but Vulkan may not report operational until fallback
   bindless/transfer behavior and real backend resources are reconciled behind
   the same RHI interfaces.

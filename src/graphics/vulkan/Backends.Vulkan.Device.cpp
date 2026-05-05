@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cassert>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -668,11 +669,333 @@ std::unique_ptr<RHI::IDevice> CreateVulkanDevice()
 
 VulkanDevice::~VulkanDevice() = default;
 
+bool VulkanDevice::HasLiveOperationalPrerequisites() const noexcept
+{
+    if (m_DeviceLost || m_Instance == VK_NULL_HANDLE || m_Surface == VK_NULL_HANDLE ||
+        m_PhysDevice == VK_NULL_HANDLE || m_Device == VK_NULL_HANDLE || m_Vma == VK_NULL_HANDLE ||
+        m_GraphicsQueue == VK_NULL_HANDLE || m_PresentQueue == VK_NULL_HANDLE ||
+        m_TransferVkQueue == VK_NULL_HANDLE || m_Swapchain == VK_NULL_HANDLE ||
+        m_GlobalPipelineLayout == VK_NULL_HANDLE || m_SwapchainExtent.width == 0u ||
+        m_SwapchainExtent.height == 0u || !m_BindlessHeap || !m_BindlessHeap->IsValid() ||
+        !m_TransferQueue || !m_TransferQueue->IsValid())
+    {
+        return false;
+    }
+
+    const std::size_t swapchainImageCount = m_SwapchainImages.size();
+    if (swapchainImageCount == 0u || m_SwapchainViews.size() != swapchainImageCount ||
+        m_SwapchainHandles.size() != swapchainImageCount)
+    {
+        return false;
+    }
+
+    for (const RHI::TextureHandle handle : m_SwapchainHandles)
+    {
+        if (!handle.IsValid())
+            return false;
+    }
+
+    if (m_FrameSlot >= kMaxFramesInFlight)
+        return false;
+
+    for (const PerFrame& frame : m_Frames)
+    {
+        if (frame.CmdPool == VK_NULL_HANDLE || frame.CmdBuffer == VK_NULL_HANDLE ||
+            frame.Fence == VK_NULL_HANDLE || frame.ImageAcquired == VK_NULL_HANDLE ||
+            frame.RenderDone == VK_NULL_HANDLE)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool VulkanDevice::HasOperationalSafetyPrerequisites() const noexcept
+{
+    // GRAPHICS-018 operational promotion is intentionally stricter than guarded
+    // bootstrap readiness. The live Vulkan objects above are necessary but not
+    // sufficient: canonical renderer frame execution, operational swapchain
+    // resize/recreation, and device-loss recovery must all be reconciled before
+    // runtime/renderer code may observe IsOperational() and therefore receive
+    // the live public services.
+    return false;
+}
+
+bool VulkanDevice::ComputeOperationalPredicate() const noexcept
+{
+    return HasLiveOperationalPrerequisites() && HasOperationalSafetyPrerequisites();
+}
+
+void VulkanDevice::RefreshOperationalState() noexcept
+{
+    m_Operational = ComputeOperationalPredicate();
+}
+
+void VulkanDevice::NoteDeviceLostIfNeeded(const VkResult result) noexcept
+{
+    if (result == VK_ERROR_DEVICE_LOST)
+    {
+        m_DeviceLost = true;
+        m_Operational = false;
+    }
+}
+
+VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWidth,
+                                                const std::uint32_t requestedHeight,
+                                                const VkSwapchainKHR oldSwapchain,
+                                                VulkanSwapchainState& outState)
+{
+    outState = {};
+    if (m_Device == VK_NULL_HANDLE || m_PhysDevice == VK_NULL_HANDLE || m_Surface == VK_NULL_HANDLE ||
+        requestedWidth == 0u || requestedHeight == 0u)
+    {
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    VkSurfaceCapabilitiesKHR surfaceCapabilities{};
+    VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysDevice,
+                                                                m_Surface,
+                                                                &surfaceCapabilities);
+    if (result != VK_SUCCESS)
+        return result;
+
+    std::uint32_t surfaceFormatCount = 0;
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDevice,
+                                                  m_Surface,
+                                                  &surfaceFormatCount,
+                                                  nullptr);
+    if (result != VK_SUCCESS || surfaceFormatCount == 0u)
+        return result == VK_SUCCESS ? VK_ERROR_FORMAT_NOT_SUPPORTED : result;
+
+    std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysDevice,
+                                                  m_Surface,
+                                                  &surfaceFormatCount,
+                                                  surfaceFormats.data());
+    if (result != VK_SUCCESS || surfaceFormatCount == 0u)
+        return result == VK_SUCCESS ? VK_ERROR_FORMAT_NOT_SUPPORTED : result;
+    surfaceFormats.resize(surfaceFormatCount);
+
+    std::uint32_t presentModeCount = 0;
+    result = vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDevice,
+                                                       m_Surface,
+                                                       &presentModeCount,
+                                                       nullptr);
+    if (result != VK_SUCCESS || presentModeCount == 0u)
+        return result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result;
+
+    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    result = vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysDevice,
+                                                       m_Surface,
+                                                       &presentModeCount,
+                                                       presentModes.data());
+    if (result != VK_SUCCESS || presentModeCount == 0u)
+        return result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result;
+    presentModes.resize(presentModeCount);
+
+    const VkSurfaceFormatKHR surfaceFormat = ChooseSwapchainSurfaceFormat(surfaceFormats);
+    const VkPresentModeKHR presentMode = ToVkPresentMode(m_PresentMode, presentModes);
+    const VkExtent2D swapchainExtent = ChooseSwapchainExtent(
+        surfaceCapabilities,
+        Platform::Extent2D{.Width = static_cast<int>(requestedWidth),
+                           .Height = static_cast<int>(requestedHeight)});
+    if (swapchainExtent.width == 0u || swapchainExtent.height == 0u)
+        return VK_ERROR_OUT_OF_DATE_KHR;
+
+    std::uint32_t desiredImageCount = surfaceCapabilities.minImageCount + 1u;
+    if (surfaceCapabilities.maxImageCount > 0u && desiredImageCount > surfaceCapabilities.maxImageCount)
+        desiredImageCount = surfaceCapabilities.maxImageCount;
+
+    const std::uint32_t queueFamilyIndices[] = {m_GraphicsFamily, m_PresentFamily};
+    VkSwapchainCreateInfoKHR swapchainInfo{};
+    swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapchainInfo.surface = m_Surface;
+    swapchainInfo.minImageCount = desiredImageCount;
+    swapchainInfo.imageFormat = surfaceFormat.format;
+    swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
+    swapchainInfo.imageExtent = swapchainExtent;
+    swapchainInfo.imageArrayLayers = 1u;
+    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    if (m_GraphicsFamily != m_PresentFamily)
+    {
+        swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        swapchainInfo.queueFamilyIndexCount = 2u;
+        swapchainInfo.pQueueFamilyIndices = queueFamilyIndices;
+    }
+    else
+    {
+        swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+    swapchainInfo.preTransform = surfaceCapabilities.currentTransform;
+    swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapchainInfo.presentMode = presentMode;
+    swapchainInfo.clipped = VK_TRUE;
+    swapchainInfo.oldSwapchain = oldSwapchain;
+
+    result = vkCreateSwapchainKHR(m_Device, &swapchainInfo, nullptr, &outState.Swapchain);
+    if (result != VK_SUCCESS || outState.Swapchain == VK_NULL_HANDLE)
+        return result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result;
+
+    outState.Format = surfaceFormat.format;
+    outState.Extent = swapchainExtent;
+
+    std::uint32_t swapchainImageCount = 0;
+    result = vkGetSwapchainImagesKHR(m_Device, outState.Swapchain, &swapchainImageCount, nullptr);
+    if (result != VK_SUCCESS || swapchainImageCount == 0u)
+    {
+        vkDestroySwapchainKHR(m_Device, outState.Swapchain, nullptr);
+        outState.Swapchain = VK_NULL_HANDLE;
+        return result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result;
+    }
+
+    outState.Images.resize(swapchainImageCount);
+    result = vkGetSwapchainImagesKHR(m_Device,
+                                     outState.Swapchain,
+                                     &swapchainImageCount,
+                                     outState.Images.data());
+    if (result != VK_SUCCESS || swapchainImageCount == 0u)
+    {
+        vkDestroySwapchainKHR(m_Device, outState.Swapchain, nullptr);
+        outState = {};
+        return result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result;
+    }
+    outState.Images.resize(swapchainImageCount);
+    outState.Views.reserve(swapchainImageCount);
+    outState.Handles.reserve(swapchainImageCount);
+
+    for (VkImage swapchainImage : outState.Images)
+    {
+        VkImageView imageView = VK_NULL_HANDLE;
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = swapchainImage;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = outState.Format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0u;
+        viewInfo.subresourceRange.levelCount = 1u;
+        viewInfo.subresourceRange.baseArrayLayer = 0u;
+        viewInfo.subresourceRange.layerCount = 1u;
+
+        result = vkCreateImageView(m_Device, &viewInfo, nullptr, &imageView);
+        if (result != VK_SUCCESS || imageView == VK_NULL_HANDLE)
+        {
+            if (imageView != VK_NULL_HANDLE)
+                vkDestroyImageView(m_Device, imageView, nullptr);
+            for (VkImageView createdView : outState.Views)
+            {
+                if (createdView != VK_NULL_HANDLE)
+                    vkDestroyImageView(m_Device, createdView, nullptr);
+            }
+            vkDestroySwapchainKHR(m_Device, outState.Swapchain, nullptr);
+            outState = {};
+            return result == VK_SUCCESS ? VK_ERROR_INITIALIZATION_FAILED : result;
+        }
+
+        outState.Views.push_back(imageView);
+    }
+
+    for (std::size_t imageIndex = 0; imageIndex < outState.Images.size(); ++imageIndex)
+    {
+        VulkanImage importedImage{};
+        importedImage.Image = outState.Images[imageIndex];
+        importedImage.View = outState.Views[imageIndex];
+        importedImage.Format = outState.Format;
+        importedImage.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        importedImage.Width = outState.Extent.width;
+        importedImage.Height = outState.Extent.height;
+        importedImage.Depth = 1u;
+        importedImage.MipLevels = 1u;
+        importedImage.ArrayLayers = 1u;
+        importedImage.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        importedImage.OwnsMemory = false;
+
+        outState.Handles.push_back(m_Images.Add(std::move(importedImage)));
+    }
+
+    return VK_SUCCESS;
+}
+
+void VulkanDevice::DestroySwapchainState(VulkanSwapchainState& state)
+{
+    if (m_Device != VK_NULL_HANDLE)
+    {
+        for (const RHI::TextureHandle handle : state.Handles)
+        {
+            VulkanImage* image = m_Images.GetIfValid(handle);
+            if (!image)
+                continue;
+
+            const VkImageView view = image->View;
+            image->Image = VK_NULL_HANDLE;
+            image->View = VK_NULL_HANDLE;
+            image->Allocation = VK_NULL_HANDLE;
+            image->CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            m_Images.Remove(handle, m_GlobalFrameNumber);
+
+            if (view != VK_NULL_HANDLE)
+                vkDestroyImageView(m_Device, view, nullptr);
+        }
+
+        if (state.Swapchain != VK_NULL_HANDLE)
+            vkDestroySwapchainKHR(m_Device, state.Swapchain, nullptr);
+    }
+
+    state = {};
+}
+
+void VulkanDevice::AdoptSwapchainState(VulkanSwapchainState&& state)
+{
+    m_Swapchain = state.Swapchain;
+    m_SwapchainFormat = state.Format;
+    m_SwapchainExtent = state.Extent;
+    m_SwapchainImages = std::move(state.Images);
+    m_SwapchainViews = std::move(state.Views);
+    m_SwapchainHandles = std::move(state.Handles);
+
+    state.Swapchain = VK_NULL_HANDLE;
+    state.Format = VK_FORMAT_UNDEFINED;
+    state.Extent = {};
+}
+
+void VulkanDevice::ResetFrameAcquisitionState() noexcept
+{
+    for (PerFrame& frame : m_Frames)
+    {
+        frame.AcquiredImageIndex = 0u;
+        frame.ImageAcquiredForFrame = false;
+        frame.SubmittedForPresent = false;
+    }
+}
+
+bool VulkanDevice::IsOperational() const noexcept
+{
+    return m_Operational && ComputeOperationalPredicate();
+}
+
+RHI::ITransferQueue& VulkanDevice::GetTransferQueue()
+{
+    if (IsOperational() && m_TransferQueue && m_TransferQueue->IsValid())
+        return *m_TransferQueue;
+    return m_FallbackTransferQueue;
+}
+
+RHI::IBindlessHeap& VulkanDevice::GetBindlessHeap()
+{
+    if (IsOperational() && m_BindlessHeap && m_BindlessHeap->IsValid())
+        return *m_BindlessHeap;
+    return m_FallbackBindlessHeap;
+}
+
 void VulkanDevice::Initialize(Platform::IWindow& window,
                               const Core::Config::RenderConfig& config)
 {
     m_ValidationEnabled = config.EnableValidation;
     m_Operational       = false;
+    m_DeviceLost        = false;
+    m_HasPendingResize  = false;
+    m_PendingResizeExtent = {};
     m_FrameSlot         = 0;
     m_GlobalFrameNumber = 0;
 
@@ -681,6 +1004,9 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
     {
         Shutdown();
         m_ValidationEnabled = config.EnableValidation;
+        m_DeviceLost        = false;
+        m_HasPendingResize  = false;
+        m_PendingResizeExtent = {};
         m_FrameSlot         = 0;
         m_GlobalFrameNumber = 0;
     }
@@ -1281,14 +1607,18 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         }
         serviceDiagnostics.CommandContextsRebound =
             serviceDiagnostics.CommandContextRebindCount == kMaxFramesInFlight;
-        serviceDiagnostics.PublicServicesRemainFailClosed = !m_Operational;
+        RefreshOperationalState();
+        serviceDiagnostics.LiveOperationalPrerequisitesReady = HasLiveOperationalPrerequisites();
+        serviceDiagnostics.OperationalSafetyPrerequisitesReady = HasOperationalSafetyPrerequisites();
+        serviceDiagnostics.PublicServicesExposed = IsOperational();
+        serviceDiagnostics.PublicServicesRemainFailClosed = !serviceDiagnostics.PublicServicesExposed;
         serviceDiagnostics.Status = VulkanServiceBootstrapStatus::Ready;
         PublishServiceDiagnostics(serviceDiagnostics);
 
         diagnostics.Status = VulkanBootstrapStatus::RegisteredSwapchainImages;
         PublishBootstrapDiagnostics(diagnostics);
 
-        Core::Log::Warn("[VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; concrete pipelines, presentation, resize, and fallback reconciliation remain incomplete, so device remains non-operational.");
+        Core::Log::Warn("[VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution, resize/device-loss handling, and operational public-service exposure remain predicate blockers, so device remains non-operational.");
         return;
     }
 
@@ -1379,6 +1709,8 @@ void VulkanDevice::Shutdown()
     m_Swapchain        = VK_NULL_HANDLE;
     m_SwapchainFormat  = VK_FORMAT_UNDEFINED;
     m_SwapchainExtent  = {};
+    m_PendingResizeExtent = {};
+    m_HasPendingResize = false;
     m_DefaultSamplerHandle = {};
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
     m_SamplerAnisotropySupported = false;
@@ -1403,6 +1735,9 @@ void VulkanDevice::Shutdown()
         frame.Fence = VK_NULL_HANDLE;
         frame.ImageAcquired = VK_NULL_HANDLE;
         frame.RenderDone = VK_NULL_HANDLE;
+        frame.AcquiredImageIndex = 0;
+        frame.ImageAcquiredForFrame = false;
+        frame.SubmittedForPresent = false;
         frame.DeletionQueue.clear();
 
         m_CmdContexts[frameSlot].Bind(VK_NULL_HANDLE,
@@ -1441,6 +1776,7 @@ void VulkanDevice::Shutdown()
         vkDestroyInstance(m_Instance, nullptr);
     m_Instance = VK_NULL_HANDLE;
     m_Operational      = false;
+    m_DeviceLost       = false;
 }
 
 void VulkanDevice::WaitIdle()
@@ -1453,12 +1789,21 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
 {
     outFrame = {};
 
-    if (!m_Operational || m_Swapchain == VK_NULL_HANDLE || m_SwapchainHandles.empty())
+    const bool lifecycleReady = !m_DeviceLost && m_Device != VK_NULL_HANDLE && m_Swapchain != VK_NULL_HANDLE &&
+        !m_SwapchainHandles.empty() && m_GraphicsQueue != VK_NULL_HANDLE &&
+        m_PresentQueue != VK_NULL_HANDLE && m_FrameSlot < kMaxFramesInFlight &&
+        m_Frames[m_FrameSlot].CmdPool != VK_NULL_HANDLE &&
+        m_Frames[m_FrameSlot].CmdBuffer != VK_NULL_HANDLE &&
+        m_Frames[m_FrameSlot].Fence != VK_NULL_HANDLE &&
+        m_Frames[m_FrameSlot].ImageAcquired != VK_NULL_HANDLE &&
+        m_Frames[m_FrameSlot].RenderDone != VK_NULL_HANDLE;
+
+    if (!lifecycleReady)
     {
         NoteFallbackBeginFrameAttempt();
         MutateFrameLifecycleDiagnostics([this](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
-            snapshot.BeginStatus = !m_Operational
+            snapshot.BeginStatus = (m_Device == VK_NULL_HANDLE || m_DeviceLost)
                 ? VulkanFrameBeginStatus::SkippedNotOperational
                 : (m_Swapchain == VK_NULL_HANDLE
                     ? VulkanFrameBeginStatus::SkippedNoSwapchain
@@ -1469,21 +1814,144 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
         });
         Core::Log::Warn("[VulkanDevice::BeginFrame] device non-operational; returning fail-closed (no frame produced)");
         return false;
     }
 
-    // BeginFrame hands out the current frame slot without rotating it. The
-    // matching EndFrame call below rotates from the handed-out slot exactly
-    // once, so acquire/end pairing remains single-owner even before full
-    // swapchain acquire/present support lands.
-    outFrame.FrameIndex = m_FrameSlot;
-    outFrame.SwapchainImageIndex = m_FrameSlot % static_cast<std::uint32_t>(m_SwapchainHandles.size());
-    MutateFrameLifecycleDiagnostics([this, &outFrame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    PerFrame& frame = m_Frames[m_FrameSlot];
+    if (frame.ImageAcquiredForFrame)
     {
-        snapshot.BeginStatus = VulkanFrameBeginStatus::Acquired;
-        snapshot.LastVkResult = 0;
+        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
+            snapshot.LastVkResult = static_cast<std::int32_t>(VK_NOT_READY);
+            snapshot.LastFrameIndex = m_FrameSlot;
+            snapshot.LastSwapchainImageIndex = frame.AcquiredImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Warn("[VulkanDevice::BeginFrame] previous guarded Vulkan frame is still in flight; acquire skipped");
+        return false;
+    }
+
+    VkResult result = vkWaitForFences(m_Device, 1u, &frame.Fence, VK_TRUE, UINT64_MAX);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastFrameIndex = m_FrameSlot;
+            snapshot.LastSwapchainImageIndex = 0;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Error("[VulkanDevice::BeginFrame] vkWaitForFences failed; guarded Vulkan frame acquire skipped");
+        return false;
+    }
+
+    result = vkResetCommandPool(m_Device, frame.CmdPool, 0u);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastFrameIndex = m_FrameSlot;
+            snapshot.LastSwapchainImageIndex = 0;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Error("[VulkanDevice::BeginFrame] vkResetCommandPool failed before acquire; guarded frame skipped");
+        return false;
+    }
+
+    std::uint32_t imageIndex = 0;
+    result = vkAcquireNextImageKHR(m_Device,
+                                   m_Swapchain,
+                                   UINT64_MAX,
+                                   frame.ImageAcquired,
+                                   VK_NULL_HANDLE,
+                                   &imageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        m_HasPendingResize = true;
+        m_PendingResizeExtent = m_SwapchainExtent;
+        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.BeginStatus = VulkanFrameBeginStatus::OutOfDate;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastFrameIndex = m_FrameSlot;
+            snapshot.LastSwapchainImageIndex = 0;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
+        });
+        Core::Log::Warn("[VulkanDevice::BeginFrame] vkAcquireNextImageKHR reported out-of-date swapchain; guarded frame skipped");
+        return false;
+    }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+    {
+        NoteDeviceLostIfNeeded(result);
+        MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastFrameIndex = m_FrameSlot;
+            snapshot.LastSwapchainImageIndex = 0;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Error("[VulkanDevice::BeginFrame] vkAcquireNextImageKHR failed; guarded frame skipped");
+        return false;
+    }
+    if (imageIndex >= m_SwapchainHandles.size())
+    {
+        MutateFrameLifecycleDiagnostics([this, imageIndex](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
+            snapshot.LastVkResult = static_cast<std::int32_t>(VK_ERROR_INITIALIZATION_FAILED);
+            snapshot.LastFrameIndex = m_FrameSlot;
+            snapshot.LastSwapchainImageIndex = imageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Error("[VulkanDevice::BeginFrame] acquired swapchain image index is outside registered handle range; guarded frame skipped");
+        return false;
+    }
+
+    frame.AcquiredImageIndex = imageIndex;
+    frame.ImageAcquiredForFrame = true;
+    frame.SubmittedForPresent = false;
+
+    m_CmdContexts[m_FrameSlot].Bind(m_Device,
+                                    frame.CmdBuffer,
+                                    m_GlobalPipelineLayout,
+                                    m_BindlessHeap ? m_BindlessHeap->GetSet() : VK_NULL_HANDLE,
+                                    &m_Buffers,
+                                    &m_Images,
+                                    &m_Pipelines);
+
+    outFrame.FrameIndex = m_FrameSlot;
+    outFrame.SwapchainImageIndex = imageIndex;
+    MutateFrameLifecycleDiagnostics([this, &outFrame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    {
+        snapshot.BeginStatus = result == VK_SUBOPTIMAL_KHR
+            ? VulkanFrameBeginStatus::Suboptimal
+            : VulkanFrameBeginStatus::Acquired;
+        snapshot.LastVkResult = static_cast<std::int32_t>(result);
         snapshot.LastFrameIndex = outFrame.FrameIndex;
         snapshot.LastSwapchainImageIndex = outFrame.SwapchainImageIndex;
         snapshot.DeviceOperational = m_Operational;
@@ -1495,7 +1963,10 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
 
 void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 {
-    if (!m_Operational)
+    const bool lifecycleReady = !m_DeviceLost && m_Device != VK_NULL_HANDLE && m_GraphicsQueue != VK_NULL_HANDLE &&
+        frame.FrameIndex < kMaxFramesInFlight;
+
+    if (!lifecycleReady)
     {
         NoteFallbackEndFrameAttempt();
         MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
@@ -1507,11 +1978,84 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
         });
         Core::Log::Warn("[VulkanDevice::EndFrame] device non-operational; ignoring frame end (no rotation)");
         return;
     }
 
+    PerFrame& perFrame = m_Frames[frame.FrameIndex];
+    if (!perFrame.ImageAcquiredForFrame || perFrame.CmdBuffer == VK_NULL_HANDLE ||
+        perFrame.ImageAcquired == VK_NULL_HANDLE || perFrame.RenderDone == VK_NULL_HANDLE ||
+        perFrame.Fence == VK_NULL_HANDLE)
+    {
+        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
+            snapshot.LastVkResult = static_cast<std::int32_t>(VK_NOT_READY);
+            snapshot.LastFrameIndex = frame.FrameIndex;
+            snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Warn("[VulkanDevice::EndFrame] guarded Vulkan frame has no acquired image or command buffer; submit skipped");
+        return;
+    }
+
+    VkResult result = vkResetFences(m_Device, 1u, &perFrame.Fence);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastFrameIndex = frame.FrameIndex;
+            snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Error("[VulkanDevice::EndFrame] vkResetFences failed; guarded submit skipped");
+        return;
+    }
+
+    const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1u;
+    submitInfo.pWaitSemaphores = &perFrame.ImageAcquired;
+    submitInfo.pWaitDstStageMask = &waitStage;
+    submitInfo.commandBufferCount = 1u;
+    submitInfo.pCommandBuffers = &perFrame.CmdBuffer;
+    submitInfo.signalSemaphoreCount = 1u;
+    submitInfo.pSignalSemaphores = &perFrame.RenderDone;
+
+    {
+        std::scoped_lock lock{m_QueueMutex};
+        result = vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, perFrame.Fence);
+    }
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        perFrame.SubmittedForPresent = false;
+        MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastFrameIndex = frame.FrameIndex;
+            snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit failed for guarded Vulkan frame");
+        return;
+    }
+
+    perFrame.SubmittedForPresent = true;
     // Rotate from the slot returned by BeginFrame, then advance the global
     // post-EndFrame counter consumed by renderer maintenance/deferred-delete
     // code.
@@ -1531,12 +2075,15 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 
 void VulkanDevice::Present(const RHI::FrameHandle& frame)
 {
-    if (!m_Operational || m_Swapchain == VK_NULL_HANDLE)
+    const bool lifecycleReady = !m_DeviceLost && m_Device != VK_NULL_HANDLE && m_PresentQueue != VK_NULL_HANDLE &&
+        m_Swapchain != VK_NULL_HANDLE && frame.FrameIndex < kMaxFramesInFlight;
+
+    if (!lifecycleReady)
     {
         NoteFallbackPresentAttempt();
         MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
-            snapshot.PresentStatus = !m_Operational
+            snapshot.PresentStatus = (m_Device == VK_NULL_HANDLE || m_DeviceLost)
                 ? VulkanFramePresentStatus::SkippedNotOperational
                 : VulkanFramePresentStatus::SkippedNoSwapchain;
             snapshot.LastVkResult = 0;
@@ -1545,31 +2092,98 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
         });
         Core::Log::Warn("[VulkanDevice::Present] device or swapchain non-operational; skipping presentation");
         return;
     }
 
-    MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    PerFrame& perFrame = m_Frames[frame.FrameIndex];
+    if (!perFrame.ImageAcquiredForFrame || !perFrame.SubmittedForPresent ||
+        frame.SwapchainImageIndex >= m_SwapchainHandles.size())
     {
-        snapshot.PresentStatus = VulkanFramePresentStatus::Presented;
-        snapshot.LastVkResult = 0;
+        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.PresentStatus = VulkanFramePresentStatus::FailedPresent;
+            snapshot.LastVkResult = static_cast<std::int32_t>(VK_NOT_READY);
+            snapshot.LastFrameIndex = frame.FrameIndex;
+            snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
+        Core::Log::Warn("[VulkanDevice::Present] guarded Vulkan frame was not submitted or has an invalid image index; present skipped");
+        return;
+    }
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1u;
+    presentInfo.pWaitSemaphores = &perFrame.RenderDone;
+    presentInfo.swapchainCount = 1u;
+    presentInfo.pSwapchains = &m_Swapchain;
+    presentInfo.pImageIndices = &perFrame.AcquiredImageIndex;
+
+    VkResult result = VK_SUCCESS;
+    {
+        std::scoped_lock lock{m_QueueMutex};
+        result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+    }
+
+    perFrame.ImageAcquiredForFrame = false;
+    perFrame.SubmittedForPresent = false;
+
+    const VulkanFramePresentStatus presentStatus = result == VK_SUCCESS
+        ? VulkanFramePresentStatus::Presented
+        : (result == VK_SUBOPTIMAL_KHR
+            ? VulkanFramePresentStatus::Suboptimal
+            : (result == VK_ERROR_OUT_OF_DATE_KHR
+                ? VulkanFramePresentStatus::OutOfDate
+                : VulkanFramePresentStatus::FailedPresent));
+
+    if (presentStatus == VulkanFramePresentStatus::Suboptimal ||
+        presentStatus == VulkanFramePresentStatus::OutOfDate)
+    {
+        m_HasPendingResize = true;
+        m_PendingResizeExtent = m_SwapchainExtent;
+    }
+
+    MutateFrameLifecycleDiagnostics([this, &frame, result, presentStatus](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    {
+        snapshot.PresentStatus = presentStatus;
+        snapshot.LastVkResult = static_cast<std::int32_t>(result);
         snapshot.LastFrameIndex = frame.FrameIndex;
         snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
         snapshot.DeviceOperational = m_Operational;
         snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
         snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        snapshot.DeviceLost = m_DeviceLost;
+        snapshot.ResizePending = m_HasPendingResize;
     });
+
+    if (presentStatus == VulkanFramePresentStatus::FailedPresent)
+    {
+        NoteDeviceLostIfNeeded(result);
+        Core::Log::Error("[VulkanDevice::Present] vkQueuePresentKHR failed for guarded Vulkan frame");
+    }
 }
 
 void VulkanDevice::Resize(uint32_t width, uint32_t height)
 {
-    if (!m_Operational || m_Swapchain == VK_NULL_HANDLE)
+    m_PendingResizeExtent = VkExtent2D{.width = width, .height = height};
+    m_HasPendingResize = true;
+
+    const bool lifecycleReady = !m_DeviceLost && m_Device != VK_NULL_HANDLE && m_PhysDevice != VK_NULL_HANDLE &&
+        m_Surface != VK_NULL_HANDLE && m_Swapchain != VK_NULL_HANDLE && m_GraphicsQueue != VK_NULL_HANDLE &&
+        m_PresentQueue != VK_NULL_HANDLE;
+
+    if (!lifecycleReady)
     {
         NoteFallbackResizeAttempt();
         MutateFrameLifecycleDiagnostics([this, width, height](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
-            snapshot.ResizeStatus = !m_Operational
+            snapshot.ResizeStatus = (m_Device == VK_NULL_HANDLE || m_DeviceLost)
                 ? VulkanFrameResizeStatus::RecordedPendingNotOperational
                 : VulkanFrameResizeStatus::RecordedPendingNoSwapchain;
             snapshot.LastVkResult = 0;
@@ -1578,10 +2192,16 @@ void VulkanDevice::Resize(uint32_t width, uint32_t height)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
         });
         Core::Log::Warn("[VulkanDevice::Resize] device or swapchain non-operational; recording pending extent only");
+        if (m_Swapchain == VK_NULL_HANDLE)
+            m_SwapchainExtent = m_PendingResizeExtent;
+        return;
     }
-    else
+
+    if (width == 0u || height == 0u)
     {
         MutateFrameLifecycleDiagnostics([this, width, height](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
@@ -1592,14 +2212,93 @@ void VulkanDevice::Resize(uint32_t width, uint32_t height)
             snapshot.DeviceOperational = m_Operational;
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
         });
+        Core::Log::Warn("[VulkanDevice::Resize] zero-sized Vulkan resize requested; deferring swapchain recreation");
+        return;
     }
 
-    m_SwapchainExtent = VkExtent2D{.width = width, .height = height};
+    VkResult result = vkDeviceWaitIdle(m_Device);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        MutateFrameLifecycleDiagnostics([this, width, height, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.ResizeStatus = VulkanFrameResizeStatus::FailedRecreate;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastRequestedWidth = width;
+            snapshot.LastRequestedHeight = height;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
+        });
+        Core::Log::Error("[VulkanDevice::Resize] vkDeviceWaitIdle failed before swapchain recreation");
+        return;
+    }
+
+    VulkanSwapchainState newState{};
+    result = CreateSwapchainResources(width, height, m_Swapchain, newState);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        DestroySwapchainState(newState);
+        MutateFrameLifecycleDiagnostics([this, width, height, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.ResizeStatus = VulkanFrameResizeStatus::FailedRecreate;
+            snapshot.LastVkResult = static_cast<std::int32_t>(result);
+            snapshot.LastRequestedWidth = width;
+            snapshot.LastRequestedHeight = height;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            snapshot.DeviceLost = m_DeviceLost;
+            snapshot.ResizePending = m_HasPendingResize;
+        });
+        Core::Log::Error("[VulkanDevice::Resize] Vulkan swapchain recreation failed");
+        return;
+    }
+
+    VulkanSwapchainState oldState{};
+    oldState.Swapchain = m_Swapchain;
+    oldState.Format = m_SwapchainFormat;
+    oldState.Extent = m_SwapchainExtent;
+    oldState.Images = std::move(m_SwapchainImages);
+    oldState.Views = std::move(m_SwapchainViews);
+    oldState.Handles = std::move(m_SwapchainHandles);
+
+    AdoptSwapchainState(std::move(newState));
+    DestroySwapchainState(oldState);
+    ResetFrameAcquisitionState();
+    m_FrameSlot = 0u;
+    m_HasPendingResize = false;
+    m_PendingResizeExtent = {};
+    RefreshOperationalState();
+
+    MutateFrameLifecycleDiagnostics([this, width, height](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+    {
+        snapshot.ResizeStatus = VulkanFrameResizeStatus::Recreated;
+        snapshot.LastVkResult = 0;
+        snapshot.LastRequestedWidth = width;
+        snapshot.LastRequestedHeight = height;
+        snapshot.DeviceOperational = m_Operational;
+        snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+        snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        snapshot.DeviceLost = m_DeviceLost;
+        snapshot.ResizePending = m_HasPendingResize;
+    });
 }
 
 Platform::Extent2D VulkanDevice::GetBackbufferExtent() const
 {
+    if (m_Swapchain == VK_NULL_HANDLE && m_HasPendingResize)
+    {
+        return Platform::Extent2D{.Width = static_cast<int>(m_PendingResizeExtent.width),
+                                  .Height = static_cast<int>(m_PendingResizeExtent.height)};
+    }
+
     return Platform::Extent2D{.Width = static_cast<int>(m_SwapchainExtent.width),
                               .Height = static_cast<int>(m_SwapchainExtent.height)};
 }
@@ -1833,9 +2532,13 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     buf.HostVisible = desc.HostVisible;
     buf.HasBDA      = RHI::HasUsage(desc.Usage, RHI::BufferUsage::Storage);
 
-    if (vmaCreateBuffer(m_Vma, &bci, &aci,
-                        &buf.Buffer, &buf.Allocation, &info) != VK_SUCCESS)
+    VkResult result = vmaCreateBuffer(m_Vma, &bci, &aci,
+                                      &buf.Buffer, &buf.Allocation, &info);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
         return {};
+    }
 
     if (desc.HostVisible)
         buf.MappedPtr = info.pMappedData;
@@ -1927,9 +2630,11 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
     VmaAllocation stagingAlloc{};
     VmaAllocationInfo stagingInfo{};
 
-    if (vmaCreateBuffer(m_Vma, &stagingCI, &stagingACI,
-                        &stagingBuf, &stagingAlloc, &stagingInfo) != VK_SUCCESS)
+    VkResult result = vmaCreateBuffer(m_Vma, &stagingCI, &stagingACI,
+                                      &stagingBuf, &stagingAlloc, &stagingInfo);
+    if (result != VK_SUCCESS)
     {
+        NoteDeviceLostIfNeeded(result);
         Core::Log::Error("[VulkanDevice::WriteBuffer] Failed to allocate staging buffer");
         return;
     }
@@ -2022,8 +2727,10 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     VmaAllocationCreateInfo allocationInfo{};
     allocationInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-    if (vmaCreateImage(m_Vma, &imageInfo, &allocationInfo, &image.Image, &image.Allocation, nullptr) != VK_SUCCESS)
+    VkResult result = vmaCreateImage(m_Vma, &imageInfo, &allocationInfo, &image.Image, &image.Allocation, nullptr);
+    if (result != VK_SUCCESS)
     {
+        NoteDeviceLostIfNeeded(result);
         Core::Log::Error("[VulkanDevice::CreateTexture] Failed to allocate image");
         return {};
     }
@@ -2039,8 +2746,10 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = image.ArrayLayers;
 
-    if (vkCreateImageView(m_Device, &viewInfo, nullptr, &image.View) != VK_SUCCESS)
+    result = vkCreateImageView(m_Device, &viewInfo, nullptr, &image.View);
+    if (result != VK_SUCCESS)
     {
+        NoteDeviceLostIfNeeded(result);
         Core::Log::Error("[VulkanDevice::CreateTexture] Failed to create image view");
         vmaDestroyImage(m_Vma, image.Image, image.Allocation);
         return {};
@@ -2162,13 +2871,15 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
     VmaAllocation stagingAllocation = VK_NULL_HANDLE;
     VmaAllocationInfo stagingAllocationInfo{};
 
-    if (vmaCreateBuffer(m_Vma,
-                        &stagingInfo,
-                        &allocationInfo,
-                        &stagingBuffer,
-                        &stagingAllocation,
-                        &stagingAllocationInfo) != VK_SUCCESS)
+    VkResult result = vmaCreateBuffer(m_Vma,
+                                      &stagingInfo,
+                                      &allocationInfo,
+                                      &stagingBuffer,
+                                      &stagingAllocation,
+                                      &stagingAllocationInfo);
+    if (result != VK_SUCCESS)
     {
+        NoteDeviceLostIfNeeded(result);
         Core::Log::Error("[VulkanDevice::WriteTexture] Failed to allocate staging buffer");
         return;
     }
@@ -2261,8 +2972,10 @@ RHI::SamplerHandle VulkanDevice::CreateSampler(const RHI::SamplerDesc& desc)
     samplerInfo.maxAnisotropy = enableAnisotropy ? desc.MaxAnisotropy : 1.0f;
 
     VulkanSampler sampler{};
-    if (vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler.Sampler) != VK_SUCCESS)
+    VkResult result = vkCreateSampler(m_Device, &samplerInfo, nullptr, &sampler.Sampler);
+    if (result != VK_SUCCESS)
     {
+        NoteDeviceLostIfNeeded(result);
         Core::Log::Error("[VulkanDevice::CreateSampler] Failed to create sampler");
         return {};
     }
@@ -2353,6 +3066,7 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
         VkResult result = CreateShaderModule(m_Device, computeSpirv.Words, computeModule);
         if (result != VK_SUCCESS || computeModule == VK_NULL_HANDLE)
         {
+            NoteDeviceLostIfNeeded(result);
             publish(VulkanPipelineCreationStatus::FailedShaderModuleCreation, result, computeSpirv.Bytes);
             Core::Log::Error("[VulkanDevice] vkCreateShaderModule failed for compute pipeline");
             return {};
@@ -2377,6 +3091,7 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
 
         if (result != VK_SUCCESS || pipeline.Pipeline == VK_NULL_HANDLE)
         {
+            NoteDeviceLostIfNeeded(result);
             publish(VulkanPipelineCreationStatus::FailedPipelineCreation, result, computeSpirv.Bytes);
             Core::Log::Error("[VulkanDevice] vkCreateComputePipelines failed");
             return {};
@@ -2412,6 +3127,7 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
         result = CreateShaderModule(m_Device, fragmentSpirv.Words, fragmentModule);
     if (result != VK_SUCCESS || vertexModule == VK_NULL_HANDLE || fragmentModule == VK_NULL_HANDLE)
     {
+        NoteDeviceLostIfNeeded(result);
         if (vertexModule != VK_NULL_HANDLE)
             vkDestroyShaderModule(m_Device, vertexModule, nullptr);
         if (fragmentModule != VK_NULL_HANDLE)
@@ -2531,6 +3247,7 @@ RHI::PipelineHandle VulkanDevice::CreatePipeline(const RHI::PipelineDesc& desc)
 
     if (result != VK_SUCCESS || pipeline.Pipeline == VK_NULL_HANDLE)
     {
+        NoteDeviceLostIfNeeded(result);
         publish(VulkanPipelineCreationStatus::FailedPipelineCreation, result, shaderBytes);
         Core::Log::Error("[VulkanDevice] vkCreateGraphicsPipelines failed");
         return {};

@@ -101,9 +101,9 @@ namespace Extrinsic::Backends::Vulkan
     // BeginFrame/EndFrame/Present/Resize attempts. This is intentionally not an
     // RHI contract and exposes no Vulkan-native types; renderer/runtime code
     // must continue to branch only on IDevice::IsOperational(). The enum values
-    // are kept stable so opt-in Vulkan smoke tests can lock future operational
-    // acquire/submit/present/resize semantics without making Vulkan mandatory in
-    // the default CPU gate.
+    // are kept stable so opt-in Vulkan smoke tests can lock guarded direct
+    // acquire/submit/present semantics and future operational resize/recreate
+    // semantics without making Vulkan mandatory in the default CPU gate.
     export enum class VulkanFrameBeginStatus : std::uint8_t
     {
         NotStarted = 0,
@@ -112,6 +112,8 @@ namespace Extrinsic::Backends::Vulkan
         SkippedNoSwapchainImages = 3,
         Acquired = 4,
         FailedAcquire = 5,
+        Suboptimal = 6,
+        OutOfDate = 7,
     };
 
     export enum class VulkanFrameEndStatus : std::uint8_t
@@ -161,6 +163,8 @@ namespace Extrinsic::Backends::Vulkan
         bool DeviceOperational = false;
         bool SwapchainAvailable = false;
         bool SwapchainImagesAvailable = false;
+        bool DeviceLost = false;
+        bool ResizePending = false;
     };
 
     export [[nodiscard]] VulkanFrameLifecycleDiagnosticsSnapshot
@@ -169,7 +173,8 @@ namespace Extrinsic::Backends::Vulkan
     // Backend-local service handoff diagnostics for live Vulkan service objects
     // created after guarded bootstrap. These diagnostics are not an RHI branch
     // seam; public GetBindlessHeap()/GetTransferQueue() accessors remain
-    // fail-closed until IDevice::IsOperational() becomes true.
+    // fail-closed until the backend-owned IDevice::IsOperational() predicate is
+    // true.
     export enum class VulkanServiceBootstrapStatus : std::uint8_t
     {
         NotStarted = 0,
@@ -190,6 +195,9 @@ namespace Extrinsic::Backends::Vulkan
         bool GlobalPipelineLayoutCreated = false;
         bool TransferQueueCreated = false;
         bool CommandContextsRebound = false;
+        bool LiveOperationalPrerequisitesReady = false;
+        bool OperationalSafetyPrerequisitesReady = false;
+        bool PublicServicesExposed = false;
         bool PublicServicesRemainFailClosed = true;
     };
 

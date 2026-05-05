@@ -25,6 +25,9 @@ namespace Extrinsic::Backends::Vulkan
         VkFence         Fence         = VK_NULL_HANDLE;
         VkSemaphore     ImageAcquired = VK_NULL_HANDLE;
         VkSemaphore     RenderDone    = VK_NULL_HANDLE;
+        std::uint32_t   AcquiredImageIndex = 0;
+        bool            ImageAcquiredForFrame = false;
+        bool            SubmittedForPresent = false;
         std::vector<VulkanDeferredDelete> DeletionQueue;
     };
 }

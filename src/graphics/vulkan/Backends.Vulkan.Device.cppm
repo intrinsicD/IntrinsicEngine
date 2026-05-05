@@ -56,7 +56,7 @@ namespace Extrinsic::Backends::Vulkan
         void Shutdown()  override;
         void WaitIdle()  override;
 
-        [[nodiscard]] bool IsOperational() const noexcept override { return m_Operational; }
+        [[nodiscard]] bool IsOperational() const noexcept override;
 
         bool BeginFrame(RHI::FrameHandle& outFrame) override;
         void EndFrame(const RHI::FrameHandle& frame) override;
@@ -95,18 +95,8 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::PipelineHandle CreatePipeline(const RHI::PipelineDesc& desc) override;
         void DestroyPipeline(RHI::PipelineHandle handle) override;
 
-        [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override
-        {
-            if (m_Operational && m_TransferQueue)
-                return *m_TransferQueue;
-            return m_FallbackTransferQueue;
-        }
-        [[nodiscard]] RHI::IBindlessHeap& GetBindlessHeap() override
-        {
-            if (m_Operational && m_BindlessHeap)
-                return *m_BindlessHeap;
-            return m_FallbackBindlessHeap;
-        }
+        [[nodiscard]] RHI::ITransferQueue& GetTransferQueue() override;
+        [[nodiscard]] RHI::IBindlessHeap& GetBindlessHeap() override;
         [[nodiscard]] RHI::IProfiler*      GetProfiler()      override { return m_Profiler.get(); }
         [[nodiscard]] uint32_t GetFramesInFlight()    const override { return kMaxFramesInFlight; }
         [[nodiscard]] uint64_t GetGlobalFrameNumber() const override { return m_GlobalFrameNumber; }
@@ -173,6 +163,19 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] VkCommandBuffer BeginOneShot();
         [[nodiscard]] bool EndOneShot(VkCommandBuffer cmd);
 
+        [[nodiscard]] bool HasLiveOperationalPrerequisites() const noexcept;
+        [[nodiscard]] bool HasOperationalSafetyPrerequisites() const noexcept;
+        [[nodiscard]] bool ComputeOperationalPredicate() const noexcept;
+        void RefreshOperationalState() noexcept;
+        void NoteDeviceLostIfNeeded(VkResult result) noexcept;
+        [[nodiscard]] VkResult CreateSwapchainResources(std::uint32_t requestedWidth,
+                                                        std::uint32_t requestedHeight,
+                                                        VkSwapchainKHR oldSwapchain,
+                                                        VulkanSwapchainState& outState);
+        void DestroySwapchainState(VulkanSwapchainState& state);
+        void AdoptSwapchainState(VulkanSwapchainState&& state);
+        void ResetFrameAcquisitionState() noexcept;
+
         void DeferDelete(VulkanDeferredDelete fn);
         void FlushDeletionQueue(uint32_t frameSlot);
 
@@ -194,6 +197,7 @@ namespace Extrinsic::Backends::Vulkan
         VkSwapchainKHR              m_Swapchain        = VK_NULL_HANDLE;
         VkFormat                    m_SwapchainFormat  = VK_FORMAT_UNDEFINED;
         VkExtent2D                  m_SwapchainExtent  = {};
+        VkExtent2D                  m_PendingResizeExtent = {};
         std::vector<VkImage>        m_SwapchainImages;
         std::vector<VkImageView>    m_SwapchainViews;
         std::vector<RHI::TextureHandle> m_SwapchainHandles;
@@ -220,6 +224,8 @@ namespace Extrinsic::Backends::Vulkan
 
         RHI::PresentMode m_PresentMode  = RHI::PresentMode::VSync;
         bool             m_Operational  = false;
+        bool             m_DeviceLost   = false;
+        bool             m_HasPendingResize = false;
         bool             m_ValidationEnabled = false;
         // Set during logical-device feature negotiation; sampler creation still
         // remains guarded by the non-operational device state until full

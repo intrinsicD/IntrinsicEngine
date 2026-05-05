@@ -13,6 +13,7 @@ import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Bindless;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
@@ -326,23 +327,6 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         FAIL() << "GLFW smoke supplied a native window, so bootstrap should not remain unstarted or skip for missing native window";
     }
 
-    Extrinsic::RHI::FrameHandle frame{};
-    EXPECT_FALSE(device->BeginFrame(frame))
-        << "guarded bootstrap must keep frame acquisition fail-closed until Vulkan is marked operational";
-
-    const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot lifecycleDiagnostics =
-        Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
-    EXPECT_EQ(lifecycleDiagnostics.BeginStatus,
-              Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNotOperational);
-    EXPECT_EQ(lifecycleDiagnostics.BeginFrameAttempts,
-              Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount());
-    EXPECT_FALSE(lifecycleDiagnostics.DeviceOperational);
-    if (diagnostics.Status == Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages)
-    {
-        EXPECT_TRUE(lifecycleDiagnostics.SwapchainAvailable);
-        EXPECT_TRUE(lifecycleDiagnostics.SwapchainImagesAvailable);
-    }
-
     const Extrinsic::Backends::Vulkan::VulkanServiceDiagnosticsSnapshot serviceDiagnostics =
         Extrinsic::Backends::Vulkan::GetVulkanServiceDiagnosticsSnapshot();
     if (diagnostics.Status == Extrinsic::Backends::Vulkan::VulkanBootstrapStatus::RegisteredSwapchainImages)
@@ -355,7 +339,70 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(serviceDiagnostics.CommandContextsRebound);
         EXPECT_EQ(serviceDiagnostics.CommandContextRebindCount, expectedFramesInFlight);
         EXPECT_GT(serviceDiagnostics.BindlessCapacity, 0u);
+        EXPECT_TRUE(serviceDiagnostics.LiveOperationalPrerequisitesReady);
+        EXPECT_FALSE(serviceDiagnostics.OperationalSafetyPrerequisitesReady);
+        EXPECT_FALSE(serviceDiagnostics.PublicServicesExposed);
         EXPECT_TRUE(serviceDiagnostics.PublicServicesRemainFailClosed);
+
+        const std::uint64_t beforeCommandRecordingFallback =
+            Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount();
+        Extrinsic::RHI::FrameHandle frame{};
+        const bool frameBegun = device->BeginFrame(frame);
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot beginDiagnostics =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_FALSE(beginDiagnostics.DeviceOperational)
+            << "guarded empty-frame smoke must not mark the promoted Vulkan device operational";
+        EXPECT_TRUE(beginDiagnostics.SwapchainAvailable);
+        EXPECT_TRUE(beginDiagnostics.SwapchainImagesAvailable);
+
+        if (frameBegun)
+        {
+            EXPECT_TRUE(beginDiagnostics.BeginStatus ==
+                            Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::Acquired ||
+                        beginDiagnostics.BeginStatus ==
+                            Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::Suboptimal);
+            EXPECT_EQ(beginDiagnostics.LastFrameIndex, frame.FrameIndex);
+            EXPECT_EQ(beginDiagnostics.LastSwapchainImageIndex, frame.SwapchainImageIndex);
+
+            Extrinsic::RHI::ICommandContext& graphicsContext = device->GetGraphicsContext(frame.FrameIndex);
+            graphicsContext.Begin();
+            const Extrinsic::RHI::TextureHandle backbuffer = device->GetBackbufferHandle(frame);
+            ASSERT_TRUE(backbuffer.IsValid()) << "acquired Vulkan swapchain image should map to a registered RHI handle";
+            graphicsContext.TextureBarrier(backbuffer,
+                                           Extrinsic::RHI::TextureLayout::Undefined,
+                                           Extrinsic::RHI::TextureLayout::Present);
+            graphicsContext.End();
+
+            device->EndFrame(frame);
+            const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot endDiagnostics =
+                Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+            EXPECT_EQ(endDiagnostics.EndStatus,
+                      Extrinsic::Backends::Vulkan::VulkanFrameEndStatus::Submitted);
+            EXPECT_EQ(endDiagnostics.LastVkResult, 0);
+            EXPECT_FALSE(endDiagnostics.DeviceOperational);
+
+            device->Present(frame);
+            const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot presentDiagnostics =
+                Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+            EXPECT_TRUE(presentDiagnostics.PresentStatus ==
+                            Extrinsic::Backends::Vulkan::VulkanFramePresentStatus::Presented ||
+                        presentDiagnostics.PresentStatus ==
+                            Extrinsic::Backends::Vulkan::VulkanFramePresentStatus::Suboptimal ||
+                        presentDiagnostics.PresentStatus ==
+                            Extrinsic::Backends::Vulkan::VulkanFramePresentStatus::OutOfDate);
+            EXPECT_FALSE(presentDiagnostics.DeviceOperational);
+            EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount(),
+                      beforeCommandRecordingFallback)
+                << "guarded empty-frame command recording should use a live Vulkan command buffer";
+        }
+        else
+        {
+            EXPECT_TRUE(beginDiagnostics.BeginStatus ==
+                            Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::OutOfDate ||
+                        beginDiagnostics.BeginStatus ==
+                            Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::FailedAcquire)
+                << "service-ready bootstrap may skip only for a structured acquire/out-of-date failure";
+        }
 
         const std::uint64_t beforeFallbackBindless =
             Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount();
@@ -426,6 +473,21 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
     }
     else
     {
+        Extrinsic::RHI::FrameHandle frame{};
+        EXPECT_FALSE(device->BeginFrame(frame))
+            << "bootstrap without registered swapchain images must keep frame acquisition fail-closed";
+        const Extrinsic::Backends::Vulkan::VulkanFrameLifecycleDiagnosticsSnapshot lifecycleDiagnostics =
+            Extrinsic::Backends::Vulkan::GetVulkanFrameLifecycleDiagnosticsSnapshot();
+        EXPECT_TRUE(lifecycleDiagnostics.BeginStatus ==
+                        Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNotOperational ||
+                    lifecycleDiagnostics.BeginStatus ==
+                        Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNoSwapchain ||
+                    lifecycleDiagnostics.BeginStatus ==
+                        Extrinsic::Backends::Vulkan::VulkanFrameBeginStatus::SkippedNoSwapchainImages);
+        EXPECT_EQ(lifecycleDiagnostics.BeginFrameAttempts,
+                  Extrinsic::Backends::Vulkan::GetFallbackBeginFrameAttemptCount());
+        EXPECT_FALSE(lifecycleDiagnostics.DeviceOperational);
+
         EXPECT_NE(serviceDiagnostics.Status,
                   Extrinsic::Backends::Vulkan::VulkanServiceBootstrapStatus::Ready);
     }

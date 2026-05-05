@@ -112,6 +112,9 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     EXPECT_FALSE(serviceDiagnostics.GlobalPipelineLayoutCreated);
     EXPECT_FALSE(serviceDiagnostics.TransferQueueCreated);
     EXPECT_FALSE(serviceDiagnostics.CommandContextsRebound);
+    EXPECT_FALSE(serviceDiagnostics.LiveOperationalPrerequisitesReady);
+    EXPECT_FALSE(serviceDiagnostics.OperationalSafetyPrerequisitesReady);
+    EXPECT_FALSE(serviceDiagnostics.PublicServicesExposed);
     EXPECT_TRUE(serviceDiagnostics.PublicServicesRemainFailClosed);
     EXPECT_EQ(serviceDiagnostics.BindlessCapacity, 0u);
     EXPECT_EQ(serviceDiagnostics.CommandContextRebindCount, 0u);
