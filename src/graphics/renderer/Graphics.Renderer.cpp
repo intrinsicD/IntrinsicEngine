@@ -758,6 +758,25 @@ namespace Extrinsic::Graphics
                         const RenderCommandPassStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    else
+                    {
+                        // GRAPHICS-018 §4: surface/deferred/debug pass command bodies
+                        // are not yet wired to operational Vulkan resources. They
+                        // soft-skip with structured diagnostics so the executor
+                        // emits the same render-graph barriers and the renderer
+                        // reports complete per-pass status, while preserving
+                        // backend-neutral RHI traffic. The status splits cleanly
+                        // by device readiness: a non-operational device reports
+                        // SkippedNonOperational so CPU CI surfaces accidental
+                        // operational claims, and an operational device reports
+                        // SkippedUnavailable so future per-pass routing changes
+                        // don't silently regress to a no-op.
+                        const RenderCommandPassStatus status =
+                            (m_Device == nullptr || !m_Device->IsOperational())
+                                ? RenderCommandPassStatus::SkippedNonOperational
+                                : RenderCommandPassStatus::SkippedUnavailable;
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                 },
                 [&graphicsContext, &compiled](const BarrierPacket& packet)
                 {

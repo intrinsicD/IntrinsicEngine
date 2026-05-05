@@ -88,15 +88,26 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.DeviceOperational);
     EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
-    EXPECT_EQ(stats.CommandRecords.Skipped, 0u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
-    EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 0u);
+    // GRAPHICS-018 §4: every pass emitted by the FrameRecipe produces a
+    // structured status entry. Routed passes (CullingPass/DepthPrepass)
+    // record real work; the remaining passes soft-skip with
+    // SkippedUnavailable so the renderer reports complete per-pass status
+    // until their command bodies are wired.
+    EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
+    EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
     EXPECT_EQ(device.GetBackbufferHandleCount, 1);
     EXPECT_EQ(device.LastBackbufferFrame.FrameIndex, frame.FrameIndex);
     EXPECT_EQ(device.LastBackbufferFrame.SwapchainImageIndex, frame.SwapchainImageIndex);
@@ -188,14 +199,22 @@ TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutes
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_FALSE(stats.Execute.DeviceOperational);
     EXPECT_EQ(stats.CommandRecords.Recorded, 0u);
-    EXPECT_EQ(stats.CommandRecords.Skipped, 2u);
-    EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 2u);
+    // GRAPHICS-018 §4: a non-operational device skips every routed pass with
+    // SkippedNonOperational so CPU CI surfaces accidental operational claims.
     EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 0u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedNonOperational);
+    EXPECT_GE(stats.CommandRecords.SkippedNonOperational, 2u);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
+    ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
     EXPECT_EQ(device.CommandContext.BeginCalls, 1);
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
@@ -231,7 +250,7 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     renderer->ExecuteFrame(frame, world);
     const Extrinsic::Graphics::RenderGraphFrameStats& nonOperationalStats =
         renderer->GetLastRenderGraphStats();
-    EXPECT_EQ(nonOperationalStats.CommandRecords.SkippedNonOperational, 2u);
+    EXPECT_GE(nonOperationalStats.CommandRecords.SkippedNonOperational, 2u);
 
     device.Operational = true;
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
@@ -251,7 +270,10 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.DeviceOperational);
     EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
-    EXPECT_EQ(stats.CommandRecords.Skipped, 0u);
+    // After operational rebuild, routed passes record real work; remaining
+    // passes soft-skip with SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
@@ -286,8 +308,11 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_EQ(stats.CommandRecords.Recorded, 1u);
-    EXPECT_EQ(stats.CommandRecords.Skipped, 1u);
-    EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 1u);
+    // Depth prepass pipeline failure surfaces as SkippedUnavailable; the
+    // remaining unwired passes also report SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
+    EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
@@ -322,8 +347,12 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_EQ(stats.CommandRecords.Recorded, 0u);
-    EXPECT_EQ(stats.CommandRecords.Skipped, 2u);
-    EXPECT_EQ(stats.CommandRecords.SkippedUnavailable, 2u);
+    // Culling pipeline failure leaves both routed passes unavailable; all
+    // remaining passes also report SkippedUnavailable since the device is
+    // operational but their command bodies are not yet wired.
+    EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
+    EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
+    EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
@@ -366,4 +395,68 @@ TEST(RendererFrameLifecycle, BeginFrameSkipDoesNotRecordCommands)
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordStatuses)
+{
+    // GRAPHICS-018 §4 contract: every pass emitted by the default FrameRecipe
+    // produces a structured RenderGraphCommandPassStats entry. Routed passes
+    // (CullingPass, DepthPrepass) record real Vulkan-flavored command traffic
+    // through the RHI seam; the remaining pass command bodies are not yet
+    // wired and must soft-skip with SkippedUnavailable so the renderer reports
+    // complete per-pass status. Render-graph bracketing remains in effect:
+    // command-context Begin/End wrap the per-pass routing exactly once.
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{200u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 256, .Height = 256},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_EQ(device.CommandContext.BeginCalls, 1);
+    EXPECT_EQ(device.CommandContext.EndCalls, 1);
+
+    // Default features (deferred lighting + depth prepass + post + ImGui)
+    // emit at least these named passes. Every entry must carry a structured
+    // status so future routing changes can't silently regress to a no-op.
+    static constexpr const char* kRoutedPasses[] = {"CullingPass", "DepthPrepass"};
+    static constexpr const char* kSoftSkippedPasses[] = {
+        "SurfacePass",
+        "CompositionPass",
+        "LinePass",
+        "PointPass",
+        "PostProcessPass",
+        "ImGuiPass",
+        "Present",
+    };
+
+    for (const char* name : kRoutedPasses)
+    {
+        ASSERT_NE(FindCommandPass(stats, name), nullptr) << name;
+        EXPECT_EQ(FindCommandPass(stats, name)->Status,
+                  Extrinsic::Graphics::RenderCommandPassStatus::Recorded) << name;
+    }
+    for (const char* name : kSoftSkippedPasses)
+    {
+        ASSERT_NE(FindCommandPass(stats, name), nullptr) << name;
+        EXPECT_EQ(FindCommandPass(stats, name)->Status,
+                  Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable) << name;
+    }
+
+    EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
+    EXPECT_GE(stats.CommandRecords.SkippedUnavailable,
+              sizeof(kSoftSkippedPasses) / sizeof(kSoftSkippedPasses[0]));
+
+    renderer->Shutdown();
+}
 

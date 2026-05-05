@@ -165,6 +165,22 @@ available through the Vulkan 1.2/1.3 feature chain.
   `GetFallbackCommandRecordingAttemptCount()` is a process-monotonic backend
   diagnostic counter for those skips. It is not part of renderer branching;
   renderer/runtime code must still gate command recording on `IDevice::IsOperational()`.
+  After service-ready bootstrap, `Bind()` additionally records the resolved
+  graphics/present/transfer queue family indices and rebinds the live frame
+  command buffer plus buffer/image/pipeline pools so per-frame `BeginFrame`
+  routes the canonical render-graph executor through the live command buffer
+  while the renderer brackets the entire executor invocation with one
+  `Begin()`/`End()` pair. `TextureBarrier`/`SubmitBarriers` translate
+  `RHI::TextureLayout`/`RHI::MemoryAccess` into `vkCmdPipelineBarrier2` records
+  and update each touched `VulkanImage::CurrentLayout` so subsequent
+  uploads/barriers in the same frame observe the most recent recorded layout.
+- `VulkanDevice::CreateBuffer` and `VulkanDevice::CreateTexture` declare
+  `VK_SHARING_MODE_CONCURRENT` with the unique graphics/transfer queue-family
+  list whenever the transfer queue lives on a different family from graphics,
+  mirroring the existing swapchain handling for differing graphics/present
+  families. This lets transfer-queue uploads and graphics-queue reads touch
+  the same resource without explicit queue-family ownership-transfer barrier
+  pairs while operational pass execution is being landed.
 - Buffer, texture, sampler, and pipeline `IDevice` overrides are symbol-complete
   in `Backends.Vulkan.Device.cpp`. They guard null/non-live backend state and can
   be exercised directly after service-ready bootstrap while `IsOperational()`
@@ -204,10 +220,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   recording skips, concrete SPIR-V pipeline creation, and a guarded direct
   empty-frame acquire/submit/present smoke path, guarded resource/descriptor
   readiness, and depth-only graphics pipeline smoke coverage are present, but
-  canonical renderer command recording/pass execution, synchronization/barrier
-  validation, queue-family ownership handling where needed, and public service
-  fallback reconciliation still need to land before
-  `IsOperational()` can become true. The opt-in `VulkanBootstrapSmoke` test is
+  canonical renderer pass command execution beyond `CullingPass`/`DepthPrepass`
+  routing, and public service fallback reconciliation still need to land before
+  `IsOperational()` can become true. Render-graph bracketing already wraps the
+  full executor invocation with a single `VulkanCommandContext::Begin()`/`End()`
+  pair, soft-skipped passes report structured `RenderGraphCommandPassStats`
+  entries, recorded barriers translate through `vkCmdPipelineBarrier2`, and
+  buffer/texture sharing mode handles graphics/transfer queue-family
+  separation when present. The opt-in `VulkanBootstrapSmoke` test is
   labeled `gpu;vulkan` and verifies that bootstrap either creates swapchain
   image/view/handle state or fails/skips cleanly on unsupported hosts. When
   service-ready bootstrap succeeds, the smoke test records an empty command

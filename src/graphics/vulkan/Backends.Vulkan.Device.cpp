@@ -1327,7 +1327,10 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
                                           VK_NULL_HANDLE,
                                           &m_Buffers,
                                           &m_Images,
-                                          &m_Pipelines);
+                                          &m_Pipelines,
+                                          m_GraphicsFamily,
+                                          m_PresentFamily,
+                                          m_TransferFamily);
         }
 
         diagnostics.PerFrameResourcesCreated =
@@ -1625,7 +1628,10 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
                                           m_BindlessHeap->GetSet(),
                                           &m_Buffers,
                                           &m_Images,
-                                          &m_Pipelines);
+                                          &m_Pipelines,
+                                          m_GraphicsFamily,
+                                          m_PresentFamily,
+                                          m_TransferFamily);
             ++serviceDiagnostics.CommandContextRebindCount;
         }
         serviceDiagnostics.CommandContextsRebound =
@@ -1965,7 +1971,10 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
                                     m_BindlessHeap ? m_BindlessHeap->GetSet() : VK_NULL_HANDLE,
                                     &m_Buffers,
                                     &m_Images,
-                                    &m_Pipelines);
+                                    &m_Pipelines,
+                                    m_GraphicsFamily,
+                                    m_PresentFamily,
+                                    m_TransferFamily);
 
     outFrame.FrameIndex = m_FrameSlot;
     outFrame.SwapchainImageIndex = imageIndex;
@@ -2538,6 +2547,35 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     // TransferSrc always present so WriteBuffer's staging copy (dst→src) works.
     bci.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
+    // GRAPHICS-018 §4 queue-family handling: if the transfer queue lives on a
+    // different family from graphics, declare CONCURRENT sharing so transfer
+    // uploads and graphics reads can touch the same buffer without explicit
+    // queue-family ownership-transfer barriers between the two queues. The
+    // simpler EXCLUSIVE path is preserved when families coincide.
+    std::uint32_t bufferQueueFamilies[3] = {m_GraphicsFamily, m_TransferFamily, m_PresentFamily};
+    std::uint32_t bufferQueueFamilyCount = 0;
+    auto pushUniqueFamily = [&bufferQueueFamilies, &bufferQueueFamilyCount](std::uint32_t family)
+    {
+        for (std::uint32_t index = 0; index < bufferQueueFamilyCount; ++index)
+        {
+            if (bufferQueueFamilies[index] == family) return;
+        }
+        bufferQueueFamilies[bufferQueueFamilyCount++] = family;
+    };
+    bufferQueueFamilyCount = 0;
+    pushUniqueFamily(m_GraphicsFamily);
+    if (m_TransferFamily != m_GraphicsFamily) pushUniqueFamily(m_TransferFamily);
+    if (bufferQueueFamilyCount > 1)
+    {
+        bci.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bci.queueFamilyIndexCount = bufferQueueFamilyCount;
+        bci.pQueueFamilyIndices = bufferQueueFamilies;
+    }
+    else
+    {
+        bci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
     VmaAllocationCreateInfo aci{};
     VmaAllocationInfo info{};
 
@@ -2746,7 +2784,22 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     imageInfo.samples = ToVkSampleCount(desc.SampleCount);
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.usage = usage;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    // GRAPHICS-018 §4 queue-family handling: when transfer queue lives on a
+    // different family from graphics, declare CONCURRENT sharing so transfer
+    // uploads (TRANSFER_DST → SHADER_READ_ONLY) and graphics reads can touch
+    // the same image without explicit queue-family ownership-transfer
+    // barriers. EXCLUSIVE is preserved when families coincide.
+    std::uint32_t imageQueueFamilies[2] = {m_GraphicsFamily, m_TransferFamily};
+    if (m_TransferFamily != m_GraphicsFamily)
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        imageInfo.queueFamilyIndexCount = 2u;
+        imageInfo.pQueueFamilyIndices = imageQueueFamilies;
+    }
+    else
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     if (desc.Dimension == RHI::TextureDimension::TexCube)
         imageInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;

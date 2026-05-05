@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <charconv>
 #include <optional>
 #include <span>
 #include <string>
