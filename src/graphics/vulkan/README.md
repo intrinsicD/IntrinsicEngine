@@ -7,16 +7,16 @@ window, `Initialize()` now performs guarded Vulkan bootstrap by initializing
 volk, creating a `VkInstance`, creating a window surface, probing for a
 surface-capable physical device/queue-family/swapchain-support tuple that also
 supports required Vulkan 1.2/1.3 features (`timelineSemaphore`, descriptor
-indexing update-after-bind/partially-bound, `bufferDeviceAddress`, and dynamic rendering), creating a
-logical device with those features and `VK_KHR_swapchain`, loading device-level volk entry points,
-acquiring graphics/present/transfer `VkQueue` handles, creating a VMA allocator,
-allocating per-frame command pools, primary command buffers, fences, and
-acquire/render semaphores, then creating a guarded swapchain with image views and
-  backend-local `RHI::TextureHandle` registrations for the swapchain images, live
-  internal bindless/global-pipeline-layout/transfer service objects, and rebound
-  command contexts. It still leaves the device non-operational until concrete
-  pipeline, presentation, resize, device-loss, and public service fallback
-  reconciliation land; `BeginFrame()` returns `false`
+indexing update-after-bind/partially-bound, `bufferDeviceAddress`, and dynamic
+rendering), creating a logical device with those features and `VK_KHR_swapchain`,
+loading device-level volk entry points, acquiring graphics/present/transfer `VkQueue` handles,
+creating a VMA allocator, allocating per-frame command pools, primary command
+buffers, fences, and acquire/render semaphores, then creating a guarded swapchain
+with image views and backend-local `RHI::TextureHandle` registrations for the
+swapchain images, live internal bindless/global-pipeline-layout/transfer service
+objects, and rebound command contexts. It still leaves the device
+non-operational until concrete pipeline, presentation, resize, device-loss, and
+public service fallback reconciliation land; `BeginFrame()` returns `false`
 instead of fabricating a frame. Full execution requires a surface-capable
 physical device with timeline semaphores, descriptor indexing
 (PARTIALLY_BOUND + UPDATE_AFTER_BIND for sampled images), buffer device
@@ -72,6 +72,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   still return fail-closed fallback services while `IsOperational() == false`;
   live services are internal prerequisites only until operational bring-up
   reconciles fallback behavior.
+- The internal `VulkanTransferQueue` path is hardened for future public handoff:
+  command-buffer allocation/begin/end/submit and semaphore-query failures now log
+  diagnostics and return invalid `RHI::TransferToken` values instead of aborting
+  through `VK_CHECK_FATAL`. Uploads also preflight service validity, data
+  pointers, sizes, buffer ranges, texture mip/layer bounds, transfer-dst usage,
+  and staging allocation before recording commands. Public transfer access still
+  resolves to the fallback queue while non-operational, even when the internal
+  service is `Ready`.
 - Non-operational instances still return valid service references for
   `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
   not allocate GPU slots or upload data; they return invalid indices/tokens and
@@ -147,9 +155,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   physical-device probing with required Vulkan 1.2/1.3 feature negotiation,
   logical-device/queue/allocator/per-frame resource acquisition, and guarded
   swapchain image/view/handle registration are present,
-  plus guarded live bindless/global-layout/transfer service handoff are present,
-  but concrete pipeline creation, presentation, resize, device-loss diagnostics,
-  and public service fallback reconciliation still need to land before `IsOperational()`
+  plus guarded live bindless/global-layout/transfer service handoff and hardened
+  internal transfer invalid-token failure behavior are present, but concrete
+  pipeline creation, presentation, resize, device-loss diagnostics, and public
+  service fallback reconciliation still need to land before `IsOperational()`
   can become true. The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan`
   and verifies that bootstrap either creates swapchain image/view/handle state or
   fails/skips cleanly on unsupported hosts. The completed renderer reset seam removes one
