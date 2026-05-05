@@ -568,23 +568,28 @@ FallbackPipelineReason GetLastFallbackPipelineReason() noexcept
 
 namespace
 {
-    void NoteFallbackBeginFrameAttempt() noexcept
+    // Frame-loop fail-closed breadcrumbs return the new counter value so callers
+    // can log only on the first fire. Subsequent fires are still counted by the
+    // process-monotonic atomic but do not produce log spam at 60 Hz; the counter
+    // itself is always available for CPU diagnostic consumers.
+    [[nodiscard]] std::uint64_t NoteFallbackBeginFrameAttempt() noexcept
     {
-        g_FallbackBeginFrameAttempts.fetch_add(1, std::memory_order_relaxed);
+        return g_FallbackBeginFrameAttempts.fetch_add(1, std::memory_order_relaxed) + 1;
     }
 
-    void NoteFallbackEndFrameAttempt() noexcept
+    [[nodiscard]] std::uint64_t NoteFallbackEndFrameAttempt() noexcept
     {
-        g_FallbackEndFrameAttempts.fetch_add(1, std::memory_order_relaxed);
+        return g_FallbackEndFrameAttempts.fetch_add(1, std::memory_order_relaxed) + 1;
     }
 
-    void NoteFallbackPresentAttempt() noexcept
+    [[nodiscard]] std::uint64_t NoteFallbackPresentAttempt() noexcept
     {
-        g_FallbackPresentAttempts.fetch_add(1, std::memory_order_relaxed);
+        return g_FallbackPresentAttempts.fetch_add(1, std::memory_order_relaxed) + 1;
     }
 
     void NoteFallbackResizeAttempt() noexcept
     {
+        // Resize is event-driven (not per-frame), so no suppression is needed.
         g_FallbackResizeAttempts.fetch_add(1, std::memory_order_relaxed);
     }
 }
@@ -1829,7 +1834,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
 
     if (!lifecycleReady)
     {
-        NoteFallbackBeginFrameAttempt();
+        const std::uint64_t count = NoteFallbackBeginFrameAttempt();
         MutateFrameLifecycleDiagnostics([this](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.BeginStatus = (m_Device == VK_NULL_HANDLE || m_DeviceLost)
@@ -1846,7 +1851,8 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
             snapshot.DeviceLost = m_DeviceLost;
             snapshot.ResizePending = m_HasPendingResize;
         });
-        Core::Log::Warn("[VulkanDevice::BeginFrame] device non-operational; returning fail-closed (no frame produced)");
+        if (count == 1)
+            Core::Log::Warn("[VulkanDevice::BeginFrame] device non-operational; returning fail-closed (no frame produced)");
         return false;
     }
 
@@ -2000,7 +2006,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
 
     if (!lifecycleReady)
     {
-        NoteFallbackEndFrameAttempt();
+        const std::uint64_t count = NoteFallbackEndFrameAttempt();
         MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.EndStatus = VulkanFrameEndStatus::SkippedNotOperational;
@@ -2013,7 +2019,8 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.DeviceLost = m_DeviceLost;
             snapshot.ResizePending = m_HasPendingResize;
         });
-        Core::Log::Warn("[VulkanDevice::EndFrame] device non-operational; ignoring frame end (no rotation)");
+        if (count == 1)
+            Core::Log::Warn("[VulkanDevice::EndFrame] device non-operational; ignoring frame end (no rotation)");
         return;
     }
 
@@ -2112,7 +2119,7 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
 
     if (!lifecycleReady)
     {
-        NoteFallbackPresentAttempt();
+        const std::uint64_t count = NoteFallbackPresentAttempt();
         MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
         {
             snapshot.PresentStatus = (m_Device == VK_NULL_HANDLE || m_DeviceLost)
@@ -2127,7 +2134,8 @@ void VulkanDevice::Present(const RHI::FrameHandle& frame)
             snapshot.DeviceLost = m_DeviceLost;
             snapshot.ResizePending = m_HasPendingResize;
         });
-        Core::Log::Warn("[VulkanDevice::Present] device or swapchain non-operational; skipping presentation");
+        if (count == 1)
+            Core::Log::Warn("[VulkanDevice::Present] device or swapchain non-operational; skipping presentation");
         return;
     }
 

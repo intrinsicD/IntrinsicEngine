@@ -113,13 +113,16 @@ available through the Vulkan 1.2/1.3 feature chain.
   swapchain not yet operational, taking the early-return path) increment
   `GetFallbackPresentAttemptCount()`. Fail-closed `Resize` calls (device or
   swapchain not yet operational) increment `GetFallbackResizeAttemptCount()`
-  while still recording the requested extent for CPU/runtime diagnostics. Each
-  emits a logger breadcrumb for CPU-testable diagnostics. Counters are
-  process-monotonic and never reset across `Initialize`/`Shutdown` cycles. The
-  `BeginFrame`/`EndFrame` counter
-  pair lets CPU diagnostics observe both halves of an unbalanced renderer
-  frame loop driving a fail-closed Vulkan device, and CPU contract coverage
-  asserts that paired Begin/End calls advance both counters in lockstep.
+  while still recording the requested extent for CPU/runtime diagnostics. Counters
+  are process-monotonic and never reset across `Initialize`/`Shutdown` cycles.
+  Frame-loop fail-closed logs (`BeginFrame`, `EndFrame`, `Present`) are emitted
+  only on the first fire to prevent log spam at 60 Hz; counters continue to
+  increment on every call so diagnostic consumers still observe the full
+  sequence. Resize fail-closed logs are not rate-limited because window-resize
+  events are inherently low-frequency. The `BeginFrame`/`EndFrame` counter pair
+  lets CPU diagnostics observe both halves of an unbalanced renderer frame loop
+  driving a fail-closed Vulkan device, and CPU contract coverage asserts that
+  paired Begin/End calls advance both counters in lockstep.
   `GetLastFallbackPipelineReason()` returns a structured
   `FallbackPipelineReason` enum (`None`, `PreBringUp`, `ShaderMissing`) so CPU
   diagnostics can distinguish "device or global pipeline layout not yet
@@ -139,26 +142,24 @@ available through the Vulkan 1.2/1.3 feature chain.
   end-frame-count, present-count, resize-count.
 - `GetVulkanFrameLifecycleDiagnosticsSnapshot()` reports the most recent
   promoted Vulkan frame lifecycle attempt with a backend-local structured status
-  taxonomy for `BeginFrame`, `EndFrame`, `Present`, and `Resize`. Fail-closed
-  paths populate `SkippedNotOperational`, `SkippedNoSwapchain`,
-  `SkippedNoSwapchainImages`, and pending resize states. After guarded bootstrap
-  has produced a logical device, swapchain, per-frame command/sync resources,
-  and live internal services, direct opt-in smoke coverage can also exercise an
-  empty `vkAcquireNextImageKHR` -> command-buffer submit -> `vkQueuePresentKHR`
-  path while `IsOperational()` remains false; those calls populate `Acquired`,
-  `Submitted`, `Presented`, `Suboptimal`, `OutOfDate`, and failure variants.
-  `Resize()` now records zero-sized requests as pending recreation, can recreate
-  the swapchain with safe idle synchronization and old image-view/handle
-  retirement when a nonzero extent is available, and reports `Recreated` or
-  `FailedRecreate`. Device-lost results from acquire, submit, present, recreate,
-  one-shot uploads, and resource/pipeline creation move the backend back to a
-  fail-closed state and surface `DeviceLost` in lifecycle diagnostics. The
-  snapshot also carries the last frame/image indices, requested resize extent,
-  availability booleans, pending-resize/device-lost flags, last Vulkan result
-  code, and the same process-monotonic lifecycle counters exposed by
-  `FallbackDiagnosticsSnapshot`. The snapshot is backend-specific diagnostics
-  only; it does not expose Vulkan-native types and must not become a renderer/RHI
-  branching seam.
+  taxonomy for `BeginFrame`, `EndFrame`, `Present`, and `Resize`. All enum
+  variants are populated from the real lifecycle paths: fail-closed paths emit
+  `SkippedNotOperational`, `SkippedNoSwapchain`, and `SkippedNoSwapchainImages`
+  for pre-operational frames, and `RecordedPendingNotOperational`,
+  `RecordedPendingNoSwapchain`, `RecordedPendingRecreate`, `Recreated`, and
+  `FailedRecreate` for resize operations. Guarded direct paths (reachable after
+  service-ready bootstrap) populate `Acquired`, `Suboptimal`, `OutOfDate`,
+  `FailedAcquire` for `BeginFrame`; `Submitted`, `FailedSubmit` for `EndFrame`;
+  `Presented`, `Suboptimal`, `OutOfDate`, `FailedPresent` for `Present`. Device-
+  lost results from acquire, submit, present, recreate, one-shot uploads, and
+  resource/pipeline creation paths set `m_DeviceLost`, surface `DeviceLost` in
+  the snapshot, and route subsequent lifecycle calls back to fail-closed
+  `SkippedNotOperational` paths via `NoteDeviceLostIfNeeded`. The snapshot also
+  carries the last frame/image indices, requested resize extent, availability
+  booleans, pending-resize/device-lost flags, last Vulkan result code, and the
+  same process-monotonic lifecycle counters exposed by `FallbackDiagnosticsSnapshot`.
+  The snapshot is backend-specific diagnostics only; it does not expose
+  Vulkan-native types and must not become a renderer/RHI branching seam.
 - `VulkanCommandContext` is fail-closed before operational bring-up: unbound or
   not-begun command recording calls skip with logger diagnostics instead of
   issuing Vulkan commands against null/non-recording command-buffer state.
@@ -211,33 +212,26 @@ available through the Vulkan 1.2/1.3 feature chain.
   destroys per-frame command/sync resources, then tears down VMA/device/surface/
   instance state so partial bring-up slices do not leak backend resources when
   callers omit explicit per-resource destroys.
-- Completing real Vulkan execution remains in `GRAPHICS-018`: instance/surface/
+- `GRAPHICS-018` brought up all major guarded Vulkan paths: instance/surface/
   physical-device probing with required Vulkan 1.2/1.3 feature negotiation,
-  logical-device/queue/allocator/per-frame resource acquisition, and guarded
-  swapchain image/view/handle registration are present,
-  plus guarded live bindless/global-layout/transfer service handoff, hardened
-  internal transfer invalid-token failure behavior, and nonfatal command-context
-  recording skips, concrete SPIR-V pipeline creation, and a guarded direct
-  empty-frame acquire/submit/present smoke path, guarded resource/descriptor
-  readiness, and depth-only graphics pipeline smoke coverage are present, but
-  canonical renderer pass command execution beyond `CullingPass`/`DepthPrepass`
-  routing, and public service fallback reconciliation still need to land before
-  `IsOperational()` can become true. Render-graph bracketing already wraps the
+  logical-device/queue/allocator/per-frame resource acquisition, swapchain
+  image/view/handle registration, live internal bindless/global-layout/transfer
+  service handoff, hardened internal transfer failure behavior, nonfatal
+  command-context recording skips, concrete SPIR-V pipeline creation, guarded
+  direct acquire/submit/present, resource/descriptor readiness, swapchain
+  recreation with device-loss transitions, and structured lifecycle diagnostics
+  for all lifecycle/resize/device-loss paths. Render-graph bracketing wraps the
   full executor invocation with a single `VulkanCommandContext::Begin()`/`End()`
   pair, soft-skipped passes report structured `RenderGraphCommandPassStats`
   entries, recorded barriers translate through `vkCmdPipelineBarrier2`, and
-  buffer/texture sharing mode handles graphics/transfer queue-family
-  separation when present. The opt-in `VulkanBootstrapSmoke` test is
-  labeled `gpu;vulkan` and verifies that bootstrap either creates swapchain
-  image/view/handle state or fails/skips cleanly on unsupported hosts. When
-  service-ready bootstrap succeeds, the smoke test records an empty command
-  buffer that transitions the acquired backbuffer to present layout, submits it,
-  and presents it while asserting that `IsOperational()` remains false and public
-  bindless/transfer access still returns fail-closed fallbacks. The completed
-  renderer reset seam removes one
-  prior blocker, but Vulkan may not report operational until fallback
-  bindless/transfer behavior and real backend pass execution are reconciled behind
-  the same RHI interfaces.
+  buffer/texture sharing mode handles graphics/transfer queue-family separation.
+  The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies
+  bootstrap state plus the guarded acquire/command-record/submit/present path
+  while asserting that `IsOperational()` remains false and public
+  bindless/transfer access still returns fail-closed fallbacks. Remaining before
+  `IsOperational()` can become true: canonical renderer pass command execution
+  beyond `CullingPass`/`DepthPrepass` routing and public service fallback
+  reconciliation.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 
