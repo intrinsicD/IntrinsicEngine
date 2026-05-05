@@ -7,7 +7,7 @@ window, `Initialize()` now performs guarded Vulkan bootstrap by initializing
 volk, creating a `VkInstance`, creating a window surface, probing for a
 surface-capable physical device/queue-family/swapchain-support tuple that also
 supports required Vulkan 1.2/1.3 features (`timelineSemaphore`, descriptor
-indexing update-after-bind/partially-bound, and dynamic rendering), creating a
+indexing update-after-bind/partially-bound, `bufferDeviceAddress`, and dynamic rendering), creating a
 logical device with those features and `VK_KHR_swapchain`, loading device-level volk entry points,
 acquiring graphics/present/transfer `VkQueue` handles, creating a VMA allocator,
 allocating per-frame command pools, primary command buffers, fences, and
@@ -17,7 +17,8 @@ still leaves the device non-operational until pipeline, bindless, transfer,
 presentation, and resize reconciliation land; `BeginFrame()` returns `false`
 instead of fabricating a frame. Full execution requires a surface-capable
 physical device with timeline semaphores, descriptor indexing
-(PARTIALLY_BOUND + UPDATE_AFTER_BIND for sampled images), and dynamic rendering
+(PARTIALLY_BOUND + UPDATE_AFTER_BIND for sampled images), buffer device
+addresses, and dynamic rendering
 available through the Vulkan 1.2/1.3 feature chain.
 
 ## Frame lifecycle status
@@ -47,7 +48,8 @@ available through the Vulkan 1.2/1.3 feature chain.
   swapchain creation/image enumeration/image-view/handle-registration counts and extent.
   It also reports whether required device features for later operational paths
   were supported and enabled: descriptor indexing, timeline semaphores, and
-  dynamic rendering. Devices lacking those required features are skipped during
+  dynamic rendering, plus buffer device addresses for BDA-only promoted buffer
+  paths. Devices lacking those required features are skipped during
   physical-device selection so later bindless/transfer/pipeline slices do not
   accidentally build on an unsuitable adapter.
   The snapshot avoids Vulkan-native types and is not an RHI/renderer branching seam;

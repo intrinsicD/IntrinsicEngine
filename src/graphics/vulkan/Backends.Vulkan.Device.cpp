@@ -57,10 +57,12 @@ namespace
         bool DescriptorIndexingSupported = false;
         bool TimelineSemaphoreSupported = false;
         bool DynamicRenderingSupported = false;
+        bool BufferDeviceAddressSupported = false;
 
         [[nodiscard]] bool AllRequiredSupported() const noexcept
         {
-            return DescriptorIndexingSupported && TimelineSemaphoreSupported && DynamicRenderingSupported;
+            return DescriptorIndexingSupported && TimelineSemaphoreSupported && DynamicRenderingSupported &&
+                   BufferDeviceAddressSupported;
         }
     };
 
@@ -217,6 +219,7 @@ namespace
             features12.descriptorBindingSampledImageUpdateAfterBind == VK_TRUE;
         probe.TimelineSemaphoreSupported = features12.timelineSemaphore == VK_TRUE;
         probe.DynamicRenderingSupported = features13.dynamicRendering == VK_TRUE;
+        probe.BufferDeviceAddressSupported = features12.bufferDeviceAddress == VK_TRUE;
         return probe;
     }
 
@@ -328,6 +331,7 @@ namespace
         enabled12.descriptorBindingPartiallyBound = VK_TRUE;
         enabled12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
         enabled12.timelineSemaphore = VK_TRUE;
+        enabled12.bufferDeviceAddress = VK_TRUE;
 
         VkPhysicalDeviceFeatures2 enabledFeatures{};
         enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -680,6 +684,7 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         diagnostics.DescriptorIndexingSupported = featureProbe.DescriptorIndexingSupported;
         diagnostics.TimelineSemaphoreSupported = featureProbe.TimelineSemaphoreSupported;
         diagnostics.DynamicRenderingSupported = featureProbe.DynamicRenderingSupported;
+        diagnostics.BufferDeviceAddressSupported = featureProbe.BufferDeviceAddressSupported;
         diagnostics.RequiredDeviceFeaturesSupported = featureProbe.AllRequiredSupported();
 
         bool samplerAnisotropySupported = false;
@@ -702,6 +707,7 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         diagnostics.DescriptorIndexingEnabled = true;
         diagnostics.TimelineSemaphoreEnabled = true;
         diagnostics.DynamicRenderingEnabled = true;
+        diagnostics.BufferDeviceAddressEnabled = true;
 
         vkGetDeviceQueue(m_Device, m_GraphicsFamily, 0, &m_GraphicsQueue);
         vkGetDeviceQueue(m_Device, m_PresentFamily, 0, &m_PresentQueue);

@@ -57,6 +57,7 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.DescriptorIndexingSupported);
         EXPECT_TRUE(diagnostics.TimelineSemaphoreSupported);
         EXPECT_TRUE(diagnostics.DynamicRenderingSupported);
+        EXPECT_TRUE(diagnostics.BufferDeviceAddressSupported);
         EXPECT_TRUE(diagnostics.RequiredDeviceFeaturesSupported);
     }
     else
@@ -64,6 +65,7 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_FALSE(diagnostics.DescriptorIndexingEnabled);
         EXPECT_FALSE(diagnostics.TimelineSemaphoreEnabled);
         EXPECT_FALSE(diagnostics.DynamicRenderingEnabled);
+        EXPECT_FALSE(diagnostics.BufferDeviceAddressEnabled);
     }
 
     if (diagnostics.LogicalDeviceCreated)
@@ -71,6 +73,7 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.DescriptorIndexingEnabled);
         EXPECT_TRUE(diagnostics.TimelineSemaphoreEnabled);
         EXPECT_TRUE(diagnostics.DynamicRenderingEnabled);
+        EXPECT_TRUE(diagnostics.BufferDeviceAddressEnabled);
     }
 
     switch (diagnostics.Status)

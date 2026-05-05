@@ -87,10 +87,12 @@ namespace Extrinsic::Backends::Vulkan
         bool DescriptorIndexingSupported = false;
         bool TimelineSemaphoreSupported = false;
         bool DynamicRenderingSupported = false;
+        bool BufferDeviceAddressSupported = false;
         bool RequiredDeviceFeaturesSupported = false;
         bool DescriptorIndexingEnabled = false;
         bool TimelineSemaphoreEnabled = false;
         bool DynamicRenderingEnabled = false;
+        bool BufferDeviceAddressEnabled = false;
     };
 
     export [[nodiscard]] VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept;
