@@ -11,6 +11,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
+import Extrinsic.RHI.Transfer;
 
 TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 {
@@ -349,6 +350,15 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount(),
                   beforeFallbackBindless + 1u)
             << "live bindless service exists internally, but public access must remain fail-closed until operational";
+
+        const std::uint64_t beforeFallbackTransfer =
+            Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
+        const Extrinsic::RHI::TransferToken transferToken =
+            device->GetTransferQueue().UploadBuffer({}, nullptr, 0u, 0u);
+        EXPECT_FALSE(transferToken.IsValid());
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
+                  beforeFallbackTransfer + 1u)
+            << "live transfer service exists internally, but public access must remain fail-closed until operational";
     }
     else
     {

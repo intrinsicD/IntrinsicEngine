@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <cstring>
@@ -93,30 +94,72 @@ bool VulkanTransferQueue::IsValid() const noexcept
 
 uint64_t VulkanTransferQueue::QueryCompletedValue() const
 {
+    if (!IsValid())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] QueryCompletedValue on invalid transfer service; returning zero");
+        return 0;
+    }
+
     uint64_t val = 0;
-    VK_CHECK_WARN(vkGetSemaphoreCounterValue(m_Device, m_Timeline, &val));
+    const VkResult result = vkGetSemaphoreCounterValue(m_Device, m_Timeline, &val);
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] vkGetSemaphoreCounterValue failed; returning zero");
+        return 0;
+    }
     return val;
 }
 
 VkCommandBuffer VulkanTransferQueue::Begin()
 {
+    if (!IsValid())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] Cannot begin transfer command buffer; service is invalid");
+        return VK_NULL_HANDLE;
+    }
+
     VkCommandBufferAllocateInfo allocCI{};
     allocCI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocCI.commandPool        = m_CmdPool;
     allocCI.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocCI.commandBufferCount = 1;
     VkCommandBuffer cmd = VK_NULL_HANDLE;
-    VK_CHECK_FATAL(vkAllocateCommandBuffers(m_Device, &allocCI, &cmd));
+    VkResult result = vkAllocateCommandBuffers(m_Device, &allocCI, &cmd);
+    if (result != VK_SUCCESS || cmd == VK_NULL_HANDLE)
+    {
+        Core::Log::Error("[VulkanTransferQueue] vkAllocateCommandBuffers failed; upload skipped");
+        return VK_NULL_HANDLE;
+    }
+
     VkCommandBufferBeginInfo beginCI{};
     beginCI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginCI.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    VK_CHECK_FATAL(vkBeginCommandBuffer(cmd, &beginCI));
+    result = vkBeginCommandBuffer(cmd, &beginCI);
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanTransferQueue] vkBeginCommandBuffer failed; upload skipped");
+        vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
+        return VK_NULL_HANDLE;
+    }
     return cmd;
 }
 
 RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
 {
-    VK_CHECK_FATAL(vkEndCommandBuffer(cmd));
+    if (!IsValid() || cmd == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] Cannot submit transfer command buffer; service or command buffer is invalid");
+        return {};
+    }
+
+    VkResult result = vkEndCommandBuffer(cmd);
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanTransferQueue] vkEndCommandBuffer failed; upload skipped");
+        vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
+        return {};
+    }
+
     const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
 
     VkCommandBufferSubmitInfo cmdInfo{};
@@ -137,7 +180,13 @@ RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
 
     {
         std::scoped_lock lock{m_Mutex};
-        VK_CHECK_FATAL(vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE));
+        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        if (result != VK_SUCCESS)
+        {
+            Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; upload skipped");
+            vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
+            return {};
+        }
         m_Belt->Retire(ticket);
     }
 
@@ -151,15 +200,45 @@ RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
                                                       uint64_t offset)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadBufferRaw", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadBufferRaw")};
-    if (!m_Buffers) return {};
+    if (!IsValid())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadBuffer rejected; transfer service is invalid");
+        return {};
+    }
+    if (!m_Buffers)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadBuffer rejected; buffer pool is unavailable");
+        return {};
+    }
+    if (data == nullptr || size == 0)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadBuffer rejected; source data is empty");
+        return {};
+    }
+
     auto* buf = m_Buffers->GetIfValid(dst);
-    if (!buf) return {};
+    if (!buf || buf->Buffer == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadBuffer rejected; destination buffer handle is invalid");
+        return {};
+    }
+    if (offset > buf->SizeBytes || size > buf->SizeBytes - offset)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadBuffer rejected; upload range exceeds destination buffer");
+        return {};
+    }
 
     auto staging = m_Belt->Allocate(static_cast<size_t>(size), 4);
-    if (!staging.MappedPtr) return {};
+    if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadBuffer rejected; staging allocation failed");
+        return {};
+    }
     std::memcpy(staging.MappedPtr, data, size);
 
     VkCommandBuffer cmd = Begin();
+    if (cmd == VK_NULL_HANDLE)
+        return {};
     VkBufferCopy region{staging.Offset, offset, size};
     vkCmdCopyBuffer(cmd, staging.Buffer, buf->Buffer, 1, &region);
     return Submit(cmd);
@@ -180,15 +259,50 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
                                                        uint32_t arrayLayer)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadTexture", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadTexture")};
-    if (!m_Images) return {};
+    if (!IsValid())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; transfer service is invalid");
+        return {};
+    }
+    if (!m_Images)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; image pool is unavailable");
+        return {};
+    }
+    if (data == nullptr || dataSizeBytes == 0)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; source data is empty");
+        return {};
+    }
+
     auto* img = m_Images->GetIfValid(dst);
-    if (!img) return {};
+    if (!img || img->Image == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; destination texture handle is invalid");
+        return {};
+    }
+    if (mipLevel >= img->MipLevels || arrayLayer >= img->ArrayLayers)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; mip level or array layer is out of range");
+        return {};
+    }
+    if ((img->Usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; destination image lacks transfer-dst usage");
+        return {};
+    }
 
     auto staging = m_Belt->Allocate(static_cast<size_t>(dataSizeBytes), 4);
-    if (!staging.MappedPtr) return {};
+    if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTexture rejected; staging allocation failed");
+        return {};
+    }
     std::memcpy(staging.MappedPtr, data, dataSizeBytes);
 
     VkCommandBuffer cmd = Begin();
+    if (cmd == VK_NULL_HANDLE)
+        return {};
 
     // Transition: Undefined → TransferDst
     VkImageMemoryBarrier2 toXfer{};
@@ -231,12 +345,22 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
 
 bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const
 {
+    if (!token.IsValid())
+        return true;
+    if (!IsValid())
+        return false;
     return token.Value <= QueryCompletedValue();
 }
 
 void VulkanTransferQueue::CollectCompleted()
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::CollectCompleted", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::CollectCompleted")};
+    if (!IsValid())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] CollectCompleted skipped; transfer service is invalid");
+        return;
+    }
+
     const uint64_t done = QueryCompletedValue();
     m_Belt->GarbageCollect(done);
 }
