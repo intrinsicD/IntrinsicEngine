@@ -37,9 +37,12 @@ std::uint64_t GetFallbackCommandRecordingAttemptCount() noexcept
 void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
                                  VkPipelineLayout globalLayout,
                                  VkDescriptorSet  bindlessSet,
-                                 const Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* buffers,
-                                 const Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* images,
-                                 const Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines)
+                                 Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* buffers,
+                                 Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* images,
+                                 Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines,
+                                 uint32_t graphicsQueueFamily,
+                                 uint32_t presentQueueFamily,
+                                 uint32_t transferQueueFamily)
 {
     m_Device        = device;
     m_Cmd           = cmd;
@@ -48,6 +51,9 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
     m_Buffers       = buffers;
     m_Images        = images;
     m_Pipelines     = pipelines;
+    m_GraphicsQueueFamily = graphicsQueueFamily;
+    m_PresentQueueFamily  = presentQueueFamily;
+    m_TransferQueueFamily = transferQueueFamily;
     m_BindPoint     = VK_PIPELINE_BIND_POINT_GRAPHICS;
     m_Recording     = false;
 }
@@ -401,7 +407,7 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
         return;
     }
 
-    const auto* img = m_Images->GetIfValid(tex);
+    auto* img = m_Images->GetIfValid(tex);
     if (!img || img->Image == VK_NULL_HANDLE) return;
     const VkImageLayout oldLayout = ToVkImageLayout(before);
     const VkImageLayout newLayout = ToVkImageLayout(after);
@@ -414,6 +420,8 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
     barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
     barrier.oldLayout     = oldLayout;
     barrier.newLayout     = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image         = img->Image;
     barrier.subresourceRange = {AspectFromFormat(img->Format), 0, img->MipLevels, 0, img->ArrayLayers};
 
@@ -422,6 +430,8 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
     dep.imageMemoryBarrierCount = 1;
     dep.pImageMemoryBarriers    = &barrier;
     vkCmdPipelineBarrier2(m_Cmd, &dep);
+
+    img->CurrentLayout = newLayout;
 }
 
 void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
@@ -463,12 +473,27 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         return;
 
     std::vector<VkImageMemoryBarrier2> imageBarriers{};
+    std::vector<VulkanImage*> imageBarrierTargets{};
     std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
     std::vector<VkMemoryBarrier2> memoryBarriers{};
 
     imageBarriers.reserve(batch.TextureBarriers.size());
+    imageBarrierTargets.reserve(batch.TextureBarriers.size());
     bufferBarriers.reserve(batch.BufferBarriers.size());
     memoryBarriers.reserve(batch.MemoryBarriers.size());
+
+    const auto resolveQueueFamily = [this](uint32_t requested) -> uint32_t
+    {
+        // Backend-neutral RHI traffic encodes "no ownership transfer" as
+        // VK_QUEUE_FAMILY_IGNORED; honor it as a passthrough. When the renderer
+        // asks for graphics/transfer/present ownership it does so via the same
+        // sentinel today, so the command context conservatively keeps the
+        // request as supplied. Concrete queue-family translation is reserved
+        // for future renderer/transfer integrations once IsOperational() can
+        // be true.
+        (void)this;
+        return requested;
+    };
 
     for (const RHI::TextureBarrierDesc& desc : batch.TextureBarriers)
     {
@@ -478,7 +503,7 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
             Core::Log::Warn("[VulkanCommandContext] SubmitBarriers skipped texture barriers; image pool is unavailable");
             break;
         }
-        const auto* image = m_Images->GetIfValid(desc.Texture);
+        auto* image = m_Images->GetIfValid(desc.Texture);
         if (!image || image->Image == VK_NULL_HANDLE) continue;
 
         VkImageMemoryBarrier2 barrier{};
@@ -489,11 +514,12 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
         barrier.oldLayout = ToVkImageLayout(desc.BeforeLayout);
         barrier.newLayout = ToVkImageLayout(desc.AfterLayout);
-        barrier.srcQueueFamilyIndex = desc.SrcQueueFamily;
-        barrier.dstQueueFamilyIndex = desc.DstQueueFamily;
+        barrier.srcQueueFamilyIndex = resolveQueueFamily(desc.SrcQueueFamily);
+        barrier.dstQueueFamilyIndex = resolveQueueFamily(desc.DstQueueFamily);
         barrier.image = image->Image;
         barrier.subresourceRange = {AspectFromFormat(image->Format), 0, image->MipLevels, 0, image->ArrayLayers};
         imageBarriers.push_back(barrier);
+        imageBarrierTargets.push_back(image);
     }
 
     for (const RHI::BufferBarrierDesc& desc : batch.BufferBarriers)
@@ -513,8 +539,8 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
         barrier.dstStageMask = ToVkStage(desc.AfterAccess);
         barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
-        barrier.srcQueueFamilyIndex = desc.SrcQueueFamily;
-        barrier.dstQueueFamilyIndex = desc.DstQueueFamily;
+        barrier.srcQueueFamilyIndex = resolveQueueFamily(desc.SrcQueueFamily);
+        barrier.dstQueueFamilyIndex = resolveQueueFamily(desc.DstQueueFamily);
         barrier.buffer = buffer->Buffer;
         barrier.offset = desc.Offset;
         barrier.size = desc.Size;
@@ -546,6 +572,18 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
     dep.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
     dep.pImageMemoryBarriers = imageBarriers.data();
     vkCmdPipelineBarrier2(m_Cmd, &dep);
+
+    // Record-time CurrentLayout tracking. The GPU executes barriers later, but
+    // tracking the recorded layout here lets subsequent barriers/uploads pick a
+    // correct oldLayout without the renderer/RHI seam having to know which
+    // backend recorded the prior transition.
+    for (std::size_t barrierIndex = 0; barrierIndex < imageBarriers.size(); ++barrierIndex)
+    {
+        if (imageBarrierTargets[barrierIndex] != nullptr)
+        {
+            imageBarrierTargets[barrierIndex]->CurrentLayout = imageBarriers[barrierIndex].newLayout;
+        }
+    }
 }
 
 void VulkanCommandContext::FillBuffer(RHI::BufferHandle handle,

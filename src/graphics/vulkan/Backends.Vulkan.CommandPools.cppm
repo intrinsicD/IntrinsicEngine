@@ -25,9 +25,12 @@ namespace Extrinsic::Backends::Vulkan
                   VkCommandBuffer cmd,
                   VkPipelineLayout globalLayout,
                   VkDescriptorSet  bindlessSet,
-                  const Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* buffers,
-                  const Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* images,
-                  const Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines);
+                  Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* buffers,
+                  Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* images,
+                  Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines,
+                  uint32_t graphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED,
+                  uint32_t presentQueueFamily  = VK_QUEUE_FAMILY_IGNORED,
+                  uint32_t transferQueueFamily = VK_QUEUE_FAMILY_IGNORED);
 
         void Begin() override;
         void End()   override;
@@ -85,9 +88,12 @@ namespace Extrinsic::Backends::Vulkan
         VkPipelineBindPoint m_BindPoint  = VK_PIPELINE_BIND_POINT_GRAPHICS;
         bool             m_Recording     = false;
 
-        const Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers   = nullptr;
-        const Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* m_Images    = nullptr;
-        const Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* m_Pipelines = nullptr;
+        Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers   = nullptr;
+        Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* m_Images    = nullptr;
+        Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* m_Pipelines = nullptr;
+        uint32_t         m_GraphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+        uint32_t         m_PresentQueueFamily  = VK_QUEUE_FAMILY_IGNORED;
+        uint32_t         m_TransferQueueFamily = VK_QUEUE_FAMILY_IGNORED;
     };
 }
 
