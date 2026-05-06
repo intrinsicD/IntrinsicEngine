@@ -1,5 +1,12 @@
 # GRAPHICS-009Q — Lighting and shadow clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-008Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-ft1YJ`.
+- Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after recording decisions and syncing them into `docs/architecture/rendering-three-pass.md`.
+
 ## Goal
 - Clarify remaining non-code decisions from `GRAPHICS-009` before Vulkan/backend-specific lighting and shadow work depends on them.
 
