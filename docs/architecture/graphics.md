@@ -142,6 +142,37 @@ Graphics is organized into explicit sublayers:
   expanding the push-constant struct, and concrete
   `VkDescriptorSetLayout` bindings remain backend-local under
   `src/graphics/vulkan` and never leak through RHI or renderer code.
+- `Extrinsic.Graphics.DebugViewSystem` owns the backend-agnostic
+  render-target inspection and resource-selection seam. It builds a
+  deterministic inspection table from `FrameRecipeIntrospection`,
+  classifies resources (texture, depth texture, buffer, backbuffer,
+  alias, unknown), and resolves the requested `DebugViewSettings::RequestedResourceName`
+  with structured fallback diagnostics. Per `GRAPHICS-013BQ`, no
+  retained graphics-owned debug-view textures or buffers exist;
+  `DebugViewRGBA` is a frame-recipe transient owned by the framegraph,
+  and the resolved sampled selection is bound through one pass-local
+  `Pass.DebugView` descriptor set with exactly two bindings (sampled
+  image view + linear-clamp sampler). Visualization mode is derived
+  deterministically from `FrameRecipeResourceKind` plus
+  `DebugViewResourceClass`, so `DebugViewSettings` does not gain a
+  user-selectable visualization-mode field and
+  `DebugViewPushConstants` keeps its existing four-`uint32` packing.
+  Concrete `VkDescriptorSetLayout` definitions and per-aspect view
+  creation (color view, depth-aspect-only view, integer-typed view for
+  `R32_UINT` selection-ID and material-ID resources) remain
+  backend-local under `src/graphics/vulkan` and never leak through RHI
+  or renderer module surfaces. Runtime/editor code owns the dictionary
+  that maps human-readable UI strings to canonical
+  `FrameRecipeIntrospection::Resources[i].Name` keys using the rows
+  exposed by `DebugViewSystem::BuildInspectionTable()`, then calls
+  `DebugViewSystem::SetSettings(...)`; graphics never receives display
+  strings and never imports ImGui or platform/window state. Buffer-class
+  resources remain listed in the inspection table but stay
+  non-previewable in `Pass.DebugView`; textual/statistical buffer
+  inspection is deferred to a future runtime/editor visualization
+  surface tracked under `GRAPHICS-014Q` that consumes existing
+  per-owner diagnostics rather than adding a parallel buffer-readback
+  API on `DebugViewSystem`.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.
   Managed-buffer compaction is explicit and opt-in: callers first request a

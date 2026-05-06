@@ -216,7 +216,36 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   debug-view resource selection. It resolves requested frame-recipe resources to
   enabled previewable texture/depth resources, reports missing/disabled/buffer
   selections through deterministic diagnostics, and falls back to the current
-  presentation source without platform/window ownership.
+  presentation source without platform/window ownership. Per `GRAPHICS-013BQ`,
+  no retained graphics-owned debug-view textures or buffers exist; `DebugViewRGBA`
+  is a frame-recipe transient owned by the framegraph, and `Pass.DebugView` owns
+  one pass-local descriptor set with exactly two bindings (sampled image view of
+  the resolved selection + linear-clamp sampler), with concrete
+  `VkDescriptorSetLayout` definitions and per-aspect view creation (color view,
+  depth-aspect-only view, integer-typed view for `R32_UINT` selection-ID /
+  material-ID resources) remaining backend-local under `src/graphics/vulkan`.
+  Visualization mode is derived deterministically from
+  `FrameRecipeResourceKind` plus `DebugViewResourceClass` (LDR color blit for
+  `SceneColorLDR`/`DebugViewRGBA`, Reinhard tonemap for `SceneColorHDR`, depth
+  linearize-to-grayscale for `SceneDepth`/`ShadowAtlas`, world-space normal
+  for `SceneNormal`, integer-hash to color for `EntityId`/`PrimitiveId`/`Material0`
+  with a different salt for material slots, direct color for `Albedo`), so
+  `DebugViewSettings` does not gain a user-selectable visualization-mode field
+  and `DebugViewPushConstants` keeps its existing four-`uint32` packing.
+  Runtime/editor code owns the dictionary that maps UI display strings to
+  canonical `FrameRecipeIntrospection::Resources[i].Name` keys using the rows
+  exposed by `DebugViewSystem::BuildInspectionTable()`, then writes the canonical
+  name into `DebugViewSettings::RequestedResourceName` via
+  `DebugViewSystem::SetSettings(...)`; graphics never receives display strings,
+  never imports ImGui or platform/window state, and the default
+  `RequestedResourceName = "FrameRecipe.PresentSource"` remains the graphics-side
+  fallback. Buffer-class resources stay listed in the inspection table but
+  remain non-previewable in `Pass.DebugView`; textual/statistical buffer
+  inspection is deferred to a future runtime/editor visualization surface
+  tracked under `GRAPHICS-014Q` that consumes existing per-owner diagnostics
+  (`PostProcessDiagnostics`, `SelectionSystem`/`Picking.Readback` drains,
+  `GpuWorld::Diagnostics`, `SpatialDebugVisualizerDiagnostics`) rather than
+  adding a parallel buffer-readback API on `DebugViewSystem`.
 - `SelectionSystem` is the CPU-visible reporting-only seam for picking.
   Selection ID passes write `EntityId` (stable extracted entity ID, `0`
   reserved for "no hit") and `PrimitiveId` (packed via `EncodedSelectionId`
