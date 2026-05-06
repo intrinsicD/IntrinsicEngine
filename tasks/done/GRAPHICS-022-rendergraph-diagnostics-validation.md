@@ -1,10 +1,10 @@
 # GRAPHICS-022 — Rendergraph diagnostics and validation
 
-- Status: in-progress (Slices A/B implemented; Slice C recipe-aware helper/docs implemented; compile-side findings pending)
+- Status: complete (Slices A/B/C implemented; diagnostic string shim removal tracked by GRAPHICS-027)
 - Owner / agent: graphics — `src/graphics/framegraph` + `src/graphics/renderer`
 - Branch: `claude/plan-rendering-tasks-ORYwq` (planning); implementation lands on a follow-up branch.
 - PR: TBD.
-- Next verification step: finish Slice C by adding compile-side structured findings, documenting the `g_LastCompileDiagnostic` removal follow-up, and running the task verification commands below.
+- Follow-up: string shim removal lives in `tasks/backlog/rendering/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md`.
 
 ## Goal
 
@@ -285,6 +285,15 @@ Under `tests/contract/graphics/`:
   and refreshed `docs/api/generated/module_inventory.md`. Remaining Slice C
   work is compile-side typed findings plus the `g_LastCompileDiagnostic`
   removal follow-up.
+- 2026-05-06: Slice C completed compile-side structured findings via
+  `CompiledRenderGraph::ValidationFindings`,
+  `RenderGraphCompiler::GetLastCompileValidationResult()`, and
+  `RenderGraph::GetLastCompileValidationResult()`. Hard compile failures now
+  mirror structured findings while `GetLastCompileDiagnostic()` remains a
+  documented compatibility shim. Added CPU contract coverage for the remaining
+  validation codes and created
+  `tasks/backlog/rendering/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md`
+  as the removal follow-up.
 
 ## Verification
 
@@ -330,13 +339,8 @@ Land in three small PRs to keep mechanical and semantic edits separated:
    `BuildRenderGraphDebugDump` and add `Test.RenderGraphDebugDump.cpp`. Pin
    the new format with golden assertions. Update
    `Test_RenderGraphPackets.cpp` golden strings if needed.
-3. **Slice C — partially complete.** Recipe-aware helper and doc updates are
-   implemented. Remaining work: add `CompiledRenderGraph::ValidationFindings`
-   produced during `Compile`. Update/remove the compatibility plan for
-   `g_LastCompileDiagnostic`. Updated
-   `docs/architecture/rendering-three-pass.md` and
-   `src/graphics/renderer/README.md` as behavior lands. Schedule removal of
-   `g_LastCompileDiagnostic` (separate small follow-up PR or final commit of
-   this slice).
+3. **Slice C — complete.** Recipe-aware helper, compile-side findings, docs,
+   tests, and the `g_LastCompileDiagnostic` compatibility-shim removal follow-up
+   are implemented/tracked.
 
 Each slice should run all four verification commands above before merge.

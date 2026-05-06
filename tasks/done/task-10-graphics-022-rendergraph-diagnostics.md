@@ -5,7 +5,7 @@
 - Branch / PR: current branch / TBD
 - Completion date: 2026-05-02
 - Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
-- Follow-ups: implementation remains in `tasks/active/GRAPHICS-022-rendergraph-diagnostics-validation.md`.
+- Follow-ups: implementation completed in `tasks/done/GRAPHICS-022-rendergraph-diagnostics-validation.md`; string shim removal is tracked by `tasks/backlog/rendering/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md`.
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict`.
 
 ---
@@ -16,7 +16,7 @@ Create a dedicated rendering task for rendergraph diagnostics and validation.
 
 Create:
 
-`tasks/active/GRAPHICS-022-rendergraph-diagnostics-validation.md`
+`tasks/done/GRAPHICS-022-rendergraph-diagnostics-validation.md`
 
 ## Goal
 

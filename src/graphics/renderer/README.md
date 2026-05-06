@@ -29,6 +29,11 @@ graphs can be checked with `ValidateCompiledGraph(...)`; recipe-built graphs use
 `ValidateRecipeCompiledGraph(const FrameRecipeIntrospection&, const
 CompiledRenderGraph&)`, which derives `ImportedResourceAuthorization` entries
 from the typed frame recipe before forwarding to the framegraph validator.
+`CompiledRenderGraph::ValidationFindings` stores the recipe-less findings
+generated during compilation, and `GetLastCompileValidationResult()` exposes
+structured hard-error findings when `Compile()` fails. `GetLastCompileDiagnostic()`
+is retained only as a temporary string compatibility shim; removal is tracked by
+`GRAPHICS-027`.
 
 ### Scene and sync systems
 
