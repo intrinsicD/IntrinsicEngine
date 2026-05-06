@@ -1,5 +1,12 @@
 # GRAPHICS-012Q — Picking backend/runtime clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-011Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-vQDOA`.
+- Next verification step: after recording decisions and syncing docs, run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .`.
+
 ## Goal
 - Clarify backend shader/readback and runtime selection-resolution details after the CPU/null `GRAPHICS-012` picking and selection contracts.
 
