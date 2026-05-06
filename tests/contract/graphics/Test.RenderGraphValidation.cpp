@@ -1,16 +1,22 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstdint>
+#include <expected>
 #include <span>
 #include <string>
 #include <vector>
 
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Core.Error;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Handles;
 
 namespace
 {
     using namespace Extrinsic::Graphics;
+    namespace RHI = Extrinsic::RHI;
 
     [[nodiscard]] CompiledRenderGraph MakeCompiled(std::uint32_t passCount,
                                                    std::uint32_t textureCount,
@@ -140,6 +146,45 @@ TEST(RenderGraphValidation, TextureReadBeforeProducerReportsMissingProducer)
     EXPECT_EQ(finding.ResourceName, "History");
 }
 
+TEST(RenderGraphValidation, BufferReadBeforeProducerReportsMissingProducer)
+{
+    CompiledRenderGraph compiled = MakeCompiled(2u, 0u, 1u);
+    compiled.PassNames[0] = "ReadBeforeWrite";
+    compiled.PassNames[1] = "WriteArgs";
+    compiled.BufferNames[0] = "DrawArgs";
+    compiled.BufferLifetimes[0] = ResourceLifetime{.HasUse = true, .FirstUsePass = 0u, .LastUsePass = 1u};
+    compiled.PassDeclarations[0].ReadBuffers = {0u};
+    compiled.PassDeclarations[1].WriteBuffers = {0u};
+
+    const RenderGraphValidationResult result = ValidateCompiledGraph(compiled);
+
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::MissingBufferProducer);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
+    EXPECT_EQ(findings.front().PassIndex, 0u);
+    EXPECT_EQ(findings.front().ResourceIndex, 0u);
+    EXPECT_FALSE(findings.front().IsTextureResource);
+    EXPECT_EQ(findings.front().ResourceName, "DrawArgs");
+}
+
+TEST(RenderGraphValidation, TransientTextureReadWithoutProducerReportsError)
+{
+    CompiledRenderGraph compiled = MakeCompiled(1u, 1u, 0u);
+    compiled.PassNames[0] = "SampleUnwritten";
+    compiled.TextureNames[0] = "UnwrittenTexture";
+    compiled.TextureLifetimes[0] = ResourceLifetime{.HasUse = true, .FirstUsePass = 0u, .LastUsePass = 0u};
+    compiled.PassDeclarations[0].ReadTextures = {0u};
+
+    const RenderGraphValidationResult result = ValidateCompiledGraph(compiled);
+
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::TransientTextureWithoutProducer);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
+    EXPECT_EQ(findings.front().ResourceIndex, 0u);
+    EXPECT_TRUE(findings.front().IsTextureResource);
+    EXPECT_EQ(findings.front().ResourceName, "UnwrittenTexture");
+}
+
 TEST(RenderGraphValidation, ImportedBackbufferNonFinalizerWriteReportsError)
 {
     CompiledRenderGraph compiled = MakeCompiled(2u, 1u, 0u);
@@ -149,6 +194,7 @@ TEST(RenderGraphValidation, ImportedBackbufferNonFinalizerWriteReportsError)
     compiled.TextureNames[0] = "Backbuffer";
     compiled.TextureImported[0] = true;
     compiled.TextureIsBackbuffer[0] = true;
+    compiled.TextureFinalStates[0] = TextureState::Present;
     compiled.TextureLifetimes[0] = ResourceLifetime{.HasUse = true, .FirstUsePass = 0u, .LastUsePass = 1u};
     compiled.PassDeclarations[0].WriteTextures = {0u};
     compiled.PassDeclarations[1].WriteTextures = {0u};
@@ -196,6 +242,205 @@ TEST(RenderGraphValidation, ImportedTextureAuthorizationListControlsWriters)
     EXPECT_EQ(finding.PassName, "DeniedPass");
     EXPECT_EQ(finding.ResourceIndex, 0u);
     EXPECT_EQ(finding.ResourceName, "History");
+}
+
+TEST(RenderGraphValidation, ImportedBufferAuthorizationListControlsWriters)
+{
+    CompiledRenderGraph compiled = MakeCompiled(1u, 0u, 1u);
+    compiled.PassNames[0] = "UnauthorizedCull";
+    compiled.BufferNames[0] = "ImportedArgs";
+    compiled.BufferImported[0] = true;
+    compiled.PassDeclarations[0].WriteBuffers = {0u};
+
+    const ImportedResourceAuthorization disallowArgs{
+        .ResourceIndex = 0u,
+        .IsTexture = false,
+        .Policy = ImportedResourceWritePolicy::Disallow,
+    };
+
+    const RenderGraphValidationResult result = ValidateCompiledGraph(
+        compiled,
+        std::span<const ImportedResourceAuthorization>(&disallowArgs, 1u));
+
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::UnauthorizedImportedBufferWrite);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
+    EXPECT_EQ(findings.front().PassIndex, 0u);
+    EXPECT_EQ(findings.front().ResourceIndex, 0u);
+    EXPECT_FALSE(findings.front().IsTextureResource);
+    EXPECT_EQ(findings.front().ResourceName, "ImportedArgs");
+}
+
+TEST(RenderGraphValidation, ImportedBackbufferFinalStateMismatchReportsError)
+{
+    CompiledRenderGraph compiled = MakeCompiled(0u, 1u, 0u);
+    compiled.TextureNames[0] = "Backbuffer";
+    compiled.TextureImported[0] = true;
+    compiled.TextureIsBackbuffer[0] = true;
+    compiled.TextureFinalStates[0] = TextureState::ShaderRead;
+
+    const RenderGraphValidationResult result = ValidateCompiledGraph(compiled);
+
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::ImportedTextureFinalStateMismatch);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
+    EXPECT_EQ(findings.front().ResourceIndex, 0u);
+    EXPECT_EQ(findings.front().ResourceName, "Backbuffer");
+}
+
+TEST(RenderGraphValidation, CompileInvalidExplicitDependencyReportsStructuredFinding)
+{
+    std::vector<RenderPassRecord> passes{
+        RenderPassRecord{.Name = "InvalidDependency", .SideEffect = true, .ExplicitDependencies = {PassRef{.Index = 42u, .Generation = 1u}}},
+    };
+
+    const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+
+    ASSERT_FALSE(compiled.has_value());
+    EXPECT_EQ(compiled.error(), Extrinsic::Core::ErrorCode::InvalidArgument);
+    const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::InvalidExplicitDependency);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
+    EXPECT_EQ(findings.front().PassIndex, 0u);
+    EXPECT_EQ(findings.front().PassName, "InvalidDependency");
+    EXPECT_NE(RenderGraphCompiler::GetLastCompileDiagnostic().find("InvalidDependency"), std::string::npos);
+}
+
+TEST(RenderGraphValidation, CompileInvalidResourceAccessReportsStructuredFindings)
+{
+    {
+        std::vector<RenderPassRecord> passes{
+            RenderPassRecord{
+                .Name = "InvalidTexture",
+                .SideEffect = true,
+                .TextureAccesses = {TextureAccess{.Ref = TextureRef{.Index = 7u, .Generation = 1u}, .Usage = TextureUsage::ShaderRead}},
+            },
+        };
+
+        const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+
+        ASSERT_FALSE(compiled.has_value());
+        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
+        const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::InvalidTextureAccess);
+        ASSERT_EQ(findings.size(), 1u);
+        EXPECT_EQ(findings.front().PassName, "InvalidTexture");
+        EXPECT_EQ(findings.front().ResourceIndex, 7u);
+        EXPECT_TRUE(findings.front().IsTextureResource);
+    }
+
+    {
+        std::vector<RenderPassRecord> passes{
+            RenderPassRecord{
+                .Name = "InvalidBuffer",
+                .SideEffect = true,
+                .BufferAccesses = {BufferAccess{.Ref = BufferRef{.Index = 9u, .Generation = 1u}, .Usage = BufferUsage::ShaderRead}},
+            },
+        };
+
+        const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+
+        ASSERT_FALSE(compiled.has_value());
+        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
+        const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::InvalidBufferAccess);
+        ASSERT_EQ(findings.size(), 1u);
+        EXPECT_EQ(findings.front().PassName, "InvalidBuffer");
+        EXPECT_EQ(findings.front().ResourceIndex, 9u);
+        EXPECT_FALSE(findings.front().IsTextureResource);
+    }
+}
+
+TEST(RenderGraphValidation, CompileRenderPassAttachmentMismatchesReportStructuredFindings)
+{
+    RHI::TextureDesc desc{};
+    std::vector<TextureResourceDesc> textures(1u);
+    textures[0].Name = "SceneTarget";
+    textures[0].Desc = desc;
+
+    {
+        const std::array colorTargets{RHI::ColorAttachment{.Target = RHI::TextureHandle{1u, 1u}}};
+        RHI::RenderPassDesc renderPass{};
+        renderPass.ColorTargets = colorTargets;
+        std::vector<RenderPassRecord> passes{
+            RenderPassRecord{.Name = "ColorMissingWrite", .SideEffect = true, .HasRenderPassDesc = true, .RenderPass = renderPass},
+        };
+
+        const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+
+        ASSERT_FALSE(compiled.has_value());
+        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
+        const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::RenderPassColorWriteMissing);
+        ASSERT_EQ(findings.size(), 1u);
+        EXPECT_EQ(findings.front().PassName, "ColorMissingWrite");
+    }
+
+    {
+        RHI::RenderPassDesc renderPass{};
+        renderPass.Depth.Target = RHI::TextureHandle{2u, 1u};
+        std::vector<RenderPassRecord> passes{
+            RenderPassRecord{.Name = "DepthMissingUsage", .SideEffect = true, .HasRenderPassDesc = true, .RenderPass = renderPass},
+        };
+
+        const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+
+        ASSERT_FALSE(compiled.has_value());
+        const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
+        const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::RenderPassDepthAccessMissing);
+        ASSERT_EQ(findings.size(), 1u);
+        EXPECT_EQ(findings.front().PassName, "DepthMissingUsage");
+    }
+}
+
+TEST(RenderGraphValidation, CompileCycleReportsStructuredFinding)
+{
+    std::vector<RenderPassRecord> passes{
+        RenderPassRecord{.Name = "CycleA", .SideEffect = true, .ExplicitDependencies = {PassRef{.Index = 1u, .Generation = 1u}}},
+        RenderPassRecord{.Name = "CycleB", .ExplicitDependencies = {PassRef{.Index = 0u, .Generation = 1u}}},
+    };
+
+    const auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
+
+    ASSERT_FALSE(compiled.has_value());
+    EXPECT_EQ(compiled.error(), Extrinsic::Core::ErrorCode::InvalidState);
+    const RenderGraphValidationResult& result = RenderGraphCompiler::GetLastCompileValidationResult();
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(result, RenderGraphValidationCode::CycleDetected);
+    ASSERT_EQ(findings.size(), 2u);
+    EXPECT_EQ(findings[0].PassName, "CycleA");
+    EXPECT_EQ(findings[1].PassName, "CycleB");
+    EXPECT_TRUE(result.HasErrors());
+    EXPECT_NE(RenderGraphCompiler::GetLastCompileDiagnostic().find("cycle"), std::string::npos);
+}
+
+TEST(RenderGraphValidation, SuccessfulCompileStoresValidationFindings)
+{
+    RHI::TextureDesc desc{};
+    std::vector<TextureResourceDesc> textures(1u);
+    textures[0].Name = "LoadedTarget";
+    textures[0].Desc = desc;
+
+    const std::array colorTargets{RHI::ColorAttachment{.Target = RHI::TextureHandle{1u, 1u}, .Load = RHI::LoadOp::Load}};
+    RHI::RenderPassDesc renderPass{};
+    renderPass.ColorTargets = colorTargets;
+    std::vector<RenderPassRecord> passes{
+        RenderPassRecord{
+            .Name = "LoadWithoutWriter",
+            .SideEffect = true,
+            .TextureAccesses = {TextureAccess{.Ref = TextureRef{.Index = 0u, .Generation = 1u}, .Usage = TextureUsage::ColorAttachmentWrite, .Write = true}},
+            .HasRenderPassDesc = true,
+            .RenderPass = renderPass,
+        },
+    };
+
+    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+
+    ASSERT_TRUE(compiled.has_value()) << RenderGraphCompiler::GetLastCompileDiagnostic();
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(
+        RenderGraphValidationResult{.Findings = compiled->ValidationFindings},
+        RenderGraphValidationCode::LoadWithoutGuaranteedWriter);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Warning);
+    EXPECT_EQ(findings.front().PassName, "LoadWithoutWriter");
+    EXPECT_EQ(RenderGraphCompiler::GetLastCompileValidationResult().Findings.size(), compiled->ValidationFindings.size());
 }
 
 TEST(RenderGraphValidation, FindingsUseDeterministicSeverityCodePassResourceOrdering)

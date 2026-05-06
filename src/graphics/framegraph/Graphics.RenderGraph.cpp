@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <expected>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <ranges>
 #include <string>
@@ -60,6 +61,7 @@ namespace Extrinsic::Graphics
         bool TransientAliasingEnabled = true;
         std::uint32_t Generation = 1;
         std::string LastCompileDiagnostic{};
+        RenderGraphValidationResult LastCompileValidationResult{};
     };
 
     RenderGraphBuilder::RenderGraphBuilder(
@@ -355,6 +357,7 @@ namespace Extrinsic::Graphics
         }
 
         m_Impl->LastCompileDiagnostic.clear();
+        m_Impl->LastCompileValidationResult.Findings.clear();
 
         const auto hasValidationFailure = std::ranges::any_of(
             m_Impl->Passes, [](const RenderPassRecord& pass) { return pass.HasValidationError; });
@@ -365,6 +368,15 @@ namespace Extrinsic::Graphics
             const std::string passName = (failedIt != m_Impl->Passes.end()) ? failedIt->Name : "<unknown>";
             m_Impl->LastCompileDiagnostic = "RenderGraph validation failed while recording pass resource usage: pass=\"" +
                                             passName + "\".";
+            m_Impl->LastCompileValidationResult.Findings.push_back(RenderGraphValidationFinding{
+                .Severity = RenderGraphValidationSeverity::Error,
+                .Code = RenderGraphValidationCode::InvalidTextureAccess,
+                .Message = m_Impl->LastCompileDiagnostic,
+                .PassIndex = failedIt != m_Impl->Passes.end()
+                                 ? static_cast<std::uint32_t>(std::distance(m_Impl->Passes.begin(), failedIt))
+                                 : std::numeric_limits<std::uint32_t>::max(),
+                .PassName = passName,
+            });
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
@@ -382,6 +394,13 @@ namespace Extrinsic::Graphics
         {
             m_Impl->LastCompileDiagnostic = "RenderGraph present pass must target an imported backbuffer texture: pass=\"" +
                                             invalidPresentPassIt->Name + "\".";
+            m_Impl->LastCompileValidationResult.Findings.push_back(RenderGraphValidationFinding{
+                .Severity = RenderGraphValidationSeverity::Error,
+                .Code = RenderGraphValidationCode::InvalidTextureAccess,
+                .Message = m_Impl->LastCompileDiagnostic,
+                .PassIndex = static_cast<std::uint32_t>(std::distance(m_Impl->Passes.begin(), invalidPresentPassIt)),
+                .PassName = invalidPresentPassIt->Name,
+            });
             return std::unexpected(Core::ErrorCode::InvalidArgument);
         }
 
@@ -389,10 +408,12 @@ namespace Extrinsic::Graphics
         if (!compiled.has_value())
         {
             m_Impl->LastCompileDiagnostic = RenderGraphCompiler::GetLastCompileDiagnostic();
+            m_Impl->LastCompileValidationResult = RenderGraphCompiler::GetLastCompileValidationResult();
             return compiled;
         }
 
         m_Impl->LastCompileDiagnostic = compiled->Diagnostic;
+        m_Impl->LastCompileValidationResult.Findings = compiled->ValidationFindings;
 
         auto BytesPerPixel = [](const RHI::Format fmt) -> std::uint64_t {
             switch (fmt)
@@ -579,6 +600,16 @@ namespace Extrinsic::Graphics
             return empty;
         }
         return m_Impl->LastCompileDiagnostic;
+    }
+
+    const RenderGraphValidationResult& RenderGraph::GetLastCompileValidationResult() const
+    {
+        static const RenderGraphValidationResult empty{};
+        if (!m_Impl)
+        {
+            return empty;
+        }
+        return m_Impl->LastCompileValidationResult;
     }
 
     Core::Result RenderGraph::ValidateTextureRef(const TextureRef ref) const

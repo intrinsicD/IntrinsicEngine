@@ -27,6 +27,7 @@ namespace Extrinsic::Graphics
     namespace
     {
         thread_local std::string g_LastCompileDiagnostic{};
+        thread_local RenderGraphValidationResult g_LastCompileValidationResult{};
 
         [[nodiscard]] constexpr TextureBarrierState ToTextureBarrierState(const TextureUsage usage)
         {
@@ -287,6 +288,52 @@ namespace Extrinsic::Graphics
             });
         }
 
+        void SortValidationFindings(RenderGraphValidationResult& result);
+
+        void AddFinding(RenderGraphValidationResult& result,
+                        const RenderGraphValidationSeverity severity,
+                        const RenderGraphValidationCode code,
+                        std::string message,
+                        const std::uint32_t passIndex,
+                        std::string passName,
+                        const bool isTexture = true,
+                        const std::uint32_t resourceIndex = InvalidValidationIndex(),
+                        std::string resourceName = {})
+        {
+            result.Findings.push_back(RenderGraphValidationFinding{
+                .Severity = severity,
+                .Code = code,
+                .Message = std::move(message),
+                .PassIndex = passIndex,
+                .PassName = std::move(passName),
+                .ResourceIndex = resourceIndex,
+                .IsTextureResource = isTexture,
+                .ResourceName = std::move(resourceName),
+            });
+        }
+
+        void SetLastCompileFinding(const RenderGraphValidationCode code,
+                                   std::string message,
+                                   const std::uint32_t passIndex,
+                                   std::string passName,
+                                   const bool isTexture = true,
+                                   const std::uint32_t resourceIndex = InvalidValidationIndex(),
+                                   std::string resourceName = {})
+        {
+            g_LastCompileDiagnostic = message;
+            g_LastCompileValidationResult.Findings.clear();
+            AddFinding(g_LastCompileValidationResult,
+                       RenderGraphValidationSeverity::Error,
+                       code,
+                       std::move(message),
+                       passIndex,
+                       std::move(passName),
+                       isTexture,
+                       resourceIndex,
+                       std::move(resourceName));
+            SortValidationFindings(g_LastCompileValidationResult);
+        }
+
         [[nodiscard]] const ImportedResourceAuthorization* FindAuthorization(
             const std::span<const ImportedResourceAuthorization> authorizations,
             const bool isTexture,
@@ -494,6 +541,7 @@ namespace Extrinsic::Graphics
         const std::span<const BufferResourceDesc> buffers)
     {
         g_LastCompileDiagnostic.clear();
+        g_LastCompileValidationResult.Findings.clear();
         const std::uint32_t passCount = static_cast<std::uint32_t>(passes.size());
         const std::uint32_t resourceCount = static_cast<std::uint32_t>(textures.size() + buffers.size());
         if (passCount == 0)
@@ -538,6 +586,9 @@ namespace Extrinsic::Graphics
                     compiled.BufferHandles[bufferIndex] = buffers[bufferIndex].ImportedHandle;
                 }
             }
+            RenderGraphValidationResult validation = ValidateCompiledGraph(compiled);
+            compiled.ValidationFindings = validation.Findings;
+            g_LastCompileValidationResult = std::move(validation);
             return compiled;
         }
 
@@ -603,8 +654,11 @@ namespace Extrinsic::Graphics
             {
                 if (!dependency.IsValid() || dependency.Index >= passCount)
                 {
-                    g_LastCompileDiagnostic = "RenderGraph explicit dependency references an invalid pass: pass=\"" +
-                                              pass.Name + "\" depends_on=" + std::to_string(dependency.Index) + ".";
+                    SetLastCompileFinding(RenderGraphValidationCode::InvalidExplicitDependency,
+                                          "RenderGraph explicit dependency references an invalid pass: pass=\"" +
+                                              pass.Name + "\" depends_on=" + std::to_string(dependency.Index) + ".",
+                                          passIndex,
+                                          pass.Name);
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
                 AddEdge(dependency.Index, passIndex, adjacency, indegree, dedup);
@@ -614,8 +668,13 @@ namespace Extrinsic::Graphics
             {
                 if (access.Ref.Index >= textureStates.size())
                 {
-                    g_LastCompileDiagnostic = "RenderGraph texture access references an invalid texture resource: pass=\"" +
-                                              pass.Name + "\" texture_index=" + std::to_string(access.Ref.Index) + ".";
+                    SetLastCompileFinding(RenderGraphValidationCode::InvalidTextureAccess,
+                                          "RenderGraph texture access references an invalid texture resource: pass=\"" +
+                                              pass.Name + "\" texture_index=" + std::to_string(access.Ref.Index) + ".",
+                                          passIndex,
+                                          pass.Name,
+                                          true,
+                                          access.Ref.Index);
                     return std::unexpected(Core::ErrorCode::OutOfRange);
                 }
                 if (access.Write)
@@ -635,8 +694,13 @@ namespace Extrinsic::Graphics
             {
                 if (access.Ref.Index >= bufferStates.size())
                 {
-                    g_LastCompileDiagnostic = "RenderGraph buffer access references an invalid buffer resource: pass=\"" +
-                                              pass.Name + "\" buffer_index=" + std::to_string(access.Ref.Index) + ".";
+                    SetLastCompileFinding(RenderGraphValidationCode::InvalidBufferAccess,
+                                          "RenderGraph buffer access references an invalid buffer resource: pass=\"" +
+                                              pass.Name + "\" buffer_index=" + std::to_string(access.Ref.Index) + ".",
+                                          passIndex,
+                                          pass.Name,
+                                          false,
+                                          access.Ref.Index);
                     return std::unexpected(Core::ErrorCode::OutOfRange);
                 }
                 if (access.Write)
@@ -662,14 +726,20 @@ namespace Extrinsic::Graphics
             {
                 if (!pass.RenderPass.ColorTargets.empty() && !hasColorAttachmentWrite)
                 {
-                    g_LastCompileDiagnostic = "RenderGraph render-pass color attachment declaration is missing a color write usage: pass=\"" +
-                                              pass.Name + "\".";
+                    SetLastCompileFinding(RenderGraphValidationCode::RenderPassColorWriteMissing,
+                                          "RenderGraph render-pass color attachment declaration is missing a color write usage: pass=\"" +
+                                              pass.Name + "\".",
+                                          passIndex,
+                                          pass.Name);
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
                 if (pass.RenderPass.Depth.Target.IsValid() && !hasDepthAccess)
                 {
-                    g_LastCompileDiagnostic = "RenderGraph render-pass depth attachment declaration is missing depth usage: pass=\"" +
-                                              pass.Name + "\".";
+                    SetLastCompileFinding(RenderGraphValidationCode::RenderPassDepthAccessMissing,
+                                          "RenderGraph render-pass depth attachment declaration is missing depth usage: pass=\"" +
+                                              pass.Name + "\".",
+                                          passIndex,
+                                          pass.Name);
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
 
@@ -876,6 +946,30 @@ namespace Extrinsic::Graphics
                 cycle << "<unknown>";
             }
             g_LastCompileDiagnostic = cycle.str();
+            g_LastCompileValidationResult.Findings.clear();
+            for (std::uint32_t i = 0; i < passCount; ++i)
+            {
+                if (!live[i] || liveIndegree[i] == 0u)
+                {
+                    continue;
+                }
+                AddFinding(g_LastCompileValidationResult,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::CycleDetected,
+                           g_LastCompileDiagnostic,
+                           i,
+                           passes[i].Name);
+            }
+            if (g_LastCompileValidationResult.Findings.empty())
+            {
+                AddFinding(g_LastCompileValidationResult,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::CycleDetected,
+                           g_LastCompileDiagnostic,
+                           InvalidValidationIndex(),
+                           std::string{});
+            }
+            SortValidationFindings(g_LastCompileValidationResult);
 
             CompiledRenderGraph failed{
                 .PassCount = livePassCount,
@@ -897,6 +991,7 @@ namespace Extrinsic::Graphics
                 .TextureFinalStates = std::move(textureFinalStates),
                 .BufferInitialStates = std::move(bufferInitialStates),
                 .BufferFinalStates = std::move(bufferFinalStates),
+                .ValidationFindings = g_LastCompileValidationResult.Findings,
             };
             return std::unexpected(Core::ErrorCode::InvalidState);
         }
@@ -1030,7 +1125,7 @@ namespace Extrinsic::Graphics
             barrierPackets.push_back(std::move(importedFinalPacket));
         }
 
-        return CompiledRenderGraph{
+        CompiledRenderGraph compiled{
             .PassCount = livePassCount,
             .CulledPassCount = passCount - livePassCount,
             .ResourceCount = resourceCount,
@@ -1058,11 +1153,20 @@ namespace Extrinsic::Graphics
             .RenderPassAttachments = std::move(renderPassAttachments),
             .BarrierPackets = std::move(barrierPackets),
         };
+        RenderGraphValidationResult validation = ValidateCompiledGraph(compiled);
+        compiled.ValidationFindings = validation.Findings;
+        g_LastCompileValidationResult = std::move(validation);
+        return compiled;
     }
 
     const std::string& RenderGraphCompiler::GetLastCompileDiagnostic()
     {
         return g_LastCompileDiagnostic;
+    }
+
+    const RenderGraphValidationResult& RenderGraphCompiler::GetLastCompileValidationResult()
+    {
+        return g_LastCompileValidationResult;
     }
 
     std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled)
@@ -1491,6 +1595,27 @@ namespace Extrinsic::Graphics
                        attachment.PassIndex,
                        true,
                        attachment.ResourceIndex);
+        }
+
+        for (std::uint32_t textureIndex = 0; textureIndex < compiled.TextureInitialStates.size(); ++textureIndex)
+        {
+            if (!BoolAt(compiled.TextureImported, textureIndex) || !BoolAt(compiled.TextureIsBackbuffer, textureIndex))
+            {
+                continue;
+            }
+            if (textureIndex < compiled.TextureFinalStates.size() && compiled.TextureFinalStates[textureIndex] == TextureState::Present)
+            {
+                continue;
+            }
+
+            AddFinding(result,
+                       RenderGraphValidationSeverity::Error,
+                       RenderGraphValidationCode::ImportedTextureFinalStateMismatch,
+                       "Imported backbuffer texture must finish in Present state.",
+                       compiled,
+                       InvalidValidationIndex(),
+                       true,
+                       textureIndex);
         }
 
         auto validateImportedWrites = [&](const bool isTexture,

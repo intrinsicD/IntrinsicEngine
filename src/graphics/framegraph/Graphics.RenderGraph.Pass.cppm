@@ -56,14 +56,14 @@ namespace Extrinsic::Graphics
         }
     };
 
-    struct TextureAccess
+    export struct TextureAccess
     {
         TextureRef Ref{};
         TextureUsage Usage = TextureUsage::ShaderRead;
         bool Write = false;
     };
 
-    struct BufferAccess
+    export struct BufferAccess
     {
         BufferRef Ref{};
         BufferUsage Usage = BufferUsage::ShaderRead;

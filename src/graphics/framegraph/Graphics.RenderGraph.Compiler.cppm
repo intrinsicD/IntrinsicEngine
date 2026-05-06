@@ -150,6 +150,7 @@ namespace Extrinsic::Graphics
         std::vector<bool> BufferImported{};
         std::vector<CompiledRenderPassAttachment> RenderPassAttachments{};
         std::vector<BarrierPacket> BarrierPackets{};
+        std::vector<RenderGraphValidationFinding> ValidationFindings{};
         std::string Diagnostic{};
     };
 
@@ -161,6 +162,7 @@ namespace Extrinsic::Graphics
             std::span<const TextureResourceDesc> textures,
             std::span<const BufferResourceDesc> buffers);
         [[nodiscard]] static const std::string& GetLastCompileDiagnostic();
+        [[nodiscard]] static const RenderGraphValidationResult& GetLastCompileValidationResult();
     };
 
     export [[nodiscard]] std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled);
