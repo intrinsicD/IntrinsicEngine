@@ -67,8 +67,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/rendering-three-pass.md`.
 - [GRAPHICS-009 — Deferred lighting and shadows](../../done/GRAPHICS-009-deferred-lighting-and-shadows.md):
   depends on GRAPHICS-008.
-- [GRAPHICS-009Q — Lighting and shadow clarification follow-ups](GRAPHICS-009Q-lighting-shadow-clarifications.md):
-  nonblocking docs-only follow-up for shadow atlas sizing input, backend sampler binding, cascade extraction ownership, and deferred-lighting debug mode seams. It must not be mixed with C++ behavior work.
+- [GRAPHICS-009Q — Lighting and shadow clarification follow-ups](../../active/GRAPHICS-009Q-lighting-shadow-clarifications.md):
+  active docs-only follow-up for shadow atlas sizing input, backend sampler binding, cascade extraction ownership, and deferred-lighting debug mode seams. It must not be mixed with C++ behavior work.
 - [GRAPHICS-010 — Lines, points, and debug primitives](../../done/GRAPHICS-010-lines-points-debug-primitives.md):
   depends on GRAPHICS-002, GRAPHICS-003, and GRAPHICS-007.
 - [GRAPHICS-010Q — Transient debug backend clarification follow-ups](GRAPHICS-010Q-transient-debug-backend-clarifications.md):
