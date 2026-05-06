@@ -1,10 +1,15 @@
 # GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff
 
-- Status: in-progress (planning-only; no C++ behavior in this task).
+- Status: completed (2026-05-06; planning-only; Slices A and B landed).
 - Owner / agent: planning across `src/runtime`, `src/graphics/renderer`, and
   `src/platform`, with cross-links into `src/legacy/Graphics` retirement.
-- Branch: `claude/plan-rendering-tasks-ORYwq` (planning).
-- PR: TBD.
+- Branches: Slice A on `claude/plan-rendering-tasks-ORYwq`; Slice B on
+  `claude/agentic-workflow-session-AO2Nr`.
+- Completed: 2026-05-06.
+- Commit: Slice A landed prior to retirement (matrix and runtime ownership
+  subsection); Slice B landed as `b09b0e9` (cross-link appendices) plus the
+  retirement commit referenced in PR/commit metadata.
+- PR/commit reference: TBD.
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict` after each planning slice.
 
 ## Goal
@@ -309,5 +314,26 @@ Each slice runs the verification commands above before merge.
   inventory and packet sketches to `docs/migration/nonlegacy-parity-matrix.md`
   and documented runtime-owned overlay handoff responsibilities in
   `docs/architecture/runtime-subsystem-boundaries.md`. Verification run:
+  `python3 tools/agents/check_task_policy.py --root . --strict` and
+  `python3 tools/docs/check_doc_links.py --root . --strict`.
+- 2026-05-06: Slice B complete. Added `Follow-up cross-link` appendices to
+  `tasks/done/GRAPHICS-010-lines-points-debug-primitives.md`,
+  `tasks/done/GRAPHICS-011-spatial-debug-visualizers.md`,
+  `tasks/done/GRAPHICS-014-visualization-attributes-overlays.md`, and
+  `tasks/done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md`,
+  each pointing at the overlay/presentation/editor handoff matrix and
+  preserving acceptance criteria/completion metadata. Added a `Cross-links`
+  section to `tasks/backlog/rendering/GRAPHICS-020-legacy-graphics-retirement-gates.md`
+  marking `GRAPHICS-024` as the authoritative source of overlay/presentation
+  per-module owner decisions for retirement gating. No new follow-up backlog
+  tasks were filed: every §1 inventory row already maps to an existing
+  clarification task (`GRAPHICS-010Q`, `GRAPHICS-011Q`, `GRAPHICS-013CQ`,
+  `GRAPHICS-014Q`, `GRAPHICS-017Q`) or to `GRAPHICS-020` itself, and the
+  composition-pass row is explicitly "no follow-up needed for ownership".
+  The optional one-paragraph update to `docs/architecture/graphics.md` (§5
+  of this task) was not applied because Slice B introduces no new public
+  C++ overlay packet contracts; the existing visualization-packets
+  paragraph in that doc already covers promoted-layer ownership for the
+  overlay packet seam. Verification run:
   `python3 tools/agents/check_task_policy.py --root . --strict` and
   `python3 tools/docs/check_doc_links.py --root . --strict`.

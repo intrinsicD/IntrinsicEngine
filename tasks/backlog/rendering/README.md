@@ -127,10 +127,12 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-023 — Shader, material, and texture hot reload](GRAPHICS-023-shader-material-texture-hot-reload.md):
   depends on GRAPHICS-006 for registry/material/pipeline contracts and
   GRAPHICS-015 for GPU asset/texture residency.
-- [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../active/GRAPHICS-024-overlays-presentation-editor-handoff.md):
-  active planning task; depends on GRAPHICS-010/011/014/017 ownership
-  decisions where overlay, visualization, picking, camera, and editor
-  handoff overlap; informs GRAPHICS-020 retirement gating.
+- [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md):
+  completed planning task; recorded the per-row owner matrix for legacy
+  overlay/presentation/editor-adjacent behaviors and cross-linked
+  GRAPHICS-010/011/014/017 done tasks plus this backlog index. Retirement
+  gating in GRAPHICS-020 resolves overlay/presentation modules through
+  the matrix in `../../../docs/migration/nonlegacy-parity-matrix.md`.
 - [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](GRAPHICS-025-hybrid-transparent-special-material-path.md):
   future-facing follow-up after GRAPHICS-006/007/008/009 and GRAPHICS-013A
   establish material, bucket, opaque, lighting, and postprocess contracts.
