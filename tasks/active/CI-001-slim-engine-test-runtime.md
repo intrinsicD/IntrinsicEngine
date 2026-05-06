@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3 parameterization complete; Slice 4 re-layering complete; Slice 5 CTest knobs next)
+- Status: in-review (Slices 1–5 implemented; final verification/self-review pending)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -193,6 +193,12 @@ Progress notes:
   split with explicit `IntrinsicGraphics`/`IntrinsicRHI` ownership. That split is
   outside this CI runtime slice, so no risky legacy/extrinsic dependency refactor
   was mixed into Slice 4.
+- 2026-05-06: Slice 5 completed by adding CTest `TIMEOUT` properties in
+  `tests/CMakeLists.txt`: regular discovered/grouped tests default to 30 seconds,
+  while entries labeled `slow` receive 120 seconds. `tests/README.md` now
+  documents the timeout policy and reiterates the current directory-based
+  `ctest --test-dir build/ci ... -j$(nproc)` commands because the repository
+  does not currently define CTest `testPresets`.
 
 ## Required changes
 

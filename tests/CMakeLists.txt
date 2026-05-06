@@ -43,6 +43,9 @@ set(_intrinsic_allowed_test_labels
     vulkan
 )
 
+set(_intrinsic_default_test_timeout_seconds 30)
+set(_intrinsic_slow_test_timeout_seconds 120)
+
 # =============================================================================
 # Helper: create an OBJECT library for a group of test sources.
 # Each .cpp is compiled exactly once; the objects are then linked into
@@ -75,6 +78,11 @@ function(intrinsic_test_executable name)
             )
         endif()
     endforeach()
+    set(_intrinsic_test_timeout ${_intrinsic_default_test_timeout_seconds})
+    list(FIND ARG_LABELS slow _intrinsic_slow_label_index)
+    if(NOT _intrinsic_slow_label_index EQUAL -1)
+        set(_intrinsic_test_timeout ${_intrinsic_slow_test_timeout_seconds})
+    endif()
     add_executable(${name})
     set_target_properties(${name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
     target_compile_options(${name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
@@ -93,6 +101,7 @@ function(intrinsic_test_executable name)
             PROPERTIES
             ENVIRONMENT "${_intrinsic_test_env}"
             LABELS "${_intrinsic_test_labels}"
+            TIMEOUT ${_intrinsic_test_timeout}
             DISCOVERY_MODE PRE_TEST
         )
         set_property(GLOBAL APPEND PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS ${name})
@@ -119,12 +128,19 @@ function(intrinsic_grouped_test name target)
         endif()
     endforeach()
 
+    set(_intrinsic_test_timeout ${_intrinsic_default_test_timeout_seconds})
+    list(FIND ARG_LABELS slow _intrinsic_slow_label_index)
+    if(NOT _intrinsic_slow_label_index EQUAL -1)
+        set(_intrinsic_test_timeout ${_intrinsic_slow_test_timeout_seconds})
+    endif()
+
     add_test(NAME ${name}
         COMMAND $<TARGET_FILE:${target}> "--gtest_filter=${ARG_FILTER}"
     )
     set_tests_properties(${name} PROPERTIES
         ENVIRONMENT "${_intrinsic_test_env}"
         LABELS "${ARG_LABELS}"
+        TIMEOUT ${_intrinsic_test_timeout}
     )
 endfunction()
 

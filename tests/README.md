@@ -45,6 +45,13 @@ ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
 ```
 
+`CMakePresets.json` currently defines configure/build presets but no CTest
+`testPresets`, so use the directory-based `ctest --test-dir build/ci ...`
+commands above rather than `ctest --preset ci`. Test registration sets a
+30-second CTest `TIMEOUT` by default; executables or grouped entries labeled
+`slow` receive a 120-second CTest `TIMEOUT` so opt-in/nightly coverage has room
+for valid longer-running cases without raising the default for cheap CPU tests.
+
 ## Shared fixtures
 
 Shared support fixtures live under `support/`. Runtime/Vulkan integration tests
