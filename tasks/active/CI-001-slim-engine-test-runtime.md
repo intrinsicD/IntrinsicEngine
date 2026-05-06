@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3 parameterization complete; Slice 4a CPU-only selection re-layering complete; remaining Slice 4 graphics contract audit next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3 parameterization complete; Slice 4 re-layering complete; Slice 5 CTest knobs next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -182,6 +182,17 @@ Progress notes:
   ownership/executable routing. The slow Vulkan-labeled `IntrinsicRuntimeTests`
   executable still keeps the broader `Test_RuntimeSelection.cpp` CPU/GPU pick
   integration contracts as the remaining runtime selection smoke/coverage.
+- 2026-05-06: Slice 4b audited the CPU-only render-resource/frame-recipe
+  assertions still present in `tests/integration/runtime/Test_RuntimeGraphics.cpp`.
+  The promoted `Extrinsic` graphics contracts under
+  `tests/contract/graphics/Test.FrameRecipeContract.cpp` already cover the
+  modern frame-recipe surface in the CPU `GraphicsContractCpuTestObjs` target.
+  The remaining `Test_RuntimeGraphics.cpp` render-resource cases exercise legacy
+  `Graphics`/`RHI` module APIs that are still linked through `RuntimeTestObjs`;
+  moving them to a CPU target would require a separate legacy graphics contract
+  split with explicit `IntrinsicGraphics`/`IntrinsicRHI` ownership. That split is
+  outside this CI runtime slice, so no risky legacy/extrinsic dependency refactor
+  was mixed into Slice 4.
 
 ## Required changes
 
