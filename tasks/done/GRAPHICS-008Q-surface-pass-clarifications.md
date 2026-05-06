@@ -1,11 +1,14 @@
 # GRAPHICS-008Q — Surface pass clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-06 after `GRAPHICS-007Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-06.
 - Branch: `claude/agentic-workflow-session-TaF1r`.
-- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after recording decisions and mirroring consequential notes into `docs/architecture/rendering-three-pass.md`.
+- Implementation commit: pending local agent workflow handoff.
+- Task-state commit: pending local agent workflow handoff.
+- Resolution: decisions recorded below and consequential notes synced into the depth/surface/G-buffer command-contract section of `docs/architecture/rendering-three-pass.md`. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (185 relative links, no broken links).
 
 ## Decisions
 - **Alpha-mask depth/G-buffer bucket policy.** Keep the `SurfaceAlphaMask`
