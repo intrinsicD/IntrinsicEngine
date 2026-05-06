@@ -75,8 +75,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   completed docs-only follow-up for transient debug packet upload/routing (per-frame host-visible buffers, not GpuWorld/cull buckets), debug-triangle dedicated debug-surface overlay routing, depth-tested vs overlay pipeline-variant policy, and `InvalidSnapshotRecordCount`-only diagnostics. Decisions also mirrored in `docs/architecture/rendering-three-pass.md` and `src/graphics/renderer/README.md`.
 - [GRAPHICS-011 — Spatial debug visualizers](../../done/GRAPHICS-011-spatial-debug-visualizers.md):
   depends on GRAPHICS-010.
-- [GRAPHICS-011Q — Spatial debug adapter clarification follow-ups](GRAPHICS-011Q-spatial-debug-adapter-clarifications.md):
-  nonblocking docs-only follow-up for concrete BVH/KD-tree/octree/convex-hull adapter ownership and diagnostics handoff.
+- [GRAPHICS-011Q — Spatial debug adapter clarification follow-ups](../../active/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md):
+  promoted to `tasks/active/` for resolution; nonblocking docs-only follow-up for concrete BVH/KD-tree/octree/convex-hull adapter ownership and diagnostics handoff.
 - [GRAPHICS-012 — Picking, selection, and outline](../../done/GRAPHICS-012-picking-selection-outline.md):
   depends on GRAPHICS-002, GRAPHICS-007, GRAPHICS-008, and GRAPHICS-010. Owns
   the logical `PickingPass` stage (split source modules

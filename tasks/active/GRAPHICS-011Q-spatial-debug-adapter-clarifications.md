@@ -1,5 +1,12 @@
 # GRAPHICS-011Q — Spatial debug adapter clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-010Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-pmrBn`.
+- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after recording decisions and mirroring consequential notes into `docs/architecture/graphics.md`.
+
 ## Goal
 - Clarify which higher-layer adapters should translate concrete geometry/runtime spatial structures into the data-only `Extrinsic.Graphics.SpatialDebugVisualizers` input records.
 
