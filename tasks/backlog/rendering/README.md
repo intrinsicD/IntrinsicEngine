@@ -120,8 +120,28 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `src/graphics/renderer/README.md`.
 - [GRAPHICS-013B — Debug view and render-target inspection](../../done/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
   depends on GRAPHICS-013A.
-- [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](../../active/GRAPHICS-013BQ-debug-view-backend-clarifications.md):
-  nonblocking docs-only follow-up for shader visualization modes, selected-resource descriptors, UI resource-name mapping, and buffer inspection policy.
+- [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](../../done/GRAPHICS-013BQ-debug-view-backend-clarifications.md):
+  retired docs-only clarification for shader visualization modes
+  (deterministic mapping from `FrameRecipeResourceKind` plus
+  `DebugViewResourceClass` to LDR-color/Reinhard-tonemap/depth-grayscale/
+  world-normal/integer-hash visualizations; no new
+  `DebugViewSettings`/`DebugViewPushConstants` fields), descriptor
+  binding ownership (one pass-local `Pass.DebugView` descriptor set
+  with sampled image view + linear-clamp sampler; per-aspect
+  `VkDescriptorSetLayout` and view creation remain backend-local under
+  `src/graphics/vulkan`; `DebugViewRGBA` framegraph-owned), UI-name
+  mapping (runtime/editor owns the human-readable -> canonical
+  `FrameRecipeIntrospection::Resources[i].Name` dictionary built from
+  `DebugViewSystem::BuildInspectionTable()` rows; graphics never
+  receives display strings or imports ImGui/platform/window state),
+  and buffer inspection (buffer-class resources stay non-previewable
+  in `Pass.DebugView`; textual/statistical buffer inspection deferred
+  to `GRAPHICS-014Q` runtime/editor surface that consumes existing
+  per-owner diagnostics rather than adding a parallel buffer-readback
+  API on `DebugViewSystem`). Decisions also mirrored in
+  `docs/architecture/rendering-three-pass.md`,
+  `docs/architecture/graphics.md`, and
+  `src/graphics/renderer/README.md`.
 - [GRAPHICS-013C — ImGui overlay and present/finalization](../../done/GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.
 - [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
