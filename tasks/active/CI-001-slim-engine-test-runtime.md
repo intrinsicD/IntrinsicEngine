@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a shared runtime RHI environment complete; Slice 2b grouped Runtime RHI CTest complete; broader Slice 2 engine/Vulkan fixtures next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator headless fixture complete; broader Slice 2 engine/Vulkan fixtures next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -119,6 +119,18 @@ Progress notes:
   `build/ci` tree passed the grouped Runtime RHI CTest entry (1 test, running
   the migrated suites in one process) and the default CPU-supported gate (1,590
   tests).
+- 2026-05-06: Slice 2c completed by migrating
+  `RenderOrchestratorHeadlessTest` in
+  `tests/integration/graphics/Test_RenderOrchestrator.cpp` to borrow
+  `RuntimeRhiTestEnvironment`, keeping bindless/texture/descriptor resources
+  local per test. CPU-only `ShaderRegistry` and `GeometryPool` checks no longer
+  use the Vulkan-backed fixture. Added
+  `IntrinsicRuntimeTests.RenderOrchestratorHeadlessGrouped` so the remaining
+  headless RenderOrchestrator cases can run in one process while individual
+  CTest cases remain registered. Local verification on the configured
+  `build/ci` tree passed the grouped RenderOrchestrator CTest entry (1 test),
+  the direct `IntrinsicRuntimeTests` filter for all 8 RenderOrchestrator cases,
+  the default CPU-supported gate (1,590 tests), and PR-fast (1,584 tests).
 
 ## Required changes
 

@@ -11,6 +11,8 @@ import RHI;
 import Graphics;
 import Core;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 // ---------------------------------------------------------------------------
 // Compile-time API contract tests
 // ---------------------------------------------------------------------------
@@ -44,15 +46,12 @@ class RenderOrchestratorHeadlessTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        // Minimal headless Vulkan setup to verify subsystem wiring.
-        RHI::ContextConfig ctxConfig{
-            .AppName = "RenderOrchestratorTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
 
         m_Bindless = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
         m_TextureManager = std::make_unique<RHI::TextureManager>(*m_Device, *m_Bindless);
@@ -66,10 +65,13 @@ protected:
         m_DescriptorLayout.reset();
         m_TextureManager.reset();
         m_Bindless.reset();
-        m_Device->FlushAllDeletionQueues();
+        if (m_Device)
+        {
+            m_Device->FlushAllDeletionQueues();
+        }
+        m_Device.reset();
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<RHI::BindlessDescriptorSystem> m_Bindless;
     std::unique_ptr<RHI::TextureManager> m_TextureManager;
@@ -77,7 +79,7 @@ protected:
     std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
 };
 
-TEST_F(RenderOrchestratorHeadlessTest, ShaderRegistryPopulated)
+TEST(RenderOrchestrator, ShaderRegistryPopulated)
 {
     // The ShaderRegistry should have entries after construction.
     // We can't fully construct RenderOrchestrator without a swapchain/renderer,
@@ -116,7 +118,7 @@ TEST_F(RenderOrchestratorHeadlessTest, MaterialRegistryCreatable)
     matSys->ProcessDeletions(1);
 }
 
-TEST_F(RenderOrchestratorHeadlessTest, GeometryPoolInitializable)
+TEST(RenderOrchestrator, GeometryPoolInitializable)
 {
     // GeometryPool is a Core::ResourcePool; it doesn't require explicit initialization.
     Graphics::GeometryPool pool;
