@@ -157,7 +157,21 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   split-plane, convex-hull edge, and point-marker snapshots and produces owned
   transient debug packet vectors plus deterministic diagnostics. It does not
   import geometry tree implementations, runtime, editor UI, or ECS ownership;
-  higher layers/adapters translate their structures into these snapshot records.
+  higher layers/adapters translate their structures into these snapshot
+  records. Per `GRAPHICS-011Q`, concrete BVH/KD-tree/octree/convex-hull
+  adapters live in **runtime extraction** (planned umbrella module name
+  `Extrinsic.Runtime.SpatialDebugAdapters`) — not in `src/geometry` and not
+  in `src/graphics` — because runtime is the only layer permitted to import
+  both geometry tree implementations and the graphics packet types. Adapters
+  may apply CPU-side pre-filters (leaf-only, occupancy-only, capped depth) and
+  surface adapter-side statistics through `RuntimeRenderExtractionStats`; the
+  graphics-side `SpatialDebugVisualizerOptions` budget and
+  `SpatialDebugVisualizerDiagnostics` remain the single graphics-visible
+  truncation/diagnostics surfaces, and the input record types are frozen by
+  the same clarification (no new fields for adapter-specific knowledge).
+  Adapter integration tests land under `tests/integration/runtime/` next to
+  `Test.RuntimeRenderExtraction.cpp`; the data-only packet contract keeps
+  its unit coverage in `tests/unit/graphics/Test.Graphics.SpatialDebugVisualizers.cpp`.
 - `Graphics.VisualizationPackets` is a CPU-only packet contract for scalar,
   color, vector-field, isoline, UV-backed fragment-bake, and Htex-backed
   visualization data. Existing mesh texcoords may drive per-fragment bakes;

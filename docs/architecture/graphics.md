@@ -52,7 +52,26 @@ Graphics is organized into explicit sublayers:
   point markers) into transient debug packets with deterministic limits and
   diagnostics. Geometry/runtime/editor adapters remain outside graphics and feed
   snapshot records instead of giving graphics live ownership of geometry trees or
-  editor state.
+  editor state. Concrete adapters that translate `Geometry::BVH`,
+  `Geometry::KDTree`, `Geometry::Octree`, and convex-hull outputs into these
+  data-only records live in **runtime extraction** (planned umbrella module
+  name `Extrinsic.Runtime.SpatialDebugAdapters`), not in `src/geometry` and not
+  in `src/graphics`: geometry stays at the `geometry -> core` layer rule and
+  graphics never imports geometry tree implementations or editor state. Editor
+  and app code may own user-facing toggles (enable/disable, color, leaf/internal
+  filters, per-depth filters) but must funnel them into the runtime adapter as
+  pre-filter inputs rather than calling
+  `Extrinsic.Graphics.SpatialDebugVisualizers` with live geometry references.
+  The `SpatialDebugVisualizerOptions::MaxLinePackets`/`MaxPointPackets`/
+  `MaxDepth` budget remains the single place that enforces graphics-side
+  truncation, and `SpatialDebugVisualizerDiagnostics` remains the only
+  graphics-visible diagnostic surface; adapters apply CPU-side pre-filters
+  (e.g. leaf-only, occupancy-only, capped depth) and report adapter-side
+  invocation/filter statistics through runtime extraction stats rather than
+  introducing a parallel graphics diagnostics struct. Adapter tests are
+  runtime integration tests under `tests/integration/runtime/` (matching
+  `Test.RuntimeRenderExtraction.cpp`); the data-only packet contract keeps
+  its unit coverage under `tests/unit/graphics/`.
 - `Extrinsic.Graphics.VisualizationPackets` is the promoted data-only seam for
   scalar/color/vector attribute buffers, vector-field overlays, isoline overlays,
   UV-backed fragment-bake atlas descriptors, and Htex patch-preview/bake atlas
