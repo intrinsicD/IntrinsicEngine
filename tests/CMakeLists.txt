@@ -103,6 +103,32 @@ function(intrinsic_test_executable name)
 endfunction()
 
 # =============================================================================
+# Helper: add an additional grouped CTest entry for selected GoogleTest suites.
+# Individual gtest_discover_tests registrations remain intact; grouped entries
+# are opt-in and are used only where a shared per-process fixture has been added.
+# =============================================================================
+function(intrinsic_grouped_test name target)
+    cmake_parse_arguments(ARG "" "FILTER" "LABELS" ${ARGN})
+    foreach(label IN LISTS ARG_LABELS)
+        list(FIND _intrinsic_allowed_test_labels "${label}" _intrinsic_label_index)
+        if(_intrinsic_label_index EQUAL -1)
+            message(FATAL_ERROR
+                "Grouped test '${name}' uses undocumented CTest label '${label}'. "
+                "Update tests/README.md and _intrinsic_allowed_test_labels in tests/CMakeLists.txt before using a new label."
+            )
+        endif()
+    endforeach()
+
+    add_test(NAME ${name}
+        COMMAND $<TARGET_FILE:${target}> "--gtest_filter=${ARG_FILTER}"
+    )
+    set_tests_properties(${name} PROPERTIES
+        ENVIRONMENT "${_intrinsic_test_env}"
+        LABELS "${ARG_LABELS}"
+    )
+endfunction()
+
+# =============================================================================
 # Helper: resolve test source paths from categorized directories.
 # =============================================================================
 function(intrinsic_resolve_test_sources out_var)
@@ -649,6 +675,11 @@ if(TARGET RuntimeTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeTests
         OBJECTS RuntimeTestObjs
         LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
+    intrinsic_grouped_test(IntrinsicRuntimeTests.RuntimeRHIGrouped IntrinsicRuntimeTests
+        FILTER "RHIBindless.*:RHIBuffer.*:RHIImage.*:RHIShader.*:RHITexture.*:RHIDescriptors.*:RHITransfer.*:RHIStagingBelt.*:DescriptorAllocatorTest.*:TransferTest.*:RHIPipeline.*:PipelineBuilderTest.*:PresentPolicy.*:VkCheckPolicy.*:VkCheckPolicyDeathTest.*:QueueFamilyIndices.*:QueueFamilyContract.*:QueueDomain.*:QueueSubmitter.*"
         LABELS integration runtime headless graphics gpu vulkan slow
     )
 

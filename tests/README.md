@@ -51,6 +51,12 @@ Shared support fixtures live under `support/`. Runtime/Vulkan integration tests
 that borrow `RuntimeRhiTestEnvironment` must keep per-test mutable state local
 to each fixture and follow the reset contract in `support/README.md`.
 
+Some slow runtime suites also have grouped CTest entries, such as
+`IntrinsicRuntimeTests.RuntimeRHIGrouped`, so shared per-process fixtures can
+actually amortize setup cost in nightly/opt-in runs. These grouped entries are
+additive: individual `gtest_discover_tests` cases must remain registered for
+focused filtering and diagnostics.
+
 ## New test naming
 
 New C++ test source files should use the `Test.<Name>.cpp` format.

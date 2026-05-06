@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a shared runtime RHI environment complete; broader Slice 2 engine/Vulkan fixtures next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a shared runtime RHI environment complete; Slice 2b grouped Runtime RHI CTest complete; broader Slice 2 engine/Vulkan fixtures next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -107,6 +107,18 @@ Progress notes:
   still registers one CTest process per GTest case, this is Slice 2 groundwork;
   broader CTest wall-clock reduction still depends on the remaining Slice 2
   fixture/grouping work.
+- 2026-05-06: Slice 2b completed by adding an additive grouped CTest helper and
+  `IntrinsicRuntimeTests.RuntimeRHIGrouped`. The grouped entry runs the migrated
+  `Test_RuntimeRHI.cpp` suites in one `IntrinsicRuntimeTests` process while
+  preserving every individual `gtest_discover_tests` case for focused filtering.
+  The focused grouped CTest passed locally. Optional GPU nightly routing is left
+  unchanged in this sub-slice because the broad optional GPU pass currently has
+  unrelated failures outside Runtime RHI; switching that workflow to grouped
+  Runtime RHI routing should be done only after the existing optional GPU pass is
+  green or explicitly quarantined. Local verification on the configured
+  `build/ci` tree passed the grouped Runtime RHI CTest entry (1 test, running
+  the migrated suites in one process) and the default CPU-supported gate (1,590
+  tests).
 
 ## Required changes
 
