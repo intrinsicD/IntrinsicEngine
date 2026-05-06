@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator, Slice 2d HeadlessEngine, and Slice 2e RenderGraphPackets fixtures complete; broader Slice 2 engine/Vulkan fixtures next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator, Slice 2d HeadlessEngine, Slice 2e RenderGraphPackets, and Slice 2f small Vulkan fixtures complete; Slice 3 parameterization next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -148,6 +148,16 @@ Progress notes:
   Added `IntrinsicRuntimeTests.RenderGraphPacketsGrouped` so packetization and
   plan-cache cases can run in one `IntrinsicRuntimeTests` process while
   individual CTest cases remain registered.
+- 2026-05-06: Slice 2f completed by migrating the remaining small
+  Vulkan-backed fixtures in `RuntimeTestObjs` to borrow
+  `RuntimeRhiTestEnvironment`: `GraphicsBackendHeadlessTest`,
+  `HeadlessAppSmokeTest`, `SceneManagerGpuHooksHeadlessTest`,
+  `GeometryReuseTest`, `AssetPipelineHeadlessTest`, and
+  `MaintenanceLaneGpuTest`. Added grouped CTest entries for each fixture while
+  preserving individual discovered tests. Per-test mutable state remains local:
+  descriptor subsystems, transfer/buffer managers, scene managers, asset
+  pipelines, GPU scenes, geometry pools, and frame scopes are still constructed
+  and reset by each fixture/test.
 
 ## Required changes
 

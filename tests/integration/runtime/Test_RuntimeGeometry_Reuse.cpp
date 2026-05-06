@@ -13,6 +13,8 @@
 import Graphics;
 import RHI;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 namespace
 {
     class GeometryReuseTest : public ::testing::Test
@@ -20,14 +22,12 @@ namespace
     protected:
         void SetUp() override
         {
-            RHI::ContextConfig ctxConfig{
-                .AppName = "GeometryReuseTest",
-                .EnableValidation = true,
-                .Headless = true,
-            };
-
-            m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-            m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+            auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+            if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+            {
+                GTEST_SKIP() << available.message();
+            }
+            m_Device = environment.Device();
             m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
             m_BufferManager = std::make_unique<RHI::BufferManager>(*m_Device);
 
@@ -57,11 +57,9 @@ namespace
             }
 
             m_Device.reset();
-            m_Context.reset();
         }
 
         Graphics::GeometryPool m_Pool;
-        std::unique_ptr<RHI::VulkanContext> m_Context;
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         std::unique_ptr<RHI::TransferManager> m_TransferManager;
         std::unique_ptr<RHI::BufferManager> m_BufferManager;

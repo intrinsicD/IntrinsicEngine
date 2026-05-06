@@ -16,6 +16,8 @@ import Geometry;
 
 import Graphics.LifecycleUtils;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 using namespace Graphics::LifecycleUtils;
 
 // ---------------------------------------------------------------------------
@@ -196,14 +198,12 @@ class SceneManagerGpuHooksHeadlessTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        RHI::ContextConfig ctxConfig{
-            .AppName = "SceneManagerGpuHooksTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
         m_DummyCompute = std::make_unique<RHI::ComputePipeline>(m_Device, VK_NULL_HANDLE, VK_NULL_HANDLE);
     }
 
@@ -213,7 +213,6 @@ protected:
         if (m_Device)
             m_Device->FlushAllDeletionQueues();
         m_Device.reset();
-        m_Context.reset();
     }
 
     [[nodiscard]] std::unique_ptr<Graphics::GPUScene> CreateGpuScene()
@@ -221,7 +220,6 @@ protected:
         return std::make_unique<Graphics::GPUScene>(*m_Device, *m_DummyCompute, VK_NULL_HANDLE, 8u);
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<RHI::ComputePipeline> m_DummyCompute;
 };

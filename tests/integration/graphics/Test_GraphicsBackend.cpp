@@ -8,6 +8,8 @@ import Runtime.GraphicsBackend;
 import RHI;
 import Core;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 // ---------------------------------------------------------------------------
 // Compile-time API contract tests
 // ---------------------------------------------------------------------------
@@ -55,18 +57,14 @@ class GraphicsBackendHeadlessTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        // Minimal headless Vulkan setup to verify subsystem wiring.
-        RHI::ContextConfig ctxConfig{
-            .AppName = "GraphicsBackendTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
 };
 

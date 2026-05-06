@@ -698,6 +698,36 @@ if(TARGET RuntimeTestObjs)
         LABELS integration runtime headless graphics gpu vulkan slow
     )
 
+    intrinsic_grouped_test(IntrinsicRuntimeTests.GraphicsBackendHeadlessGrouped IntrinsicRuntimeTests
+        FILTER "GraphicsBackendHeadlessTest.*"
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
+    intrinsic_grouped_test(IntrinsicRuntimeTests.HeadlessAppSmokeGrouped IntrinsicRuntimeTests
+        FILTER "HeadlessAppSmokeTest.*"
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
+    intrinsic_grouped_test(IntrinsicRuntimeTests.SceneManagerGpuHooksGrouped IntrinsicRuntimeTests
+        FILTER "SceneManagerGpuHooksHeadlessTest.*"
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
+    intrinsic_grouped_test(IntrinsicRuntimeTests.GeometryReuseGrouped IntrinsicRuntimeTests
+        FILTER "GeometryReuseTest.*"
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
+    intrinsic_grouped_test(IntrinsicRuntimeTests.AssetPipelineHeadlessGrouped IntrinsicRuntimeTests
+        FILTER "AssetPipelineHeadlessTest.*"
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
+    intrinsic_grouped_test(IntrinsicRuntimeTests.MaintenanceLaneGpuGrouped IntrinsicRuntimeTests
+        FILTER "MaintenanceLaneGpuTest.*"
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
     intrinsic_test_executable(IntrinsicRuntimeIntegrationTests
         OBJECTS RuntimeIntegrationTestObjs
         LINK_LIBS ExtrinsicRuntime

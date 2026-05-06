@@ -11,37 +11,7 @@ import RHI;
 import Runtime.FrameLoop;
 import Runtime.ResourceMaintenance;
 
-namespace
-{
-    // Probe whether Vulkan instance creation will succeed. VulkanContext's
-    // constructor calls std::exit(-1) on failure, so we must pre-check.
-    [[nodiscard]] bool IsVulkanAvailable()
-    {
-        if (volkInitialize() != VK_SUCCESS)
-            return false;
-
-        // Try to actually create an instance — this catches missing ICDs and
-        // driver issues that volkInitialize() alone cannot detect.
-        VkApplicationInfo appInfo{};
-        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        appInfo.pApplicationName = "VulkanProbe";
-        appInfo.apiVersion = VK_API_VERSION_1_3;
-
-        VkInstanceCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
-        VkInstance probeInstance = VK_NULL_HANDLE;
-        VkResult result = vkCreateInstance(&createInfo, nullptr, &probeInstance);
-        if (result != VK_SUCCESS || probeInstance == VK_NULL_HANDLE)
-            return false;
-
-        const auto destroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(
-            vkGetInstanceProcAddr(probeInstance, "vkDestroyInstance"));
-        if (destroyInstance != nullptr)
-            destroyInstance(probeInstance, nullptr);
-        return true;
-    }
-}
+#include "RuntimeRhiTestEnvironment.hpp"
 
 // =============================================================================
 // CPU-only tests — verify maintenance lane coordinator contract over N frames
@@ -180,23 +150,12 @@ class MaintenanceLaneGpuTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        if (!IsVulkanAvailable())
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
         {
-            GTEST_SKIP() << "No Vulkan ICD available (headless environment)";
+            GTEST_SKIP() << available.message();
         }
-
-        RHI::ContextConfig ctxConfig{
-            .AppName = "MaintenanceLaneTest",
-            .EnableValidation = false,
-            .Headless = true,
-        };
-
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
-        if (!m_Device->IsValid())
-        {
-            GTEST_SKIP() << "No suitable GPU found";
-        }
+        m_Device = environment.Device();
     }
 
     void TearDown() override
@@ -209,7 +168,6 @@ protected:
         }
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
 };
 

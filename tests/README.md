@@ -55,10 +55,17 @@ Some slow runtime suites also have grouped CTest entries, such as
 `IntrinsicRuntimeTests.RuntimeRHIGrouped`,
 `IntrinsicRuntimeTests.RenderOrchestratorHeadlessGrouped`,
 `IntrinsicRuntimeTests.HeadlessEngineGrouped`, and
-`IntrinsicRuntimeTests.RenderGraphPacketsGrouped`, so shared per-process
-fixtures can actually amortize setup cost in nightly/opt-in runs. These grouped
-entries are additive: individual `gtest_discover_tests` cases must remain
-registered for focused filtering and diagnostics.
+`IntrinsicRuntimeTests.RenderGraphPacketsGrouped`. Smaller Vulkan-backed
+fixtures also have grouped entries, including
+`IntrinsicRuntimeTests.GraphicsBackendHeadlessGrouped`,
+`IntrinsicRuntimeTests.HeadlessAppSmokeGrouped`,
+`IntrinsicRuntimeTests.SceneManagerGpuHooksGrouped`,
+`IntrinsicRuntimeTests.GeometryReuseGrouped`,
+`IntrinsicRuntimeTests.AssetPipelineHeadlessGrouped`, and
+`IntrinsicRuntimeTests.MaintenanceLaneGpuGrouped`. These entries let shared
+per-process fixtures amortize setup cost in nightly/opt-in runs. They are
+additive: individual `gtest_discover_tests` cases must remain registered for
+focused filtering and diagnostics.
 
 ## New test naming
 

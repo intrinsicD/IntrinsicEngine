@@ -12,6 +12,8 @@ import Asset.Manager;
 import RHI;
 import Core;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 // ---------------------------------------------------------------------------
 // Compile-time API contract tests
 // ---------------------------------------------------------------------------
@@ -52,14 +54,12 @@ class AssetPipelineHeadlessTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        RHI::ContextConfig ctxConfig{
-            .AppName = "AssetPipelineTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
         m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
         m_Pipeline = std::make_unique<Runtime::AssetPipeline>(*m_TransferManager);
     }
@@ -71,10 +71,8 @@ protected:
         if (m_Device)
             m_Device->FlushAllDeletionQueues();
         m_Device.reset();
-        m_Context.reset();
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<RHI::TransferManager> m_TransferManager;
     std::unique_ptr<Runtime::AssetPipeline> m_Pipeline;
