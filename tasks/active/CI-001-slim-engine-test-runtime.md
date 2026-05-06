@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-review (Slices 1–5 implemented; final verification/self-review pending)
+- Status: ready-for-review (Slices 1–5 implemented and verified locally)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -199,6 +199,11 @@ Progress notes:
   documents the timeout policy and reiterates the current directory-based
   `ctest --test-dir build/ci ... -j$(nproc)` commands because the repository
   does not currently define CTest `testPresets`.
+- 2026-05-06: Final local verification after all five slices passed on the
+  configured `build/ci` tree: `cmake --preset ci` with clang/clang++ and
+  `INTRINSIC_OFFLINE_DEPS=ON`, `cmake --build --preset ci --target
+  IntrinsicTests`, the default CPU-supported gate (1,599 tests), PR-fast
+  `unit|contract` gate (1,593 tests), and structural/doc checks.
 
 ## Required changes
 
