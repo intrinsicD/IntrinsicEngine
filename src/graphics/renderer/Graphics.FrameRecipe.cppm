@@ -317,6 +317,83 @@ namespace Extrinsic::Graphics
         return out;
     }
 
+    export [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(
+        const FrameRecipeIntrospection& recipe,
+        const CompiledRenderGraph& compiled)
+    {
+        auto containsName = [](const std::vector<std::string_view>& names, const std::string_view name) {
+            for (const std::string_view candidate : names)
+            {
+                if (candidate == name)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        auto authorizedWritersFor = [&recipe, &containsName](const FrameRecipeResourceDeclaration& resource) {
+            std::vector<std::string> writerNames{};
+            for (const FrameRecipePassDeclaration& pass : recipe.Passes)
+            {
+                if (!pass.Enabled)
+                {
+                    continue;
+                }
+
+                if ((resource.Backbuffer && pass.FinalizesBackbuffer) ||
+                    (resource.ImportedWriteAllowed && containsName(pass.Writes, resource.Name)))
+                {
+                    writerNames.emplace_back(pass.Name);
+                }
+            }
+            return writerNames;
+        };
+
+        std::vector<ImportedResourceAuthorization> authorizations{};
+        auto addAuthorizationsFor = [&authorizations](const std::string_view resourceName,
+                                                       const ImportedResourceWritePolicy policy,
+                                                       const std::vector<std::string>& writerNames,
+                                                       const bool isTexture,
+                                                       const std::vector<std::string>& compiledNames,
+                                                       const std::vector<bool>& importedFlags) {
+            for (std::uint32_t index = 0; index < compiledNames.size(); ++index)
+            {
+                if (compiledNames[index] != resourceName || index >= importedFlags.size() || !importedFlags[index])
+                {
+                    continue;
+                }
+
+                authorizations.push_back(ImportedResourceAuthorization{
+                    .ResourceIndex = index,
+                    .IsTexture = isTexture,
+                    .Policy = policy,
+                    .AuthorizedWriterPassNames = writerNames,
+                });
+            }
+        };
+
+        for (const FrameRecipeResourceDeclaration& resource : recipe.Resources)
+        {
+            if (!resource.Enabled || !resource.Imported)
+            {
+                continue;
+            }
+
+            const ImportedResourceWritePolicy policy = (resource.Backbuffer || resource.ImportedWriteAllowed)
+                                                           ? ImportedResourceWritePolicy::AllowFinalizerOnly
+                                                           : ImportedResourceWritePolicy::Disallow;
+            const std::vector<std::string> writerNames = policy == ImportedResourceWritePolicy::Disallow
+                                                             ? std::vector<std::string>{}
+                                                             : authorizedWritersFor(resource);
+
+            addAuthorizationsFor(resource.Name, policy, writerNames, true, compiled.TextureNames, compiled.TextureImported);
+            addAuthorizationsFor(resource.Name, policy, writerNames, false, compiled.BufferNames, compiled.BufferImported);
+        }
+
+        return ValidateCompiledGraph(compiled, authorizations);
+    }
+
     export [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
                                                                         const FrameRecipeFeatures& features,
                                                                         const FrameRecipeImports& imports,

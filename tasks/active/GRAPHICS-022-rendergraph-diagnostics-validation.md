@@ -1,10 +1,10 @@
 # GRAPHICS-022 — Rendergraph diagnostics and validation
 
-- Status: in-progress (Slices A/B implemented; Slice C recipe-aware helper and docs pending)
+- Status: in-progress (Slices A/B implemented; Slice C recipe-aware helper/docs implemented; compile-side findings pending)
 - Owner / agent: graphics — `src/graphics/framegraph` + `src/graphics/renderer`
 - Branch: `claude/plan-rendering-tasks-ORYwq` (planning); implementation lands on a follow-up branch.
 - PR: TBD.
-- Next verification step: for Slice C, add the recipe-aware validation helper, compile-side structured findings, docs updates, and run the task verification commands below.
+- Next verification step: finish Slice C by adding compile-side structured findings, documenting the `g_LastCompileDiagnostic` removal follow-up, and running the task verification commands below.
 
 ## Goal
 
@@ -279,6 +279,12 @@ Under `tests/contract/graphics/`:
   `tests/unit/graphics/Test.RenderGraphDebugDump.cpp` golden coverage and
   refreshed `docs/api/generated/module_inventory.md`. Remaining work stays
   scoped to Slice C below.
+- 2026-05-06: Slice C sub-slice added
+  `ValidateRecipeCompiledGraph(...)`, frame-recipe contract coverage proving the
+  canonical default recipe validates cleanly, architecture/renderer README docs,
+  and refreshed `docs/api/generated/module_inventory.md`. Remaining Slice C
+  work is compile-side typed findings plus the `g_LastCompileDiagnostic`
+  removal follow-up.
 
 ## Verification
 
@@ -324,12 +330,13 @@ Land in three small PRs to keep mechanical and semantic edits separated:
    `BuildRenderGraphDebugDump` and add `Test.RenderGraphDebugDump.cpp`. Pin
    the new format with golden assertions. Update
    `Test_RenderGraphPackets.cpp` golden strings if needed.
-3. **Slice C — recipe-aware helper, compile-side findings, doc updates.** Add
-   `ValidateRecipeCompiledGraph` and `CompiledRenderGraph::ValidationFindings`
-   produced during `Compile`. Update
+3. **Slice C — partially complete.** Recipe-aware helper and doc updates are
+   implemented. Remaining work: add `CompiledRenderGraph::ValidationFindings`
+   produced during `Compile`. Update/remove the compatibility plan for
+   `g_LastCompileDiagnostic`. Updated
    `docs/architecture/rendering-three-pass.md` and
-   `src/graphics/renderer/README.md`. Schedule removal of
-   `g_LastCompileDiagnostic` (separate small follow-up PR or final commit
-   of this slice).
+   `src/graphics/renderer/README.md` as behavior lands. Schedule removal of
+   `g_LastCompileDiagnostic` (separate small follow-up PR or final commit of
+   this slice).
 
 Each slice should run all four verification commands above before merge.

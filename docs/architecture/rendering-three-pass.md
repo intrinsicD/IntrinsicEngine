@@ -296,11 +296,12 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 - Render-graph introspection reports per-pass attachment metadata (resource name, format, load/store ops, imported flag).
 - Render-graph introspection reports per-resource first/last read and write pass indices.
 - Temporary audit logging may dump pass order, resource creation, transitions, and formats from `RenderDriver`.
-- Any pass using `LOAD` without a guaranteed earlier write in-frame or an imported resource should emit a warning.
-- `ValidateCompiledGraph()` returns `RenderGraphValidationResult` with structured diagnostics (error/warning severity).
+- Any pass using `LOAD` without a guaranteed earlier write in-frame emits a `LoadWithoutGuaranteedWriter` warning; imported resources with a defined initial state are reported as informational findings.
+- `ValidateCompiledGraph(const CompiledRenderGraph&, std::span<const ImportedResourceAuthorization>)` returns `RenderGraphValidationResult` findings tagged with `RenderGraphValidationSeverity` and `RenderGraphValidationCode`.
+- `ValidateRecipeCompiledGraph(const FrameRecipeIntrospection&, const CompiledRenderGraph&)` is the renderer-layer convenience helper that derives imported-resource authorizations from the typed frame recipe and forwards to the framegraph validator.
 - Missing required resources and transient resources without producers are validation **errors** (not warnings).
 - Imported-resource write policies (`ImportedResourceWritePolicy`) enforce authorized writers per imported resource. Unauthorized writes are validation **errors**.
-- Default policy: only `Present.LDR` may write to the imported Backbuffer.
+- Default recipe policy: only the pass marked `FinalizesBackbuffer` may write the imported Backbuffer, and imported cull buckets may only be written by recipe-declared writer passes.
 
 ## Robustness Requirements
 

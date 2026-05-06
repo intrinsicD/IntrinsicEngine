@@ -107,6 +107,30 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
     EXPECT_EQ(build.DeclaredPassCount, expected.size());
 }
 
+TEST(FrameRecipeContract, DefaultRecipeCompiledGraphHasNoValidationFindings)
+{
+    RenderGraph graph;
+    const FrameRecipeFeatures features{};
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(features);
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 1280u, .Height = 720u});
+
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors());
+    EXPECT_FALSE(validation.HasWarnings());
+    EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Error), 0u);
+    EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Warning), 0u);
+    EXPECT_TRUE(validation.Findings.empty());
+}
+
 TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
 {
     const FrameRecipeIntrospection defaults = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});

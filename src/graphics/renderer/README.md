@@ -23,6 +23,13 @@ and renderer/render-graph orchestration.
 
 `Extrinsic.Graphics.RenderGraph` executes barrier packets in pass order: for each pass, any packets tagged with that pass index are emitted immediately before the pass callback, and imported-resource final-state packets (the compiler's end-of-graph sentinel) are emitted after the last pass. The concrete renderer lowers those packets through `RHI::ICommandContext::SubmitBarriers` when recording a frame.
 
+Render-graph diagnostics use `RenderGraphValidationResult` findings tagged by
+`RenderGraphValidationSeverity` and `RenderGraphValidationCode`. Bare compiled
+graphs can be checked with `ValidateCompiledGraph(...)`; recipe-built graphs use
+`ValidateRecipeCompiledGraph(const FrameRecipeIntrospection&, const
+CompiledRenderGraph&)`, which derives `ImportedResourceAuthorization` entries
+from the typed frame recipe before forwarding to the framegraph validator.
+
 ### Scene and sync systems
 
 - `Extrinsic.Graphics.RenderFrameInput`
