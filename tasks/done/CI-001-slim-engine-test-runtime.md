@@ -1,8 +1,8 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: ready-for-review (Slices 1–5 implemented and verified locally)
+- Status: complete (Slices 1–5 implemented and verified locally on `claude/complete-ci-001-LRnte`)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
-- Branch: `claude/optimize-engine-tests-Js8Zh`
+- Branch: `claude/complete-ci-001-LRnte` (planning seed merged via PR #739 from `claude/optimize-engine-tests-Js8Zh`).
 - PR: TBD.
 - Next verification step: after each slice, run `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and the relevant CTest gate against the configured build directory (`ctest --test-dir build/ci -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)` for the PR-fast slice; `ctest --test-dir build/ci -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)` for the Linux-clang gate). `CMakePresets.json` does not currently define a `testPresets` entry, so the directory-based invocation matches the workflows in `.github/workflows/` and the canonical command in `AGENTS.md`. Compare wall-clock against a recorded baseline on the same branch.
 
