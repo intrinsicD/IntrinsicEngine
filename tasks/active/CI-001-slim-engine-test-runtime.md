@@ -1,0 +1,226 @@
+# CI-001 — Slim engine test runtime without losing coverage
+
+- Status: planned
+- Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
+- Branch: `claude/optimize-engine-tests-Js8Zh`
+- PR: TBD.
+- Next verification step: after each slice, run `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and the relevant CTest gate (`ctest --preset ci -L "unit|contract"` for the PR-fast slice; full `ctest --preset ci -LE "gpu|vulkan|slow|flaky-quarantine"` for the Linux-clang gate). Compare wall-clock against a recorded baseline on the same branch.
+
+## Goal
+
+Reduce CTest wall-clock time for the PR-fast and Linux-clang gates without
+removing assertions or weakening coverage. Target outcomes:
+
+- PR-fast (`-L "unit|contract"`): keep ≤ 12 min.
+- Linux-clang full CPU (`-LE "gpu|vulkan|slow|flaky-quarantine"`): drop from
+  ~30 min toward ~12–15 min.
+- Nightly-deep: drop from ~90 min toward ~30–40 min.
+
+The optimization is structural (shared fixtures, label hygiene, parameterization,
+re-layering of misplaced integration assertions). No deletion of test cases is in
+scope; only consolidation of duplicates via `TEST_P` and movement of CPU-only
+assertions out of engine-boot fixtures.
+
+## Non-goals
+
+- No deletion of existing test cases or assertions.
+- No merge of the 22 separate test executables into one binary; the current
+  layout supports clean label slicing and parallel CTest runs.
+- No removal of geometry unit coverage (DEC, mesh ops, processing) — these are
+  cheap per case and correctness-critical.
+- No new test framework; GoogleTest + `gtest_discover_tests` stays.
+- No changes to `methods/` or `benchmarks/` test harnesses.
+- No change to GPU/Vulkan skip semantics on hosts without a device.
+
+## Context
+
+Audit of `tests/` (2026-05-06) recorded:
+
+- 195 test files, ~66.6k LOC, 2,723 GTest cases across 22 executables.
+- Framework: GoogleTest registered via `gtest_discover_tests(... DISCOVERY_MODE PRE_TEST)` through the helper at `tests/CMakeLists.txt:45–69`.
+- Existing CTest labels (declared per executable in `tests/CMakeLists.txt`):
+  `unit`, `contract`, `integration`, `regression`, `gpu`, `vulkan`, `benchmark`,
+  `slo`, `platform`, `headless`, `graphics`, `core`, `ecs`, `geometry`,
+  `assets`. `slow` and `flaky-quarantine` are referenced in the CI exclusion
+  filter but never applied to any executable, so the filter is currently a no-op.
+- Workflow gates:
+  - `pr-fast`: `-L "unit|contract"`.
+  - `ci-linux-clang`: `-LE "gpu|vulkan|slow|flaky-quarantine"`.
+  - `nightly-gpu`: `-L "gpu|vulkan"` (self-hosted).
+- Runtime is dominated by integration tests that boot a full headless engine
+  + Vulkan + transfer manager + asset pipeline per `TEST()`. Concrete hot
+  spots (line counts):
+  - `tests/integration/graphics/Test.RuntimeRenderExtraction.cpp` (1,682)
+  - `tests/integration/runtime/Test_RuntimeGraphics.cpp` (1,516)
+  - `tests/integration/runtime/Test_IORegistry.cpp` (1,394)
+  - `tests/integration/graphics/Test.RenderGraphLegacy.cpp` (1,167)
+  - `tests/integration/runtime/Test_RuntimeSelection.cpp` (1,047)
+  - `tests/integration/runtime/Test_RuntimeRHI.cpp` (1,040)
+  - `tests/unit/runtime/Test_RuntimeFrameLoop.cpp` (1,039)
+- Duplicated scene scaffolding visible across
+  `Test_RuntimeSelection.cpp` and `Test_RuntimeSelection_Multi.cpp` (same
+  scene; vary `PickMode`).
+- No `TEST_P` parameterization is used anywhere in `tests/`.
+
+This task implements the four-step plan summarized in the audit:
+
+1. Populate the existing `slow` / `flaky-quarantine` labels.
+2. Share the engine + Vulkan boot via a `::testing::Environment` /
+   `SetUpTestSuite` fixture so it runs once per executable.
+3. Parameterize duplicated scene/fixture variants with `TEST_P`.
+4. Move CPU-only assertions out of engine-boot fixtures into the existing
+   `unit/` and `contract/` layers.
+
+## Required changes
+
+Slice the work into independent commits in this order. Each slice must be
+verifiable on its own.
+
+### Slice 1 — Label hygiene (low risk, immediate PR-CI win)
+
+- In `tests/CMakeLists.txt`, add `slow` to the `LABELS` list of executables
+  that boot the full headless engine and/or initialize Vulkan in the default
+  CPU path. At minimum:
+  - the integration runtime executable hosting `Test_RuntimeGraphics.cpp`,
+    `Test.RuntimeRenderExtraction.cpp`, `Test_RuntimeRHI.cpp`,
+    `Test.RuntimeStreamingExecutor.cpp`, `Test.RuntimeRenderExtraction.cpp`.
+  - the runtime asset/IO executable hosting `Test_IORegistry.cpp` and
+    `Test.AssetLoadPipeline.cpp` (real-glTF parse paths).
+  - the `tests/benchmark/slo/Test_ArchitectureSLO.cpp` 2,000-node FrameGraph
+    and scheduler-contention SLOs.
+- Do not retag pure CPU contract tests as `slow`.
+- Update `tests/README.md` to document the `slow` and `flaky-quarantine`
+  labels and when to apply them.
+- Confirm `.github/workflows/*.yml` already excludes `slow` in the
+  Linux-clang gate; if not, add the exclusion. Ensure `nightly-deep`
+  includes everything (`-LE "flaky-quarantine"` only).
+
+### Slice 2 — Shared engine/Vulkan fixture (largest runtime win)
+
+- Introduce a `::testing::Environment` (or static `SetUpTestSuite` on a
+  shared fixture base) under `tests/support/` that constructs the headless
+  engine + Vulkan device + transfer manager + descriptor pools once per
+  executable and tears them down once at exit.
+- Migrate `Test_RuntimeGraphics.cpp`, `Test.RuntimeRenderExtraction.cpp`,
+  `Test_RuntimeRHI.cpp`, `Test_RuntimeFrameLoop.cpp`,
+  `Test_HeadlessEngine.cpp`, `Test.RuntimeStreamingExecutor.cpp` to consume
+  the shared fixture instead of constructing per-test engines.
+- Per-test state (scenes, asset registrations, framegraph compositions) must
+  reset between tests; document the reset contract in `tests/support/`.
+- Preserve `GTEST_SKIP()` semantics on hosts without Vulkan.
+- Do not move tests across executables in this slice; layering boundaries
+  are unchanged.
+
+### Slice 3 — Parameterize duplicated fixtures with `TEST_P`
+
+- Collapse `Test_RuntimeSelection.cpp` and `Test_RuntimeSelection_Multi.cpp`
+  into a single parameterized fixture varying `PickMode` (`Replace`, `Add`,
+  `Toggle`, plus single-vs-multi entity arity).
+- Audit the geometry validator suites for the same pattern (same mesh,
+  varied algorithm options) and convert obvious duplicates to `TEST_P`. Do
+  not invent new coverage; only consolidate existing assertions.
+- Each `INSTANTIATE_TEST_SUITE_P` must enumerate exactly the cases that
+  existed before so coverage is preserved.
+
+### Slice 4 — Re-layer CPU-only assertions
+
+- Identify integration tests that assert pure-CPU logic (dirty flags,
+  registry lookups, mode transitions) but pay full engine-boot cost.
+  Concrete starting set flagged by the audit:
+  - overlap between `Test.SelectionSystemContracts.cpp`,
+    `Test.SelectionPassContracts.cpp`, and
+    `Test_RuntimeSelection.cpp` selection-mode assertions.
+  - material dirty-flag assertions duplicated across runtime integration
+    and graphics contract layers.
+- Move CPU-only assertions down to `tests/unit/` or `tests/contract/`. Keep
+  one integration smoke per system to prove wiring.
+- Layer ownership rules from `AGENTS.md` §2 must hold: contract tests stay
+  CPU-only and must not import live runtime services.
+
+### Slice 5 — CTest knobs
+
+- In `cmake/` (or the `intrinsic_add_test(...)` helper), set a default
+  per-test `TIMEOUT 30` (down from the implicit 60s) and allow `slow`-
+  labeled executables to override to a higher value.
+- Document `ctest --preset ci -j$(nproc)` in `tests/README.md`.
+
+## Tests
+
+- All existing GTest cases must still register and pass; `ctest --preset ci`
+  case count must not decrease except where `TEST_P` instantiations replace
+  N previously separate `TEST()` cases with the same N parameterized cases.
+- Add a guard in the `intrinsic_add_test(...)` helper (or a Python check
+  under `tools/agents/`) that fails configuration if a CTest label outside
+  the documented set is used. Documented set lives in `tests/README.md`.
+- Per-slice verification commands are listed under **Verification**.
+
+## Docs
+
+- Update `tests/README.md` with:
+  - the documented label set (`unit`, `contract`, `integration`,
+    `regression`, `gpu`, `vulkan`, `benchmark`, `slo`, `platform`,
+    `headless`, `graphics`, `core`, `ecs`, `geometry`, `assets`, `slow`,
+    `flaky-quarantine`).
+  - guidance for when to apply `slow` (any test that boots the full engine
+    or initializes Vulkan in a non-`gpu`-labeled executable, or any test
+    > 1 s wall-clock on the reference Linux-clang runner).
+  - the shared-engine fixture contract introduced in slice 2.
+- No changes to `AGENTS.md` or `docs/agent/`; this task does not alter
+  policy, only test infrastructure.
+
+## Acceptance criteria
+
+- Baseline wall-clock for `pr-fast` and `ci-linux-clang` gates is recorded
+  on the branch before slice 1 and after each subsequent slice.
+- After slice 1: `ci-linux-clang` excludes the newly tagged `slow`
+  executables and the gate completes without losing any case the prior
+  green run produced (case count unchanged at the union of `pr-fast` +
+  `ci-linux-clang` + `nightly-deep`).
+- After slice 2: the integration runtime executable wall-clock is reduced
+  by ≥ 3× on the reference Linux-clang runner, with no test failure
+  reintroduced.
+- After slice 3: the consolidated parameterized suites enumerate exactly
+  the cases the prior split files enumerated; CTest case count is
+  preserved (or strictly increased).
+- After slice 4: integration runtime executable line count drops measurably
+  while `unit/` and `contract/` line counts increase by a comparable
+  amount; no assertion is lost (verify via diff of `EXPECT_*` /
+  `ASSERT_*` call sites pre- and post-move).
+- Final: `nightly-deep` total wall-clock drops below 45 min on the
+  reference runner.
+
+## Verification
+
+```bash
+# Configure + build.
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+
+# PR-fast slice.
+ctest --preset ci -L "unit|contract" --output-on-failure
+
+# Linux-clang full CPU gate.
+ctest --preset ci -LE "gpu|vulkan|slow|flaky-quarantine" --output-on-failure -j$(nproc)
+
+# Nightly-deep equivalent (local).
+ctest --preset ci -LE "flaky-quarantine" --output-on-failure -j$(nproc)
+
+# Repository policy guards.
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+
+# Per-slice timing capture (record before and after each slice).
+ctest --preset ci -LE "gpu|vulkan|slow|flaky-quarantine" -j$(nproc) --output-junit ctest.xml
+```
+
+## Forbidden changes
+
+- Mixing mechanical file moves with semantic refactors.
+- Introducing unrelated feature work.
+- Deleting existing assertions to meet wall-clock targets.
+- Merging the 22 separate test executables into one binary.
+- Weakening or removing the `GTEST_SKIP()` paths on hosts without Vulkan.
+- Adding `slow` to executables that do not actually boot the engine or
+  initialize Vulkan.
+- Tagging tests `flaky-quarantine` without an accompanying issue link in
+  the test source.
