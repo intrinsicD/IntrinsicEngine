@@ -120,7 +120,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `src/graphics/renderer/README.md`.
 - [GRAPHICS-013B — Debug view and render-target inspection](../../done/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
   depends on GRAPHICS-013A.
-- [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](GRAPHICS-013BQ-debug-view-backend-clarifications.md):
+- [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](../../active/GRAPHICS-013BQ-debug-view-backend-clarifications.md):
   nonblocking docs-only follow-up for shader visualization modes, selected-resource descriptors, UI resource-name mapping, and buffer inspection policy.
 - [GRAPHICS-013C — ImGui overlay and present/finalization](../../done/GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.
