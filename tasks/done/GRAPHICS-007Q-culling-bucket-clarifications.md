@@ -1,11 +1,14 @@
 # GRAPHICS-007Q — Culling bucket clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-06 after `tasks/active/` cleared following `CI-001` and `GRAPHICS-024` retirement.
+- Completed: 2026-05-06.
 - Branch: `claude/agentic-workflow-session-7ytd0`.
-- Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after the consequential `docs/architecture/rendering-three-pass.md` notes are merged, then retire to `tasks/done/`.
+- Implementation commit: pending local agent workflow handoff.
+- Task-state commit: pending local agent workflow handoff.
+- Resolution: decisions recorded below and consequential notes synced into the Culling and draw-bucket contract section of `docs/architecture/rendering-three-pass.md`. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (184 relative links, no broken links).
 
 ## Decisions
 - **Selection bucket primitive-domain split.** Keep the existing three selection
