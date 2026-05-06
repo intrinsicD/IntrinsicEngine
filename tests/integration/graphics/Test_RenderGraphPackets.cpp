@@ -16,6 +16,8 @@ import Graphics;
 import RHI;
 import Core;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 using namespace Graphics;
 using namespace Core::Hash;
 
@@ -42,13 +44,12 @@ protected:
     {
         Core::Tasks::Scheduler::Initialize();
 
-        RHI::ContextConfig ctxConfig{
-            .AppName = "RenderGraphPacketTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
 
         m_Arena = std::make_unique<Core::Memory::LinearArena>(256 * 1024);
         m_Scope = std::make_unique<Core::Memory::ScopeStack>(64 * 1024);
@@ -67,7 +68,6 @@ protected:
         if (m_Device)
             vkDeviceWaitIdle(m_Device->GetLogicalDevice());
         m_Device.reset();
-        m_Context.reset();
         Core::Tasks::Scheduler::Shutdown();
     }
 
@@ -125,7 +125,6 @@ protected:
             [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<Core::Memory::LinearArena> m_Arena;
     std::unique_ptr<Core::Memory::ScopeStack> m_Scope;

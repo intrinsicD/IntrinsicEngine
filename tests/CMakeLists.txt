@@ -693,6 +693,11 @@ if(TARGET RuntimeTestObjs)
         LABELS integration runtime headless graphics gpu vulkan slow
     )
 
+    intrinsic_grouped_test(IntrinsicRuntimeTests.RenderGraphPacketsGrouped IntrinsicRuntimeTests
+        FILTER "RenderGraphPacketTest.*"
+        LABELS integration runtime headless graphics gpu vulkan slow
+    )
+
     intrinsic_test_executable(IntrinsicRuntimeIntegrationTests
         OBJECTS RuntimeIntegrationTestObjs
         LINK_LIBS ExtrinsicRuntime

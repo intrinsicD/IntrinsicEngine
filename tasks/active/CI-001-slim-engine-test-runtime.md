@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator and Slice 2d HeadlessEngine fixtures complete; broader Slice 2 engine/Vulkan fixtures next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator, Slice 2d HeadlessEngine, and Slice 2e RenderGraphPackets fixtures complete; broader Slice 2 engine/Vulkan fixtures next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -141,6 +141,13 @@ Progress notes:
   the grouped HeadlessEngine entry (1 test), grouped-plus-individual
   HeadlessEngine coverage (7 CTest entries), the default CPU-supported gate
   (1,590 tests), and PR-fast (1,584 tests).
+- 2026-05-06: Slice 2e completed by migrating `RenderGraphPacketTest` in
+  `tests/integration/graphics/Test_RenderGraphPackets.cpp` to borrow
+  `RuntimeRhiTestEnvironment`, while keeping render graph, transient allocator,
+  arena, scope, imported images, and per-test pass topology local to each test.
+  Added `IntrinsicRuntimeTests.RenderGraphPacketsGrouped` so packetization and
+  plan-cache cases can run in one `IntrinsicRuntimeTests` process while
+  individual CTest cases remain registered.
 
 ## Required changes
 

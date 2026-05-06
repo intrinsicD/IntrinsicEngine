@@ -53,11 +53,12 @@ to each fixture and follow the reset contract in `support/README.md`.
 
 Some slow runtime suites also have grouped CTest entries, such as
 `IntrinsicRuntimeTests.RuntimeRHIGrouped`,
-`IntrinsicRuntimeTests.RenderOrchestratorHeadlessGrouped`, and
-`IntrinsicRuntimeTests.HeadlessEngineGrouped`, so shared per-process fixtures
-can actually amortize setup cost in nightly/opt-in runs. These grouped entries
-are additive: individual `gtest_discover_tests` cases must remain registered for
-focused filtering and diagnostics.
+`IntrinsicRuntimeTests.RenderOrchestratorHeadlessGrouped`,
+`IntrinsicRuntimeTests.HeadlessEngineGrouped`, and
+`IntrinsicRuntimeTests.RenderGraphPacketsGrouped`, so shared per-process
+fixtures can actually amortize setup cost in nightly/opt-in runs. These grouped
+entries are additive: individual `gtest_discover_tests` cases must remain
+registered for focused filtering and diagnostics.
 
 ## New test naming
 
