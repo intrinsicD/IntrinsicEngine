@@ -101,8 +101,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-013A — Postprocess chain](../../done/GRAPHICS-013A-postprocess-chain.md):
   depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
   scene-color or HDR inputs are required.
-- [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](GRAPHICS-013AQ-postprocess-backend-clarifications.md):
-  nonblocking docs-only follow-up for bloom backend shape, histogram/exposure history, AA shader/LUT policy, and postprocess descriptor ownership.
+- [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](../../active/GRAPHICS-013AQ-postprocess-backend-clarifications.md):
+  in-progress docs-only follow-up for bloom backend shape, histogram/exposure history, AA shader/LUT policy, and postprocess descriptor ownership.
 - [GRAPHICS-013B — Debug view and render-target inspection](../../done/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
   depends on GRAPHICS-013A.
 - [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](GRAPHICS-013BQ-debug-view-backend-clarifications.md):

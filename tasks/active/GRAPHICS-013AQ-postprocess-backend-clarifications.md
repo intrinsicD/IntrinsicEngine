@@ -1,5 +1,13 @@
 # GRAPHICS-013AQ — Postprocess backend clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-012Q` retirement cleared `tasks/active/`.
+- Branch: `claude/setup-agentic-workflow-3OTyj`.
+- Implementation commit: pending local agent workflow handoff.
+- Task-state commit: pending local agent workflow handoff.
+
 ## Goal
 - Clarify concrete backend/shader details that remain after the CPU/null `GRAPHICS-013A` postprocess chain contracts.
 
