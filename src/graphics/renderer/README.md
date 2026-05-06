@@ -190,7 +190,28 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. Frame
   recipe resources `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
   `PostProcess.AATemp` are transient postprocess-owned intermediates; concrete
-  Vulkan descriptors/shaders remain backend follow-ups.
+  Vulkan descriptors/shaders remain backend follow-ups. Per `GRAPHICS-013AQ`,
+  `PostProcessSystem` is the sole owner of the retained postprocess resources
+  (SMAA `AreaTex` `R8G8_UNORM` 160x560 and `SearchTex` `R8_UNORM` 256x33
+  lookup textures, plus the exposure-adaptation history buffer holding
+  `previous_average_log_lum` / `adaptation_velocity` / `frame_index`),
+  allocated once at `Initialize()` through
+  `RHI::TextureManager`/`RHI::BufferManager` and freed at `Shutdown()`. Bloom
+  uses one frame-transient `PostProcess.BloomScratch` mip-chain texture with
+  per-mip subviews (capped at six mips, truncating at extents below `8x8`),
+  the histogram stage uses a fixed 256-bin layout over `[-10, +10]` log2
+  luminance stops, and histogram diagnostics readback uses the same drain
+  pattern as `Picking.Readback` (host-visible staging copy recorded at
+  frame-record time, drained on the next `BeginFrame()` after the issuing
+  frame's fences complete). FXAA samples post-tonemap `SceneColorLDR` with no
+  intermediate and no LUT, while SMAA edge/blend intermediates fold under the
+  existing `PostProcess.AATemp` slot as two named subresources
+  (`AATemp.Edges` `R8G8_UNORM`, `AATemp.Weights` `R8G8B8A8_UNORM`); FXAA and
+  SMAA remain mutually exclusive per `PostProcessSettings::AntiAliasing`, and
+  quality presets are encoded into `PostProcessPushConstants::StageKind`
+  packing rather than expanding the push-constant struct. Concrete
+  `VkDescriptorSetLayout` bindings remain backend-local under
+  `src/graphics/vulkan` and never leak through RHI or renderer code.
 - `DebugViewSystem` owns backend-agnostic render-target inspection metadata and
   debug-view resource selection. It resolves requested frame-recipe resources to
   enabled previewable texture/depth resources, reports missing/disabled/buffer
