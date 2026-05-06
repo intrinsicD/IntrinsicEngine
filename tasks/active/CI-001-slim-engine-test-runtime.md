@@ -1,10 +1,10 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene complete; Slice 2 shared engine/Vulkan fixture next)
+- Status: in-progress (Slice 1 label hygiene and CPU CTest gate parallelism complete; Slice 2 shared engine/Vulkan fixture next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
-- Next verification step: after each slice, run `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and the relevant CTest gate against the configured build directory (`ctest --test-dir build/ci -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60` for the PR-fast slice; `ctest --test-dir build/ci -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60` for the Linux-clang gate). `CMakePresets.json` does not currently define a `testPresets` entry, so the directory-based invocation matches the workflows in `.github/workflows/` and the canonical command in `AGENTS.md`. Compare wall-clock against a recorded baseline on the same branch.
+- Next verification step: after each slice, run `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and the relevant CTest gate against the configured build directory (`ctest --test-dir build/ci -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)` for the PR-fast slice; `ctest --test-dir build/ci -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)` for the Linux-clang gate). `CMakePresets.json` does not currently define a `testPresets` entry, so the directory-based invocation matches the workflows in `.github/workflows/` and the canonical command in `AGENTS.md`. Compare wall-clock against a recorded baseline on the same branch.
 
 ## Goal
 
@@ -80,6 +80,14 @@ Progress notes:
   gate counts on this workstation changed from 1,602 default CPU tests before
   the slice to 1,572 after Slice 1; the nightly CPU-equivalent filter retains
   the 12 benchmark/SLO `slow` tests and ran 1,584 CPU-supported tests.
+- 2026-05-06: Follow-up low-risk CI sub-slice completed by adding
+  `-j$(nproc)` to PR-fast, Linux-clang, and nightly CPU/sanitizer CTest
+  commands so existing label filters run in parallel without changing selected
+  coverage. Performance/SLO and optional GPU commands remain serial to avoid
+  benchmark/GPU contention.
+  Local verification on the configured `build/ci` tree passed PR-fast (1,584
+  tests), Linux-clang/default CPU (1,590 tests), and nightly CPU-equivalent
+  (1,602 tests, including 12 `benchmark|slo|slow` tests with two SLO skips).
 
 ## Required changes
 
@@ -215,7 +223,7 @@ cmake --build --preset ci --target IntrinsicTests
 
 # PR-fast slice (matches .github/workflows/pr-fast.yml).
 ctest --test-dir build/ci --output-on-failure \
-    -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60
+    -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 
 # Linux-clang full CPU gate (matches .github/workflows/ci-linux-clang.yml).
 ctest --test-dir build/ci --output-on-failure \
