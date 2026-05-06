@@ -438,6 +438,7 @@ set(_graphics_contract_cpu_test_files
     Test.PostProcessChainContract.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
+    Test.RenderGraphValidation.cpp
     Test.SelectionPassContracts.cpp
     Test.SelectionSystemContracts.cpp
     Test.SurfacePassContracts.cpp

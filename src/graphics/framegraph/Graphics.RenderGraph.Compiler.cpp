@@ -3,11 +3,14 @@ module;
 #include <algorithm>
 #include <cstdint>
 #include <expected>
+#include <limits>
 #include <sstream>
 #include <stack>
 #include <ranges>
 #include <string>
+#include <tuple>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 module Extrinsic.Graphics.RenderGraph;
@@ -15,6 +18,7 @@ module Extrinsic.Graphics.RenderGraph;
 import :Compiler;
 
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.Core.Error;
 
 namespace Extrinsic::Graphics
@@ -207,6 +211,124 @@ namespace Extrinsic::Graphics
             lifetime.FirstUsePass = std::min(lifetime.FirstUsePass, passIndex);
             lifetime.LastUsePass = std::max(lifetime.LastUsePass, passIndex);
         }
+
+        [[nodiscard]] constexpr std::uint32_t InvalidValidationIndex()
+        {
+            return std::numeric_limits<std::uint32_t>::max();
+        }
+
+        [[nodiscard]] bool BoolAt(const std::vector<bool>& values, const std::uint32_t index)
+        {
+            return index < values.size() && values[index];
+        }
+
+        template <typename T>
+        [[nodiscard]] const T* ValueAt(const std::vector<T>& values, const std::uint32_t index)
+        {
+            return index < values.size() ? &values[index] : nullptr;
+        }
+
+        [[nodiscard]] std::string PassNameFor(const CompiledRenderGraph& compiled, const std::uint32_t passIndex)
+        {
+            if (const std::string* byIndex = ValueAt(compiled.PassNames, passIndex))
+            {
+                return *byIndex;
+            }
+            const auto orderIt = std::ranges::find(compiled.TopologicalOrder, passIndex);
+            if (orderIt != compiled.TopologicalOrder.end())
+            {
+                const auto orderIndex = static_cast<std::uint32_t>(std::distance(compiled.TopologicalOrder.begin(), orderIt));
+                if (const std::string* byOrder = ValueAt(compiled.PassNames, orderIndex))
+                {
+                    return *byOrder;
+                }
+            }
+            return {};
+        }
+
+        [[nodiscard]] std::string ResourceNameFor(const CompiledRenderGraph& compiled,
+                                                  const bool isTexture,
+                                                  const std::uint32_t resourceIndex)
+        {
+            if (isTexture)
+            {
+                if (const std::string* name = ValueAt(compiled.TextureNames, resourceIndex))
+                {
+                    return *name;
+                }
+                return {};
+            }
+            if (const std::string* name = ValueAt(compiled.BufferNames, resourceIndex))
+            {
+                return *name;
+            }
+            return {};
+        }
+
+        void AddFinding(RenderGraphValidationResult& result,
+                        const RenderGraphValidationSeverity severity,
+                        const RenderGraphValidationCode code,
+                        std::string message,
+                        const CompiledRenderGraph& compiled,
+                        const std::uint32_t passIndex = InvalidValidationIndex(),
+                        const bool isTexture = true,
+                        const std::uint32_t resourceIndex = InvalidValidationIndex())
+        {
+            result.Findings.push_back(RenderGraphValidationFinding{
+                .Severity = severity,
+                .Code = code,
+                .Message = std::move(message),
+                .PassIndex = passIndex,
+                .PassName = passIndex == InvalidValidationIndex() ? std::string{} : PassNameFor(compiled, passIndex),
+                .ResourceIndex = resourceIndex,
+                .IsTextureResource = isTexture,
+                .ResourceName = resourceIndex == InvalidValidationIndex() ? std::string{} : ResourceNameFor(compiled, isTexture, resourceIndex),
+            });
+        }
+
+        [[nodiscard]] const ImportedResourceAuthorization* FindAuthorization(
+            const std::span<const ImportedResourceAuthorization> authorizations,
+            const bool isTexture,
+            const std::uint32_t resourceIndex)
+        {
+            const auto it = std::ranges::find_if(authorizations, [isTexture, resourceIndex](const ImportedResourceAuthorization& auth) {
+                return auth.IsTexture == isTexture && auth.ResourceIndex == resourceIndex;
+            });
+            return it == authorizations.end() ? nullptr : &(*it);
+        }
+
+        [[nodiscard]] bool ContainsPassName(const std::vector<std::string>& names, const std::string& passName)
+        {
+            return std::ranges::find(names, passName) != names.end();
+        }
+
+        void SortValidationFindings(RenderGraphValidationResult& result)
+        {
+            std::ranges::stable_sort(result.Findings, [](const RenderGraphValidationFinding& lhs,
+                                                         const RenderGraphValidationFinding& rhs) {
+                return std::tie(lhs.Severity, lhs.Code, lhs.PassIndex, lhs.ResourceIndex, lhs.IsTextureResource, lhs.PassName,
+                                lhs.ResourceName, lhs.Message) <
+                       std::tie(rhs.Severity, rhs.Code, rhs.PassIndex, rhs.ResourceIndex, rhs.IsTextureResource, rhs.PassName,
+                                rhs.ResourceName, rhs.Message);
+            });
+        }
+    }
+
+    bool RenderGraphValidationResult::HasErrors() const
+    {
+        return CountBySeverity(RenderGraphValidationSeverity::Error) != 0u;
+    }
+
+    bool RenderGraphValidationResult::HasWarnings() const
+    {
+        return CountBySeverity(RenderGraphValidationSeverity::Warning) != 0u;
+    }
+
+    std::size_t RenderGraphValidationResult::CountBySeverity(const RenderGraphValidationSeverity severity) const
+    {
+        return static_cast<std::size_t>(std::ranges::count_if(Findings, [severity](const RenderGraphValidationFinding& finding) {
+            return finding.Severity == severity;
+        }));
     }
 
     bool CompiledPassDeclarations::DeclaresTextureRead(const TextureRef ref) const
@@ -290,7 +412,15 @@ namespace Extrinsic::Graphics
         std::vector<RHI::TextureHandle> textureHandles(textures.size());
         std::vector<RHI::BufferHandle> bufferHandles(buffers.size());
         std::vector<bool> textureImported(textures.size(), false);
+        std::vector<bool> textureIsBackbuffer(textures.size(), false);
         std::vector<bool> bufferImported(buffers.size(), false);
+        std::vector<std::string> textureNames(textures.size());
+        std::vector<std::string> bufferNames(buffers.size());
+        std::vector<TextureState> textureInitialStates(textures.size(), TextureState::Undefined);
+        std::vector<TextureState> textureFinalStates(textures.size(), TextureState::Undefined);
+        std::vector<BufferState> bufferInitialStates(buffers.size(), BufferState::Undefined);
+        std::vector<BufferState> bufferFinalStates(buffers.size(), BufferState::Undefined);
+        std::vector<bool> passSideEffects(passCount, false);
         std::vector<ResourceLifetime> textureLifetimes(textures.size());
         std::vector<ResourceLifetime> bufferLifetimes(buffers.size());
         std::vector<std::vector<std::uint32_t>> adjacency(passCount);
@@ -303,6 +433,10 @@ namespace Extrinsic::Graphics
 
         for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
         {
+            textureNames[textureIndex] = textures[textureIndex].Name;
+            textureInitialStates[textureIndex] = textures[textureIndex].InitialState;
+            textureFinalStates[textureIndex] = textures[textureIndex].FinalState;
+            textureIsBackbuffer[textureIndex] = textures[textureIndex].IsBackbuffer;
             if (textures[textureIndex].Imported)
             {
                 textureHandles[textureIndex] = textures[textureIndex].ImportedHandle;
@@ -311,6 +445,9 @@ namespace Extrinsic::Graphics
         }
         for (std::uint32_t bufferIndex = 0; bufferIndex < buffers.size(); ++bufferIndex)
         {
+            bufferNames[bufferIndex] = buffers[bufferIndex].Name;
+            bufferInitialStates[bufferIndex] = buffers[bufferIndex].InitialState;
+            bufferFinalStates[bufferIndex] = buffers[bufferIndex].FinalState;
             if (buffers[bufferIndex].Imported)
             {
                 bufferHandles[bufferIndex] = buffers[bufferIndex].ImportedHandle;
@@ -321,6 +458,7 @@ namespace Extrinsic::Graphics
         for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
         {
             const RenderPassRecord& pass = passes[passIndex];
+            passSideEffects[passIndex] = pass.SideEffect;
             passDeclarations[passIndex].PassIndex = passIndex;
             for (const PassRef dependency : pass.ExplicitDependencies)
             {
@@ -562,9 +700,16 @@ namespace Extrinsic::Graphics
                 .QueueHandoffEdgeCount = queueHandoffEdgeCount,
                 .TopologicalOrder = order,
                 .TopologicalLayerByPass = layerByPass,
+                .PassSideEffects = passSideEffects,
                 .PassDeclarations = std::move(passDeclarations),
+                .TextureNames = std::move(textureNames),
+                .BufferNames = std::move(bufferNames),
                 .TextureLifetimes = std::move(textureLifetimes),
                 .BufferLifetimes = std::move(bufferLifetimes),
+                .TextureInitialStates = std::move(textureInitialStates),
+                .TextureFinalStates = std::move(textureFinalStates),
+                .BufferInitialStates = std::move(bufferInitialStates),
+                .BufferFinalStates = std::move(bufferFinalStates),
             };
             return std::unexpected(Core::ErrorCode::InvalidState);
         }
@@ -710,12 +855,20 @@ namespace Extrinsic::Graphics
             .TopologicalOrder = std::move(order),
             .TopologicalLayerByPass = std::move(layerByPass),
             .PassNames = std::move(passNames),
+            .PassSideEffects = std::move(passSideEffects),
             .PassDeclarations = std::move(passDeclarations),
+            .TextureNames = std::move(textureNames),
+            .BufferNames = std::move(bufferNames),
             .TextureLifetimes = std::move(textureLifetimes),
             .BufferLifetimes = std::move(bufferLifetimes),
+            .TextureInitialStates = std::move(textureInitialStates),
+            .TextureFinalStates = std::move(textureFinalStates),
+            .BufferInitialStates = std::move(bufferInitialStates),
+            .BufferFinalStates = std::move(bufferFinalStates),
             .TextureHandles = std::move(textureHandles),
             .BufferHandles = std::move(bufferHandles),
             .TextureImported = std::move(textureImported),
+            .TextureIsBackbuffer = std::move(textureIsBackbuffer),
             .BufferImported = std::move(bufferImported),
             .BarrierPackets = std::move(barrierPackets),
         };
@@ -777,5 +930,309 @@ namespace Extrinsic::Graphics
             out << '\n';
         }
         return out.str();
+    }
+
+    RenderGraphValidationResult ValidateCompiledGraph(
+        const CompiledRenderGraph& compiled,
+        const std::span<const ImportedResourceAuthorization> authorizations)
+    {
+        RenderGraphValidationResult result{};
+
+        std::vector<std::uint32_t> passRank(compiled.PassDeclarations.size(), InvalidValidationIndex());
+        for (std::uint32_t orderIndex = 0; orderIndex < compiled.TopologicalOrder.size(); ++orderIndex)
+        {
+            const std::uint32_t passIndex = compiled.TopologicalOrder[orderIndex];
+            if (passIndex < passRank.size())
+            {
+                passRank[passIndex] = orderIndex;
+            }
+        }
+
+        std::vector<std::vector<std::uint32_t>> textureWriters(compiled.TextureLifetimes.size());
+        std::vector<std::vector<std::uint32_t>> bufferWriters(compiled.BufferLifetimes.size());
+        std::vector<bool> textureReaders(compiled.TextureLifetimes.size(), false);
+        std::vector<bool> bufferReaders(compiled.BufferLifetimes.size(), false);
+
+        for (const std::uint32_t passIndex : compiled.TopologicalOrder)
+        {
+            if (passIndex >= compiled.PassDeclarations.size())
+            {
+                AddFinding(result,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::InvalidExplicitDependency,
+                           "Compiled render graph topological order references an invalid pass.",
+                           compiled,
+                           passIndex);
+                continue;
+            }
+
+            const CompiledPassDeclarations& declarations = compiled.PassDeclarations[passIndex];
+            for (const std::uint32_t textureIndex : declarations.ReadTextures)
+            {
+                if (textureIndex >= textureReaders.size())
+                {
+                    AddFinding(result,
+                               RenderGraphValidationSeverity::Error,
+                               RenderGraphValidationCode::InvalidTextureAccess,
+                               "Compiled render graph pass reads an invalid texture resource.",
+                               compiled,
+                               passIndex,
+                               true,
+                               textureIndex);
+                    continue;
+                }
+                textureReaders[textureIndex] = true;
+            }
+            for (const std::uint32_t textureIndex : declarations.WriteTextures)
+            {
+                if (textureIndex >= textureWriters.size())
+                {
+                    AddFinding(result,
+                               RenderGraphValidationSeverity::Error,
+                               RenderGraphValidationCode::InvalidTextureAccess,
+                               "Compiled render graph pass writes an invalid texture resource.",
+                               compiled,
+                               passIndex,
+                               true,
+                               textureIndex);
+                    continue;
+                }
+                textureWriters[textureIndex].push_back(passIndex);
+            }
+            for (const std::uint32_t bufferIndex : declarations.ReadBuffers)
+            {
+                if (bufferIndex >= bufferReaders.size())
+                {
+                    AddFinding(result,
+                               RenderGraphValidationSeverity::Error,
+                               RenderGraphValidationCode::InvalidBufferAccess,
+                               "Compiled render graph pass reads an invalid buffer resource.",
+                               compiled,
+                               passIndex,
+                               false,
+                               bufferIndex);
+                    continue;
+                }
+                bufferReaders[bufferIndex] = true;
+            }
+            for (const std::uint32_t bufferIndex : declarations.WriteBuffers)
+            {
+                if (bufferIndex >= bufferWriters.size())
+                {
+                    AddFinding(result,
+                               RenderGraphValidationSeverity::Error,
+                               RenderGraphValidationCode::InvalidBufferAccess,
+                               "Compiled render graph pass writes an invalid buffer resource.",
+                               compiled,
+                               passIndex,
+                               false,
+                               bufferIndex);
+                    continue;
+                }
+                bufferWriters[bufferIndex].push_back(passIndex);
+            }
+        }
+
+        for (std::uint32_t textureIndex = 0; textureIndex < textureWriters.size(); ++textureIndex)
+        {
+            if (!BoolAt(compiled.TextureImported, textureIndex) && textureReaders[textureIndex] && textureWriters[textureIndex].empty())
+            {
+                AddFinding(result,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::TransientTextureWithoutProducer,
+                           "Transient texture is read but has no producing writer.",
+                           compiled,
+                           InvalidValidationIndex(),
+                           true,
+                           textureIndex);
+            }
+        }
+        for (std::uint32_t bufferIndex = 0; bufferIndex < bufferWriters.size(); ++bufferIndex)
+        {
+            if (!BoolAt(compiled.BufferImported, bufferIndex) && bufferReaders[bufferIndex] && bufferWriters[bufferIndex].empty())
+            {
+                AddFinding(result,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::TransientBufferWithoutProducer,
+                           "Transient buffer is read but has no producing writer.",
+                           compiled,
+                           InvalidValidationIndex(),
+                           false,
+                           bufferIndex);
+            }
+        }
+
+        auto hasEarlierWriter = [&passRank](const std::vector<std::uint32_t>& writers, const std::uint32_t readPass) {
+            const std::uint32_t readRank = readPass < passRank.size() ? passRank[readPass] : InvalidValidationIndex();
+            return std::ranges::any_of(writers, [readRank, &passRank](const std::uint32_t writerPass) {
+                return writerPass < passRank.size() && passRank[writerPass] < readRank;
+            });
+        };
+
+        for (const std::uint32_t passIndex : compiled.TopologicalOrder)
+        {
+            if (passIndex >= compiled.PassDeclarations.size())
+            {
+                continue;
+            }
+
+            const CompiledPassDeclarations& declarations = compiled.PassDeclarations[passIndex];
+            for (const std::uint32_t textureIndex : declarations.ReadTextures)
+            {
+                if (textureIndex >= textureWriters.size() || BoolAt(compiled.TextureImported, textureIndex) || textureWriters[textureIndex].empty() ||
+                    hasEarlierWriter(textureWriters[textureIndex], passIndex))
+                {
+                    continue;
+                }
+
+                AddFinding(result,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::MissingTextureProducer,
+                           "Texture is read before any guaranteed producing writer.",
+                           compiled,
+                           passIndex,
+                           true,
+                           textureIndex);
+            }
+            for (const std::uint32_t bufferIndex : declarations.ReadBuffers)
+            {
+                if (bufferIndex >= bufferWriters.size() || BoolAt(compiled.BufferImported, bufferIndex) || bufferWriters[bufferIndex].empty() ||
+                    hasEarlierWriter(bufferWriters[bufferIndex], passIndex))
+                {
+                    continue;
+                }
+
+                AddFinding(result,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::MissingBufferProducer,
+                           "Buffer is read before any guaranteed producing writer.",
+                           compiled,
+                           passIndex,
+                           false,
+                           bufferIndex);
+            }
+        }
+
+        for (const CompiledRenderPassAttachment& attachment : compiled.RenderPassAttachments)
+        {
+            if (attachment.Load != RHI::LoadOp::Load)
+            {
+                continue;
+            }
+            if (!attachment.IsTextureResource || attachment.ResourceIndex >= textureWriters.size())
+            {
+                AddFinding(result,
+                           RenderGraphValidationSeverity::Error,
+                           RenderGraphValidationCode::InvalidTextureAccess,
+                           "Render-pass LOAD attachment references an invalid texture resource.",
+                           compiled,
+                           attachment.PassIndex,
+                           true,
+                           attachment.ResourceIndex);
+                continue;
+            }
+
+            if (hasEarlierWriter(textureWriters[attachment.ResourceIndex], attachment.PassIndex))
+            {
+                continue;
+            }
+
+            const bool imported = BoolAt(compiled.TextureImported, attachment.ResourceIndex);
+            const bool wellDefinedImportedState = imported && attachment.ResourceIndex < compiled.TextureInitialStates.size() &&
+                                                 compiled.TextureInitialStates[attachment.ResourceIndex] != TextureState::Undefined;
+            AddFinding(result,
+                       wellDefinedImportedState ? RenderGraphValidationSeverity::Info : RenderGraphValidationSeverity::Warning,
+                       RenderGraphValidationCode::LoadWithoutGuaranteedWriter,
+                       wellDefinedImportedState ? "Render-pass LOAD uses an imported texture with a defined initial state."
+                                               : "Render-pass LOAD has no earlier guaranteed writer.",
+                       compiled,
+                       attachment.PassIndex,
+                       true,
+                       attachment.ResourceIndex);
+        }
+
+        auto validateImportedWrites = [&](const bool isTexture,
+                                          const std::uint32_t resourceIndex,
+                                          const std::vector<std::uint32_t>& writers) {
+            if (writers.empty())
+            {
+                return;
+            }
+
+            const ImportedResourceAuthorization* auth = FindAuthorization(authorizations, isTexture, resourceIndex);
+            const bool isBackbuffer = isTexture && BoolAt(compiled.TextureIsBackbuffer, resourceIndex);
+            std::uint32_t finalizerPass = writers.back();
+            for (const std::uint32_t writerPass : writers)
+            {
+                if (BoolAt(compiled.PassSideEffects, writerPass))
+                {
+                    finalizerPass = writerPass;
+                }
+            }
+
+            for (const std::uint32_t writerPass : writers)
+            {
+                const std::string writerName = PassNameFor(compiled, writerPass);
+                bool allowed = false;
+                if (auth != nullptr)
+                {
+                    switch (auth->Policy)
+                    {
+                    case ImportedResourceWritePolicy::Disallow:
+                        allowed = false;
+                        break;
+                    case ImportedResourceWritePolicy::AllowAny:
+                        allowed = true;
+                        break;
+                    case ImportedResourceWritePolicy::AllowFinalizerOnly:
+                        allowed = auth->AuthorizedWriterPassNames.empty()
+                                      ? writerPass == finalizerPass
+                                      : ContainsPassName(auth->AuthorizedWriterPassNames, writerName);
+                        break;
+                    }
+                }
+                else
+                {
+                    allowed = BoolAt(compiled.PassSideEffects, writerPass) && (!isBackbuffer || writerPass == finalizerPass);
+                }
+
+                if (allowed)
+                {
+                    continue;
+                }
+
+                const RenderGraphValidationCode code = isBackbuffer
+                                                            ? RenderGraphValidationCode::BackbufferWrittenByNonFinalizer
+                                                            : (isTexture ? RenderGraphValidationCode::UnauthorizedImportedTextureWrite
+                                                                         : RenderGraphValidationCode::UnauthorizedImportedBufferWrite);
+                AddFinding(result,
+                           RenderGraphValidationSeverity::Error,
+                           code,
+                           isBackbuffer ? "Imported backbuffer is written by a non-finalizer pass."
+                                        : "Imported resource write is not authorized.",
+                           compiled,
+                           writerPass,
+                           isTexture,
+                           resourceIndex);
+            }
+        };
+
+        for (std::uint32_t textureIndex = 0; textureIndex < textureWriters.size(); ++textureIndex)
+        {
+            if (BoolAt(compiled.TextureImported, textureIndex))
+            {
+                validateImportedWrites(true, textureIndex, textureWriters[textureIndex]);
+            }
+        }
+        for (std::uint32_t bufferIndex = 0; bufferIndex < bufferWriters.size(); ++bufferIndex)
+        {
+            if (BoolAt(compiled.BufferImported, bufferIndex))
+            {
+                validateImportedWrites(false, bufferIndex, bufferWriters[bufferIndex]);
+            }
+        }
+
+        SortValidationFindings(result);
+        return result;
     }
 }

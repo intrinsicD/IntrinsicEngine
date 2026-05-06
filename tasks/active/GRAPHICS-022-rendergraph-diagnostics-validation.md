@@ -1,10 +1,10 @@
 # GRAPHICS-022 — Rendergraph diagnostics and validation
 
-- Status: in-progress (planning landed; implementation pending)
+- Status: in-progress (Slice A implemented; Slice B debug dump expansion pending)
 - Owner / agent: graphics — `src/graphics/framegraph` + `src/graphics/renderer`
 - Branch: `claude/plan-rendering-tasks-ORYwq` (planning); implementation lands on a follow-up branch.
 - PR: TBD.
-- Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after planning; for implementation slices, run `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and the default CPU CTest gate.
+- Next verification step: for Slice B, extend `BuildRenderGraphDebugDump`, add `Test.RenderGraphDebugDump.cpp`, regenerate inventories if the module surface changes, then run the task verification commands below.
 
 ## Goal
 
@@ -266,6 +266,14 @@ Under `tests/contract/graphics/`:
 - Architecture and renderer-README docs reference the implemented types
   rather than aspirational ones.
 
+## Progress
+
+- 2026-05-06: Slice A landed the exported validation types,
+  `ValidateCompiledGraph(...)`, minimal compiled metadata for recipe-less
+  validation, and `tests/contract/graphics/Test.RenderGraphValidation.cpp`.
+  Focused `RenderGraphValidation` CTest coverage passes. Remaining work stays
+  scoped to Slice B/C below.
+
 ## Verification
 
 ```bash
@@ -301,8 +309,8 @@ ctest --test-dir build/ci --output-on-failure -R 'RenderGraphValidation|RenderGr
 
 Land in three small PRs to keep mechanical and semantic edits separated:
 
-1. **Slice A — types + recipe-less validator (no behavior change to
-   `Compile`).** Add `RenderGraphValidationFinding`/`Result`/`Code`,
+1. **Slice A — complete.** Types + recipe-less validator (no behavior change to
+   `Compile`). Add `RenderGraphValidationFinding`/`Result`/`Code`,
    `ImportedResourceAuthorization`, and `ValidateCompiledGraph(...)`. Add
    `Test.RenderGraphValidation.cpp` covering the codes that can be exercised
    on a hand-built `CompiledRenderGraph` fixture.

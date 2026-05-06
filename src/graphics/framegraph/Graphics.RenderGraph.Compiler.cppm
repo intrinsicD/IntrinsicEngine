@@ -1,6 +1,8 @@
 module;
 
 #include <cstdint>
+#include <cstddef>
+#include <limits>
 #include <span>
 #include <string>
 #include <vector>
@@ -8,6 +10,7 @@ module;
 export module Extrinsic.Graphics.RenderGraph:Compiler;
 
 import Extrinsic.Core.Error;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
 import :Pass;
 import :Resources;
@@ -15,6 +18,77 @@ import :Barriers;
 
 namespace Extrinsic::Graphics
 {
+    export enum class RenderGraphValidationSeverity : std::uint8_t
+    {
+        Info = 0,
+        Warning,
+        Error,
+    };
+
+    export enum class RenderGraphValidationCode : std::uint16_t
+    {
+        MissingTextureProducer = 0,
+        MissingBufferProducer,
+        TransientTextureWithoutProducer,
+        TransientBufferWithoutProducer,
+        LoadWithoutGuaranteedWriter,
+        UnauthorizedImportedTextureWrite,
+        UnauthorizedImportedBufferWrite,
+        BackbufferWrittenByNonFinalizer,
+        ImportedTextureFinalStateMismatch,
+        RenderPassColorWriteMissing,
+        RenderPassDepthAccessMissing,
+        CycleDetected,
+        InvalidExplicitDependency,
+        InvalidTextureAccess,
+        InvalidBufferAccess,
+    };
+
+    export struct RenderGraphValidationFinding
+    {
+        RenderGraphValidationSeverity Severity = RenderGraphValidationSeverity::Info;
+        RenderGraphValidationCode Code = RenderGraphValidationCode::MissingTextureProducer;
+        std::string Message{};
+        std::uint32_t PassIndex = std::numeric_limits<std::uint32_t>::max();
+        std::string PassName{};
+        std::uint32_t ResourceIndex = std::numeric_limits<std::uint32_t>::max();
+        bool IsTextureResource = true;
+        std::string ResourceName{};
+    };
+
+    export struct RenderGraphValidationResult
+    {
+        std::vector<RenderGraphValidationFinding> Findings{};
+
+        [[nodiscard]] bool HasErrors() const;
+        [[nodiscard]] bool HasWarnings() const;
+        [[nodiscard]] std::size_t CountBySeverity(RenderGraphValidationSeverity severity) const;
+    };
+
+    export enum class ImportedResourceWritePolicy : std::uint8_t
+    {
+        Disallow = 0,
+        AllowFinalizerOnly,
+        AllowAny,
+    };
+
+    export struct ImportedResourceAuthorization
+    {
+        std::uint32_t ResourceIndex = 0;
+        bool IsTexture = true;
+        ImportedResourceWritePolicy Policy = ImportedResourceWritePolicy::Disallow;
+        std::vector<std::string> AuthorizedWriterPassNames{};
+    };
+
+    export struct CompiledRenderPassAttachment
+    {
+        std::uint32_t PassIndex = 0;
+        std::uint32_t ResourceIndex = 0;
+        bool IsTextureResource = true;
+        bool IsDepthAttachment = false;
+        RHI::LoadOp Load = RHI::LoadOp::Clear;
+    };
+
     export struct CompiledPassDeclarations
     {
         std::uint32_t PassIndex = 0;
@@ -54,13 +128,22 @@ namespace Extrinsic::Graphics
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
         std::vector<std::string> PassNames{};
+        std::vector<bool> PassSideEffects{};
         std::vector<CompiledPassDeclarations> PassDeclarations{};
+        std::vector<std::string> TextureNames{};
+        std::vector<std::string> BufferNames{};
         std::vector<ResourceLifetime> TextureLifetimes{};
         std::vector<ResourceLifetime> BufferLifetimes{};
+        std::vector<TextureState> TextureInitialStates{};
+        std::vector<TextureState> TextureFinalStates{};
+        std::vector<BufferState> BufferInitialStates{};
+        std::vector<BufferState> BufferFinalStates{};
         std::vector<RHI::TextureHandle> TextureHandles{};
         std::vector<RHI::BufferHandle> BufferHandles{};
         std::vector<bool> TextureImported{};
+        std::vector<bool> TextureIsBackbuffer{};
         std::vector<bool> BufferImported{};
+        std::vector<CompiledRenderPassAttachment> RenderPassAttachments{};
         std::vector<BarrierPacket> BarrierPackets{};
         std::string Diagnostic{};
     };
@@ -76,4 +159,7 @@ namespace Extrinsic::Graphics
     };
 
     export [[nodiscard]] std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled);
+    export [[nodiscard]] RenderGraphValidationResult ValidateCompiledGraph(
+        const CompiledRenderGraph& compiled,
+        std::span<const ImportedResourceAuthorization> authorizations = {});
 }
