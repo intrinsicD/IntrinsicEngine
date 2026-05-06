@@ -196,6 +196,26 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   enabled previewable texture/depth resources, reports missing/disabled/buffer
   selections through deterministic diagnostics, and falls back to the current
   presentation source without platform/window ownership.
+- `SelectionSystem` is the CPU-visible reporting-only seam for picking.
+  Selection ID passes write `EntityId` (stable extracted entity ID, `0`
+  reserved for "no hit") and `PrimitiveId` (packed via `EncodedSelectionId`
+  with the high 4 bits = `SelectionPrimitiveDomain` and the low 28 bits =
+  authoritative face/edge/point payload). The renderer copies the requested
+  pixel into the graphics-owned host-visible `Picking.Readback` buffer at
+  frame-record time and drains it on the next `BeginFrame()` after the
+  issuing frame's fences complete, calling `PublishPickResult` for valid
+  samples and `PublishNoHit` for `EntityId == 0` / invalidated requests /
+  deterministic readback failures. Backends never invoke `RequestPick` /
+  `ConsumePick` themselves, and the CPU/null backend simulates the same
+  drain without Vulkan-specific code so it stays the correctness gate. Per
+  `GRAPHICS-012Q`, runtime owns `StableEntityId` -> live ECS resolution,
+  ECS selection / hover mutation, editor selection policy, and the
+  selection-outline input mask consumed by `SelectionOutlinePass`; graphics
+  never reads or mutates ECS state. Until `GRAPHICS-025` introduces
+  selectable transparent / special-forward sub-buckets, only `Selectable`
+  opaque renderables flow through `SelectionSurface` / `SelectionLines` /
+  `SelectionPoints`, and transparent picks fall back to runtime CPU
+  picking when editor policy requires them.
 - `ImGuiOverlaySystem` owns backend-agnostic overlay draw-data summaries and
   diagnostics translated from higher-level UI/runtime code. `ImGuiPass` overlays
   accepted draw data on `FrameRecipe.PresentSource`; it never writes the imported
