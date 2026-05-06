@@ -1,5 +1,12 @@
 # GRAPHICS-007Q — Culling bucket clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `tasks/active/` cleared following `CI-001` and `GRAPHICS-024` retirement.
+- Branch: `claude/agentic-workflow-session-7ytd0`.
+- Next verification step: capture decisions in a `## Decisions` block, sync consequential notes into `docs/architecture/rendering-three-pass.md`, then run the verification commands below.
+
 ## Goal
 - Resolve remaining product/architecture questions for culling bucket policy before downstream selection, diagnostics, and layer-mask consumers depend on the current contracts.
 

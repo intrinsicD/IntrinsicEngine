@@ -50,9 +50,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   (source module `Extrinsic.Graphics.Pass.Culling`) command contracts and the
   GPU draw-bucket contracts consumed by the surface, line, point, shadow, and
   selection passes.
-- [GRAPHICS-007Q — Culling bucket clarification follow-ups](GRAPHICS-007Q-culling-bucket-clarifications.md):
-  clarification-only backlog for selection bucket specialization, layer-mask
-  policy, culling diagnostics ownership, and unsupported bucket combinations.
+- [GRAPHICS-007Q — Culling bucket clarification follow-ups](../../active/GRAPHICS-007Q-culling-bucket-clarifications.md):
+  active clarification-only task for selection bucket specialization,
+  layer-mask policy, culling diagnostics ownership, and unsupported bucket
+  combinations.
 - [GRAPHICS-008 — Depth/surface/G-buffer passes](../../done/GRAPHICS-008-depth-surface-gbuffer-passes.md):
   depends on GRAPHICS-003, GRAPHICS-006, and GRAPHICS-007.
 - [GRAPHICS-008Q — Surface pass clarification follow-ups](GRAPHICS-008Q-surface-pass-clarifications.md):
