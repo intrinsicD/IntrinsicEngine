@@ -144,7 +144,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `src/graphics/renderer/README.md`.
 - [GRAPHICS-013C — ImGui overlay and present/finalization](../../done/GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.
-- [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
+- [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](../../active/GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
   nonblocking docs-only follow-up for ImGui draw-data translation, overlay upload/descriptor policy, present finalization strategy, and platform/backend ownership boundaries.
 - [GRAPHICS-014 — Visualization attributes and overlays](../../done/GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever

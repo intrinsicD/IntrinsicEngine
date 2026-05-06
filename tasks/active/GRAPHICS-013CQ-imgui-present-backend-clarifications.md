@@ -1,5 +1,13 @@
 # GRAPHICS-013CQ — ImGui/present backend clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-013BQ` retirement cleared `tasks/active/`.
+- Branch: `claude/setup-agentic-workflow-tayDz`.
+- Implementation commit: pending local agent workflow handoff.
+- Task-state commit: pending local agent workflow handoff.
+
 ## Goal
 - Clarify concrete backend/runtime details that remain after the CPU/null `GRAPHICS-013C` ImGui overlay and present/finalization contracts.
 
