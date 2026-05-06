@@ -1,5 +1,12 @@
 # GRAPHICS-008Q — Surface pass clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-007Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-TaF1r`.
+- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after recording decisions and mirroring consequential notes into `docs/architecture/rendering-three-pass.md`.
+
 ## Goal
 - Resolve remaining policy questions discovered while completing the CPU/null depth, forward surface, and G-buffer pass contracts.
 

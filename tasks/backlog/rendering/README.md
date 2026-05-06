@@ -57,9 +57,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/rendering-three-pass.md`.
 - [GRAPHICS-008 — Depth/surface/G-buffer passes](../../done/GRAPHICS-008-depth-surface-gbuffer-passes.md):
   depends on GRAPHICS-003, GRAPHICS-006, and GRAPHICS-007.
-- [GRAPHICS-008Q — Surface pass clarification follow-ups](GRAPHICS-008Q-surface-pass-clarifications.md):
-  clarification-only backlog for alpha-mask depth/G-buffer policy, descriptor
-  bind seams, renderpass attachment ownership, and empty-bucket diagnostics.
+- [GRAPHICS-008Q — Surface pass clarification follow-ups](../../active/GRAPHICS-008Q-surface-pass-clarifications.md):
+  active clarification task; resolves alpha-mask depth/G-buffer bucket policy,
+  descriptor-bind seam vs `SceneTableBDA`, renderpass attachment ownership for
+  depth/surface/G-buffer paths, and empty/invalid bucket diagnostics policy.
 - [GRAPHICS-009 — Deferred lighting and shadows](../../done/GRAPHICS-009-deferred-lighting-and-shadows.md):
   depends on GRAPHICS-008.
 - [GRAPHICS-009Q — Lighting and shadow clarification follow-ups](GRAPHICS-009Q-lighting-shadow-clarifications.md):
