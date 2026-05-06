@@ -45,6 +45,12 @@ ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
 ```
 
+## Shared fixtures
+
+Shared support fixtures live under `support/`. Runtime/Vulkan integration tests
+that borrow `RuntimeRhiTestEnvironment` must keep per-test mutable state local
+to each fixture and follow the reset contract in `support/README.md`.
+
 ## New test naming
 
 New C++ test source files should use the `Test.<Name>.cpp` format.

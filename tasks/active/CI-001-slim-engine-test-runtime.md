@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared engine/Vulkan fixture next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a shared runtime RHI environment complete; broader Slice 2 engine/Vulkan fixtures next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -94,6 +94,19 @@ Progress notes:
   allow-list is synchronized with `tests/README.md`. Local verification on the
   configured `build/ci` tree passed PR-fast (1,584 tests) and
   Linux-clang/default CPU (1,590 tests) after the guard was added.
+- 2026-05-06: Slice 2a completed by adding
+  `tests/support/RuntimeRhiTestEnvironment.hpp`, a lazy per-process headless
+  `RHI::VulkanContext` + `RHI::VulkanDevice` owner for legacy runtime/RHI
+  integration tests. `tests/integration/runtime/Test_RuntimeRHI.cpp` now borrows
+  that shared device while retaining per-test descriptor allocators, transfer
+  managers, pipeline builders, and queue submitters; skip semantics are routed
+  through `CheckAvailable()` before each borrow. The reset contract is documented
+  in `tests/support/README.md`. Focused CTest for the 22 migrated RHI cases
+  passed, and the direct `IntrinsicRuntimeTests` filter ran all 22 migrated cases
+  in one process through the shared environment. Because `gtest_discover_tests`
+  still registers one CTest process per GTest case, this is Slice 2 groundwork;
+  broader CTest wall-clock reduction still depends on the remaining Slice 2
+  fixture/grouping work.
 
 ## Required changes
 

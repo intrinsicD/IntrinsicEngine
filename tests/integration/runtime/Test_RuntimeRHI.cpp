@@ -16,6 +16,8 @@
 import RHI;
 import Core;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 TEST(RHIBindless, ConstructorTakesDeviceByRef)
 {
     // Compile-time API contract: bindless system must be device-owned, not shared-owned.
@@ -97,14 +99,12 @@ class DescriptorAllocatorTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        RHI::ContextConfig config{
-            .AppName = "DescriptorAllocatorTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-
-        m_Context = std::make_unique<RHI::VulkanContext>(config);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
 
         m_Layout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
         ASSERT_TRUE(m_Layout->IsValid());
@@ -113,7 +113,6 @@ protected:
         ASSERT_TRUE(m_Allocator->IsValid());
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
 
     std::unique_ptr<RHI::DescriptorLayout> m_Layout;
@@ -156,22 +155,15 @@ TEST_F(DescriptorAllocatorTest, ResetRecyclesPoolsAndAllocationsStillSucceed)
 class TransferTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Minimal Vulkan setup for testing
-        RHI::ContextConfig config{
-            .AppName = "TransferTest",
-            .EnableValidation = true,
-            .Headless = true
-        };
-        m_Context = std::make_unique<RHI::VulkanContext>(config);
-
-        // Note: In a real test, you'd need a surface.
-        // For headless RHI tests, we assume a mock or a dummy window.
-        // Here we use the Device's ability to pick a GPU without a surface for pure transfer.
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
         m_TransferMgr = std::make_unique<RHI::TransferManager>(*m_Device);
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<RHI::TransferManager> m_TransferMgr;
 };
@@ -485,20 +477,18 @@ class PipelineBuilderTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        RHI::ContextConfig config{
-            .AppName = "PipelineBuilderTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-        m_Context = std::make_unique<RHI::VulkanContext>(config);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
 
         VkPhysicalDeviceProperties props{};
         vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &props);
         m_MaxPushConstantsSize = props.limits.maxPushConstantsSize;
     }
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     uint32_t m_MaxPushConstantsSize = 0;
 };
@@ -812,23 +802,12 @@ TEST(QueueFamilyIndices, IsComplete_MissingPresent)
 // Requires a Vulkan-capable GPU; skips gracefully in headless CI environments.
 TEST(QueueFamilyContract, HeadlessDevice_GraphicsAndTransferResolved)
 {
-    RHI::ContextConfig config{
-        .AppName = "QueueFamilyContractTest",
-        .EnableValidation = false,
-        .Headless = true,
-    };
-
-    auto context = std::make_unique<RHI::VulkanContext>(config);
-    if (!context->GetInstance())
+    auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+    if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
     {
-        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+        GTEST_SKIP() << available.message();
     }
-
-    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
-    if (!device->IsValid())
-    {
-        GTEST_SKIP() << "No suitable GPU found";
-    }
+    auto device = environment.Device();
 
     auto indices = device->GetQueueIndices();
 
@@ -882,24 +861,12 @@ TEST(QueueDomain, EnumSize_IsCompact)
 // GPU integration test: QueueSubmitter resolves queues and family indices.
 TEST(QueueSubmitter, HeadlessDevice_ResolvesQueuesAndFamilies)
 {
-    RHI::ContextConfig config{
-        .AppName = "QueueSubmitterTest",
-        .EnableValidation = false,
-        .Headless = true,
-    };
-
-    auto context = std::make_unique<RHI::VulkanContext>(config);
-    if (!context->GetInstance())
+    auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+    if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
     {
-        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+        GTEST_SKIP() << available.message();
     }
-
-    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
-    if (!device->IsValid())
-    {
-        GTEST_SKIP() << "No suitable GPU found";
-    }
-
+    auto device = environment.Device();
     RHI::QueueSubmitter submitter(*device);
 
     // Graphics domain always has a queue.
@@ -921,24 +888,12 @@ TEST(QueueSubmitter, HeadlessDevice_ResolvesQueuesAndFamilies)
 
 TEST(QueueSubmitter, RequiresOwnershipTransfer_SameDomain_ReturnsFalse)
 {
-    RHI::ContextConfig config{
-        .AppName = "QueueSubmitterOwnershipTest",
-        .EnableValidation = false,
-        .Headless = true,
-    };
-
-    auto context = std::make_unique<RHI::VulkanContext>(config);
-    if (!context->GetInstance())
+    auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+    if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
     {
-        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+        GTEST_SKIP() << available.message();
     }
-
-    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
-    if (!device->IsValid())
-    {
-        GTEST_SKIP() << "No suitable GPU found";
-    }
-
+    auto device = environment.Device();
     RHI::QueueSubmitter submitter(*device);
 
     // Same domain never requires ownership transfer.
@@ -953,24 +908,12 @@ TEST(QueueSubmitter, RequiresOwnershipTransfer_SameDomain_ReturnsFalse)
 
 TEST(QueueSubmitter, RequiresOwnershipTransfer_GraphicsToTransfer_MatchesDedicatedStatus)
 {
-    RHI::ContextConfig config{
-        .AppName = "QueueSubmitterOwnershipTest2",
-        .EnableValidation = false,
-        .Headless = true,
-    };
-
-    auto context = std::make_unique<RHI::VulkanContext>(config);
-    if (!context->GetInstance())
+    auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+    if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
     {
-        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+        GTEST_SKIP() << available.message();
     }
-
-    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
-    if (!device->IsValid())
-    {
-        GTEST_SKIP() << "No suitable GPU found";
-    }
-
+    auto device = environment.Device();
     RHI::QueueSubmitter submitter(*device);
 
     // Ownership transfer between Graphics↔Transfer is needed iff the transfer
@@ -984,24 +927,12 @@ TEST(QueueSubmitter, RequiresOwnershipTransfer_GraphicsToTransfer_MatchesDedicat
 
 TEST(QueueSubmitter, HasDedicatedQueue_GraphicsAlwaysTrue_ComputeAlwaysFalse)
 {
-    RHI::ContextConfig config{
-        .AppName = "QueueSubmitterDedicatedTest",
-        .EnableValidation = false,
-        .Headless = true,
-    };
-
-    auto context = std::make_unique<RHI::VulkanContext>(config);
-    if (!context->GetInstance())
+    auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+    if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
     {
-        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+        GTEST_SKIP() << available.message();
     }
-
-    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
-    if (!device->IsValid())
-    {
-        GTEST_SKIP() << "No suitable GPU found";
-    }
-
+    auto device = environment.Device();
     RHI::QueueSubmitter submitter(*device);
 
     // Graphics always has its own queue.
@@ -1017,24 +948,12 @@ TEST(QueueSubmitter, HasDedicatedQueue_GraphicsAlwaysTrue_ComputeAlwaysFalse)
 
 TEST(QueueSubmitter, GetDevice_ReturnsOriginalDevice)
 {
-    RHI::ContextConfig config{
-        .AppName = "QueueSubmitterDeviceTest",
-        .EnableValidation = false,
-        .Headless = true,
-    };
-
-    auto context = std::make_unique<RHI::VulkanContext>(config);
-    if (!context->GetInstance())
+    auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+    if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
     {
-        GTEST_SKIP() << "No Vulkan instance available (headless environment)";
+        GTEST_SKIP() << available.message();
     }
-
-    auto device = std::make_shared<RHI::VulkanDevice>(*context, VK_NULL_HANDLE);
-    if (!device->IsValid())
-    {
-        GTEST_SKIP() << "No suitable GPU found";
-    }
-
+    auto device = environment.Device();
     RHI::QueueSubmitter submitter(*device);
     EXPECT_EQ(&submitter.GetDevice(), device.get());
 }
