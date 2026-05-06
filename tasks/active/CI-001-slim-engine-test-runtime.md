@@ -4,7 +4,7 @@
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
-- Next verification step: after each slice, run `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and the relevant CTest gate (`ctest --preset ci -L "unit|contract"` for the PR-fast slice; full `ctest --preset ci -LE "gpu|vulkan|slow|flaky-quarantine"` for the Linux-clang gate). Compare wall-clock against a recorded baseline on the same branch.
+- Next verification step: after each slice, run `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, and the relevant CTest gate against the configured build directory (`ctest --test-dir build/ci -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60` for the PR-fast slice; `ctest --test-dir build/ci -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60` for the Linux-clang gate). `CMakePresets.json` does not currently define a `testPresets` entry, so the directory-based invocation matches the workflows in `.github/workflows/` and the canonical command in `AGENTS.md`. Compare wall-clock against a recorded baseline on the same branch.
 
 ## Goal
 
@@ -171,7 +171,8 @@ verifiable on its own.
 ## Acceptance criteria
 
 - Baseline wall-clock for `pr-fast` and `ci-linux-clang` gates is recorded
-  on the branch before slice 1 and after each subsequent slice.
+  on the branch before slice 1 and after each subsequent slice using
+  `ctest --test-dir build/ci ...` (matching `.github/workflows/`).
 - After slice 1: `ci-linux-clang` excludes the newly tagged `slow`
   executables and the gate completes without losing any case the prior
   green run produced (case count unchanged at the union of `pr-fast` +
@@ -191,26 +192,36 @@ verifiable on its own.
 
 ## Verification
 
+`CMakePresets.json` exposes a configure/build preset named `ci` but no
+`testPresets` entry, so `ctest --preset ci` does not work. Use the
+directory-based invocation that the workflows in `.github/workflows/` and
+`AGENTS.md` already use. If a future slice introduces a CTest preset, update
+this block.
+
 ```bash
 # Configure + build.
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 
-# PR-fast slice.
-ctest --preset ci -L "unit|contract" --output-on-failure
+# PR-fast slice (matches .github/workflows/pr-fast.yml).
+ctest --test-dir build/ci --output-on-failure \
+    -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60
 
-# Linux-clang full CPU gate.
-ctest --preset ci -LE "gpu|vulkan|slow|flaky-quarantine" --output-on-failure -j$(nproc)
+# Linux-clang full CPU gate (matches .github/workflows/ci-linux-clang.yml).
+ctest --test-dir build/ci --output-on-failure \
+    -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 
-# Nightly-deep equivalent (local).
-ctest --preset ci -LE "flaky-quarantine" --output-on-failure -j$(nproc)
+# Nightly-deep equivalent (matches .github/workflows/nightly-deep.yml).
+ctest --test-dir build/ci --output-on-failure \
+    -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 
 # Repository policy guards.
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 
 # Per-slice timing capture (record before and after each slice).
-ctest --preset ci -LE "gpu|vulkan|slow|flaky-quarantine" -j$(nproc) --output-junit ctest.xml
+ctest --test-dir build/ci -LE "gpu|vulkan|slow|flaky-quarantine" \
+    -j$(nproc) --output-junit ctest.xml
 ```
 
 ## Forbidden changes
