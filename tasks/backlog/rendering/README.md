@@ -171,8 +171,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-014 — Visualization attributes and overlays](../../done/GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever
   texture/atlas resources are required.
-- [GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups](GRAPHICS-014Q-visualization-runtime-backend-clarifications.md):
-  nonblocking docs-only follow-up for runtime/geometry visualization packet producers, invalid-packet handling, overlay upload strategy, and UV/Htex bake selection policy.
+- [GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups](../../active/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md):
+  promoted to `tasks/active/` for the current session; nonblocking docs-only follow-up for runtime/geometry visualization packet producers, invalid-packet handling, overlay upload strategy, and UV/Htex bake selection policy.
 - [GRAPHICS-015 — GPU assets, textures, and residency](../../done/GRAPHICS-015-gpu-assets-textures-residency.md):
   depends on GRAPHICS-006 wherever material texture references are involved.
 - [GRAPHICS-015Q — Texture residency backend clarification follow-ups](GRAPHICS-015Q-texture-residency-backend-clarifications.md):

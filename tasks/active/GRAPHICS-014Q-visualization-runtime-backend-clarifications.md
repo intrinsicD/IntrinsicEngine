@@ -1,5 +1,15 @@
 # GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-013CQ` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-T6CQd`.
+- Promotion commit: pending (this commit moves the file from `tasks/backlog/rendering/` to `tasks/active/`).
+- Implementation commit: pending docs sync into `docs/architecture/rendering-three-pass.md`, `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
+- Task-state commit: pending retirement commit (will move the file from `tasks/active/` to `tasks/done/`).
+- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after docs sync lands.
+
 ## Goal
 - Clarify runtime, geometry, and backend details that remain after the CPU/null `GRAPHICS-014` visualization packet and snapshot contracts.
 
