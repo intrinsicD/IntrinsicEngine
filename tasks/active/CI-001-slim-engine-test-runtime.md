@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator, Slice 2d HeadlessEngine, Slice 2e RenderGraphPackets, and Slice 2f small Vulkan fixtures complete; Slice 3 parameterization next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3a selection parameterization complete; Slice 3b geometry validator audit next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -158,6 +158,14 @@ Progress notes:
   descriptor subsystems, transfer/buffer managers, scene managers, asset
   pipelines, GPU scenes, geometry pools, and frame scopes are still constructed
   and reset by each fixture/test.
+- 2026-05-06: Slice 3a completed by converting the six duplicated
+  `Runtime::Selection::ApplySelection` mode/arity cases in
+  `tests/integration/runtime/Test_RuntimeSelection_Multi.cpp` to a single
+  `TEST_P` fixture. The instantiation list preserves the original scenarios:
+  Add, Toggle deselect, background Replace clear, Toggle add-to-multi, Toggle
+  remove-from-multi, and Replace clear-to-target. `Test_RuntimeSelection.cpp`
+  was audited; it contains CPU/GPU pick contract coverage rather than matching
+  mode/arity duplicates, so it was left untouched in this sub-slice.
 
 ## Required changes
 

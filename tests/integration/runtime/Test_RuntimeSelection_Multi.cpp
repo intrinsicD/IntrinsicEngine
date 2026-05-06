@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <ostream>
 #include <vector>
 #include <entt/entity/registry.hpp>
 
@@ -7,133 +9,122 @@ import ECS;
 import Runtime.Selection;
 import Runtime.SelectionModule;
 
-TEST(RuntimeSelection, SingleClick_Add_DoesNotDeselectOthers)
+namespace
 {
+    struct SelectionModeCase
+    {
+        const char* Name{};
+        std::size_t EntityCount{};
+        std::vector<std::size_t> InitiallySelected{};
+        std::size_t TargetIndex{};
+        bool TargetBackground{};
+        Runtime::Selection::PickMode Mode{};
+        std::vector<std::size_t> ExpectedSelected{};
+    };
+
+    class RuntimeSelectionModeParameterized : public ::testing::TestWithParam<SelectionModeCase>
+    {
+    };
+
+    [[nodiscard]] bool ContainsIndex(const std::vector<std::size_t>& indices, std::size_t index)
+    {
+        return std::find(indices.begin(), indices.end(), index) != indices.end();
+    }
+
+    void PrintTo(const SelectionModeCase& testCase, std::ostream* os)
+    {
+        *os << testCase.Name;
+    }
+}
+
+TEST_P(RuntimeSelectionModeParameterized, ApplySelectionUpdatesSelectionState)
+{
+    const auto& testCase = GetParam();
     ECS::Scene scene;
     auto& reg = scene.GetRegistry();
 
-    const entt::entity a = scene.CreateEntity("A");
-    const entt::entity b = scene.CreateEntity("B");
+    std::vector<entt::entity> entities;
+    entities.reserve(testCase.EntityCount);
+    for (std::size_t i = 0; i < testCase.EntityCount; ++i)
+    {
+        const entt::entity entity = scene.CreateEntity("Selectable");
+        reg.emplace<ECS::Components::Selection::SelectableTag>(entity);
+        entities.push_back(entity);
+    }
 
-    reg.emplace<ECS::Components::Selection::SelectableTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectableTag>(b);
+    for (const std::size_t index : testCase.InitiallySelected)
+        reg.emplace<ECS::Components::Selection::SelectedTag>(entities[index]);
 
-    // Pretend A already selected.
-    reg.emplace<ECS::Components::Selection::SelectedTag>(a);
+    const entt::entity target = testCase.TargetBackground ? entt::null : entities[testCase.TargetIndex];
+    Runtime::Selection::ApplySelection(scene, target, testCase.Mode);
 
-    // Single click on B => Add (no deselection)
-    Runtime::Selection::ApplySelection(scene, b, Runtime::Selection::PickMode::Add);
-
-    EXPECT_TRUE(reg.all_of<ECS::Components::Selection::SelectedTag>(a));
-    EXPECT_TRUE(reg.all_of<ECS::Components::Selection::SelectedTag>(b));
+    for (std::size_t i = 0; i < entities.size(); ++i)
+    {
+        EXPECT_EQ(reg.all_of<ECS::Components::Selection::SelectedTag>(entities[i]),
+                  ContainsIndex(testCase.ExpectedSelected, i))
+            << "case=" << testCase.Name << " entityIndex=" << i;
+    }
 }
 
-TEST(RuntimeSelection, ShiftClick_Toggle_DeselectsWhenAlreadySelected)
-{
-    ECS::Scene scene;
-    auto& reg = scene.GetRegistry();
-
-    const entt::entity a = scene.CreateEntity("A");
-
-    reg.emplace<ECS::Components::Selection::SelectableTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectedTag>(a);
-
-    // Shift-click => Toggle => deselect
-    Runtime::Selection::ApplySelection(scene, a, Runtime::Selection::PickMode::Toggle);
-
-    EXPECT_FALSE(reg.all_of<ECS::Components::Selection::SelectedTag>(a));
-}
-
-TEST(RuntimeSelection, BackgroundClick_Replace_ClearsAll)
-{
-    ECS::Scene scene;
-    auto& reg = scene.GetRegistry();
-
-    const entt::entity a = scene.CreateEntity("A");
-    const entt::entity b = scene.CreateEntity("B");
-
-    reg.emplace<ECS::Components::Selection::SelectableTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectableTag>(b);
-
-    reg.emplace<ECS::Components::Selection::SelectedTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectedTag>(b);
-
-    Runtime::Selection::ApplySelection(scene, entt::null, Runtime::Selection::PickMode::Replace);
-
-    EXPECT_FALSE(reg.all_of<ECS::Components::Selection::SelectedTag>(a));
-    EXPECT_FALSE(reg.all_of<ECS::Components::Selection::SelectedTag>(b));
-}
+INSTANTIATE_TEST_SUITE_P(
+    RuntimeSelection,
+    RuntimeSelectionModeParameterized,
+    ::testing::Values(
+        SelectionModeCase{
+            .Name = "SingleClick_Add_DoesNotDeselectOthers",
+            .EntityCount = 2u,
+            .InitiallySelected = {0u},
+            .TargetIndex = 1u,
+            .TargetBackground = false,
+            .Mode = Runtime::Selection::PickMode::Add,
+            .ExpectedSelected = {0u, 1u}},
+        SelectionModeCase{
+            .Name = "ShiftClick_Toggle_DeselectsWhenAlreadySelected",
+            .EntityCount = 1u,
+            .InitiallySelected = {0u},
+            .TargetIndex = 0u,
+            .TargetBackground = false,
+            .Mode = Runtime::Selection::PickMode::Toggle,
+            .ExpectedSelected = {}},
+        SelectionModeCase{
+            .Name = "BackgroundClick_Replace_ClearsAll",
+            .EntityCount = 2u,
+            .InitiallySelected = {0u, 1u},
+            .TargetIndex = 0u,
+            .TargetBackground = true,
+            .Mode = Runtime::Selection::PickMode::Replace,
+            .ExpectedSelected = {}},
+        SelectionModeCase{
+            .Name = "CtrlClick_Toggle_AddsSecondEntity",
+            .EntityCount = 3u,
+            .InitiallySelected = {0u},
+            .TargetIndex = 1u,
+            .TargetBackground = false,
+            .Mode = Runtime::Selection::PickMode::Toggle,
+            .ExpectedSelected = {0u, 1u}},
+        SelectionModeCase{
+            .Name = "CtrlClick_Toggle_RemovesFromMultiSelection",
+            .EntityCount = 2u,
+            .InitiallySelected = {0u, 1u},
+            .TargetIndex = 0u,
+            .TargetBackground = false,
+            .Mode = Runtime::Selection::PickMode::Toggle,
+            .ExpectedSelected = {1u}},
+        SelectionModeCase{
+            .Name = "PlainClick_Replace_ClearsMultiSelection",
+            .EntityCount = 3u,
+            .InitiallySelected = {0u, 1u},
+            .TargetIndex = 2u,
+            .TargetBackground = false,
+            .Mode = Runtime::Selection::PickMode::Replace,
+            .ExpectedSelected = {2u}}),
+    [](const ::testing::TestParamInfo<SelectionModeCase>& info)
+    {
+        return info.param.Name;
+    });
 
 // --- Multi-entity selection tests (F4: Hierarchy Multi-Select) ---
 
-TEST(RuntimeSelection, CtrlClick_Toggle_AddsSecondEntity)
-{
-    ECS::Scene scene;
-    auto& reg = scene.GetRegistry();
-
-    const entt::entity a = scene.CreateEntity("A");
-    const entt::entity b = scene.CreateEntity("B");
-    const entt::entity c = scene.CreateEntity("C");
-
-    reg.emplace<ECS::Components::Selection::SelectableTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectableTag>(b);
-    reg.emplace<ECS::Components::Selection::SelectableTag>(c);
-
-    // Select A via Replace.
-    Runtime::Selection::ApplySelection(scene, a, Runtime::Selection::PickMode::Replace);
-    EXPECT_TRUE(reg.all_of<ECS::Components::Selection::SelectedTag>(a));
-
-    // Ctrl+click B => Toggle (adds B, keeps A).
-    Runtime::Selection::ApplySelection(scene, b, Runtime::Selection::PickMode::Toggle);
-    EXPECT_TRUE(reg.all_of<ECS::Components::Selection::SelectedTag>(a));
-    EXPECT_TRUE(reg.all_of<ECS::Components::Selection::SelectedTag>(b));
-    EXPECT_FALSE(reg.all_of<ECS::Components::Selection::SelectedTag>(c));
-}
-
-TEST(RuntimeSelection, CtrlClick_Toggle_RemovesFromMultiSelection)
-{
-    ECS::Scene scene;
-    auto& reg = scene.GetRegistry();
-
-    const entt::entity a = scene.CreateEntity("A");
-    const entt::entity b = scene.CreateEntity("B");
-
-    reg.emplace<ECS::Components::Selection::SelectableTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectableTag>(b);
-
-    // Both selected.
-    reg.emplace<ECS::Components::Selection::SelectedTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectedTag>(b);
-
-    // Ctrl+click A => toggles A off, B stays.
-    Runtime::Selection::ApplySelection(scene, a, Runtime::Selection::PickMode::Toggle);
-    EXPECT_FALSE(reg.all_of<ECS::Components::Selection::SelectedTag>(a));
-    EXPECT_TRUE(reg.all_of<ECS::Components::Selection::SelectedTag>(b));
-}
-
-TEST(RuntimeSelection, PlainClick_Replace_ClearsMultiSelection)
-{
-    ECS::Scene scene;
-    auto& reg = scene.GetRegistry();
-
-    const entt::entity a = scene.CreateEntity("A");
-    const entt::entity b = scene.CreateEntity("B");
-    const entt::entity c = scene.CreateEntity("C");
-
-    reg.emplace<ECS::Components::Selection::SelectableTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectableTag>(b);
-    reg.emplace<ECS::Components::Selection::SelectableTag>(c);
-
-    // A and B selected.
-    reg.emplace<ECS::Components::Selection::SelectedTag>(a);
-    reg.emplace<ECS::Components::Selection::SelectedTag>(b);
-
-    // Plain click on C => Replace clears A and B, selects C.
-    Runtime::Selection::ApplySelection(scene, c, Runtime::Selection::PickMode::Replace);
-    EXPECT_FALSE(reg.all_of<ECS::Components::Selection::SelectedTag>(a));
-    EXPECT_FALSE(reg.all_of<ECS::Components::Selection::SelectedTag>(b));
-    EXPECT_TRUE(reg.all_of<ECS::Components::Selection::SelectedTag>(c));
-}
 
 TEST(RuntimeSelection, RangeSelect_ReplaceThenAdd_SelectsContiguousRange)
 {
