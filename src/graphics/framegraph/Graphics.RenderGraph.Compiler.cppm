@@ -11,6 +11,7 @@ export module Extrinsic.Graphics.RenderGraph:Compiler;
 
 import Extrinsic.Core.Error;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import :Pass;
 import :Resources;
@@ -84,9 +85,12 @@ namespace Extrinsic::Graphics
     {
         std::uint32_t PassIndex = 0;
         std::uint32_t ResourceIndex = 0;
+        std::uint32_t AttachmentIndex = 0;
         bool IsTextureResource = true;
         bool IsDepthAttachment = false;
         RHI::LoadOp Load = RHI::LoadOp::Clear;
+        RHI::StoreOp Store = RHI::StoreOp::Store;
+        RHI::Format Format = RHI::Format::Undefined;
     };
 
     export struct CompiledPassDeclarations
@@ -128,6 +132,7 @@ namespace Extrinsic::Graphics
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
         std::vector<std::string> PassNames{};
+        std::vector<RenderQueue> PassQueues{};
         std::vector<bool> PassSideEffects{};
         std::vector<CompiledPassDeclarations> PassDeclarations{};
         std::vector<std::string> TextureNames{};

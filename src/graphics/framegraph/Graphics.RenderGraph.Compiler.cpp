@@ -19,6 +19,7 @@ import :Compiler;
 
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.Core.Error;
 
 namespace Extrinsic::Graphics
@@ -312,6 +313,106 @@ namespace Extrinsic::Graphics
                                 rhs.ResourceName, rhs.Message);
             });
         }
+
+        [[nodiscard]] constexpr const char* ToString(const RenderQueue queue)
+        {
+            switch (queue)
+            {
+            case RenderQueue::Graphics: return "graphics";
+            case RenderQueue::AsyncCompute: return "async_compute";
+            case RenderQueue::AsyncTransfer: return "async_transfer";
+            }
+            return "unknown";
+        }
+
+        [[nodiscard]] constexpr const char* ToString(const TextureState state)
+        {
+            switch (state)
+            {
+            case TextureState::Undefined: return "Undefined";
+            case TextureState::ShaderRead: return "ShaderRead";
+            case TextureState::ShaderWrite: return "ShaderWrite";
+            case TextureState::ColorAttachmentWrite: return "ColorAttachmentWrite";
+            case TextureState::DepthWrite: return "DepthWrite";
+            case TextureState::TransferSrc: return "TransferSrc";
+            case TextureState::TransferDst: return "TransferDst";
+            case TextureState::Present: return "Present";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] constexpr const char* ToString(const BufferState state)
+        {
+            switch (state)
+            {
+            case BufferState::Undefined: return "Undefined";
+            case BufferState::ShaderRead: return "ShaderRead";
+            case BufferState::ShaderWrite: return "ShaderWrite";
+            case BufferState::VertexRead: return "VertexRead";
+            case BufferState::IndexRead: return "IndexRead";
+            case BufferState::IndirectRead: return "IndirectRead";
+            case BufferState::TransferSrc: return "TransferSrc";
+            case BufferState::TransferDst: return "TransferDst";
+            case BufferState::HostReadback: return "HostReadback";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] constexpr const char* ToString(const RHI::LoadOp op)
+        {
+            switch (op)
+            {
+            case RHI::LoadOp::Load: return "load";
+            case RHI::LoadOp::Clear: return "clear";
+            case RHI::LoadOp::DontCare: return "dont_care";
+            }
+            return "unknown";
+        }
+
+        [[nodiscard]] constexpr const char* ToString(const RHI::StoreOp op)
+        {
+            switch (op)
+            {
+            case RHI::StoreOp::Store: return "store";
+            case RHI::StoreOp::DontCare: return "dont_care";
+            }
+            return "unknown";
+        }
+
+        [[nodiscard]] constexpr const char* ToString(const RHI::Format format)
+        {
+            switch (format)
+            {
+            case RHI::Format::Undefined: return "Undefined";
+            case RHI::Format::R8_UNORM: return "R8_UNORM";
+            case RHI::Format::RG8_UNORM: return "RG8_UNORM";
+            case RHI::Format::RGBA8_UNORM: return "RGBA8_UNORM";
+            case RHI::Format::RGBA8_SRGB: return "RGBA8_SRGB";
+            case RHI::Format::BGRA8_UNORM: return "BGRA8_UNORM";
+            case RHI::Format::BGRA8_SRGB: return "BGRA8_SRGB";
+            case RHI::Format::R16_FLOAT: return "R16_FLOAT";
+            case RHI::Format::RG16_FLOAT: return "RG16_FLOAT";
+            case RHI::Format::RGBA16_FLOAT: return "RGBA16_FLOAT";
+            case RHI::Format::R16_UINT: return "R16_UINT";
+            case RHI::Format::R16_UNORM: return "R16_UNORM";
+            case RHI::Format::R32_FLOAT: return "R32_FLOAT";
+            case RHI::Format::RG32_FLOAT: return "RG32_FLOAT";
+            case RHI::Format::RGB32_FLOAT: return "RGB32_FLOAT";
+            case RHI::Format::RGBA32_FLOAT: return "RGBA32_FLOAT";
+            case RHI::Format::R32_UINT: return "R32_UINT";
+            case RHI::Format::R32_SINT: return "R32_SINT";
+            case RHI::Format::D16_UNORM: return "D16_UNORM";
+            case RHI::Format::D32_FLOAT: return "D32_FLOAT";
+            case RHI::Format::D24_UNORM_S8_UINT: return "D24_UNORM_S8_UINT";
+            case RHI::Format::D32_FLOAT_S8_UINT: return "D32_FLOAT_S8_UINT";
+            case RHI::Format::BC1_UNORM: return "BC1_UNORM";
+            case RHI::Format::BC3_UNORM: return "BC3_UNORM";
+            case RHI::Format::BC5_UNORM: return "BC5_UNORM";
+            case RHI::Format::BC7_UNORM: return "BC7_UNORM";
+            case RHI::Format::BC7_SRGB: return "BC7_SRGB";
+            }
+            return "Unknown";
+        }
     }
 
     bool RenderGraphValidationResult::HasErrors() const
@@ -397,14 +498,47 @@ namespace Extrinsic::Graphics
         const std::uint32_t resourceCount = static_cast<std::uint32_t>(textures.size() + buffers.size());
         if (passCount == 0)
         {
-            return CompiledRenderGraph{
-                .PassCount = passCount,
-                .ResourceCount = resourceCount,
-                .TextureHandles = std::vector<RHI::TextureHandle>(textures.size()),
-                .BufferHandles = std::vector<RHI::BufferHandle>(buffers.size()),
-                .TextureImported = std::vector<bool>(textures.size(), false),
-                .BufferImported = std::vector<bool>(buffers.size(), false),
-            };
+            CompiledRenderGraph compiled{};
+            compiled.PassCount = passCount;
+            compiled.ResourceCount = resourceCount;
+            compiled.TextureNames.resize(textures.size());
+            compiled.BufferNames.resize(buffers.size());
+            compiled.TextureLifetimes.resize(textures.size());
+            compiled.BufferLifetimes.resize(buffers.size());
+            compiled.TextureInitialStates.resize(textures.size(), TextureState::Undefined);
+            compiled.TextureFinalStates.resize(textures.size(), TextureState::Undefined);
+            compiled.BufferInitialStates.resize(buffers.size(), BufferState::Undefined);
+            compiled.BufferFinalStates.resize(buffers.size(), BufferState::Undefined);
+            compiled.TextureHandles.resize(textures.size());
+            compiled.BufferHandles.resize(buffers.size());
+            compiled.TextureImported.resize(textures.size(), false);
+            compiled.TextureIsBackbuffer.resize(textures.size(), false);
+            compiled.BufferImported.resize(buffers.size(), false);
+
+            for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
+            {
+                compiled.TextureNames[textureIndex] = textures[textureIndex].Name;
+                compiled.TextureInitialStates[textureIndex] = textures[textureIndex].InitialState;
+                compiled.TextureFinalStates[textureIndex] = textures[textureIndex].FinalState;
+                compiled.TextureImported[textureIndex] = textures[textureIndex].Imported;
+                compiled.TextureIsBackbuffer[textureIndex] = textures[textureIndex].IsBackbuffer;
+                if (textures[textureIndex].Imported)
+                {
+                    compiled.TextureHandles[textureIndex] = textures[textureIndex].ImportedHandle;
+                }
+            }
+            for (std::uint32_t bufferIndex = 0; bufferIndex < buffers.size(); ++bufferIndex)
+            {
+                compiled.BufferNames[bufferIndex] = buffers[bufferIndex].Name;
+                compiled.BufferInitialStates[bufferIndex] = buffers[bufferIndex].InitialState;
+                compiled.BufferFinalStates[bufferIndex] = buffers[bufferIndex].FinalState;
+                compiled.BufferImported[bufferIndex] = buffers[bufferIndex].Imported;
+                if (buffers[bufferIndex].Imported)
+                {
+                    compiled.BufferHandles[bufferIndex] = buffers[bufferIndex].ImportedHandle;
+                }
+            }
+            return compiled;
         }
 
         std::vector<ResourceState> textureStates(textures.size());
@@ -420,7 +554,10 @@ namespace Extrinsic::Graphics
         std::vector<TextureState> textureFinalStates(textures.size(), TextureState::Undefined);
         std::vector<BufferState> bufferInitialStates(buffers.size(), BufferState::Undefined);
         std::vector<BufferState> bufferFinalStates(buffers.size(), BufferState::Undefined);
+        std::vector<std::string> passNames(passCount);
+        std::vector<RenderQueue> passQueues(passCount, RenderQueue::Graphics);
         std::vector<bool> passSideEffects(passCount, false);
+        std::vector<CompiledRenderPassAttachment> renderPassAttachments{};
         std::vector<ResourceLifetime> textureLifetimes(textures.size());
         std::vector<ResourceLifetime> bufferLifetimes(buffers.size());
         std::vector<std::vector<std::uint32_t>> adjacency(passCount);
@@ -458,6 +595,8 @@ namespace Extrinsic::Graphics
         for (std::uint32_t passIndex = 0; passIndex < passCount; ++passIndex)
         {
             const RenderPassRecord& pass = passes[passIndex];
+            passNames[passIndex] = pass.Name;
+            passQueues[passIndex] = pass.Queue;
             passSideEffects[passIndex] = pass.SideEffect;
             passDeclarations[passIndex].PassIndex = passIndex;
             for (const PassRef dependency : pass.ExplicitDependencies)
@@ -532,6 +671,52 @@ namespace Extrinsic::Graphics
                     g_LastCompileDiagnostic = "RenderGraph render-pass depth attachment declaration is missing depth usage: pass=\"" +
                                               pass.Name + "\".";
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
+                }
+
+                std::vector<std::uint32_t> colorWriteTextures{};
+                colorWriteTextures.reserve(pass.TextureAccesses.size());
+                std::uint32_t depthTexture = std::numeric_limits<std::uint32_t>::max();
+                for (const TextureAccess& access : pass.TextureAccesses)
+                {
+                    if (access.Write && access.Usage == TextureUsage::ColorAttachmentWrite)
+                    {
+                        colorWriteTextures.push_back(access.Ref.Index);
+                    }
+                    if (depthTexture == std::numeric_limits<std::uint32_t>::max() &&
+                        (access.Usage == TextureUsage::DepthRead || access.Usage == TextureUsage::DepthWrite))
+                    {
+                        depthTexture = access.Ref.Index;
+                    }
+                }
+
+                const std::size_t colorCount = std::min(pass.RenderPass.ColorTargets.size(), colorWriteTextures.size());
+                for (std::size_t colorIndex = 0; colorIndex < colorCount; ++colorIndex)
+                {
+                    const std::uint32_t textureIndex = colorWriteTextures[colorIndex];
+                    renderPassAttachments.push_back(CompiledRenderPassAttachment{
+                        .PassIndex = passIndex,
+                        .ResourceIndex = textureIndex,
+                        .AttachmentIndex = static_cast<std::uint32_t>(colorIndex),
+                        .IsTextureResource = true,
+                        .IsDepthAttachment = false,
+                        .Load = pass.RenderPass.ColorTargets[colorIndex].Load,
+                        .Store = pass.RenderPass.ColorTargets[colorIndex].Store,
+                        .Format = textureIndex < textures.size() ? textures[textureIndex].Desc.Fmt : RHI::Format::Undefined,
+                    });
+                }
+
+                if (pass.RenderPass.Depth.Target.IsValid() && depthTexture != std::numeric_limits<std::uint32_t>::max())
+                {
+                    renderPassAttachments.push_back(CompiledRenderPassAttachment{
+                        .PassIndex = passIndex,
+                        .ResourceIndex = depthTexture,
+                        .AttachmentIndex = 0u,
+                        .IsTextureResource = true,
+                        .IsDepthAttachment = true,
+                        .Load = pass.RenderPass.Depth.Load,
+                        .Store = pass.RenderPass.Depth.Store,
+                        .Format = depthTexture < textures.size() ? textures[depthTexture].Desc.Fmt : RHI::Format::Undefined,
+                    });
                 }
             }
 
@@ -700,7 +885,9 @@ namespace Extrinsic::Graphics
                 .QueueHandoffEdgeCount = queueHandoffEdgeCount,
                 .TopologicalOrder = order,
                 .TopologicalLayerByPass = layerByPass,
-                .PassSideEffects = passSideEffects,
+                .PassNames = std::move(passNames),
+                .PassQueues = std::move(passQueues),
+                .PassSideEffects = std::move(passSideEffects),
                 .PassDeclarations = std::move(passDeclarations),
                 .TextureNames = std::move(textureNames),
                 .BufferNames = std::move(bufferNames),
@@ -732,8 +919,6 @@ namespace Extrinsic::Graphics
 
         std::vector<BarrierPacket> barrierPackets{};
         barrierPackets.reserve(order.size());
-        std::vector<std::string> passNames{};
-        passNames.reserve(order.size());
         std::vector<TextureBarrierState> textureStateByRef(textures.size(), TextureBarrierState::Undefined);
         std::vector<BufferBarrierState> bufferStateByRef(buffers.size(), BufferBarrierState::Undefined);
 
@@ -755,7 +940,6 @@ namespace Extrinsic::Graphics
         for (const std::uint32_t passIndex : order)
         {
             const auto& pass = passes[passIndex];
-            passNames.push_back(pass.Name);
             BarrierPacket packet{};
             packet.PassIndex = passIndex;
 
@@ -855,6 +1039,7 @@ namespace Extrinsic::Graphics
             .TopologicalOrder = std::move(order),
             .TopologicalLayerByPass = std::move(layerByPass),
             .PassNames = std::move(passNames),
+            .PassQueues = std::move(passQueues),
             .PassSideEffects = std::move(passSideEffects),
             .PassDeclarations = std::move(passDeclarations),
             .TextureNames = std::move(textureNames),
@@ -870,6 +1055,7 @@ namespace Extrinsic::Graphics
             .TextureImported = std::move(textureImported),
             .TextureIsBackbuffer = std::move(textureIsBackbuffer),
             .BufferImported = std::move(bufferImported),
+            .RenderPassAttachments = std::move(renderPassAttachments),
             .BarrierPackets = std::move(barrierPackets),
         };
     }
@@ -881,6 +1067,81 @@ namespace Extrinsic::Graphics
 
     std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled)
     {
+        struct ResourceDebugUse
+        {
+            std::uint32_t FirstWritePass = InvalidValidationIndex();
+            std::uint32_t LastReadPass = InvalidValidationIndex();
+            std::uint32_t ProducerCount = 0;
+            std::uint32_t ConsumerCount = 0;
+        };
+
+        std::vector<ResourceDebugUse> textureUses(compiled.TextureLifetimes.size());
+        std::vector<ResourceDebugUse> bufferUses(compiled.BufferLifetimes.size());
+        for (const std::uint32_t passIndex : compiled.TopologicalOrder)
+        {
+            if (passIndex >= compiled.PassDeclarations.size())
+            {
+                continue;
+            }
+
+            const CompiledPassDeclarations& declarations = compiled.PassDeclarations[passIndex];
+            for (const std::uint32_t textureIndex : declarations.WriteTextures)
+            {
+                if (textureIndex >= textureUses.size())
+                {
+                    continue;
+                }
+                ResourceDebugUse& use = textureUses[textureIndex];
+                if (use.FirstWritePass == InvalidValidationIndex())
+                {
+                    use.FirstWritePass = passIndex;
+                }
+                ++use.ProducerCount;
+            }
+            for (const std::uint32_t textureIndex : declarations.ReadTextures)
+            {
+                if (textureIndex >= textureUses.size())
+                {
+                    continue;
+                }
+                ResourceDebugUse& use = textureUses[textureIndex];
+                use.LastReadPass = passIndex;
+                ++use.ConsumerCount;
+            }
+            for (const std::uint32_t bufferIndex : declarations.WriteBuffers)
+            {
+                if (bufferIndex >= bufferUses.size())
+                {
+                    continue;
+                }
+                ResourceDebugUse& use = bufferUses[bufferIndex];
+                if (use.FirstWritePass == InvalidValidationIndex())
+                {
+                    use.FirstWritePass = passIndex;
+                }
+                ++use.ProducerCount;
+            }
+            for (const std::uint32_t bufferIndex : declarations.ReadBuffers)
+            {
+                if (bufferIndex >= bufferUses.size())
+                {
+                    continue;
+                }
+                ResourceDebugUse& use = bufferUses[bufferIndex];
+                use.LastReadPass = passIndex;
+                ++use.ConsumerCount;
+            }
+        }
+
+        auto writeOptionalPass = [](std::ostringstream& out, const std::uint32_t passIndex) {
+            if (passIndex == InvalidValidationIndex())
+            {
+                out << "none";
+                return;
+            }
+            out << passIndex;
+        };
+
         std::ostringstream out;
         out << "RenderGraph\n";
         out << "  pass_count=" << compiled.PassCount
@@ -895,25 +1156,93 @@ namespace Extrinsic::Graphics
         {
             const auto passIndex = compiled.TopologicalOrder[orderIndex];
             out << "    [" << orderIndex << "] pass=" << passIndex;
-            if (orderIndex < compiled.PassNames.size())
+            if (passIndex < compiled.PassNames.size())
             {
-                out << " name=\"" << compiled.PassNames[orderIndex] << '"';
+                out << " name=\"" << compiled.PassNames[passIndex] << '"';
             }
             if (passIndex < compiled.TopologicalLayerByPass.size())
             {
                 out << " layer=" << compiled.TopologicalLayerByPass[passIndex];
             }
+            if (passIndex < compiled.PassQueues.size())
+            {
+                out << " queue=" << ToString(compiled.PassQueues[passIndex]);
+            }
+            out << " side_effect=" << (BoolAt(compiled.PassSideEffects, passIndex) ? "true" : "false");
             out << '\n';
+
+            out << "      color_targets:";
+            bool wroteColorHeader = false;
+            for (const CompiledRenderPassAttachment& attachment : compiled.RenderPassAttachments)
+            {
+                if (attachment.PassIndex != passIndex || attachment.IsDepthAttachment)
+                {
+                    continue;
+                }
+                if (!wroteColorHeader)
+                {
+                    out << '\n';
+                    wroteColorHeader = true;
+                }
+                out << "        [" << attachment.AttachmentIndex << "] texture=" << attachment.ResourceIndex;
+                if (attachment.ResourceIndex < compiled.TextureNames.size() && !compiled.TextureNames[attachment.ResourceIndex].empty())
+                {
+                    out << " name=\"" << compiled.TextureNames[attachment.ResourceIndex] << '"';
+                }
+                out << " load=" << ToString(attachment.Load)
+                    << " store=" << ToString(attachment.Store)
+                    << " format=" << ToString(attachment.Format) << '\n';
+            }
+            if (!wroteColorHeader)
+            {
+                out << " none\n";
+            }
+
+            out << "      depth_target:";
+            bool wroteDepth = false;
+            for (const CompiledRenderPassAttachment& attachment : compiled.RenderPassAttachments)
+            {
+                if (attachment.PassIndex != passIndex || !attachment.IsDepthAttachment)
+                {
+                    continue;
+                }
+                wroteDepth = true;
+                out << " texture=" << attachment.ResourceIndex;
+                if (attachment.ResourceIndex < compiled.TextureNames.size() && !compiled.TextureNames[attachment.ResourceIndex].empty())
+                {
+                    out << " name=\"" << compiled.TextureNames[attachment.ResourceIndex] << '"';
+                }
+                out << " load=" << ToString(attachment.Load)
+                    << " store=" << ToString(attachment.Store)
+                    << " format=" << ToString(attachment.Format) << '\n';
+            }
+            if (!wroteDepth)
+            {
+                out << " none\n";
+            }
         }
 
         out << "  textures:\n";
         for (std::size_t index = 0; index < compiled.TextureLifetimes.size(); ++index)
         {
             const auto& lifetime = compiled.TextureLifetimes[index];
-            out << "    texture[" << index << "] used=" << (lifetime.HasUse ? "true" : "false");
+            out << "    texture[" << index << "]";
+            if (index < compiled.TextureNames.size() && !compiled.TextureNames[index].empty())
+            {
+                out << " name=\"" << compiled.TextureNames[index] << '"';
+            }
+            out << " used=" << (lifetime.HasUse ? "true" : "false")
+                << " imported=" << (BoolAt(compiled.TextureImported, static_cast<std::uint32_t>(index)) ? "true" : "false")
+                << " final_state=" << (index < compiled.TextureFinalStates.size() ? ToString(compiled.TextureFinalStates[index]) : "Unknown")
+                << " first_write_pass=";
+            writeOptionalPass(out, textureUses[index].FirstWritePass);
+            out << " last_read_pass=";
+            writeOptionalPass(out, textureUses[index].LastReadPass);
+            out << " producer_count=" << textureUses[index].ProducerCount
+                << " consumer_count=" << textureUses[index].ConsumerCount;
             if (lifetime.HasUse)
             {
-                out << " first=" << lifetime.FirstUsePass << " last=" << lifetime.LastUsePass;
+                out << " first_use_pass=" << lifetime.FirstUsePass << " last_use_pass=" << lifetime.LastUsePass;
             }
             out << '\n';
         }
@@ -922,10 +1251,23 @@ namespace Extrinsic::Graphics
         for (std::size_t index = 0; index < compiled.BufferLifetimes.size(); ++index)
         {
             const auto& lifetime = compiled.BufferLifetimes[index];
-            out << "    buffer[" << index << "] used=" << (lifetime.HasUse ? "true" : "false");
+            out << "    buffer[" << index << "]";
+            if (index < compiled.BufferNames.size() && !compiled.BufferNames[index].empty())
+            {
+                out << " name=\"" << compiled.BufferNames[index] << '"';
+            }
+            out << " used=" << (lifetime.HasUse ? "true" : "false")
+                << " imported=" << (BoolAt(compiled.BufferImported, static_cast<std::uint32_t>(index)) ? "true" : "false")
+                << " final_state=" << (index < compiled.BufferFinalStates.size() ? ToString(compiled.BufferFinalStates[index]) : "Unknown")
+                << " first_write_pass=";
+            writeOptionalPass(out, bufferUses[index].FirstWritePass);
+            out << " last_read_pass=";
+            writeOptionalPass(out, bufferUses[index].LastReadPass);
+            out << " producer_count=" << bufferUses[index].ProducerCount
+                << " consumer_count=" << bufferUses[index].ConsumerCount;
             if (lifetime.HasUse)
             {
-                out << " first=" << lifetime.FirstUsePass << " last=" << lifetime.LastUsePass;
+                out << " first_use_pass=" << lifetime.FirstUsePass << " last_use_pass=" << lifetime.LastUsePass;
             }
             out << '\n';
         }

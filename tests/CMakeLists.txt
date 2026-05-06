@@ -363,6 +363,7 @@ set(_graphics_renderer_cpu_unit_test_files
     Test.Graphics.ImGuiOverlaySystem.cpp
     Test.Graphics.MaterialSystem.cpp
     Test.Graphics.PostProcessSystem.cpp
+    Test.RenderGraphDebugDump.cpp
     Test.Graphics.SpatialDebugVisualizers.cpp
     Test.Graphics.VisualizationPackets.cpp
 )
