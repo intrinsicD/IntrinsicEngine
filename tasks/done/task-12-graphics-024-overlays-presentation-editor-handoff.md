@@ -5,7 +5,7 @@
 - Branch / PR: current branch / TBD
 - Completion date: 2026-05-02
 - Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
-- Follow-ups: implementation remains in `tasks/backlog/rendering/GRAPHICS-024-overlays-presentation-editor-handoff.md`.
+- Follow-ups: implementation remains in `tasks/active/GRAPHICS-024-overlays-presentation-editor-handoff.md`.
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict`.
 
 ---
@@ -16,7 +16,7 @@ Create a dedicated task for legacy overlay/presentation/editor-adjacent renderin
 
 Create:
 
-`tasks/backlog/rendering/GRAPHICS-024-overlays-presentation-editor-handoff.md`
+`tasks/active/GRAPHICS-024-overlays-presentation-editor-handoff.md`
 
 ## Goal
 
