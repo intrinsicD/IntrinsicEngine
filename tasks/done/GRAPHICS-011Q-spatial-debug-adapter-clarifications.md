@@ -1,11 +1,14 @@
 # GRAPHICS-011Q — Spatial debug adapter clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-06 after `GRAPHICS-010Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-06.
 - Branch: `claude/agentic-workflow-session-pmrBn`.
-- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after recording decisions and mirroring consequential notes into `docs/architecture/graphics.md` and `src/graphics/renderer/README.md`.
+- Implementation commit: `37df72b` (resolve decisions and sync architecture/renderer-README docs).
+- Task-state commit: pending retirement commit (this commit moves the file from `tasks/active/` to `tasks/done/`).
+- Resolution: decisions recorded below and consequential notes synced into the `Extrinsic.Graphics.SpatialDebugVisualizers` paragraph of `docs/architecture/graphics.md` and into the spatial-debug visualizer bullet of `src/graphics/renderer/README.md`. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (186 relative links, no broken links).
 
 ## Decisions
 - **Concrete adapter ownership.** Concrete adapters that translate
