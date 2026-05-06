@@ -1,12 +1,14 @@
 # GRAPHICS-013AQ — Postprocess backend clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-06 after `GRAPHICS-012Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-06.
 - Branch: `claude/setup-agentic-workflow-3OTyj`.
-- Implementation commit: pending local agent workflow handoff.
-- Task-state commit: pending local agent workflow handoff.
+- Implementation commit: `5e0b97c` (resolve decisions and sync rendering-three-pass / graphics / renderer-README docs).
+- Task-state commit: pending retirement commit (this commit moves the file from `tasks/active/` to `tasks/done/`).
+- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/rendering-three-pass.md` (postprocess chain contract block), `docs/architecture/graphics.md` (`PostProcessSystem` ownership bullet in the GPU scene ownership block), and `src/graphics/renderer/README.md` (matching ownership-contract bullet next to the existing `PostProcessSystem` line). The rendering backlog README entry for `GRAPHICS-013AQ` is redirected to the `tasks/done/` location by this retirement commit. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (187 relative links, no broken links).
 
 ## Decisions
 - **Bloom backend shape and scratch policy.** Bloom uses a single
