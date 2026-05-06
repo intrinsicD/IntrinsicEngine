@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3 parameterization complete; Slice 4 re-layering next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3 parameterization complete; Slice 4a CPU-only selection re-layering complete; remaining Slice 4 graphics contract audit next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -174,6 +174,14 @@ Progress notes:
   preserve case count while reducing duplicated setup. No code change was made
   for this audit, matching the task constraint to convert only obvious
   duplicates and avoid inventing coverage.
+- 2026-05-06: Slice 4a moved the CPU-only selection mode suite from
+  `tests/integration/runtime/Test_RuntimeSelection_Multi.cpp` to
+  `tests/contract/runtime/Test.RuntimeSelectionModes.cpp` and registered it via
+  `IntrinsicRuntimeSelectionContractTests` with `contract;runtime;ecs` labels.
+  The file was already parameterized in Slice 3a; this sub-slice only changes
+  ownership/executable routing. The slow Vulkan-labeled `IntrinsicRuntimeTests`
+  executable still keeps the broader `Test_RuntimeSelection.cpp` CPU/GPU pick
+  integration contracts as the remaining runtime selection smoke/coverage.
 
 ## Required changes
 
