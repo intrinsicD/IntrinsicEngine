@@ -136,7 +136,22 @@ is retained only as a temporary string compatibility shim; removal is tracked by
 - Transient debug packets are frame-local runtime submissions, not persistent
   editor overlay entities. The renderer rejects non-finite coordinates/colors,
   clamps line widths to `[0.5, 32]`, clamps point radii to `[0.0001, 1]`, and
-  reports rejected records through `InvalidSnapshotRecordCount`.
+  reports rejected records through `InvalidSnapshotRecordCount`. Concrete
+  backend expansion of `DebugLinePacket`/`DebugPointPacket`/`DebugTrianglePacket`
+  spans goes through dedicated per-frame host-visible (transient) GPU buffers
+  owned by a future backend upload helper, never through `GpuWorld` or the
+  canonical `CullingPass` buckets. Debug triangles are routed through a
+  dedicated debug-surface overlay drawn into `SceneColorHDR`/`SceneDepth`
+  after the lit composition (next to `Pass.Forward.Line` / `Pass.Forward.Point`),
+  not through `Pass.Forward.Surface` or `Pass.Deferred.GBuffers`. The per-packet
+  `DepthTested` field is expressed as two pipeline variants per primitive lane,
+  not as separate cull buckets or frame-graph resources, and
+  `InvalidSnapshotRecordCount` remains the only CPU diagnostic surface for
+  malformed transient records (mirroring the `GRAPHICS-007Q`/`GRAPHICS-008Q`
+  diagnostics stance). Concrete upload-helper sizing, the
+  `TransientDebugUploadDiagnostics` field, and the numbered pipeline-order step
+  for the debug-surface overlay are tracked under `GRAPHICS-018` Vulkan
+  integration scope.
 - `Graphics.SpatialDebugVisualizers` is a CPU-only packet builder layer for
   spatial debug views. It consumes data-only bounds, hierarchy-node,
   split-plane, convex-hull edge, and point-marker snapshots and produces owned
@@ -153,7 +168,9 @@ is retained only as a temporary string compatibility shim; removal is tracked by
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
   `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /
-  `Cull.Points.Count`.
+  `Cull.Points.Count`. These cull-bucket resources stay reserved for retained
+  `GpuRender_Line`/`GpuRender_Point` renderables and are not the transient
+  debug expansion path.
 - `PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain settings,
   deterministic stage description, sanitized diagnostics, and push-constant
   packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. Frame
