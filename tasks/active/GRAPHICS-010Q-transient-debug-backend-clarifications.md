@@ -1,5 +1,13 @@
 # GRAPHICS-010Q — Transient debug backend clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-06 after `GRAPHICS-009Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-Q4y6S`.
+- Implementation commit: pending local agent workflow handoff.
+- Task-state commit: pending local agent workflow handoff.
+
 ## Goal
 - Clarify backend/runtime handoff decisions for expanding `GRAPHICS-010` transient debug line/point/triangle packets into concrete GPU buffers and draw calls.
 
