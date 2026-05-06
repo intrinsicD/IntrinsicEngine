@@ -302,3 +302,12 @@ the new matrix:
    implementation, each conforming to `docs/agent/task-format.md`).
 
 Each slice runs the verification commands above before merge.
+
+## Slice progress
+
+- 2026-05-06: Slice A complete. Added the overlay/presentation/editor handoff
+  inventory and packet sketches to `docs/migration/nonlegacy-parity-matrix.md`
+  and documented runtime-owned overlay handoff responsibilities in
+  `docs/architecture/runtime-subsystem-boundaries.md`. Verification run:
+  `python3 tools/agents/check_task_policy.py --root . --strict` and
+  `python3 tools/docs/check_doc_links.py --root . --strict`.

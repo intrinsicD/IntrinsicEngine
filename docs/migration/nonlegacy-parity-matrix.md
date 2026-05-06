@@ -35,6 +35,67 @@ claim that legacy retirement is complete.
 | `runtime` | `Extrinsic.Runtime.Engine`<br>`Extrinsic.Runtime.FrameClock`<br>`Extrinsic.Runtime.FrameLoop`<br>`Extrinsic.Runtime.RenderExtraction`<br>`Extrinsic.Runtime.StreamingExecutor` | `Runtime.Engine`, `Runtime.FrameLoop`, `Runtime.GraphicsBackend`, `Runtime.RenderExtraction`, `Runtime.RenderOrchestrator`, `Runtime.ResourceMaintenance`, `Runtime.AssetIngestService`, `Runtime.SceneManager`, `Runtime.SceneSerializer`, `Runtime.Selection`, `Runtime.SelectionModule`, `Runtime.SystemBundles`, `Runtime.PointCloudKMeans`. | Composition root, frame clock, fixed-step/variable-tick frame loop, subsystem wiring, CPU frame graph, render frame orchestration, runtime-owned ECS-to-graphics transform/light/visualization extraction sidecars, and persistent streaming executor are promoted. Scene manager/serialization, selection module behavior, legacy system bundles, asset ingest service, runtime K-means helper, graphics backend selection policy, and full mesh/graph/point-cloud extraction parity require explicit promoted owners/tests. | Unit tests for frame clock/config/maintenance lane/streaming executor. Contract tests for runtime composition, layering, and validation. Integration tests for headless engine startup/shutdown, fixed-step scheduling, asset streaming, render extraction through null renderer, resize/minimized paths, and scene/selection behavior once promoted. | Legacy runtime modules remain until selection, scene serialization/manager, asset ingest, system bundles, full render extraction/lifecycle coverage, and render orchestration are either implemented as promoted runtime APIs with tests or formally retired. |
 | `app` | `Extrinsic.Sandbox` | Legacy executable/editor/UI entry points such as `Runtime.EditorUI`, `Interface`, `Interface:GUI`, and app-level use of legacy runtime/graphics modules. | Sandbox is the promoted reference app entry point. Editor UI panels, GUI contract wiring, richer sample scenes, command-line/headless modes, and app-level selection/debug workflows remain unproven as non-legacy behavior. | Integration smoke tests for headless app startup, runtime lifecycle, and sandbox configuration. Contract/UI tests for panel registration and app-to-runtime-only dependency direction before replacing legacy editor/interface modules. | App legacy/UI modules remain until sandbox or a promoted app/editor layer owns UI workflows and validates them without back-importing app types into engine layers. |
 
+## Overlay/presentation/editor handoff inventory (`GRAPHICS-024` Slice A)
+
+This matrix records the owner decisions for the legacy overlay and presentation
+behaviors that are adjacent to the promoted renderer. It is planning-only: no
+legacy implementation is copied, and no promoted C++ API is introduced here.
+Runtime/editor/app owns mutation and ECS lifetime decisions; graphics owns only
+immutable packet consumption, GPU translation, render-graph finalization, and
+structured diagnostics; platform owns window/input/swapchain host state.
+
+| Legacy module path | Behavior summary | Promoted owner | Promoted module/path | Snapshot/packet hand-off shape | Retirement gate | Open questions / follow-up |
+|---|---|---|---|---|---|---|
+| `src/legacy/Graphics/Graphics.OverlayEntityFactory.cppm` / `.cpp` | Creates selectable mesh, point-cloud, and graph child overlay entities, attaches hierarchy, seeds dirty state, assigns pick IDs, and destroys overlays. | `runtime/editor/app` | Proposed runtime/editor overlay producer feeding `src/runtime/Runtime.RenderExtraction.cppm`; graphics consumption remains through `src/graphics/renderer/Graphics.VisualizationPackets.cppm` and primitive snapshot seams. | `OverlayLineSnapshot`, `OverlayPointSnapshot`, optional `OverlayTriangleSnapshot`, and `OverlayVectorFieldSnapshot`; persistent ECS/entity mutation stays outside graphics. | `GRAPHICS-020` overlay-entity-factory row. | `GRAPHICS-014Q` clarifies visualization producers/upload; `GRAPHICS-017Q` clarifies editor interaction producers; `GRAPHICS-020` verifies legacy retirement mapping. |
+| `src/legacy/Graphics/Graphics.OverlayEntityFactory.cpp` | Immediately uploads mesh overlay triangle geometry and stores a graphics geometry handle on the child surface component. | Split: `runtime/editor/app` owns overlay creation and authoritative geometry references; `graphics` owns GPU upload/descriptors from extracted handles or packets. | Runtime extraction sidecars plus graphics geometry/visualization upload systems; no canonical ECS component should store graphics-owned GPU handles. | Overlay snapshots carry source geometry/attribute references, dirty-domain stamps, and selection flags; graphics translates to geometry GPU views/buckets and reports invalid packets. | `GRAPHICS-020` overlay GPU-upload row. | `GRAPHICS-014Q` owns backend upload strategy; `GRAPHICS-010Q` owns transient primitive backend expansion when non-persistent debug packets are used instead of ECS overlays. |
+| `src/legacy/Graphics/Graphics.OverlayEntityFactory.cpp` | Maintains overlay dirty/topology/attribute state through ECS dirty tags and `GpuDirty` flags. | `runtime/editor/app` | Runtime/editor overlay mutation policy plus `src/runtime/Runtime.RenderExtraction.cppm` snapshot stamping. | Dirty-domain stamp in each overlay snapshot; topology and attribute stamps are monotonic and extracted deterministically. | `GRAPHICS-020` overlay dirty-state row. | `GRAPHICS-014Q` decides producer-side filtering vs diagnostics for invalid visualization data. |
+| `src/legacy/Graphics/Graphics.OverlayEntityFactory.cpp` | Gives overlays independent selection participation through `SelectableTag` and `PickID`. | Split: `runtime/editor/app` owns selection state and pick-ID allocation; `graphics` owns selection-bucket/outline eligibility from immutable packets. | Runtime selection/extraction plus `src/graphics/renderer/Graphics.SelectionSystem.*` and selection pass modules. | `SelectionSnapshot` plus overlay snapshot `selection-outline eligibility` flags; graphics mirrors accepted surface/line/point overlays into selection lanes. | `GRAPHICS-020` overlay selection-outline row. | `GRAPHICS-017Q` owns editor interaction and pick-request scheduling; no graphics-side editor mutation. |
+| `src/legacy/Graphics/Graphics.OverlayEntityFactory.cpp` | Detaches and destroys overlay children, including vector-field child overlays, to avoid stale GPU references. | `runtime/editor/app` | Runtime scene/overlay lifecycle maintenance before extraction. | `OverlayVectorFieldSnapshot` includes parent reference and child-overlay invariants stamp; destruction closure is resolved before graphics sees the frame. | `GRAPHICS-020` overlay destruction row. | Follow-up implementation must preserve `docs/architecture/vectorfield-overlay-lifecycle-invariants.md` invariant C. |
+| `src/legacy/Graphics/Graphics.Presentation.cppm` / `.cpp` | Wraps begin/end frame, frame/image index, backbuffer accessors, depth-buffer resize lifetime, and resize notification. | Split: `platform` owns window/swapchain host state; `graphics/rhi` exposes backend frame/backbuffer handles; `runtime` sequences acquire/render/present; `graphics/renderer` owns finalizer pass declaration only. | `src/platform/*`, `src/graphics/rhi/*`, runtime frame coordination, and `src/graphics/renderer/Pass.Present.*`. | `PresentSnapshot` with presentation source (`SceneColorLDR` by default), backbuffer state expectations, and optional ImGui-overlay attachment flag. | `GRAPHICS-020` presentation-system row. | `GRAPHICS-013CQ` clarifies concrete backend/runtime present policy and resize/acquire timing. |
+| `src/legacy/Graphics/Passes/Graphics.Passes.Composition.cppm` / `.cpp` | Resolves deferred G-buffer resources into `SceneColorHDR` and no-ops for forward lighting. | `graphics` | Promoted deferred composition contract in `src/graphics/renderer/Pass.Composition.*` / `DeferredSystem` and recipe-driven frame graph. | Existing frame-recipe resources (`SceneNormal`, `Albedo`, `Material0`, `SceneDepth`, `SceneColorHDR`); no new overlay packet required. | `GRAPHICS-020` composition-pass row. | No new follow-up needed for ownership; backend parity remains part of render-graph/pass retirement evidence. |
+| `src/legacy/Graphics/Passes/Graphics.Passes.Composition.cpp` plus presentation handoff | Final `SceneColorLDR -> Backbuffer` finalization and ImGui overlay adjacency. | `graphics` for finalizer pass and ImGui draw-data summary consumption; `runtime + platform` for ImGui platform/window glue and concrete draw-data production. | `src/graphics/renderer/Graphics.ImGuiOverlaySystem.*`, `Pass.ImGui.*`, `Pass.Present.*`, runtime/editor ImGui translator, and platform backends. | `PresentSnapshot` plus renderer-owned `ImGuiOverlayFrame` summaries; graphics never imports Dear ImGui platform/window state. | `GRAPHICS-020` ImGui/present adjacency row. | `GRAPHICS-013CQ` owns backend descriptor/upload/finalization details. |
+| Legacy editor/interface callers of overlay and presentation modules | Translates input, camera, gizmo, and UI intent into overlay mutation or render packets. | `runtime/editor/app` | Runtime/editor producers and `app` entry points; graphics consumes data-only camera, gizmo, debug, visualization, ImGui, and present packets. | Camera/pick/gizmo snapshots from `GRAPHICS-017`, debug primitive snapshots from `GRAPHICS-010`, visualization snapshots from `GRAPHICS-014`, and `PresentSnapshot`. | `GRAPHICS-020` editor-handoff row. | `GRAPHICS-017Q` owns camera/gizmo mutation policy; `GRAPHICS-024` Slice B cross-links done tasks without changing their acceptance state. |
+
+### Overlay snapshot/packet sketches
+
+These names are planning sketches for follow-up tasks; they do not define public
+C++ API in this slice. All records are immutable for the graphics frame that
+consumes them, and graphics reports malformed packet counts through structured
+diagnostics rather than querying live ECS/editor state.
+
+- `OverlayLineSnapshot`: stable overlay key, optional parent key, object-space
+  endpoints or source edge span reference, color, width, depth/z-bias hint,
+  selection-outline eligibility, topology dirty-domain stamp, and attribute
+  dirty-domain stamp. Runtime/editor/app owns mutation and stamp monotonicity;
+  graphics owns line-bucket translation and width/finite-value validation.
+- `OverlayPointSnapshot`: stable overlay key, optional parent key, positions,
+  radii, colors, depth/z-bias hint, selection-outline eligibility, and
+  dirty-domain stamps for position/topology and attributes. Runtime/editor/app
+  owns point-cloud/sphere-point semantics; graphics owns point-bucket expansion
+  and diagnostics for invalid radii or resources.
+- `OverlayTriangleSnapshot` (optional): stable overlay key, triangle positions or
+  promoted geometry-view reference, color/material hint, depth mode,
+  selection-outline eligibility, and dirty-domain stamps. Use only when a
+  persistent overlay needs surface-domain rendering; transient debug triangles
+  should continue through the `GRAPHICS-010` debug primitive path unless a
+  follow-up task chooses otherwise.
+- `OverlayVectorFieldSnapshot`: stable overlay key, parent reference, sample
+  positions, vectors, scale/color parameters, child-overlay invariants stamp,
+  and dirty-domain stamps. Runtime/editor/app must resolve parent/child
+  destruction closure before extraction; graphics owns glyph/vector packet
+  validation and upload decisions.
+- `PresentSnapshot`: presentation source resource name (`SceneColorLDR` by
+  default), imported-backbuffer state expectation, frame/image identifiers when
+  supplied by runtime/backend, and optional ImGui-overlay attachment flag.
+  Runtime/platform/backend own acquire, resize, and present sequencing; graphics
+  owns the single finalizer pass that consumes the imported `Backbuffer`.
+
+The sketches preserve the five vector-field/overlay lifecycle invariants:
+authoritative geometry stays in runtime/editor/app-owned data, dirty-domain
+stamps are monotonic, parent/child closure is complete before extraction,
+selection-outline eligibility is explicit for all overlay primitive classes, and
+deterministic stable keys make extraction order independent of ECS iteration.
+
 ## CI/check script decision
 
 No new CI/check script is added by this task. The requested matrix is a static

@@ -99,6 +99,34 @@ Engine
 - **Borrows:** device, swapchain, renderer, bindless, descriptor pool/layout, texture system, and asset manager.
 - **Does not own:** the window, swapchain recreation policy outside its resize entrypoint, scene registry, or asset ingestion queues.
 
+#### Runtime-owned overlay and presentation handoff responsibilities (`GRAPHICS-024`)
+
+`GRAPHICS-024` assigns legacy overlay factory, presentation-adjacent, and
+editor-handoff behavior without moving editor mutation or platform ownership into
+graphics:
+
+- **Runtime/editor/app owns:** persistent overlay entity creation, overlay
+  topology/attribute mutation, dirty-domain stamp monotonicity, parent/child
+  overlay destruction closure, selection/pick-ID state, camera/gizmo/input
+  mutation, and concrete ImGui draw-data production.
+- **Runtime extraction owns:** conversion from current ECS/editor state into
+  immutable overlay, visualization, camera/pick/gizmo, debug, ImGui, and
+  present snapshots before renderer submission. Extraction must preserve stable
+  ordering keys so graphics sees deterministic packet spans rather than live ECS
+  views.
+- **Graphics owns:** packet validation, GPU upload/descriptor translation,
+  render-graph pass scheduling, selection-outline lane participation from packet
+  flags, ImGui draw-data summary consumption, and the single present finalizer
+  pass that consumes the imported `Backbuffer`.
+- **Platform/backends own:** window/input polling, platform ImGui backend glue,
+  swapchain surface lifetime, acquire/present timing, and resize recreation
+  policy; `src/graphics/renderer` must not import platform/window state.
+
+The current planning inventory lives in
+`docs/migration/nonlegacy-parity-matrix.md` under the `GRAPHICS-024` Slice A
+handoff matrix. Implementation follow-ups must keep the five invariants in
+`docs/architecture/vectorfield-overlay-lifecycle-invariants.md` intact.
+
 ---
 
 ## 2. Current Inter-Subsystem Dependency Directions
