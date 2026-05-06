@@ -1,10 +1,10 @@
 # GRAPHICS-022 — Rendergraph diagnostics and validation
 
-- Status: in-progress (Slice A implemented; Slice B debug dump expansion pending)
+- Status: in-progress (Slices A/B implemented; Slice C recipe-aware helper and docs pending)
 - Owner / agent: graphics — `src/graphics/framegraph` + `src/graphics/renderer`
 - Branch: `claude/plan-rendering-tasks-ORYwq` (planning); implementation lands on a follow-up branch.
 - PR: TBD.
-- Next verification step: for Slice B, extend `BuildRenderGraphDebugDump`, add `Test.RenderGraphDebugDump.cpp`, regenerate inventories if the module surface changes, then run the task verification commands below.
+- Next verification step: for Slice C, add the recipe-aware validation helper, compile-side structured findings, docs updates, and run the task verification commands below.
 
 ## Goal
 
@@ -273,6 +273,12 @@ Under `tests/contract/graphics/`:
   validation, and `tests/contract/graphics/Test.RenderGraphValidation.cpp`.
   Focused `RenderGraphValidation` CTest coverage passes. Remaining work stays
   scoped to Slice B/C below.
+- 2026-05-06: Slice B expanded `BuildRenderGraphDebugDump` with stable pass
+  queue/side-effect, render-pass attachment, and per-resource
+  producer/consumer metadata. Added
+  `tests/unit/graphics/Test.RenderGraphDebugDump.cpp` golden coverage and
+  refreshed `docs/api/generated/module_inventory.md`. Remaining work stays
+  scoped to Slice C below.
 
 ## Verification
 
@@ -314,7 +320,7 @@ Land in three small PRs to keep mechanical and semantic edits separated:
    `ImportedResourceAuthorization`, and `ValidateCompiledGraph(...)`. Add
    `Test.RenderGraphValidation.cpp` covering the codes that can be exercised
    on a hand-built `CompiledRenderGraph` fixture.
-2. **Slice B — debug dump expansion + golden tests.** Extend
+2. **Slice B — complete.** Debug dump expansion + golden tests. Extend
    `BuildRenderGraphDebugDump` and add `Test.RenderGraphDebugDump.cpp`. Pin
    the new format with golden assertions. Update
    `Test_RenderGraphPackets.cpp` golden strings if needed.
