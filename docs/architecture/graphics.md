@@ -158,10 +158,17 @@ Graphics is organized into explicit sublayers:
   user-selectable visualization-mode field and
   `DebugViewPushConstants` keeps its existing four-`uint32` packing.
   Concrete `VkDescriptorSetLayout` definitions and per-aspect view
-  creation (color view, depth-aspect-only view, integer-typed view for
-  `R32_UINT` selection-ID and material-ID resources) remain
-  backend-local under `src/graphics/vulkan` and never leak through RHI
-  or renderer module surfaces. Runtime/editor code owns the dictionary
+  creation (color view for `RGBA8_UNORM`/`RGBA16_FLOAT` resources,
+  depth-aspect-only view for depth-class resources, integer-typed view
+  for the `R32_UINT` selection-ID resources `EntityId`/`PrimitiveId`)
+  remain backend-local under `src/graphics/vulkan` and never leak
+  through RHI or renderer module surfaces. `Material0` is
+  `RGBA16_FLOAT` carrying scalar PBR channels (roughness in R,
+  metallic in G, reserved in B/A) and is visualized as a scalar
+  channel false-color preview rather than as an integer slot-ID
+  hash; `DebugViewRGBA` is the pass color attachment and is
+  deliberately non-selectable as a preview input by
+  `DebugViewSystem::BuildInspectionTable()` to prevent self-sampling. Runtime/editor code owns the dictionary
   that maps human-readable UI strings to canonical
   `FrameRecipeIntrospection::Resources[i].Name` keys using the rows
   exposed by `DebugViewSystem::BuildInspectionTable()`, then calls

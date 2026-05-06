@@ -217,21 +217,30 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   enabled previewable texture/depth resources, reports missing/disabled/buffer
   selections through deterministic diagnostics, and falls back to the current
   presentation source without platform/window ownership. Per `GRAPHICS-013BQ`,
-  no retained graphics-owned debug-view textures or buffers exist; `DebugViewRGBA`
-  is a frame-recipe transient owned by the framegraph, and `Pass.DebugView` owns
-  one pass-local descriptor set with exactly two bindings (sampled image view of
-  the resolved selection + linear-clamp sampler), with concrete
-  `VkDescriptorSetLayout` definitions and per-aspect view creation (color view,
-  depth-aspect-only view, integer-typed view for `R32_UINT` selection-ID /
-  material-ID resources) remaining backend-local under `src/graphics/vulkan`.
-  Visualization mode is derived deterministically from
-  `FrameRecipeResourceKind` plus `DebugViewResourceClass` (LDR color blit for
-  `SceneColorLDR`/`DebugViewRGBA`, Reinhard tonemap for `SceneColorHDR`, depth
-  linearize-to-grayscale for `SceneDepth`/`ShadowAtlas`, world-space normal
-  for `SceneNormal`, integer-hash to color for `EntityId`/`PrimitiveId`/`Material0`
-  with a different salt for material slots, direct color for `Albedo`), so
-  `DebugViewSettings` does not gain a user-selectable visualization-mode field
-  and `DebugViewPushConstants` keeps its existing four-`uint32` packing.
+  no retained graphics-owned debug-view textures or buffers exist;
+  `DebugViewRGBA` is a frame-recipe transient owned by the framegraph and is
+  deliberately non-selectable as a preview input
+  (`DebugViewSystem::BuildInspectionTable()` excludes
+  `FrameRecipeResourceKind::DebugViewRGBA` from `Previewable` to prevent
+  self-sampling). `Pass.DebugView` owns one pass-local descriptor set with
+  exactly two bindings (sampled image view of the resolved selection +
+  linear-clamp sampler), with concrete `VkDescriptorSetLayout` definitions and
+  per-aspect view creation (color view for `RGBA8_UNORM`/`RGBA16_FLOAT`
+  resources, depth-aspect-only view for depth-class resources, integer-typed
+  view for the `R32_UINT` selection-ID resources `EntityId`/`PrimitiveId`)
+  remaining backend-local under `src/graphics/vulkan`. Visualization mode is
+  derived deterministically from `FrameRecipeResourceKind` plus
+  `DebugViewResourceClass`: direct LDR color blit for `SceneColorLDR`,
+  Reinhard tonemap for `SceneColorHDR`, depth-linearize-to-grayscale for
+  `SceneDepth`/`ShadowAtlas`, world-space normal for `SceneNormal`,
+  integer-hash to color for `EntityId`/`PrimitiveId` (`PrimitiveId` decoded
+  via `EncodedSelectionId`), direct color for `Albedo`, and scalar
+  channel false-color (roughness -> R, metallic -> G, blue zeroed) for
+  `Material0` per the `surface_gbuffer.frag` G-buffer contract — `Material0`
+  is **not** an integer slot-ID resource and never uses the integer-hash
+  path. `DebugViewSettings` does not gain a user-selectable visualization-mode
+  field, and `DebugViewPushConstants` keeps its existing four-`uint32`
+  packing.
   Runtime/editor code owns the dictionary that maps UI display strings to
   canonical `FrameRecipeIntrospection::Resources[i].Name` keys using the rows
   exposed by `DebugViewSystem::BuildInspectionTable()`, then writes the canonical

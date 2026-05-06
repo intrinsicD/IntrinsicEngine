@@ -17,35 +17,49 @@
   user-selectable visualization-mode field is added to
   `DebugViewSettings`, and `DebugViewPushConstants` keeps its existing
   four-`uint32` packing (`ResourceKind`, `ResourceClass`,
-  `UsedFallback`, `Reserved`). The mapping is: `SceneColorLDR` and
-  `DebugViewRGBA` previews use a direct LDR color blit; `SceneColorHDR`
-  uses a backend-local Reinhard tone-mapped color preview (no
-  commitment to the postprocess chain); `SceneDepth` and other
-  depth-class textures linearize via the existing `CameraUBO` near/far
-  and emit a grayscale ramp; `SceneNormal` uses world-space normal
-  visualization (`* 0.5 + 0.5`); `EntityId`/`PrimitiveId` (`R32_UINT`)
-  use a deterministic 32-bit integer hash to color, with `PrimitiveId`
-  first decoded through the existing `EncodedSelectionId` helper so the
-  high 4 bits (`SelectionPrimitiveDomain`) modulate hue and the low 28
-  bits drive the hash; `Albedo` uses direct color; `Material0` uses the
-  same integer-ID hash family as `EntityId` with a different salt so
-  material-slot IDs and entity IDs do not collide visually;
-  `ShadowAtlas` uses depth-aspect linearization to grayscale at a
-  backend-fixed shadow projection. Future user-selectable overrides
-  (e.g., manual mode, channel masks, false-color ramps) are explicit
-  follow-ups and must extend `DebugViewSettings`/`DebugViewPushConstants`
-  through their own task with budget justification.
+  `UsedFallback`, `Reserved`). The mapping is: `SceneColorLDR`
+  (`RGBA8_UNORM`) uses a direct LDR color blit; `SceneColorHDR`
+  (`RGBA16_FLOAT`) uses a backend-local Reinhard tone-mapped color
+  preview (no commitment to the postprocess chain); `SceneDepth` and
+  other depth-class textures linearize via the existing `CameraUBO`
+  near/far and emit a grayscale ramp; `SceneNormal` (`RGBA16_FLOAT`)
+  uses world-space normal visualization (`* 0.5 + 0.5`);
+  `EntityId`/`PrimitiveId` (`R32_UINT`) use a deterministic 32-bit
+  integer hash to color, with `PrimitiveId` first decoded through the
+  existing `EncodedSelectionId` helper so the high 4 bits
+  (`SelectionPrimitiveDomain`) modulate hue and the low 28 bits drive
+  the hash; `Albedo` (`RGBA8_UNORM`) uses direct color; `Material0`
+  (`RGBA16_FLOAT`, scalar PBR channels per `surface_gbuffer.frag`:
+  roughness in R, metallic in G, reserved in B/A) uses a scalar
+  channel false-color visualization (roughness routed to the red
+  channel, metallic routed to the green channel, blue zeroed) — it is
+  **not** an integer slot-ID resource and never uses the integer-hash
+  path. Adding a separate material-slot-ID render target later is a
+  distinct follow-up that would introduce its own `R32_UINT` resource
+  and integer-hash mapping; `ShadowAtlas` uses depth-aspect
+  linearization to grayscale at a backend-fixed shadow projection.
+  `DebugViewRGBA` is the `Pass.DebugView` color attachment and is
+  **non-selectable** as a preview input — `DebugViewSystem::BuildInspectionTable()`
+  already gates `Previewable` on
+  `resource.Kind != FrameRecipeResourceKind::DebugViewRGBA`, so the
+  visualization-mode mapping has no `DebugViewRGBA` entry and backends
+  must not invent a `DebugViewRGBA` blit/self-preview mode that would
+  bypass that aliasing gate. Future user-selectable overrides (e.g.,
+  manual mode, channel masks, false-color ramps) are explicit
+  follow-ups and must extend
+  `DebugViewSettings`/`DebugViewPushConstants` through their own task
+  with budget justification.
 - **Descriptor binding ownership.** `Pass.DebugView` owns one
   pass-local descriptor set with exactly two bindings: (b0) a sampled
   image view of the resolved selection's texture/depth resource and
   (b1) a single linear-clamp sampler, mirroring the postprocess pattern
   of one push-constant block plus one pass-local descriptor set.
   Concrete `VkDescriptorSetLayout` definitions, per-aspect view
-  creation (color view, depth-aspect-only view for depth-class
-  resources, integer-typed view for `R32_UINT` selection-ID and
-  material-ID resources), and sampler creation remain backend-local
-  under `src/graphics/vulkan` and never leak through RHI or renderer
-  module surfaces. `DebugViewRGBA` is the pass color attachment, owned
+  creation (color view for `RGBA8_UNORM`/`RGBA16_FLOAT` resources,
+  depth-aspect-only view for depth-class resources, integer-typed
+  view for `R32_UINT` selection-ID resources `EntityId`/`PrimitiveId`),
+  and sampler creation remain backend-local under `src/graphics/vulkan`
+  and never leak through RHI or renderer module surfaces. `DebugViewRGBA` is the pass color attachment, owned
   by the framegraph through the frame-recipe resource map, and is not
   part of the descriptor set. Aliasing protection relies on the
   existing exclusion of `DebugViewRGBA` from the previewable inspection
