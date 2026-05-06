@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator headless fixture complete; broader Slice 2 engine/Vulkan fixtures next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2a/2b shared Runtime RHI groundwork complete; Slice 2c RenderOrchestrator and Slice 2d HeadlessEngine fixtures complete; broader Slice 2 engine/Vulkan fixtures next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -131,6 +131,16 @@ Progress notes:
   `build/ci` tree passed the grouped RenderOrchestrator CTest entry (1 test),
   the direct `IntrinsicRuntimeTests` filter for all 8 RenderOrchestrator cases,
   the default CPU-supported gate (1,590 tests), and PR-fast (1,584 tests).
+- 2026-05-06: Slice 2d completed by migrating `HeadlessEngineTest` in
+  `tests/integration/runtime/Test_HeadlessEngine.cpp` to borrow
+  `RuntimeRhiTestEnvironment`, while keeping scene manager, transfer manager,
+  descriptor resources, asset pipeline, and frame scope local per test. Added
+  `IntrinsicRuntimeTests.HeadlessEngineGrouped` so all six HeadlessEngine cases
+  can run in one `IntrinsicRuntimeTests` process while individual CTest cases
+  remain registered. Local verification on the configured `build/ci` tree passed
+  the grouped HeadlessEngine entry (1 test), grouped-plus-individual
+  HeadlessEngine coverage (7 CTest entries), the default CPU-supported gate
+  (1,590 tests), and PR-fast (1,584 tests).
 
 ## Required changes
 

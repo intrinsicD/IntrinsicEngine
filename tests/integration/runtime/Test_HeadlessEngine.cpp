@@ -16,6 +16,8 @@ import RHI;
 import Core;
 import ECS;
 
+#include "RuntimeRhiTestEnvironment.hpp"
+
 // ===========================================================================
 // Headless Engine Smoke Test
 //
@@ -71,13 +73,12 @@ protected:
         m_SceneManager = std::make_unique<Runtime::SceneManager>();
 
         // 2. Headless Vulkan (replaces Window + GraphicsBackend surface path)
-        RHI::ContextConfig ctxConfig{
-            .AppName = "HeadlessEngineTest",
-            .EnableValidation = true,
-            .Headless = true,
-        };
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        auto& environment = Intrinsic::Tests::RuntimeRhiTestEnvironment::Get();
+        if (const ::testing::AssertionResult available = environment.CheckAvailable(); !available)
+        {
+            GTEST_SKIP() << available.message();
+        }
+        m_Device = environment.Device();
 
         // 3. GPU infrastructure that GraphicsBackend normally owns
         m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
@@ -135,13 +136,11 @@ protected:
         if (m_Device)
             m_Device->FlushAllDeletionQueues();
         m_Device.reset();
-        m_Context.reset();
     }
 
     // --- Subsystems ---
     std::unique_ptr<Runtime::SceneManager> m_SceneManager;
 
-    std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<RHI::TransferManager> m_TransferManager;
     std::unique_ptr<RHI::BindlessDescriptorSystem> m_Bindless;
