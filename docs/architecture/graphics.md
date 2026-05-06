@@ -107,7 +107,54 @@ Graphics is organized into explicit sublayers:
   The packet layer validates domains, ranges, colormap IDs, buffer-address seams,
   missing texcoords/resources, and Htex recreation requests without importing
   geometry algorithms, ECS ownership, or texture residency. Htex/UV atlas texture
-  allocation remains deferred to graphics asset/residency work.
+  allocation remains deferred to graphics asset/residency work. Per
+  `GRAPHICS-014Q`, runtime extraction (`Extrinsic.Runtime.RenderExtraction`) is
+  the sole owner of translating PropertySet attributes, KMeans labels, isoline
+  results, vector fields, and Htex metadata into the `RuntimeRenderSnapshotBatch`
+  visualization packet spans; concrete producer adapters live under a planned
+  `Extrinsic.Runtime.VisualizationAdapters` umbrella mirroring the
+  `Extrinsic.Runtime.SpatialDebugAdapters` pattern from `GRAPHICS-011Q`, and
+  graphics never imports geometry algorithm modules or live ECS ownership.
+  Editor/app code provides user-facing surfaces (selected attribute, colormap,
+  range, isoline parameters, vector-field scale/color, Htex regeneration
+  request) but funnels them into the runtime adapter as pre-filter inputs.
+  Runtime/extraction performs no packet filtering; validation is centralized
+  in graphics through `ValidateVisualizationPackets(...)` called by the
+  renderer at snapshot extraction time, rejected records are dropped from the
+  consumed `RenderWorld::Visualization` snapshot and counted in
+  `VisualizationDiagnostics` (`MissingAttributeCount`, `DomainMismatchCount`,
+  `InvalidRangeCount`, `UnsupportedColormapCount`, `InvalidResourceCount`,
+  `MissingTexcoordCount`, `HtexRecreateRequestCount`,
+  `TextureResidencyDeferredCount`, `HasErrors`), and future backend upload
+  stages do not re-validate. Vector-field glyphs and isoline polylines are NOT
+  routed through retained `GpuRender_Line`/`GpuRender_Point` cull buckets and
+  are NOT GPU-scene renderable instances; they are auxiliary draw resources
+  owned by a backend-local upload helper under `src/graphics/vulkan` mirroring
+  the transient debug expansion from `GRAPHICS-007Q`/`GRAPHICS-010Q` and the
+  ImGui overlay upload from `GRAPHICS-013CQ` (per-frame host-visible transient
+  GPU buffers, recycled each frame, never retained on `GpuWorld`, never exposed
+  through RHI or renderer module surfaces). The backend-local helper expands
+  `VectorFieldOverlayPacket` and `IsolineOverlayPacket` into per-frame
+  transient vertex/index buffers consumed by dedicated visualization-overlay
+  passes that LOAD `SceneColorHDR`/`SceneDepth` next to
+  `Pass.Forward.Line`/`Pass.Forward.Point`, expressing depth-tested vs
+  always-on-top behavior as the same two-pipeline-variant policy resolved for
+  transient debug primitives in `GRAPHICS-010Q`. Auxiliary GPU resources
+  referenced through packet BDAs and the Htex/UV bake atlas textures are
+  uploaded by the existing `Graphics.GpuAssetCache`/`RHI::BufferManager`/
+  `RHI::TextureManager` paths once `GRAPHICS-015` texture/buffer residency
+  lands. Bake mapping selection is runtime/editor-owned: editor UI maps
+  directly to `VisualizationFragmentBakeMapping`
+  (`ExistingTexcoords`/`ExistingHtex`/`RecreateHtex`), and `RecreateHtex` is an
+  explicit user-driven request scheduled by runtime/geometry on a background
+  task through `Extrinsic.Runtime.StreamingExecutor` (async visualization
+  baking remains CPU/runtime-only). Graphics increments
+  `HtexRecreateRequestCount` and accepts the descriptor without owning the
+  Htex regeneration algorithm; once regeneration completes the next extraction
+  frame submits the `FragmentBakeAtlasPacket` with `Mapping = ExistingHtex`.
+  UV-backed bakes require `MeshHasTexcoords = true` and a non-zero
+  `TexcoordBufferBDA`; missing texcoords are rejected from the snapshot and
+  counted in `MissingTexcoordCount`.
 - `Extrinsic.Graphics.PostProcessSystem` owns the backend-agnostic
   HDR-to-LDR chain. `SceneColorHDR`, `SceneColorLDR`,
   `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
