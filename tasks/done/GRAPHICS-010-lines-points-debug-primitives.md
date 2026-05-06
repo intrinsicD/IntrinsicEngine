@@ -44,3 +44,14 @@ ctest --test-dir build/ci --output-on-failure -R 'RenderWorldContract|FrameRecip
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
 - Reintroducing live gameplay/editor ownership into graphics.
+
+## Follow-up cross-link
+`GRAPHICS-024` (overlays/presentation/editor handoff planning) confirms that the
+transient debug line/point/triangle packet contracts established here are the
+canonical path for non-persistent overlays. Persistent overlay entities are
+owned by runtime/editor/app and are extracted as `OverlayLine/Point/Triangle`
+snapshots routed through `Graphics.VisualizationPackets`, not through the
+transient debug primitive path defined in this task. See the overlay /
+presentation / editor handoff inventory in
+`../../docs/migration/nonlegacy-parity-matrix.md` for the per-row owner matrix.
+This appendix does not modify acceptance criteria or completion metadata.
