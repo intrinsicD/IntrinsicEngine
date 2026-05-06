@@ -144,8 +144,30 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `src/graphics/renderer/README.md`.
 - [GRAPHICS-013C — ImGui overlay and present/finalization](../../done/GRAPHICS-013C-imgui-overlay-and-present.md):
   depends on GRAPHICS-013B.
-- [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
-  nonblocking docs-only follow-up for ImGui draw-data translation, overlay upload/descriptor policy, present finalization strategy, and platform/backend ownership boundaries.
+- [GRAPHICS-013CQ — ImGui/present backend clarification follow-ups](../../done/GRAPHICS-013CQ-imgui-present-backend-clarifications.md):
+  retired docs-only clarification for `ImDrawData` -> `ImGuiOverlayFrame`
+  translation and submission timing (runtime-side Dear ImGui adapter
+  builds the records and calls `SubmitFrame()` after `ImGui::Render()`
+  and before `IRenderer::PrepareFrame()`; graphics never imports
+  `imgui.h` or sees `ImDrawData`), overlay vertex/index upload + font/
+  user texture descriptor policy + backend pipeline state (per-frame
+  transient host-visible buffers under `src/graphics/vulkan` mirroring
+  the `GRAPHICS-007Q`/`GRAPHICS-008Q` debug pattern; font atlas
+  graphics-owned retained mirroring the SMAA `AreaTex`/`SearchTex`
+  pattern from `GRAPHICS-013AQ`; user textures via existing
+  `RHI::Bindless`; one backend-local pipeline bound through the
+  existing `SetPipeline` seam), present finalization strategy
+  (`Pass.Present` keeps the CPU-testable fullscreen-triangle form;
+  backend-native `vkCmdCopyImage`/`vkCmdBlitImage` rejected as the
+  contract finalization form because graphics cannot guarantee
+  identical formats or `TRANSFER_DST_OPTIMAL` swapchain layout), and
+  platform/backend boundaries (platform owns window/event-pump/DPI;
+  backend owns surface/swapchain/acquire/present through `IDevice`;
+  runtime owns composition; graphics owns only the backbuffer-import
+  declaration, the `Pass.Present` command contract, and render-graph
+  rejection of non-present writes to the imported backbuffer).
+  Decisions also mirrored in `docs/architecture/rendering-three-pass.md`,
+  `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
 - [GRAPHICS-014 — Visualization attributes and overlays](../../done/GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever
   texture/atlas resources are required.

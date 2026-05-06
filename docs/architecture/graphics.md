@@ -180,6 +180,63 @@ Graphics is organized into explicit sublayers:
   surface tracked under `GRAPHICS-014Q` that consumes existing
   per-owner diagnostics rather than adding a parallel buffer-readback
   API on `DebugViewSystem`.
+- `Extrinsic.Graphics.ImGuiOverlaySystem` and
+  `Extrinsic.Graphics.Pass.Present` own the backend-agnostic ImGui
+  overlay summary contract and the imported backbuffer finalization
+  shim. Per `GRAPHICS-013CQ`, runtime/editor code (the runtime-side
+  Dear ImGui platform/renderer adapter, **not** graphics) translates
+  `ImDrawData` produced by `ImGui::Render()` into `ImGuiOverlayFrame`
+  records and calls `ImGuiOverlaySystem::SubmitFrame(...)` once per
+  frame after `ImGui::Render()` and before
+  `IRenderer::PrepareFrame()`, alongside the
+  `IRenderer::SubmitRuntimeSnapshots()` handoff; the renderer invokes
+  the matching `ClearFrame()` at end-of-frame after `Pass.Present`
+  finalizes the backbuffer. Graphics never imports `imgui.h`, never
+  calls Dear ImGui platform/renderer backends, and never sees
+  `ImDrawData` directly. Overlay vertex/index buffer upload mirrors
+  the transient debug expansion pattern from
+  `GRAPHICS-007Q`/`GRAPHICS-008Q`: per-frame host-visible (transient)
+  GPU buffers owned by a backend-local upload helper under
+  `src/graphics/vulkan` and recycled each frame, never retained on
+  `GpuWorld` and never exposed through RHI or renderer module
+  surfaces. The font atlas texture is graphics-owned retained
+  (mirroring SMAA `AreaTex`/`SearchTex` ownership from
+  `GRAPHICS-013AQ`): `ImGuiOverlaySystem::Initialize()` accepts the
+  runtime-supplied font-atlas pixel buffer (`R8_UNORM` default,
+  `R8G8B8A8_UNORM` for colored atlases) and allocates a single
+  retained `RHI::TextureHandle` through `RHI::TextureManager`, freed
+  at `Shutdown()`; DPI/font rebuilds re-run the `Shutdown()` /
+  `Initialize()` cycle. User textures (image previews referenced by
+  `ImTextureID` in editor panels) flow through the existing
+  `RHI::Bindless` heap as bindless texture indices carried in a
+  backend-local per-cmd parameter buffer; no new graphics-visible
+  descriptor surface is added, and
+  `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains the only
+  graphics-visible diagnostics flag for user-texture presence.
+  `ImGuiPass` owns one pipeline created by the backend at startup and
+  bound through the existing `SetPipeline`/`RHI::PipelineHandle` seam;
+  backend Vulkan pipeline state (dynamic rendering against the
+  present-source attachment, premultiplied-alpha blend, no depth test,
+  scissor enabled, viewport derived from `DisplayWidth`/`DisplayHeight`,
+  vertex stride `sizeof(ImDrawVert)`) remains backend-local under
+  `src/graphics/vulkan`. `Pass.Present` keeps the existing
+  CPU-testable fullscreen-triangle finalization contract — backend-
+  native swapchain copy/blit paths are rejected as the contract form
+  because graphics cannot guarantee identical source/backbuffer
+  formats or a `TRANSFER_DST_OPTIMAL` swapchain layout without owning
+  swapchain state; a backend may opt into a copy/blit fast-path
+  internally only when it can prove identical formats and a compatible
+  source layout, and that decision never alters the `Pass.Present`
+  command contract or the frame-recipe `Present` declaration. Platform
+  (`src/platform/`) owns window creation/destroy, the window-event
+  pump, and DPI/display reporting; backend (`src/graphics/vulkan`)
+  owns surface/swapchain lifecycle and acquire/present timing through
+  `IDevice::BeginFrame`/`Present`/`Resize` per `GRAPHICS-018`; runtime
+  (`src/runtime/`) owns composition (event pump, `IRenderer::BeginFrame`/
+  `EndFrame` bracketing, post-`EndFrame` `IDevice::Present(frame)`,
+  resize forwarding); graphics owns only the backbuffer-import
+  declaration, the `Pass.Present` command contract, and render-graph
+  rejection of non-present writes to the imported backbuffer.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.
   Managed-buffer compaction is explicit and opt-in: callers first request a
