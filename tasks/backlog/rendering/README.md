@@ -71,8 +71,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   completed docs-only follow-up for shadow atlas sizing input, backend sampler binding (global set 0 / binding 1, `sampler2DShadow` with `VK_COMPARE_OP_LESS_OR_EQUAL`), runtime/shadow extraction ownership of texel-snapped cascade view-projection matrices and missing-caster diagnostics, and deferred-lighting push-constant scope (scene-table-only; debug visualization owned by `Pass.DebugView`). Decisions also mirrored in `docs/architecture/rendering-three-pass.md`.
 - [GRAPHICS-010 — Lines, points, and debug primitives](../../done/GRAPHICS-010-lines-points-debug-primitives.md):
   depends on GRAPHICS-002, GRAPHICS-003, and GRAPHICS-007.
-- [GRAPHICS-010Q — Transient debug backend clarification follow-ups](../../active/GRAPHICS-010Q-transient-debug-backend-clarifications.md):
-  in-progress docs-only follow-up for transient debug packet upload/routing, debug triangle backend path, overlay bucket policy, and excessive-count diagnostics.
+- [GRAPHICS-010Q — Transient debug backend clarification follow-ups](../../done/GRAPHICS-010Q-transient-debug-backend-clarifications.md):
+  completed docs-only follow-up for transient debug packet upload/routing (per-frame host-visible buffers, not GpuWorld/cull buckets), debug-triangle dedicated debug-surface overlay routing, depth-tested vs overlay pipeline-variant policy, and `InvalidSnapshotRecordCount`-only diagnostics. Decisions also mirrored in `docs/architecture/rendering-three-pass.md` and `src/graphics/renderer/README.md`.
 - [GRAPHICS-011 — Spatial debug visualizers](../../done/GRAPHICS-011-spatial-debug-visualizers.md):
   depends on GRAPHICS-010.
 - [GRAPHICS-011Q — Spatial debug adapter clarification follow-ups](GRAPHICS-011Q-spatial-debug-adapter-clarifications.md):

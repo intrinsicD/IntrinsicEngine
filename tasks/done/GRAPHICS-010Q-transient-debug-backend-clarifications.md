@@ -1,12 +1,14 @@
 # GRAPHICS-010Q — Transient debug backend clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-06 after `GRAPHICS-009Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-06.
 - Branch: `claude/agentic-workflow-session-Q4y6S`.
 - Implementation commit: pending local agent workflow handoff.
 - Task-state commit: pending local agent workflow handoff.
+- Resolution: decisions recorded below and consequential notes synced into the line/point command-contract section of `docs/architecture/rendering-three-pass.md` and the transient-debug ownership bullet in `src/graphics/renderer/README.md`. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (186 relative links, no broken links).
 
 ## Decisions
 - **Transient packet expansion path.** Keep transient debug line/point/triangle
