@@ -101,8 +101,23 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-013A — Postprocess chain](../../done/GRAPHICS-013A-postprocess-chain.md):
   depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
   scene-color or HDR inputs are required.
-- [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](GRAPHICS-013AQ-postprocess-backend-clarifications.md):
-  nonblocking docs-only follow-up for bloom backend shape, histogram/exposure history, AA shader/LUT policy, and postprocess descriptor ownership.
+- [GRAPHICS-013AQ — Postprocess backend clarification follow-ups](../../done/GRAPHICS-013AQ-postprocess-backend-clarifications.md):
+  retired docs-only clarification for bloom backend shape (single
+  half-resolution mip-chain `PostProcess.BloomScratch` with per-mip
+  subviews, capped at six mips), histogram/exposure policy (fixed
+  256-bin layout over `[-10, +10]` log2 stops, retained
+  exposure-adaptation history buffer owned by `PostProcessSystem`,
+  diagnostics readback via the `Picking.Readback` drain pattern), AA
+  backend (FXAA single fullscreen draw with no LUT or intermediate;
+  SMAA three-pass form with retained `AreaTex`/`SearchTex` lookups
+  owned by `PostProcessSystem`, edge/blend intermediates folded into
+  `PostProcess.AATemp` subresources), and descriptor/binding ownership
+  (`SceneColorHDR`/`SceneColorLDR`/`PostProcess.*` are frame-recipe
+  transient; only SMAA lookups + exposure history are retained
+  graphics-owned). Decisions also mirrored in
+  `docs/architecture/rendering-three-pass.md`,
+  `docs/architecture/graphics.md`, and
+  `src/graphics/renderer/README.md`.
 - [GRAPHICS-013B — Debug view and render-target inspection](../../done/GRAPHICS-013B-debug-view-and-render-target-inspection.md):
   depends on GRAPHICS-013A.
 - [GRAPHICS-013BQ — Debug-view backend clarification follow-ups](GRAPHICS-013BQ-debug-view-backend-clarifications.md):

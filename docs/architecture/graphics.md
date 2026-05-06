@@ -108,6 +108,40 @@ Graphics is organized into explicit sublayers:
   missing texcoords/resources, and Htex recreation requests without importing
   geometry algorithms, ECS ownership, or texture residency. Htex/UV atlas texture
   allocation remains deferred to graphics asset/residency work.
+- `Extrinsic.Graphics.PostProcessSystem` owns the backend-agnostic
+  HDR-to-LDR chain. `SceneColorHDR`, `SceneColorLDR`,
+  `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
+  `PostProcess.AATemp` are frame-recipe transient resources owned by
+  the framegraph; postprocess passes obtain their RHI handles through
+  the frame-recipe resource map rather than through static descriptor
+  sets. Per `GRAPHICS-013AQ`, `PostProcessSystem` is the sole owner of
+  the small set of **retained** postprocess resources: the SMAA
+  `AreaTex` (`R8G8_UNORM`, 160x560) and `SearchTex` (`R8_UNORM`,
+  256x33) lookup textures and the exposure-adaptation history buffer
+  (`{previous_average_log_lum, adaptation_velocity, frame_index}`).
+  These retained resources are allocated once at
+  `PostProcessSystem::Initialize()` through
+  `RHI::TextureManager`/`RHI::BufferManager`, freed at `Shutdown()`,
+  and imported by the bloom/histogram/SMAA passes as retained
+  resources when the corresponding settings are enabled. Bloom uses a
+  single progressive down-/up-sample pyramid built into the one
+  frame-transient `PostProcess.BloomScratch` mip-chain texture (per-
+  mip subviews, not one scratch texture per mip), the histogram stage
+  uses a fixed 256-bin layout over a fixed log2-luminance range of
+  `[-10, +10]` stops, and histogram diagnostics readback follows the
+  same drain pattern as `Picking.Readback` (host-visible staging copy
+  recorded at frame-record time, drained on the next `BeginFrame()`
+  after the issuing frame's fences complete; the CPU/null backend
+  simulates the same drain without Vulkan-specific code). FXAA and
+  SMAA remain mutually exclusive per `PostProcessSettings::AntiAliasing`;
+  SMAA edge and blend intermediates fold under the existing
+  `PostProcess.AATemp` frame-recipe resource as two named
+  subresources (`AATemp.Edges` `R8G8_UNORM`, `AATemp.Weights`
+  `R8G8B8A8_UNORM`). Quality presets are encoded into the existing
+  `PostProcessPushConstants::StageKind` packing space rather than
+  expanding the push-constant struct, and concrete
+  `VkDescriptorSetLayout` bindings remain backend-local under
+  `src/graphics/vulkan` and never leak through RHI or renderer code.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.
   Managed-buffer compaction is explicit and opt-in: callers first request a
