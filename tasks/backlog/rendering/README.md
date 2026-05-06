@@ -90,8 +90,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `Pass.Selection.EntityId`/`FaceId`/`EdgeId`/`PointId`) and the
   `SelectionOutlinePass` (`Pass.Selection.Outline`); see the Pass module
   naming map in `docs/architecture/rendering-three-pass.md`.
-- [GRAPHICS-012Q — Picking backend/runtime clarification follow-ups](../../active/GRAPHICS-012Q-picking-backend-runtime-clarifications.md):
-  active docs-only clarification for shader-side ID encoding, backend
+- [GRAPHICS-012Q — Picking backend/runtime clarification follow-ups](../../done/GRAPHICS-012Q-picking-backend-runtime-clarifications.md):
+  retired docs-only clarification for shader-side ID encoding, backend
   readback drain, runtime ECS selection resolution, and transparent /
   special forward picking eligibility. Decisions also mirrored in
   `docs/architecture/rendering-three-pass.md`,

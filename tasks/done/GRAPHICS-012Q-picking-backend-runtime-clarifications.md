@@ -1,11 +1,14 @@
 # GRAPHICS-012Q — Picking backend/runtime clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-06 after `GRAPHICS-011Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-06.
 - Branch: `claude/agentic-workflow-session-vQDOA`.
-- Next verification step: after recording decisions and syncing docs, run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .`.
+- Implementation commit: `f931a7b` (resolve decisions and sync rendering-three-pass / graphics / renderer-README docs).
+- Task-state commit: pending retirement commit (this commit moves the file from `tasks/active/` to `tasks/done/`).
+- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/rendering-three-pass.md` (picking and sub-element selection contract + picking notes block), `docs/architecture/graphics.md` (`SelectionSystem` ownership bullet in the GPU scene ownership block), and `src/graphics/renderer/README.md` (matching ownership-contract bullet next to `DebugViewSystem` and `ImGuiOverlaySystem`). The rendering backlog README entry for `GRAPHICS-012Q` is redirected to the `tasks/done/` location by this retirement commit. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (187 relative links, no broken links).
 
 ## Decisions
 - **Shader-side `EntityId` and `PrimitiveId` encoding.** `EntityId` is an
