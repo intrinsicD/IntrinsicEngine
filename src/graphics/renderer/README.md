@@ -280,6 +280,56 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   accepted draw data on `FrameRecipe.PresentSource`; it never writes the imported
   backbuffer. `PresentPass` is the explicit finalization shim, and render-graph
   validation rejects non-present writes to imported backbuffer resources.
+  Per `GRAPHICS-013CQ`, runtime/editor code (the runtime-side Dear ImGui
+  platform/renderer adapter, **not** graphics) walks the `ImDrawData` produced
+  by `ImGui::Render()` and constructs `ImGuiOverlayFrame` records, then calls
+  `ImGuiOverlaySystem::SubmitFrame(...)` once per frame after `ImGui::Render()`
+  and before `IRenderer::PrepareFrame()`, alongside the
+  `IRenderer::SubmitRuntimeSnapshots()` handoff; the renderer invokes
+  `ClearFrame()` at end-of-frame after `Pass.Present` finalizes the backbuffer.
+  Graphics never imports `imgui.h`, never calls Dear ImGui platform/renderer
+  backends, and never sees `ImDrawData` directly. Overlay vertex/index payload
+  upload mirrors the transient debug expansion pattern from
+  `GRAPHICS-007Q`/`GRAPHICS-008Q`: per-frame host-visible (transient) GPU
+  buffers owned by a backend-local upload helper under `src/graphics/vulkan`
+  and recycled each frame, never retained on `GpuWorld` and never exposed
+  through RHI or renderer module surfaces. Font atlas texture is graphics-
+  owned retained, mirroring SMAA `AreaTex`/`SearchTex` from `GRAPHICS-013AQ`
+  (`R8_UNORM` default or `R8G8B8A8_UNORM` for colored atlases, allocated
+  once at `Initialize()` through `RHI::TextureManager` and freed at
+  `Shutdown()`); DPI/font rebuilds re-run the `Shutdown()`/`Initialize()`
+  cycle. User textures referenced by `ImTextureID` in editor panels flow
+  through the existing `RHI::Bindless` heap as bindless texture indices
+  carried in a backend-local per-cmd parameter buffer; no new
+  graphics-visible descriptor surface is added, and
+  `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains the only
+  graphics-visible diagnostics flag for user-texture presence.
+  `ImGuiPass` owns exactly one pipeline created by the backend at startup
+  and bound through the existing `SetPipeline`/`RHI::PipelineHandle` seam;
+  backend Vulkan pipeline state (dynamic rendering against the
+  present-source attachment, premultiplied-alpha blend, no depth test,
+  scissor enabled, viewport from `DisplayWidth`/`DisplayHeight`, vertex
+  stride `sizeof(ImDrawVert)`) remains backend-local under
+  `src/graphics/vulkan`. `Pass.Present` keeps the CPU-testable
+  fullscreen-triangle finalization form (`Draw(3, 1, 0, 0)` after binding
+  the present pipeline); backend-native swapchain `vkCmdCopyImage` /
+  `vkCmdBlitImage` paths are rejected as the contract form because
+  graphics cannot guarantee identical source/backbuffer formats or a
+  `TRANSFER_DST_OPTIMAL` swapchain layout without owning swapchain state.
+  A backend may opt into a copy/blit fast-path only when it can prove
+  identical formats and a compatible source layout after the overlay
+  barrier; that decision remains backend-local and never alters the
+  `Pass.Present` command contract or the frame-recipe `Present`
+  declaration. Platform (`src/platform/`) owns window creation/destroy,
+  the window-event pump, and DPI/display reporting; backend
+  (`src/graphics/vulkan`) owns surface/swapchain lifecycle and
+  acquire/present timing through `IDevice::BeginFrame`/`Present`/`Resize`
+  per `GRAPHICS-018`; runtime (`src/runtime/`) owns composition (event
+  pump, `IRenderer::BeginFrame`/`EndFrame` bracketing, post-`EndFrame`
+  `IDevice::Present(frame)`, resize forwarding); graphics owns only the
+  backbuffer-import declaration, the `Pass.Present` command contract,
+  and render-graph rejection of non-present writes to the imported
+  backbuffer.
 - `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and
