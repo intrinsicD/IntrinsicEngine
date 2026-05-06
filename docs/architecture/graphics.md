@@ -47,6 +47,32 @@ Graphics is organized into explicit sublayers:
   Runtime/platform own camera motion, input polling, pick-request creation,
   gizmo hit testing, and transform application; graphics only consumes the
   resulting data snapshots.
+- `Extrinsic.Graphics.SelectionSystem` is a CPU-visible reporting-only seam
+  for picking. Selection ID passes write `EntityId` (`R32_UINT`, the stable
+  extracted entity ID surfaced through `RenderableInstance`, value `0`
+  reserved for "no hit") and `PrimitiveId` (`R32_UINT`, packed via
+  `EncodedSelectionId` as `(domain << 28) | (payload & 0x0FFFFFFFu)` with
+  authoritative face/edge/point payloads from the corresponding cull
+  buckets). The renderer copies the requested pixel(s) into the
+  graphics-owned host-visible `Picking.Readback` buffer at frame-record
+  time and drains it on the next `BeginFrame()` after the issuing frame's
+  fences complete: valid samples invoke
+  `SelectionSystem::PublishPickResult(...)` and `EntityId == 0` /
+  invalidated requests / deterministic readback failures invoke
+  `PublishNoHit()`. Pending-pick consumption stays inside the renderer's
+  frame-record path so `SelectionSystemDiagnostics` counts remain
+  comparable across backends, and the CPU/null backend simulates the same
+  drain without Vulkan-specific code so it remains the correctness gate.
+  Runtime owns `StableEntityId` -> live ECS resolution, ECS selection /
+  hover mutation, editor selection policy, and the selection-outline
+  input mask consumed by `SelectionOutlinePass`; graphics never reads or
+  mutates ECS state. Until
+  [`GRAPHICS-025`](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md)
+  introduces selectable transparent / special-forward sub-buckets, only
+  `Selectable` opaque renderables flow through `SelectionSurface` /
+  `SelectionLines` / `SelectionPoints`, and runtime extraction routes
+  transparent picks through CPU pick fallback if editor policy requires
+  them.
 - `Extrinsic.Graphics.SpatialDebugVisualizers` converts data-only spatial debug
   snapshots (bounds, hierarchy nodes, split planes, convex-hull wire edges, and
   point markers) into transient debug packets with deterministic limits and
