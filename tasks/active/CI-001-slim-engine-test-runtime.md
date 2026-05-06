@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3a selection parameterization complete; Slice 3b geometry validator audit next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared Vulkan fixtures complete; Slice 3 parameterization complete; Slice 4 re-layering next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -166,6 +166,14 @@ Progress notes:
   remove-from-multi, and Replace clear-to-target. `Test_RuntimeSelection.cpp`
   was audited; it contains CPU/GPU pick contract coverage rather than matching
   mode/arity duplicates, so it was left untouched in this sub-slice.
+- 2026-05-06: Slice 3b audited
+  `tests/unit/geometry/Test_Validation.cpp` for same-mesh/varied-option
+  validator duplicates. The file covers scalar/vector finiteness, primitive
+  validity/degeneracy, and sanitize smoke cases with different input types; it
+  does not contain repeated same-mesh validation cases where `TEST_P` would
+  preserve case count while reducing duplicated setup. No code change was made
+  for this audit, matching the task constraint to convert only obvious
+  duplicates and avoid inventing coverage.
 
 ## Required changes
 
