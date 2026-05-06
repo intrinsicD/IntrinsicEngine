@@ -23,6 +23,10 @@ The documented label set is:
 - capabilities/backends: `glfw`, `gpu`, `vulkan`.
 - opt-in filters: `slow`, `flaky-quarantine`.
 
+`tests/CMakeLists.txt` enforces this set at configure time through the test
+executable helper. Additions must update this README and the helper's allow-list
+in the same change before a new CTest label can be used.
+
 Use `slow` for valid tests that should not run in fast PR or default local CPU
 correctness gates, including executables that boot the full headless engine,
 initialize Vulkan in a non-`gpu`-only path, run benchmark/SLO thresholds, or

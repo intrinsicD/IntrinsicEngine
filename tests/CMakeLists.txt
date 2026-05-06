@@ -20,6 +20,29 @@ if(INTRINSIC_LLVM_SYMBOLIZER)
     list(APPEND _intrinsic_test_env "ASAN_SYMBOLIZER_PATH=${INTRINSIC_LLVM_SYMBOLIZER}")
 endif()
 
+set(_intrinsic_allowed_test_labels
+    assets
+    benchmark
+    build
+    contract
+    core
+    ecs
+    flaky-quarantine
+    geometry
+    glfw
+    gpu
+    graphics
+    headless
+    integration
+    platform
+    regression
+    runtime
+    slo
+    slow
+    unit
+    vulkan
+)
+
 # =============================================================================
 # Helper: create an OBJECT library for a group of test sources.
 # Each .cpp is compiled exactly once; the objects are then linked into
@@ -43,6 +66,15 @@ endfunction()
 # =============================================================================
 function(intrinsic_test_executable name)
     cmake_parse_arguments(ARG "NO_DISCOVER" "" "OBJECTS;LINK_LIBS;LABELS" ${ARGN})
+    foreach(label IN LISTS ARG_LABELS)
+        list(FIND _intrinsic_allowed_test_labels "${label}" _intrinsic_label_index)
+        if(_intrinsic_label_index EQUAL -1)
+            message(FATAL_ERROR
+                "Test target '${name}' uses undocumented CTest label '${label}'. "
+                "Update tests/README.md and _intrinsic_allowed_test_labels in tests/CMakeLists.txt before using a new label."
+            )
+        endif()
+    endforeach()
     add_executable(${name})
     set_target_properties(${name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
     target_compile_options(${name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})

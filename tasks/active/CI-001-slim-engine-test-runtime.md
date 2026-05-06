@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: in-progress (Slice 1 label hygiene and CPU CTest gate parallelism complete; Slice 2 shared engine/Vulkan fixture next)
+- Status: in-progress (Slice 1 label hygiene, CPU CTest gate parallelism, and label guard complete; Slice 2 shared engine/Vulkan fixture next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -88,6 +88,12 @@ Progress notes:
   Local verification on the configured `build/ci` tree passed PR-fast (1,584
   tests), Linux-clang/default CPU (1,590 tests), and nightly CPU-equivalent
   (1,602 tests, including 12 `benchmark|slo|slow` tests with two SLO skips).
+- 2026-05-06: Added the task-required configure-time CTest label guard in
+  `tests/CMakeLists.txt`; undocumented labels now fail configuration with the
+  target name and label before GoogleTest discovery registers tests. The guard's
+  allow-list is synchronized with `tests/README.md`. Local verification on the
+  configured `build/ci` tree passed PR-fast (1,584 tests) and
+  Linux-clang/default CPU (1,590 tests) after the guard was added.
 
 ## Required changes
 
@@ -176,9 +182,9 @@ verifiable on its own.
 
 - Update `tests/README.md` with:
   - the documented label set (`unit`, `contract`, `integration`,
-    `regression`, `gpu`, `vulkan`, `benchmark`, `slo`, `platform`,
-    `headless`, `graphics`, `core`, `ecs`, `geometry`, `assets`, `slow`,
-    `flaky-quarantine`).
+    `regression`, `benchmark`, `slo`, `assets`, `build`, `core`, `ecs`,
+    `geometry`, `graphics`, `headless`, `platform`, `runtime`, `glfw`, `gpu`,
+    `vulkan`, `slow`, `flaky-quarantine`).
   - guidance for when to apply `slow` (any test that boots the full engine
     or initializes Vulkan in a non-`gpu`-labeled executable, or any test
     > 1 s wall-clock on the reference Linux-clang runner).
