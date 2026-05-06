@@ -44,7 +44,7 @@ jobs:
         run: cmake --build --preset ci
 
       - name: Run full CPU test suite
-        run: ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60
+        run: ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|flaky-quarantine" --timeout 60
 
       - name: Run sanitizer-extended test pass (ASan)
         run: |

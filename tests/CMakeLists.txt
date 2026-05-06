@@ -617,13 +617,13 @@ if(TARGET RuntimeTestObjs)
     intrinsic_test_executable(IntrinsicRuntimeTests
         OBJECTS RuntimeTestObjs
         LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
-        LABELS integration runtime headless graphics gpu vulkan
+        LABELS integration runtime headless graphics gpu vulkan slow
     )
 
     intrinsic_test_executable(IntrinsicRuntimeIntegrationTests
         OBJECTS RuntimeIntegrationTestObjs
         LINK_LIBS ExtrinsicRuntime
-        LABELS integration runtime graphics gpu vulkan
+        LABELS integration runtime graphics gpu vulkan slow
     )
 endif()
 
@@ -652,7 +652,7 @@ intrinsic_test_executable(IntrinsicContractBuildTests
 intrinsic_test_executable(IntrinsicBenchmarkTests
     OBJECTS  BenchmarkTestObjs
     LINK_LIBS IntrinsicCore
-    LABELS benchmark slo
+    LABELS benchmark slo slow
 )
 
 # --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---

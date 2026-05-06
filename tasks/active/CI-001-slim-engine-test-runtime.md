@@ -1,6 +1,6 @@
 # CI-001 — Slim engine test runtime without losing coverage
 
-- Status: planned
+- Status: in-progress (Slice 1 label hygiene complete; Slice 2 shared engine/Vulkan fixture next)
 - Owner / agent: ci — `tests/`, `cmake/IntrinsicTests.cmake` helper, `.github/workflows/`
 - Branch: `claude/optimize-engine-tests-Js8Zh`
 - PR: TBD.
@@ -70,6 +70,16 @@ This task implements the four-step plan summarized in the audit:
 3. Parameterize duplicated scene/fixture variants with `TEST_P`.
 4. Move CPU-only assertions out of engine-boot fixtures into the existing
    `unit/` and `contract/` layers.
+
+Progress notes:
+
+- 2026-05-06: Slice 1 completed by labeling heavyweight runtime/Vulkan-backed
+  executables and benchmark/SLO coverage as `slow`, documenting label policy in
+  `tests/README.md`, and keeping nightly CPU coverage opted into CPU-supported
+  `slow` tests while default/PR gates continue to exclude them. Local configured
+  gate counts on this workstation changed from 1,602 default CPU tests before
+  the slice to 1,572 after Slice 1; the nightly CPU-equivalent filter retains
+  the 12 benchmark/SLO `slow` tests and ran 1,584 CPU-supported tests.
 
 ## Required changes
 
@@ -213,7 +223,7 @@ ctest --test-dir build/ci --output-on-failure \
 
 # Nightly-deep equivalent (matches .github/workflows/nightly-deep.yml).
 ctest --test-dir build/ci --output-on-failure \
-    -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+    -LE "gpu|vulkan|flaky-quarantine" --timeout 60 -j$(nproc)
 
 # Repository policy guards.
 python3 tools/agents/check_task_policy.py --root . --strict
