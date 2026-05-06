@@ -1,13 +1,14 @@
 # GRAPHICS-013CQ — ImGui/present backend clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-06 after `GRAPHICS-013BQ` retirement cleared `tasks/active/`.
+- Completed: 2026-05-06.
 - Branch: `claude/setup-agentic-workflow-tayDz`.
-- Implementation commit: pending local agent workflow handoff.
-- Task-state commit: pending local agent workflow handoff.
-- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/rendering-three-pass.md` (ImGui overlay and present/finalization contract block), `docs/architecture/graphics.md` (`ImGuiOverlaySystem`/`PresentPass` ownership bullet under the GPU scene ownership block), and `src/graphics/renderer/README.md` (matching ownership-contract bullet next to the existing `ImGuiOverlaySystem` line). Verification: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .`.
+- Implementation commit: `2d2370f` (resolve decisions and sync rendering-three-pass / graphics / renderer-README docs).
+- Task-state commit: pending retirement commit (this commit moves the file from `tasks/active/` to `tasks/done/`).
+- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/rendering-three-pass.md` (ImGui overlay and present/finalization contract block), `docs/architecture/graphics.md` (`ImGuiOverlaySystem`/`PresentPass` ownership bullet under the GPU scene ownership block), and `src/graphics/renderer/README.md` (matching ownership-contract bullet next to the existing `ImGuiOverlaySystem` line). The rendering backlog README entry for `GRAPHICS-013CQ` is redirected to the `tasks/done/` location by this retirement commit. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (187 relative links, no broken links).
 
 ## Decisions
 - **`ImDrawData` -> `ImGuiOverlayFrame` translation and submission timing.**
