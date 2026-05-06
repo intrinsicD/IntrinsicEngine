@@ -47,3 +47,14 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
 - Depending on legacy `Graphics.VectorFieldManager` or related legacy modules.
+
+## Follow-up cross-link
+`GRAPHICS-024` (overlays/presentation/editor handoff planning) confirms that
+`Graphics.VisualizationPackets` is the canonical promoted home for overlay GPU
+upload, descriptor binding, and dirty-state translation. Runtime/editor/app
+retains overlay mutation, dirty-domain stamping, and selection/pick-ID
+ownership; graphics consumes immutable visualization snapshots. Producer-side
+filtering and backend upload questions stay tracked under `GRAPHICS-014Q`. See
+the overlay / presentation / editor handoff inventory in
+`../../docs/migration/nonlegacy-parity-matrix.md` for the per-row owner matrix.
+This appendix does not modify acceptance criteria or completion metadata.

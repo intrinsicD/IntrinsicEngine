@@ -30,3 +30,17 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
 - Removing legacy source before parity gates and follow-up tasks are satisfied.
+
+## Cross-links
+- `GRAPHICS-024` (overlays/presentation/editor handoff planning) is the
+  authoritative source for per-module owner decisions covering
+  `Graphics.OverlayEntityFactory`, `Graphics.Presentation`,
+  `Graphics.Passes.Composition`, and `Graphics.VisualizationConfig`.
+  Retirement gating in this task must mechanically resolve each legacy
+  overlay/presentation module against the overlay / presentation / editor
+  handoff inventory in
+  `../../../docs/migration/nonlegacy-parity-matrix.md` before any deletion or
+  isolation decision. Open follow-ups identified by `GRAPHICS-024` are tracked
+  through existing `GRAPHICS-010Q`, `GRAPHICS-011Q`, `GRAPHICS-013CQ`,
+  `GRAPHICS-014Q`, and `GRAPHICS-017Q` clarification tasks; no new follow-up
+  task is required for this row.

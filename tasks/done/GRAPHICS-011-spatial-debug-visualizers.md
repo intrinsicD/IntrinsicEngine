@@ -42,3 +42,13 @@ ctest --test-dir build/ci --output-on-failure -R 'GraphicsSpatialDebugVisualizer
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
 - Importing editor/runtime ownership into `src/graphics`.
+
+## Follow-up cross-link
+`GRAPHICS-024` (overlays/presentation/editor handoff planning) confirms that
+spatial debug visualizers continue on the data-only adapter contract defined in
+this task: runtime/editor/app produces snapshot records and graphics never
+holds live geometry trees, ECS state, or editor mutation. Continued runtime
+adapter clarifications stay in `GRAPHICS-011Q`. See the overlay / presentation /
+editor handoff inventory in
+`../../docs/migration/nonlegacy-parity-matrix.md` for the per-row owner matrix.
+This appendix does not modify acceptance criteria or completion metadata.
