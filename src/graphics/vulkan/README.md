@@ -244,7 +244,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   graphics-queue helper, per-subresource layout tracking stays whole-image
   until multi-subresource batching lands, and multi-mip / multi-layer /
   cubemap batching plus opt-in `gpu;vulkan` smoke for those uploads is owned
-  by [`GRAPHICS-018T`](../../../tasks/active/GRAPHICS-018T-texture-upload-batching.md),
+  by [`GRAPHICS-018T`](../../../tasks/done/GRAPHICS-018T-texture-upload-batching.md),
   not by 018Q. Per `GRAPHICS-018T` slice A.1, the CPU-testable
   per-subresource byte-size and packed full-mip-chain offset math is
   exposed as backend-neutral free functions in
@@ -261,7 +261,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   std::span<const std::byte>)` for callers that provide this packed
   full-chain layout. The Null backend and non-operational Vulkan fallback
   return invalid tokens for that seam. The live Vulkan transfer queue now
-  validates 2D color texture-array metadata and exact byte counts, copies
+  validates 2D color texture-array / six-face cubemap metadata and exact byte counts, copies
   initialized subresource ranges into one staging-belt allocation, emits one
   whole-image `Undefined`/current-layout → `TransferDst` barrier, one
   `vkCmdCopyBufferToImage` with a `VkBufferImageCopy` array built from
@@ -271,8 +271,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   and gates bindless lookup on `ColormapSystem::IsReady()` so first-frame draws
   can skip while the asynchronous upload token is pending. Slice A.2d exposes
   the live transfer queue once guarded live prerequisites are ready and adds an
-  opt-in `gpu;vulkan` smoke for a 2D multi-mip full-chain upload. Cubemap/3D batching
-  remains a deferred follow-up; the existing single-subresource `WriteTexture()` /
+  opt-in `gpu;vulkan` smoke for a 2D multi-mip full-chain upload. Slice B extends
+  the same batched transfer path to six-face cubemaps and expands the opt-in smoke
+  to cover 2D array and cubemap full-chain uploads. 3D batching remains deferred;
+  the existing single-subresource `WriteTexture()` /
   one-`UploadTexture()` paths remain the fail-closed correctness baseline.
   Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded

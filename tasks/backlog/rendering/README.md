@@ -263,9 +263,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   Vulkan integration decisions —
   texture upload policy (guarded synchronous `WriteTexture()` stays the
   fail-closed baseline, runtime/streaming uses `RHI::ITransferQueue`, whole-
-  image layout tracking until multi-subresource batching, multi-mip / multi-
-  layer / cubemap batching plus opt-in `gpu;vulkan` smoke owned by
-  GRAPHICS-018T), sampler anisotropy (probed and enabled when supported,
+  image layout tracking for the batched path, multi-mip / multi-layer /
+  cubemap batching plus opt-in `gpu;vulkan` smoke landed with GRAPHICS-018T),
+  sampler anisotropy (probed and enabled when supported,
   silently disabled on missing support, clamped to physical-device max with
   one warn breadcrumb when reduced, no new RHI surface), `FallbackPipelineReason`
   extension policy (each counter and its reason enum stay 1:1 to its path;
@@ -278,11 +278,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   breadcrumbs is a separate semantic task only when operational bring-up
   demonstrates many-per-frame firing). It must not be mixed with C++
   behavior work.
-- [GRAPHICS-018T — Vulkan texture upload batching](../../active/GRAPHICS-018T-texture-upload-batching.md):
-  in-progress nonblocking follow-up to `GRAPHICS-018Q`/`GRAPHICS-026` that owns
-  multi-mip / multi-layer / cubemap `VkBufferImageCopy` batching plus opt-in
-  `gpu;vulkan` smoke; CPU-only fail-closed correctness path remains via the
-  guarded synchronous `WriteTexture()` baseline. Upstream gates GRAPHICS-006,
+- [GRAPHICS-018T — Vulkan texture upload batching](../../done/GRAPHICS-018T-texture-upload-batching.md):
+  retired follow-up to `GRAPHICS-018Q`/`GRAPHICS-026` that landed multi-mip /
+  multi-layer / cubemap `VkBufferImageCopy` batching plus opt-in `gpu;vulkan`
+  smoke; CPU-only fail-closed correctness path remains via the guarded
+  synchronous `WriteTexture()` baseline. Upstream gates GRAPHICS-006,
   GRAPHICS-015, GRAPHICS-018, GRAPHICS-018Q, and GRAPHICS-026 are retired in
   `tasks/done/`.
 - [GRAPHICS-019 — Legacy graphics IO boundaries](GRAPHICS-019-legacy-graphics-io-boundaries.md):

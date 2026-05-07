@@ -95,7 +95,7 @@
 - Temporary fail-closed shim retirement status (updated 2026-05-05):
   - Fallback bindless heap and fallback transfer queue: public accessor behavior is predicate-gated against live internal services. The fallbacks remain as the pre-operational path; live services are exposed only after the remaining predicate safety prerequisites (canonical renderer pass execution and public service reconciliation) are cleared. No removal yet.
   - Empty-handle `Create*` paths for non-operational devices: remain as fail-closed guards. Operational-path replacement remains in `GRAPHICS-018` scope; the renderer reset seam (`GRAPHICS-018R`) is already present and CPU-tested.
-  - One-subresource blocking texture upload path: deferred to `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`; tracked separately before multi-mip/layer Vulkan texture smoke tests.
+  - One-subresource blocking texture upload path: deferred to `tasks/done/GRAPHICS-018T-texture-upload-batching.md`; tracked separately before multi-mip/layer Vulkan texture smoke tests.
   - Fail-closed frame-loop log suppression (new): `BeginFrame`/`EndFrame`/`Present` breadcrumbs emit only on first fire; counters remain process-monotonic. No removal needed — this is the settled behavior for non-operational frame loops.
   - All section 5 diagnostics/docs/shim items are complete. Remaining blockers for `IsOperational() == true` are tracked in section 6.
 
