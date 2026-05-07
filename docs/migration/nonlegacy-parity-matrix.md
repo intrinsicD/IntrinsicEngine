@@ -52,8 +52,26 @@ registries.
 | TGF graph import | `geometry` graph IO. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
 | GLTF/GLB meshes, embedded images, material texture refs, and external buffers/images | `assets` owns model/scene CPU ingest and external-resource resolution; `geometry` owns extracted primitive geometry; `runtime` owns ECS/entity instantiation; `graphics/assets` owns later GPU residency from asset IDs. | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md), [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
 | Texture file decode and legacy immediate GPU upload | `assets` owns CPU texture payload decode/metadata; `runtime` wires asset events to `graphics/assets::GpuAssetCache`; graphics layers own only GPU residency and render consumption. | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) |
-| `Graphics.ModelLoader` / `Graphics.Model` retained model object, collision helpers, and GPU upload | Split and retire: `assets` stores model/scene payload identity, `geometry` stores CPU geometry/collision-friendly data, `runtime` creates ECS/renderable state, and graphics consumes snapshots/asset IDs. | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md), [`GRAPHICS-028`](../../tasks/backlog/rendering/GRAPHICS-028-ecs-renderable-residency-bridge.md), [`GRAPHICS-020`](../../tasks/backlog/rendering/GRAPHICS-020-legacy-graphics-retirement-gates.md) |
+| `Graphics.ModelLoader` / `Graphics.Model` retained model object, collision helpers, and GPU upload | Split and retire: `assets` stores model/scene payload identity, `geometry` stores CPU geometry/collision-friendly data, `runtime` creates ECS/renderable state, and graphics consumes snapshots/asset IDs. | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md), [`GRAPHICS-028`](../../tasks/backlog/rendering/GRAPHICS-028-ecs-renderable-residency-bridge.md), [`GRAPHICS-020`](../../tasks/done/GRAPHICS-020-legacy-graphics-retirement-gates.md) |
 | OBJ/PLY/STL exporters | `geometry` owns geometry serialization; asset export orchestration may route to geometry encoders; final graphics layers never export model files. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
+
+## Legacy graphics retirement gates (`GRAPHICS-020`)
+
+`GRAPHICS-020` is the active mechanical gate map for deleting or isolating
+retained legacy rendering modules. It groups every legacy graphics/RHI/runtime
+rendering module from `docs/api/generated/module_inventory.md` into a promoted
+owner, required parity evidence, current readiness state, and final removal
+follow-up. No source deletion is authorized by this matrix alone.
+
+| Legacy family | Promoted owner / gate summary | Readiness |
+| --- | --- | --- |
+| Graphics component/data-authority modules and lifecycle/GPU-scene sync systems | Split across CPU-only ECS/geometry data, runtime extraction sidecars, and graphics renderer packets/resources; gated by `GRAPHICS-016`, `GRAPHICS-028`, `ASSETIO-001`, `GEOIO-002`, and lifecycle/dirty-domain tests. | blocked |
+| GPU scene/world/global resources and retained draw state | Promoted `GpuWorld`, culling, material/light/selection, and asset residency gates exist, but full asset/geometry renderable residency still depends on `GRAPHICS-028`. | partial |
+| Framegraph/render-driver/pipeline/path and pass modules | Promoted renderer/framegraph/pass contracts are covered by `GRAPHICS-002` through `GRAPHICS-014`, `GRAPHICS-022`, and clarification tasks; final deletion still requires import scans and backend parity evidence. | partial |
+| Materials, shader/pipeline registries, and hot reload | Base material/pipeline contracts are done; retirement waits on `GRAPHICS-023` hot-reload ownership and tests. | blocked |
+| Import/export/model/texture IO | Owner split recorded by `GRAPHICS-019`; implementation gates are `ASSETIO-001`, `GEOIO-002`, and `GRAPHICS-028`. | blocked |
+| Visualization/debug/camera/gizmo/overlay/presentation adjacency | Packet/producer ownership is recorded by `GRAPHICS-010Q`, `GRAPHICS-011Q`, `GRAPHICS-013CQ`, `GRAPHICS-014Q`, `GRAPHICS-017Q`, and `GRAPHICS-024`; runtime/editor/app parity and final import scans remain. | partial |
+| Legacy RHI/Vulkan/CUDA/runtime render orchestration | RHI/Vulkan CPU/null and opt-in GPU gates are split through `GRAPHICS-006`, `GRAPHICS-015`, `GRAPHICS-018*`, and `GRAPHICS-026`; runtime orchestration gates include `GRAPHICS-016`, `GRAPHICS-018R`, and `RORG-031-runtime-composition`. CUDA remains an explicit keep/remove decision for the final deletion slice. | partial/open |
 
 ## Overlay/presentation/editor handoff inventory (`GRAPHICS-024` Slice A)
 

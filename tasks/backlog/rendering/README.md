@@ -289,8 +289,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   completed planning task that assigns legacy graphics import/export/model/texture
   IO to `assets`, `geometry`, `runtime`, and `graphics/assets` handoff owners;
   final graphics layers must not own file IO or parser/exporter registries.
-- [GRAPHICS-020 — Legacy graphics retirement gates](GRAPHICS-020-legacy-graphics-retirement-gates.md):
-  final retirement gating after parity tasks complete.
+- [GRAPHICS-020 — Legacy graphics retirement gates](../../done/GRAPHICS-020-legacy-graphics-retirement-gates.md):
+  completed planning gate map for retained legacy graphics/RHI/runtime-rendering
+  modules. It records promoted owners, blocker tasks, test evidence, and final
+  deletion readiness checks; no legacy source deletion happens in this slice.
 - [GRAPHICS-022 — Rendergraph diagnostics and validation](../../done/GRAPHICS-022-rendergraph-diagnostics-validation.md):
   completed follow-on infrastructure hardening task; canonical ordering matches
   GRAPHICS-001 and it depends on GRAPHICS-003 for frame-recipe context while
