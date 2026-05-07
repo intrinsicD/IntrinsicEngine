@@ -254,10 +254,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   Core::Expected<TextureUploadLayout>`), with the canonical layer-major
   / mip-minor packing convention plus deterministic
   `InvalidArgument`/`InvalidFormat` rejection for zero extents and
-  depth-stencil/`Undefined` formats. Slice A.2 will rewrite the Vulkan
-  multi-mip / multi-layer 2D color upload path to coalesce
-  `VkBufferImageCopy` regions in a single
-  `VulkanTransferQueue::UploadTexture()` submission consuming this
+  depth-stencil/`Undefined` formats. Slice A.2a adds the RHI seam
+  `ITransferQueue::UploadTextureFullChain(TextureHandle,
+  std::span<const std::byte>)` for callers that provide this packed
+  full-chain layout. The Null backend and non-operational Vulkan fallback
+  return invalid tokens for that seam, and the live Vulkan transfer queue
+  still rejects it deterministically until the batching implementation lands.
+  A later A.2b slice will coalesce `VkBufferImageCopy` regions in a single
+  `VulkanTransferQueue::UploadTextureFullChain()` submission consuming this
   layout while the existing single-subresource `WriteTexture()` /
   one-`UploadTexture()` paths remain the fail-closed correctness
   baseline. Pipeline creation now builds

@@ -1,6 +1,6 @@
 # Module Inventory (auto-generated)
 
-_Generated on 2026-05-06 by `tools/repo/generate_module_inventory.py`._
+_Generated on 2026-05-07 by `tools/repo/generate_module_inventory.py`._
 
 Root scanned: `src`
 
@@ -10,13 +10,13 @@ Root scanned: `src`
 |---|---:|
 | `app` | 1 |
 | `assets` | 7 |
-| `core` | 34 |
+| `core` | 36 |
 | `ecs` | 18 |
 | `geometry` | 76 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 50 |
-| `graphics/rhi` | 16 |
+| `graphics/rhi` | 17 |
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
 | `platform` | 5 |
@@ -34,6 +34,7 @@ Root scanned: `src`
 | `Extrinsic.Asset.Registry` | `src/assets/Asset.Registry.cppm` | `assets` |
 | `Extrinsic.Asset.Service` | `src/assets/Asset.Service.cppm` | `assets` |
 | `Extrinsic.Asset.TypePool` | `src/assets/Asset.TypePool.cppm` | `assets` |
+| `Extrinsic.Core.BoundedHeap` | `src/core/Core.BoundedHeap.cppm` | `core` |
 | `Extrinsic.Core.CallbackRegistry` | `src/core/Core.CallbackRegistry.cppm` | `core` |
 | `Extrinsic.Core.Config.Engine` | `src/core/Core.Config.Engine.cppm` | `core` |
 | `Extrinsic.Core.Config.Render` | `src/core/Core.Config.Render.cppm` | `core` |
@@ -62,6 +63,7 @@ Root scanned: `src`
 | `Extrinsic.Core.Memory` | `src/core/Core.Memory.cppm` | `core` |
 | `Extrinsic.Core.Process` | `src/core/Core.Process.cppm` | `core` |
 | `Extrinsic.Core.ResourcePool` | `src/core/Core.ResourcePool.cppm` | `core` |
+| `Extrinsic.Core.RingBuffer` | `src/core/Core.RingBuffer.cppm` | `core` |
 | `Extrinsic.Core.StrongHandle` | `src/core/Core.StrongHandle.cppm` | `core` |
 | `Extrinsic.Core.Tasks.CounterEvent` | `src/core/Core.Tasks.CounterEvent.cppm` | `core` |
 | `Extrinsic.Core.Tasks:Internal` | `src/core/Core.Tasks.Internal.cppm` | `core` |
@@ -233,6 +235,7 @@ Root scanned: `src`
 | `Extrinsic.RHI.Profiler` | `src/graphics/rhi/RHI.Profiler.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.SamplerManager` | `src/graphics/rhi/RHI.SamplerManager.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.TextureManager` | `src/graphics/rhi/RHI.TextureManager.cppm` | `graphics/rhi` |
+| `Extrinsic.RHI.TextureUpload` | `src/graphics/rhi/RHI.TextureUpload.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Transfer` | `src/graphics/rhi/RHI.Transfer.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.TransferQueue` | `src/graphics/rhi/RHI.TransferQueue.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Types` | `src/graphics/rhi/RHI.Types.cppm` | `graphics/rhi` |
@@ -441,4 +444,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **414**
+Total modules: **417**
