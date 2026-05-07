@@ -258,9 +258,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   depends on stable CPU/null contracts from GRAPHICS-002, GRAPHICS-003,
   GRAPHICS-004, GRAPHICS-006, GRAPHICS-007, GRAPHICS-008, GRAPHICS-009, and
   GRAPHICS-013C.
-- [GRAPHICS-018Q — Vulkan integration clarification follow-ups](../../active/GRAPHICS-018Q-vulkan-integration-clarifications.md):
-  promoted to `tasks/active/` for the current session; nonblocking docs-only
-  follow-up resolving the four remaining Vulkan integration decisions —
+- [GRAPHICS-018Q — Vulkan integration clarification follow-ups](../../done/GRAPHICS-018Q-vulkan-integration-clarifications.md):
+  retired; nonblocking docs-only follow-up resolving the four remaining
+  Vulkan integration decisions —
   texture upload policy (guarded synchronous `WriteTexture()` stays the
   fail-closed baseline, runtime/streaming uses `RHI::ITransferQueue`, whole-
   image layout tracking until multi-subresource batching, multi-mip / multi-

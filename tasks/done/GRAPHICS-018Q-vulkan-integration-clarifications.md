@@ -1,14 +1,15 @@
 # GRAPHICS-018Q — Vulkan integration clarification follow-ups
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-07 after `GRAPHICS-017Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-07.
 - Branch: `claude/agentic-workflow-session-qg1Wv`.
 - Promotion commit: `e38257c` (move file from `tasks/backlog/rendering/` to `tasks/active/`).
-- Implementation commit: this commit (records the four remaining clarification decisions on the active task file and syncs `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, `src/graphics/renderer/README.md`, and `src/graphics/vulkan/README.md`; refreshes the rendering backlog README description).
-- Task-state commit: pending retirement commit (will move the file from `tasks/active/` to `tasks/done/`).
-- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .`.
+- Implementation commit: `2ca4e15` (record the four remaining clarification decisions on the active task file and sync `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, `src/graphics/renderer/README.md`, and `src/graphics/vulkan/README.md`; refresh the rendering backlog README description).
+- Task-state commit: this retirement commit (moves the file from `tasks/active/` to `tasks/done/` and redirects the rendering backlog README link).
+- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/graphics.md` (extended Vulkan-backend bullet with a new "Per `GRAPHICS-018Q`" paragraph capturing the four decisions next to the existing Vulkan operational summary), `docs/architecture/rendering-three-pass.md` (new "Vulkan integration follow-up contract" subsection alongside the existing `GRAPHICS-013AQ`/`013BQ`/`013CQ`/`014Q`/`015Q`/`017Q` clarification paragraphs), `src/graphics/renderer/README.md` (new ownership-contract bullet next to the existing `GpuAssetCache`/`MaterialSystem` description), and `src/graphics/vulkan/README.md` (extended texture-upload, sampler, fallback-reason, and breadcrumb paragraphs with cross-links to `GRAPHICS-018Q` and `GRAPHICS-018T`). The rendering backlog README entry for `GRAPHICS-018Q` is redirected from `tasks/backlog/rendering/` to `tasks/active/` by the promotion commit and from `tasks/active/` to `tasks/done/` by this retirement commit. No `docs/migration/nonlegacy-parity-matrix.md` rows change because the four decisions are backend-internal Vulkan policy rather than legacy-vs-promoted parity entries. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .`.
 
 ## Decisions
 
