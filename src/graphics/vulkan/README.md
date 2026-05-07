@@ -242,7 +242,7 @@ available through the Vulkan 1.2/1.3 feature chain.
   graphics-queue helper, per-subresource layout tracking stays whole-image
   until multi-subresource batching lands, and multi-mip / multi-layer /
   cubemap batching plus opt-in `gpu;vulkan` smoke for those uploads is owned
-  by [`GRAPHICS-018T`](../../../tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md),
+  by [`GRAPHICS-018T`](../../../tasks/active/GRAPHICS-018T-texture-upload-batching.md),
   not by 018Q. Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded
   bootstrap has created the Vulkan device/global layout; `assets/shaders/depth_prepass.vert`
