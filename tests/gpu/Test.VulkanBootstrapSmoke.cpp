@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <string>
+#include <vector>
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Render;
@@ -20,6 +24,8 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
+import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
 
 namespace
@@ -344,7 +350,9 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(serviceDiagnostics.LiveOperationalPrerequisitesReady);
         EXPECT_FALSE(serviceDiagnostics.OperationalSafetyPrerequisitesReady);
         EXPECT_FALSE(serviceDiagnostics.PublicServicesExposed);
-        EXPECT_TRUE(serviceDiagnostics.PublicServicesRemainFailClosed);
+        EXPECT_FALSE(serviceDiagnostics.PublicServicesRemainFailClosed);
+        EXPECT_FALSE(serviceDiagnostics.PublicBindlessHeapExposed);
+        EXPECT_TRUE(serviceDiagnostics.PublicTransferQueueExposed);
 
         const Extrinsic::RHI::BufferHandle sceneTableBuffer = device->CreateBuffer({
             .SizeBytes = sizeof(Extrinsic::RHI::GpuSceneTable),
@@ -410,6 +418,45 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 
         const std::array<std::uint32_t, 1u> texel{0xff'ff'ff'ffu};
         device->WriteTexture(sampledTexture, texel.data(), sizeof(texel), 0u, 0u);
+
+        const Extrinsic::RHI::TextureDesc fullChainTextureDesc{
+            .Width = 4u,
+            .Height = 4u,
+            .MipLevels = 3u,
+            .Fmt = Extrinsic::RHI::Format::RGBA8_UNORM,
+            .Dimension = Extrinsic::RHI::TextureDimension::Tex2D,
+            .Usage = Extrinsic::RHI::TextureUsage::Sampled | Extrinsic::RHI::TextureUsage::TransferDst,
+            .DebugName = "VulkanBootstrapSmoke.FullChainTexture",
+        };
+        const Extrinsic::RHI::TextureHandle fullChainTexture = device->CreateTexture(fullChainTextureDesc);
+        ASSERT_TRUE(fullChainTexture.IsValid())
+            << "service-ready guarded bootstrap should create sampled multi-mip textures for full-chain transfer smoke";
+
+        auto layoutOr = Extrinsic::RHI::ComputeFullChainUploadLayout(fullChainTextureDesc);
+        ASSERT_TRUE(layoutOr.has_value());
+        std::vector<std::byte> fullChainBytes(static_cast<std::size_t>(layoutOr->TotalBytes), std::byte{0});
+        for (const Extrinsic::RHI::TextureUploadSubresource& sub : layoutOr->Subresources)
+        {
+            const std::byte pattern{static_cast<unsigned char>(0x20u + sub.MipLevel + sub.ArrayLayer * 8u)};
+            std::fill_n(fullChainBytes.data() + static_cast<std::size_t>(sub.OffsetBytes),
+                        static_cast<std::size_t>(sub.SizeBytes),
+                        pattern);
+        }
+
+        const std::uint64_t beforeFallbackTransfer =
+            Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
+        Extrinsic::RHI::ITransferQueue& transferQueue = device->GetTransferQueue();
+        const Extrinsic::RHI::TransferToken fullChainToken = transferQueue.UploadTextureFullChain(
+            fullChainTexture,
+            std::span<const std::byte>{fullChainBytes});
+        EXPECT_TRUE(fullChainToken.IsValid())
+            << "service-ready public transfer queue should exercise the live Vulkan full-chain upload path";
+        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
+                  beforeFallbackTransfer)
+            << "service-ready public transfer queue should not route upload smoke through fallback";
+        device->WaitIdle();
+        EXPECT_TRUE(transferQueue.IsComplete(fullChainToken));
+        transferQueue.CollectCompleted();
 
         const std::uint64_t beforeCommandRecordingFallback =
             Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount();
@@ -512,15 +559,6 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
                   beforeFallbackBindless + 1u)
             << "live bindless service exists internally, but public access must remain fail-closed until operational";
 
-        const std::uint64_t beforeFallbackTransfer =
-            Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
-        const Extrinsic::RHI::TransferToken transferToken =
-            device->GetTransferQueue().UploadBuffer({}, nullptr, 0u, 0u);
-        EXPECT_FALSE(transferToken.IsValid());
-        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
-                  beforeFallbackTransfer + 1u)
-            << "live transfer service exists internally, but public access must remain fail-closed until operational";
-
         if (!CommandSucceeded("glslc --version >/dev/null 2>&1"))
         {
             SUCCEED() << "glslc is not available on PATH; skipping opt-in Vulkan pipeline creation sub-check.";
@@ -609,6 +647,7 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         }
 
         device->DestroySampler(sampler);
+        device->DestroyTexture(fullChainTexture);
         device->DestroyTexture(sampledTexture);
         device->DestroyTexture(colorTarget);
         device->DestroyTexture(depthTarget);

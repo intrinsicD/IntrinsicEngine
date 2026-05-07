@@ -69,22 +69,20 @@ available through the Vulkan 1.2/1.3 feature chain.
   failure/skipped statuses, and the backend-owned operational predicate inputs.
   Constructors for these internal service objects leave invalid state and log
   diagnostics instead of aborting when Vulkan allocation fails, so the promoted
-  backend can remain fail-closed. Public `GetBindlessHeap()` and
-  `GetTransferQueue()` now route through the same predicate as
-  `IDevice::IsOperational()`: live logical-device/swapchain/per-frame/service
-  state must be present, and operational safety blockers for canonical renderer
-  resource/descriptor/pass execution must be cleared. The guarded
-  bootstrap currently satisfies the live-prerequisite half only, so the public
-  accessors still return fail-closed fallback services even when the service
-  snapshot reports `Ready`.
+  backend can remain fail-closed. Public `GetBindlessHeap()` still routes
+  through `IDevice::IsOperational()` so descriptor allocation remains blocked
+  until canonical renderer resource/descriptor/pass execution is reconciled.
+  Public `GetTransferQueue()` now exposes the live async upload service once
+  guarded live prerequisites are ready (`PublicTransferQueueExposed = true`),
+  while the device itself and bindless heap remain non-operational/fail-closed.
 - The internal `VulkanTransferQueue` path is hardened for future public handoff:
   command-buffer allocation/begin/end/submit and semaphore-query failures now log
   diagnostics and return invalid `RHI::TransferToken` values instead of aborting
   through `VK_CHECK_FATAL`. Uploads also preflight service validity, data
   pointers, sizes, buffer ranges, texture mip/layer bounds, transfer-dst usage,
-  and staging allocation before recording commands. Public transfer access still
-  resolves to the fallback queue while non-operational, even when the internal
-  service is `Ready`.
+  and staging allocation before recording commands. Submitted command buffers are
+  retained until the timeline semaphore reports completion, then reclaimed by
+  `CollectCompleted()` with the staging-belt allocation.
 - `VulkanDevice::CreatePipeline()` now has a guarded concrete Vulkan path once
   bootstrap has produced a logical device and global pipeline layout. It reads
   SPIR-V shader files from `RHI::PipelineDesc`, creates shader modules, and builds
@@ -97,10 +95,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   still gates on `IDevice::IsOperational()`, so this direct backend resource path
   is an opt-in bootstrap prerequisite and does not make canonical frame execution
   operational.
-- Non-operational instances still return valid service references for
-  `GetBindlessHeap()` and `GetTransferQueue()`. These fail-closed fallbacks do
-  not allocate GPU slots or upload data; they return invalid indices/tokens and
-  make maintenance calls no-ops so callers never dereference null backend state.
+- Pre-bootstrap and non-service-ready instances still return valid fail-closed
+  service references for `GetBindlessHeap()` and `GetTransferQueue()`. These
+  fallbacks do not allocate GPU slots or upload data; they return invalid
+  indices/tokens and make maintenance calls no-ops so callers never dereference
+  null backend state. Once guarded live prerequisites are ready,
+  `GetTransferQueue()` returns the live Vulkan transfer queue even while
+  `IsOperational()` remains false; `GetBindlessHeap()` continues to return the
+  fallback heap until operational promotion.
   Fallback bindless allocation attempts increment
   `GetFallbackBindlessAllocationAttemptCount()`, fallback transfer-queue upload
   attempts (buffer or texture) increment
@@ -267,7 +269,9 @@ available through the Vulkan 1.2/1.3 feature chain.
   before returning the timeline `TransferToken`. Slice A.2c migrates the retained
   colormap LUT initialization caller to `IDevice::GetTransferQueue().UploadTexture()`
   and gates bindless lookup on `ColormapSystem::IsReady()` so first-frame draws
-  can skip while the asynchronous upload token is pending. Cubemap/3D batching
+  can skip while the asynchronous upload token is pending. Slice A.2d exposes
+  the live transfer queue once guarded live prerequisites are ready and adds an
+  opt-in `gpu;vulkan` smoke for a 2D multi-mip full-chain upload. Cubemap/3D batching
   remains a deferred follow-up; the existing single-subresource `WriteTexture()` /
   one-`UploadTexture()` paths remain the fail-closed correctness baseline.
   Pipeline creation now builds

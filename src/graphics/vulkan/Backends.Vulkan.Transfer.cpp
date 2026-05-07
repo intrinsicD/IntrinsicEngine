@@ -86,6 +86,9 @@ VulkanTransferQueue::VulkanTransferQueue(const Config& cfg)
 
 VulkanTransferQueue::~VulkanTransferQueue()
 {
+    if (m_Queue != VK_NULL_HANDLE)
+        vkQueueWaitIdle(m_Queue);
+    RetireCompletedCommandBuffers(std::numeric_limits<std::uint64_t>::max());
     if (m_CmdPool   != VK_NULL_HANDLE) vkDestroyCommandPool(m_Device, m_CmdPool, nullptr);
     if (m_Timeline  != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, m_Timeline, nullptr);
 }
@@ -153,6 +156,8 @@ RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
     if (!IsValid() || cmd == VK_NULL_HANDLE)
     {
         Core::Log::Warn("[VulkanTransferQueue] Cannot submit transfer command buffer; service or command buffer is invalid");
+        if (cmd != VK_NULL_HANDLE && m_Device != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE)
+            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
         return {};
     }
 
@@ -191,11 +196,28 @@ RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
             vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
             return {};
         }
+        m_InFlightCommandBuffers.push_back(RetiredCommandBuffer{.CommandBuffer = cmd,
+                                                                .RetireValue = ticket});
         m_Belt->Retire(ticket);
     }
 
-    vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
     return RHI::TransferToken{ticket};
+}
+
+void VulkanTransferQueue::RetireCompletedCommandBuffers(const uint64_t completedValue)
+{
+    if (m_Device == VK_NULL_HANDLE || m_CmdPool == VK_NULL_HANDLE)
+        return;
+
+    std::scoped_lock lock{m_Mutex};
+    while (!m_InFlightCommandBuffers.empty() &&
+           m_InFlightCommandBuffers.front().RetireValue <= completedValue)
+    {
+        const VkCommandBuffer cmd = m_InFlightCommandBuffers.front().CommandBuffer;
+        if (cmd != VK_NULL_HANDLE)
+            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        m_InFlightCommandBuffers.pop_front();
+    }
 }
 
 RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
@@ -523,6 +545,7 @@ void VulkanTransferQueue::CollectCompleted()
     }
 
     const uint64_t done = QueryCompletedValue();
+    RetireCompletedCommandBuffers(done);
     m_Belt->GarbageCollect(done);
 }
 

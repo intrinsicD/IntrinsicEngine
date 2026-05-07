@@ -990,7 +990,7 @@ bool VulkanDevice::IsOperational() const noexcept
 
 RHI::ITransferQueue& VulkanDevice::GetTransferQueue()
 {
-    if (IsOperational() && m_TransferQueue && m_TransferQueue->IsValid())
+    if (HasLiveOperationalPrerequisites() && m_TransferQueue && m_TransferQueue->IsValid())
         return *m_TransferQueue;
     return m_FallbackTransferQueue;
 }
@@ -1648,8 +1648,13 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         RefreshOperationalState();
         serviceDiagnostics.LiveOperationalPrerequisitesReady = HasLiveOperationalPrerequisites();
         serviceDiagnostics.OperationalSafetyPrerequisitesReady = HasOperationalSafetyPrerequisites();
-        serviceDiagnostics.PublicServicesExposed = IsOperational();
-        serviceDiagnostics.PublicServicesRemainFailClosed = !serviceDiagnostics.PublicServicesExposed;
+        serviceDiagnostics.PublicBindlessHeapExposed = IsOperational() && m_BindlessHeap && m_BindlessHeap->IsValid();
+        serviceDiagnostics.PublicTransferQueueExposed = serviceDiagnostics.LiveOperationalPrerequisitesReady &&
+                                                         m_TransferQueue && m_TransferQueue->IsValid();
+        serviceDiagnostics.PublicServicesExposed = serviceDiagnostics.PublicBindlessHeapExposed &&
+                                                   serviceDiagnostics.PublicTransferQueueExposed;
+        serviceDiagnostics.PublicServicesRemainFailClosed = !serviceDiagnostics.PublicBindlessHeapExposed &&
+                                                            !serviceDiagnostics.PublicTransferQueueExposed;
         serviceDiagnostics.Status = VulkanServiceBootstrapStatus::Ready;
         PublishServiceDiagnostics(serviceDiagnostics);
 

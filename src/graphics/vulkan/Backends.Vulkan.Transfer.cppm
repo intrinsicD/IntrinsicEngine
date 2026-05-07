@@ -110,6 +110,13 @@ namespace Extrinsic::Backends::Vulkan
     private:
         [[nodiscard]] VkCommandBuffer Begin();
         [[nodiscard]] RHI::TransferToken Submit(VkCommandBuffer cmd);
+        void RetireCompletedCommandBuffers(uint64_t completedValue);
+
+        struct RetiredCommandBuffer
+        {
+            VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
+            uint64_t RetireValue = 0;
+        };
 
         VkDevice      m_Device        = VK_NULL_HANDLE;
         VmaAllocator  m_Vma           = VK_NULL_HANDLE;
@@ -120,6 +127,7 @@ namespace Extrinsic::Backends::Vulkan
         std::atomic<uint64_t> m_NextTicket{1};
         std::unique_ptr<StagingBelt> m_Belt;
         mutable std::mutex m_Mutex;
+        std::deque<RetiredCommandBuffer> m_InFlightCommandBuffers;
 
         Core::ResourcePool<VulkanBuffer, RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers = nullptr;
         Core::ResourcePool<VulkanImage,  RHI::TextureHandle,  kMaxFramesInFlight>* m_Images  = nullptr;

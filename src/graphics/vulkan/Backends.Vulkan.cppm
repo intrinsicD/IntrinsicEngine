@@ -171,10 +171,12 @@ namespace Extrinsic::Backends::Vulkan
     GetVulkanFrameLifecycleDiagnosticsSnapshot() noexcept;
 
     // Backend-local service handoff diagnostics for live Vulkan service objects
-    // created after guarded bootstrap. These diagnostics are not an RHI branch
-    // seam; public GetBindlessHeap()/GetTransferQueue() accessors remain
-    // fail-closed until the backend-owned IDevice::IsOperational() predicate is
-    // true.
+    // created after guarded bootstrap. These diagnostics are not a renderer branch
+    // seam. Public bindless access remains fail-closed until the backend-owned
+    // IDevice::IsOperational() predicate is true; the public transfer queue may
+    // expose the live async upload service once guarded live prerequisites are
+    // ready so opt-in upload smoke tests and streaming seams do not need full
+    // renderer operational promotion.
     export enum class VulkanServiceBootstrapStatus : std::uint8_t
     {
         NotStarted = 0,
@@ -199,6 +201,8 @@ namespace Extrinsic::Backends::Vulkan
         bool OperationalSafetyPrerequisitesReady = false;
         bool PublicServicesExposed = false;
         bool PublicServicesRemainFailClosed = true;
+        bool PublicBindlessHeapExposed = false;
+        bool PublicTransferQueueExposed = false;
     };
 
     export [[nodiscard]] VulkanServiceDiagnosticsSnapshot GetVulkanServiceDiagnosticsSnapshot() noexcept;
