@@ -473,6 +473,7 @@ set(_graphics_contract_test_files
     Test.MinimalTriangleAcceptance.cpp
     Test.RHI.CommandContextBarriers.cpp
     Test.RendererRhiBoundary.cpp
+    Test.TextureUploadLayout.cpp
 )
 intrinsic_resolve_test_sources(_graphics_contract_test_sources
     SEARCH_DIRS contract/graphics

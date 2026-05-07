@@ -243,7 +243,24 @@ available through the Vulkan 1.2/1.3 feature chain.
   until multi-subresource batching lands, and multi-mip / multi-layer /
   cubemap batching plus opt-in `gpu;vulkan` smoke for those uploads is owned
   by [`GRAPHICS-018T`](../../../tasks/active/GRAPHICS-018T-texture-upload-batching.md),
-  not by 018Q. Pipeline creation now builds
+  not by 018Q. Per `GRAPHICS-018T` slice A.1, the CPU-testable
+  per-subresource byte-size and packed full-mip-chain offset math is
+  exposed as backend-neutral free functions in
+  `Extrinsic.RHI.TextureUpload` (`BytesPerBlock(Format)`,
+  `IsBlockCompressedFormat(Format)`, `IsDepthStencilFormat(Format)`,
+  `MipExtent(extent, mipLevel)`,
+  `ComputeSubresourceUploadSize(TextureDesc, mipLevel)`, and
+  `ComputeFullChainUploadLayout(TextureDesc) ->
+  Core::Expected<TextureUploadLayout>`), with the canonical layer-major
+  / mip-minor packing convention plus deterministic
+  `InvalidArgument`/`InvalidFormat` rejection for zero extents and
+  depth-stencil/`Undefined` formats. Slice A.2 will rewrite the Vulkan
+  multi-mip / multi-layer 2D color upload path to coalesce
+  `VkBufferImageCopy` regions in a single
+  `VulkanTransferQueue::UploadTexture()` submission consuming this
+  layout while the existing single-subresource `WriteTexture()` /
+  one-`UploadTexture()` paths remain the fail-closed correctness
+  baseline. Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded
   bootstrap has created the Vulkan device/global layout; `assets/shaders/depth_prepass.vert`
   is the canonical depth-prepass shader source used by opt-in smoke coverage.
