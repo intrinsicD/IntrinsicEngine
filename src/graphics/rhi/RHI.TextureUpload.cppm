@@ -30,6 +30,19 @@ import Extrinsic.RHI.Descriptors;
 // uploads every subresource through one staging buffer and one
 // barrier-bracket pair, never tracking per-subresource layouts.
 //
+// Per-subresource offsets are rounded up to
+// `RequiredBufferOffsetAlignment(Format)` =
+// `max(4, BytesPerBlock(Format))` so the layout is directly
+// consumable as `VkBufferImageCopy::bufferOffset` values without
+// the backend having to re-pack. This satisfies both
+// `VUID-VkBufferImageCopy-bufferOffset-00193` (multiple of the
+// format's element/block size) and
+// `VUID-vkCmdCopyBufferToImage-commandBuffer-07737` (multiple of 4
+// on transfer-only queue families without graphics or compute
+// support — which the Vulkan backend prefers when one exists).
+// The padding cost is at most `RequiredBufferOffsetAlignment - 1`
+// bytes per subresource boundary.
+//
 // Slice A.1 is purely additive. Slice A.2 will rewrite the Vulkan
 // `UploadTexture()` path to consume this layout in a single
 // `VkBufferImageCopy`-per-subresource batch.
@@ -136,6 +149,38 @@ export namespace Extrinsic::RHI
         return BytesPerBlock(fmt) != 0u;
     }
 
+    /// Required `bufferOffset` alignment, in bytes, for a copy region
+    /// uploading `fmt` data into a Vulkan image (or any backend that
+    /// inherits the same VUIDs). Returns 0 for non-uploadable formats.
+    ///
+    /// The value is `max(4, BytesPerBlock(fmt))`, which is the LCM of
+    /// the two `VkBufferImageCopy::bufferOffset` rules that apply
+    /// simultaneously in this backend:
+    ///
+    ///   * `VUID-VkBufferImageCopy-bufferOffset-00193`: must be a
+    ///     multiple of the texel-block element size in bytes (i.e.
+    ///     `BytesPerBlock(fmt)` — 1/2/4 for narrow color formats,
+    ///     8/12/16 for wide formats, 8/16 for BC*).
+    ///   * `VUID-vkCmdCopyBufferToImage-commandBuffer-07737`: when the
+    ///     command buffer is allocated from a queue family that
+    ///     supports neither `VK_QUEUE_GRAPHICS_BIT` nor
+    ///     `VK_QUEUE_COMPUTE_BIT`, must additionally be a multiple of
+    ///     4. The Vulkan backend prefers a transfer-only family in
+    ///     `Backends.Vulkan.Device.cpp`, so this rule applies in
+    ///     practice and the 4-byte floor must always hold.
+    ///
+    /// All `BytesPerBlock` values produced by this header are powers of
+    /// 2 except 12 (RGB32_FLOAT), which is itself divisible by 4, so
+    /// `max(4, BytesPerBlock(fmt))` is always sufficient (no separate
+    /// LCM computation is needed).
+    [[nodiscard]] constexpr std::uint32_t RequiredBufferOffsetAlignment(Format fmt) noexcept
+    {
+        const std::uint32_t bpb = BytesPerBlock(fmt);
+        if (bpb == 0u)
+            return 0u;
+        return bpb < 4u ? 4u : bpb;
+    }
+
     // ----------------------------------------------------------
     // Mip extent helpers
     // ----------------------------------------------------------
@@ -219,11 +264,25 @@ export namespace Extrinsic::RHI
     /// `VkBufferImageCopy[]` array against one staging buffer.
     ///
     /// `TotalBytes` is the size of the flat staging buffer the caller
-    /// must allocate and fill with all per-subresource bytes
-    /// concatenated in the same order, with each subresource starting
-    /// at `Subresources[i].OffsetBytes` (no inter-subresource padding;
-    /// per-subresource bytes are tightly packed by their block
-    /// layout).
+    /// must allocate; per-subresource bytes start at
+    /// `Subresources[i].OffsetBytes`, run for `Subresources[i].SizeBytes`,
+    /// and may be separated by alignment padding bytes the caller does
+    /// not need to initialize (the backend will not read them).
+    ///
+    /// Each `OffsetBytes` is a multiple of
+    /// `RequiredBufferOffsetAlignment(desc.Fmt)`, which is the LCM of
+    /// `VkBufferImageCopy::bufferOffset`'s element-size rule
+    /// (`VUID-VkBufferImageCopy-bufferOffset-00193`) and the transfer-
+    /// only-queue 4-byte rule
+    /// (`VUID-vkCmdCopyBufferToImage-commandBuffer-07737`). This
+    /// matters whenever a non-zero offset would otherwise land at a
+    /// non-multiple-of-4 byte — for example, a 2-layer 2x2 R8 texture
+    /// without alignment would place layer 1 at offset 5, violating
+    /// the transfer-queue VUID; with the alignment in this layout it
+    /// lands at offset 8 instead. Tightly packed offsets remain the
+    /// rule for power-of-two RGBA8 / RG8 / BC* mip chains because
+    /// their per-mip byte counts are already divisible by their
+    /// alignment.
     struct TextureUploadLayout
     {
         std::uint64_t TotalBytes = 0;
@@ -261,6 +320,7 @@ export namespace Extrinsic::RHI
 
         const bool is3D = (desc.Dimension == TextureDimension::Tex3D);
         const std::uint32_t arrayLayers = is3D ? 1u : desc.DepthOrArrayLayers;
+        const std::uint32_t alignment   = RequiredBufferOffsetAlignment(desc.Fmt);
 
         TextureUploadLayout layout{};
         layout.Subresources.reserve(static_cast<std::size_t>(arrayLayers) * desc.MipLevels);
@@ -275,6 +335,12 @@ export namespace Extrinsic::RHI
                 {
                     return Core::Err<TextureUploadLayout>(Core::ErrorCode::InvalidArgument);
                 }
+
+                // Round cursor up to the format's required bufferOffset
+                // alignment (see RequiredBufferOffsetAlignment doc). Plain
+                // arithmetic — alignment may be 12 (RGB32_FLOAT) which is
+                // not a power of two, so the bitmask trick is unsafe here.
+                cursor = ((cursor + alignment - 1u) / alignment) * alignment;
 
                 TextureUploadSubresource sub{};
                 sub.MipLevel    = mip;

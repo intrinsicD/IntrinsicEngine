@@ -300,3 +300,119 @@ TEST(TextureUploadLayout, RejectsZeroExtentOrCount)
     auto zeroLayers = Make2D(4u, 4u, 1u, 0u);
     EXPECT_FALSE(RHI::ComputeFullChainUploadLayout(zeroLayers).has_value());
 }
+
+// ---------- Vulkan-safe bufferOffset alignment ------------------------------
+
+TEST(TextureUploadAlignment, RequiredBufferOffsetAlignmentMatchesVulkanVUIDs)
+{
+    // max(4, BytesPerBlock(fmt)).
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::R8_UNORM),     4u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::RG8_UNORM),    4u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::RGBA8_UNORM),  4u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::R16_FLOAT),    4u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::RG16_FLOAT),   4u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::RGBA16_FLOAT), 8u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::R32_FLOAT),    4u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::RG32_FLOAT),   8u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::RGB32_FLOAT),  12u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::RGBA32_FLOAT), 16u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::BC1_UNORM),    8u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::BC7_UNORM),    16u);
+
+    // Non-uploadable formats yield 0 alignment.
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::Undefined), 0u);
+    EXPECT_EQ(RHI::RequiredBufferOffsetAlignment(Format::D32_FLOAT), 0u);
+}
+
+TEST(TextureUploadAlignment, R8MultiLayerOffsetsAreFourAligned)
+{
+    // 2 layers x 2 mips of 2x2 R8: per-mip byte counts 4 and 1.
+    // Without alignment padding, layer 1 mip 0 would land at offset 5,
+    // violating VUID-vkCmdCopyBufferToImage-commandBuffer-07737 on
+    // transfer-only queues. With alignment max(4, 1) = 4 padding,
+    // layer 1 mip 0 lands at offset 8 instead.
+    const TextureDesc desc = Make2D(2u, 2u, 2u, 2u, Format::R8_UNORM);
+    auto layoutOr = RHI::ComputeFullChainUploadLayout(desc);
+    ASSERT_TRUE(layoutOr.has_value());
+    const auto& layout = *layoutOr;
+
+    ASSERT_EQ(layout.Subresources.size(), 4u);
+    EXPECT_EQ(layout.Subresources[0].OffsetBytes, 0u);   // L0 M0: 4 B
+    EXPECT_EQ(layout.Subresources[0].SizeBytes,   4u);
+    EXPECT_EQ(layout.Subresources[1].OffsetBytes, 4u);   // L0 M1: 1 B (aligned to 4)
+    EXPECT_EQ(layout.Subresources[1].SizeBytes,   1u);
+    EXPECT_EQ(layout.Subresources[2].OffsetBytes, 8u);   // L1 M0: 4 B (aligned, was 5 unaligned)
+    EXPECT_EQ(layout.Subresources[2].SizeBytes,   4u);
+    EXPECT_EQ(layout.Subresources[3].OffsetBytes, 12u);  // L1 M1: 1 B (aligned, was 9 unaligned)
+    EXPECT_EQ(layout.Subresources[3].SizeBytes,   1u);
+    EXPECT_EQ(layout.TotalBytes, 13u);
+
+    // Every offset must be a multiple of 4.
+    for (const auto& sub : layout.Subresources)
+        EXPECT_EQ(sub.OffsetBytes % 4u, 0u);
+}
+
+TEST(TextureUploadAlignment, RGB32FloatHasNonPowerOfTwoAlignment)
+{
+    // RGB32_FLOAT is 12 B/texel — alignment 12, not a power of two.
+    // Two mips of 1x1 RGB32_FLOAT at 12 B each, two layers:
+    //   (L=0,M=0) offset 0,  size 12, cursor 12
+    //   (L=0,M=1) offset 12, size 12, cursor 24
+    //   (L=1,M=0) offset 24, size 12, cursor 36
+    //   (L=1,M=1) offset 36, size 12, cursor 48
+    // All offsets divisible by 12 (and by 4) without explicit padding.
+    const TextureDesc desc = Make2D(1u, 1u, 2u, 2u, Format::RGB32_FLOAT);
+    auto layoutOr = RHI::ComputeFullChainUploadLayout(desc);
+    ASSERT_TRUE(layoutOr.has_value());
+    const auto& layout = *layoutOr;
+
+    ASSERT_EQ(layout.Subresources.size(), 4u);
+    for (std::size_t i = 0; i < layout.Subresources.size(); ++i)
+    {
+        EXPECT_EQ(layout.Subresources[i].OffsetBytes, i * 12u);
+        EXPECT_EQ(layout.Subresources[i].SizeBytes,   12u);
+        EXPECT_EQ(layout.Subresources[i].OffsetBytes % 12u, 0u);
+        EXPECT_EQ(layout.Subresources[i].OffsetBytes % 4u,  0u);
+    }
+    EXPECT_EQ(layout.TotalBytes, 48u);
+}
+
+TEST(TextureUploadAlignment, RG8MultiLayerOddMipPadsToFour)
+{
+    // 2 layers x 2 mips of 3x3 RG8 (2 B/texel): mip 0 = 18 B, mip 1 = 2 B.
+    //   (L=0,M=0) offset 0,  size 18, cursor 18
+    //   (L=0,M=1) offset 20, size 2,  cursor 22  (cursor 18 -> 20 align to 4)
+    //   (L=1,M=0) offset 24, size 18, cursor 42  (cursor 22 -> 24 align to 4)
+    //   (L=1,M=1) offset 44, size 2,  cursor 46  (cursor 42 -> 44 align to 4)
+    const TextureDesc desc = Make2D(3u, 3u, 2u, 2u, Format::RG8_UNORM);
+    auto layoutOr = RHI::ComputeFullChainUploadLayout(desc);
+    ASSERT_TRUE(layoutOr.has_value());
+    const auto& layout = *layoutOr;
+
+    ASSERT_EQ(layout.Subresources.size(), 4u);
+    EXPECT_EQ(layout.Subresources[0].OffsetBytes, 0u);
+    EXPECT_EQ(layout.Subresources[1].OffsetBytes, 20u);
+    EXPECT_EQ(layout.Subresources[2].OffsetBytes, 24u);
+    EXPECT_EQ(layout.Subresources[3].OffsetBytes, 44u);
+    EXPECT_EQ(layout.TotalBytes, 46u);
+    for (const auto& sub : layout.Subresources)
+        EXPECT_EQ(sub.OffsetBytes % 4u, 0u);
+}
+
+TEST(TextureUploadAlignment, BC7OffsetsAreSixteenAligned)
+{
+    // BC7 element size 16 B. 6x6 + 3x3 + 1x1 textures all round to
+    // 4x4-block size = 16 B per mip; offsets stack at 0, 16, 32 — all
+    // multiples of 16 (and 4).
+    const TextureDesc desc = Make2D(6u, 6u, 3u, 1u, Format::BC7_UNORM);
+    auto layoutOr = RHI::ComputeFullChainUploadLayout(desc);
+    ASSERT_TRUE(layoutOr.has_value());
+    const auto& layout = *layoutOr;
+
+    ASSERT_EQ(layout.Subresources.size(), 3u);
+    for (const auto& sub : layout.Subresources)
+    {
+        EXPECT_EQ(sub.OffsetBytes % 16u, 0u);
+        EXPECT_EQ(sub.OffsetBytes % 4u,  0u);
+    }
+}
