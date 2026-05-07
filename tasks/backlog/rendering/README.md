@@ -278,6 +278,13 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   breadcrumbs is a separate semantic task only when operational bring-up
   demonstrates many-per-frame firing). It must not be mixed with C++
   behavior work.
+- [GRAPHICS-018T — Vulkan texture upload batching](../../active/GRAPHICS-018T-texture-upload-batching.md):
+  in-progress nonblocking follow-up to `GRAPHICS-018Q`/`GRAPHICS-026` that owns
+  multi-mip / multi-layer / cubemap `VkBufferImageCopy` batching plus opt-in
+  `gpu;vulkan` smoke; CPU-only fail-closed correctness path remains via the
+  guarded synchronous `WriteTexture()` baseline. Upstream gates GRAPHICS-006,
+  GRAPHICS-015, GRAPHICS-018, GRAPHICS-018Q, and GRAPHICS-026 are retired in
+  `tasks/done/`.
 - [GRAPHICS-019 — Legacy graphics IO boundaries](GRAPHICS-019-legacy-graphics-io-boundaries.md):
   may run as planning in parallel with the implementation tasks above, but
   must not put IO ownership into graphics.

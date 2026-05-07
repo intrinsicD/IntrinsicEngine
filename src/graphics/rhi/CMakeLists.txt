@@ -9,6 +9,7 @@ target_sources(${target_name}
         RHI.Handles.cppm
         RHI.Transfer.cppm
         RHI.TransferQueue.cppm
+        RHI.TextureUpload.cppm
         RHI.Profiler.cppm
         RHI.Bindless.cppm
         RHI.Types.cppm
