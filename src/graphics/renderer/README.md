@@ -564,6 +564,16 @@ human-readable summary should read `Findings.front().Message`.
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and
   null-device mode.
+- Per
+  [`GRAPHICS-028`](../../../tasks/done/GRAPHICS-028-ecs-renderable-residency-bridge.md),
+  renderable ECS residency is a runtime-owned bridge. `Runtime.RenderExtraction`
+  may keep entity-keyed sidecars containing graphics-owned values such as
+  `GpuSceneSlot`, `GpuInstanceHandle`, material instances, and asset generation
+  metadata, but graphics render passes consume only submitted snapshots/views and
+  never query live ECS or runtime sidecar state. ECS dirty tags remain CPU-only
+  semantics; runtime maps them to `GpuWorld::GeometryUploadDesc` uploads,
+  `GpuSceneSlot::NamedBuffers`, or per-instance updates according to the active
+  domain packer.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.

@@ -315,19 +315,15 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](GRAPHICS-025-hybrid-transparent-special-material-path.md):
   future-facing follow-up after GRAPHICS-006/007/008/009 and GRAPHICS-013A
   establish material, bucket, opaque, lighting, and postprocess contracts.
-- [GRAPHICS-028 — ECS renderable-entity to GpuWorld residency bridge](GRAPHICS-028-ecs-renderable-residency-bridge.md):
-  planning-only task that records the runtime-owned residency bridge
+- [GRAPHICS-028 — ECS renderable-entity to GpuWorld residency bridge](../../done/GRAPHICS-028-ecs-renderable-residency-bridge.md):
+  completed planning task that records the runtime-owned residency bridge
   between live ECS queries and `GpuWorld`. Residency state lives in a
   runtime-owned sidecar/cache keyed by stable entity ID and may store
-  graphics-owned `Graphics::Components::GpuSceneSlot` values (with planned
-  asset-id + last-seen-generation metadata); no GPU-typed component is
-  introduced under `src/ecs/Components/`.
-  Records per-stream static-vs-dynamic split, dirty-tag drain order,
-  hierarchy decomposition, per-domain packers (mesh / graph / point
-  cloud), and primitive-instancing policy (regular instances vs collected
-  instanced debug batches). Depends on retired GRAPHICS-002/004/005/007/
-  010/011/014/015/016 contracts; no implementation, no `src/graphics/*`
-  ECS imports, no `graphics/*` imports inside `src/ecs/*`.
+  graphics-owned `Graphics::Components::GpuSceneSlot` values; no GPU-typed
+  component is introduced under `src/ecs/Components/`. It records per-stream
+  static-vs-dynamic split, dirty-tag drain order, hierarchy decomposition,
+  per-domain packers (mesh / graph / point cloud), and primitive-instancing
+  policy. Follow-up implementation remains separate from this docs-only slice.
 
 ## Agent selection rules
 

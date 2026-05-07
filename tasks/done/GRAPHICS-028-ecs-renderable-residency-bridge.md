@@ -15,6 +15,8 @@ Define the planning-level architecture for turning a renderable ECS entity (sing
 - No new asset kinds; geometry domains are mesh, graph, point cloud, and the existing primitive set.
 
 ## Context
+Status: completed planning task.
+
 Existing pieces already cover the residency machinery in isolation:
 
 - `src/ecs/Components/ECS.Component.AssetInstance.cppm` — `AssetInstance::Source { std::uint32_t AssetId }`; runtime normalizes this CPU asset identifier to the `Assets::AssetId` expected by `GpuAssetCache` where that bridge is available.
@@ -82,9 +84,9 @@ What is *not* yet defined is the contract that wires them together: how `GpuScen
 - GPU coverage stays opt-in `gpu;vulkan` smoke and outside the default CPU gate.
 
 ## Docs
-- Add an "ECS renderable residency" section to `docs/architecture/graphics.md` (or a sibling under `docs/architecture/`) once decisions are recorded.
-- Cross-link from `src/ecs/Components/README.md`, `src/ecs/Systems/README.md`, and `src/graphics/renderer/README.md`.
-- Update `docs/migration/nonlegacy-parity-matrix.md` if the residency bridge subsumes any legacy renderable-iteration paths.
+- Added the "ECS renderable residency bridge" section to `docs/architecture/graphics.md`.
+- Cross-linked the boundary from `src/ecs/Components/README.md`, `src/ecs/Systems/README.md`, and `src/graphics/renderer/README.md`.
+- Updated `docs/migration/nonlegacy-parity-matrix.md` links for the completed planning gate.
 
 ## Acceptance criteria
 - The ECS-to-GpuWorld renderable bridge has a single recorded owner (`runtime`) and a clear runtime-owned residency-sidecar/cache contract that stores graphics-owned `GpuSceneSlot` state rather than introducing an ECS-side GPU-typed component.
@@ -99,6 +101,13 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
 ```
+
+## Completion
+- Completed: 2026-05-07.
+- Commit reference: local commit for GRAPHICS-028 planning-doc synchronization slice.
+- Notes:
+  - Planning decisions are mirrored in `docs/architecture/graphics.md` and source-layer README cross-links.
+  - No implementation, shader, renderer pass, or ECS component changes landed in this slice.
 
 ## Forbidden changes
 - No implementation, no shader changes, no pipeline-registry changes.
