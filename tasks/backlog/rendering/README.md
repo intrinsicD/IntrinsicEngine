@@ -96,8 +96,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   special forward picking eligibility. Decisions also mirrored in
   `docs/architecture/rendering-three-pass.md`,
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
-- [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](GRAPHICS-013-postprocess-debugview-imgui-present.md):
-  planning-only umbrella; execute through GRAPHICS-013A/B/C.
+- [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](../../done/GRAPHICS-013-postprocess-debugview-imgui-present.md):
+  retired planning-only umbrella; superseded by the split children
+  GRAPHICS-013A/B/C and their retired clarification follow-ups
+  GRAPHICS-013AQ/BQ/CQ. Listed here only as a historical pointer; not an
+  eligible next-active candidate.
 - [GRAPHICS-013A — Postprocess chain](../../done/GRAPHICS-013A-postprocess-chain.md):
   depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
   scene-color or HDR inputs are required.
