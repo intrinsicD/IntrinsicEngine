@@ -202,8 +202,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
 - [GRAPHICS-015 — GPU assets, textures, and residency](../../done/GRAPHICS-015-gpu-assets-textures-residency.md):
   depends on GRAPHICS-006 wherever material texture references are involved.
-- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](../../active/GRAPHICS-015Q-texture-residency-backend-clarifications.md):
-  active docs-only clarification for cache capacity/eviction (stays
+- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](../../done/GRAPHICS-015Q-texture-residency-backend-clarifications.md):
+  retired docs-only clarification for cache capacity/eviction (stays
   non-evicting in this slice with future eviction routed through the
   frame-anchored retire queue and refusing to evict the fallback lease),
   streaming mips (partial reupload via `RHI::TextureManager::Reupload()`

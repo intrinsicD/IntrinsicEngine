@@ -1,14 +1,15 @@
 # GRAPHICS-015Q — Texture residency backend clarification follow-ups
 
 ## Status
-- State: in-progress (docs-only clarification slice).
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-07 after `GRAPHICS-014Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-07.
 - Branch: `claude/agentic-workflow-session-xssSg`.
 - Promotion commit: `499e0f2` (move file from `tasks/backlog/rendering/` to `tasks/active/`).
-- Implementation commit: pending (this commit records the decisions below and syncs the consequential notes into `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, `src/graphics/renderer/README.md`, and `src/graphics/assets/README.md`).
-- Resolution: decisions recorded below and consequential notes synced into the four documents listed above. The rendering backlog README entry for `GRAPHICS-015Q` is redirected from the in-place backlog path to the `tasks/active/` path by this implementation commit and will be redirected to `tasks/done/` by the retirement commit.
-- Next verification step: run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` before retiring the task to `tasks/done/`.
+- Implementation commit: `55773ad` (resolve decisions and sync graphics / rendering-three-pass / renderer-README / graphics-assets-README docs).
+- Task-state commit: pending retirement commit (this commit moves the file from `tasks/active/` to `tasks/done/` and redirects the rendering backlog README link).
+- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/graphics.md` ("Graphics asset residency" section, "Per `GRAPHICS-015Q`" paragraph), `docs/architecture/rendering-three-pass.md` (new "Per `GRAPHICS-015Q`" paragraph next to the existing `GRAPHICS-014Q` paragraph), `src/graphics/renderer/README.md` (new MaterialSystem / GpuAssetCache ownership-contract bullet listing the five decisions), and `src/graphics/assets/README.md` (new "Per `GRAPHICS-015Q`" subsection under "Texture residency and fallback policy"). The rendering backlog README entry for `GRAPHICS-015Q` is redirected to the `tasks/done/` location by this retirement commit. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` (75 task files validated, 0 findings) and `python3 tools/docs/check_doc_links.py --root .` (187 relative links, no broken links).
 
 ## Decisions
 
