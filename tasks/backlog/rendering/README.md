@@ -287,6 +287,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   completed follow-on infrastructure hardening task; canonical ordering matches
   GRAPHICS-001 and it depends on GRAPHICS-003 for frame-recipe context while
   remaining CPU/null testable (no Vulkan requirement).
+- [GRAPHICS-027 — Remove rendergraph compile diagnostic string shim](../../active/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md):
+  in-progress follow-up to GRAPHICS-022 that removes the
+  `GetLastCompileDiagnostic()` string compatibility shim once downstream
+  callers have migrated to structured `RenderGraphValidationResult` findings.
+  CPU-only, no Vulkan requirement.
 - [GRAPHICS-023 — Shader, material, and texture hot reload](GRAPHICS-023-shader-material-texture-hot-reload.md):
   depends on GRAPHICS-006 for registry/material/pipeline contracts and
   GRAPHICS-015 for GPU asset/texture residency.

@@ -356,7 +356,7 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 - Missing required resources and transient resources without producers are validation **errors** (not warnings).
 - Imported-resource write policies (`ImportedResourceWritePolicy`) enforce authorized writers per imported resource. Unauthorized writes are validation **errors**.
 - Default recipe policy: only the pass marked `FinalizesBackbuffer` may write the imported Backbuffer, and imported cull buckets may only be written by recipe-declared writer passes.
-- `GetLastCompileDiagnostic()` remains a temporary string compatibility shim that mirrors the first hard-error message; its removal is tracked by [GRAPHICS-027](../../tasks/backlog/rendering/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md).
+- `GetLastCompileDiagnostic()` remains a temporary string compatibility shim that mirrors the first hard-error message; its removal is tracked by [GRAPHICS-027](../../tasks/active/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md).
 
 ## Robustness Requirements
 

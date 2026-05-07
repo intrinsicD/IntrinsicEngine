@@ -1,5 +1,15 @@
 # GRAPHICS-027 — Remove rendergraph compile diagnostic string shim
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-07 after `GRAPHICS-018Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-lfLwc`.
+- Promotion commit: pending (this commit moves the file from `tasks/backlog/rendering/` to `tasks/active/` and redirects the rendering backlog README link).
+- Implementation commit: pending. Migrate `src/graphics/renderer/Graphics.Renderer.cpp` and the test callers in `tests/contract/graphics/Test.RenderGraphValidation.cpp`, `Test.ImGuiPresentContract.cpp`, `Test.FrameRecipeContract.cpp`, `Test.PostProcessChainContract.cpp`, `Test.DebugViewContract.cpp`, `tests/unit/graphics/Test.RenderGraphDebugDump.cpp`, and `tests/integration/graphics/Test.RenderGraphLegacy.cpp` from `GetLastCompileDiagnostic()` to `GetLastCompileValidationResult()` / `CompiledRenderGraph::ValidationFindings`; remove the string shim API and `g_LastCompileDiagnostic` / `RenderGraph::Impl::LastCompileDiagnostic` storage from `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cppm`/`.cpp` and `src/graphics/framegraph/Graphics.RenderGraph.cppm`/`.cpp`; sync `src/graphics/renderer/README.md` and `docs/architecture/rendering-three-pass.md` to drop the compatibility-shim language and the `GRAPHICS-027` link.
+- Task-state commit: pending retirement commit (will move the file from `tasks/active/` to `tasks/done/` and redirect the rendering backlog README entry).
+- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after the file move; the implementation slice runs the focused CTest filter `RenderGraphValidation|RenderGraphDebugDump|FrameRecipeContract` followed by the default CPU correctness gate from `AGENTS.md` once the build is green.
+
 ## Goal
 
 Remove the temporary `GetLastCompileDiagnostic()` string compatibility shim once downstream callers have migrated to structured rendergraph validation findings.
