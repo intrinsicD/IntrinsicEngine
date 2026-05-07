@@ -258,13 +258,16 @@ available through the Vulkan 1.2/1.3 feature chain.
   `ITransferQueue::UploadTextureFullChain(TextureHandle,
   std::span<const std::byte>)` for callers that provide this packed
   full-chain layout. The Null backend and non-operational Vulkan fallback
-  return invalid tokens for that seam, and the live Vulkan transfer queue
-  still rejects it deterministically until the batching implementation lands.
-  A later A.2b slice will coalesce `VkBufferImageCopy` regions in a single
-  `VulkanTransferQueue::UploadTextureFullChain()` submission consuming this
-  layout while the existing single-subresource `WriteTexture()` /
-  one-`UploadTexture()` paths remain the fail-closed correctness
-  baseline. Pipeline creation now builds
+  return invalid tokens for that seam. The live Vulkan transfer queue now
+  validates 2D color texture-array metadata and exact byte counts, copies
+  initialized subresource ranges into one staging-belt allocation, emits one
+  whole-image `Undefined`/current-layout → `TransferDst` barrier, one
+  `vkCmdCopyBufferToImage` with a `VkBufferImageCopy` array built from
+  `TextureUploadLayout`, and one `TransferDst` → `ShaderReadOnly` barrier
+  before returning the timeline `TransferToken`. Cubemap/3D batching remains a
+  deferred follow-up; the existing single-subresource `WriteTexture()` /
+  one-`UploadTexture()` paths remain the fail-closed correctness baseline.
+  Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded
   bootstrap has created the Vulkan device/global layout; `assets/shaders/depth_prepass.vert`
   is the canonical depth-prepass shader source used by opt-in smoke coverage.
