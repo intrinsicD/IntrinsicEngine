@@ -157,7 +157,9 @@ TEST(GraphicsImGuiPresentContract, RenderGraphRejectsNonPresentBackbufferWrites)
 
     const auto compiled = graph.Compile();
     EXPECT_FALSE(compiled.has_value());
-    EXPECT_NE(graph.GetLastCompileDiagnostic().find("BadOverlayBackbufferWrite"), std::string::npos);
+    const auto& findings = graph.GetLastCompileValidationResult().Findings;
+    ASSERT_FALSE(findings.empty());
+    EXPECT_NE(findings.front().Message.find("BadOverlayBackbufferWrite"), std::string::npos);
 }
 
 TEST(GraphicsImGuiPresentContract, DefaultFrameRecipeBuildsPresentAsOnlyBackbufferUse)
@@ -171,7 +173,9 @@ TEST(GraphicsImGuiPresentContract, DefaultFrameRecipeBuildsPresentAsOnlyBackbuff
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    const auto& compileResult = graph.GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     ASSERT_FALSE(compiled->PassNames.empty());
     EXPECT_EQ(compiled->PassNames.back(), "Present");
 }

@@ -65,7 +65,11 @@ TEST(RenderGraphDebugDump, GoldenSmallRenderPassGraphIncludesAttachmentsAndResou
     });
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
 
     const std::string expected =
         "RenderGraph\n"
@@ -101,7 +105,11 @@ TEST(RenderGraphDebugDump, ResourceOnlyGraphRetainsImportedStateMetadata)
         TextureState::Present);
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
 
     const std::string dump = BuildRenderGraphDebugDump(*compiled);
     EXPECT_NE(dump.find("pass_count=0"), std::string::npos);

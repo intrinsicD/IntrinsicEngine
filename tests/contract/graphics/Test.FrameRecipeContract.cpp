@@ -90,7 +90,11 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
 
     const std::vector<std::string> expected{
         "CullingPass",
@@ -121,7 +125,11 @@ TEST(FrameRecipeContract, DefaultRecipeCompiledGraphHasNoValidationFindings)
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
 
     const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
     EXPECT_FALSE(validation.HasErrors());
@@ -213,7 +221,11 @@ TEST(FrameRecipeContract, DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership)
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
     const std::vector<std::string> passNames = OrderedPassNames(*compiled);
     EXPECT_EQ(std::ranges::find(passNames, "DepthPrepass"), passNames.end());
     EXPECT_NE(std::ranges::find(passNames, "SurfacePass"), passNames.end());

@@ -352,11 +352,10 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 - Any pass using `LOAD` without a guaranteed earlier write in-frame emits a `LoadWithoutGuaranteedWriter` warning; imported resources with a defined initial state are reported as informational findings.
 - `ValidateCompiledGraph(const CompiledRenderGraph&, std::span<const ImportedResourceAuthorization>)` returns `RenderGraphValidationResult` findings tagged with `RenderGraphValidationSeverity` and `RenderGraphValidationCode`.
 - `ValidateRecipeCompiledGraph(const FrameRecipeIntrospection&, const CompiledRenderGraph&)` is the renderer-layer convenience helper that derives imported-resource authorizations from the typed frame recipe and forwards to the framegraph validator.
-- `CompiledRenderGraph::ValidationFindings` stores the recipe-less validation findings produced during compilation, and `RenderGraphCompiler::GetLastCompileValidationResult()` / `RenderGraph::GetLastCompileValidationResult()` expose structured hard-error findings when `Compile()` returns an error.
+- `CompiledRenderGraph::ValidationFindings` stores the recipe-less validation findings produced during compilation, and `RenderGraphCompiler::GetLastCompileValidationResult()` / `RenderGraph::GetLastCompileValidationResult()` expose structured hard-error findings when `Compile()` returns an error. Callers needing a human-readable summary should read the first finding's `Message` field.
 - Missing required resources and transient resources without producers are validation **errors** (not warnings).
 - Imported-resource write policies (`ImportedResourceWritePolicy`) enforce authorized writers per imported resource. Unauthorized writes are validation **errors**.
 - Default recipe policy: only the pass marked `FinalizesBackbuffer` may write the imported Backbuffer, and imported cull buckets may only be written by recipe-declared writer passes.
-- `GetLastCompileDiagnostic()` remains a temporary string compatibility shim that mirrors the first hard-error message; its removal is tracked by [GRAPHICS-027](../../tasks/active/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md).
 
 ## Robustness Requirements
 

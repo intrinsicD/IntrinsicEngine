@@ -26,7 +26,6 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
-        thread_local std::string g_LastCompileDiagnostic{};
         thread_local RenderGraphValidationResult g_LastCompileValidationResult{};
 
         [[nodiscard]] constexpr TextureBarrierState ToTextureBarrierState(const TextureUsage usage)
@@ -320,7 +319,6 @@ namespace Extrinsic::Graphics
                                    const std::uint32_t resourceIndex = InvalidValidationIndex(),
                                    std::string resourceName = {})
         {
-            g_LastCompileDiagnostic = message;
             g_LastCompileValidationResult.Findings.clear();
             AddFinding(g_LastCompileValidationResult,
                        RenderGraphValidationSeverity::Error,
@@ -540,7 +538,6 @@ namespace Extrinsic::Graphics
         const std::span<const TextureResourceDesc> textures,
         const std::span<const BufferResourceDesc> buffers)
     {
-        g_LastCompileDiagnostic.clear();
         g_LastCompileValidationResult.Findings.clear();
         const std::uint32_t passCount = static_cast<std::uint32_t>(passes.size());
         const std::uint32_t resourceCount = static_cast<std::uint32_t>(textures.size() + buffers.size());
@@ -945,7 +942,7 @@ namespace Extrinsic::Graphics
             {
                 cycle << "<unknown>";
             }
-            g_LastCompileDiagnostic = cycle.str();
+            const std::string cycleMessage = cycle.str();
             g_LastCompileValidationResult.Findings.clear();
             for (std::uint32_t i = 0; i < passCount; ++i)
             {
@@ -956,7 +953,7 @@ namespace Extrinsic::Graphics
                 AddFinding(g_LastCompileValidationResult,
                            RenderGraphValidationSeverity::Error,
                            RenderGraphValidationCode::CycleDetected,
-                           g_LastCompileDiagnostic,
+                           cycleMessage,
                            i,
                            passes[i].Name);
             }
@@ -965,7 +962,7 @@ namespace Extrinsic::Graphics
                 AddFinding(g_LastCompileValidationResult,
                            RenderGraphValidationSeverity::Error,
                            RenderGraphValidationCode::CycleDetected,
-                           g_LastCompileDiagnostic,
+                           cycleMessage,
                            InvalidValidationIndex(),
                            std::string{});
             }
@@ -1157,11 +1154,6 @@ namespace Extrinsic::Graphics
         compiled.ValidationFindings = validation.Findings;
         g_LastCompileValidationResult = std::move(validation);
         return compiled;
-    }
-
-    const std::string& RenderGraphCompiler::GetLastCompileDiagnostic()
-    {
-        return g_LastCompileDiagnostic;
     }
 
     const RenderGraphValidationResult& RenderGraphCompiler::GetLastCompileValidationResult()

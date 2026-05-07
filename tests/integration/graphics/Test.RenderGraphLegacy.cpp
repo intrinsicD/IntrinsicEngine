@@ -303,8 +303,9 @@ TEST(GraphicsRenderGraph, InvalidExplicitDependencyFailsCompile)
 
     auto compiled = graph.Compile();
     EXPECT_FALSE(compiled.has_value());
-    const std::string& diagnostic = graph.GetLastCompileDiagnostic();
-    EXPECT_NE(diagnostic.find("Dependent"), std::string::npos);
+    const auto& findings = graph.GetLastCompileValidationResult().Findings;
+    ASSERT_FALSE(findings.empty());
+    EXPECT_NE(findings.front().Message.find("Dependent"), std::string::npos);
 }
 
 TEST(GraphicsRenderGraph, DependencyCycleReportsPassNamesInDiagnostic)
@@ -324,10 +325,11 @@ TEST(GraphicsRenderGraph, DependencyCycleReportsPassNamesInDiagnostic)
 
     auto compiled = RenderGraphCompiler::Compile(passes, {}, {});
     ASSERT_FALSE(compiled.has_value());
-    const std::string& diagnostic = RenderGraphCompiler::GetLastCompileDiagnostic();
-    EXPECT_FALSE(diagnostic.empty());
-    EXPECT_NE(diagnostic.find("PassA"), std::string::npos);
-    EXPECT_NE(diagnostic.find("PassB"), std::string::npos);
+    const auto& findings = RenderGraphCompiler::GetLastCompileValidationResult().Findings;
+    ASSERT_FALSE(findings.empty());
+    EXPECT_FALSE(findings.front().Message.empty());
+    EXPECT_NE(findings.front().Message.find("PassA"), std::string::npos);
+    EXPECT_NE(findings.front().Message.find("PassB"), std::string::npos);
 }
 
 TEST(GraphicsRenderGraph, InvalidPresentTargetFailsValidation)
@@ -340,8 +342,9 @@ TEST(GraphicsRenderGraph, InvalidPresentTargetFailsValidation)
 
     auto compiled = graph.Compile();
     EXPECT_FALSE(compiled.has_value());
-    const std::string& diagnostic = graph.GetLastCompileDiagnostic();
-    EXPECT_NE(diagnostic.find("Present"), std::string::npos);
+    const auto& findings = graph.GetLastCompileValidationResult().Findings;
+    ASSERT_FALSE(findings.empty());
+    EXPECT_NE(findings.front().Message.find("Present"), std::string::npos);
 }
 
 TEST(GraphicsRenderGraph, PresentOnImportedBackbufferCompiles)

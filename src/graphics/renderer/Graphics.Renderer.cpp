@@ -700,7 +700,8 @@ namespace Extrinsic::Graphics
                 std::chrono::duration_cast<std::chrono::microseconds>(compileEnd - compileBegin).count());
             if (!compiled.has_value())
             {
-                m_LastRenderGraphStats.Diagnostic = m_RenderGraph.GetLastCompileDiagnostic();
+                const auto& findings = m_RenderGraph.GetLastCompileValidationResult().Findings;
+                m_LastRenderGraphStats.Diagnostic = findings.empty() ? std::string{} : findings.front().Message;
                 Core::Log::Error("[Graphics] RenderGraph Compile() failed: error={} diagnostic={}",
                                  static_cast<int>(compiled.error()),
                                  m_LastRenderGraphStats.Diagnostic);

@@ -304,7 +304,7 @@ TEST(RenderGraphValidation, CompileInvalidExplicitDependencyReportsStructuredFin
     EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
     EXPECT_EQ(findings.front().PassIndex, 0u);
     EXPECT_EQ(findings.front().PassName, "InvalidDependency");
-    EXPECT_NE(RenderGraphCompiler::GetLastCompileDiagnostic().find("InvalidDependency"), std::string::npos);
+    EXPECT_NE(findings.front().Message.find("InvalidDependency"), std::string::npos);
 }
 
 TEST(RenderGraphValidation, CompileInvalidResourceAccessReportsStructuredFindings)
@@ -408,7 +408,7 @@ TEST(RenderGraphValidation, CompileCycleReportsStructuredFinding)
     EXPECT_EQ(findings[0].PassName, "CycleA");
     EXPECT_EQ(findings[1].PassName, "CycleB");
     EXPECT_TRUE(result.HasErrors());
-    EXPECT_NE(RenderGraphCompiler::GetLastCompileDiagnostic().find("cycle"), std::string::npos);
+    EXPECT_NE(findings[0].Message.find("cycle"), std::string::npos);
 }
 
 TEST(RenderGraphValidation, SuccessfulCompileStoresValidationFindings)
@@ -433,7 +433,9 @@ TEST(RenderGraphValidation, SuccessfulCompileStoresValidationFindings)
 
     const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
 
-    ASSERT_TRUE(compiled.has_value()) << RenderGraphCompiler::GetLastCompileDiagnostic();
+    const auto& compileResult = RenderGraphCompiler::GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(
         RenderGraphValidationResult{.Findings = compiled->ValidationFindings},
         RenderGraphValidationCode::LoadWithoutGuaranteedWriter);

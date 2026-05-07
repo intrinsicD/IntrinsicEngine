@@ -151,7 +151,6 @@ namespace Extrinsic::Graphics
         std::vector<CompiledRenderPassAttachment> RenderPassAttachments{};
         std::vector<BarrierPacket> BarrierPackets{};
         std::vector<RenderGraphValidationFinding> ValidationFindings{};
-        std::string Diagnostic{};
     };
 
     export class RenderGraphCompiler final
@@ -161,7 +160,6 @@ namespace Extrinsic::Graphics
             std::span<const RenderPassRecord> passes,
             std::span<const TextureResourceDesc> textures,
             std::span<const BufferResourceDesc> buffers);
-        [[nodiscard]] static const std::string& GetLastCompileDiagnostic();
         [[nodiscard]] static const RenderGraphValidationResult& GetLastCompileValidationResult();
     };
 
