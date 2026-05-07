@@ -405,9 +405,13 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
         Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; destination image lacks sampled usage");
         return {};
     }
-    if (img->Dimension != RHI::TextureDimension::Tex2D || img->Depth != 1u)
+    const bool supported2DArray = img->Dimension == RHI::TextureDimension::Tex2D && img->Depth == 1u;
+    const bool supportedCube = img->Dimension == RHI::TextureDimension::TexCube &&
+                               img->Depth == 1u &&
+                               img->ArrayLayers == 6u;
+    if (!supported2DArray && !supportedCube)
     {
-        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; only 2D color texture arrays are supported by this slice");
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; only 2D color texture arrays and six-face cubemaps are supported by this slice");
         return {};
     }
 

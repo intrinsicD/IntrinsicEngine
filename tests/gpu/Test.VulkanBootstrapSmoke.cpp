@@ -419,6 +419,64 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         const std::array<std::uint32_t, 1u> texel{0xff'ff'ff'ffu};
         device->WriteTexture(sampledTexture, texel.data(), sizeof(texel), 0u, 0u);
 
+        Extrinsic::RHI::ITransferQueue& transferQueue = device->GetTransferQueue();
+        const auto uploadFullChain = [&](const Extrinsic::RHI::TextureDesc& desc,
+                                         const char* label) -> bool
+        {
+            const Extrinsic::RHI::TextureHandle texture = device->CreateTexture(desc);
+            if (!texture.IsValid())
+            {
+                ADD_FAILURE() << label << ": service-ready guarded bootstrap should create the sampled texture";
+                return false;
+            }
+
+            auto layoutOr = Extrinsic::RHI::ComputeFullChainUploadLayout(desc);
+            if (!layoutOr.has_value())
+            {
+                ADD_FAILURE() << label << ": CPU upload layout computation failed";
+                device->DestroyTexture(texture);
+                return false;
+            }
+
+            std::vector<std::byte> fullChainBytes(static_cast<std::size_t>(layoutOr->TotalBytes), std::byte{0});
+            for (const Extrinsic::RHI::TextureUploadSubresource& sub : layoutOr->Subresources)
+            {
+                const std::byte pattern{static_cast<unsigned char>(0x20u + sub.MipLevel + sub.ArrayLayer * 8u)};
+                std::fill_n(fullChainBytes.data() + static_cast<std::size_t>(sub.OffsetBytes),
+                            static_cast<std::size_t>(sub.SizeBytes),
+                            pattern);
+            }
+
+            const std::uint64_t beforeFallbackTransfer =
+                Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
+            const Extrinsic::RHI::TransferToken token = transferQueue.UploadTextureFullChain(
+                texture,
+                std::span<const std::byte>{fullChainBytes});
+            if (!token.IsValid())
+            {
+                ADD_FAILURE() << label << ": service-ready public transfer queue should return a live token";
+                device->DestroyTexture(texture);
+                return false;
+            }
+            if (Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount() != beforeFallbackTransfer)
+            {
+                ADD_FAILURE() << label << ": upload smoke routed through the fallback transfer queue";
+                device->DestroyTexture(texture);
+                return false;
+            }
+
+            device->WaitIdle();
+            if (!transferQueue.IsComplete(token))
+            {
+                ADD_FAILURE() << label << ": transfer token did not complete after WaitIdle()";
+                device->DestroyTexture(texture);
+                return false;
+            }
+            transferQueue.CollectCompleted();
+            device->DestroyTexture(texture);
+            return true;
+        };
+
         const Extrinsic::RHI::TextureDesc fullChainTextureDesc{
             .Width = 4u,
             .Height = 4u,
@@ -428,35 +486,31 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
             .Usage = Extrinsic::RHI::TextureUsage::Sampled | Extrinsic::RHI::TextureUsage::TransferDst,
             .DebugName = "VulkanBootstrapSmoke.FullChainTexture",
         };
-        const Extrinsic::RHI::TextureHandle fullChainTexture = device->CreateTexture(fullChainTextureDesc);
-        ASSERT_TRUE(fullChainTexture.IsValid())
-            << "service-ready guarded bootstrap should create sampled multi-mip textures for full-chain transfer smoke";
+        ASSERT_TRUE(uploadFullChain(fullChainTextureDesc, "2D full-chain texture"));
 
-        auto layoutOr = Extrinsic::RHI::ComputeFullChainUploadLayout(fullChainTextureDesc);
-        ASSERT_TRUE(layoutOr.has_value());
-        std::vector<std::byte> fullChainBytes(static_cast<std::size_t>(layoutOr->TotalBytes), std::byte{0});
-        for (const Extrinsic::RHI::TextureUploadSubresource& sub : layoutOr->Subresources)
-        {
-            const std::byte pattern{static_cast<unsigned char>(0x20u + sub.MipLevel + sub.ArrayLayer * 8u)};
-            std::fill_n(fullChainBytes.data() + static_cast<std::size_t>(sub.OffsetBytes),
-                        static_cast<std::size_t>(sub.SizeBytes),
-                        pattern);
-        }
+        const Extrinsic::RHI::TextureDesc arrayFullChainTextureDesc{
+            .Width = 4u,
+            .Height = 4u,
+            .DepthOrArrayLayers = 2u,
+            .MipLevels = 3u,
+            .Fmt = Extrinsic::RHI::Format::RGBA8_UNORM,
+            .Dimension = Extrinsic::RHI::TextureDimension::Tex2D,
+            .Usage = Extrinsic::RHI::TextureUsage::Sampled | Extrinsic::RHI::TextureUsage::TransferDst,
+            .DebugName = "VulkanBootstrapSmoke.ArrayFullChainTexture",
+        };
+        ASSERT_TRUE(uploadFullChain(arrayFullChainTextureDesc, "2D array full-chain texture"));
 
-        const std::uint64_t beforeFallbackTransfer =
-            Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount();
-        Extrinsic::RHI::ITransferQueue& transferQueue = device->GetTransferQueue();
-        const Extrinsic::RHI::TransferToken fullChainToken = transferQueue.UploadTextureFullChain(
-            fullChainTexture,
-            std::span<const std::byte>{fullChainBytes});
-        EXPECT_TRUE(fullChainToken.IsValid())
-            << "service-ready public transfer queue should exercise the live Vulkan full-chain upload path";
-        EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
-                  beforeFallbackTransfer)
-            << "service-ready public transfer queue should not route upload smoke through fallback";
-        device->WaitIdle();
-        EXPECT_TRUE(transferQueue.IsComplete(fullChainToken));
-        transferQueue.CollectCompleted();
+        const Extrinsic::RHI::TextureDesc cubeFullChainTextureDesc{
+            .Width = 4u,
+            .Height = 4u,
+            .DepthOrArrayLayers = 6u,
+            .MipLevels = 3u,
+            .Fmt = Extrinsic::RHI::Format::RGBA8_UNORM,
+            .Dimension = Extrinsic::RHI::TextureDimension::TexCube,
+            .Usage = Extrinsic::RHI::TextureUsage::Sampled | Extrinsic::RHI::TextureUsage::TransferDst,
+            .DebugName = "VulkanBootstrapSmoke.CubeFullChainTexture",
+        };
+        ASSERT_TRUE(uploadFullChain(cubeFullChainTextureDesc, "cubemap full-chain texture"));
 
         const std::uint64_t beforeCommandRecordingFallback =
             Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount();
@@ -647,7 +701,6 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         }
 
         device->DestroySampler(sampler);
-        device->DestroyTexture(fullChainTexture);
         device->DestroyTexture(sampledTexture);
         device->DestroyTexture(colorTarget);
         device->DestroyTexture(depthTarget);
