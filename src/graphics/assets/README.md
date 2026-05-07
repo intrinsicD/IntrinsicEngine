@@ -36,6 +36,110 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   missing/pending/failed assets when available. Runtime owns producer sidecars;
   graphics only consumes IDs and cache views.
 
+### Per `GRAPHICS-015Q`
+
+- **Capacity / eviction.** The cache stays explicitly non-evicting in this
+  contract slice; capacity introspection comes from
+  `GpuAssetCacheDiagnostics` (`TrackedAssets`, `PendingRetireRecords`,
+  `NonEvictingCache = true`). Bounded eviction is a separate semantic task
+  that must extend the existing diagnostics, route evicted leases through
+  the same frame-anchored retire queue with
+  `retireDeadline = currentFrame + framesInFlight` so renderer snapshots
+  remain valid for at least `framesInFlight` frames after eviction
+  (mirroring the existing `NotifyReloaded` retirement), refuse to evict the
+  fallback texture lease, and prefer a priority + LRU pair over pure LRU
+  so runtime/editor can pin critical material textures.
+- **Streaming mip / reupload.** Partial-mip streaming reuses
+  `RHI::TextureManager::Reupload()` to preserve the lease's existing
+  `RHI::TextureHandle`, bindless index, and sampler binding when the
+  destination `TextureDesc` (extent, format, mip count, usage) is
+  unchanged. Full lease replacement through
+  `RequestUpload(GpuTextureRequest)` is reserved for format / extent /
+  mip-count / usage changes and hot-reload swaps to a distinct asset
+  version. A future `RequestStreamingReupload(AssetId, MipRange,
+  std::span<const std::byte>)` seam will validate the lease is `Ready`,
+  forward to `TextureManager::Reupload()`, and increment a
+  `StreamingMipUploads` counter on `GpuAssetCacheDiagnostics` analogous
+  to `TextureUploadRequests`. Until that seam lands, runtime bridges
+  emit `NotifyReloaded` followed by `RequestUpload`, accepting the
+  bindless rebind and one retire-queue entry per stream step.
+- **Fallback texture content.** A single deterministic fallback texture
+  covers every sampled material texture slot (`Albedo`, `Normal`,
+  `MetallicRoughness`, `Emissive`). The fallback is a 4x4
+  magenta-and-black checkerboard (`RGBA8_UNORM`, alpha `0xFF`, nearest
+  filter, clamp-to-edge addressing); `GetViewOrFallback()` returns it
+  with `UsedFallback = true` and the matching
+  `GpuAssetFallbackReason` for missing / pending / failed assets so the
+  magenta checker is visually obvious in development builds. Per-channel
+  "neutral" interpretation is enforced by material shader code that
+  observes the resolved `UsedFallback` bit, not by allocating per-slot
+  fallback textures: `Normal` reverts to a flat `(0.5, 0.5, 1.0)`
+  tangent normal, `MetallicRoughness` reverts to per-material
+  `MetallicFactor`/`RoughnessFactor` scalars (treated as `metallic = 0`,
+  `roughness = 1` when factors are absent), and `Emissive` is multiplied
+  by per-material `EmissiveFactor` defaulting to `0.0` so unbound
+  emissive assets do not silently glow. Visualization and Htex/UV bake
+  atlas references do **not** use this fallback: per `GRAPHICS-014Q`
+  visualization atlas descriptors with deferred residency are dropped
+  from `RenderWorld::Visualization` and counted in
+  `VisualizationDiagnostics::TextureResidencyDeferredCount`. If
+  `InitializeFallbackTexture()` itself fails (for example
+  `OutOfDeviceMemory`), the cache leaves
+  `GpuAssetCacheDiagnostics::FallbackTextureReady = false` and
+  `GetViewOrFallback()` returns
+  `GpuAssetFallbackReason::Unavailable`, letting material code fall back
+  to factor-only shading deterministically.
+- **Bindless descriptor flush cadence.** Bindless texture descriptor
+  writes are coalesced per frame: the backend records all bindless slot
+  writes produced during the frame's `IRenderer::PrepareFrame`/`Record`
+  window and drains them as a single descriptor batch at the start of
+  the next frame's `BeginFrame()`, mirroring the `Picking.Readback`
+  drain pattern from `GRAPHICS-012Q` and the histogram readback drain
+  from `GRAPHICS-013AQ`. Sampler creation is deduplicated through
+  `RHI::SamplerManager`; sampler changes detected through a different
+  `SamplerDesc` on the next `RequestUpload` trigger a coalesced
+  bindless rewrite of the affected lease's descriptor in the same
+  per-frame batch and increment a `BindlessDescriptorRewrites` counter
+  on `GpuAssetCacheDiagnostics`. Material slot updates that swap an
+  `AssetId` flow through `MaterialSystem::ResolveTextureAssetBindings()`
+  and write the resolved `BindlessIndex` into `MaterialParams` without
+  forcing a separate descriptor flush, because bindless indices are
+  retained-stable per lease for the lease's `Ready` lifetime.
+  Stale-bindless-index hazards on hot reload are prevented by the
+  existing frame-anchored retire queue holding the descriptor live for
+  `framesInFlight` frames after retirement; no additional fence,
+  semaphore, or graphics-side synchronization is introduced. Concrete
+  `VkDescriptorSet` layout and heap write batching remain backend-local
+  under `src/graphics/vulkan` and never leak through RHI or renderer
+  module surfaces.
+- **Runtime ownership.** Runtime owns both fallback initialization and
+  upload scheduling. `Runtime.Engine` (or a runtime-side graphics-
+  bootstrap step) calls `cache.InitializeFallbackTexture(fallbackDesc)`
+  exactly once after the cache is constructed and before any runtime
+  asset bridge issues `RequestUpload(GpuTextureRequest)`, sourcing the
+  fallback bytes from a baked engine resource owned by the runtime
+  layer (compiled-in byte array or runtime-loaded engine asset, **not**
+  a graphics-layer file read); the cache only consumes the
+  `std::span<const std::byte>`. Texture-typed asset bridges (planned
+  umbrella module `Extrinsic.Runtime.AssetBridges.Texture`, mirroring
+  the `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
+  `GRAPHICS-011Q` and the `Extrinsic.Runtime.VisualizationAdapters`
+  pattern from `GRAPHICS-014Q`) subscribe to texture-typed
+  `AssetEvent::Ready` events on `AssetService::SubscribeAll`, read the
+  decoded CPU payload, construct a `GpuTextureRequest` (`AssetId`,
+  `Bytes` span, `TextureDesc`, sampler descriptor or pre-allocated
+  `SamplerHandle`), and call `cache.RequestUpload(req)` synchronously
+  from the asset-event handler thread. Heavy CPU decoding may be
+  queued through `Extrinsic.Runtime.StreamingExecutor` (the same async
+  surface used for visualization baking under `GRAPHICS-014Q`), but the
+  final `RequestUpload` call is always synchronous from runtime;
+  graphics never schedules CPU work and never imports `AssetService` or
+  `AssetEventBus`. `AssetEvent::Destroyed` flows to
+  `cache.NotifyDestroyed(id)` which queues live leases for retirement.
+  Editor / app code may expose per-asset upload priority hints through
+  future runtime APIs, but the cache currently has no priority queue
+  and graphics never receives priority data.
+
 ## Layering
 
 This subdirectory is part of the `graphics/*` layer. Per `AGENTS.md` §2 it

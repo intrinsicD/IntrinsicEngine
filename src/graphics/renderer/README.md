@@ -242,6 +242,69 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   `Cull.Points.Count`. These cull-bucket resources stay reserved for retained
   `GpuRender_Line`/`GpuRender_Point` renderables and are not the transient
   debug expansion path.
+- `Graphics.GpuAssetCache` and `MaterialSystem` own the texture residency
+  contract. Per `GRAPHICS-015Q`, the cache stays explicitly non-evicting in
+  the `GRAPHICS-015` slice; capacity introspection comes from
+  `GpuAssetCacheDiagnostics` (`TrackedAssets`, `PendingRetireRecords`,
+  `NonEvictingCache = true`), and bounded eviction is a separate semantic
+  task that must extend the diagnostics, route evicted leases through the
+  same frame-anchored retire queue (`retireDeadline = currentFrame +
+  framesInFlight`), refuse to evict the fallback texture lease, and prefer
+  a priority + LRU pair over pure LRU. Streaming mip / reupload uses
+  `RHI::TextureManager::Reupload()` to preserve the lease's existing
+  `RHI::TextureHandle`, bindless index, and sampler binding for partial-mip
+  updates whose destination `TextureDesc` is unchanged; full
+  `RequestUpload(GpuTextureRequest)` is reserved for format / extent /
+  mip-count / usage changes and hot-reload swaps. A future
+  `RequestStreamingReupload(AssetId, MipRange, std::span<const std::byte>)`
+  seam will validate the lease is `Ready`, forward to
+  `TextureManager::Reupload()`, and increment a `StreamingMipUploads`
+  counter on `GpuAssetCacheDiagnostics`. A single deterministic 4x4
+  magenta-and-black checkerboard fallback texture (RGBA8_UNORM, alpha
+  0xFF, nearest filter, clamp-to-edge) covers every sampled
+  `MaterialParams` texture slot (`Albedo`/`Normal`/`MetallicRoughness`/
+  `Emissive`); per-channel "neutral" interpretation is enforced by
+  material shader code observing the resolved `UsedFallback` bit, not by
+  allocating per-slot fallback textures (`Normal` -> flat `(0.5, 0.5, 1.0)`
+  tangent normal, `MetallicRoughness` -> `MetallicFactor`/`RoughnessFactor`
+  scalars treated as `metallic = 0`, `roughness = 1` when factors are
+  absent, `Emissive` -> per-material `EmissiveFactor` defaulting to
+  `0.0` so unbound emissive assets do not silently glow). Visualization
+  and Htex/UV bake atlas references do not use the magenta fallback: per
+  `GRAPHICS-014Q`, deferred-residency atlas descriptors are dropped from
+  `RenderWorld::Visualization` and counted in
+  `VisualizationDiagnostics::TextureResidencyDeferredCount`. Bindless
+  texture descriptor writes are coalesced per frame: the backend records
+  all bindless slot writes during the frame's `IRenderer::PrepareFrame`/
+  `Record` window and drains them as a single descriptor batch at the
+  start of the next frame's `BeginFrame()`, mirroring the
+  `Picking.Readback` drain from `GRAPHICS-012Q` and the histogram
+  readback drain from `GRAPHICS-013AQ`. Sampler creation is deduplicated
+  through `RHI::SamplerManager`; `SamplerDesc` changes on the next
+  `RequestUpload` trigger a coalesced bindless rewrite of the lease's
+  descriptor in the same per-frame batch and increment a
+  `BindlessDescriptorRewrites` counter on `GpuAssetCacheDiagnostics`.
+  `MaterialSystem::ResolveTextureAssetBindings()` writes resolved
+  `BindlessIndex` values into `MaterialParams` without forcing a
+  separate descriptor flush because bindless indices are retained-stable
+  per lease, and stale-bindless hazards on hot reload are prevented by
+  the existing frame-anchored retire queue holding the descriptor live
+  for `framesInFlight` frames after retirement. Concrete `VkDescriptorSet`
+  layout and heap write batching remain backend-local under
+  `src/graphics/vulkan`. Runtime owns both fallback initialization (a
+  runtime-side graphics-bootstrap step calls
+  `cache.InitializeFallbackTexture(fallbackDesc)` exactly once with
+  fallback bytes from a baked engine resource owned by the runtime
+  layer; the cache never reads files) and upload scheduling
+  (texture-typed asset bridges under the planned umbrella
+  `Extrinsic.Runtime.AssetBridges.Texture` subscribe to texture-typed
+  `AssetEvent::Ready`, build `GpuTextureRequest`, and call
+  `cache.RequestUpload(req)` synchronously; heavy CPU decoding may be
+  queued through `Extrinsic.Runtime.StreamingExecutor`; graphics never
+  imports `AssetService`/`AssetEventBus` and never schedules CPU work).
+  If `InitializeFallbackTexture()` fails, `FallbackTextureReady = false`
+  and `GetViewOrFallback()` returns `GpuAssetFallbackReason::Unavailable`,
+  letting material code fall back to factor-only shading deterministically.
 - `PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain settings,
   deterministic stage description, sanitized diagnostics, and push-constant
   packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. Frame

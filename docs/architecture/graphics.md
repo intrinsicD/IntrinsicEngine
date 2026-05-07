@@ -319,6 +319,90 @@ Graphics is organized into explicit sublayers:
   texture/sampler allocation failures, fallback hits/misses, tracked assets,
   pending retire records, fallback readiness, and the non-eviction policy.
 
+Per `GRAPHICS-015Q`, the texture residency backend follow-ups resolve as
+follows. The cache stays explicitly non-evicting in the `GRAPHICS-015`
+contract slice; capacity introspection happens through the existing
+`GpuAssetCacheDiagnostics` fields (`TrackedAssets`, `PendingRetireRecords`,
+`NonEvictingCache = true`), and any future bounded-eviction work is a
+separate semantic task that must extend the existing diagnostics, route
+evicted leases through the same frame-anchored retire queue with
+`retireDeadline = currentFrame + framesInFlight` (mirroring the existing
+`NotifyReloaded` retirement so renderer snapshots remain valid for at
+least `framesInFlight` frames after eviction), refuse to evict the
+fallback texture lease, and prefer a priority + LRU pair over pure LRU
+so runtime/editor can pin critical material textures. Streaming mip /
+reupload behavior reuses `RHI::TextureManager::Reupload()` to preserve
+the existing `RHI::TextureHandle`, bindless index, and sampler binding
+of the lease for partial-mip updates whose destination `TextureDesc`
+(extent, format, mip count, usage) is unchanged; full lease replacement
+through `RequestUpload(GpuTextureRequest)` is reserved for format /
+extent / mip-count / usage changes and hot-reload swaps to a distinct
+asset version, and a future `RequestStreamingReupload(AssetId,
+MipRange, std::span<const std::byte>)` seam will validate the lease is
+`Ready` and forward to `TextureManager::Reupload()` while incrementing
+a `StreamingMipUploads` counter on `GpuAssetCacheDiagnostics`. A
+single deterministic 4x4 magenta-and-black checkerboard fallback
+texture (RGBA8_UNORM, alpha 0xFF, nearest filter, clamp-to-edge
+addressing) covers every sampled material texture slot (`Albedo`,
+`Normal`, `MetallicRoughness`, `Emissive`); per-channel "neutral"
+interpretation is enforced by material shader code that observes the
+resolved `UsedFallback` bit (`Normal` reverts to a flat `(0.5, 0.5,
+1.0)` tangent normal, `MetallicRoughness` reverts to per-material
+`MetallicFactor`/`RoughnessFactor` scalars treated as `metallic = 0`,
+`roughness = 1` when factors are absent, and `Emissive` is multiplied
+by per-material `EmissiveFactor` defaulting to `0.0` so unbound
+emissive assets do not silently glow). Visualization and Htex/UV bake
+atlas references do not use the magenta fallback: per `GRAPHICS-014Q`,
+visualization atlas descriptors with deferred residency are dropped
+from `RenderWorld::Visualization` and counted in
+`VisualizationDiagnostics::TextureResidencyDeferredCount`. If
+`InitializeFallbackTexture()` itself fails, the cache reports
+`FallbackTextureReady = false` and `GetViewOrFallback()` returns
+`GpuAssetFallbackReason::Unavailable` so material code can fall back
+to factor-only shading deterministically. Bindless texture descriptor
+writes are coalesced per frame: the backend records all bindless slot
+writes produced during the frame's `IRenderer::PrepareFrame`/`Record`
+window and drains them as a single descriptor batch at the start of
+the next frame's `BeginFrame()`, mirroring the `Picking.Readback`
+drain pattern from `GRAPHICS-012Q` and the histogram readback drain
+from `GRAPHICS-013AQ`. Sampler creation is deduplicated through
+`RHI::SamplerManager`; sampler changes detected through a different
+`SamplerDesc` on the next `RequestUpload` trigger a coalesced
+bindless re-write of the lease's descriptor in the same per-frame
+batch and increment a `BindlessDescriptorRewrites` counter on
+`GpuAssetCacheDiagnostics`. Material slot updates that swap an
+`AssetId` flow through `MaterialSystem::ResolveTextureAssetBindings()`
+and write the resolved `BindlessIndex` into `MaterialParams` without
+forcing a separate descriptor flush, because bindless indices are
+retained-stable per lease for the lease's `Ready` lifetime;
+stale-bindless-index hazards on hot reload are prevented by the
+existing frame-anchored retire queue holding the descriptor live for
+`framesInFlight` frames after retirement. Concrete `VkDescriptorSet`
+layout and heap write batching remain backend-local under
+`src/graphics/vulkan`. Runtime owns both fallback initialization and
+upload scheduling: `Runtime.Engine` (or a runtime-side graphics-
+bootstrap step) calls `cache.InitializeFallbackTexture(fallbackDesc)`
+exactly once after the cache is constructed and before any runtime
+asset bridge issues `RequestUpload(GpuTextureRequest)`, sourcing the
+fallback bytes from a baked engine resource owned by the runtime
+layer (compiled-in byte array or runtime-loaded engine asset, not a
+graphics-layer file read); the cache only consumes the
+`std::span<const std::byte>`. Texture-typed asset bridges (planned
+umbrella module `Extrinsic.Runtime.AssetBridges.Texture`, mirroring
+the `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
+`GRAPHICS-011Q` and the `Extrinsic.Runtime.VisualizationAdapters`
+pattern from `GRAPHICS-014Q`) subscribe to texture-typed
+`AssetEvent::Ready` events on `AssetService::SubscribeAll`, read the
+decoded CPU payload, construct a `GpuTextureRequest`, and call
+`cache.RequestUpload(req)` synchronously from the asset-event handler
+thread; heavy CPU decoding may be queued through
+`Extrinsic.Runtime.StreamingExecutor`, but the final `RequestUpload`
+call is always synchronous from runtime, and graphics never imports
+`AssetService` or `AssetEventBus`. `AssetEvent::Destroyed` flows to
+`cache.NotifyDestroyed(id)` which queues live leases for retirement;
+graphics never schedules CPU work, never reads priority data, and
+never owns asset event subscription.
+
 ## Pipeline and shader registry contract
 
 - `Extrinsic.RHI.PipelineRegistry` is the promoted CPU-testable cache layer for

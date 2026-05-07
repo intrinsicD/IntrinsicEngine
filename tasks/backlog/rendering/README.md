@@ -96,8 +96,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   special forward picking eligibility. Decisions also mirrored in
   `docs/architecture/rendering-three-pass.md`,
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
-- [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](GRAPHICS-013-postprocess-debugview-imgui-present.md):
-  planning-only umbrella; execute through GRAPHICS-013A/B/C.
+- [GRAPHICS-013 — Postprocess/debug-view/ImGui/present umbrella index](../../done/GRAPHICS-013-postprocess-debugview-imgui-present.md):
+  retired planning-only umbrella; superseded by the split children
+  GRAPHICS-013A/B/C and their retired clarification follow-ups
+  GRAPHICS-013AQ/BQ/CQ. Listed here only as a historical pointer; not an
+  eligible next-active candidate.
 - [GRAPHICS-013A — Postprocess chain](../../done/GRAPHICS-013A-postprocess-chain.md):
   depends on GRAPHICS-003 and on GRAPHICS-008/GRAPHICS-009 wherever
   scene-color or HDR inputs are required.
@@ -199,8 +202,31 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
 - [GRAPHICS-015 — GPU assets, textures, and residency](../../done/GRAPHICS-015-gpu-assets-textures-residency.md):
   depends on GRAPHICS-006 wherever material texture references are involved.
-- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](GRAPHICS-015Q-texture-residency-backend-clarifications.md):
-  nonblocking docs-only follow-up for cache capacity/eviction, streaming mips, fallback texture content, bindless descriptor flush cadence, and runtime upload scheduling policy.
+- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](../../done/GRAPHICS-015Q-texture-residency-backend-clarifications.md):
+  retired docs-only clarification for cache capacity/eviction (stays
+  non-evicting in this slice with future eviction routed through the
+  frame-anchored retire queue and refusing to evict the fallback lease),
+  streaming mips (partial reupload via `RHI::TextureManager::Reupload()`
+  preserving bindless index; full lease replacement reserved for
+  format/extent/mip-count/usage changes), fallback texture content (one
+  4x4 magenta-checker fallback covers all sampled `MaterialParams` slots;
+  per-channel neutrality enforced by material shader code observing
+  `UsedFallback`; visualization atlases drop deferred-residency
+  descriptors per `GRAPHICS-014Q` rather than using the magenta
+  fallback), bindless descriptor flush cadence (per-frame coalesced
+  drain at the next `BeginFrame()` mirroring the `Picking.Readback`
+  pattern; samplers deduplicated through `RHI::SamplerManager`;
+  `MaterialSystem::ResolveTextureAssetBindings()` writes resolved
+  bindless indices without forcing a flush; stale-bindless hazards on
+  hot reload prevented by the existing `framesInFlight` retire queue),
+  and runtime upload scheduling policy (runtime owns
+  `InitializeFallbackTexture()` and the texture-typed asset bridges
+  under planned `Extrinsic.Runtime.AssetBridges.Texture`; graphics never
+  imports `AssetService`/`AssetEventBus`). Decisions also mirrored in
+  `docs/architecture/graphics.md`,
+  `docs/architecture/rendering-three-pass.md`,
+  `src/graphics/renderer/README.md`, and
+  `src/graphics/assets/README.md`.
 - [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](../../done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
   depends on GRAPHICS-012 for picking handoff. Camera packet contracts may be
   defined earlier without blocking.
