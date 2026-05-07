@@ -206,8 +206,8 @@ set(INTRINSIC_MODULE_INVENTORY_ROOT "${INTRINSIC_SOURCE_ROOT}")
 # ------------------------------------------------------------------------------
 # Subdirectories
 # ------------------------------------------------------------------------------
-add_subdirectory(${INTRINSIC_LEGACY_CORE_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_CORE_SOURCE_ROOT})
+add_subdirectory(${INTRINSIC_LEGACY_CORE_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_GEOMETRY_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_ASSETS_SOURCE_ROOT})
 add_subdirectory(${INTRINSIC_ECS_SOURCE_ROOT})

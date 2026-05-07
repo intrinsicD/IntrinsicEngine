@@ -3,6 +3,7 @@ module;
 #include <string>
 #include <functional>
 #include <optional>
+#include <filesystem>
 
 export module Extrinsic.Core.Filesystem.PathResolver;
 
@@ -13,6 +14,8 @@ namespace Extrinsic::Core::Filesystem
 {
     using ShaderPathLookup = std::function<std::optional<std::string>(Hash::StringID)>;
     export [[nodiscard]] Expected<std::string> TryResolveShaderPath(ShaderPathLookup lookup, Hash::StringID name);
+
+    export std::filesystem::path GetRoot();
 
     export std::string GetAssetPath(const std::string& relativePath);
 

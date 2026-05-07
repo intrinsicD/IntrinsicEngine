@@ -19,7 +19,7 @@ layout(push_constant, scalar) uniform PushConstants
 void main()
 {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
-    const GpuLightRef lights = GpuLightRef(scene.LightBDA);
+    GpuLightRef lights = GpuLightRef(scene.LightBDA);
 
     vec3 accum = vec3(0.0);
     for (uint i = 0u; i < scene.LightCount; ++i)

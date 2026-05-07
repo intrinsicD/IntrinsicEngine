@@ -9,6 +9,7 @@ engine subsystems.
 - `Extrinsic.Core.Config.Render`
 - `Extrinsic.Core.Config.Simulation`
 - `Extrinsic.Core.Config.Engine`
+- `Extrinsic.Core.BoundedHeap`
 - `Extrinsic.Core.CallbackRegistry`
 - `Extrinsic.Core.Dag.Scheduler`
 - `Extrinsic.Core.Dag.TaskGraph`
@@ -23,6 +24,7 @@ engine subsystems.
 - `Extrinsic.Core.Logging`
 - `Extrinsic.Core.Memory`
 - `Extrinsic.Core.Process`
+- `Extrinsic.Core.RingBuffer`
 - `Extrinsic.Core.ResourcePool`
 - `Extrinsic.Core.StrongHandle`
 - `Extrinsic.Core.Tasks`

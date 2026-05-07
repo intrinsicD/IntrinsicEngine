@@ -4,6 +4,7 @@ intrinsic_add_module_library(${target_name})
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Core.BoundedHeap.cppm
         Core.Config.Window.cppm
         Core.Config.Render.cppm
         Core.Config.Simulation.cppm
@@ -18,6 +19,7 @@ target_sources(${target_name}
         Core.FrameGraph.cppm
         Core.IOBackend.cppm
         Core.Process.cppm
+        Core.RingBuffer.cppm
         Core.ResourcePool.cppm
         Core.Telemetry.cppm
         Core.CallbackRegistry.cppm
@@ -65,3 +67,9 @@ target_sources(${target_name}
 )
 
 target_include_directories(${target_name} PUBLIC .)
+
+target_compile_definitions(${target_name}
+        PUBLIC
+        ENGINE_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+)
+

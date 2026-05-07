@@ -9,7 +9,7 @@ namespace Extrinsic::Core
 {
     // Hardware destructive interference size (cache line size)
     // Standard on x64/ARM64 is usually 64 bytes.
-    constexpr size_t CACHE_LINE_SIZE = 64;
+    export constexpr size_t CACHE_LINE_SIZE = 64;
 
     export template <typename T>
     class LockFreeQueue

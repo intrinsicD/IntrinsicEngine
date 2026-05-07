@@ -106,7 +106,7 @@ namespace Extrinsic::Core::Filesystem
         }
     }
 
-    inline std::filesystem::path GetRoot()
+    std::filesystem::path GetRoot()
     {
                 // Cache result; root doesn't change during process lifetime.
         static std::once_flag s_Once;
