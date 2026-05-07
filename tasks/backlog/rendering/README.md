@@ -202,8 +202,31 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
 - [GRAPHICS-015 — GPU assets, textures, and residency](../../done/GRAPHICS-015-gpu-assets-textures-residency.md):
   depends on GRAPHICS-006 wherever material texture references are involved.
-- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](GRAPHICS-015Q-texture-residency-backend-clarifications.md):
-  nonblocking docs-only follow-up for cache capacity/eviction, streaming mips, fallback texture content, bindless descriptor flush cadence, and runtime upload scheduling policy.
+- [GRAPHICS-015Q — Texture residency backend clarification follow-ups](../../active/GRAPHICS-015Q-texture-residency-backend-clarifications.md):
+  active docs-only clarification for cache capacity/eviction (stays
+  non-evicting in this slice with future eviction routed through the
+  frame-anchored retire queue and refusing to evict the fallback lease),
+  streaming mips (partial reupload via `RHI::TextureManager::Reupload()`
+  preserving bindless index; full lease replacement reserved for
+  format/extent/mip-count/usage changes), fallback texture content (one
+  4x4 magenta-checker fallback covers all sampled `MaterialParams` slots;
+  per-channel neutrality enforced by material shader code observing
+  `UsedFallback`; visualization atlases drop deferred-residency
+  descriptors per `GRAPHICS-014Q` rather than using the magenta
+  fallback), bindless descriptor flush cadence (per-frame coalesced
+  drain at the next `BeginFrame()` mirroring the `Picking.Readback`
+  pattern; samplers deduplicated through `RHI::SamplerManager`;
+  `MaterialSystem::ResolveTextureAssetBindings()` writes resolved
+  bindless indices without forcing a flush; stale-bindless hazards on
+  hot reload prevented by the existing `framesInFlight` retire queue),
+  and runtime upload scheduling policy (runtime owns
+  `InitializeFallbackTexture()` and the texture-typed asset bridges
+  under planned `Extrinsic.Runtime.AssetBridges.Texture`; graphics never
+  imports `AssetService`/`AssetEventBus`). Decisions also mirrored in
+  `docs/architecture/graphics.md`,
+  `docs/architecture/rendering-three-pass.md`,
+  `src/graphics/renderer/README.md`, and
+  `src/graphics/assets/README.md`.
 - [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](../../done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
   depends on GRAPHICS-012 for picking handoff. Camera packet contracts may be
   defined earlier without blocking.
