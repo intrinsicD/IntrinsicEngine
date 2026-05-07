@@ -179,6 +179,63 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   validates domains, ranges, colormap IDs, BDA/resource seams, missing texcoords,
   and Htex atlas descriptors while leaving texture residency and geometry
   algorithm generation to later graphics-assets/runtime/geometry owners.
+  Per `GRAPHICS-014Q`, runtime extraction (`Extrinsic.Runtime.RenderExtraction`)
+  is the sole owner of translating PropertySet attributes, KMeans labels,
+  isoline results, vector fields, and Htex metadata into the
+  `RuntimeRenderSnapshotBatch` visualization packet spans
+  (`VisualizationAttributeBuffers`, `VisualizationScalars`,
+  `VisualizationColors`, `VisualizationVectorFields`, `VisualizationIsolines`,
+  `VisualizationHtexAtlases`, `VisualizationFragmentBakeAtlases`); concrete
+  producer adapters live under a planned `Extrinsic.Runtime.VisualizationAdapters`
+  umbrella, mirroring the `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
+  `GRAPHICS-011Q`. Editor/app code provides user-facing surfaces (selected
+  attribute, colormap, scalar range, isoline parameters, vector-field
+  scale/color, Htex regeneration request) and funnels them into the runtime
+  adapter as pre-filter inputs; graphics never imports geometry algorithm
+  modules or live ECS ownership. Runtime/extraction performs no packet
+  filtering — every authored packet flows through
+  `IRenderer::SubmitRuntimeSnapshots()`; validation is centralized in
+  `ValidateVisualizationPackets(...)` invoked by the renderer at snapshot
+  extraction time, rejected records are dropped from the consumed
+  `RenderWorld::Visualization` snapshot and counted in
+  `VisualizationDiagnostics`, and future backend upload stages do not
+  re-validate (mirroring the `InvalidSnapshotRecordCount` drain pattern from
+  `GRAPHICS-002`/`GRAPHICS-010Q`). Vector-field glyphs and isoline polylines
+  are NOT routed through retained `GpuRender_Line`/`GpuRender_Point` cull
+  buckets and are NOT GPU-scene renderable instances; they are auxiliary draw
+  resources owned by a backend-local upload helper under `src/graphics/vulkan`
+  mirroring the transient debug expansion from `GRAPHICS-007Q`/`GRAPHICS-010Q`
+  and the ImGui overlay upload from `GRAPHICS-013CQ` (per-frame host-visible
+  transient GPU buffers recycled each frame, never retained on `GpuWorld`,
+  never exposed through RHI or renderer module surfaces). The backend-local
+  helper expands `VectorFieldOverlayPacket`/`IsolineOverlayPacket` into
+  per-frame transient vertex/index buffers consumed by dedicated
+  visualization-overlay passes that LOAD `SceneColorHDR`/`SceneDepth` next to
+  `Pass.Forward.Line`/`Pass.Forward.Point`, expressing depth-tested vs
+  always-on-top behavior as the same two-pipeline-variant policy resolved for
+  transient debug primitives in `GRAPHICS-010Q`. Concrete pipeline binding,
+  pipeline-order placement, and a future `VisualizationOverlayUploadDiagnostics`
+  field analogous to `TransientDebugUploadDiagnostics` are tracked under
+  `GRAPHICS-018` Vulkan integration scope. Auxiliary GPU resources referenced
+  through packet BDAs and Htex/UV bake atlas textures are uploaded by the
+  existing `Graphics.GpuAssetCache`/`RHI::BufferManager`/`RHI::TextureManager`
+  paths once `GRAPHICS-015` texture/buffer residency lands; until then the
+  CPU/null contract validates packet metadata only and
+  `VisualizationDiagnostics::TextureResidencyDeferredCount` reports atlas
+  descriptors whose texture residency is intentionally deferred. Bake mapping
+  selection is runtime/editor-owned: the editor UI maps directly to
+  `VisualizationFragmentBakeMapping` (`ExistingTexcoords`/`ExistingHtex`/
+  `RecreateHtex`), and `RecreateHtex` is an explicit user-driven request
+  scheduled by runtime/geometry on a background task through
+  `Extrinsic.Runtime.StreamingExecutor` (async visualization baking remains
+  CPU/runtime-only). Graphics increments
+  `VisualizationDiagnostics::HtexRecreateRequestCount` and accepts the
+  descriptor without owning the Htex regeneration algorithm; once regeneration
+  completes the next extraction frame submits the `FragmentBakeAtlasPacket`
+  with `Mapping = ExistingHtex`. UV-backed bakes require
+  `MeshHasTexcoords = true` and a non-zero `TexcoordBufferBDA`; missing
+  texcoords are rejected from the snapshot and counted in
+  `MissingTexcoordCount`.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
   `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /

@@ -171,8 +171,32 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-014 — Visualization attributes and overlays](../../done/GRAPHICS-014-visualization-attributes-overlays.md):
   depends on GRAPHICS-002 and GRAPHICS-010, and on GRAPHICS-015 wherever
   texture/atlas resources are required.
-- [GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups](GRAPHICS-014Q-visualization-runtime-backend-clarifications.md):
-  nonblocking docs-only follow-up for runtime/geometry visualization packet producers, invalid-packet handling, overlay upload strategy, and UV/Htex bake selection policy.
+- [GRAPHICS-014Q — Visualization runtime/backend clarification follow-ups](../../done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md):
+  retired docs-only clarification for runtime visualization packet producer
+  ownership (`Extrinsic.Runtime.RenderExtraction` is sole owner; concrete
+  adapters under planned `Extrinsic.Runtime.VisualizationAdapters` umbrella,
+  mirroring the `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
+  `GRAPHICS-011Q`; graphics never imports geometry algorithm modules),
+  invalid-packet handling (no runtime/extraction filtering; centralized
+  validation through `ValidateVisualizationPackets()` at snapshot extraction
+  time, rejected records dropped from `RenderWorld::Visualization` and counted
+  in `VisualizationDiagnostics`; future backend upload stages do not
+  re-validate, mirroring the `InvalidSnapshotRecordCount` drain pattern from
+  `GRAPHICS-002`/`GRAPHICS-010Q`), overlay upload strategy (vector-field
+  glyphs and isoline polylines are auxiliary draw resources expanded by a
+  backend-local upload helper under `src/graphics/vulkan` into per-frame
+  transient vertex/index buffers, consumed by dedicated visualization-overlay
+  passes that LOAD `SceneColorHDR`/`SceneDepth` next to
+  `Pass.Forward.Line`/`Pass.Forward.Point` with the `GRAPHICS-010Q`
+  two-pipeline-variant policy; not routed through retained line/point cull
+  buckets), and UV-vs-Htex bake selection policy (runtime/editor-owned;
+  editor UI maps directly to `VisualizationFragmentBakeMapping`;
+  `RecreateHtex` is an explicit user-driven request scheduled by
+  runtime/geometry on a background task through
+  `Extrinsic.Runtime.StreamingExecutor`; graphics increments
+  `HtexRecreateRequestCount` and never owns the regeneration algorithm).
+  Decisions also mirrored in `docs/architecture/rendering-three-pass.md`,
+  `docs/architecture/graphics.md`, and `src/graphics/renderer/README.md`.
 - [GRAPHICS-015 — GPU assets, textures, and residency](../../done/GRAPHICS-015-gpu-assets-textures-residency.md):
   depends on GRAPHICS-006 wherever material texture references are involved.
 - [GRAPHICS-015Q — Texture residency backend clarification follow-ups](GRAPHICS-015Q-texture-residency-backend-clarifications.md):
