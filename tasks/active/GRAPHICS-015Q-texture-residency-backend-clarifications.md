@@ -1,5 +1,13 @@
 # GRAPHICS-015Q — Texture residency backend clarification follow-ups
 
+## Status
+- State: in-progress (docs-only clarification slice).
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-07 after `GRAPHICS-014Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-xssSg`.
+- Promotion commit: pending (this commit moves the file from `tasks/backlog/rendering/` to `tasks/active/`).
+- Next verification step: resolve the five open clarifications below by recording decisions in this task file and synchronizing the consequential notes into `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, and the graphics renderer/assets READMEs, then run `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` before retiring the task to `tasks/done/`.
+
 ## Goal
 - Clarify backend/runtime details that remain after the CPU/null `GRAPHICS-015` GPU asset cache, fallback texture, and material texture binding contracts.
 
