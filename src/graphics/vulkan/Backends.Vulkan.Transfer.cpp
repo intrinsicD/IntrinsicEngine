@@ -4,9 +4,11 @@ module;
 #include <atomic>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <span>
+#include <vector>
 
 #ifndef GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_NONE
@@ -18,6 +20,8 @@ module Extrinsic.Backends.Vulkan;
 
 import :Transfer;
 import Extrinsic.Core.Logging;
+import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.TextureUpload;
 
 namespace Extrinsic::Backends::Vulkan
 {
@@ -347,10 +351,157 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
                                                                std::span<const std::byte> src)
 {
     [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadTextureFullChain", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadTextureFullChain")};
-    (void)dst;
-    (void)src;
-    Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; batched texture uploads are not implemented yet");
-    return {};
+    if (!IsValid())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; transfer service is invalid");
+        return {};
+    }
+    if (!m_Images)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; image pool is unavailable");
+        return {};
+    }
+    if (src.empty())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; source data is empty");
+        return {};
+    }
+
+    auto* img = m_Images->GetIfValid(dst);
+    if (!img || img->Image == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; destination texture handle is invalid");
+        return {};
+    }
+    if ((img->Usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; destination image lacks transfer-dst usage");
+        return {};
+    }
+    if ((img->Usage & VK_IMAGE_USAGE_SAMPLED_BIT) == 0)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; destination image lacks sampled usage");
+        return {};
+    }
+    if (img->Dimension != RHI::TextureDimension::Tex2D || img->Depth != 1u)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; only 2D color texture arrays are supported by this slice");
+        return {};
+    }
+
+    RHI::TextureDesc desc{};
+    desc.Width = img->Width;
+    desc.Height = img->Height;
+    desc.DepthOrArrayLayers = img->ArrayLayers;
+    desc.MipLevels = img->MipLevels;
+    desc.Fmt = img->RhiFormat;
+    desc.Dimension = img->Dimension;
+    desc.Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst;
+
+    auto layoutOr = RHI::ComputeFullChainUploadLayout(desc);
+    if (!layoutOr.has_value())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; upload layout computation failed with error={}",
+                        static_cast<int>(layoutOr.error()));
+        return {};
+    }
+    const RHI::TextureUploadLayout& layout = *layoutOr;
+    if (layout.TotalBytes != static_cast<std::uint64_t>(src.size_bytes()))
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; upload size mismatch: expected={} actual={}",
+                        layout.TotalBytes,
+                        static_cast<std::uint64_t>(src.size_bytes()));
+        return {};
+    }
+    if (layout.TotalBytes > static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()) ||
+        layout.Subresources.size() > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; upload layout is too large for this host/backend");
+        return {};
+    }
+
+    const std::uint32_t offsetAlignment = RHI::RequiredBufferOffsetAlignment(desc.Fmt);
+    auto staging = m_Belt->Allocate(static_cast<std::size_t>(layout.TotalBytes), offsetAlignment);
+    if (!staging.MappedPtr || staging.Buffer == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; staging allocation failed");
+        return {};
+    }
+
+    auto* stagingBytes = static_cast<std::byte*>(staging.MappedPtr);
+    for (const RHI::TextureUploadSubresource& sub : layout.Subresources)
+    {
+        std::memcpy(stagingBytes + static_cast<std::size_t>(sub.OffsetBytes),
+                    src.data() + static_cast<std::size_t>(sub.OffsetBytes),
+                    static_cast<std::size_t>(sub.SizeBytes));
+    }
+
+    std::vector<VkBufferImageCopy> regions;
+    regions.reserve(layout.Subresources.size());
+    const VkImageAspectFlags aspectMask = AspectFromFormat(img->Format);
+    for (const RHI::TextureUploadSubresource& sub : layout.Subresources)
+    {
+        VkBufferImageCopy region{};
+        region.bufferOffset = staging.Offset + sub.OffsetBytes;
+        region.imageSubresource = VkImageSubresourceLayers{.aspectMask = aspectMask,
+                                                           .mipLevel = sub.MipLevel,
+                                                           .baseArrayLayer = sub.ArrayLayer,
+                                                           .layerCount = 1u};
+        region.imageExtent = VkExtent3D{.width = sub.Width,
+                                        .height = sub.Height,
+                                        .depth = sub.Depth};
+        regions.push_back(region);
+    }
+
+    VkCommandBuffer cmd = Begin();
+    if (cmd == VK_NULL_HANDLE)
+        return {};
+
+    VkImageMemoryBarrier2 toXfer{};
+    toXfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    toXfer.srcStageMask = img->CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED
+                              ? VK_PIPELINE_STAGE_2_NONE
+                              : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    toXfer.srcAccessMask = img->CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED
+                               ? 0
+                               : VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
+    toXfer.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    toXfer.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    toXfer.oldLayout = img->CurrentLayout;
+    toXfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toXfer.image = img->Image;
+    toXfer.subresourceRange = VkImageSubresourceRange{.aspectMask = aspectMask,
+                                                      .baseMipLevel = 0u,
+                                                      .levelCount = img->MipLevels,
+                                                      .baseArrayLayer = 0u,
+                                                      .layerCount = img->ArrayLayers};
+    VkDependencyInfo dep{};
+    dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dep.imageMemoryBarrierCount = 1u;
+    dep.pImageMemoryBarriers = &toXfer;
+    vkCmdPipelineBarrier2(cmd, &dep);
+
+    vkCmdCopyBufferToImage(cmd,
+                           staging.Buffer,
+                           img->Image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           static_cast<std::uint32_t>(regions.size()),
+                           regions.data());
+
+    VkImageMemoryBarrier2 toRead = toXfer;
+    toRead.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    toRead.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    toRead.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    toRead.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    toRead.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toRead.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    dep.pImageMemoryBarriers = &toRead;
+    vkCmdPipelineBarrier2(cmd, &dep);
+
+    const RHI::TransferToken token = Submit(cmd);
+    if (token.IsValid())
+        img->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    return token;
 }
 
 bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const

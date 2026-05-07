@@ -914,6 +914,8 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
         importedImage.Image = outState.Images[imageIndex];
         importedImage.View = outState.Views[imageIndex];
         importedImage.Format = outState.Format;
+        importedImage.RhiFormat = RHI::Format::Undefined;
+        importedImage.Dimension = RHI::TextureDimension::Tex2D;
         importedImage.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         importedImage.Width = outState.Extent.width;
         importedImage.Height = outState.Extent.height;
@@ -1525,6 +1527,8 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
             importedImage.Image = swapchainImage;
             importedImage.View = imageView;
             importedImage.Format = m_SwapchainFormat;
+            importedImage.RhiFormat = RHI::Format::Undefined;
+            importedImage.Dimension = RHI::TextureDimension::Tex2D;
             importedImage.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
             importedImage.Width = m_SwapchainExtent.width;
             importedImage.Height = m_SwapchainExtent.height;
@@ -2769,6 +2773,8 @@ RHI::TextureHandle VulkanDevice::CreateTexture(const RHI::TextureDesc& desc)
     // Tex2D with DepthOrArrayLayers > 1.
     VulkanImage image{};
     image.Format = format;
+    image.RhiFormat = desc.Fmt;
+    image.Dimension = desc.Dimension;
     image.Usage = usage;
     image.Width = desc.Width;
     image.Height = desc.Height;

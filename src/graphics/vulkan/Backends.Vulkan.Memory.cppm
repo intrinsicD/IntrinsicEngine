@@ -6,6 +6,8 @@ module;
 
 export module Extrinsic.Backends.Vulkan:Memory;
 
+export import Extrinsic.RHI.Descriptors;
+
 namespace Extrinsic::Backends::Vulkan
 {
     export struct VulkanBuffer
@@ -24,6 +26,8 @@ namespace Extrinsic::Backends::Vulkan
         VkImageView   View        = VK_NULL_HANDLE;
         VmaAllocation Allocation  = VK_NULL_HANDLE;
         VkFormat      Format      = VK_FORMAT_UNDEFINED;
+        RHI::Format   RhiFormat   = RHI::Format::Undefined;
+        RHI::TextureDimension Dimension = RHI::TextureDimension::Tex2D;
         VkImageUsageFlags Usage    = 0;
         uint32_t      Width       = 0;
         uint32_t      Height      = 0;

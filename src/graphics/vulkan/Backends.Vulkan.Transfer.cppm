@@ -51,7 +51,7 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] size_t Capacity() const noexcept { return m_Capacity; }
 
     private:
-        static size_t AlignUp(size_t v, size_t a) { return (v + a - 1) & ~(a - 1); }
+        static size_t AlignUp(size_t v, size_t a) { return a == 0 ? v : ((v + a - 1) / a) * a; }
 
         struct Region { size_t Begin, End; uint64_t RetireValue; };
 
