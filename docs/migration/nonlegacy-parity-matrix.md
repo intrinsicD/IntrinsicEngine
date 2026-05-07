@@ -57,7 +57,7 @@ registries.
 
 ## Legacy graphics retirement gates (`GRAPHICS-020`)
 
-`GRAPHICS-020` is the active mechanical gate map for deleting or isolating
+`GRAPHICS-020` is the completed mechanical gate map for deleting or isolating
 retained legacy rendering modules. It groups every legacy graphics/RHI/runtime
 rendering module from `docs/api/generated/module_inventory.md` into a promoted
 owner, required parity evidence, current readiness state, and final removal
