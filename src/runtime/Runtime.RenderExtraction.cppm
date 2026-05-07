@@ -59,6 +59,14 @@ export namespace Extrinsic::Runtime
         std::uint64_t ObservedGeneration = 0;
     };
 
+    enum class RuntimeRenderableAssetAcknowledgmentResult : std::uint8_t
+    {
+        Acknowledged,
+        SkippedNoSourceAsset,
+        SkippedAssetMismatch,
+        SkippedNoObservedGeneration,
+    };
+
     struct RuntimeRenderExtractionStats
     {
         std::uint32_t CandidateRenderableCount{0};
@@ -75,12 +83,17 @@ export namespace Extrinsic::Runtime
         std::uint32_t SourceAssetGenerationUnavailableCount{0};
         std::uint32_t SourceAssetUpToDateCount{0};
         std::uint32_t SourceAssetRebindRequiredCount{0};
+        std::uint32_t SourceAssetRebindAcknowledgedCount{0};
     };
 
     [[nodiscard]] RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
         Graphics::Components::GpuSceneSlot& slot,
         Assets::AssetId sourceAsset,
         Graphics::GpuAssetCache* gpuAssets);
+
+    [[nodiscard]] RuntimeRenderableAssetAcknowledgmentResult AcknowledgeRenderableAssetRebind(
+        Graphics::Components::GpuSceneSlot& slot,
+        const RuntimeRenderableAssetGenerationObservation& observation) noexcept;
 
     class RenderExtractionCache
     {
@@ -309,6 +322,26 @@ namespace Extrinsic::Runtime
             break;
         }
         return observation;
+    }
+
+    RuntimeRenderableAssetAcknowledgmentResult AcknowledgeRenderableAssetRebind(
+        Graphics::Components::GpuSceneSlot& slot,
+        const RuntimeRenderableAssetGenerationObservation& observation) noexcept
+    {
+        if (!slot.HasSourceAsset())
+        {
+            return RuntimeRenderableAssetAcknowledgmentResult::SkippedNoSourceAsset;
+        }
+        if (!observation.SourceAsset.IsValid() || observation.SourceAsset != slot.SourceAsset)
+        {
+            return RuntimeRenderableAssetAcknowledgmentResult::SkippedAssetMismatch;
+        }
+        if (observation.ObservedGeneration == 0)
+        {
+            return RuntimeRenderableAssetAcknowledgmentResult::SkippedNoObservedGeneration;
+        }
+        slot.UpdateLastSeenAssetGeneration(observation.ObservedGeneration);
+        return RuntimeRenderableAssetAcknowledgmentResult::Acknowledged;
     }
 
     RenderExtractionCache::RenderableSidecar* RenderExtractionCache::EnsureRenderable(

@@ -126,7 +126,12 @@ human-readable summary should read `Findings.front().Message`.
   supplied `Graphics.GpuAssetCache` view and `GpuSceneSlot` metadata, but
   `GpuSceneSlot` itself only exposes value-type comparison helpers and does not
   import `Graphics.GpuAssetCache`, ECS, runtime, live `AssetService`, or backend
-  modules.
+  modules. Per `GRAPHICS-023D`, the runtime side advances
+  `GpuSceneSlot::LastSeenAssetGeneration` only through the explicit
+  `Runtime::AcknowledgeRenderableAssetRebind` helper; the default
+  `RenderExtractionCache::ExtractAndSubmit` path observes without
+  acknowledging until a later upload/rebind slice actually performs the
+  binding work.
 - `RenderWorld` exposes immutable spans of renderer-owned `RenderableSnapshot`
   and `LightSnapshot` values, sanitized transient debug line/point/triangle
   packet spans, transform-gizmo render packet spans, `VisualizationSnapshot`

@@ -320,6 +320,13 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `AssetInstance::Source` against a supplied `Graphics.GpuAssetCache` view and
   classify pending/up-to-date/rebind-required `GpuSceneSlot` states without
   performing upload, file-watching, shader reload, or GPU geometry rebinding.
+- [GRAPHICS-023D — Runtime asset-generation rebind acknowledgment](../../active/GRAPHICS-023D-runtime-asset-generation-rebind-acknowledgment.md):
+  active focused child task that adds the runtime-owned
+  `AcknowledgeRenderableAssetRebind` helper closing the
+  observe → classify → acknowledge loop opened by `GRAPHICS-023C`. The default
+  `ExtractAndSubmit` path still observes without acknowledging; uploads,
+  file-watching, shader reload, and texture residency reload remain out of
+  scope.
 - [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md):
   completed planning task; recorded the per-row owner matrix for legacy
   overlay/presentation/editor-adjacent behaviors and cross-linked

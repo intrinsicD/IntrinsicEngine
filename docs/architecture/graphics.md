@@ -386,8 +386,14 @@ runtime; it does not import `Graphics.GpuAssetCache` or query live asset state.
 read `AssetInstance::Source`, query a supplied `Graphics.GpuAssetCache`, and
 report whether a future rebind is required, but it does not mark newer
 generations as last-seen until a later upload/rebind slice actually performs the
-binding work. Graphics render passes receive only renderer-submitted
-snapshots/views and must not query ECS or runtime sidecar storage directly.
+binding work. `GRAPHICS-023D` closes that loop on the runtime side only by
+adding `Runtime::AcknowledgeRenderableAssetRebind(slot, observation)`, an
+explicit caller-driven helper that advances `GpuSceneSlot::LastSeenAssetGeneration`
+to the observed generation when the asset identity matches; it does not
+auto-acknowledge inside `RenderExtractionCache::ExtractAndSubmit`, perform
+uploads, watch files, recompile shaders, or reload texture residency. Graphics
+render passes receive only renderer-submitted snapshots/views and must not
+query ECS or runtime sidecar storage directly.
 
 Static-vs-dynamic geometry residency is decided per stream. Immutable, shared
 asset geometry flows from the CPU asset identifier on `AssetInstance::Source`
