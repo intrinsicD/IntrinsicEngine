@@ -106,6 +106,7 @@ target_sources(${target_name}
         Geometry.NormalEstimation.cpp
         Geometry.Octree.cpp
         Geometry.Parameterization.cpp
+        Geometry.PCA.cpp
         Geometry.PointCloud.cpp
         Geometry.PointCloudIO.cpp
         Geometry.PointCloudUtils.cpp
