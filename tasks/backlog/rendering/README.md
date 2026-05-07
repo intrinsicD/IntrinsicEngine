@@ -285,9 +285,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   synchronous `WriteTexture()` baseline. Upstream gates GRAPHICS-006,
   GRAPHICS-015, GRAPHICS-018, GRAPHICS-018Q, and GRAPHICS-026 are retired in
   `tasks/done/`.
-- [GRAPHICS-019 — Legacy graphics IO boundaries](GRAPHICS-019-legacy-graphics-io-boundaries.md):
-  may run as planning in parallel with the implementation tasks above, but
-  must not put IO ownership into graphics.
+- [GRAPHICS-019 — Legacy graphics IO boundaries](../../done/GRAPHICS-019-legacy-graphics-io-boundaries.md):
+  completed planning task that assigns legacy graphics import/export/model/texture
+  IO to `assets`, `geometry`, `runtime`, and `graphics/assets` handoff owners;
+  final graphics layers must not own file IO or parser/exporter registries.
 - [GRAPHICS-020 — Legacy graphics retirement gates](GRAPHICS-020-legacy-graphics-retirement-gates.md):
   final retirement gating after parity tasks complete.
 - [GRAPHICS-022 — Rendergraph diagnostics and validation](../../done/GRAPHICS-022-rendergraph-diagnostics-validation.md):
