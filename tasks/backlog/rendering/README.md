@@ -314,10 +314,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   establish material, bucket, opaque, lighting, and postprocess contracts.
 - [GRAPHICS-028 — ECS renderable-entity to GpuWorld residency bridge](GRAPHICS-028-ecs-renderable-residency-bridge.md):
   planning-only task that records the runtime-owned residency bridge
-  between the ECS registry and `GpuWorld`. Residency state lives in the
-  graphics-owned per-entity sidecar `Graphics::Components::GpuSceneSlot`
-  (extended with asset-id + last-seen-generation) and is mutated only by
-  `runtime`; no GPU-typed component is introduced under `src/ecs/Components/`.
+  between live ECS queries and `GpuWorld`. Residency state lives in a
+  runtime-owned sidecar/cache keyed by stable entity ID and may store
+  graphics-owned `Graphics::Components::GpuSceneSlot` values (with planned
+  asset-id + last-seen-generation metadata); no GPU-typed component is
+  introduced under `src/ecs/Components/`.
   Records per-stream static-vs-dynamic split, dirty-tag drain order,
   hierarchy decomposition, per-domain packers (mesh / graph / point
   cloud), and primitive-instancing policy (regular instances vs collected
