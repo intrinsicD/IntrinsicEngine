@@ -1,5 +1,15 @@
 # GRAPHICS-018Q — Vulkan integration clarification follow-ups
 
+## Status
+- State: in-progress.
+- Owner/agent: local agent workflow.
+- Activated: 2026-05-07 after `GRAPHICS-017Q` retirement cleared `tasks/active/`.
+- Branch: `claude/agentic-workflow-session-qg1Wv`.
+- Promotion commit: pending (this commit moves the file from `tasks/backlog/rendering/` to `tasks/active/`).
+- Implementation commit: pending docs sync into `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, and `src/graphics/renderer/README.md`.
+- Task-state commit: pending retirement commit (will move the file from `tasks/active/` to `tasks/done/`).
+- Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .` after docs sync lands.
+
 ## Goal
 Capture Vulkan renderer integration questions that should not be implemented inside unrelated `GRAPHICS-018` plumbing slices.
 

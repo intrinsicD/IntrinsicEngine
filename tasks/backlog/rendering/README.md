@@ -258,10 +258,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   depends on stable CPU/null contracts from GRAPHICS-002, GRAPHICS-003,
   GRAPHICS-004, GRAPHICS-006, GRAPHICS-007, GRAPHICS-008, GRAPHICS-009, and
   GRAPHICS-013C.
-- [GRAPHICS-018Q — Vulkan integration clarification follow-ups](GRAPHICS-018Q-vulkan-integration-clarifications.md):
-  nonblocking docs-only follow-up for platform/window fixtures in opt-in
-  swapchain smoke tests, shader/pipeline asset packaging, and resize/present
-  failure diagnostic taxonomy. It must not be mixed with C++ behavior work.
+- [GRAPHICS-018Q — Vulkan integration clarification follow-ups](../../active/GRAPHICS-018Q-vulkan-integration-clarifications.md):
+  promoted to `tasks/active/` for the current session; nonblocking docs-only
+  follow-up for platform/window fixtures in opt-in swapchain smoke tests,
+  shader/pipeline asset packaging, and resize/present failure diagnostic
+  taxonomy. It must not be mixed with C++ behavior work.
 - [GRAPHICS-019 — Legacy graphics IO boundaries](GRAPHICS-019-legacy-graphics-io-boundaries.md):
   may run as planning in parallel with the implementation tasks above, but
   must not put IO ownership into graphics.
