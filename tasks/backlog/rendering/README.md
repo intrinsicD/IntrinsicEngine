@@ -306,6 +306,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-023 — Shader, material, and texture hot reload](GRAPHICS-023-shader-material-texture-hot-reload.md):
   depends on GRAPHICS-006 for registry/material/pipeline contracts and
   GRAPHICS-015 for GPU asset/texture residency.
+- [GRAPHICS-023A — GpuSceneSlot asset generation tracking](../../done/GRAPHICS-023A-gpu-scene-slot-asset-generation-tracking.md):
+  completed focused child task that lands the `GpuSceneSlot::SourceAsset` and
+  `GpuSceneSlot::LastSeenAssetGeneration` metadata required by completed
+  `GRAPHICS-028` for later runtime residency hot-reload comparisons. It does
+  not implement runtime polling, file watching, shader reload, or asset ingest.
 - [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md):
   completed planning task; recorded the per-row owner matrix for legacy
   overlay/presentation/editor-adjacent behaviors and cross-linked

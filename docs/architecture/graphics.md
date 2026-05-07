@@ -376,10 +376,11 @@ read CPU-only `AssetInstance::Source`, `GeometrySources::*`, hierarchy, transfor
 and dirty-tag components, and maintain an entity-keyed residency sidecar/cache.
 That cache may store graphics-owned value types such as
 `Graphics::Components::GpuSceneSlot`, `GpuInstanceHandle`, material instances, and
-asset-binding metadata, but those values remain outside canonical ECS components
-and outside the live `entt::registry` as GPU-typed ECS state. Graphics render
-passes receive only renderer-submitted snapshots/views and must not query ECS or
-runtime sidecar storage directly.
+asset-binding metadata (`GpuSceneSlot::SourceAsset` and
+`GpuSceneSlot::LastSeenAssetGeneration`), but those values remain outside
+canonical ECS components and outside the live `entt::registry` as GPU-typed ECS
+state. Graphics render passes receive only renderer-submitted snapshots/views and
+must not query ECS or runtime sidecar storage directly.
 
 Static-vs-dynamic geometry residency is decided per stream. Immutable, shared
 asset geometry flows from the CPU asset identifier on `AssetInstance::Source`

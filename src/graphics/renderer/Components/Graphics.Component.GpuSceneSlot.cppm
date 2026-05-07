@@ -7,6 +7,7 @@ module;
 
 export module Extrinsic.Graphics.Component.GpuSceneSlot;
 
+import Extrinsic.Asset.Registry;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
 
@@ -61,6 +62,8 @@ export namespace Extrinsic::Graphics::Components
         std::uint32_t InstanceGeneration = 0;
         std::uint32_t GeometrySlot = UINT32_MAX;
         std::uint32_t GeometryGeneration = 0;
+        Assets::AssetId SourceAsset{};
+        std::uint64_t LastSeenAssetGeneration = 0;
 
         std::unordered_map<std::string, RHI::BufferHandle> NamedBuffers;
         std::unordered_map<std::string, BufferEntry> NamedBufferEntries;
@@ -78,6 +81,11 @@ export namespace Extrinsic::Graphics::Components
         [[nodiscard]] bool IsRegistered() const noexcept
         {
             return HasInstance();
+        }
+
+        [[nodiscard]] bool HasSourceAsset() const noexcept
+        {
+            return SourceAsset.IsValid();
         }
 
         // Returns the handle for the named buffer, or a null handle if not found.
@@ -132,7 +140,22 @@ export namespace Extrinsic::Graphics::Components
             GeometrySlot = h.Index;
             GeometryGeneration = h.Generation;
         }
+
+        void SetSourceAsset(Assets::AssetId asset, std::uint64_t generation = 0) noexcept
+        {
+            SourceAsset = asset;
+            LastSeenAssetGeneration = generation;
+        }
+
+        void UpdateLastSeenAssetGeneration(std::uint64_t generation) noexcept
+        {
+            LastSeenAssetGeneration = generation;
+        }
+
+        void ClearSourceAsset() noexcept
+        {
+            SourceAsset = {};
+            LastSeenAssetGeneration = 0;
+        }
     };
 }
-
-
