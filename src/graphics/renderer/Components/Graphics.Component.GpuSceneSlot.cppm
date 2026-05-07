@@ -21,6 +21,15 @@ export namespace Extrinsic::Graphics
 
 export namespace Extrinsic::Graphics::Components
 {
+    enum class GpuSceneSlotAssetRebindDecision : std::uint8_t
+    {
+        NoSourceAsset,
+        AssetMismatch,
+        GenerationUnavailable,
+        UpToDate,
+        RebindRequired,
+    };
+
     // A named GPU buffer view owned by this renderable's GpuSceneSlot.
     // The lifecycle system populates these; render passes and visualization
     // components reference them by name.
@@ -150,6 +159,32 @@ export namespace Extrinsic::Graphics::Components
         void UpdateLastSeenAssetGeneration(std::uint64_t generation) noexcept
         {
             LastSeenAssetGeneration = generation;
+        }
+
+        [[nodiscard]] GpuSceneSlotAssetRebindDecision EvaluateSourceAssetRebind(
+            Assets::AssetId observedAsset,
+            std::uint64_t observedGeneration) const noexcept
+        {
+            if (!HasSourceAsset())
+                return GpuSceneSlotAssetRebindDecision::NoSourceAsset;
+
+            if (observedAsset != SourceAsset)
+                return GpuSceneSlotAssetRebindDecision::AssetMismatch;
+
+            if (observedGeneration == 0)
+                return GpuSceneSlotAssetRebindDecision::GenerationUnavailable;
+
+            if (observedGeneration <= LastSeenAssetGeneration)
+                return GpuSceneSlotAssetRebindDecision::UpToDate;
+
+            return GpuSceneSlotAssetRebindDecision::RebindRequired;
+        }
+
+        [[nodiscard]] bool NeedsSourceAssetRebind(Assets::AssetId observedAsset,
+                                                  std::uint64_t observedGeneration) const noexcept
+        {
+            return EvaluateSourceAssetRebind(observedAsset, observedGeneration)
+                == GpuSceneSlotAssetRebindDecision::RebindRequired;
         }
 
         void ClearSourceAsset() noexcept

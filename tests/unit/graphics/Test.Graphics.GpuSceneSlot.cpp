@@ -102,3 +102,32 @@ TEST(GraphicsGpuSceneSlot, ClearingSourceAssetPreservesResidencyAndBuffers)
     EXPECT_EQ(slot.ToGeometryHandle(), geometry);
     EXPECT_EQ(slot.Find("positions"), positions);
 }
+
+TEST(GraphicsGpuSceneSlot, EvaluatesAssetRebindDecisionDeterministically)
+{
+    using Decision = Graphics::Components::GpuSceneSlotAssetRebindDecision;
+
+    Graphics::Components::GpuSceneSlot slot{};
+    const auto asset = MakeAssetId(5u, 6u);
+    const auto otherAsset = MakeAssetId(7u, 1u);
+
+    EXPECT_EQ(slot.EvaluateSourceAssetRebind(asset, 1u), Decision::NoSourceAsset);
+    EXPECT_FALSE(slot.NeedsSourceAssetRebind(asset, 1u));
+
+    slot.SetSourceAsset(asset, 10u);
+
+    EXPECT_EQ(slot.EvaluateSourceAssetRebind(otherAsset, 11u), Decision::AssetMismatch);
+    EXPECT_FALSE(slot.NeedsSourceAssetRebind(otherAsset, 11u));
+
+    EXPECT_EQ(slot.EvaluateSourceAssetRebind(asset, 0u), Decision::GenerationUnavailable);
+    EXPECT_FALSE(slot.NeedsSourceAssetRebind(asset, 0u));
+
+    EXPECT_EQ(slot.EvaluateSourceAssetRebind(asset, 9u), Decision::UpToDate);
+    EXPECT_FALSE(slot.NeedsSourceAssetRebind(asset, 9u));
+
+    EXPECT_EQ(slot.EvaluateSourceAssetRebind(asset, 10u), Decision::UpToDate);
+    EXPECT_FALSE(slot.NeedsSourceAssetRebind(asset, 10u));
+
+    EXPECT_EQ(slot.EvaluateSourceAssetRebind(asset, 11u), Decision::RebindRequired);
+    EXPECT_TRUE(slot.NeedsSourceAssetRebind(asset, 11u));
+}

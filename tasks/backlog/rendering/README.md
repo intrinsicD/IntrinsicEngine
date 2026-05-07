@@ -311,6 +311,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `GpuSceneSlot::LastSeenAssetGeneration` metadata required by completed
   `GRAPHICS-028` for later runtime residency hot-reload comparisons. It does
   not implement runtime polling, file watching, shader reload, or asset ingest.
+- [GRAPHICS-023B — GpuSceneSlot asset rebind decision](../../done/GRAPHICS-023B-gpu-scene-slot-asset-rebind-decision.md):
+  completed focused child task that adds the CPU-only `GpuSceneSlot` decision helper
+  for comparing runtime-observed asset generations without importing
+  `Graphics.GpuAssetCache` into the renderer component value type.
 - [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md):
   completed planning task; recorded the per-row owner matrix for legacy
   overlay/presentation/editor-adjacent behaviors and cross-linked

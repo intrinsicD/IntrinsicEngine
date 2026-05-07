@@ -570,9 +570,12 @@ human-readable summary should read `Findings.front().Message`.
   may keep entity-keyed sidecars containing graphics-owned values such as
   `GpuSceneSlot`, `GpuInstanceHandle`, material instances, and asset generation
   metadata (`GpuSceneSlot::SourceAsset` plus
-  `GpuSceneSlot::LastSeenAssetGeneration`), but graphics render passes consume
-  only submitted snapshots/views and never query live ECS or runtime sidecar
-  state. ECS dirty tags remain CPU-only semantics; runtime maps them to
+  `GpuSceneSlot::LastSeenAssetGeneration`). The value type exposes
+  `EvaluateSourceAssetRebind()` / `NeedsSourceAssetRebind()` for comparing an
+  observed `(AssetId, generation)` supplied by runtime; it does not import
+  `Graphics.GpuAssetCache` or query live asset state. Graphics render passes
+  consume only submitted snapshots/views and never query live ECS or runtime
+  sidecar state. ECS dirty tags remain CPU-only semantics; runtime maps them to
   `GpuWorld::GeometryUploadDesc` uploads, `GpuSceneSlot::NamedBuffers`, or
   per-instance updates according to the active domain packer.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it

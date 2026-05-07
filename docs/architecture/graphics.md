@@ -379,8 +379,11 @@ That cache may store graphics-owned value types such as
 asset-binding metadata (`GpuSceneSlot::SourceAsset` and
 `GpuSceneSlot::LastSeenAssetGeneration`), but those values remain outside
 canonical ECS components and outside the live `entt::registry` as GPU-typed ECS
-state. Graphics render passes receive only renderer-submitted snapshots/views and
-must not query ECS or runtime sidecar storage directly.
+state. `GpuSceneSlot::EvaluateSourceAssetRebind()` compares the sidecar's stored
+asset binding against an observed `(Assets::AssetId, generation)` supplied by
+runtime; it does not import `Graphics.GpuAssetCache` or query live asset state.
+Graphics render passes receive only renderer-submitted snapshots/views and must
+not query ECS or runtime sidecar storage directly.
 
 Static-vs-dynamic geometry residency is decided per stream. Immutable, shared
 asset geometry flows from the CPU asset identifier on `AssetInstance::Source`
