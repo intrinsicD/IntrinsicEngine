@@ -43,6 +43,13 @@ namespace Extrinsic::Backends::Null
             return RHI::TransferToken{++m_Next};
         }
 
+        [[nodiscard]] RHI::TransferToken UploadTextureFullChain(RHI::TextureHandle,
+                                                                std::span<const std::byte>) override
+        {
+            [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"NullTransferQueue::UploadTextureFullChain", Extrinsic::Core::Telemetry::HashString("NullTransferQueue::UploadTextureFullChain")};
+            return {};
+        }
+
         [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
         {
             return token.Value <= m_Next.load(std::memory_order_relaxed);

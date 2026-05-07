@@ -69,6 +69,12 @@ namespace Extrinsic::Tests
             return {};
         }
 
+        [[nodiscard]] RHI::TransferToken UploadTextureFullChain(RHI::TextureHandle,
+                                                                std::span<const std::byte>) override
+        {
+            return {};
+        }
+
         [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
         {
             (void)token;

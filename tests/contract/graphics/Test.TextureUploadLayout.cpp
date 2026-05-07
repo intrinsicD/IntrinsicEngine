@@ -1,9 +1,18 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <span>
 
+import Extrinsic.Backends.Null;
 import Extrinsic.Core.Error;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.TextureUpload;
 
 namespace
@@ -416,3 +425,22 @@ TEST(TextureUploadAlignment, BC7OffsetsAreSixteenAligned)
         EXPECT_EQ(sub.OffsetBytes % 4u,  0u);
     }
 }
+
+// ---------- Transfer-queue full-chain seam -----------------------------------
+
+TEST(TransferQueueFullChain, NullBackendRejectsFullChainUploadsFailClosed)
+{
+    std::unique_ptr<RHI::IDevice> device = Extrinsic::Backends::Null::CreateNullDevice();
+    ASSERT_NE(device, nullptr);
+
+    const RHI::TextureHandle texture = device->CreateTexture(Make2D(2u, 2u, 2u));
+    ASSERT_TRUE(texture.IsValid());
+
+    const std::array<std::byte, 20u> packedBytes{};
+    RHI::ITransferQueue& queue = device->GetTransferQueue();
+
+    const RHI::TransferToken token = queue.UploadTextureFullChain(texture, std::span<const std::byte>{packedBytes});
+    EXPECT_FALSE(token.IsValid());
+    EXPECT_TRUE(queue.IsComplete(token));
+}
+

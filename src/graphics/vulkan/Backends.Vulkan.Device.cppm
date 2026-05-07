@@ -153,6 +153,14 @@ namespace Extrinsic::Backends::Vulkan
                 return {};
             }
 
+            [[nodiscard]] RHI::TransferToken UploadTextureFullChain(RHI::TextureHandle,
+                                                                    std::span<const std::byte>) override
+            {
+                NoteFallbackTransferUploadAttempt();
+                Core::Log::Warn("[VulkanDevice] Fallback transfer queue rejected full-chain texture upload; device is non-operational");
+                return {};
+            }
+
             [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override { return !token.IsValid(); }
             void CollectCompleted() override {}
         };

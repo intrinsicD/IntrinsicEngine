@@ -100,6 +100,8 @@ namespace Extrinsic::Backends::Vulkan
                                                         uint64_t dataSizeBytes,
                                                         uint32_t mipLevel,
                                                         uint32_t arrayLayer) override;
+        [[nodiscard]] RHI::TransferToken UploadTextureFullChain(RHI::TextureHandle dst,
+                                                                std::span<const std::byte> src) override;
         [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override;
         void CollectCompleted() override;
 

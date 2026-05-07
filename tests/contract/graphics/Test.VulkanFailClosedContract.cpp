@@ -147,8 +147,12 @@ TEST(VulkanFailClosedContract, FallbackTransferQueueIncrementsUploadCounter)
     EXPECT_FALSE(textureToken.IsValid());
     EXPECT_TRUE(queue.IsComplete(textureToken));
 
+    const Extrinsic::RHI::TransferToken fullChainToken = queue.UploadTextureFullChain({}, emptyBytes);
+    EXPECT_FALSE(fullChainToken.IsValid());
+    EXPECT_TRUE(queue.IsComplete(fullChainToken));
+
     EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackTransferUploadAttemptCount(),
-              before + 3u);
+              before + 4u);
 }
 
 TEST(VulkanFailClosedContract, CreatePipelineIncrementsCreationCounter)

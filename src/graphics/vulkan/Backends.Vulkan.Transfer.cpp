@@ -343,6 +343,16 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
     return Submit(cmd);
 }
 
+RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandle dst,
+                                                               std::span<const std::byte> src)
+{
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::UploadTextureFullChain", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::UploadTextureFullChain")};
+    (void)dst;
+    (void)src;
+    Core::Log::Warn("[VulkanTransferQueue] UploadTextureFullChain rejected; batched texture uploads are not implemented yet");
+    return {};
+}
+
 bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const
 {
     if (!token.IsValid())

@@ -24,7 +24,7 @@ import Extrinsic.RHI.Transfer;
 //   ITransferQueue&, never IDevice&.
 //
 // Thread-safety contract:
-//   UploadBuffer / UploadTexture — safe to call from any thread
+//   UploadBuffer / UploadTexture / UploadTextureFullChain — safe to call from any thread
 //     (e.g. asset loader thread).  Data is copied into a staging
 //     buffer on the caller thread; the GPU submission happens
 //     asynchronously on the transfer queue.
@@ -34,7 +34,7 @@ import Extrinsic.RHI.Transfer;
 //
 // Invariant (matches src/ async-upload guarantee):
 //   No caller thread ever blocks on a GPU fence inside
-//   UploadBuffer / UploadTexture.  Fence waiting happens
+//   UploadBuffer / UploadTexture / UploadTextureFullChain.  Fence waiting happens
 //   exclusively inside CollectCompleted() on the render thread.
 // ============================================================
 
@@ -71,6 +71,16 @@ export namespace Extrinsic::RHI
                                                           std::uint64_t  dataSizeBytes,
                                                           std::uint32_t  mipLevel   = 0,
                                                           std::uint32_t  arrayLayer = 0) = 0;
+
+        /// Non-blocking full texture-chain upload. `src` must be packed according
+        /// to `ComputeFullChainUploadLayout()` for the destination texture's
+        /// descriptor: layer-major, mip-minor order with each subresource offset
+        /// aligned to `RequiredBufferOffsetAlignment(format)`. Backends must
+        /// validate the destination texture metadata and byte count before
+        /// accepting the upload; unsupported formats, depth-stencil textures, or
+        /// size mismatches fail closed by returning an invalid token.
+        [[nodiscard]] virtual TransferToken UploadTextureFullChain(TextureHandle              dst,
+                                                                   std::span<const std::byte> src) = 0;
 
         // ---- Completion polling --------------------------------------
 

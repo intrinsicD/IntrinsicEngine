@@ -67,6 +67,13 @@ namespace
             Issued.push_back(t);
             return t;
         }
+        [[nodiscard]] RHI::TransferToken UploadTextureFullChain(RHI::TextureHandle,
+                                                                std::span<const std::byte>) override
+        {
+            RHI::TransferToken t{++m_Counter};
+            Issued.push_back(t);
+            return t;
+        }
         [[nodiscard]] bool IsComplete(RHI::TransferToken) const override
         {
             return AlwaysComplete;
