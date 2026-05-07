@@ -264,8 +264,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   whole-image `Undefined`/current-layout → `TransferDst` barrier, one
   `vkCmdCopyBufferToImage` with a `VkBufferImageCopy` array built from
   `TextureUploadLayout`, and one `TransferDst` → `ShaderReadOnly` barrier
-  before returning the timeline `TransferToken`. Cubemap/3D batching remains a
-  deferred follow-up; the existing single-subresource `WriteTexture()` /
+  before returning the timeline `TransferToken`. Slice A.2c migrates the retained
+  colormap LUT initialization caller to `IDevice::GetTransferQueue().UploadTexture()`
+  and gates bindless lookup on `ColormapSystem::IsReady()` so first-frame draws
+  can skip while the asynchronous upload token is pending. Cubemap/3D batching
+  remains a deferred follow-up; the existing single-subresource `WriteTexture()` /
   one-`UploadTexture()` paths remain the fail-closed correctness baseline.
   Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded

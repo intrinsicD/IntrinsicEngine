@@ -290,6 +290,16 @@ human-readable summary should read `Findings.front().Message`.
   `MeshHasTexcoords = true` and a non-zero `TexcoordBufferBDA`; missing
   texcoords are rejected from the snapshot and counted in
   `MissingTexcoordCount`.
+- `Graphics.ColormapSystem` owns the retained 256-sample RGBA8 LUT textures for
+  built-in scalar colormaps. Initialization creates the sampler/textures through
+  `RHI::SamplerManager`/`RHI::TextureManager`, submits LUT bytes through
+  `IDevice::GetTransferQueue().UploadTexture()`, and records the returned
+  `TransferToken` values. `IsReady()` is the CPU-visible first-frame readiness
+  guard; `GetBindlessIndex()` returns `kInvalidBindlessIndex` until every LUT
+  transfer token is valid and complete, so colormap-dependent draws can skip
+  deterministically instead of sampling an in-flight upload. The synchronous
+  `IDevice::WriteTexture()` helper remains only as the guarded backend
+  fail-closed baseline, not a renderer/runtime upload path.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
   `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /

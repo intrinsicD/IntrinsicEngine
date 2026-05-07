@@ -219,6 +219,13 @@ Graphics is organized into explicit sublayers:
   UV-backed bakes require `MeshHasTexcoords = true` and a non-zero
   `TexcoordBufferBDA`; missing texcoords are rejected from the snapshot and
   counted in `MissingTexcoordCount`.
+- `Extrinsic.Graphics.ColormapSystem` owns built-in colormap LUT residency. It
+  allocates retained 256-sample RGBA8 LUT textures through RHI managers, submits
+  the initial bytes through `RHI::ITransferQueue`, and exposes `IsReady()` as the
+  first-frame readiness guard. Bindless colormap indices stay invalid until all
+  LUT transfer tokens are valid and complete, keeping renderer/runtime callers on
+  the async transfer seam instead of the blocking `IDevice::WriteTexture()`
+  helper.
 - `Extrinsic.Graphics.PostProcessSystem` owns the backend-agnostic
   HDR-to-LDR chain. `SceneColorHDR`, `SceneColorLDR`,
   `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
