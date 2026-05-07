@@ -1,14 +1,15 @@
 # GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups
 
 ## Status
-- State: in-progress (resolution recorded; pending retirement to `tasks/done/`).
+- State: done.
 - Owner/agent: local agent workflow.
 - Activated: 2026-05-07 after `GRAPHICS-015Q` retirement cleared `tasks/active/`.
+- Completed: 2026-05-07.
 - Branch: `claude/agentic-workflow-session-undXM`.
 - Promotion commit: `b41e622` (move file from `tasks/backlog/rendering/` to `tasks/active/`).
-- Implementation commit: this commit (resolve decisions and sync graphics / rendering-three-pass / renderer-README docs; refresh rendering backlog README description).
-- Task-state commit: pending retirement commit (will move the file from `tasks/active/` to `tasks/done/` and redirect the rendering backlog README link).
-- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/graphics.md` (new "Per `GRAPHICS-017Q`" paragraph next to the existing `Extrinsic.Graphics.CameraSnapshots` ownership bullet), `docs/architecture/rendering-three-pass.md` (new "Camera, picking-request, and gizmo runtime contract" subsection alongside the existing `GRAPHICS-013AQ`/`013BQ`/`013CQ`/`014Q`/`015Q` clarification paragraphs), and `src/graphics/renderer/README.md` (new ownership-contract bullet listing the five decisions next to the `Graphics.CameraSnapshots` data-only bullet). The rendering backlog README entry for `GRAPHICS-017Q` is redirected from `tasks/backlog/rendering/` to `tasks/active/` by the promotion commit and will be redirected to `tasks/done/` by the retirement commit. No `docs/migration/nonlegacy-parity-matrix.md` rows change because the existing matrix rows already cross-link to `GRAPHICS-017Q` for editor interaction, pick-request scheduling, and camera/gizmo mutation policy. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .`.
+- Implementation commit: `a152674` (resolve decisions and sync graphics / rendering-three-pass / renderer-README docs; refresh rendering backlog README description).
+- Task-state commit: this retirement commit (moves the file from `tasks/active/` to `tasks/done/` and redirects the rendering backlog README link).
+- Resolution: decisions recorded below and consequential notes synced into `docs/architecture/graphics.md` (extended `Extrinsic.Graphics.CameraSnapshots` ownership bullet with a new "Per `GRAPHICS-017Q`" paragraph), `docs/architecture/rendering-three-pass.md` (new "Camera, picking-request, and gizmo runtime contract" subsection alongside the existing `GRAPHICS-013AQ`/`013BQ`/`013CQ`/`014Q`/`015Q` clarification paragraphs), and `src/graphics/renderer/README.md` (extended `Graphics.CameraSnapshots` ownership-contract bullet with a matching "Per `GRAPHICS-017Q`" paragraph). The rendering backlog README entry for `GRAPHICS-017Q` is redirected from `tasks/backlog/rendering/` to `tasks/active/` by the promotion commit and from `tasks/active/` to `tasks/done/` by this retirement commit. No `docs/migration/nonlegacy-parity-matrix.md` rows change because the existing matrix rows already cross-link to `GRAPHICS-017Q` for editor interaction, pick-request scheduling, and camera/gizmo mutation policy. Verification: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root .`.
 
 ## Decisions
 

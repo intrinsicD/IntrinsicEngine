@@ -230,8 +230,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](../../done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
   depends on GRAPHICS-012 for picking handoff. Camera packet contracts may be
   defined earlier without blocking.
-- [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](../../active/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
-  active docs-only clarification for runtime camera controller
+- [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](../../done/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
+  retired docs-only clarification for runtime camera controller
   ownership (concrete controllers under planned umbrella module
   `Extrinsic.Runtime.CameraControllers`, mirroring the
   `Extrinsic.Runtime.SpatialDebugAdapters`/`VisualizationAdapters`/
