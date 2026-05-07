@@ -18,6 +18,7 @@ import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.TransferQueue;
 
 // ============================================================
 // ColormapSystem — implementation
@@ -163,10 +164,12 @@ namespace Extrinsic::Graphics
         {
             RHI::TextureManager::TextureLease Lease;
             RHI::BindlessIndex                BindlessIdx = RHI::kInvalidBindlessIndex;
+            RHI::TransferToken                UploadToken{};
             Lut256                            CpuLut{};
         };
 
         std::array<Entry, static_cast<std::size_t>(Colormap::kColormapCount)> Entries;
+        RHI::ITransferQueue* TransferQueue = nullptr;
 
         // The shared linear sampler used by all LUT textures.
         // Must outlive all TextureLease entries.
@@ -212,6 +215,8 @@ namespace Extrinsic::Graphics
         if (!samplerLeaseOr.has_value()) return;
         m_Impl->SharedSampler = std::move(*samplerLeaseOr);
         const RHI::SamplerHandle sampler = m_Impl->SharedSampler.GetHandle();
+        RHI::ITransferQueue& transferQueue = device.GetTransferQueue();
+        m_Impl->TransferQueue = &transferQueue;
 
         // Upload one 256×1 texture per colormap
         for (std::size_t i = 0; i < static_cast<std::size_t>(Colormap::kColormapCount); ++i)
@@ -234,12 +239,11 @@ namespace Extrinsic::Graphics
             entry.Lease     = std::move(*leaseOr);
             entry.BindlessIdx = textureMgr.GetBindlessIndex(entry.Lease.GetHandle());
 
-            // Upload the CPU LUT
-            device.WriteTexture(entry.Lease.GetHandle(),
-                                entry.CpuLut.data(),
-                                entry.CpuLut.size(),
-                                /*mipLevel=*/0,
-                                /*arrayLayer=*/0);
+            entry.UploadToken = transferQueue.UploadTexture(entry.Lease.GetHandle(),
+                                                            entry.CpuLut.data(),
+                                                            entry.CpuLut.size(),
+                                                            /*mipLevel=*/0,
+                                                            /*arrayLayer=*/0);
         }
 
         m_Impl->Initialized = true;
@@ -249,8 +253,13 @@ namespace Extrinsic::Graphics
     void ColormapSystem::Shutdown()
     {
         for (auto& e : m_Impl->Entries)
+        {
             e.Lease = {};
+            e.BindlessIdx = RHI::kInvalidBindlessIndex;
+            e.UploadToken = {};
+        }
         m_Impl->SharedSampler = {};
+        m_Impl->TransferQueue = nullptr;
         m_Impl->Initialized = false;
     }
 
@@ -261,10 +270,28 @@ namespace Extrinsic::Graphics
     }
 
     // ----------------------------------------------------------------
+    bool ColormapSystem::IsReady() const noexcept
+    {
+        if (!m_Impl->Initialized || m_Impl->TransferQueue == nullptr)
+            return false;
+
+        for (const auto& entry : m_Impl->Entries)
+        {
+            if (!entry.Lease.GetHandle().IsValid() || !entry.UploadToken.IsValid())
+                return false;
+            if (!m_Impl->TransferQueue->IsComplete(entry.UploadToken))
+                return false;
+        }
+        return true;
+    }
+
+    // ----------------------------------------------------------------
     RHI::BindlessIndex ColormapSystem::GetBindlessIndex(Colormap::Type t) const noexcept
     {
         const auto idx = static_cast<std::size_t>(t);
         if (idx >= static_cast<std::size_t>(Colormap::kColormapCount))
+            return RHI::kInvalidBindlessIndex;
+        if (!IsReady())
             return RHI::kInvalidBindlessIndex;
         return m_Impl->Entries[idx].BindlessIdx;
     }

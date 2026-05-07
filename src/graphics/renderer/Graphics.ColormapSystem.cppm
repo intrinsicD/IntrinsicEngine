@@ -1,5 +1,6 @@
 module;
 
+#include <cstdint>
 #include <memory>
 #include <glm/glm.hpp>
 
@@ -10,13 +11,14 @@ import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Transfer;
 
 // ============================================================
 // ColormapSystem — GPU colourmap LUT owner.
 //
-// Uploads one 256×1 RGBA8_UNORM 1-D texture per Colormap::Type
-// to device memory at Initialize() and registers each in the
-// bindless descriptor heap.  Shaders sample the LUT at the
+// Allocates one 256×1 RGBA8_UNORM 1-D texture per Colormap::Type,
+// submits its initial bytes through ITransferQueue at Initialize(),
+// and registers each in the bindless descriptor heap.  Shaders sample the LUT at the
 // normalised scalar value t ∈ [0,1] to obtain the mapped colour.
 //
 // Also provides a CPU-side SampleCpu() path so that
@@ -60,13 +62,19 @@ export namespace Extrinsic::Graphics
 
         [[nodiscard]] bool IsInitialized() const noexcept;
 
+        /// True once all asynchronous LUT uploads submitted by Initialize()
+        /// have completed. Bindless indices remain invalid until this returns
+        /// true so first-frame users can branch deterministically instead of
+        /// sampling a texture whose staging transfer is still in flight.
+        [[nodiscard]] bool IsReady() const noexcept;
+
         // -----------------------------------------------------------------
         // GPU query
         // -----------------------------------------------------------------
 
         /// Bindless slot index for the given colourmap's 1-D LUT texture.
-        /// Returns kInvalidBindlessIndex before Initialize() or for
-        /// Colormap::Type::Count (the sentinel value).
+        /// Returns kInvalidBindlessIndex before Initialize(), before IsReady(),
+        /// or for Colormap::Type::Count (the sentinel value).
         [[nodiscard]] RHI::BindlessIndex GetBindlessIndex(Colormap::Type t) const noexcept;
 
         // -----------------------------------------------------------------

@@ -45,6 +45,20 @@ namespace Extrinsic::Tests
     class MockTransferQueue final : public RHI::ITransferQueue
     {
     public:
+        struct TextureUploadRecord
+        {
+            RHI::TextureHandle Texture{};
+            std::uint64_t SizeBytes = 0;
+            std::uint32_t MipLevel = 0;
+            std::uint32_t ArrayLayer = 0;
+            std::vector<std::byte> Data{};
+        };
+
+        bool AlwaysComplete = true;
+        bool FailTextureUploads = false;
+        std::vector<RHI::TransferToken> Issued{};
+        std::vector<TextureUploadRecord> TextureUploads{};
+
         [[nodiscard]] RHI::TransferToken UploadBuffer(RHI::BufferHandle,
                                                      const void*,
                                                      std::uint64_t,
@@ -60,13 +74,28 @@ namespace Extrinsic::Tests
             return {std::uint64_t(src.size())};
         }
 
-        [[nodiscard]] RHI::TransferToken UploadTexture(RHI::TextureHandle,
-                                                      const void*,
-                                                      std::uint64_t,
-                                                      std::uint32_t = 0,
-                                                      std::uint32_t = 0) override
+        [[nodiscard]] RHI::TransferToken UploadTexture(RHI::TextureHandle texture,
+                                                       const void* data,
+                                                       std::uint64_t size,
+                                                       std::uint32_t mipLevel = 0,
+                                                       std::uint32_t arrayLayer = 0) override
         {
-            return {};
+            TextureUploadRecord rec;
+            rec.Texture = texture;
+            rec.SizeBytes = size;
+            rec.MipLevel = mipLevel;
+            rec.ArrayLayer = arrayLayer;
+            rec.Data.resize(static_cast<std::size_t>(size));
+            if (data != nullptr && size > 0)
+                std::memcpy(rec.Data.data(), data, static_cast<std::size_t>(size));
+            TextureUploads.push_back(std::move(rec));
+
+            if (FailTextureUploads)
+                return {};
+
+            RHI::TransferToken t{++m_Counter};
+            Issued.push_back(t);
+            return t;
         }
 
         [[nodiscard]] RHI::TransferToken UploadTextureFullChain(RHI::TextureHandle,
@@ -78,10 +107,13 @@ namespace Extrinsic::Tests
         [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
         {
             (void)token;
-            return true;
+            return AlwaysComplete;
         }
 
         void CollectCompleted() override {}
+
+    private:
+        std::uint64_t m_Counter = 0;
     };
 
     // -----------------------------------------------------------------------
@@ -268,6 +300,14 @@ namespace Extrinsic::Tests
             std::vector<std::byte> Data{};
         };
 
+        struct TextureWriteRecord
+        {
+            RHI::TextureHandle Handle{};
+            std::uint64_t SizeBytes = 0;
+            std::uint32_t MipLevel = 0;
+            std::uint32_t ArrayLayer = 0;
+        };
+
         // ---- Knobs ---------------------------------------------------------
         bool Operational            = true;
         bool FailNextBufferCreate   = false;
@@ -296,6 +336,7 @@ namespace Extrinsic::Tests
         mutable int GetBackbufferHandleCount = 0;
         mutable RHI::FrameHandle LastBackbufferFrame{};
         std::vector<BufferWriteRecord> BufferWrites;
+        std::vector<TextureWriteRecord> TextureWrites;
 
         MockBindlessHeap   Bindless;
         MockCommandContext CommandContext;
@@ -362,8 +403,14 @@ namespace Extrinsic::Tests
             return RHI::TextureHandle{m_NextTexture++, 1u};
         }
         void DestroyTexture(RHI::TextureHandle) override { ++DestroyTextureCount; }
-        void WriteTexture(RHI::TextureHandle, const void*, std::uint64_t,
-                          std::uint32_t, std::uint32_t) override {}
+        void WriteTexture(RHI::TextureHandle handle, const void*, std::uint64_t size,
+                          std::uint32_t mipLevel, std::uint32_t arrayLayer) override
+        {
+            TextureWrites.push_back(TextureWriteRecord{.Handle = handle,
+                                                       .SizeBytes = size,
+                                                       .MipLevel = mipLevel,
+                                                       .ArrayLayer = arrayLayer});
+        }
 
         RHI::SamplerHandle CreateSampler(const RHI::SamplerDesc&) override
         {

@@ -433,6 +433,7 @@ intrinsic_test_object_lib(GraphicsRhiCpuUnitTestObjs
 )
 
 set(_graphics_renderer_cpu_unit_test_files
+    Test.Graphics.ColormapSystem.cpp
     Test.Graphics.DebugViewSystem.cpp
     Test.Graphics.ImGuiOverlaySystem.cpp
     Test.Graphics.MaterialSystem.cpp
