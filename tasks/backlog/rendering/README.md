@@ -231,7 +231,29 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   depends on GRAPHICS-012 for picking handoff. Camera packet contracts may be
   defined earlier without blocking.
 - [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](../../active/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
-  nonblocking docs-only follow-up for runtime camera controllers, pick-request scheduling, transform-gizmo hit testing, interaction state, and transform application ownership.
+  active docs-only clarification for runtime camera controller
+  ownership (concrete controllers under planned umbrella module
+  `Extrinsic.Runtime.CameraControllers`, mirroring the
+  `Extrinsic.Runtime.SpatialDebugAdapters`/`VisualizationAdapters`/
+  `AssetBridges.Texture` patterns from `GRAPHICS-011Q`/`014Q`/`015Q`;
+  graphics never imports `src/platform/` or polls window events),
+  pick-request scheduling (per-frame queue coalesced at runtime by
+  `(viewport, pixel, request_kind)` key, single-shot `PickPixelRequest`
+  span on `RenderFrameInput`, drained on the next `BeginFrame()`
+  mirroring the `Picking.Readback` drain from `GRAPHICS-012Q`),
+  transform-gizmo hit testing (runtime/editor-owned under planned
+  umbrella `Extrinsic.Runtime.GizmoInteraction`, reading
+  `CameraViewSnapshot::ViewProjection`/`PickRay` plus platform pointer
+  pixels; `TransformGizmoRenderPacket` carries only render-relevant
+  fields), interaction state storage (runtime/editor-owned per-frame
+  state with mode/axis/delta/origin/snap/pivot/orientation; never
+  enters graphics), and transform application/undo (runtime/editor
+  applies authoring transforms and pushes undo commands; legacy
+  orientation/snap/pivot/modifier-key/numeric-commit behaviors are
+  enumerated through existing
+  `docs/migration/nonlegacy-parity-matrix.md` editor-handoff rows that
+  already cross-link `GRAPHICS-017Q`, with concrete promoted-task IDs
+  gated by `GRAPHICS-020`).
 - [GRAPHICS-018 — Vulkan renderer integration](../../done/GRAPHICS-018-vulkan-renderer-integration.md):
   depends on stable CPU/null contracts from GRAPHICS-002, GRAPHICS-003,
   GRAPHICS-004, GRAPHICS-006, GRAPHICS-007, GRAPHICS-008, GRAPHICS-009, and

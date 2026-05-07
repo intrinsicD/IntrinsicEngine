@@ -132,7 +132,62 @@ is retained only as a temporary string compatibility shim; removal is tracked by
 - `Graphics.CameraSnapshots` is data-only: it validates view/projection
   matrices, extracts frustum planes, and derives pick rays from immutable pixel
   requests. Camera motion, input polling, gizmo hit testing, and transform
-  mutation remain runtime/platform/editor responsibilities.
+  mutation remain runtime/platform/editor responsibilities. Per
+  `GRAPHICS-017Q`, the camera/gizmo runtime follow-ups resolve as
+  follows. Concrete camera controllers (orbit, fly, free-look,
+  top-down) live as runtime modules under the planned umbrella
+  module name `Extrinsic.Runtime.CameraControllers`, mirroring the
+  `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
+  `GRAPHICS-011Q`, the `Extrinsic.Runtime.VisualizationAdapters`
+  pattern from `GRAPHICS-014Q`, and the
+  `Extrinsic.Runtime.AssetBridges.Texture` pattern from
+  `GRAPHICS-015Q`. Controllers read platform input deltas through
+  the existing platform input port, translate them into runtime-owned
+  camera state, and runtime extraction fills `CameraViewInput` and
+  submits it through `IRenderer::SubmitRuntimeSnapshots()`. Multiple
+  cameras (preview, top-down, editor secondary view) are
+  runtime-owned and emit one `CameraViewInput` per frame each.
+  Pick-request scheduling is runtime-owned and single-shot: each
+  input frame's accepted picks are coalesced at runtime by
+  `(viewport, pixel, request_kind)` key into the per-frame
+  `PickPixelRequest` span on `RenderFrameInput`; the renderer drains
+  `Picking.Readback` on the next `BeginFrame()` mirroring the drain
+  pattern from `GRAPHICS-012Q`, and there is no graphics-side
+  persistent pending-pick queue across frames. Transform-gizmo hit
+  testing is runtime/editor-owned under the planned umbrella module
+  name `Extrinsic.Runtime.GizmoInteraction`; the hit-test path reads
+  selection authoring transforms from runtime ECS/editor state, the
+  same `CameraViewSnapshot::ViewProjection`/`PickRay` derivation
+  that graphics already produces, and raw pointer pixels from the
+  platform input port. Graphics never receives raw pointer
+  coordinates and never imports any gizmo hit-test code path. The
+  `TransformGizmoRenderPacket` spans on `RenderWorld` carry only
+  render-relevant data — world-space origin, camera-relative scale,
+  active mode (translate / rotate / scale), highlighted axis or
+  plane mask, and per-handle render flags — while drag state, axis
+  lock, drag origin, snap thresholds, modifier-key state,
+  multi-select pivot policy, and orientation reference frame stay
+  runtime-side. Interaction state is runtime/editor-owned (either
+  editor-side singleton or ECS component) and never enters graphics;
+  the gizmo render packets are carried only until the next
+  `BeginFrame()` clears `RenderWorld`, mirroring the existing
+  transient debug primitive lifetime from
+  `GRAPHICS-002`/`GRAPHICS-010Q`. Transform application is
+  runtime/editor-owned: drag-tick writes update authoring transforms
+  in runtime ECS / asset / prefab storage; drag-commit pushes a
+  single undoable `(entity, before, after)` command onto the editor
+  undo stack. Undo / redo lives entirely in the editor and graphics
+  never mutates ECS, asset, or prefab state. Legacy
+  `Graphics.TransformGizmo` and `Graphics.Interaction` features
+  (orientation modes, snap modes, multi-select pivot policy,
+  modifier-key behavior, numeric-input commit, per-axis constraint
+  locks) are enumerated by the editor-handoff rows in
+  `../../../docs/migration/nonlegacy-parity-matrix.md` that
+  cross-link `GRAPHICS-017Q`; concrete promoted-implementation task
+  IDs are deliberately not allocated by this clarification because
+  the matrix already cross-links them and `GRAPHICS-020` (legacy
+  graphics retirement gates) is the gating task that consumes the
+  matrix.
 - Transient debug packets are frame-local runtime submissions, not persistent
   editor overlay entities. The renderer rejects non-finite coordinates/colors,
   clamps line widths to `[0.5, 32]`, clamps point radii to `[0.0001, 1]`, and
