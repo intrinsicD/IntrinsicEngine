@@ -121,6 +121,12 @@ human-readable summary should read `Findings.front().Message`.
   graphics. The renderer copies snapshot records into frame-local storage before
   `ExtractRenderWorld()`/`PrepareFrame()` consume them; it does not retain ECS
   registry references.
+- Renderable asset-generation observation is runtime-owned. Per `GRAPHICS-023C`,
+  `Extrinsic.Runtime.RenderExtraction` may compare `AssetInstance::Source` with a
+  supplied `Graphics.GpuAssetCache` view and `GpuSceneSlot` metadata, but
+  `GpuSceneSlot` itself only exposes value-type comparison helpers and does not
+  import `Graphics.GpuAssetCache`, ECS, runtime, live `AssetService`, or backend
+  modules.
 - `RenderWorld` exposes immutable spans of renderer-owned `RenderableSnapshot`
   and `LightSnapshot` values, sanitized transient debug line/point/triangle
   packet spans, transform-gizmo render packet spans, `VisualizationSnapshot`

@@ -463,6 +463,7 @@ namespace Extrinsic::Runtime
             Graphics::IRenderer& Renderer;
             ECS::Scene::Registry& Scene;
             RenderExtractionCache& Extraction;
+            Graphics::GpuAssetCache* GpuAssetCache;
             RHI::FrameHandle& Frame;
             const Graphics::RenderFrameInput& Input;
             Graphics::RenderWorld& World;
@@ -470,12 +471,14 @@ namespace Extrinsic::Runtime
             RenderFrameHooks(Graphics::IRenderer& renderer,
                              ECS::Scene::Registry& scene,
                              RenderExtractionCache& extraction,
+                             Graphics::GpuAssetCache* gpuAssetCache,
                              RHI::FrameHandle& frame,
                              const Graphics::RenderFrameInput& input,
                              Graphics::RenderWorld& world)
                 : Renderer(renderer)
                 , Scene(scene)
                 , Extraction(extraction)
+                , GpuAssetCache(gpuAssetCache)
                 , Frame(frame)
                 , Input(input)
                 , World(world)
@@ -485,7 +488,8 @@ namespace Extrinsic::Runtime
             bool BeginFrame() override { return Renderer.BeginFrame(Frame); }
             void ExtractRenderWorld() override
             {
-                [[maybe_unused]] const RuntimeRenderExtractionStats stats = Extraction.ExtractAndSubmit(Scene, Renderer);
+                [[maybe_unused]] const RuntimeRenderExtractionStats stats =
+                    Extraction.ExtractAndSubmit(Scene, Renderer, GpuAssetCache);
                 World = Renderer.ExtractRenderWorld(Input);
             }
             void PrepareFrame() override { Renderer.PrepareFrame(World); }
@@ -493,7 +497,13 @@ namespace Extrinsic::Runtime
             std::uint64_t EndFrame() override { return Renderer.EndFrame(Frame); }
         };
 
-        RenderFrameHooks renderHooks(*m_Renderer, *m_Scene, m_RenderExtraction, frame, renderInput, renderWorld);
+        RenderFrameHooks renderHooks(*m_Renderer,
+                                     *m_Scene,
+                                     m_RenderExtraction,
+                                     m_GpuAssetCache.get(),
+                                     frame,
+                                     renderInput,
+                                     renderWorld);
 
         const RuntimeRenderFrameResult renderResult = ExecuteRuntimeRenderFrameContract(renderHooks);
         if (!renderResult.BeganFrame)

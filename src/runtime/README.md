@@ -50,7 +50,12 @@ branching logic.
 ECS render queries. It stores entity-to-graphics sidecars outside canonical ECS
 components, allocates/frees `GpuWorld` instance handles through the renderer,
 builds transform/light/visualization/gizmo snapshot records, and submits those
-records to graphics through `IRenderer::SubmitRuntimeSnapshots()`.
+records to graphics through `IRenderer::SubmitRuntimeSnapshots()`. It also owns
+the `GRAPHICS-023C` asset-generation observation bridge: when a renderable has
+`AssetInstance::Source`, extraction can compare the normalized `Assets::AssetId`
+with a supplied `Graphics::GpuAssetCache` view and `GpuSceneSlot` metadata to
+report pending/up-to-date/rebind-required states without performing the later
+GPU geometry or material rebind.
 
 Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
 and transform application. Graphics receives only immutable `CameraViewInput`,

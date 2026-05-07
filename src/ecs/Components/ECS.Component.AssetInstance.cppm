@@ -4,7 +4,7 @@ module;
 
 export module Extrinsic.ECS.Components.AssetInstance;
 
-namespace Extrinsic::ECS::Components::AssetInstance
+export namespace Extrinsic::ECS::Components::AssetInstance
 {
     struct Source
     {

@@ -315,6 +315,11 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   completed focused child task that adds the CPU-only `GpuSceneSlot` decision helper
   for comparing runtime-observed asset generations without importing
   `Graphics.GpuAssetCache` into the renderer component value type.
+- [GRAPHICS-023C — Runtime asset-generation observation bridge](../../done/GRAPHICS-023C-runtime-asset-generation-observation.md):
+  completed focused child task that lets `Runtime.RenderExtraction` observe
+  `AssetInstance::Source` against a supplied `Graphics.GpuAssetCache` view and
+  classify pending/up-to-date/rebind-required `GpuSceneSlot` states without
+  performing upload, file-watching, shader reload, or GPU geometry rebinding.
 - [GRAPHICS-024 — Overlays, presentation adjacency, and editor handoff](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md):
   completed planning task; recorded the per-row owner matrix for legacy
   overlay/presentation/editor-adjacent behaviors and cross-linked

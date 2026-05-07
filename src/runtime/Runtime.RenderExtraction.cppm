@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <span>
 #include <unordered_map>
@@ -16,11 +17,14 @@ module;
 export module Extrinsic.Runtime.RenderExtraction;
 
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.Light;
+import Extrinsic.Asset.Registry;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
@@ -36,6 +40,25 @@ import Extrinsic.RHI.Types;
 
 export namespace Extrinsic::Runtime
 {
+    enum class RuntimeRenderableAssetObservationStatus : std::uint8_t
+    {
+        NoSourceAsset,
+        CacheUnavailable,
+        ViewUnavailable,
+        GenerationUnavailable,
+        UpToDate,
+        RebindRequired,
+    };
+
+    struct RuntimeRenderableAssetGenerationObservation
+    {
+        RuntimeRenderableAssetObservationStatus Status = RuntimeRenderableAssetObservationStatus::NoSourceAsset;
+        Graphics::Components::GpuSceneSlotAssetRebindDecision Decision =
+            Graphics::Components::GpuSceneSlotAssetRebindDecision::NoSourceAsset;
+        Assets::AssetId SourceAsset{};
+        std::uint64_t ObservedGeneration = 0;
+    };
+
     struct RuntimeRenderExtractionStats
     {
         std::uint32_t CandidateRenderableCount{0};
@@ -46,7 +69,18 @@ export namespace Extrinsic::Runtime
         std::uint32_t FreedInstanceCount{0};
         std::uint32_t DirtyTransformCount{0};
         std::uint32_t SkippedInvalidEntityCount{0};
+        std::uint32_t SourceAssetObservationCount{0};
+        std::uint32_t SourceAssetCacheUnavailableCount{0};
+        std::uint32_t SourceAssetViewUnavailableCount{0};
+        std::uint32_t SourceAssetGenerationUnavailableCount{0};
+        std::uint32_t SourceAssetUpToDateCount{0};
+        std::uint32_t SourceAssetRebindRequiredCount{0};
     };
+
+    [[nodiscard]] RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
+        Graphics::Components::GpuSceneSlot& slot,
+        Assets::AssetId sourceAsset,
+        Graphics::GpuAssetCache* gpuAssets);
 
     class RenderExtractionCache
     {
@@ -58,7 +92,8 @@ export namespace Extrinsic::Runtime
         RenderExtractionCache& operator=(const RenderExtractionCache&) = delete;
 
         [[nodiscard]] RuntimeRenderExtractionStats ExtractAndSubmit(ECS::Scene::Registry& scene,
-                                                                    Graphics::IRenderer& renderer);
+                                                                    Graphics::IRenderer& renderer,
+                                                                    Graphics::GpuAssetCache* gpuAssets = nullptr);
         void Shutdown(Graphics::IRenderer& renderer);
 
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept { return m_LastStats; }
@@ -186,6 +221,94 @@ namespace Extrinsic::Runtime
             snapshot.Intensity = light.Intensity;
             return snapshot;
         }
+
+        [[nodiscard]] Assets::AssetId NormalizeAssetSource(
+            const ECS::Components::AssetInstance::Source& source) noexcept
+        {
+            if (source.AssetId == std::numeric_limits<std::uint32_t>::max())
+            {
+                return {};
+            }
+            return Assets::AssetId{source.AssetId, 1u};
+        }
+
+        void AccumulateAssetObservationStats(const RuntimeRenderableAssetGenerationObservation& observation,
+                                             RuntimeRenderExtractionStats& stats) noexcept
+        {
+            switch (observation.Status)
+            {
+            case RuntimeRenderableAssetObservationStatus::NoSourceAsset:
+                break;
+            case RuntimeRenderableAssetObservationStatus::CacheUnavailable:
+                ++stats.SourceAssetCacheUnavailableCount;
+                break;
+            case RuntimeRenderableAssetObservationStatus::ViewUnavailable:
+                ++stats.SourceAssetViewUnavailableCount;
+                break;
+            case RuntimeRenderableAssetObservationStatus::GenerationUnavailable:
+                ++stats.SourceAssetGenerationUnavailableCount;
+                break;
+            case RuntimeRenderableAssetObservationStatus::UpToDate:
+                ++stats.SourceAssetUpToDateCount;
+                break;
+            case RuntimeRenderableAssetObservationStatus::RebindRequired:
+                ++stats.SourceAssetRebindRequiredCount;
+                break;
+            }
+        }
+    }
+
+    RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
+        Graphics::Components::GpuSceneSlot& slot,
+        const Assets::AssetId sourceAsset,
+        Graphics::GpuAssetCache* gpuAssets)
+    {
+        RuntimeRenderableAssetGenerationObservation observation{};
+        observation.SourceAsset = sourceAsset;
+
+        if (!sourceAsset.IsValid())
+        {
+            slot.ClearSourceAsset();
+            return observation;
+        }
+
+        if (!slot.HasSourceAsset() || slot.SourceAsset != sourceAsset)
+        {
+            slot.SetSourceAsset(sourceAsset, 0);
+        }
+
+        if (!gpuAssets)
+        {
+            observation.Status = RuntimeRenderableAssetObservationStatus::CacheUnavailable;
+            return observation;
+        }
+
+        auto view = gpuAssets->GetView(sourceAsset);
+        if (!view.has_value())
+        {
+            observation.Status = RuntimeRenderableAssetObservationStatus::ViewUnavailable;
+            return observation;
+        }
+
+        observation.ObservedGeneration = view->Generation;
+        observation.Decision = slot.EvaluateSourceAssetRebind(sourceAsset, view->Generation);
+        switch (observation.Decision)
+        {
+        case Graphics::Components::GpuSceneSlotAssetRebindDecision::GenerationUnavailable:
+            observation.Status = RuntimeRenderableAssetObservationStatus::GenerationUnavailable;
+            break;
+        case Graphics::Components::GpuSceneSlotAssetRebindDecision::UpToDate:
+            observation.Status = RuntimeRenderableAssetObservationStatus::UpToDate;
+            break;
+        case Graphics::Components::GpuSceneSlotAssetRebindDecision::RebindRequired:
+            observation.Status = RuntimeRenderableAssetObservationStatus::RebindRequired;
+            break;
+        case Graphics::Components::GpuSceneSlotAssetRebindDecision::NoSourceAsset:
+        case Graphics::Components::GpuSceneSlotAssetRebindDecision::AssetMismatch:
+            observation.Status = RuntimeRenderableAssetObservationStatus::NoSourceAsset;
+            break;
+        }
+        return observation;
     }
 
     RenderExtractionCache::RenderableSidecar* RenderExtractionCache::EnsureRenderable(
@@ -238,7 +361,8 @@ namespace Extrinsic::Runtime
     }
 
     RuntimeRenderExtractionStats RenderExtractionCache::ExtractAndSubmit(ECS::Scene::Registry& scene,
-                                                                         Graphics::IRenderer& renderer)
+                                                                         Graphics::IRenderer& renderer,
+                                                                         Graphics::GpuAssetCache* gpuAssets)
     {
         RuntimeRenderExtractionStats stats{};
         auto& registry = scene.Raw();
@@ -302,6 +426,20 @@ namespace Extrinsic::Runtime
             else
             {
                 sidecar->HasVisualization = false;
+            }
+
+            if (const auto* source = registry.try_get<ECS::Components::AssetInstance::Source>(entity))
+            {
+                ++stats.SourceAssetObservationCount;
+                const RuntimeRenderableAssetGenerationObservation observation = ObserveRenderableAssetGeneration(
+                    sidecar->GpuSlot,
+                    NormalizeAssetSource(*source),
+                    gpuAssets);
+                AccumulateAssetObservationStats(observation, stats);
+            }
+            else
+            {
+                sidecar->GpuSlot.ClearSourceAsset();
             }
 
             m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
