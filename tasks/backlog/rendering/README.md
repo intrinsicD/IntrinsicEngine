@@ -260,9 +260,24 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   GRAPHICS-013C.
 - [GRAPHICS-018Q — Vulkan integration clarification follow-ups](../../active/GRAPHICS-018Q-vulkan-integration-clarifications.md):
   promoted to `tasks/active/` for the current session; nonblocking docs-only
-  follow-up for platform/window fixtures in opt-in swapchain smoke tests,
-  shader/pipeline asset packaging, and resize/present failure diagnostic
-  taxonomy. It must not be mixed with C++ behavior work.
+  follow-up resolving the four remaining Vulkan integration decisions —
+  texture upload policy (guarded synchronous `WriteTexture()` stays the
+  fail-closed baseline, runtime/streaming uses `RHI::ITransferQueue`, whole-
+  image layout tracking until multi-subresource batching, multi-mip / multi-
+  layer / cubemap batching plus opt-in `gpu;vulkan` smoke owned by
+  GRAPHICS-018T), sampler anisotropy (probed and enabled when supported,
+  silently disabled on missing support, clamped to physical-device max with
+  one warn breadcrumb when reduced, no new RHI surface), `FallbackPipelineReason`
+  extension policy (each counter and its reason enum stay 1:1 to its path;
+  pipeline reasons append to the existing enum, future second reasons in
+  other counters introduce a new path-local enum and append a matching
+  `LastXxxReason` field to `FallbackDiagnosticsSnapshot`), and per-call
+  breadcrumb logging (per-call canonical for bindless/transfer/pipeline
+  paths during pre-bring-up, frame-loop counters keep the existing once-
+  per-fail-closed-cycle rate limiting, migration to per-counter rate-limited
+  breadcrumbs is a separate semantic task only when operational bring-up
+  demonstrates many-per-frame firing). It must not be mixed with C++
+  behavior work.
 - [GRAPHICS-019 — Legacy graphics IO boundaries](GRAPHICS-019-legacy-graphics-io-boundaries.md):
   may run as planning in parallel with the implementation tasks above, but
   must not put IO ownership into graphics.

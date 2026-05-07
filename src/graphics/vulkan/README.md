@@ -119,7 +119,16 @@ available through the Vulkan 1.2/1.3 feature chain.
   only on the first fire to prevent log spam at 60 Hz; counters continue to
   increment on every call so diagnostic consumers still observe the full
   sequence. Resize fail-closed logs are not rate-limited because window-resize
-  events are inherently low-frequency. The `BeginFrame`/`EndFrame` counter pair
+  events are inherently low-frequency. Per `GRAPHICS-018Q`, per-call warn
+  breadcrumbs on the bindless / transfer-queue / pipeline-creation fallback
+  paths remain canonical for now because those callsites fire infrequently
+  while non-operational and the visibility helps catch accidental loops or
+  missing operational gating before bring-up; migration of any per-call
+  counter to once-per-frame rate-limited breadcrumbs (with a cumulative-
+  skipped count appended to the next emission) is a separate semantic task
+  scoped to that counter only when operational bring-up demonstrates many-per-
+  frame fallback firing, never a sweeping retrofit, and must keep the
+  underlying counter exact. The `BeginFrame`/`EndFrame` counter pair
   lets CPU diagnostics observe both halves of an unbalanced renderer frame loop
   driving a fail-closed Vulkan device, and CPU contract coverage asserts that
   paired Begin/End calls advance both counters in lockstep.
@@ -130,6 +139,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   is still unimplemented". Bindless, transfer-queue, and frame-loop fallbacks
   intentionally do not yet expose a reason enum — each currently has a single
   fail-closed reason and the pattern is being piloted on `CreatePipeline` first.
+  Per `GRAPHICS-018Q`, this 1:1 path-scoping is canonical: future device-loss /
+  extension / feature-negotiation reasons in the pipeline path are appended to
+  the existing `FallbackPipelineReason` enum, and any second reason in another
+  counter introduces a *new* path-local `FallbackXxxReason` enum named after
+  that counter (e.g. `FallbackBindlessReason`, `FallbackTransferUploadReason`,
+  `FallbackBeginFrameReason`) with a matching `LastXxxReason` field appended
+  to `FallbackDiagnosticsSnapshot` after the existing eight fields, never a
+  combined mega-enum.
   `GetFallbackDiagnosticsSnapshot()` returns a `FallbackDiagnosticsSnapshot`
   aggregate of all seven counters plus the last pipeline reason in a single
   call, so CPU diagnostics consumers do not have to combine multiple
@@ -200,7 +217,17 @@ available through the Vulkan 1.2/1.3 feature chain.
   rendering attachments, and sampler creation creates real `VkSampler` objects
   with backend-local translation from `RHI::SamplerDesc::BorderColor` to Vulkan
   `VkBorderColor`; anisotropy remains disabled unless device feature negotiation
-  records support. The live internal `VulkanBindlessHeap` now resolves
+  records support. Per `GRAPHICS-018Q`, anisotropy stays expressed through
+  `RHI::SamplerDesc::MaxAnisotropy` (no new RHI enum or cap query): the backend
+  probes `VkPhysicalDeviceFeatures::samplerAnisotropy` during physical-device
+  selection alongside the existing required Vulkan 1.2 / 1.3 features, enables
+  it on the logical device when supported, records support / enablement on
+  `GetVulkanBootstrapDiagnosticsSnapshot()`, and at sampler creation silently
+  disables anisotropy when the feature is unsupported or `MaxAnisotropy <= 1.0`;
+  otherwise it clamps the requested value to
+  `min(MaxAnisotropy, VkPhysicalDeviceLimits::maxSamplerAnisotropy)` and emits
+  one warn breadcrumb when clamping reduces the value. Missing support never
+  fails sampler creation. The live internal `VulkanBindlessHeap` now resolves
   backend-owned RHI texture/sampler handles into queued descriptor writes through
   a Vulkan-local resolver set by `VulkanDevice`, so future public service handoff
   does not require Vulkan handles or live ECS knowledge in renderer/RHI callers.
@@ -208,7 +235,15 @@ available through the Vulkan 1.2/1.3 feature chain.
   synchronous staging-buffer upload path with mip/layer bounds checks, exact
   byte-size validation, sampled- and transfer-dst-usage validation, explicit
   depth-stencil upload rejection, and transfer-to-shader-read layout transitions that update tracked
-  layout only after one-shot submission succeeds. Pipeline creation now builds
+  layout only after one-shot submission succeeds. Per `GRAPHICS-018Q`, this
+  guarded synchronous one-subresource path stays the fail-closed correctness
+  baseline; runtime/streaming uploads must use `RHI::ITransferQueue` (the
+  canonical seam declared by `GRAPHICS-026`) rather than the blocking
+  graphics-queue helper, per-subresource layout tracking stays whole-image
+  until multi-subresource batching lands, and multi-mip / multi-layer /
+  cubemap batching plus opt-in `gpu;vulkan` smoke for those uploads is owned
+  by [`GRAPHICS-018T`](../../../tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md),
+  not by 018Q. Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded
   bootstrap has created the Vulkan device/global layout; `assets/shaders/depth_prepass.vert`
   is the canonical depth-prepass shader source used by opt-in smoke coverage.

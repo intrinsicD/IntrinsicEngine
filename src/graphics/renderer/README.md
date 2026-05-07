@@ -360,6 +360,52 @@ is retained only as a temporary string compatibility shim; removal is tracked by
   If `InitializeFallbackTexture()` fails, `FallbackTextureReady = false`
   and `GetViewOrFallback()` returns `GpuAssetFallbackReason::Unavailable`,
   letting material code fall back to factor-only shading deterministically.
+- Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
+  to the `GRAPHICS-018` guarded backend bring-up resolve as follows.
+  Texture upload policy keeps the guarded synchronous staging-buffer
+  one-subresource `WriteTexture()` path as the fail-closed correctness
+  baseline; runtime/streaming uploads must use `RHI::ITransferQueue`
+  (the canonical seam declared by `GRAPHICS-026`) rather than the
+  blocking graphics-queue helper, per-subresource layout tracking
+  stays whole-image until multi-subresource batching lands, and
+  multi-mip / multi-layer / cubemap batching plus opt-in `gpu;vulkan`
+  smoke is owned by
+  `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`,
+  not by this clarification. Sampler anisotropy stays expressed
+  through the existing `RHI::SamplerDesc::MaxAnisotropy` float; the
+  Vulkan backend probes `VkPhysicalDeviceFeatures::samplerAnisotropy`
+  during physical-device selection alongside the existing required
+  Vulkan 1.2 / 1.3 features, enables it on the logical device when
+  supported, records support / enablement on
+  `GetVulkanBootstrapDiagnosticsSnapshot()`, and at sampler creation
+  silently disables anisotropy when the feature is unsupported or
+  `MaxAnisotropy <= 1.0`, otherwise clamps to
+  `min(MaxAnisotropy, VkPhysicalDeviceLimits::maxSamplerAnisotropy)`
+  with one warn breadcrumb when clamping reduces the value. Missing
+  support never fails sampler creation and no new RHI-visible enum
+  or cap is added. Fallback reason taxonomy keeps each fail-closed
+  counter and its reason enum 1:1 to its path: future device-loss /
+  extension / feature-negotiation reasons in the pipeline path are
+  appended to the existing `FallbackPipelineReason` enum, and any
+  second reason in another counter introduces a *new* path-local
+  `FallbackXxxReason` enum named after that counter with a matching
+  `LastXxxReason` field appended to `FallbackDiagnosticsSnapshot`
+  after the existing eight fields. Counters stay process-monotonic
+  across `Initialize`/`Shutdown` cycles independent of any reason
+  field. Per-call warn breadcrumbs on bindless / transfer-queue /
+  pipeline-creation fallback paths remain canonical for now (those
+  callsites fire infrequently while non-operational and the
+  visibility helps catch accidental loops before bring-up);
+  frame-loop counters keep the existing once-per-fail-closed-cycle
+  rate-limited breadcrumb policy already locked in by 018, with
+  `FallbackDiagnosticsSnapshot` carrying the precise diagnostic
+  regardless of breadcrumb suppression, and `Resize` stays
+  unrate-limited. Migration of any per-call counter to once-per-frame
+  rate-limited breadcrumbs (with a cumulative-skipped count appended)
+  is a separate semantic task scoped to that counter only when
+  operational bring-up demonstrates many-per-frame fallback firing.
+  This clarification adds no new graphics fields, no new RHI enums,
+  and no new graphics acceptance criteria.
 - `PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain settings,
   deterministic stage description, sanitized diagnostics, and push-constant
   packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. Frame
