@@ -230,7 +230,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-017 — Camera, interaction, and gizmo boundaries](../../done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md):
   depends on GRAPHICS-012 for picking handoff. Camera packet contracts may be
   defined earlier without blocking.
-- [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
+- [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](../../active/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
   nonblocking docs-only follow-up for runtime camera controllers, pick-request scheduling, transform-gizmo hit testing, interaction state, and transform application ownership.
 - [GRAPHICS-018 — Vulkan renderer integration](../../done/GRAPHICS-018-vulkan-renderer-integration.md):
   depends on stable CPU/null contracts from GRAPHICS-002, GRAPHICS-003,
