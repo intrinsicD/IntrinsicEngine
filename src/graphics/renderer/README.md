@@ -369,7 +369,7 @@ human-readable summary should read `Findings.front().Message`.
   stays whole-image until multi-subresource batching lands, and
   multi-mip / multi-layer / cubemap batching plus opt-in `gpu;vulkan`
   smoke is owned by
-  `tasks/backlog/rendering/GRAPHICS-018T-texture-upload-batching.md`,
+  `tasks/active/GRAPHICS-018T-texture-upload-batching.md`,
   not by this clarification. Sampler anisotropy stays expressed
   through the existing `RHI::SamplerDesc::MaxAnisotropy` float; the
   Vulkan backend probes `VkPhysicalDeviceFeatures::samplerAnisotropy`
