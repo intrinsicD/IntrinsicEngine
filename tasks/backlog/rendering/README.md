@@ -312,6 +312,13 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
 - [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](GRAPHICS-025-hybrid-transparent-special-material-path.md):
   future-facing follow-up after GRAPHICS-006/007/008/009 and GRAPHICS-013A
   establish material, bucket, opaque, lighting, and postprocess contracts.
+- [GRAPHICS-028 — ECS renderable-entity to GpuWorld residency bridge](GRAPHICS-028-ecs-renderable-residency-bridge.md):
+  planning-only task that records the ECS-to-`GpuWorld` residency-component
+  contract, per-stream static-vs-dynamic split, dirty-tag drain order,
+  hierarchy decomposition, per-domain packers (mesh / graph / point cloud),
+  and primitive-instancing policy (regular instances vs collected
+  instanced debug batches). Depends on retired GRAPHICS-004/005/007/010/011/
+  014/015 contracts; no implementation, no `src/graphics/*` ECS imports.
 
 ## Agent selection rules
 
