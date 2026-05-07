@@ -152,7 +152,9 @@ TEST(GraphicsDebugViewContract, FrameRecipeDeclaresDebugViewPreviewStage)
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    const auto& compileResult = graph.GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<std::string> order = OrderedPassNames(*compiled);
     const auto post = std::ranges::find(order, "PostProcessPass");
     const auto debug = std::ranges::find(order, "DebugViewPass");

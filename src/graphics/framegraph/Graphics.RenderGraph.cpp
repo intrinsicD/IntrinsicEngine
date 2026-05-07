@@ -60,7 +60,6 @@ namespace Extrinsic::Graphics
         TransientAllocator Transients{};
         bool TransientAliasingEnabled = true;
         std::uint32_t Generation = 1;
-        std::string LastCompileDiagnostic{};
         RenderGraphValidationResult LastCompileValidationResult{};
     };
 
@@ -356,7 +355,6 @@ namespace Extrinsic::Graphics
             return RenderGraphCompiler::Compile({}, {}, {});
         }
 
-        m_Impl->LastCompileDiagnostic.clear();
         m_Impl->LastCompileValidationResult.Findings.clear();
 
         const auto hasValidationFailure = std::ranges::any_of(
@@ -366,12 +364,12 @@ namespace Extrinsic::Graphics
             const auto failedIt = std::ranges::find_if(
                 m_Impl->Passes, [](const RenderPassRecord& pass) { return pass.HasValidationError; });
             const std::string passName = (failedIt != m_Impl->Passes.end()) ? failedIt->Name : "<unknown>";
-            m_Impl->LastCompileDiagnostic = "RenderGraph validation failed while recording pass resource usage: pass=\"" +
-                                            passName + "\".";
+            std::string message = "RenderGraph validation failed while recording pass resource usage: pass=\"" +
+                                  passName + "\".";
             m_Impl->LastCompileValidationResult.Findings.push_back(RenderGraphValidationFinding{
                 .Severity = RenderGraphValidationSeverity::Error,
                 .Code = RenderGraphValidationCode::InvalidTextureAccess,
-                .Message = m_Impl->LastCompileDiagnostic,
+                .Message = std::move(message),
                 .PassIndex = failedIt != m_Impl->Passes.end()
                                  ? static_cast<std::uint32_t>(std::distance(m_Impl->Passes.begin(), failedIt))
                                  : std::numeric_limits<std::uint32_t>::max(),
@@ -392,12 +390,12 @@ namespace Extrinsic::Graphics
         });
         if (invalidPresentPassIt != m_Impl->Passes.end())
         {
-            m_Impl->LastCompileDiagnostic = "RenderGraph present pass must target an imported backbuffer texture: pass=\"" +
-                                            invalidPresentPassIt->Name + "\".";
+            std::string message = "RenderGraph present pass must target an imported backbuffer texture: pass=\"" +
+                                  invalidPresentPassIt->Name + "\".";
             m_Impl->LastCompileValidationResult.Findings.push_back(RenderGraphValidationFinding{
                 .Severity = RenderGraphValidationSeverity::Error,
                 .Code = RenderGraphValidationCode::InvalidTextureAccess,
-                .Message = m_Impl->LastCompileDiagnostic,
+                .Message = std::move(message),
                 .PassIndex = static_cast<std::uint32_t>(std::distance(m_Impl->Passes.begin(), invalidPresentPassIt)),
                 .PassName = invalidPresentPassIt->Name,
             });
@@ -407,12 +405,10 @@ namespace Extrinsic::Graphics
         auto compiled = RenderGraphCompiler::Compile(m_Impl->Passes, m_Impl->Textures, m_Impl->Buffers);
         if (!compiled.has_value())
         {
-            m_Impl->LastCompileDiagnostic = RenderGraphCompiler::GetLastCompileDiagnostic();
             m_Impl->LastCompileValidationResult = RenderGraphCompiler::GetLastCompileValidationResult();
             return compiled;
         }
 
-        m_Impl->LastCompileDiagnostic = compiled->Diagnostic;
         m_Impl->LastCompileValidationResult.Findings = compiled->ValidationFindings;
 
         auto BytesPerPixel = [](const RHI::Format fmt) -> std::uint64_t {
@@ -590,16 +586,6 @@ namespace Extrinsic::Graphics
         }
 
         return compiled;
-    }
-
-    const std::string& RenderGraph::GetLastCompileDiagnostic() const
-    {
-        static const std::string empty{};
-        if (!m_Impl)
-        {
-            return empty;
-        }
-        return m_Impl->LastCompileDiagnostic;
     }
 
     const RenderGraphValidationResult& RenderGraph::GetLastCompileValidationResult() const

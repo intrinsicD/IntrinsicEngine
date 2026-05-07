@@ -1,10 +1,10 @@
 # GRAPHICS-022 — Rendergraph diagnostics and validation
 
-- Status: complete (Slices A/B/C implemented; diagnostic string shim removal tracked by GRAPHICS-027)
+- Status: complete (Slices A/B/C implemented; diagnostic string shim removed by GRAPHICS-027)
 - Owner / agent: graphics — `src/graphics/framegraph` + `src/graphics/renderer`
 - Branch: `claude/plan-rendering-tasks-ORYwq` (planning); implementation lands on a follow-up branch.
 - PR: TBD.
-- Follow-up: string shim removal lives in `tasks/backlog/rendering/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md`.
+- Follow-up: string shim removal completed in `tasks/done/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md`.
 
 ## Goal
 
@@ -292,8 +292,8 @@ Under `tests/contract/graphics/`:
   mirror structured findings while `GetLastCompileDiagnostic()` remains a
   documented compatibility shim. Added CPU contract coverage for the remaining
   validation codes and created
-  `tasks/backlog/rendering/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md`
-  as the removal follow-up.
+  `tasks/done/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md`
+  as the removal follow-up (completed 2026-05-07).
 
 ## Verification
 

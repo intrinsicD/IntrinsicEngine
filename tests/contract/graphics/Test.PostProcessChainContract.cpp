@@ -218,7 +218,9 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
-    ASSERT_TRUE(compiled.has_value()) << graph.GetLastCompileDiagnostic();
+    const auto& compileResult = graph.GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<std::string> order = OrderedPassNames(*compiled);
     EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessPass"), order.end());
     EXPECT_NE(std::find(order.begin(), order.end(), "Present"), order.end());
