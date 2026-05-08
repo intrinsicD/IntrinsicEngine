@@ -26,4 +26,15 @@ export namespace Geometry::MeshIO
     Core::Expected<MeshIOResult> LoadPLY(std::string_view absolute_path);
     Core::Expected<MeshIOResult> LoadSTL(std::string_view absolute_path);
     // and other missing formats for meshes only. Complete models or scenes will be handled differently?
+
+    enum class MeshIOWriteStatus
+    {
+        Success = 0,
+        EmptyMesh,
+        InvalidFace,
+        InvalidPath,
+        FileWriteError,
+    };
+
+    MeshIOWriteStatus WriteOBJ(std::string_view absolute_path, const MeshIOResult& mesh);
 }

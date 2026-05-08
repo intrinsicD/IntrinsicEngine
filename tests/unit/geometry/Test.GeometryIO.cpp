@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <fstream>
+#include <span>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -229,6 +232,165 @@ TEST(GeometryIO_GraphIO, LoadsEdgeListWithImplicitVertices)
     auto edgeWeights = result->Graph.EdgeProperties().Get<float>("e:weight");
     ASSERT_TRUE(edgeWeights.IsValid());
     EXPECT_FLOAT_EQ(edgeWeights[1], 2.0f);
+}
+
+namespace
+{
+    void PopulateTriangleMesh(Geometry::MeshIO::MeshIOResult& mesh,
+                              std::span<const glm::vec3> positions,
+                              std::span<const std::vector<std::uint32_t>> faces,
+                              std::span<const glm::vec3> normals = {})
+    {
+        mesh.Vertices.Resize(positions.size());
+        auto pointProperty = mesh.Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.0f));
+        for (std::size_t i = 0; i < positions.size(); ++i)
+        {
+            pointProperty[i] = positions[i];
+        }
+        if (!normals.empty())
+        {
+            auto normalProperty = mesh.Vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3(0.0f, 1.0f, 0.0f));
+            for (std::size_t i = 0; i < normals.size(); ++i)
+            {
+                normalProperty[i] = normals[i];
+            }
+        }
+
+        mesh.Faces.Resize(faces.size());
+        auto faceProperty = mesh.Faces.GetOrAdd<std::vector<std::uint32_t>>("f:vertices", {});
+        for (std::size_t i = 0; i < faces.size(); ++i)
+        {
+            faceProperty[i] = faces[i];
+        }
+    }
+
+    [[nodiscard]] std::string ReadFileContents(const std::string& path)
+    {
+        std::ifstream in(path, std::ios::binary);
+        std::ostringstream buffer;
+        buffer << in.rdbuf();
+        return buffer.str();
+    }
+}
+
+TEST(GeometryIO_MeshIO, WritesOBJTriangle)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+}
+
+TEST(GeometryIO_MeshIO, WritesOBJTriangleWithNormals)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, normals);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("vn 0.000000 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("f 1//1 2//2 3//3\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+}
+
+TEST(GeometryIO_MeshIO, WritesOBJQuadRoundTripsFaceArity)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 4> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u, 3u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Vertices.Size(), 4u);
+    EXPECT_EQ(loaded->Faces.Size(), 1u);
+
+    auto faceVertices = loaded->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(faceVertices.IsValid());
+    ASSERT_EQ(faceVertices.Vector().size(), 1u);
+    EXPECT_EQ(faceVertices.Vector()[0].size(), 4u);
+    EXPECT_EQ(faceVertices.Vector()[0][3], 3u);
+}
+
+TEST(GeometryIO_MeshIO, WriteOBJRejectsEmptyMesh)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    TempFile file(".obj", "");
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
+}
+
+TEST(GeometryIO_MeshIO, WriteOBJRejectsOutOfRangeIndex)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 99u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".obj", "");
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(file.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
+}
+
+TEST(GeometryIO_MeshIO, WriteOBJRejectsBadPath)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    const std::string path =
+        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
+        std::to_string(static_cast<long long>(getpid())) + ".obj";
+
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
 }
 
 
