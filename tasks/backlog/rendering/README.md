@@ -345,6 +345,54 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   static-vs-dynamic split, dirty-tag drain order, hierarchy decomposition,
   per-domain packers (mesh / graph / point cloud), and primitive-instancing
   policy. Follow-up implementation remains separate from this docs-only slice.
+- [GRAPHICS-029 — Reference scene bootstrap and minimal renderable extraction (planning)](GRAPHICS-029-runtime-reference-scene-bootstrap.md):
+  planning-only follow-up to the 2026-05-08 sandbox geometry rendering gap
+  analysis; locks down module placement, bootstrap-seam shape, renderable
+  composition, camera/light policy, lifetime, extensibility, and performance
+  bounds for an opt-in reference scene observable by `Runtime.RenderExtraction`.
+  Implementation child slices (`GRAPHICS-029-Impl-A/B/C`) are identified but
+  not opened. Sandbox stays policy-light; no GPU-typed ECS components.
+- [GRAPHICS-030 — Procedural-source geometry residency bridge (planning)](GRAPHICS-030-runtime-geometry-residency-bridge.md):
+  planning-only first concrete slice of the GRAPHICS-028 contract; locks down
+  procedural-geometry descriptor shape, cache identity and refcount,
+  generation-tracking sentinel, packer placement, lifecycle ordering, failure
+  modes, diagnostics, and extensibility to other procedural primitives.
+  Implementation child slices (`GRAPHICS-030-Impl-A/B/C/D`) are identified but
+  not opened. Asset-backed mesh residency is deferred to GRAPHICS-034.
+- [GRAPHICS-031 — Default debug surface material and missing-material fallback (planning)](GRAPHICS-031-default-debug-surface-material.md):
+  planning-only definition of a deterministic default/debug surface material
+  plus an explicit, testable missing-material fallback policy; locks down
+  identity/slot, shader pair, pipeline state, vertex format, descriptor
+  layout, fallback ownership, diagnostics, visibility guarantees,
+  extensibility, performance bounds, and layering. Implementation child
+  slices (`GRAPHICS-031-Impl-A/B/C`) are identified but not opened.
+- [GRAPHICS-032 — Minimal surface and present command recording path (planning)](GRAPHICS-032-minimal-surface-present-command-path.md):
+  planning-only definition of the smallest visible-path command recording
+  bodies (recipe identity, pass set, render targets, backbuffer integration,
+  barrier model, CPU-mock command-stream contract, diagnostics, recipe-vs-
+  default isolation, extensibility, performance bounds, test split, failure
+  modes, layering). Implementation child slices
+  (`GRAPHICS-032-Impl-A/B/C/D`) are identified but not opened. Vulkan
+  operational-readiness defers to GRAPHICS-033.
+- [GRAPHICS-033 — Vulkan operational readiness and runtime fallback diagnostics (planning)](GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
+  planning-only operational-gate definition for the promoted Vulkan backend;
+  locks down the gate enumeration, single-source `IsOperational` function,
+  reason enum, reconciliation truth table, diagnostic counters and
+  breadcrumbs, validation-layer policy, required-vs-optional extensions,
+  queue-family ownership rules, hot-reload/swapchain transitions, test split,
+  performance characteristics, extensibility, and layering. Implementation
+  child slices (`GRAPHICS-033-Impl-A/B/C/D`) are identified but not opened;
+  fail-closed behavior is preserved.
+- [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
+  planning-only design for the asset-source residency path; locks down
+  AssetId-normalization placement, separate runtime cache, key + refcount,
+  per-renderable state machine, ordering against `GpuAssetCache::Tick`,
+  GRAPHICS-023A/B/C/D integration, sharing fairness, stuck-pending policy,
+  failure-mode fallback (cube placeholder via GRAPHICS-031 + GRAPHICS-030
+  procedural source), diagnostics, performance, extensibility to non-mesh
+  domains, and layering. Implementation child slices
+  (`GRAPHICS-034-Impl-A/B/C/D/E`) are identified but not opened. Depends on
+  GRAPHICS-028, GRAPHICS-030, and ASSETIO-001 ingest ownership.
 
 ## Agent selection rules
 
