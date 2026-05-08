@@ -1034,3 +1034,266 @@ TEST(GeometryIO_MeshIO, LoadsAsciiPLYAfterBinaryDispatch)
     ASSERT_TRUE(result.has_value());
     ExpectTriangleMeshProperties(*result);
 }
+
+namespace
+{
+    struct BinaryPlyPointCloudVertex
+    {
+        glm::vec3 Position{0.0f};
+        bool HasNormal = false;
+        glm::vec3 Normal{0.0f};
+        bool HasColor = false;
+        std::uint8_t R = 0;
+        std::uint8_t G = 0;
+        std::uint8_t B = 0;
+        bool HasIntensity = false;
+        float Intensity = 0.0f;
+    };
+
+    [[nodiscard]] std::string WriteBinaryPLYPointCloudFixture(
+        std::span<const BinaryPlyPointCloudVertex> vertices,
+        std::size_t advertisedVertexCountOverride,
+        BinaryPlyEndian endian,
+        bool injectListPropertyInVertex = false,
+        bool truncateBodyAfterFirst = false)
+    {
+        static int counter = 0;
+        const char* tmpDir = std::getenv("TEST_TMPDIR");
+        if (tmpDir == nullptr || tmpDir[0] == '\0')
+        {
+            tmpDir = "/tmp";
+        }
+        std::string path = std::string(tmpDir) + "/intrinsic_geometry_io_binplypc_" +
+                           std::to_string(static_cast<long long>(getpid())) + "_" +
+                           std::to_string(counter++) + ".ply";
+        std::ofstream out(path, std::ios::binary);
+
+        const bool hasNormals = !vertices.empty() && vertices.front().HasNormal;
+        const bool hasIntensity = !vertices.empty() && vertices.front().HasIntensity;
+        const bool hasColors = !vertices.empty() && vertices.front().HasColor;
+        const char* formatToken =
+            endian == BinaryPlyEndian::Little ? "binary_little_endian" : "binary_big_endian";
+
+        const std::size_t advertisedCount =
+            advertisedVertexCountOverride > 0 ? advertisedVertexCountOverride : vertices.size();
+
+        out << "ply\n";
+        out << "format " << formatToken << " 1.0\n";
+        out << "comment Test fixture\n";
+        out << "element vertex " << advertisedCount << "\n";
+        out << "property float x\n";
+        out << "property float y\n";
+        out << "property float z\n";
+        if (hasNormals)
+        {
+            out << "property float nx\n";
+            out << "property float ny\n";
+            out << "property float nz\n";
+        }
+        if (hasIntensity)
+        {
+            out << "property float intensity\n";
+        }
+        if (hasColors)
+        {
+            out << "property uchar red\n";
+            out << "property uchar green\n";
+            out << "property uchar blue\n";
+        }
+        if (injectListPropertyInVertex)
+        {
+            out << "property list uchar int unsupported\n";
+        }
+        out << "end_header\n";
+
+        for (const auto& v : vertices)
+        {
+            const auto x = EncodeFloat(v.Position.x, endian);
+            const auto y = EncodeFloat(v.Position.y, endian);
+            const auto z = EncodeFloat(v.Position.z, endian);
+            out.write(reinterpret_cast<const char*>(x.data()), 4);
+            out.write(reinterpret_cast<const char*>(y.data()), 4);
+            out.write(reinterpret_cast<const char*>(z.data()), 4);
+            if (hasNormals)
+            {
+                const auto nx = EncodeFloat(v.Normal.x, endian);
+                const auto ny = EncodeFloat(v.Normal.y, endian);
+                const auto nz = EncodeFloat(v.Normal.z, endian);
+                out.write(reinterpret_cast<const char*>(nx.data()), 4);
+                out.write(reinterpret_cast<const char*>(ny.data()), 4);
+                out.write(reinterpret_cast<const char*>(nz.data()), 4);
+            }
+            if (hasIntensity)
+            {
+                const auto intensity = EncodeFloat(v.Intensity, endian);
+                out.write(reinterpret_cast<const char*>(intensity.data()), 4);
+            }
+            if (hasColors)
+            {
+                const std::uint8_t rgb[3] = {v.R, v.G, v.B};
+                out.write(reinterpret_cast<const char*>(rgb), 3);
+            }
+            if (truncateBodyAfterFirst)
+            {
+                return path;
+            }
+        }
+
+        return path;
+    }
+
+    struct TempBinaryPLYPointCloud
+    {
+        std::string Path;
+
+        TempBinaryPLYPointCloud(std::span<const BinaryPlyPointCloudVertex> vertices,
+                                BinaryPlyEndian endian,
+                                std::size_t advertisedVertexCountOverride = 0,
+                                bool injectListPropertyInVertex = false,
+                                bool truncateBodyAfterFirst = false)
+            : Path(WriteBinaryPLYPointCloudFixture(vertices,
+                                                   advertisedVertexCountOverride,
+                                                   endian,
+                                                   injectListPropertyInVertex,
+                                                   truncateBodyAfterFirst))
+        {
+        }
+
+        ~TempBinaryPLYPointCloud()
+        {
+            if (!Path.empty())
+            {
+                std::remove(Path.c_str());
+            }
+        }
+    };
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryLittleEndianPLYPointCloud)
+{
+    const std::array<BinaryPlyPointCloudVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{0.0f, 1.0f, 2.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    TempBinaryPLYPointCloud file(vertices, BinaryPlyEndian::Little);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 3u);
+    EXPECT_FALSE(result->Cloud.HasNormals());
+    EXPECT_FALSE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 2.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryBigEndianPLYPointCloud)
+{
+    const std::array<BinaryPlyPointCloudVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{0.0f, 1.0f, 2.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    TempBinaryPLYPointCloud file(vertices, BinaryPlyEndian::Big);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 3u);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 2.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPLYPointCloudWithNormalsAndColor)
+{
+    const std::array<BinaryPlyPointCloudVertex, 1> vertices{{
+        {glm::vec3{1.0f, 2.0f, 3.0f}, true, glm::vec3{0.0f, 0.0f, 1.0f}, true, 255, 128, 0, false, 0.0f},
+    }};
+    TempBinaryPLYPointCloud file(vertices, BinaryPlyEndian::Little);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
+    EXPECT_TRUE(result->Cloud.HasNormals());
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).x, 1.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).z, 0.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPLYPointCloudSkipsExtraScalars)
+{
+    const std::array<BinaryPlyPointCloudVertex, 2> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, true, 255, 0, 0, true, 0.5f},
+        {glm::vec3{1.0f, 2.0f, 3.0f}, false, glm::vec3{0.0f}, true, 0, 255, 0, true, 0.25f},
+    }};
+    TempBinaryPLYPointCloud file(vertices, BinaryPlyEndian::Little);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).y, 1.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadPLYPointCloudRejectsTruncatedBinaryBody)
+{
+    const std::array<BinaryPlyPointCloudVertex, 4> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{0.0f, 0.0f, 1.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    TempBinaryPLYPointCloud file(vertices,
+                                 BinaryPlyEndian::Little,
+                                 /*advertisedVertexCountOverride=*/0,
+                                 /*injectListPropertyInVertex=*/false,
+                                 /*truncateBodyAfterFirst=*/true);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadPLYPointCloudRejectsListPropertyInVertex)
+{
+    const std::array<BinaryPlyPointCloudVertex, 1> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    TempBinaryPLYPointCloud file(vertices,
+                                 BinaryPlyEndian::Little,
+                                 /*advertisedVertexCountOverride=*/0,
+                                 /*injectListPropertyInVertex=*/true);
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsAsciiPLYPointCloudAfterBinaryDispatch)
+{
+    // Regression: the ASCII path must continue to parse the canonical
+    // ASCII point-cloud fixture after LoadPLY was refactored into a
+    // header-driven dispatch supporting binary little/big-endian formats.
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 1\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "property uchar red\n"
+                  "property uchar green\n"
+                  "property uchar blue\n"
+                  "end_header\n"
+                  "1 2 3 255 128 0\n");
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
+}
