@@ -20,7 +20,7 @@
 - No GPU/Vulkan requirement in the default CPU gate.
 
 ## Context
-- Status: in-progress.
+- Status: completed implementation slice.
 - Owner: `runtime` composition/extraction layer, using lower-layer
   `graphics/renderer` `GpuSceneSlot` value semantics from `GRAPHICS-023A`/`B`.
 - Branch: `claude/setup-agentic-workflow-deiFw`.
@@ -84,6 +84,18 @@
   `SourceAssetRebindAcknowledgedCount` counter; the default
   `ExtractAndSubmit` path continues to leave it at zero.
 - Tests prove the helper behavior on the CPU/default path.
+
+## Completion
+- Completed: 2026-05-08.
+- Commit reference: 2c9b716 ("GRAPHICS-023D: acknowledge runtime asset rebinds").
+- Notes:
+  - Landed only the runtime-owned `AcknowledgeRenderableAssetRebind` helper,
+    the `SourceAssetRebindAcknowledgedCount` counter, and focused CPU
+    integration coverage in `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp`.
+  - `RenderExtractionCache::ExtractAndSubmit` continues to observe without
+    acknowledging; uploads, file watching, shader reload, and texture
+    residency reload remain outside this slice and stay scoped to the parent
+    `GRAPHICS-023` series.
 
 ## Verification
 ```bash
