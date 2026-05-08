@@ -2,7 +2,7 @@ module;
 
 #include <cstdint>
 
-export module Geometry.HalfedgeMeshFwd;
+export module Geometry.HalfedgeMesh.Fwd;
 
 import Geometry.Properties;
 

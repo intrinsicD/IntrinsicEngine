@@ -3,7 +3,7 @@ module;
 #include <string>
 #include <string_view>
 
-export module Geometry.PointCloudIO;
+export module Geometry.PointCloud.IO;
 
 import Geometry.PointCloud;
 import Core.Error;

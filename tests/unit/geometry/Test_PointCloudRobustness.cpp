@@ -12,7 +12,7 @@
 #include <gtest/gtest.h>
 
 import Geometry.PointCloud;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 
 namespace
 {

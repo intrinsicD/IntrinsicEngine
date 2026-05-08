@@ -12,7 +12,7 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry.PointCloudIO;
+module Geometry.PointCloud.IO;
 
 import Geometry.PointCloud;
 import Geometry.Properties;

@@ -10,11 +10,11 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry.MeshAnalysis;
+module Geometry.HalfedgeMesh.Analysis;
 
 import Core.Logging;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 
 namespace Geometry::MeshAnalysis

@@ -13,7 +13,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.ShortestPath;
+module Geometry.Graph.ShortestPath;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;

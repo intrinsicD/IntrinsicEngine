@@ -3,7 +3,7 @@ module;
 #include <string_view>
 #include <string>
 
-export module Geometry.MeshIO;
+export module Geometry.HalfedgeMesh.IO;
 
 import Geometry.Properties;
 import Core.Error;

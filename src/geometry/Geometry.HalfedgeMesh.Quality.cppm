@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <vector>
 
-export module Geometry.MeshQuality;
+export module Geometry.HalfedgeMesh.Quality;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

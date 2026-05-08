@@ -16,7 +16,7 @@ module Graphics.Importers.OBJ;
 import Graphics.IORegistry;
 import Graphics.Geometry;
 import Asset.Errors;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 
 #include "Graphics.Importers.PostProcess.hpp"
 

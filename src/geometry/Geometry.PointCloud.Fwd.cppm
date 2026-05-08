@@ -2,7 +2,7 @@ module;
 
 #include <cstddef>
 
-export module Geometry.PointCloudFwd;
+export module Geometry.PointCloud.Fwd;
 
 import Geometry.Properties;
 

@@ -7,7 +7,7 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-export module Geometry.GraphUtils;
+export module Geometry.Graph.Utils;
 
 export import Geometry.Graph;
 

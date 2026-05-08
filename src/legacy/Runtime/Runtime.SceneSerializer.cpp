@@ -35,7 +35,7 @@ import Asset.Pipeline;
 import Runtime.RenderOrchestrator;
 import Runtime.GraphicsBackend;
 
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 
 using json = nlohmann::json;
 

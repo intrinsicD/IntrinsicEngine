@@ -18,7 +18,7 @@ module Geometry.Simplification;
 import Geometry.Quadric;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.Validation;
 
 namespace Geometry::Simplification

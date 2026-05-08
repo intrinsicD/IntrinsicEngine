@@ -6,7 +6,7 @@ module;
 #include <vector>
 #include <glm/fwd.hpp>
 
-export module Geometry.MeshUtils;
+export module Geometry.HalfedgeMesh.Utils;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

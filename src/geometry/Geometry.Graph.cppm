@@ -12,7 +12,7 @@ module;
 
 export module Geometry.Graph;
 
-export import Geometry.GraphFwd;
+export import Geometry.Graph.Fwd;
 import Geometry.Properties;
 import Geometry.Circulators;
 

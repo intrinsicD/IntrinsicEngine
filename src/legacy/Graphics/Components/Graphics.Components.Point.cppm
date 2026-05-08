@@ -13,7 +13,7 @@ module;
 export module Graphics.Components.Point;
 
 import Geometry.Handle;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 
 export namespace ECS::Point
 {

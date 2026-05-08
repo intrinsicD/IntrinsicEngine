@@ -13,7 +13,7 @@ module Geometry.Boolean;
 
 import Geometry.AABB;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 
 namespace Geometry::Boolean

@@ -3,7 +3,7 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-export module Geometry.SphereSampling;
+export module Geometry.Sphere.Sampling;
 
 import Geometry.Sphere;
 

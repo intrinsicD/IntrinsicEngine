@@ -16,7 +16,7 @@ import Core.Memory;
 import Core.Logging;
 import Graphics.Components;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import ECS;
 import Core.Tasks;
 

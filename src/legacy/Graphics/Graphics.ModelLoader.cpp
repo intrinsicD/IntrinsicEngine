@@ -41,7 +41,7 @@ import RHI.Transfer;
 import Graphics.Geometry;
 import Geometry.AABB;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.Octree;
 import Geometry.Properties;
 

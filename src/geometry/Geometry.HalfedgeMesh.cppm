@@ -13,7 +13,7 @@ module;
 
 export module Geometry.HalfedgeMesh;
 
-export import Geometry.HalfedgeMeshFwd;
+export import Geometry.HalfedgeMesh.Fwd;
 import Geometry.Properties;
 import Geometry.Circulators;
 

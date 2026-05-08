@@ -23,7 +23,7 @@ import Graphics.IORegistry;
 import Graphics.Geometry;
 import Asset.Errors;
 import Core.Logging;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 
 #include "Graphics.Importers.PostProcess.hpp"
 

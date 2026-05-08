@@ -3,7 +3,7 @@ module;
 #include <optional>
 #include <vector>
 
-export module Geometry.MeshBoundary;
+export module Geometry.HalfedgeMesh.Boundary;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;

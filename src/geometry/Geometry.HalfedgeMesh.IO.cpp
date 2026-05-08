@@ -15,7 +15,7 @@ module;
 
 #include "Geometry.IOText.hpp"
 
-module Geometry.MeshIO;
+module Geometry.HalfedgeMesh.IO;
 
 import Geometry.Properties;
 import Core.Error;

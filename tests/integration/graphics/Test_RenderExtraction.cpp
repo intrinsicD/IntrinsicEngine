@@ -21,7 +21,7 @@ import Graphics.DebugDraw;
 import Graphics.RenderPipeline;
 import Geometry.Graph;
 import Geometry.PointCloud;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 import Geometry.HalfedgeMesh;
 import Geometry.Handle;
 import ECS;

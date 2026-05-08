@@ -1,7 +1,7 @@
 # GEOIO-002A — Geometry-owned OBJ mesh exporter
 
 ## Goal
-- Add a geometry-owned ASCII OBJ exporter API to `Geometry.MeshIO` that
+- Add a geometry-owned ASCII OBJ exporter API to `Geometry.HalfedgeMesh.IO` that
   serializes a `MeshIOResult` (positions, optional vertex normals, polygon
   face lists) without introducing assets/runtime/graphics dependencies, so
   the broader `GEOIO-002` parity work can layer PLY/STL exporters and
@@ -24,7 +24,7 @@
   retired on `claude/setup-agentic-workflow-PjgiX`.
 - Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-001` landed minimal `LoadOBJ`/`LoadOFF`/`LoadPLY`/`LoadSTL`
-  importers in `src/geometry/Geometry.MeshIO.{cppm,cpp}`. The exporter side
+  importers in `src/geometry/Geometry.HalfedgeMesh.IO.{cppm,cpp}`. The exporter side
   is currently empty; legacy reference implementations live under
   `src/legacy/Graphics/Exporters/Graphics.Exporters.OBJ.{cppm,cpp}` and may
   be consulted as behavioural references only (do not import).
@@ -47,7 +47,7 @@
     `MeshIOWriteStatus WriteOBJ(std::string_view absolute_path,
                                  const MeshIOResult& mesh);`
   - Keep all existing `Load*` declarations bit-for-bit.
-- Implement `WriteOBJ` in `src/geometry/Geometry.MeshIO.cpp`:
+- Implement `WriteOBJ` in `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
   - Reject empty meshes (no vertex `v:point` property or zero vertices, or
     no `f:vertices` face property, or zero faces) with `EmptyMesh`.
   - Reject any face with fewer than three indices or any index that is out
@@ -155,7 +155,7 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   on a host with the documented C++23 toolchain when available.
 - Notes:
   - `Geometry::MeshIO::WriteOBJ` and `MeshIOWriteStatus` ship in
-    `src/geometry/Geometry.MeshIO.{cppm,cpp}`; round-trip and
+    `src/geometry/Geometry.HalfedgeMesh.IO.{cppm,cpp}`; round-trip and
     negative-path coverage lives in
     `tests/unit/geometry/Test.GeometryIO.cpp` (six new
     `WritesOBJ*`/`WriteOBJRejects*` cases).

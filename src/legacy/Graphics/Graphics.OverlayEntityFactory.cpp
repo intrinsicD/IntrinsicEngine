@@ -14,11 +14,11 @@ import ECS;
 
 import Core.Logging;
 
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.Graph;
 import Geometry.Handle;
 import Geometry.HalfedgeMesh;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;

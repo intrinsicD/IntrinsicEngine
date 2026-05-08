@@ -6,7 +6,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.MeshRepair;
+export module Geometry.HalfedgeMesh.Repair;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;

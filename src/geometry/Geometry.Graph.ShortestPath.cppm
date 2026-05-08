@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <span>
 
-export module Geometry.ShortestPath;
+export module Geometry.Graph.ShortestPath;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;

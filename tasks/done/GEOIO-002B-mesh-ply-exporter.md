@@ -1,7 +1,7 @@
 # GEOIO-002B — Geometry-owned ASCII PLY mesh exporter
 
 ## Goal
-- Add a geometry-owned ASCII PLY exporter API to `Geometry.MeshIO` that
+- Add a geometry-owned ASCII PLY exporter API to `Geometry.HalfedgeMesh.IO` that
   serializes a `MeshIOResult` (positions, optional vertex normals, polygon
   face lists) without introducing assets/runtime/graphics dependencies, so
   the broader `GEOIO-002` parity work can layer the STL exporter and
@@ -109,7 +109,7 @@
   changed in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding a single new exported
-  function to the existing `Geometry.MeshIO` module is expected to update
+  function to the existing `Geometry.HalfedgeMesh.IO` module is expected to update
   the inventory; if the regenerator only changes the date, leave it
   untouched.
 - No additional architecture/migration doc edits required for this slice;
@@ -170,7 +170,7 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   - `python3 tools/repo/generate_module_inventory.py --root src --out
     docs/api/generated/module_inventory.md` — only the regeneration
     date and pre-existing renames from commit `d070e17` differ; this
-    slice adds a function to the existing exported `Geometry.MeshIO`
+    slice adds a function to the existing exported `Geometry.HalfedgeMesh.IO`
     module without changing the module name set, so the inventory was
     left untouched to avoid mixing unrelated drift into this slice.
 - Build/CTest gate not run in this container: `cmake --preset ci`

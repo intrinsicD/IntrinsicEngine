@@ -15,7 +15,7 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry.GraphUtils;
+module Geometry.Graph.Utils;
 
 import Geometry.AABB;
 import Geometry.Octree;

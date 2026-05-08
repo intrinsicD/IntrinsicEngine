@@ -7,7 +7,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.PointCloudUtils;
+export module Geometry.PointCloud.Utils;
 
 export import Geometry.PointCloud;
 

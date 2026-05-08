@@ -12,7 +12,7 @@ module;
 
 module Geometry.HalfedgeMesh;
 
-import Geometry.HalfedgeMeshFwd;
+import Geometry.HalfedgeMesh.Fwd;
 import Geometry.Properties;
 
 namespace Geometry::HalfedgeMesh

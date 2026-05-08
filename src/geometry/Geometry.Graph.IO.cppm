@@ -3,7 +3,7 @@ module;
 #include <string>
 #include <string_view>
 
-export module Geometry.GraphIO;
+export module Geometry.Graph.IO;
 
 import Geometry.Graph;
 import Core.Error;

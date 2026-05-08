@@ -6,7 +6,7 @@ module;
 
 module Geometry.PointCloud;
 
-import Geometry.PointCloudFwd;
+import Geometry.PointCloud.Fwd;
 
 namespace Geometry::PointCloud
 {

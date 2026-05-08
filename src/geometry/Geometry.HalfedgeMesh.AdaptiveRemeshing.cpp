@@ -13,12 +13,12 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.AdaptiveRemeshing;
+module Geometry.HalfedgeMesh.AdaptiveRemeshing;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.Curvature;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.KDTree;
 import Geometry.AABB;
 

@@ -6,7 +6,7 @@ module;
 #include <glm/glm.hpp>
 #include <random>
 
-module Geometry.SphereSampling;
+module Geometry.Sphere.Sampling;
 
 import Geometry.Sphere;
 

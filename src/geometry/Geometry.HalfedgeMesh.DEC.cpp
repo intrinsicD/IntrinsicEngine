@@ -15,7 +15,7 @@ module Geometry.DEC;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 
 namespace Geometry::DEC
 {

@@ -14,9 +14,9 @@
 - Legacy graphics importers contain parsing behavior, but new geometry modules must not depend on `graphics`, `assets`, `runtime`, or live legacy importer registries.
 
 ## Required changes
-- Register and implement `Geometry.MeshIO`.
-- Add `Geometry.PointCloudIO` with text point cloud loaders.
-- Add `Geometry.GraphIO` with text graph loaders.
+- Register and implement `Geometry.HalfedgeMesh.IO`.
+- Add `Geometry.PointCloud.IO` with text point cloud loaders.
+- Add `Geometry.Graph.IO` with text graph loaders.
 - Re-export the new I/O modules from the aggregate `Geometry` module.
 
 ## Tests

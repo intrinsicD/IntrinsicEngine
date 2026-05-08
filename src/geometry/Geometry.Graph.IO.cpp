@@ -11,7 +11,7 @@ module;
 
 #include "Geometry.IOText.hpp"
 
-module Geometry.GraphIO;
+module Geometry.Graph.IO;
 
 import Geometry.Graph;
 import Geometry.Properties;

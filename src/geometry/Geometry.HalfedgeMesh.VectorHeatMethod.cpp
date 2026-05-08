@@ -18,7 +18,7 @@ module Geometry.VectorHeatMethod;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 import Geometry.Geodesic;
 
 namespace Geometry::VectorHeatMethod

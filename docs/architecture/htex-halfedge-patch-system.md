@@ -48,12 +48,12 @@ This feature fits the engine as a **new geometry-side patch authoring module** p
 
 Relevant existing integration points:
 
-- `src/Runtime/Geometry/Geometry.HalfedgeMesh.cppm`
+- `src/geometry/Geometry.HalfedgeMesh.cppm`
   - halfedge connectivity and edge indexing
   - `HalfedgeMesh::Mesh::Edge(HalfedgeHandle)`
   - `HalfedgeMesh::Mesh::OppositeHalfedge(HalfedgeHandle)`
   - `HalfedgeMesh::Mesh::NextHalfedge(HalfedgeHandle)` / `PrevHalfedge(...)`
-- `src/Runtime/Geometry/Geometry.HalfedgeMesh.Utils.cppm`
+- `src/geometry/Geometry.HalfedgeMesh.Utils.cppm`
   - `BuildHalfedgeMeshFromIndexedTriangles(...)`
   - `ExtractIndexedTriangles(..., triangleFaceIds)`
 - `src/Runtime/RHI/RHI.Texture.cppm`
@@ -122,8 +122,8 @@ Suggested sidecar buffers:
 
 Add a new geometry module pair:
 
-- `src/Runtime/Geometry/Geometry.HtexPatch.cppm`
-- `src/Runtime/Geometry/Geometry.HtexPatch.cpp`
+- `src/geometry/Geometry.HtexPatch.cppm`
+- `src/geometry/Geometry.HtexPatch.cpp`
 
 Responsibilities:
 
@@ -375,8 +375,8 @@ These later items are intentionally left as backlog items in `tasks/backlog/lega
 If implementation starts, the most likely files are:
 
 - `docs/architecture/htex-halfedge-patch-system.md` ← this note
-- `src/Runtime/Geometry/Geometry.HtexPatch.cppm`
-- `src/Runtime/Geometry/Geometry.HtexPatch.cpp`
+- `src/geometry/Geometry.HtexPatch.cppm`
+- `src/geometry/Geometry.HtexPatch.cpp`
 - `src/Runtime/Geometry/CMakeLists.txt`
 - `src/Runtime/Graphics/Graphics.RenderPipeline.cppm`
 - `src/Runtime/Graphics/Passes/Graphics.Passes.HalfedgePatch.cppm`

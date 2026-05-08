@@ -16,7 +16,7 @@ module Geometry.Geodesic;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 
 namespace Geometry::Geodesic
 {

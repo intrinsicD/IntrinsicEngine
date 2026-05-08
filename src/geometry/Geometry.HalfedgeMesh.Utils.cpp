@@ -15,7 +15,7 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.MeshUtils;
+module Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Core.Logging;

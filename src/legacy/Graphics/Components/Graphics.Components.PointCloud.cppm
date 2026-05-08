@@ -38,7 +38,7 @@ export module Graphics.Components.PointCloud;
 
 import Graphics.Components.Core;
 import Graphics.VisualizationConfig;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 import Geometry.Handle;
 import Geometry.KMeans;
 #ifdef INTRINSIC_HAS_CUDA

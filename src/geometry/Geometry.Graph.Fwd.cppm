@@ -2,7 +2,7 @@ module;
 
 #include <cstddef>
 
-export module Geometry.GraphFwd;
+export module Geometry.Graph.Fwd;
 
 import Geometry.Properties;
 

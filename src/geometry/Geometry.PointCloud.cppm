@@ -12,7 +12,7 @@ module;
 
 export module Geometry.PointCloud;
 
-export import Geometry.PointCloudFwd;
+export import Geometry.PointCloud.Fwd;
 import Geometry.Properties;
 
 export namespace Geometry::PointCloud

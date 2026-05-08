@@ -3,7 +3,7 @@ module;
 #include <cstdint>
 #include <optional>
 
-export module Geometry.MeshBuilder;
+export module Geometry.HalfedgeMesh.Builder;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Primitives;

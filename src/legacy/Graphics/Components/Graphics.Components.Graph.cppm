@@ -29,7 +29,7 @@ export module Graphics.Components.Graph;
 import Graphics.Components.Core;
 import Graphics.VisualizationConfig;
 import Geometry.Graph;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 import Geometry.Handle;
 import Geometry.KMeans;
 

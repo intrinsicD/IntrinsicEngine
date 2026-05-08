@@ -4,7 +4,7 @@ module;
 #include <optional>
 #include <vector>
 
-module Geometry.MeshBoundary;
+module Geometry.HalfedgeMesh.Boundary;
 
 
 namespace Geometry::MeshBoundary

@@ -27,8 +27,8 @@ import Runtime.SelectionModule;
 import Core.Commands;
 import Graphics.Components;
 import Graphics.Geometry;
-import Geometry.MeshAnalysis;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Analysis;
+import Geometry.HalfedgeMesh.Utils;
 import ECS;
 import Interface;
 

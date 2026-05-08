@@ -22,7 +22,7 @@ export module Graphics.OverlayEntityFactory;
 import Graphics.Geometry;
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 import RHI.Buffer;
 import RHI.Device;
 import RHI.Transfer;

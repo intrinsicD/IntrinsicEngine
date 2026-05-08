@@ -15,7 +15,7 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry.PointCloudUtils;
+module Geometry.PointCloud.Utils;
 
 import Geometry.AABB;
 import Geometry.Octree;

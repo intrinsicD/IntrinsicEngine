@@ -7,7 +7,7 @@
 - No file IO ownership in `src/graphics/*`.
 ## Context
 - Owner: `geometry -> core` only.
-- `GEOIO-001` added minimal `Geometry.MeshIO`, `Geometry.PointCloudIO`, and `Geometry.GraphIO` loaders for OBJ/OFF/PLY/STL, XYZ/PCD/PLY, and TGF/edge-list.
+- `GEOIO-001` added minimal `Geometry.HalfedgeMesh.IO`, `Geometry.PointCloud.IO`, and `Geometry.Graph.IO` loaders for OBJ/OFF/PLY/STL, XYZ/PCD/PLY, and TGF/edge-list.
 - `GRAPHICS-019` assigns legacy `Graphics.Importers.*` and `Graphics.Exporters.*` retirement to promoted geometry/assets owners.
 - Legacy exporters exist for OBJ, PLY, and STL under `src/legacy/Graphics/Exporters` and remain behavioral references only.
 ## Required changes

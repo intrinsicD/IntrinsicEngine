@@ -5,7 +5,7 @@ module;
 #include <optional>
 #include <vector>
 
-export module Geometry.MeshAnalysis;
+export module Geometry.HalfedgeMesh.Analysis;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;

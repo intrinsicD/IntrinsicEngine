@@ -11,11 +11,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry.MeshRepair;
+module Geometry.HalfedgeMesh.Repair;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
+import Geometry.HalfedgeMesh.Utils;
 
 namespace Geometry::MeshRepair
 {

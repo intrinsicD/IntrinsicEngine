@@ -15,7 +15,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-module Geometry.MeshBuilder;
+module Geometry.HalfedgeMesh.Builder;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Subdivision;

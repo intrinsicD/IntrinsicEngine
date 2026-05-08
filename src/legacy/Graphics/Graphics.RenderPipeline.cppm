@@ -23,7 +23,7 @@ import Geometry.Handle;
 import Geometry.Frustum;
 import Geometry.HalfedgeMesh;
 import Geometry.Overlap;
-import Geometry.PointCloudUtils;
+import Geometry.PointCloud.Utils;
 import Geometry.Sphere;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
