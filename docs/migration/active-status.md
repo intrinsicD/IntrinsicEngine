@@ -2,7 +2,7 @@
 
 Use this file as a quick “what does what, and where should it live?” reference.
 
-> **Dual-tree note.** The repository currently builds both `src/` (legacy) and `src_new/` (in-progress reimplementation). Routing rules below describe where new work belongs once a subsystem exists in `src_new`. While a subsystem still lives only in `src/`, follow the legacy layout. See `CLAUDE.md` → "Active Effort: `src_new/` Reimplementation" for the migration contract, and `docs/migration/src_new_module_inventory.md` for the live `src_new` module list.
+> **Source-tree note.** The repository builds a single source tree under `src/`, with retired-but-still-referenced subsystems isolated in `src/legacy/`. Routing rules below describe where new work belongs in the promoted layout. See `AGENTS.md` for the authoritative source-tree map.
 
 ## Engine
 
@@ -63,20 +63,18 @@ Use this file as a quick “what does what, and where should it live?” referen
 
 ### Practical placement
 
-In `src_new/` (new work):
+In `src/` (promoted layout):
 
-- `Core` (`Extrinsic.Core.*`) — utilities, memory, tasks, telemetry, logging, filesystem, config, handles, error types.
-- `Assets` (`Extrinsic.Asset.*`) — registry, payload store, load pipeline, event bus, path index.
-- `ECS` (`Extrinsic.ECS.*`) — scene registry, scene handles, components, systems.
-- `Graphics` (`Extrinsic.Graphics.*`, `Extrinsic.RHI.*`, `Extrinsic.Backends.*`) — rendering, RHI, Vulkan backend.
-- `Platform` (`Extrinsic.Platform.*`) — window and input abstractions plus per-platform implementations (e.g. `LinuxGlfwVulkan`).
-- `Runtime` (`Extrinsic.Runtime.*`) — composition root that wires the engine together.
+- `core/` (`Extrinsic.Core.*`) — utilities, memory, tasks, telemetry, logging, filesystem, config, handles, error types.
+- `assets/` (`Extrinsic.Asset.*`) — registry, payload store, load pipeline, event bus, path index.
+- `ecs/` (`Extrinsic.ECS.*`) — scene registry, scene handles, components, systems.
+- `geometry/` — algorithms and data structures for meshes, graphs, point clouds.
+- `graphics/` (`Extrinsic.Graphics.*`, `Extrinsic.RHI.*`, `Extrinsic.Backends.*`) — rendering, RHI, Vulkan backend.
+- `platform/` (`Extrinsic.Platform.*`) — window and input abstractions plus per-platform implementations.
+- `runtime/` (`Extrinsic.Runtime.*`) — composition root that wires the engine together.
+- `app/` — sandbox/editor entry points.
 
-Reused from `src/` (do not fork into `src_new`):
-
-- `Geometry` — algorithms and data structures for meshes, graphs, point clouds.
-
-Legacy `src/` (still building until each subsystem migrates): `Core`, `RHI`, `Asset`, `ECS`, `Graphics`, `Runtime`, `Interface`, `EditorUI`, `Apps/Sandbox`.
+`src/legacy/` retains transitional subsystems pending retirement; follow `tasks/backlog/` and `docs/migration/legacy-retirement.md` for retirement order.
 
 ## GUI
 

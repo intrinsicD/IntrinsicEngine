@@ -6,9 +6,7 @@ Transition from the current mixed source roots to the final explicit source layo
 
 ## Current migration shape
 
-- Legacy root: `src/`
-- Promotion root: `src_new/`
-- Target root model: `src/{legacy,core,assets,ecs,geometry,graphics,runtime,platform,app}`
+- Source root model: `src/{legacy,core,assets,ecs,geometry,graphics,runtime,platform,app}`
 
 ## Execution rules
 
@@ -22,8 +20,7 @@ Transition from the current mixed source roots to the final explicit source layo
 1. Establish path and policy scaffolding (docs, task tracking, guard scripts).
 2. Introduce path abstraction in build scripts where required.
 3. Move legacy source under `src/legacy/` and promote canonical roots.
-4. Remove `src_new/` after promoted modules are stable.
-5. Tighten layering/docs/task checks to strict mode.
+4. Tighten layering/docs/task checks to strict mode.
 
 ## Risks and mitigations
 

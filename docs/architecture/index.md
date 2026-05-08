@@ -50,7 +50,6 @@ Status labels:
 | `runtime-subsystem-boundaries.md` | legacy-background | Detailed runtime background. |
 | `legacy-rendering-architecture-migration.md` | migration | Specific to the source-tree migration phase. |
 | `legacy-task-graphs-migration.md` | migration | Specific to the source-tree migration phase. |
-| `../migration/src_new_module_inventory.md` | migration | Archived migration inventory for the retired migration source tree; canonical inventory lives at `docs/api/generated/module_inventory.md`. |
 | `vectorfield-overlay-lifecycle-invariants.md` | legacy-background | Subsystem-specific historical notes. |
 
 ## Notes

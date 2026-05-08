@@ -47,7 +47,6 @@ This page is the canonical entry point for repository documentation.
 ## Migration
 
 - [Migration docs index](migration/index.md)
-- [Current repository inventory snapshot](migration/current-repo-inventory.md)
 - [Target repository layout](migration/target-repo-layout.md)
 - [Legacy retirement plan](migration/legacy-retirement.md)
 - [Non-legacy parity matrix](migration/nonlegacy-parity-matrix.md)
@@ -59,7 +58,6 @@ This page is the canonical entry point for repository documentation.
 Generated API and inventory docs:
 
 - [Canonical module inventory (`src/`)](api/generated/module_inventory.md)
-- [Migration module inventory (historical migration snapshot)](migration/src_new_module_inventory.md)
 
 ## Build / troubleshooting
 
