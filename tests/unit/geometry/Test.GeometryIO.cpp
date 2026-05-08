@@ -1297,3 +1297,274 @@ TEST(GeometryIO_PointCloudIO, LoadsAsciiPLYPointCloudAfterBinaryDispatch)
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
 }
+
+namespace
+{
+    struct BinaryPcdPointCloudVertex
+    {
+        glm::vec3 Position{0.0f};
+        bool HasNormal = false;
+        glm::vec3 Normal{0.0f};
+        bool HasColor = false;
+        std::uint8_t R = 0;
+        std::uint8_t G = 0;
+        std::uint8_t B = 0;
+        bool HasIntensity = false;
+        float Intensity = 0.0f;
+    };
+
+    struct BinaryPcdFixtureOptions
+    {
+        std::size_t AdvertisedPointCountOverride = 0;
+        bool OmitPointsLine = false;
+        std::string DataEncoding = "binary";
+        bool TruncateBodyAfterFirst = false;
+    };
+
+    [[nodiscard]] std::string WriteBinaryPCDFixture(
+        std::span<const BinaryPcdPointCloudVertex> vertices,
+        const BinaryPcdFixtureOptions& opts)
+    {
+        static int counter = 0;
+        const char* tmpDir = std::getenv("TEST_TMPDIR");
+        if (tmpDir == nullptr || tmpDir[0] == '\0')
+        {
+            tmpDir = "/tmp";
+        }
+        std::string path = std::string(tmpDir) + "/intrinsic_geometry_io_binpcd_" +
+                           std::to_string(static_cast<long long>(getpid())) + "_" +
+                           std::to_string(counter++) + ".pcd";
+        std::ofstream out(path, std::ios::binary);
+
+        const bool hasNormals = !vertices.empty() && vertices.front().HasNormal;
+        const bool hasIntensity = !vertices.empty() && vertices.front().HasIntensity;
+        const bool hasColors = !vertices.empty() && vertices.front().HasColor;
+
+        const std::size_t advertisedCount =
+            opts.AdvertisedPointCountOverride > 0 ? opts.AdvertisedPointCountOverride : vertices.size();
+
+        out << "# .PCD v0.7\n";
+        out << "FIELDS x y z";
+        if (hasNormals) out << " normal_x normal_y normal_z";
+        if (hasIntensity) out << " intensity";
+        if (hasColors) out << " r g b";
+        out << "\n";
+
+        out << "SIZE 4 4 4";
+        if (hasNormals) out << " 4 4 4";
+        if (hasIntensity) out << " 4";
+        if (hasColors) out << " 1 1 1";
+        out << "\n";
+
+        out << "TYPE F F F";
+        if (hasNormals) out << " F F F";
+        if (hasIntensity) out << " F";
+        if (hasColors) out << " U U U";
+        out << "\n";
+
+        out << "COUNT 1 1 1";
+        if (hasNormals) out << " 1 1 1";
+        if (hasIntensity) out << " 1";
+        if (hasColors) out << " 1 1 1";
+        out << "\n";
+
+        out << "WIDTH " << advertisedCount << "\n";
+        out << "HEIGHT 1\n";
+        if (!opts.OmitPointsLine)
+        {
+            out << "POINTS " << advertisedCount << "\n";
+        }
+        out << "DATA " << opts.DataEncoding << "\n";
+
+        auto writeFloat = [&](float value)
+        {
+            std::array<std::byte, 4> bytes{};
+            std::memcpy(bytes.data(), &value, 4);
+            out.write(reinterpret_cast<const char*>(bytes.data()), 4);
+        };
+
+        for (const auto& v : vertices)
+        {
+            writeFloat(v.Position.x);
+            writeFloat(v.Position.y);
+            writeFloat(v.Position.z);
+            if (hasNormals)
+            {
+                writeFloat(v.Normal.x);
+                writeFloat(v.Normal.y);
+                writeFloat(v.Normal.z);
+            }
+            if (hasIntensity)
+            {
+                writeFloat(v.Intensity);
+            }
+            if (hasColors)
+            {
+                const std::uint8_t rgb[3] = {v.R, v.G, v.B};
+                out.write(reinterpret_cast<const char*>(rgb), 3);
+            }
+            if (opts.TruncateBodyAfterFirst)
+            {
+                return path;
+            }
+        }
+
+        return path;
+    }
+
+    struct TempBinaryPCD
+    {
+        std::string Path;
+
+        TempBinaryPCD(std::span<const BinaryPcdPointCloudVertex> vertices,
+                      const BinaryPcdFixtureOptions& opts)
+            : Path(WriteBinaryPCDFixture(vertices, opts))
+        {
+        }
+
+        ~TempBinaryPCD()
+        {
+            if (!Path.empty())
+            {
+                std::remove(Path.c_str());
+            }
+        }
+    };
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloud)
+{
+    const std::array<BinaryPcdPointCloudVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{0.0f, 1.0f, 2.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    BinaryPcdFixtureOptions opts;
+    TempBinaryPCD file(vertices, opts);
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 3u);
+    EXPECT_FALSE(result->Cloud.HasNormals());
+    EXPECT_FALSE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 2.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudWithNormalsAndColor)
+{
+    const std::array<BinaryPcdPointCloudVertex, 1> vertices{{
+        {glm::vec3{1.0f, 2.0f, 3.0f}, true, glm::vec3{0.0f, 0.0f, 1.0f}, true, 255, 128, 0, false, 0.0f},
+    }};
+    BinaryPcdFixtureOptions opts;
+    TempBinaryPCD file(vertices, opts);
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
+    EXPECT_TRUE(result->Cloud.HasNormals());
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).x, 1.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).z, 0.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudSkipsExtraScalars)
+{
+    const std::array<BinaryPcdPointCloudVertex, 2> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, true, 255, 0, 0, true, 0.5f},
+        {glm::vec3{1.0f, 2.0f, 3.0f}, false, glm::vec3{0.0f}, true, 0, 255, 0, true, 0.25f},
+    }};
+    BinaryPcdFixtureOptions opts;
+    TempBinaryPCD file(vertices, opts);
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_FALSE(result->Cloud.HasNormals());
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{1}).y, 1.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudFromWidthHeight)
+{
+    const std::array<BinaryPcdPointCloudVertex, 2> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{1.0f, 2.0f, 3.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    BinaryPcdFixtureOptions opts;
+    opts.OmitPointsLine = true;
+    TempBinaryPCD file(vertices, opts);
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadPCDRejectsTruncatedBinaryBody)
+{
+    const std::array<BinaryPcdPointCloudVertex, 4> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+        {glm::vec3{0.0f, 0.0f, 1.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    BinaryPcdFixtureOptions opts;
+    opts.TruncateBodyAfterFirst = true;
+    TempBinaryPCD file(vertices, opts);
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadPCDRejectsBinaryCompressed)
+{
+    const std::array<BinaryPcdPointCloudVertex, 1> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, glm::vec3{0.0f}, false, 0, 0, 0, false, 0.0f},
+    }};
+    BinaryPcdFixtureOptions opts;
+    opts.DataEncoding = "binary_compressed";
+    TempBinaryPCD file(vertices, opts);
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadPCDRejectsZeroSizeField)
+{
+    static int counter = 0;
+    const char* tmpDir = std::getenv("TEST_TMPDIR");
+    if (tmpDir == nullptr || tmpDir[0] == '\0') tmpDir = "/tmp";
+    std::string path = std::string(tmpDir) + "/intrinsic_geometry_io_binpcd_zerosize_" +
+                       std::to_string(static_cast<long long>(getpid())) + "_" +
+                       std::to_string(counter++) + ".pcd";
+    {
+        std::ofstream out(path, std::ios::binary);
+        out << "# .PCD v0.7\n"
+               "FIELDS x y z\n"
+               "SIZE 0 4 4\n"
+               "TYPE F F F\n"
+               "COUNT 1 1 1\n"
+               "WIDTH 1\n"
+               "HEIGHT 1\n"
+               "POINTS 1\n"
+               "DATA binary\n";
+        const float zero = 0.0f;
+        for (int i = 0; i < 3; ++i)
+        {
+            out.write(reinterpret_cast<const char*>(&zero), 4);
+        }
+    }
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(path);
+    std::remove(path.c_str());
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}

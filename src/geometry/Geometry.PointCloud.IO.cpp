@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -603,6 +604,250 @@ namespace Geometry::PointCloudIO
 
             return result;
         }
+
+        struct PcdField
+        {
+            std::string Name;
+            std::size_t Size = 0;
+            char Type = 'F';
+            std::size_t Count = 1;
+            std::size_t ByteOffset = 0;
+            std::size_t ScalarOffset = 0;
+        };
+
+        struct PcdHeader
+        {
+            std::vector<PcdField> Fields;
+            std::size_t Points = 0;
+            std::size_t Width = 0;
+            std::size_t Height = 1;
+            std::size_t PointStride = 0;
+            std::size_t ScalarValueCount = 0;
+            std::string DataEncoding;
+        };
+
+        [[nodiscard]] const PcdField* FindPCDField(std::span<const PcdField> fields, std::string_view name)
+        {
+            for (const auto& f : fields)
+            {
+                if (f.Name == name)
+                {
+                    return &f;
+                }
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] std::optional<PcdHeader> ParsePCDHeader(std::string_view text, std::size_t& cursor)
+        {
+            PcdHeader header;
+            std::vector<std::string> fieldNames;
+            std::vector<std::size_t> fieldSizes;
+            std::vector<char> fieldTypes;
+            std::vector<std::size_t> fieldCounts;
+
+            std::string_view line;
+            while (NextLine(text, cursor, line))
+            {
+                if (line.empty() || line.front() == '#')
+                {
+                    continue;
+                }
+                const auto tokens = SplitWhitespace(line);
+                if (tokens.empty())
+                {
+                    continue;
+                }
+                const std::string_view key = tokens[0];
+                if (key == "FIELDS")
+                {
+                    fieldNames.clear();
+                    for (std::size_t i = 1; i < tokens.size(); ++i)
+                    {
+                        fieldNames.emplace_back(tokens[i]);
+                    }
+                }
+                else if (key == "SIZE")
+                {
+                    fieldSizes.clear();
+                    for (std::size_t i = 1; i < tokens.size(); ++i)
+                    {
+                        const auto s = ParseNumber<std::size_t>(tokens[i]);
+                        if (!s || *s == 0)
+                        {
+                            return std::nullopt;
+                        }
+                        fieldSizes.push_back(*s);
+                    }
+                }
+                else if (key == "TYPE")
+                {
+                    fieldTypes.clear();
+                    for (std::size_t i = 1; i < tokens.size(); ++i)
+                    {
+                        if (tokens[i].empty())
+                        {
+                            return std::nullopt;
+                        }
+                        const char c = tokens[i].front();
+                        const char upper = (c >= 'a' && c <= 'z') ? static_cast<char>(c - 'a' + 'A') : c;
+                        if (upper != 'F' && upper != 'I' && upper != 'U')
+                        {
+                            return std::nullopt;
+                        }
+                        fieldTypes.push_back(upper);
+                    }
+                }
+                else if (key == "COUNT")
+                {
+                    fieldCounts.clear();
+                    for (std::size_t i = 1; i < tokens.size(); ++i)
+                    {
+                        const auto c = ParseNumber<std::size_t>(tokens[i]);
+                        if (!c || *c == 0)
+                        {
+                            return std::nullopt;
+                        }
+                        fieldCounts.push_back(*c);
+                    }
+                }
+                else if (key == "POINTS" && tokens.size() >= 2)
+                {
+                    const auto p = ParseNumber<std::size_t>(tokens[1]);
+                    if (!p)
+                    {
+                        return std::nullopt;
+                    }
+                    header.Points = *p;
+                }
+                else if (key == "WIDTH" && tokens.size() >= 2)
+                {
+                    const auto w = ParseNumber<std::size_t>(tokens[1]);
+                    if (!w)
+                    {
+                        return std::nullopt;
+                    }
+                    header.Width = *w;
+                }
+                else if (key == "HEIGHT" && tokens.size() >= 2)
+                {
+                    const auto h = ParseNumber<std::size_t>(tokens[1]);
+                    if (!h)
+                    {
+                        return std::nullopt;
+                    }
+                    header.Height = *h;
+                }
+                else if (key == "DATA" && tokens.size() >= 2)
+                {
+                    header.DataEncoding.assign(tokens[1]);
+                    for (auto& ch : header.DataEncoding)
+                    {
+                        if (ch >= 'A' && ch <= 'Z')
+                        {
+                            ch = static_cast<char>(ch - 'A' + 'a');
+                        }
+                    }
+                    break;
+                }
+            }
+
+            if (fieldNames.empty() || fieldSizes.empty() || fieldTypes.empty() || header.DataEncoding.empty())
+            {
+                return std::nullopt;
+            }
+            if (fieldNames.size() != fieldSizes.size() || fieldNames.size() != fieldTypes.size())
+            {
+                return std::nullopt;
+            }
+            if (fieldCounts.empty())
+            {
+                fieldCounts.assign(fieldNames.size(), 1);
+            }
+            if (fieldCounts.size() != fieldNames.size())
+            {
+                return std::nullopt;
+            }
+
+            if (header.Points == 0 && header.Width > 0 && header.Height > 0)
+            {
+                header.Points = header.Width * header.Height;
+            }
+
+            header.Fields.reserve(fieldNames.size());
+            std::size_t byteOffset = 0;
+            std::size_t scalarOffset = 0;
+            for (std::size_t i = 0; i < fieldNames.size(); ++i)
+            {
+                PcdField field;
+                field.Name = std::move(fieldNames[i]);
+                field.Size = fieldSizes[i];
+                field.Type = fieldTypes[i];
+                field.Count = fieldCounts[i];
+                field.ByteOffset = byteOffset;
+                field.ScalarOffset = scalarOffset;
+                byteOffset += field.Size * field.Count;
+                scalarOffset += field.Count;
+                header.Fields.push_back(std::move(field));
+            }
+            header.PointStride = byteOffset;
+            header.ScalarValueCount = scalarOffset;
+            return header;
+        }
+
+        template <typename T>
+        [[nodiscard]] T ReadPCDIntegerScalar(const std::byte* ptr)
+        {
+            T value{};
+            std::memcpy(&value, ptr, sizeof(T));
+            if constexpr (sizeof(T) > 1)
+            {
+                if constexpr (std::endian::native == std::endian::big)
+                {
+                    value = std::byteswap(value);
+                }
+            }
+            return value;
+        }
+
+        [[nodiscard]] std::optional<float> ReadPCDBinaryScalar(std::span<const std::byte> pointBytes,
+                                                               const PcdField& field)
+        {
+            if (field.Count == 0 || field.ByteOffset + field.Size > pointBytes.size())
+            {
+                return std::nullopt;
+            }
+            const std::byte* ptr = pointBytes.data() + field.ByteOffset;
+            switch (field.Type)
+            {
+            case 'F':
+                if (field.Size == 4)
+                {
+                    const auto bits = ReadPCDIntegerScalar<std::uint32_t>(ptr);
+                    return std::bit_cast<float>(bits);
+                }
+                if (field.Size == 8)
+                {
+                    const auto bits = ReadPCDIntegerScalar<std::uint64_t>(ptr);
+                    return static_cast<float>(std::bit_cast<double>(bits));
+                }
+                return std::nullopt;
+            case 'I':
+                if (field.Size == 1) return static_cast<float>(ReadPCDIntegerScalar<std::int8_t>(ptr));
+                if (field.Size == 2) return static_cast<float>(ReadPCDIntegerScalar<std::int16_t>(ptr));
+                if (field.Size == 4) return static_cast<float>(ReadPCDIntegerScalar<std::int32_t>(ptr));
+                if (field.Size == 8) return static_cast<float>(ReadPCDIntegerScalar<std::int64_t>(ptr));
+                return std::nullopt;
+            case 'U':
+                if (field.Size == 1) return static_cast<float>(ReadPCDIntegerScalar<std::uint8_t>(ptr));
+                if (field.Size == 2) return static_cast<float>(ReadPCDIntegerScalar<std::uint16_t>(ptr));
+                if (field.Size == 4) return static_cast<float>(ReadPCDIntegerScalar<std::uint32_t>(ptr));
+                if (field.Size == 8) return static_cast<float>(ReadPCDIntegerScalar<std::uint64_t>(ptr));
+                return std::nullopt;
+            default:
+                return std::nullopt;
+            }
+        }
     }
 
     Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path)
@@ -706,83 +951,35 @@ namespace Geometry::PointCloudIO
             return Core::Err<PointCloudIOResult>(text.error());
         }
 
-        std::vector<std::string> fields;
-        std::size_t pointCount = 0;
-        bool dataAscii = false;
-
         std::size_t cursor = 0;
-        std::string_view line;
-        while (NextLine(*text, cursor, line))
-        {
-            if (line.empty() || line.front() == '#')
-            {
-                continue;
-            }
-            const auto tokens = SplitWhitespace(line);
-            if (tokens.empty())
-            {
-                continue;
-            }
-            if (tokens[0] == "FIELDS")
-            {
-                fields.clear();
-                for (std::size_t i = 1; i < tokens.size(); ++i)
-                {
-                    fields.emplace_back(tokens[i]);
-                }
-            }
-            else if (tokens[0] == "POINTS" && tokens.size() >= 2)
-            {
-                if (const auto parsed = ParseNumber<std::size_t>(tokens[1]))
-                {
-                    pointCount = *parsed;
-                }
-            }
-            else if (tokens[0] == "DATA" && tokens.size() >= 2)
-            {
-                dataAscii = tokens[1] == "ascii";
-                break;
-            }
-        }
-
-        if (!dataAscii || fields.empty())
+        const auto headerOpt = ParsePCDHeader(*text, cursor);
+        if (!headerOpt)
         {
             return InvalidPointCloudFormat();
         }
+        const PcdHeader& header = *headerOpt;
 
-        auto fieldIndex = [&](std::string_view name) -> std::optional<std::size_t>
-        {
-            for (std::size_t i = 0; i < fields.size(); ++i)
-            {
-                if (fields[i] == name)
-                {
-                    return i;
-                }
-            }
-            return std::nullopt;
-        };
-
-        const auto xIndex = fieldIndex("x");
-        const auto yIndex = fieldIndex("y");
-        const auto zIndex = fieldIndex("z");
-        if (!xIndex || !yIndex || !zIndex)
+        const auto* xField = FindPCDField(header.Fields, "x");
+        const auto* yField = FindPCDField(header.Fields, "y");
+        const auto* zField = FindPCDField(header.Fields, "z");
+        if (xField == nullptr || yField == nullptr || zField == nullptr)
         {
             return InvalidPointCloudFormat();
         }
-        const auto nxIndex = fieldIndex("normal_x");
-        const auto nyIndex = fieldIndex("normal_y");
-        const auto nzIndex = fieldIndex("normal_z");
-        const auto rIndex = fieldIndex("r");
-        const auto gIndex = fieldIndex("g");
-        const auto bIndex = fieldIndex("b");
-        const bool hasNormals = nxIndex && nyIndex && nzIndex;
-        const bool hasColors = rIndex && gIndex && bIndex;
+        const auto* nxField = FindPCDField(header.Fields, "normal_x");
+        const auto* nyField = FindPCDField(header.Fields, "normal_y");
+        const auto* nzField = FindPCDField(header.Fields, "normal_z");
+        const auto* rField = FindPCDField(header.Fields, "r");
+        const auto* gField = FindPCDField(header.Fields, "g");
+        const auto* bField = FindPCDField(header.Fields, "b");
+        const bool hasNormals = nxField && nyField && nzField;
+        const bool hasColors = rField && gField && bField;
 
         PointCloudIOResult result;
         ApplyPathInfo(result, absolute_path);
-        if (pointCount > 0)
+        if (header.Points > 0)
         {
-            result.Cloud.Reserve(pointCount);
+            result.Cloud.Reserve(header.Points);
         }
         if (hasNormals)
         {
@@ -793,51 +990,144 @@ namespace Geometry::PointCloudIO
             result.Cloud.EnableColors(glm::vec4(1.0f));
         }
 
-        while (NextLine(*text, cursor, line))
+        if (header.DataEncoding == "ascii")
         {
-            if (line.empty() || line.front() == '#')
+            std::string_view line;
+            while (NextLine(*text, cursor, line))
             {
-                continue;
-            }
-            const auto tokens = SplitWhitespace(line);
-            if (tokens.size() < fields.size())
-            {
-                return InvalidPointCloudFormat();
-            }
-            const auto x = ParseNumber<float>(tokens[*xIndex]);
-            const auto y = ParseNumber<float>(tokens[*yIndex]);
-            const auto z = ParseNumber<float>(tokens[*zIndex]);
-            if (!x || !y || !z)
-            {
-                return InvalidPointCloudFormat();
-            }
-            const auto point = result.Cloud.AddPoint(glm::vec3(*x, *y, *z));
+                if (line.empty() || line.front() == '#')
+                {
+                    continue;
+                }
+                const auto tokens = SplitWhitespace(line);
+                if (tokens.size() < header.ScalarValueCount)
+                {
+                    return InvalidPointCloudFormat();
+                }
+                const auto x = ParseNumber<float>(tokens[xField->ScalarOffset]);
+                const auto y = ParseNumber<float>(tokens[yField->ScalarOffset]);
+                const auto z = ParseNumber<float>(tokens[zField->ScalarOffset]);
+                if (!x || !y || !z)
+                {
+                    return InvalidPointCloudFormat();
+                }
+                const auto point = result.Cloud.AddPoint(glm::vec3(*x, *y, *z));
 
-            if (hasNormals)
-            {
-                const auto nx = ParseNumber<float>(tokens[*nxIndex]);
-                const auto ny = ParseNumber<float>(tokens[*nyIndex]);
-                const auto nz = ParseNumber<float>(tokens[*nzIndex]);
-                if (!nx || !ny || !nz)
+                if (hasNormals)
                 {
-                    return InvalidPointCloudFormat();
+                    const auto nx = ParseNumber<float>(tokens[nxField->ScalarOffset]);
+                    const auto ny = ParseNumber<float>(tokens[nyField->ScalarOffset]);
+                    const auto nz = ParseNumber<float>(tokens[nzField->ScalarOffset]);
+                    if (!nx || !ny || !nz)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
                 }
-                result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
-            }
-            if (hasColors)
-            {
-                const auto r = ParseNumber<float>(tokens[*rIndex]);
-                const auto g = ParseNumber<float>(tokens[*gIndex]);
-                const auto b = ParseNumber<float>(tokens[*bIndex]);
-                if (!r || !g || !b)
+                if (hasColors)
                 {
-                    return InvalidPointCloudFormat();
+                    const auto r = ParseNumber<float>(tokens[rField->ScalarOffset]);
+                    const auto g = ParseNumber<float>(tokens[gField->ScalarOffset]);
+                    const auto b = ParseNumber<float>(tokens[bField->ScalarOffset]);
+                    if (!r || !g || !b)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Color(point) = glm::vec4(
+                        NormalizeColorChannel(*r),
+                        NormalizeColorChannel(*g),
+                        NormalizeColorChannel(*b),
+                        1.0f);
                 }
-                result.Cloud.Color(point) = glm::vec4(NormalizeColorChannel(*r), NormalizeColorChannel(*g), NormalizeColorChannel(*b), 1.0f);
+
+                if (header.Points > 0 && result.Cloud.VerticesSize() >= header.Points)
+                {
+                    break;
+                }
             }
         }
+        else if (header.DataEncoding == "binary")
+        {
+            if (header.PointStride == 0)
+            {
+                return InvalidPointCloudFormat();
+            }
+            if (cursor > text->size())
+            {
+                return InvalidPointCloudFormat();
+            }
+            const std::span<const std::byte> body(
+                reinterpret_cast<const std::byte*>(text->data() + cursor),
+                text->size() - cursor);
 
-        if (result.Cloud.IsEmpty() || (pointCount > 0 && result.Cloud.VerticesSize() != pointCount))
+            std::size_t pointCount = header.Points;
+            if (pointCount == 0)
+            {
+                if (header.PointStride == 0 || body.size() % header.PointStride != 0)
+                {
+                    return InvalidPointCloudFormat();
+                }
+                pointCount = body.size() / header.PointStride;
+            }
+            if (pointCount == 0)
+            {
+                return InvalidPointCloudFormat();
+            }
+
+            const std::size_t requiredBytes = pointCount * header.PointStride;
+            if (body.size() < requiredBytes)
+            {
+                return InvalidPointCloudFormat();
+            }
+
+            for (std::size_t row = 0; row < pointCount; ++row)
+            {
+                const std::span<const std::byte> pointBytes =
+                    body.subspan(row * header.PointStride, header.PointStride);
+
+                const auto x = ReadPCDBinaryScalar(pointBytes, *xField);
+                const auto y = ReadPCDBinaryScalar(pointBytes, *yField);
+                const auto z = ReadPCDBinaryScalar(pointBytes, *zField);
+                if (!x || !y || !z)
+                {
+                    return InvalidPointCloudFormat();
+                }
+                const auto point = result.Cloud.AddPoint(glm::vec3(*x, *y, *z));
+
+                if (hasNormals)
+                {
+                    const auto nx = ReadPCDBinaryScalar(pointBytes, *nxField);
+                    const auto ny = ReadPCDBinaryScalar(pointBytes, *nyField);
+                    const auto nz = ReadPCDBinaryScalar(pointBytes, *nzField);
+                    if (!nx || !ny || !nz)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
+                }
+                if (hasColors)
+                {
+                    const auto r = ReadPCDBinaryScalar(pointBytes, *rField);
+                    const auto g = ReadPCDBinaryScalar(pointBytes, *gField);
+                    const auto b = ReadPCDBinaryScalar(pointBytes, *bField);
+                    if (!r || !g || !b)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Color(point) = glm::vec4(
+                        NormalizeColorChannel(*r),
+                        NormalizeColorChannel(*g),
+                        NormalizeColorChannel(*b),
+                        1.0f);
+                }
+            }
+        }
+        else
+        {
+            return InvalidPointCloudFormat();
+        }
+
+        if (result.Cloud.IsEmpty() || (header.Points > 0 && result.Cloud.VerticesSize() != header.Points))
         {
             return InvalidPointCloudFormat();
         }
