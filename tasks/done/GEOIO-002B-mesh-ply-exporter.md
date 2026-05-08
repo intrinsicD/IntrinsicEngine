@@ -21,7 +21,7 @@
 - No GPU/Vulkan requirement in the default CPU gate.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-rX6Um`.
 - Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
@@ -152,3 +152,42 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Auto-acknowledging or mutating any runtime/render extraction state
   (unrelated to this slice).
 - Introducing GPU/Vulkan-only verification requirements.
+
+## Completion
+- Completed: 2026-05-08.
+- Implementation commit: `15b6dce`
+  (`GEOIO-002B: add geometry-owned PLY mesh exporter`).
+- Retired in a follow-up commit on
+  `claude/setup-agentic-workflow-rX6Um`.
+- Verified in this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (84 task files validated).
+  - `python3 tools/repo/check_layering.py --root src --strict` — no
+    layering violations; `geometry` imports remain `geometry -> core`
+    only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out
+    docs/api/generated/module_inventory.md` — only the regeneration
+    date and pre-existing renames from commit `d070e17` differ; this
+    slice adds a function to the existing exported `Geometry.MeshIO`
+    module without changing the module name set, so the inventory was
+    left untouched to avoid mixing unrelated drift into this slice.
+- Build/CTest gate not run in this container: `cmake --preset ci`
+  configure fails because `clang-20`/`clang++-20` are not installed in
+  this agent environment, matching the limitation called out under
+  `Context` and the prior `GEOIO-002A` retirement. The default CPU
+  correctness gate
+  (`ctest --test-dir build/ci -R 'GeometryIO' -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) should be re-run
+  on a host with the documented C++23 toolchain when available.
+- Notes:
+  - `Geometry::MeshIO::WritePLY` ships in
+    `src/geometry/Geometry.HalfedgeMesh.IO.{cppm,cpp}` and reuses the
+    existing `MeshIOWriteStatus` enum from `GEOIO-002A`.
+  - Round-trip and negative-path coverage lives in
+    `tests/unit/geometry/Test.GeometryIO.cpp` (six new
+    `WritesPLY*`/`WritePLYRejects*` cases).
+  - The remaining `GEOIO-002` exporter slice (STL) is still tracked
+    under the parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
