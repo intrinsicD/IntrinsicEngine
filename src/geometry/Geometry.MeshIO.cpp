@@ -1,6 +1,9 @@
 module;
 
 #include <cstdint>
+#include <cstdio>
+#include <fstream>
+#include <ios>
 #include <optional>
 #include <span>
 #include <string>
@@ -452,6 +455,116 @@ namespace Geometry::MeshIO
         result.BasePath = pathInfo.BasePath;
         PopulateResult(result, vertices, faces);
         return result;
+    }
+
+    MeshIOWriteStatus WriteOBJ(std::string_view absolute_path, const MeshIOResult& mesh)
+    {
+        if (absolute_path.empty())
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        const auto positionsView = mesh.Vertices.Get<glm::vec3>("v:point");
+        if (!positionsView.IsValid() || positionsView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& positions = positionsView.Vector();
+
+        const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+        if (!facesView.IsValid() || facesView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& faces = facesView.Vector();
+
+        for (const auto& face : faces)
+        {
+            if (face.size() < 3)
+            {
+                return MeshIOWriteStatus::InvalidFace;
+            }
+            for (const auto index : face)
+            {
+                if (static_cast<std::size_t>(index) >= positions.size())
+                {
+                    return MeshIOWriteStatus::InvalidFace;
+                }
+            }
+        }
+
+        const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
+        const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        char buffer[128];
+
+        stream << "# Exported by IntrinsicEngine\n";
+
+        for (const auto& p : positions)
+        {
+            const int written = std::snprintf(buffer, sizeof(buffer), "v %.6f %.6f %.6f\n",
+                                              static_cast<double>(p.x),
+                                              static_cast<double>(p.y),
+                                              static_cast<double>(p.z));
+            if (written <= 0)
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+        }
+
+        if (hasNormals)
+        {
+            for (const auto& n : normalsView.Vector())
+            {
+                const int written = std::snprintf(buffer, sizeof(buffer), "vn %.6f %.6f %.6f\n",
+                                                  static_cast<double>(n.x),
+                                                  static_cast<double>(n.y),
+                                                  static_cast<double>(n.z));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+        }
+
+        for (const auto& face : faces)
+        {
+            stream.put('f');
+            for (const auto index : face)
+            {
+                const auto oneBased = static_cast<unsigned long long>(index) + 1ULL;
+                int written = 0;
+                if (hasNormals)
+                {
+                    written = std::snprintf(buffer, sizeof(buffer), " %llu//%llu", oneBased, oneBased);
+                }
+                else
+                {
+                    written = std::snprintf(buffer, sizeof(buffer), " %llu", oneBased);
+                }
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+            stream.put('\n');
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+        return MeshIOWriteStatus::Success;
     }
 }
 
