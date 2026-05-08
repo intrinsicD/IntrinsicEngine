@@ -29,7 +29,7 @@
 - No GPU/Vulkan requirement in the default CPU gate.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-Yxe9K`.
 - Parent backlog task:
@@ -217,3 +217,69 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Auto-acknowledging or mutating any runtime/render extraction state
   (unrelated to this slice).
 - Introducing GPU/Vulkan-only verification requirements.
+
+## Completion
+- Completed: 2026-05-08.
+- Implementation commit: `6a0334c`
+  (`GEOIO-002E: add geometry-owned binary PLY mesh importer`).
+- Retired in a follow-up commit on
+  `claude/setup-agentic-workflow-Yxe9K`.
+- Verified in this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (87 task files validated before retirement; 87 after
+    retirement, including this file).
+  - `python3 tools/repo/check_layering.py --root src --strict` — no
+    layering violations; `geometry` imports remain `geometry -> core`
+    only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out
+    docs/api/generated/module_inventory.md` — no diff vs. the
+    pre-existing inventory; this slice adds anonymous-namespace
+    helpers and refactors `LoadPLY` internally without changing the
+    public `Geometry.MeshIO` module surface, matching
+    `GEOIO-002B`/`C`/`D` precedent.
+- Build/CTest gate not run in this container: `cmake --preset ci`
+  configure fails because `clang-20`/`clang++-20` are not installed in
+  this agent environment, matching the limitation called out under
+  `Context` and the prior `GEOIO-002A`/`B`/`C`/`D` retirement notes.
+  The default CPU correctness gate
+  (`ctest --test-dir build/ci -R 'GeometryIO' -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) should be re-run
+  on a host with the documented C++23 toolchain when available.
+- Notes:
+  - Header parsing now produces a `std::vector<PlyElement>` with full
+    `PlyProperty` records (scalar type, list element/count types,
+    name) regardless of format, and the existing ASCII vertex/face
+    parser was extracted verbatim into a `ParseAsciiPLY` helper that
+    consumes the structured `vertex`/`face` element counts. Behavior
+    on the previously-supported ASCII path is unchanged; only the
+    invariants that previously came from inline header parsing are
+    now expressed as `formatSeen`/`headerEndSeen` checks.
+  - The binary parser (`ParseBinaryPLY`) walks elements in
+    declaration order and only materializes positions and the face
+    `vertex_indices`/`vertex_index` list, matching the geometry-side
+    ASCII reader's no-color/no-normal behavior. Other vertex scalar
+    properties (e.g., `uchar red/green/blue`) are skipped by stride;
+    list properties inside the vertex element are rejected because
+    they would break fixed-stride decoding. Big-endian decoding goes
+    through a small `ReadScalarAs<T>` helper that byte-swaps a
+    fixed-size buffer before `std::memcpy` into the host scalar
+    type.
+  - Coverage in `tests/unit/geometry/Test.GeometryIO.cpp` adds seven
+    cases: `LoadsBinaryLittleEndianPLYTriangle`,
+    `LoadsBinaryBigEndianPLYTriangle`,
+    `LoadsBinaryLittleEndianPLYQuad`,
+    `LoadsBinaryLittleEndianPLYWithExtraVertexProperties`,
+    `LoadPLYRejectsTruncatedBinaryBody`,
+    `LoadPLYRejectsBinaryFaceListBelowThree`, and
+    `LoadsAsciiPLYAfterBinaryDispatch`. A new `WriteBinaryPLYFixture`
+    helper writes the canonical ASCII header followed by a binary
+    body via `std::ofstream(..., std::ios::binary)` with explicit
+    byte-swap for big-endian variants.
+  - Remaining `GEOIO-002` scope (binary point-cloud PLY import,
+    binary PCD import, granular `MeshIOReadStatus` diagnostics enum
+    across OBJ/OFF/PLY/STL, domain-selection metadata for
+    asset/runtime routing, importer parity hardening for additional
+    point-cloud variants) stays tracked under the parent backlog
+    task `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
