@@ -292,3 +292,122 @@ TEST(RuntimeRenderExtraction, HelperDoesNotMarkRebindGenerationAsSeen)
     EXPECT_EQ(slot.LastSeenAssetGeneration, view->Generation);
 }
 
+TEST(RuntimeRenderExtraction, AcknowledgeRebindAdvancesLastSeenGeneration)
+{
+    RendererFixture fixture;
+    ImmediateTransferQueue transfer;
+    Graphics::GpuAssetCache gpuAssets(fixture.Renderer->GetBufferManager(),
+                                      fixture.Renderer->GetTextureManager(),
+                                      fixture.Renderer->GetSamplerManager(),
+                                      transfer);
+    const auto asset = MakeAssetId(5u);
+    auto upload = gpuAssets.RequestUpload(Graphics::GpuBufferRequest{
+        .Id = asset,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = TestBufferDesc(),
+    });
+    ASSERT_TRUE(upload.has_value()) << static_cast<int>(upload.error());
+    gpuAssets.Tick(0u, fixture.Device.GetFramesInFlight());
+    const auto view = gpuAssets.GetView(asset);
+    ASSERT_TRUE(view.has_value());
+
+    Graphics::Components::GpuSceneSlot slot{};
+    const auto pending = Runtime::ObserveRenderableAssetGeneration(slot, asset, &gpuAssets);
+    ASSERT_EQ(pending.Status, Runtime::RuntimeRenderableAssetObservationStatus::RebindRequired);
+    ASSERT_EQ(slot.LastSeenAssetGeneration, 0u);
+
+    const auto ack = Runtime::AcknowledgeRenderableAssetRebind(slot, pending);
+    EXPECT_EQ(ack, Runtime::RuntimeRenderableAssetAcknowledgmentResult::Acknowledged);
+    EXPECT_EQ(slot.LastSeenAssetGeneration, view->Generation);
+
+    const auto settled = Runtime::ObserveRenderableAssetGeneration(slot, asset, &gpuAssets);
+    EXPECT_EQ(settled.Status, Runtime::RuntimeRenderableAssetObservationStatus::UpToDate);
+    EXPECT_EQ(slot.LastSeenAssetGeneration, view->Generation);
+
+    const auto reAck = Runtime::AcknowledgeRenderableAssetRebind(slot, settled);
+    EXPECT_EQ(reAck, Runtime::RuntimeRenderableAssetAcknowledgmentResult::Acknowledged);
+    EXPECT_EQ(slot.LastSeenAssetGeneration, view->Generation);
+}
+
+TEST(RuntimeRenderExtraction, AcknowledgeRebindRejectsObservationsWithoutGeneration)
+{
+    Graphics::Components::GpuSceneSlot slot{};
+    const auto asset = MakeAssetId(6u);
+    slot.SetSourceAsset(asset, 0u);
+
+    Runtime::RuntimeRenderableAssetGenerationObservation cacheUnavailable{};
+    cacheUnavailable.Status = Runtime::RuntimeRenderableAssetObservationStatus::CacheUnavailable;
+    cacheUnavailable.SourceAsset = asset;
+    cacheUnavailable.ObservedGeneration = 0u;
+
+    const auto skipped = Runtime::AcknowledgeRenderableAssetRebind(slot, cacheUnavailable);
+    EXPECT_EQ(skipped, Runtime::RuntimeRenderableAssetAcknowledgmentResult::SkippedNoObservedGeneration);
+    EXPECT_EQ(slot.LastSeenAssetGeneration, 0u);
+}
+
+TEST(RuntimeRenderExtraction, AcknowledgeRebindRejectsAssetMismatch)
+{
+    Graphics::Components::GpuSceneSlot slot{};
+    const auto bound = MakeAssetId(7u);
+    slot.SetSourceAsset(bound, 4u);
+
+    Runtime::RuntimeRenderableAssetGenerationObservation stale{};
+    stale.Status = Runtime::RuntimeRenderableAssetObservationStatus::RebindRequired;
+    stale.SourceAsset = MakeAssetId(8u);
+    stale.ObservedGeneration = 9u;
+
+    const auto skipped = Runtime::AcknowledgeRenderableAssetRebind(slot, stale);
+    EXPECT_EQ(skipped, Runtime::RuntimeRenderableAssetAcknowledgmentResult::SkippedAssetMismatch);
+    EXPECT_EQ(slot.LastSeenAssetGeneration, 4u);
+    EXPECT_EQ(slot.SourceAsset, bound);
+}
+
+TEST(RuntimeRenderExtraction, AcknowledgeRebindRejectsSlotWithoutSourceAsset)
+{
+    Graphics::Components::GpuSceneSlot slot{};
+
+    Runtime::RuntimeRenderableAssetGenerationObservation observation{};
+    observation.Status = Runtime::RuntimeRenderableAssetObservationStatus::RebindRequired;
+    observation.SourceAsset = MakeAssetId(9u);
+    observation.ObservedGeneration = 3u;
+
+    const auto skipped = Runtime::AcknowledgeRenderableAssetRebind(slot, observation);
+    EXPECT_EQ(skipped, Runtime::RuntimeRenderableAssetAcknowledgmentResult::SkippedNoSourceAsset);
+    EXPECT_FALSE(slot.HasSourceAsset());
+    EXPECT_EQ(slot.LastSeenAssetGeneration, 0u);
+}
+
+TEST(RuntimeRenderExtraction, ExtractAndSubmitDoesNotAutoAcknowledgeRebinds)
+{
+    RendererFixture fixture;
+    ImmediateTransferQueue transfer;
+    Graphics::GpuAssetCache gpuAssets(fixture.Renderer->GetBufferManager(),
+                                      fixture.Renderer->GetTextureManager(),
+                                      fixture.Renderer->GetSamplerManager(),
+                                      transfer);
+    const auto asset = MakeAssetId(10u);
+    auto upload = gpuAssets.RequestUpload(Graphics::GpuBufferRequest{
+        .Id = asset,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = TestBufferDesc(),
+    });
+    ASSERT_TRUE(upload.has_value()) << static_cast<int>(upload.error());
+    gpuAssets.Tick(0u, fixture.Device.GetFramesInFlight());
+
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+    const auto entity = scene.Create();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    registry.emplace<ECS::Components::AssetInstance::Source>(entity).AssetId = asset.Index;
+
+    const auto first = fixture.Extract(scene, &gpuAssets);
+    EXPECT_EQ(first.SourceAssetRebindRequiredCount, 1u);
+    EXPECT_EQ(first.SourceAssetRebindAcknowledgedCount, 0u);
+
+    const auto second = fixture.Extract(scene, &gpuAssets);
+    EXPECT_EQ(second.SourceAssetRebindRequiredCount, 1u);
+    EXPECT_EQ(second.SourceAssetUpToDateCount, 0u);
+    EXPECT_EQ(second.SourceAssetRebindAcknowledgedCount, 0u);
+}
+
