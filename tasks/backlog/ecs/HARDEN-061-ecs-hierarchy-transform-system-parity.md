@@ -20,7 +20,7 @@
 - Preserve cycle rejection, self-parent rejection, reparenting, null-parent detach, sibling-chain maintenance, and child-count invariants.
 - Implement promoted transform hierarchy update over local transform, world matrix, hierarchy, and dirty/world-updated tags.
 - Define the promoted system registration contract against `Extrinsic.Core.FrameGraph` only if the current promoted frame-graph surface supports it; otherwise keep registration as a separate follow-up and document the blocker.
-- Replace stale `src_new` comments in promoted ECS system files with current-state documentation.
+- Replace stale migration-era comments in promoted ECS system files with current-state documentation.
 
 ## Tests
 - Add or update `tests/unit/ecs/Test.ECS.Hierarchy.cpp`.

@@ -20,25 +20,10 @@ SRC_LAYER_BY_TOP = {
     "app": "app",
 }
 
-SRC_NEW_LAYER_BY_TOP = {
-    "Core": "core",
-    "Geometry": "geometry",
-    "Assets": "assets",
-    "ECS": "ecs",
-    "Runtime": "runtime",
-    "Platform": "platform",
-    "App": "app",
-    "Graphics": "graphics",
-}
-
-
 def detect_layer(path: pathlib.Path, root: pathlib.Path) -> str:
     rel = path.relative_to(root)
     if not rel.parts:
         return "unknown"
-
-    if root.name == "src_new":
-        return SRC_NEW_LAYER_BY_TOP.get(rel.parts[0], "legacy")
 
     if root.name == "src":
         top = rel.parts[0]

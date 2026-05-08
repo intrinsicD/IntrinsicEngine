@@ -83,24 +83,6 @@ def detect_owner_layer(path: Path) -> str | None:
     if "src" in parts and "legacy" in parts:
         return "legacy"
 
-    if "src_new" in parts:
-        if "Core" in parts:
-            return "core"
-        if "Assets" in parts:
-            return "assets"
-        if "ECS" in parts:
-            return "ecs"
-        if "Platform" in parts:
-            return "platform"
-        if "Runtime" in parts:
-            return "runtime"
-        if "App" in parts:
-            return "app"
-        if "Graphics" in parts and "RHI" in parts:
-            return "graphics_rhi"
-        if "Graphics" in parts:
-            return "graphics"
-
     if "src" in parts:
         # Files physically under src/graphics/<sub>/ always belong to a
         # graphics layer, even when <sub> matches another top-level layer
