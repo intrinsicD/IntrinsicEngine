@@ -345,6 +345,43 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   static-vs-dynamic split, dirty-tag drain order, hierarchy decomposition,
   per-domain packers (mesh / graph / point cloud), and primitive-instancing
   policy. Follow-up implementation remains separate from this docs-only slice.
+- [GRAPHICS-029 — Runtime-owned reference scene bootstrap and minimal renderable extraction contract](GRAPHICS-029-runtime-reference-scene-bootstrap.md):
+  follow-up to the 2026-05-08 sandbox geometry rendering gap analysis that
+  adds a runtime-owned, opt-in reference scene bootstrap creating one
+  deterministic renderable candidate (transform + render hint + camera) so
+  that `Runtime.RenderExtraction` observes at least one candidate when
+  `ExtrinsicSandbox` runs. Sandbox stays policy-light; no GPU upload, no
+  material/shader, no asset-file loading in this slice.
+- [GRAPHICS-030 — Runtime ECS-to-GpuWorld geometry residency bridge with procedural triangle test seam](GRAPHICS-030-runtime-geometry-residency-bridge.md):
+  first concrete implementation slice of the GRAPHICS-028 planning contract;
+  uploads procedural geometry for renderable ECS entities and binds it via
+  `GpuWorld::SetInstanceGeometry()`. Depends on GRAPHICS-028 and GRAPHICS-029.
+  Asset-backed mesh residency is deferred to GRAPHICS-034.
+- [GRAPHICS-031 — Default debug surface material and missing-material fallback policy](GRAPHICS-031-default-debug-surface-material.md):
+  defines and adds a deterministic default/debug surface material plus an
+  explicit missing-material fallback policy so that the minimal surface pass
+  in GRAPHICS-032 does not silently skip on absent material/pipeline state.
+  Depends on GRAPHICS-006/006Q.
+- [GRAPHICS-032 — Minimal surface and present pass command recording path](GRAPHICS-032-minimal-surface-present-command-path.md):
+  implements the smallest visible-path command recording bodies needed to draw
+  the reference triangle (one surface or debug-surface pass body, one present
+  pass body, render-target setup, and barriers/synchronization) while keeping
+  null-renderer contracts intact for non-operational devices. Depends on
+  GRAPHICS-003, GRAPHICS-008/008Q, GRAPHICS-013C/CQ, GRAPHICS-030, and
+  GRAPHICS-031. Vulkan operational-readiness defers to GRAPHICS-033.
+- [GRAPHICS-033 — Promoted Vulkan operational readiness and runtime fallback diagnostics](GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
+  flips `IDevice::IsOperational()` to `true` only after device, allocator,
+  swapchain, command, synchronization, and validation contracts are
+  satisfied, reconciles runtime config / CMake options / device fallback
+  policy, and emits explicit diagnostics whenever runtime selects null
+  fallback despite Vulkan being requested. Depends on GRAPHICS-018 and
+  GRAPHICS-032.
+- [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld geometry](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
+  bridges `AssetInstance::Source` through `Asset.Service` and
+  `Graphics.GpuAssetCache` into `GpuWorld` geometry residency, with asset ID
+  normalization, generation tracking via GRAPHICS-023A/B/C/D, cache reuse,
+  invalidation, and cleanup. Depends on GRAPHICS-028, GRAPHICS-030, and
+  ASSETIO-001 ingest ownership.
 
 ## Agent selection rules
 
