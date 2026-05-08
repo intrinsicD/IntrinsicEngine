@@ -255,3 +255,79 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Introducing GPU/Vulkan-only verification requirements.
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
+
+## Completion
+- Completed: 2026-05-08.
+- Status: done.
+- Implementation commit: `99facf8`
+  (`GEOIO-002G: add geometry-owned binary PCD point-cloud importer`).
+- Retired in a follow-up commit on
+  `claude/setup-agentic-workflow-B6Efb`.
+- Verified in this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (96 task files validated before retirement; the same
+    96 after retirement, including this file under `tasks/done/`).
+  - `python3 tools/repo/check_layering.py --root src --strict` — no
+    layering violations; `geometry` imports remain `geometry -> core`
+    only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out
+    docs/api/generated/module_inventory.md` — no diff vs. the
+    pre-existing inventory; this slice adds anonymous-namespace
+    helpers and refactors `LoadPCD` internally without changing the
+    public `Geometry.PointCloud.IO` module surface, matching
+    `GEOIO-002B`/`C`/`D`/`E`/`F` precedent.
+- Build/CTest gate not run in this container: `cmake --preset ci`
+  configure fails because `clang-20`/`clang++-20` are not installed
+  in this agent environment, matching the limitation called out in
+  `Context` and the prior `GEOIO-002A`-`002F` retirement notes. The
+  default CPU correctness gate
+  (`ctest --test-dir build/ci -R 'GeometryIO' -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) should be
+  re-run on a host with the documented C++23 toolchain when
+  available.
+- Notes:
+  - Header parsing now produces a `PcdHeader` with full per-field
+    `PcdField` records (name, byte size, scalar type tag, count,
+    byte offset, scalar offset). The existing inline `FIELDS` /
+    `POINTS` / `DATA` capture is replaced by a single
+    `ParsePCDHeader` helper that also recognizes `SIZE`, `TYPE`,
+    `COUNT`, `WIDTH`, and `HEIGHT`. ASCII-path parsing is preserved
+    byte-for-byte by indexing tokens via `field.ScalarOffset`,
+    which equals the previous direct-FIELD index for the common
+    all-`COUNT 1` case (the existing
+    `LoadsASCIIPCDWithNormalsAndColor` continues to pass through
+    the refactored dispatch).
+  - The binary parser slices a per-row
+    `std::span<const std::byte>` of `header.PointStride` bytes from
+    the body span and decodes positions / optional normals /
+    optional `r/g/b` colors via `ReadPCDBinaryScalar`, which
+    handles `F` (4/8 bytes), `I` (1/2/4/8 bytes), and `U` (1/2/4/8
+    bytes) types. Per the PCD spec, binary scalars are stored in
+    host-endian byte order; the helper byte-swaps integer scalars
+    only on big-endian hosts via `std::byteswap` and reinterprets
+    float bit patterns through `std::bit_cast`. Unrecognized
+    fields are skipped via the per-row stride. When `POINTS` is
+    absent, the loader derives `Points = Width * Height`.
+  - Coverage in `tests/unit/geometry/Test.GeometryIO.cpp` adds
+    seven cases: `LoadsBinaryPCDPointCloud`,
+    `LoadsBinaryPCDPointCloudWithNormalsAndColor`,
+    `LoadsBinaryPCDPointCloudSkipsExtraScalars`,
+    `LoadsBinaryPCDPointCloudFromWidthHeight`,
+    `LoadPCDRejectsTruncatedBinaryBody`,
+    `LoadPCDRejectsBinaryCompressed`, and
+    `LoadPCDRejectsZeroSizeField`. A `WriteBinaryPCDFixture`
+    helper writes the canonical ASCII header followed by a
+    host-endian binary body via `std::ofstream(...,
+    std::ios::binary)`, with optional `normal_x/normal_y/normal_z`,
+    optional `intensity` extra-scalar, and optional `r/g/b` blocks.
+    The zero-`SIZE` case bypasses the helper and emits the
+    fixture inline because the writer enforces `SIZE >= 1`.
+  - Remaining `GEOIO-002` scope (granular
+    `MeshIOReadStatus`/`PointCloudIOReadStatus` diagnostics enums,
+    domain-selection metadata for asset/runtime routing,
+    importer parity hardening for additional point-cloud variants
+    such as packed `rgb`/`rgba` PCD and `binary_compressed` LZF
+    decompression) stays tracked under the parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
