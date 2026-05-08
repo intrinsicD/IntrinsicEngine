@@ -206,6 +206,24 @@ TEST(GeometryIO_MeshIO, LoadOFFSkipsDegenerateFaceRows)
     EXPECT_EQ(faceVertices[0][2], 2u);
 }
 
+TEST(GeometryIO_MeshIO, LoadOFFRejectsAllDegenerateFaces)
+{
+    // Every declared face row is degenerate (count < 3); the loader
+    // soft-skips each row but must still reject the load because no
+    // usable face topology was populated.
+    TempFile file(".off",
+                  "OFF\n"
+                  "3 1 0\n"
+                  "0 0 0\n"
+                  "1 0 0\n"
+                  "0 1 0\n"
+                  "2 0 1\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
 TEST(GeometryIO_MeshIO, LoadOFFRejectsUnknownMagic)
 {
     TempFile file(".off", "FOO\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2\n");

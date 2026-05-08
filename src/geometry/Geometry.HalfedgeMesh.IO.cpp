@@ -916,6 +916,11 @@ namespace Geometry::MeshIO
             faces.push_back(std::move(face));
         }
 
+        if (faces.empty())
+        {
+            return InvalidMeshFormat();
+        }
+
         MeshIOResult result;
         const auto pathInfo = MakePathInfo(absolute_path);
         result.SourcePath = pathInfo.SourcePath;
