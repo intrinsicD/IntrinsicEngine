@@ -154,6 +154,71 @@ namespace Geometry::PointCloudIO
             return glm::vec4(NormalizeColorChannel(*r), NormalizeColorChannel(*g), NormalizeColorChannel(*b), 1.0f);
         }
 
+        [[nodiscard]] std::optional<glm::vec4> ParseXYZPointColor(std::span<const std::string_view> tokens)
+        {
+            if (tokens.size() >= 7)
+            {
+                if (auto color = ParseRgb(tokens, tokens.size() - 3))
+                {
+                    return color;
+                }
+            }
+            if (tokens.size() >= 6)
+            {
+                if (auto color = ParseRgb(tokens, 3))
+                {
+                    return color;
+                }
+            }
+            if (tokens.size() == 4)
+            {
+                if (const auto intensity = ParseNumber<float>(tokens[3]))
+                {
+                    const float c = NormalizeColorChannel(*intensity);
+                    return glm::vec4(c, c, c, 1.0f);
+                }
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] bool IsXYZScanLineMarker(std::span<const std::string_view> tokens)
+        {
+            if (tokens.size() != 1)
+            {
+                return false;
+            }
+            const std::string_view token = tokens.front();
+            if (token.size() <= 2 || !token.starts_with("LH"))
+            {
+                return false;
+            }
+            for (char c : token.substr(2))
+            {
+                if (c < '0' || c > '9')
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool XYZNeedsDelimiterNormalization(std::string_view line)
+        {
+            return line.find(';') != std::string_view::npos;
+        }
+
+        void XYZNormalizeDelimitedLine(std::string_view line, std::string& scratch)
+        {
+            scratch.assign(line.begin(), line.end());
+            for (char& c : scratch)
+            {
+                if (c == ';')
+                {
+                    c = ' ';
+                }
+            }
+        }
+
         [[nodiscard]] Core::Expected<PointCloudIOResult> InvalidPointCloudFormat()
         {
             return Core::Err<PointCloudIOResult>(Core::ErrorCode::InvalidFormat);
@@ -865,6 +930,7 @@ namespace Geometry::PointCloudIO
         std::string_view line;
         bool firstPayloadLine = true;
         std::size_t expectedCount = 0;
+        std::string normalizedLine;
         while (NextLine(*text, cursor, line))
         {
             const auto comment = line.find('#');
@@ -877,8 +943,22 @@ namespace Geometry::PointCloudIO
                 continue;
             }
 
+            if (XYZNeedsDelimiterNormalization(line))
+            {
+                XYZNormalizeDelimitedLine(line, normalizedLine);
+                line = Trim(std::string_view(normalizedLine));
+                if (line.empty())
+                {
+                    continue;
+                }
+            }
+
             const auto tokens = SplitWhitespace(line);
             if (tokens.empty())
+            {
+                continue;
+            }
+            if (IsXYZScanLineMarker(tokens))
             {
                 continue;
             }
@@ -896,29 +976,17 @@ namespace Geometry::PointCloudIO
 
             if (tokens.size() < 3)
             {
-                return InvalidPointCloudFormat();
+                continue;
             }
             const auto x = ParseNumber<float>(tokens[0]);
             const auto y = ParseNumber<float>(tokens[1]);
             const auto z = ParseNumber<float>(tokens[2]);
             if (!x || !y || !z)
             {
-                return InvalidPointCloudFormat();
+                continue;
             }
 
-            std::optional<glm::vec4> color;
-            if (tokens.size() >= 6)
-            {
-                color = ParseRgb(tokens, 3);
-            }
-            else if (tokens.size() == 4)
-            {
-                if (const auto intensity = ParseNumber<float>(tokens[3]))
-                {
-                    const float c = NormalizeColorChannel(*intensity);
-                    color = glm::vec4(c, c, c, 1.0f);
-                }
-            }
+            const std::optional<glm::vec4> color = ParseXYZPointColor(tokens);
 
             if (color && !result.Cloud.HasColors())
             {

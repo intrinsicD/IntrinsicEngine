@@ -148,6 +148,83 @@ TEST(GeometryIO_PointCloudIO, LoadsXYZWithColor)
     EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 }
 
+TEST(GeometryIO_PointCloudIO, LoadsXYZRGBTrailingColor)
+{
+    // .xyzrgb: 7+ tokens with RGB carried in the trailing three positions
+    // (here: x y z nx ny nz r g b -> 9 tokens).
+    TempFile file(".xyzrgb",
+                  "0 0 0 0 1 0 255 0 0\n"
+                  "1 0 0 0 1 0 0 255 0\n");
+
+    const auto result = Geometry::PointCloudIO::LoadXYZ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{1}), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsXYZSemicolonDelimited)
+{
+    TempFile file(".xyz",
+                  "1.0;2.0;3.0;255;0;0\n"
+                  "4.0;5.0;6.0;0;255;0\n");
+
+    const auto result = Geometry::PointCloudIO::LoadXYZ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(4.0f, 5.0f, 6.0f));
+    EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{1}), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsXYZSkipsScanLineMarkers)
+{
+    TempFile file(".xyz",
+                  "LH001\n"
+                  "0 0 0\n"
+                  "LH42\n"
+                  "1 2 3\n"
+                  "LH9\n");
+
+    const auto result = Geometry::PointCloudIO::LoadXYZ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_FALSE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsXYZSoftSkipsMalformedRows)
+{
+    TempFile file(".xyz",
+                  "0 0 0\n"
+                  "garbage row\n"
+                  "1 nan-token 2\n"
+                  "1 2 3\n");
+
+    const auto result = Geometry::PointCloudIO::LoadXYZ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 2.0f, 3.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadXYZRejectsAllMalformedInput)
+{
+    TempFile file(".xyz",
+                  "# only comments and scan-line markers\n"
+                  "LH001\n"
+                  "LH42\n");
+
+    const auto result = Geometry::PointCloudIO::LoadXYZ(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
 TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithNormalsAndColor)
 {
     TempFile file(".pcd",
