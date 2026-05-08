@@ -25,7 +25,7 @@
 - No GPU/Vulkan requirement in the default CPU gate.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-rYQnA`.
 - Parent backlog task:
@@ -207,3 +207,79 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Introducing GPU/Vulkan-only verification requirements.
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
+
+## Completion
+- Completed: 2026-05-08.
+- Implementation commit: `26016b3`
+  (`GEOIO-002F: add geometry-owned binary PLY point-cloud importer`).
+- Retired in a follow-up commit on
+  `claude/setup-agentic-workflow-rYQnA`.
+- Verified in this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (88 task files validated before retirement; 88 after
+    retirement, including this file).
+  - `python3 tools/repo/check_layering.py --root src --strict` — no
+    layering violations; `geometry` imports remain `geometry -> core`
+    only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out
+    docs/api/generated/module_inventory.md` — no diff vs. the
+    pre-existing inventory; this slice adds anonymous-namespace
+    helpers and refactors `LoadPLY` internally without changing the
+    public `Geometry.PointCloud.IO` module surface, matching
+    `GEOIO-002B`/`C`/`D`/`E` precedent.
+- Build/CTest gate not run in this container: `cmake --preset ci`
+  configure fails because `clang-20`/`clang++-20` are not installed
+  in this agent environment, matching the limitation called out in
+  `Context` and the prior `GEOIO-002A`/`B`/`C`/`D`/`E` retirement
+  notes. The default CPU correctness gate
+  (`ctest --test-dir build/ci -R 'GeometryIO' -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) should be re-run
+  on a host with the documented C++23 toolchain when available.
+- Notes:
+  - Header parsing now produces a `std::vector<PlyElement>` with full
+    `PlyProperty` records (scalar type, list element/count types,
+    name) regardless of format. The existing ASCII vertex parser
+    (positions, optional `nx/ny/nz` normals, optional uchar
+    `red/green/blue` colors) was extracted into a
+    `ParseAsciiPLYPointCloud` helper that consumes the structured
+    `vertex` element. ASCII-path behavior is unchanged; the existing
+    `LoadsVertexOnlyASCIIPLY` test continues to pass through the
+    refactored dispatch.
+  - The binary parser (`ParseBinaryPLYPointCloud`) walks elements in
+    declaration order. Inside the `vertex` element it locates the
+    property indices for `x/y/z` (Float32, mandatory), `nx/ny/nz`
+    (Float32, optional), and `red/green/blue` (UInt8, optional),
+    computes a fixed per-row stride from all scalar properties, and
+    reads each row via `readFloat`/`readUInt8` plus
+    `NormalizeColorChannel` for color bytes. Unrecognized vertex
+    scalar properties are skipped via stride; list properties inside
+    the `vertex` element are rejected because they break fixed-stride
+    decoding. Other elements are skipped only when their properties
+    are all scalars; encountering a list property in a non-vertex
+    element is also rejected (conservative posture matching the
+    geometry-side mesh PLY reader for non-`face` elements).
+    Big-endian decoding goes through the `ReadScalarAs<T>` helper
+    that byte-swaps a fixed-size buffer before `std::memcpy` into
+    the host scalar type.
+  - Coverage in `tests/unit/geometry/Test.GeometryIO.cpp` adds seven
+    cases:
+    `LoadsBinaryLittleEndianPLYPointCloud`,
+    `LoadsBinaryBigEndianPLYPointCloud`,
+    `LoadsBinaryPLYPointCloudWithNormalsAndColor`,
+    `LoadsBinaryPLYPointCloudSkipsExtraScalars`,
+    `LoadPLYPointCloudRejectsTruncatedBinaryBody`,
+    `LoadPLYPointCloudRejectsListPropertyInVertex`, and
+    `LoadsAsciiPLYPointCloudAfterBinaryDispatch`. A new
+    `WriteBinaryPLYPointCloudFixture` helper writes the canonical
+    ASCII header followed by a binary body via
+    `std::ofstream(..., std::ios::binary)` with explicit byte-swap
+    for big-endian variants and reuses the mesh-side
+    `BinaryPlyEndian`/`EncodeFloat` helpers from the same TU.
+  - Remaining `GEOIO-002` scope (binary PCD import, granular
+    `MeshIOReadStatus`/`PointCloudIOReadStatus` diagnostics enums,
+    domain-selection metadata for asset/runtime routing, importer
+    parity hardening for additional point-cloud variants) stays
+    tracked under the parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
