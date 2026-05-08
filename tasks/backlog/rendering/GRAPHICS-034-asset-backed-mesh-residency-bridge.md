@@ -1,77 +1,87 @@
-# GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld geometry
+# GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)
 
 ## Goal
-Bridge `ECS::Components::AssetInstance::Source` through `Asset.Service` and `Graphics.GpuAssetCache` into `Graphics.GpuWorld` geometry residency, so that a renderable referencing a shared mesh asset participates in the same runtime-owned residency cache as the procedural-source path from GRAPHICS-030, with asset ID normalization, generation tracking, cache reuse, invalidation, and cleanup.
+Lock down the design for the asset-source residency path that bridges `ECS::Components::AssetInstance::Source` through `Asset.Service` and `Graphics.GpuAssetCache` into `GpuWorld` geometry residency — including AssetId normalization placement, refcount and sharing semantics, pending/failure/ready/regeneration policy, ordering against `GpuAssetCache::Tick`, and extensibility to non-mesh asset types — before any code lands. This is a planning task; no engine behavior, no asset ingest, no `GpuWorld` upload from runtime extraction in this slice.
 
 ## Non-goals
-- No new asset format work (glTF/USD/etc. ingestion lives with `assets`/ASSETIO-001 and downstream tasks).
+- No implementation, no new build modules, no extraction wiring changes in this slice.
+- No new asset format work (glTF/USD/etc. ingestion is `assets`/ASSETIO-001 territory).
 - No texture or material asset residency work (covered by GRAPHICS-015/015Q and GRAPHICS-031).
 - No live ECS access from `src/graphics/*`; bridge stays in `runtime`.
-- No GPU-typed ECS components per AGENTS.md section 2 and GRAPHICS-028.
-- No new `GpuWorld` / `GpuAssetCache` capacity or eviction policy beyond what GRAPHICS-004 / 005 / 015 / 015Q already establish.
+- No GPU-typed ECS components per AGENTS.md §2 and GRAPHICS-028.
+- No new `GpuWorld` / `GpuAssetCache` capacity, eviction, or generation policy beyond what GRAPHICS-004 / 005 / 015 / 015Q / 023A/B/C/D establish.
 - No expansion of hot-reload semantics beyond the existing GRAPHICS-023A/B/C/D acknowledgment loop.
+- No procedural-source duplication; the procedural path stays as planned in GRAPHICS-030.
 
 ## Context
-- Owner layer: `runtime` (residency-bridge writer) plus `assets` and `graphics/assets` for the data flow; final boundaries follow AGENTS.md section 4 and the GRAPHICS-019 IO boundary planning.
+- Owner layer: `runtime` (residency-bridge writer); `assets` and `graphics/assets` for the data flow; final boundaries follow AGENTS.md §4 and GRAPHICS-019 IO boundary planning.
 - `src/ecs/Components/ECS.Component.AssetInstance.cppm` exposes `AssetInstance::Source { std::uint32_t AssetId }`. Runtime normalizes the CPU asset identifier to `Assets::AssetId` consumed by `GpuAssetCache`.
-- `src/graphics/assets/Graphics.GpuAssetCache.cppm` implements `Assets::AssetId → GpuAssetView` with `NotRequested → CpuPending → GpuUploading → Ready/Failed`, generation counter, retire queue. GRAPHICS-023A/B/C/D already wire generation tracking and acknowledgment; this task layers actual upload/binding on top.
-- `Extrinsic::Graphics::Components::GpuSceneSlot` already carries `SourceAsset`, `LastSeenAssetGeneration`, and `InstanceSlot/Generation`/`GeometrySlot/Generation` fields needed by this bridge (landed in GRAPHICS-023A).
-- The 2026-05-08 review (`docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md`, section "Asset loading is not yet a renderable geometry residency bridge" and "minimal milestone plan / 5. Asset-backed geometry milestone") records this as the asset-backed follow-up to GRAPHICS-030.
-- `docs/architecture/graphics.md` already notes that the full ECS renderable residency bridge from `AssetInstance::Source` to normalized `Assets::AssetId`, through GPU asset cache/world upload, and into instance geometry binding is follow-up work.
-- `tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md` covers asset-side ingest ownership; this task consumes whatever shape that boundary lands on without redefining ingest.
+- `src/graphics/assets/Graphics.GpuAssetCache.cppm` implements `Assets::AssetId → GpuAssetView` with `NotRequested → CpuPending → GpuUploading → Ready/Failed`, generation counter, retire queue. GRAPHICS-023A/B/C/D already wire generation tracking and acknowledgment.
+- `Extrinsic::Graphics::Components::GpuSceneSlot` already carries `SourceAsset`, `LastSeenAssetGeneration`, and slot/generation fields needed by this bridge (landed in GRAPHICS-023A).
+- The 2026-05-08 review (sections "Asset loading is not yet a renderable geometry residency bridge" and "minimal milestone plan / 5") records this as the asset-backed follow-up to GRAPHICS-030.
+- `tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md` covers asset-side ingest ownership; this task consumes whatever shape that boundary lands on.
+
+## Design decisions to record
+1. **AssetId normalization placement.** Decide the function signature and module that converts `AssetInstance::Source::AssetId (std::uint32_t)` to `Assets::AssetId` and where it lives. Recommend a runtime-side helper `Runtime::NormalizeAssetInstanceId(...)` so neither ECS nor graphics imports the asset registry; record the rule that runtime never embeds the normalization in extraction tick code (it goes through one named function for testability).
+2. **Cache placement.** Decide whether asset-backed geometry residency reuses `Runtime::ProceduralGeometryCache` from GRAPHICS-030 or a separate `Runtime::AssetGeometryCache`. Recommend separate caches with a shared internal `RuntimeGeometryHandle` value type so deduplication, refcount semantics, and retire-queue interaction are independent and unit-testable. Record the trade-off vs a unified cache.
+3. **Cache key.** For asset-backed geometry, the key is `Assets::AssetId` (not the entity ID); cache reuses one `GpuGeometryHandle` across all renderables sharing the asset. Record the rule that a generation bump invalidates the cache entry but keeps the asset-id key stable so refcount stays correct.
+4. **Refcount and sharing.** Decide refcount type and lifecycle: increment on `EnsureResident(AssetId)`, decrement on entity destruction or candidate disqualification, retire through `GpuAssetCache::Tick(currentFrame, framesInFlight)` and `GpuWorld` deferred-free when the count hits zero. Forbid immediate `FreeGeometry` while in flight.
+5. **State machine.** Lock the per-renderable observation state (consuming the GRAPHICS-023C classifier outputs):
+   - `NotRequested` → request CPU payload via `Asset.Service`; renderable is observed but unbound.
+   - `CpuPending` → still waiting; counter increments per stuck-frame budget; no binding.
+   - `GpuUploading` → upload submitted; not yet bindable.
+   - `Ready` → bind via `SetInstanceGeometry`; record `LastSeenAssetGeneration`.
+   - `Failed` → fall back per decision (10) below; counter increments; the renderable does not silently disappear.
+6. **Ordering inside extraction tick.** Lock the order: (1) classify per-entity asset state, (2) request uploads for new `NotRequested` entries, (3) bind `Ready` entries via `SetInstanceGeometry`, (4) drive the GRAPHICS-023D acknowledgment loop for generation rebinds, (5) release/retire entries whose entity disappeared, (6) call `GpuAssetCache::Tick` and `GpuWorld::SyncFrame` to close the frame.
+7. **Generation tracking integration.** Decide that this task only consumes the GRAPHICS-023A/B/C/D loop without adding new acknowledgment surfaces. Record the precise call sequence and the rule that generation rebinds reuse the same `GpuInstanceHandle` while replacing the geometry binding; previous geometry is retired through the deferred-free path.
+8. **Sharing fairness.** Lock the rule that all renderables sharing an `AssetId` see the same `GpuGeometryHandle` after `Ready`; no per-renderable copies. Record diagnostics that count asset-cache hits vs misses per frame.
+9. **Stuck-pending policy.** Decide the upper bound on consecutive frames an asset may be in `CpuPending` before runtime emits a diagnostic warning (recommend a configurable budget with a reasonable default). Forbid hard-failing the engine on a slow asset; the renderable stays unbound until the cache resolves.
+10. **Failure-mode fallback.** Decide what the renderable does when `GpuAssetCache` reports `Failed`. Two options: (a) substitute the GRAPHICS-031 default debug material with a sentinel "missing-mesh" geometry (cube placeholder), or (b) leave the renderable unbound and visible only via debug-overlay diagnostic. Recommend (a) so the missing-asset condition is visibly testable; record the placeholder geometry source. The placeholder must itself be a procedural source from GRAPHICS-030 (no chicken-and-egg).
+11. **Diagnostics.** Name explicitly: `AssetGeometryCacheHits`, `AssetGeometryCacheMisses`, `AssetGeometryRebinds`, `AssetGeometryFailedAssets`, `AssetGeometryStuckPendingCount`. Decide their location on the runtime extraction diagnostics surface.
+12. **Performance characteristics.** Record: O(1) per-renderable observation; no per-frame upload for resident assets; deduplication across renderables; no per-frame string allocations; the CPU payload request is a one-shot, not a polling loop.
+13. **Extensibility surface.** Identify how non-mesh asset-backed geometry (graph asset, point-cloud asset, primitive-set asset) plugs in: each adds a per-domain packer and reuses the same cache + state machine. None are in scope here; enumerate to confirm the design generalizes.
+14. **Layering audit.** Confirm: `src/ecs/*` adds no graphics or assets imports; `src/graphics/*` does not access live ECS or `Asset.Service`; `src/runtime/*` is the only writer of the asset-geometry cache; `src/graphics/assets/Graphics.GpuAssetCache` is consumed through its public surface only.
 
 ## Required changes
-- Implement asset-source residency in the runtime residency bridge from GRAPHICS-030:
-  - Normalize `AssetInstance::Source::AssetId` to `Assets::AssetId` in runtime, not in graphics or ECS.
-  - Request CPU payload through `Asset.Service`; once ready, drive `GpuAssetCache` upload, observe state transitions, and bind the resulting `GpuGeometryHandle` via `GpuWorld::SetInstanceGeometry()` only when the cache reports `Ready`.
-  - Reuse a single `GpuGeometryHandle` across all renderables sharing the same `Assets::AssetId`; refcount in the runtime cache.
-  - Free or retire the geometry when no live renderable references it, ordered correctly with `GpuAssetCache::Tick(currentFrame, framesInFlight)` and `GpuWorld` deferred-free semantics.
-  - Use the existing GRAPHICS-023C observe / GRAPHICS-023D acknowledge loop for generation comparison; no new acknowledgment surface here.
-- Define the failure modes:
-  - Asset missing or `Failed` cache state → renderable falls back to the default debug material from GRAPHICS-031 (or a configurable missing-mesh sentinel) and increments a runtime diagnostic counter.
-  - Pending uploads → the renderable is observed but not bound until `Ready`; tests must demonstrate this transition without renderer pass body soft-skip on the minimal recipe.
-- Keep procedural-source residency from GRAPHICS-030 unchanged; the two paths share the runtime cache infrastructure but distinguish source identity.
-- Cross-link decisions with ASSETIO-001, GRAPHICS-015 / 015Q (texture residency analogue), GRAPHICS-019 (IO boundaries), GRAPHICS-023A/B/C/D (generation tracking/rebind), GRAPHICS-028 (planning), GRAPHICS-029 (bootstrap), and GRAPHICS-030 (procedural source).
+- Capture all fourteen decisions as explicit recorded answers, including the state-machine table in (5), the ordering in (6), and the fallback rule in (10).
+- Cross-link with ASSETIO-001 (asset ingest ownership), GRAPHICS-015 / 015Q (texture residency analogue), GRAPHICS-019 (legacy IO boundaries), GRAPHICS-023A/B/C/D (generation tracking + acknowledgment), GRAPHICS-028 (residency planning), GRAPHICS-029 (bootstrap), GRAPHICS-030 (procedural source + placeholder geometry source), GRAPHICS-031 (default debug material for failure fallback).
+- Identify follow-up implementation children (do **not** open here):
+  - **GRAPHICS-034-Impl-A** — `Runtime::NormalizeAssetInstanceId` + `Runtime::AssetGeometryCache` skeleton + diagnostics; no extraction wiring yet.
+  - **GRAPHICS-034-Impl-B** — extraction wiring for `NotRequested → CpuPending → GpuUploading → Ready` happy path; contract tests.
+  - **GRAPHICS-034-Impl-C** — `Failed` fallback path + stuck-pending diagnostic + cleanup regression tests.
+  - **GRAPHICS-034-Impl-D** — generation rebind via GRAPHICS-023D acknowledgment integration.
+  - **GRAPHICS-034-Impl-E** (optional) — non-mesh asset-backed geometry packers (graph, point cloud) gated behind GRAPHICS-014 / 011 readiness.
 
 ## Tests
-- Add `contract;runtime` tests asserting the asset-source residency state machine:
-  - Missing asset → fallback path, diagnostic counter increments, no `GpuGeometryHandle` bound.
-  - Pending → no binding yet, snapshot reflects pending state, no extraction-time soft-skip.
-  - Ready → exactly one `GpuGeometryHandle` allocated per `Assets::AssetId`, multiple renderables share it, refcount honored on destroy.
-  - Generation advance → existing GRAPHICS-023C/D acknowledgment loop drives rebind without leaking the previous handle.
-- Add a `contract;runtime` cleanup regression test that destroying all referencing renderables retires the geometry through `GpuAssetCache::Tick` and `GpuWorld` deferred-free without violating frame-in-flight semantics.
-- Reuse the GRAPHICS-029 bootstrap fixture (extended with an asset-source variant) for end-to-end residency assertions.
-- Verification gate: default CPU-supported correctness target.
-  ```bash
-  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-  ```
+- Planning slice: validators only.
+- Implementation children must add `contract;runtime` tests covering the full state machine (including `Failed` fallback and stuck-pending diagnostics), refcount cleanup, generation rebinds, and asset-id normalization unit coverage.
+- GPU coverage stays opt-in `gpu;vulkan` and outside the default CPU gate.
 
 ## Docs
-- Update `docs/architecture/graphics.md` "ECS renderable residency bridge" section to record that the asset-source path is implemented and how it composes with GRAPHICS-023A/B/C/D.
-- Update `src/runtime/README.md`, `src/graphics/assets/README.md`, and `src/graphics/renderer/README.md` cross-links for the new asset-source residency seam.
+- Update `docs/architecture/graphics.md` "ECS renderable residency bridge" section with the asset-source plan and its composition with GRAPHICS-023A/B/C/D and GRAPHICS-030.
+- Update `src/runtime/README.md`, `src/graphics/assets/README.md`, and `src/graphics/renderer/README.md` cross-links once decisions are recorded.
 - Update `docs/migration/nonlegacy-parity-matrix.md` rows for asset-backed renderable residency.
-- Update `tasks/backlog/rendering/README.md` DAG to insert this task after GRAPHICS-030 (and after ASSETIO-001 ingest ownership lands).
+- Update `tasks/backlog/rendering/README.md` DAG after GRAPHICS-030 (and after ASSETIO-001 ingest ownership lands).
 
 ## Acceptance criteria
-- A renderable referencing an asset by `AssetInstance::Source::AssetId` ends up with a valid `GpuInstanceHandle` and `GpuGeometryHandle` once `GpuAssetCache` reports `Ready`, sharing geometry with other renderables on the same asset ID.
-- Failure / pending / ready / regenerated states all have explicit, testable behavior; diagnostic counters surface the failure path.
-- Layering invariants hold: ECS does not import graphics or assets internals; graphics does not access live ECS state; runtime is the only writer of the residency cache.
-- All new tests pass under the default CPU gate.
+- All fourteen decisions recorded with explicit answers and trade-off rationales; state-machine table and ordering are fully enumerated.
+- Implementation children identified with scope and dependency gates but not opened.
+- No new ingest / loader / format work scheduled here; ASSETIO-001 retains ownership of asset ingest.
+- Layering invariants hold; no engine behavior changes land in this slice.
 
 ## Verification
 ```bash
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
 
 ## Forbidden changes
 - No new asset format ingestion work (defer to ASSETIO-001 and downstream tasks).
 - No GPU-typed ECS components.
-- No live ECS access from graphics or asset-cache layers.
+- No live ECS or `Asset.Service` access from graphics layers.
 - No new `GpuAssetCache` eviction or capacity policy.
 - No new hot-reload acknowledgment surface beyond GRAPHICS-023A/B/C/D.
+- No silent disappearance of renderables on `Failed` assets; fallback must be visible and counted.
 - No mixing of mechanical file moves with semantic refactors.
+- No premature opening of implementation child tasks before this planning slice is approved.
