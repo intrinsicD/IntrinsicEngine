@@ -13,13 +13,15 @@
 - Paper/method: foundational rigid-body dynamics and impulse/constraint solving; exact references must be selected during intake.
 - Method package: `methods/physics/rigid_body_reference/`
 - Geometry already has contact and overlap primitives, but rigid-body dynamics needs state integration, mass/inertia, contacts, constraints, solver iterations, diagnostics, and determinism guarantees.
+- The reference method should model collision shapes separately from rigid-body state so future ECS authoring components and physics-world integration can compare against the same collider/body split.
 - This task follows `docs/agent/method-workflow.md`: paper/method intake, CPU reference first, correctness tests, benchmark harness/manifests, then documentation.
 
 ## Required changes
 - [ ] Intake paper(s) or textbook method references and define the method contract.
 - [ ] Define body state/descriptors: pose, linear/angular velocity, mass, inverse mass, inertia tensor, damping, gravity, sleep flags, and collision shape references.
 - [ ] Implement CPU reference integration for unconstrained rigid bodies with deterministic fixed-step stepping.
-- [ ] Implement reference contact generation inputs/outputs using simple analytic shapes first: sphere, box/AABB/OBB, capsule if supported by geometry contact routines.
+- [ ] Implement reference contact generation inputs/outputs using simple analytic dynamic-capable shapes first: sphere, capsule, and box/AABB/OBB, with compound-shape inputs represented as explicit child shapes with local poses.
+- [ ] Treat triangle mesh colliders as static/kinematic-only reference inputs unless a later convex-decomposition or specialized method task expands dynamic concave support.
 - [ ] Implement a correctness-first contact/constraint solve path with explicit diagnostics for non-convergence, penetration tolerance, and energy drift.
 - [ ] Add benchmark harness/manifests with stable IDs and machine-readable metrics.
 - [ ] Document diagnostics, unit conventions, numerical tolerances, and known limitations.

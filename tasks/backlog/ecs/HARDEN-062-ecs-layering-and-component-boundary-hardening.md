@@ -14,12 +14,15 @@
 - `src/ecs/Components/CMakeLists.txt` currently links `ExtrinsicCore`, `ExtrinsicAssets`, `IntrinsicGeometry`, and `glm::glm`.
 - `ECS.Component.AssetInstance.cppm` stores a raw `std::uint32_t AssetId` while the architecture contract prefers declared asset ID types, and ECS should not have live `AssetService` traffic.
 - `ECS.Component.Collider.cppm` imports `Geometry.Sphere`, which may be legitimate but needs an explicit documented boundary because physics will likely consume collider data later.
+- Collider and rigid-body authoring policy is split into `HARDEN-064`; this task should enforce the boundary that ECS stores CPU-only descriptors/IDs, not physics-world solver handles or runtime sidecars.
 
 ## Required changes
 - Run and review the strict layering check for `src`.
 - Remove unnecessary ECS link dependencies if they are not required by promoted modules.
 - Replace untyped asset IDs in ECS components with the promoted asset registry ID type only if that preserves the documented `ecs` dependency policy; otherwise record a follow-up architecture exception instead of adding an ad hoc type.
 - Document which geometry types ECS components may store directly and why.
+- Document that scene hierarchy and collider hierarchy are separate concepts: ECS parent/child relationships do not implicitly become compound-collider topology.
+- Add checks or docs that prohibit `PhysicsBodyHandle`, broadphase proxy handles, contact caches, island IDs, solver indices, runtime sync sidecars, graphics handles, and RHI handles from canonical ECS components.
 - Add a contract test or structural check coverage for prohibited ECS imports into graphics, runtime, platform, app, and live asset services.
 
 ## Tests
@@ -34,6 +37,7 @@
 ## Acceptance criteria
 - ECS CMake dependencies match actual promoted module imports.
 - ECS component docs explicitly separate CPU scene data from runtime/graphics/physics sidecars.
+- ECS component docs explicitly separate collider descriptors from rigid-body descriptors and defer solver-owned state to the future physics/runtime integration boundary.
 - Structural checks catch accidental high-layer imports into ECS.
 
 ## Verification
