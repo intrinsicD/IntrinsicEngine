@@ -32,7 +32,7 @@
   little-endian by spec).
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-O37xw`.
 - Parent backlog task:
@@ -181,3 +181,57 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Auto-acknowledging or mutating any runtime/render extraction state
   (unrelated to this slice).
 - Introducing GPU/Vulkan-only verification requirements.
+
+## Completion
+- Completed: 2026-05-08.
+- Implementation commit: `5fa504b`
+  (`GEOIO-002D: add geometry-owned binary STL mesh importer`).
+- Retired in a follow-up commit on
+  `claude/setup-agentic-workflow-O37xw`.
+- Verified in this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (86 task files validated).
+  - `python3 tools/repo/check_layering.py --root src --strict` — no
+    layering violations; `geometry` imports remain `geometry -> core`
+    only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out
+    docs/api/generated/module_inventory.md` — only the regeneration
+    date and pre-existing renames from prior commits differ; this
+    slice adds internal helpers and expands a function body in the
+    existing `Geometry.MeshIO` module without changing the module
+    name set, so the inventory was left untouched to avoid mixing
+    unrelated drift into this slice (matches `GEOIO-002B`/`C`
+    precedent).
+- Build/CTest gate not run in this container: `cmake --preset ci`
+  configure fails because `clang-20`/`clang++-20` are not installed in
+  this agent environment, matching the limitation called out under
+  `Context` and the prior `GEOIO-002A`/`B`/`C` retirement notes.
+  The default CPU correctness gate
+  (`ctest --test-dir build/ci -R 'GeometryIO' -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) should be re-run
+  on a host with the documented C++23 toolchain when available.
+- Notes:
+  - `IsBinarySTL` and `ParseBinarySTL` ship as anonymous-namespace
+    helpers in `src/geometry/Geometry.HalfedgeMesh.IO.cpp`. The
+    public signature of `LoadSTL` is unchanged; the dispatch is a
+    `std::span<const std::byte>` view over the existing
+    `ReadTextFile` buffer (which already opens in binary mode), so
+    no new IO helper was introduced.
+  - Binary parse emits raw triangle-soup positions (3*N) and
+    triangle face index lists (`{3i, 3i+1, 3i+2}`), matching the
+    geometry-side ASCII path's no-dedup behavior.
+  - Coverage in `tests/unit/geometry/Test.GeometryIO.cpp` adds four
+    cases: `LoadsBinarySTLSingleTriangle`,
+    `LoadsBinarySTLTwoTriangles`,
+    `LoadSTLRejectsTruncatedBinaryPayload`, and
+    `LoadsASCIISTLAfterBinaryDispatch`. A new `WriteBinarySTLFixture`
+    helper writes the canonical 80-byte header + `uint32_t` count +
+    50-byte triangle records via `std::ofstream(..., std::ios::binary)`.
+  - Remaining `GEOIO-002` scope (binary mesh PLY import, granular
+    `MeshIOReadStatus` diagnostics enum across OBJ/OFF/PLY/STL,
+    domain-selection metadata for asset/runtime routing, importer
+    parity hardening for additional point-cloud variants) stays
+    tracked under the parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
