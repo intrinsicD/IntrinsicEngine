@@ -8,11 +8,17 @@ startup/shutdown.
 
 | Module | Responsibility |
 |---|---|
-| `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring |
+| `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring, app-facing reference engine config helper |
 | `Extrinsic.Runtime.FrameClock` | Per-frame wall-clock management |
 | `Extrinsic.Runtime.FrameLoop` | Testable platform/render/maintenance/shutdown phase contracts |
 | `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
+
+`Extrinsic.Runtime.Engine` exports `CreateReferenceEngineConfig()` so reference
+applications can request the standard runtime configuration without importing
+lower-layer `core` config modules directly. Applications may pass the returned
+config to `Engine`; runtime remains responsible for interpreting subsystem
+configuration and composition.
 
 ## Canonical frame loop phases (`Engine::RunFrame`)
 

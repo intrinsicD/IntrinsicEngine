@@ -49,6 +49,19 @@ namespace Extrinsic::Runtime
         return RuntimeDeviceSelection{};
     }
 
+    export [[nodiscard]] inline Core::Config::EngineConfig CreateReferenceEngineConfig()
+    {
+        Core::Config::EngineConfig config{};
+        config.Window.Title = "Modular Vulkan Engine";
+        config.Window.Width = 1600;
+        config.Window.Height = 900;
+        config.Render.Backend = Core::Config::GraphicsBackend::Vulkan;
+        config.Render.EnableValidation = true;
+        config.Render.EnableVSync = true;
+        config.Render.FramesInFlight = 2;
+        return config;
+    }
+
     // ============================================================
     // IApplication — the user-facing hook interface.
     //

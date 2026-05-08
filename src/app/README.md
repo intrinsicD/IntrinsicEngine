@@ -5,9 +5,10 @@ engine runtime. The canonical entry point is `Sandbox`.
 
 ## Applications
 
-- `Sandbox/` — reference integration target. Builds the full engine (`Core` +
-  `Assets` + `ECS` + `Platform` + `Graphics` + `Runtime`), opens a window, and
-  drives the frame loop. Used to validate the composition root end-to-end.
+- `Sandbox/` — reference integration target. Links to `Runtime`, opens a window,
+  and drives the frame loop with the runtime-owned reference configuration. Used
+  to validate the composition root end-to-end without adding specialized app
+  behavior.
 
 ## Directory layout
 
@@ -20,7 +21,8 @@ Sandbox/
 
 ## Dependency note
 
-`App` depends on `Runtime` (and transitively on every subsystem it wires). An
-application is the only layer that may depend on everything; it must not
-expose types back to the engine. No other engine layer may import an
-application module.
+`App` depends on `Runtime` only. Runtime transitively owns lower subsystem
+composition and exposes app-facing helpers such as the reference engine
+configuration. Applications must not import lower engine layers for convenience
+and must not expose types back to the engine. No other engine layer may import
+an application module.

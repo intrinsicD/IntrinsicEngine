@@ -15,5 +15,4 @@ target_sources(ExtrinsicSandbox
 target_link_libraries(ExtrinsicSandbox
         PRIVATE
         ExtrinsicRuntime
-        ExtrinsicCore
 )
