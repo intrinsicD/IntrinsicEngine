@@ -4,10 +4,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <span>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <unistd.h>
@@ -763,4 +765,272 @@ TEST(GeometryIO_MeshIO, WriteSTLRejectsBadPath)
               Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
 }
 
+namespace
+{
+    enum class BinaryPlyEndian
+    {
+        Little,
+        Big,
+    };
 
+    [[nodiscard]] std::array<std::byte, 4> EncodeFloat(float value, BinaryPlyEndian endian)
+    {
+        std::array<std::byte, 4> bytes{};
+        std::memcpy(bytes.data(), &value, 4);
+        if (endian == BinaryPlyEndian::Big)
+        {
+            std::swap(bytes[0], bytes[3]);
+            std::swap(bytes[1], bytes[2]);
+        }
+        return bytes;
+    }
+
+    [[nodiscard]] std::array<std::byte, 4> EncodeUint32(std::uint32_t value, BinaryPlyEndian endian)
+    {
+        std::array<std::byte, 4> bytes{};
+        std::memcpy(bytes.data(), &value, 4);
+        if (endian == BinaryPlyEndian::Big)
+        {
+            std::swap(bytes[0], bytes[3]);
+            std::swap(bytes[1], bytes[2]);
+        }
+        return bytes;
+    }
+
+    struct BinaryPlyVertex
+    {
+        glm::vec3 Position{0.0f};
+        bool HasColor = false;
+        std::uint8_t R = 0;
+        std::uint8_t G = 0;
+        std::uint8_t B = 0;
+    };
+
+    [[nodiscard]] std::string WriteBinaryPLYFixture(std::span<const BinaryPlyVertex> vertices,
+                                                    std::span<const std::vector<std::uint32_t>> faces,
+                                                    BinaryPlyEndian endian,
+                                                    std::uint32_t advertisedFaceListCountOverride = 0,
+                                                    bool truncateBody = false)
+    {
+        static int counter = 0;
+        const char* tmpDir = std::getenv("TEST_TMPDIR");
+        if (tmpDir == nullptr || tmpDir[0] == '\0')
+        {
+            tmpDir = "/tmp";
+        }
+        std::string path = std::string(tmpDir) + "/intrinsic_geometry_io_binply_" +
+                           std::to_string(static_cast<long long>(getpid())) + "_" +
+                           std::to_string(counter++) + ".ply";
+        std::ofstream out(path, std::ios::binary);
+
+        const bool hasColor = !vertices.empty() && vertices.front().HasColor;
+        const char* formatToken =
+            endian == BinaryPlyEndian::Little ? "binary_little_endian" : "binary_big_endian";
+
+        out << "ply\n";
+        out << "format " << formatToken << " 1.0\n";
+        out << "comment Test fixture\n";
+        out << "element vertex " << vertices.size() << "\n";
+        out << "property float x\n";
+        out << "property float y\n";
+        out << "property float z\n";
+        if (hasColor)
+        {
+            out << "property uchar red\n";
+            out << "property uchar green\n";
+            out << "property uchar blue\n";
+        }
+        out << "element face " << faces.size() << "\n";
+        out << "property list uchar int vertex_indices\n";
+        out << "end_header\n";
+
+        std::size_t vertexBytesWritten = 0;
+        for (const auto& v : vertices)
+        {
+            const auto x = EncodeFloat(v.Position.x, endian);
+            const auto y = EncodeFloat(v.Position.y, endian);
+            const auto z = EncodeFloat(v.Position.z, endian);
+            out.write(reinterpret_cast<const char*>(x.data()), 4);
+            out.write(reinterpret_cast<const char*>(y.data()), 4);
+            out.write(reinterpret_cast<const char*>(z.data()), 4);
+            vertexBytesWritten += 12;
+            if (hasColor)
+            {
+                const std::uint8_t rgb[3] = {v.R, v.G, v.B};
+                out.write(reinterpret_cast<const char*>(rgb), 3);
+                vertexBytesWritten += 3;
+            }
+            if (truncateBody)
+            {
+                return path;
+            }
+        }
+        (void)vertexBytesWritten;
+
+        for (const auto& face : faces)
+        {
+            const std::uint32_t reportedCount =
+                advertisedFaceListCountOverride > 0 ? advertisedFaceListCountOverride
+                                                    : static_cast<std::uint32_t>(face.size());
+            const std::uint8_t countByte = static_cast<std::uint8_t>(reportedCount);
+            out.write(reinterpret_cast<const char*>(&countByte), 1);
+            for (const auto idx : face)
+            {
+                const auto bytes = EncodeUint32(idx, endian);
+                out.write(reinterpret_cast<const char*>(bytes.data()), 4);
+            }
+        }
+
+        return path;
+    }
+
+    struct TempBinaryPLY
+    {
+        std::string Path;
+
+        TempBinaryPLY(std::span<const BinaryPlyVertex> vertices,
+                      std::span<const std::vector<std::uint32_t>> faces,
+                      BinaryPlyEndian endian,
+                      std::uint32_t advertisedFaceListCountOverride = 0,
+                      bool truncateBody = false)
+            : Path(WriteBinaryPLYFixture(vertices, faces, endian, advertisedFaceListCountOverride, truncateBody))
+        {
+        }
+
+        ~TempBinaryPLY()
+        {
+            if (!Path.empty())
+            {
+                std::remove(Path.c_str());
+            }
+        }
+    };
+}
+
+TEST(GeometryIO_MeshIO, LoadsBinaryLittleEndianPLYTriangle)
+{
+    const std::array<BinaryPlyVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Little);
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+}
+
+TEST(GeometryIO_MeshIO, LoadsBinaryBigEndianPLYTriangle)
+{
+    const std::array<BinaryPlyVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Big);
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+}
+
+TEST(GeometryIO_MeshIO, LoadsBinaryLittleEndianPLYQuad)
+{
+    const std::array<BinaryPlyVertex, 4> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u, 3u}}};
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Little);
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Vertices.Size(), 4u);
+    EXPECT_EQ(result->Faces.Size(), 1u);
+
+    auto faceVertices = result->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(faceVertices.IsValid());
+    ASSERT_EQ(faceVertices.Vector().size(), 1u);
+    ASSERT_EQ(faceVertices[0].size(), 4u);
+    EXPECT_EQ(faceVertices[0][3], 3u);
+}
+
+TEST(GeometryIO_MeshIO, LoadsBinaryLittleEndianPLYWithExtraVertexProperties)
+{
+    const std::array<BinaryPlyVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, true, 255, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, true, 0, 255, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, true, 0, 0, 255},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Little);
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+}
+
+TEST(GeometryIO_MeshIO, LoadPLYRejectsTruncatedBinaryBody)
+{
+    const std::array<BinaryPlyVertex, 2> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 0u}}};
+    // Header advertises vertex 2 / face 1, but the writer stops after the
+    // first vertex's bytes -> remaining body is too small for the second
+    // vertex and the face list.
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Little, 0, /*truncateBody=*/true);
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadPLYRejectsBinaryFaceListBelowThree)
+{
+    const std::array<BinaryPlyVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    // Real face list has three indices, but advertise count==2 so the
+    // reader sees a degenerate list. The trailing index byte is consumed
+    // as padding by the size check; the importer must reject the count.
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Little, /*advertisedFaceListCountOverride=*/2u);
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadsAsciiPLYAfterBinaryDispatch)
+{
+    // Regression: the ASCII path must continue to parse the canonical
+    // ASCII fixture after LoadPLY was refactored into a header-driven
+    // dispatch supporting binary little/big-endian formats.
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 3\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "element face 1\n"
+                  "property list uchar int vertex_indices\n"
+                  "end_header\n"
+                  "0 0 0\n"
+                  "1 0 0\n"
+                  "0 1 0\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+}
