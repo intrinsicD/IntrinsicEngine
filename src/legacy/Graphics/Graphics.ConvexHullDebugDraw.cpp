@@ -29,14 +29,14 @@ namespace Graphics
     }
 
     void DrawConvexHull(DebugDraw& dd,
-                        const Geometry::Halfedge::Mesh& hullMesh,
+                        const Geometry::HalfedgeMesh::Mesh& hullMesh,
                         const ConvexHullDebugDrawSettings& settings)
     {
         DrawConvexHull(dd, hullMesh, settings, glm::mat4(1.0f));
     }
 
     void DrawConvexHull(DebugDraw& dd,
-                        const Geometry::Halfedge::Mesh& hullMesh,
+                        const Geometry::HalfedgeMesh::Mesh& hullMesh,
                         const ConvexHullDebugDrawSettings& settings,
                         const glm::mat4& worldTransform)
     {

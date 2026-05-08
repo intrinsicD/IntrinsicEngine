@@ -12,9 +12,9 @@ import Geometry;
 #include "Test_MeshBuilders.h"
 
 // Create a flat NxN grid of triangles (all in the Z=0 plane)
-static Geometry::Halfedge::Mesh MakeFlatGrid(int n)
+static Geometry::HalfedgeMesh::Mesh MakeFlatGrid(int n)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     std::vector<Geometry::VertexHandle> verts;
     verts.reserve((n + 1) * (n + 1));
 
@@ -54,7 +54,7 @@ static Geometry::Halfedge::Mesh MakeFlatGrid(int n)
 
 TEST(AdaptiveRemesh, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::AdaptiveRemeshing::AdaptiveRemesh(mesh);
     EXPECT_FALSE(result.has_value());
 }

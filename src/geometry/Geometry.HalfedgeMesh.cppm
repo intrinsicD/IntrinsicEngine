@@ -17,7 +17,7 @@ export import Geometry.HalfedgeMeshFwd;
 import Geometry.Properties;
 import Geometry.Circulators;
 
-export namespace Geometry::Halfedge
+export namespace Geometry::HalfedgeMesh
 {
     class Mesh
     {
@@ -102,6 +102,14 @@ export namespace Geometry::Halfedge
         [[nodiscard]] std::size_t HalfedgeCount() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size * 2u : HalfedgesSize() - 2u * m_DeletedEdges; }
         [[nodiscard]] std::size_t EdgeCount() const noexcept { return m_IsSubmeshView ? m_EdgeRange.Size : EdgesSize() - m_DeletedEdges; }
         [[nodiscard]] std::size_t FaceCount() const noexcept { return m_IsSubmeshView ? m_FaceRange.Size : FacesSize() - m_DeletedFaces; }
+
+        [[nodiscard]] std::size_t DeletedVertexCount() const noexcept { return m_DeletedVertices; }
+        [[nodiscard]] std::size_t DeletedEdgeCount() const noexcept { return m_DeletedEdges; }
+        [[nodiscard]] std::size_t DeletedFaceCount() const noexcept { return m_DeletedFaces; }
+
+        [[nodiscard]] std::size_t &DeletedVertexCount() noexcept { return m_DeletedVertices; }
+        [[nodiscard]] std::size_t &DeletedEdgeCount() noexcept { return m_DeletedEdges; }
+        [[nodiscard]] std::size_t &DeletedFaceCount() noexcept { return m_DeletedFaces; }
 
         [[nodiscard]] bool IsEmpty() const noexcept { return VertexCount() == 0; }
 

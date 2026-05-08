@@ -67,7 +67,7 @@ export namespace Geometry::HtexPatch
     };
 
     [[nodiscard]] std::optional<PatchBuildResult> BuildPatchMetadata(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const PatchBuildParams& params = {});
 
     [[nodiscard]] PatchAtlasLayout ComputeAtlasLayout(
@@ -76,22 +76,22 @@ export namespace Geometry::HtexPatch
         std::uint32_t maxColumns = 32u) noexcept;
 
     [[nodiscard]] std::optional<glm::vec3> SamplePatchSurfacePoint(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const HalfedgePatchMeta& patch,
         glm::vec2 patchUV) noexcept;
 
     [[nodiscard]] std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangle(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         std::uint32_t halfedgeIndex) noexcept;
 
     [[nodiscard]] std::optional<std::uint32_t> ClassifyPatchSurfacePointToCentroid(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const HalfedgePatchMeta& patch,
         glm::vec2 patchUV,
         std::span<const glm::vec3> centroids) noexcept;
 
     [[nodiscard]] bool BuildCategoricalPatchAtlas(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         std::span<const HalfedgePatchMeta> patches,
         std::span<const glm::vec3> centroids,
         std::vector<std::uint32_t>& outTexels,

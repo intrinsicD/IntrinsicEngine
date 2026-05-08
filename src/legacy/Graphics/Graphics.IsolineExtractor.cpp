@@ -18,7 +18,7 @@ using namespace Graphics;
 using namespace Geometry;
 
 IsolineExtractor::IsolineResult IsolineExtractor::Extract(
-    const Halfedge::Mesh& mesh,
+    const HalfedgeMesh::Mesh& mesh,
     const std::string& scalarProperty,
     uint32_t isoCount,
     float rangeMin,

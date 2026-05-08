@@ -1908,9 +1908,9 @@ private:
                                    });
             }
             if (ImGui::MenuItem("Icosahedron"))
-                SpawnPrimitiveMeshFromHalfedge("Icosahedron", Geometry::Halfedge::MakeMeshIcosahedron());
+                SpawnPrimitiveMeshFromHalfedge("Icosahedron", Geometry::HalfedgeMesh::MakeMeshIcosahedron());
             if (ImGui::MenuItem("Octahedron"))
-                SpawnPrimitiveMeshFromHalfedge("Octahedron", Geometry::Halfedge::MakeMeshOctahedron());
+                SpawnPrimitiveMeshFromHalfedge("Octahedron", Geometry::HalfedgeMesh::MakeMeshOctahedron());
             ImGui::EndMenu();
         }
 
@@ -1927,7 +1927,7 @@ private:
     template <typename PrimitiveT>
     void SpawnPrimitiveMesh(const char* name, const PrimitiveT& primitive)
     {
-        auto meshOpt = Geometry::Halfedge::MakeMesh(primitive);
+        auto meshOpt = Geometry::HalfedgeMesh::MakeMesh(primitive);
         if (!meshOpt)
         {
             Log::Warn("Failed to create {} primitive mesh.", name);
@@ -1936,9 +1936,9 @@ private:
         SpawnPrimitiveMeshFromHalfedge(name, std::move(*meshOpt));
     }
 
-    void SpawnPrimitiveMeshFromHalfedge(const char* name, Geometry::Halfedge::Mesh mesh)
+    void SpawnPrimitiveMeshFromHalfedge(const char* name, Geometry::HalfedgeMesh::Mesh mesh)
     {
-        auto meshShared = std::make_shared<Geometry::Halfedge::Mesh>(std::move(mesh));
+        auto meshShared = std::make_shared<Geometry::HalfedgeMesh::Mesh>(std::move(mesh));
 
         // Shared handle between redo/undo lambdas (avoids dangling reference).
         auto entityHandle = std::make_shared<entt::entity>(entt::null);

@@ -125,7 +125,7 @@ namespace Geometry::Implicit
 
         struct MeshClosestPointOracle
         {
-            explicit MeshClosestPointOracle(const Halfedge::Mesh& mesh)
+            explicit MeshClosestPointOracle(const HalfedgeMesh::Mesh& mesh)
             {
                 BuildTriangles(mesh);
             }
@@ -168,7 +168,7 @@ namespace Geometry::Implicit
             }
 
         private:
-            void BuildTriangles(const Halfedge::Mesh& mesh)
+            void BuildTriangles(const HalfedgeMesh::Mesh& mesh)
             {
                 for (std::size_t faceIndex = 0; faceIndex < mesh.FacesSize(); ++faceIndex)
                 {
@@ -250,7 +250,7 @@ namespace Geometry::Implicit
             tree.NodeProperties.PushBack();
         }
 
-        [[nodiscard]] AABB ComputeMeshBounds(const Halfedge::Mesh& mesh)
+        [[nodiscard]] AABB ComputeMeshBounds(const HalfedgeMesh::Mesh& mesh)
         {
             AABB bounds{};
             bool found = false;
@@ -314,7 +314,7 @@ namespace Geometry::Implicit
             NodeProperty<std::uint32_t> Flags;
             NodeProperty<std::uint32_t> SourcePrimitive;
 
-            explicit BuildContext(const Halfedge::Mesh& mesh, const BuildParams& params, BuildStats& stats, PlaneField& field)
+            explicit BuildContext(const HalfedgeMesh::Mesh& mesh, const BuildParams& params, BuildStats& stats, PlaneField& field)
                 : Oracle(mesh), Params(params), Stats(&stats),
                   ClosestPoint(field.Hierarchy().GetOrAddNodeProperty<glm::vec3>(std::string(kClosestPointProperty), glm::vec3(0.0f))),
                   Normal(field.Hierarchy().GetOrAddNodeProperty<glm::vec3>(std::string(kNormalProperty), glm::vec3(0.0f, 1.0f, 0.0f))),
@@ -679,7 +679,7 @@ namespace Geometry::Implicit
         return current;
     }
 
-    std::optional<BuildResult> BuildPlaneField(const Halfedge::Mesh& mesh, const BuildParams& params)
+    std::optional<BuildResult> BuildPlaneField(const HalfedgeMesh::Mesh& mesh, const BuildParams& params)
     {
         if (mesh.VertexCount() == 0u || mesh.FaceCount() == 0u)
             return std::nullopt;
@@ -762,7 +762,7 @@ namespace Geometry::Implicit
         return grid;
     }
 
-    std::optional<Halfedge::Mesh> ExtractMesh(
+    std::optional<HalfedgeMesh::Mesh> ExtractMesh(
         const PlaneField& field,
         const Grid::GridDimensions& dims,
         const MarchingCubes::MarchingCubesParams& mcParams,

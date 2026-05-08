@@ -107,7 +107,7 @@ namespace Runtime::PointCloudKMeans
         }
 
         [[nodiscard]] std::vector<glm::vec3> SnapshotMeshVertices(
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             std::vector<uint32_t>* handles = nullptr)
         {
             std::vector<glm::vec3> points;

@@ -280,7 +280,7 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
     Runtime::SceneManager sceneManager;
     auto& registry = sceneManager.GetRegistry();
 
-    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = mesh->AddVertex(glm::vec3(0.0f, 0.0f, 0.0f));
     const auto v1 = mesh->AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
     const auto v2 = mesh->AddVertex(glm::vec3(0.0f, 1.0f, 0.0f));
@@ -570,7 +570,7 @@ TEST(RenderExtraction, ExtractedHtexPreviewPacketRemainsStableAfterMeshMutation)
     Runtime::SceneManager sceneManager;
     auto& registry = sceneManager.GetRegistry();
 
-    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = mesh->AddVertex(glm::vec3(0.0f, 0.0f, 0.0f));
     const auto v1 = mesh->AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
     const auto v2 = mesh->AddVertex(glm::vec3(0.0f, 1.0f, 0.0f));

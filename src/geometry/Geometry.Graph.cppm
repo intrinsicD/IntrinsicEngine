@@ -35,7 +35,7 @@ export namespace Geometry::Graph
         // -----------------------------------------------------------------
         // Submesh view support
         // -----------------------------------------------------------------
-        // See Halfedge::Mesh for the full view contract. Span accessors are
+        // See HalfedgeMesh::Mesh for the full view contract. Span accessors are
         // range-restricted; handle-based access uses absolute indices.
         // -----------------------------------------------------------------
 
@@ -158,7 +158,7 @@ export namespace Geometry::Graph
             return Geometry::EdgeProperty<T>(m_Edges.GetOrAdd<T>(std::string{name}, std::move(defaultValue)));
         }
 
-        // Public PropertySet accessors (mirrors Halfedge::Mesh pattern).
+        // Public PropertySet accessors (mirrors HalfedgeMesh::Mesh pattern).
         [[nodiscard]] Vertices& VertexProperties() noexcept { return m_Vertices; }
         [[nodiscard]] ConstPropertySet VertexProperties() const noexcept { return ConstPropertySet(m_Vertices); } // NOLINT(readability-convert-member-functions-to-static)
 

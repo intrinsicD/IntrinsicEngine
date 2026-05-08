@@ -19,7 +19,7 @@ TEST(Subdivision, SingleIterationQuadruplesFaces)
     auto input = MakeTetrahedron();
     ASSERT_EQ(input.FaceCount(), 4u);
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 1;
 
@@ -34,7 +34,7 @@ TEST(Subdivision, TwoIterations)
 {
     auto input = MakeTetrahedron();
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 2;
 
@@ -52,7 +52,7 @@ TEST(Subdivision, VertexCountFormula)
     // Tetrahedron has 6 edges
     const std::size_t eOld = 6;
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 1;
 
@@ -67,7 +67,7 @@ TEST(Subdivision, IcosahedronConvergesToSphere)
 
     auto input = MakeIcosahedron();
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 3;
 
@@ -93,7 +93,7 @@ TEST(Subdivision, OutputIsClosedWhenInputIsClosed)
 {
     auto input = MakeTetrahedron();
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 1;
 
@@ -111,8 +111,8 @@ TEST(Subdivision, OutputIsClosedWhenInputIsClosed)
 
 TEST(Subdivision, ReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh input;
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh input;
+    Geometry::HalfedgeMesh::Mesh output;
 
     auto result = Geometry::Subdivision::Subdivide(input, output);
     EXPECT_FALSE(result.has_value());
@@ -122,7 +122,7 @@ TEST(Subdivision, ReturnsNulloptForNonTriangleMesh)
 {
     auto input = MakeSingleQuad(); // Quads, not triangles
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     auto result = Geometry::Subdivision::Subdivide(input, output);
     EXPECT_FALSE(result.has_value());
 }
@@ -130,7 +130,7 @@ TEST(Subdivision, ReturnsNulloptForNonTriangleMesh)
 TEST(Subdivision, ZeroIterationsReturnsNullopt)
 {
     auto input = MakeTetrahedron();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 0;
@@ -145,7 +145,7 @@ TEST(Subdivision, InputMeshIsNotModified)
     const auto origVerts = input.VertexCount();
     const auto origFaces = input.FaceCount();
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     (void)Geometry::Subdivision::Subdivide(input, output);
 
     EXPECT_EQ(input.VertexCount(), origVerts);
@@ -155,7 +155,7 @@ TEST(Subdivision, InputMeshIsNotModified)
 TEST(Subdivision, RespectsMaxOutputFaceBudget)
 {
     auto input = MakeTetrahedron();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 5;
@@ -170,7 +170,7 @@ TEST(Subdivision, RespectsMaxOutputFaceBudget)
 TEST(Subdivision, ReturnsNulloptWhenBudgetBlocksFirstIteration)
 {
     auto input = MakeTetrahedron();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     Geometry::Subdivision::SubdivisionParams params;
     params.Iterations = 1;
@@ -187,13 +187,13 @@ TEST(Subdivision, ReturnsNulloptWhenBudgetBlocksFirstIteration)
 namespace
 {
 
-[[nodiscard]] Geometry::Halfedge::Mesh MakeQuadCube()
+[[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeQuadCube()
 {
-    auto mesh = Geometry::Halfedge::MakeMesh(Geometry::AABB{
+    auto mesh = Geometry::HalfedgeMesh::MakeMesh(Geometry::AABB{
         .Min = {-1.0f, -1.0f, -1.0f},
         .Max = { 1.0f,  1.0f,  1.0f},
     });
-    return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
+    return mesh ? std::move(*mesh) : Geometry::HalfedgeMesh::Mesh{};
 }
 
 } // namespace
@@ -201,7 +201,7 @@ namespace
 TEST(CatmullClark, SingleTriangleProducesQuads)
 {
     auto input = MakeSingleTriangle();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
     ASSERT_TRUE(result.has_value());
@@ -222,7 +222,7 @@ TEST(CatmullClark, SingleTriangleProducesQuads)
 TEST(CatmullClark, TetrahedronProducesAllQuads)
 {
     auto input = MakeTetrahedron();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
     ASSERT_TRUE(result.has_value());
@@ -238,7 +238,7 @@ TEST(CatmullClark, TetrahedronProducesAllQuads)
 TEST(CatmullClark, CubeProducesAllQuads)
 {
     auto input = MakeQuadCube();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
     ASSERT_TRUE(result.has_value());
@@ -251,7 +251,7 @@ TEST(CatmullClark, CubeProducesAllQuads)
 TEST(CatmullClark, PreservesClosedMeshEulerCharacteristic)
 {
     auto input = MakeTetrahedron();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
     ASSERT_TRUE(result.has_value());
@@ -267,7 +267,7 @@ TEST(CatmullClark, PreservesClosedMeshEulerCharacteristic)
 TEST(CatmullClark, CubePreservesEulerCharacteristic)
 {
     auto input = MakeQuadCube();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
     ASSERT_TRUE(result.has_value());
@@ -282,7 +282,7 @@ TEST(CatmullClark, CubePreservesEulerCharacteristic)
 TEST(CatmullClark, TwoIterationsWork)
 {
     auto input = MakeTetrahedron();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     Geometry::CatmullClark::SubdivisionParams params;
     params.Iterations = 2;
@@ -305,7 +305,7 @@ TEST(CatmullClark, CubeConvergesToSphere)
     // strictly decreases with each subdivision iteration.
     auto input = MakeQuadCube();
 
-    auto computeRadiusVariance = [](const Geometry::Halfedge::Mesh& mesh) -> double
+    auto computeRadiusVariance = [](const Geometry::HalfedgeMesh::Mesh& mesh) -> double
     {
         double sumR = 0.0, sumR2 = 0.0;
         std::size_t count = 0;
@@ -323,7 +323,7 @@ TEST(CatmullClark, CubeConvergesToSphere)
     };
 
     // Variance after 1 iteration
-    Geometry::Halfedge::Mesh output1;
+    Geometry::HalfedgeMesh::Mesh output1;
     Geometry::CatmullClark::SubdivisionParams p1;
     p1.Iterations = 1;
     auto r1 = Geometry::CatmullClark::Subdivide(input, output1, p1);
@@ -331,7 +331,7 @@ TEST(CatmullClark, CubeConvergesToSphere)
     double var1 = computeRadiusVariance(output1);
 
     // Variance after 2 iterations
-    Geometry::Halfedge::Mesh output2;
+    Geometry::HalfedgeMesh::Mesh output2;
     Geometry::CatmullClark::SubdivisionParams p2;
     p2.Iterations = 2;
     auto r2 = Geometry::CatmullClark::Subdivide(input, output2, p2);
@@ -345,8 +345,8 @@ TEST(CatmullClark, CubeConvergesToSphere)
 
 TEST(CatmullClark, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh input;
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh input;
+    Geometry::HalfedgeMesh::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
     EXPECT_FALSE(result.has_value());
@@ -355,7 +355,7 @@ TEST(CatmullClark, EmptyMeshReturnsNullopt)
 TEST(CatmullClark, ZeroIterationsReturnsNullopt)
 {
     auto input = MakeTetrahedron();
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
 
     Geometry::CatmullClark::SubdivisionParams params;
     params.Iterations = 0;
@@ -372,7 +372,7 @@ TEST(CatmullClark, VertexCountFormula)
     std::size_t Eold = input.EdgeCount();
     std::size_t Fold = input.FaceCount();
 
-    Geometry::Halfedge::Mesh output;
+    Geometry::HalfedgeMesh::Mesh output;
     auto result = Geometry::CatmullClark::Subdivide(input, output);
     ASSERT_TRUE(result.has_value());
 

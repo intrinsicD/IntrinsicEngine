@@ -1173,7 +1173,7 @@ TEST(DEC_HeatKernel, ObtuseTriangleAlwaysPositive)
     // Key motivation: cotan weights can go negative at obtuse angles,
     // but heat kernel weights are always strictly positive.
     // MakeRightTriangle has a 90-degree angle. Make one more obtuse.
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     // Obtuse triangle: angle at v2 > 90 degrees
     auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     auto v1 = mesh.AddVertex({3.0f, 0.0f, 0.0f});

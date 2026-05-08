@@ -19,10 +19,10 @@ import Geometry;
 namespace
 {
     // Subdivided icosahedron approximating a unit sphere.
-    Geometry::Halfedge::Mesh MakeSphereMesh()
+    Geometry::HalfedgeMesh::Mesh MakeSphereMesh()
     {
         auto ico = MakeIcosahedron();
-        Geometry::Halfedge::Mesh refined;
+        Geometry::HalfedgeMesh::Mesh refined;
         Geometry::Subdivision::SubdivisionParams sp;
         sp.Iterations = 2;
         (void)Geometry::Subdivision::Subdivide(ico, refined, sp);
@@ -30,9 +30,9 @@ namespace
     }
 
     // Flat grid mesh for testing transport on a trivially flat surface.
-    Geometry::Halfedge::Mesh MakeFlatGrid(int n = 5)
+    Geometry::HalfedgeMesh::Mesh MakeFlatGrid(int n = 5)
     {
-        Geometry::Halfedge::Mesh mesh;
+        Geometry::HalfedgeMesh::Mesh mesh;
         // Create (n+1) x (n+1) grid of vertices
         std::vector<Geometry::VertexHandle> verts;
         for (int y = 0; y <= n; ++y)
@@ -300,7 +300,7 @@ TEST(VectorHeatMethod, FlatGridLogMapCircularSymmetry)
 
 TEST(VectorHeatMethod, TransportReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     std::vector<std::size_t> sources = {0};
     std::vector<glm::vec3> vecs = {glm::vec3(1, 0, 0)};
 
@@ -330,7 +330,7 @@ TEST(VectorHeatMethod, TransportReturnsNulloptForMismatchedArrays)
 
 TEST(VectorHeatMethod, LogMapReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
 
     auto result = Geometry::VectorHeatMethod::ComputeLogMap(mesh, 0);
     EXPECT_FALSE(result.has_value());

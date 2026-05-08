@@ -8,9 +8,9 @@ import Geometry;
 
 namespace
 {
-    Geometry::Halfedge::Mesh MakeQuadMesh()
+    Geometry::HalfedgeMesh::Mesh MakeQuadMesh()
     {
-        Geometry::Halfedge::Mesh mesh;
+        Geometry::HalfedgeMesh::Mesh mesh;
         const auto v0 = mesh.AddVertex(glm::vec3(-1.0f, -1.0f, 0.0f));
         const auto v1 = mesh.AddVertex(glm::vec3( 1.0f, -1.0f, 0.0f));
         const auto v2 = mesh.AddVertex(glm::vec3( 1.0f,  1.0f, 0.0f));
@@ -22,7 +22,7 @@ namespace
 
 TEST(ImplicitPlaneField, BuildFromQuadProducesActiveLeavesAndSignedEvaluation)
 {
-    Geometry::Halfedge::Mesh mesh = MakeQuadMesh();
+    Geometry::HalfedgeMesh::Mesh mesh = MakeQuadMesh();
 
     Geometry::Implicit::BuildParams params;
     params.MaxDepth = 5;
@@ -52,7 +52,7 @@ TEST(ImplicitPlaneField, BuildFromQuadProducesActiveLeavesAndSignedEvaluation)
 
 TEST(ImplicitPlaneField, ProjectSnapsToSurface)
 {
-    Geometry::Halfedge::Mesh mesh = MakeQuadMesh();
+    Geometry::HalfedgeMesh::Mesh mesh = MakeQuadMesh();
 
     Geometry::Implicit::BuildParams params;
     params.MaxDepth = 5;
@@ -74,14 +74,14 @@ TEST(ImplicitPlaneField, ProjectSnapsToSurface)
 
 TEST(ImplicitPlaneField, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh empty;
+    Geometry::HalfedgeMesh::Mesh empty;
     auto result = Geometry::Implicit::BuildPlaneField(empty);
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(ImplicitPlaneField, CanSampleToDenseGrid)
 {
-    Geometry::Halfedge::Mesh mesh = MakeQuadMesh();
+    Geometry::HalfedgeMesh::Mesh mesh = MakeQuadMesh();
 
     Geometry::Implicit::BuildParams params;
     params.MaxDepth = 4;
@@ -112,7 +112,7 @@ TEST(ImplicitPlaneField, CanSampleToDenseGrid)
 
 TEST(ImplicitPlaneField, ExtractMeshProducesGeometry)
 {
-    Geometry::Halfedge::Mesh mesh = MakeQuadMesh();
+    Geometry::HalfedgeMesh::Mesh mesh = MakeQuadMesh();
 
     Geometry::Implicit::BuildParams params;
     params.MaxDepth = 4;

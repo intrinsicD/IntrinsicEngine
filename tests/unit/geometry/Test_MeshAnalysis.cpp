@@ -13,7 +13,7 @@ import Geometry;
 
 TEST(MeshAnalysis, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::MeshAnalysis::Analyze(mesh);
     EXPECT_FALSE(result.has_value());
 }

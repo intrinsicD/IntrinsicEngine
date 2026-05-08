@@ -161,7 +161,7 @@ TEST(SDF_Solver, Sphere_Vs_Triangle)
 
 TEST(HalfedgeMesh, SingleTriangle_Connectivity)
 {
-    using Geometry::Halfedge::Mesh;
+    using Geometry::HalfedgeMesh::Mesh;
 
     Mesh m;
     auto v0 = m.AddVertex();
@@ -197,7 +197,7 @@ TEST(HalfedgeMesh, SingleTriangle_Connectivity)
 
 TEST(HalfedgeMesh, TwoTriangles_SharedEdge)
 {
-    using Geometry::Halfedge::Mesh;
+    using Geometry::HalfedgeMesh::Mesh;
 
     Mesh m;
     for (int i = 0; i < 4; ++i) (void)m.AddVertex();
@@ -219,7 +219,7 @@ TEST(HalfedgeMesh, TwoTriangles_SharedEdge)
 
 TEST(HalfedgeMesh, AddFace_RejectsNonBoundaryInsertion)
 {
-    using Geometry::Halfedge::Mesh;
+    using Geometry::HalfedgeMesh::Mesh;
 
     // Build a closed triangle, then attempt to add another face reusing a directed halfedge that already has a face.
     Mesh m;
@@ -238,7 +238,7 @@ TEST(HalfedgeMesh, AddFace_RejectsNonBoundaryInsertion)
 
 TEST(HalfedgeMesh, DeleteFace_ThenGarbageCollect)
 {
-    using Geometry::Halfedge::Mesh;
+    using Geometry::HalfedgeMesh::Mesh;
 
     Mesh m;
     for (int i = 0; i < 4; ++i) (void)m.AddVertex();

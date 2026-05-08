@@ -91,6 +91,6 @@ export namespace Geometry::MarchingCubes
     // the function skips those and returns the best possible mesh.
     //
     // Returns nullopt if the result is empty.
-    [[nodiscard]] std::optional<Halfedge::Mesh> ToMesh(const MarchingCubesResult& result);
+    [[nodiscard]] std::optional<HalfedgeMesh::Mesh> ToMesh(const MarchingCubesResult& result);
 
 } // namespace Geometry::MarchingCubes

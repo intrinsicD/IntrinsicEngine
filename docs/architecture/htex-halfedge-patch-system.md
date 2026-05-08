@@ -50,10 +50,10 @@ Relevant existing integration points:
 
 - `src/Runtime/Geometry/Geometry.HalfedgeMesh.cppm`
   - halfedge connectivity and edge indexing
-  - `Halfedge::Mesh::Edge(HalfedgeHandle)`
-  - `Halfedge::Mesh::OppositeHalfedge(HalfedgeHandle)`
-  - `Halfedge::Mesh::NextHalfedge(HalfedgeHandle)` / `PrevHalfedge(...)`
-- `src/Runtime/Geometry/Geometry.MeshUtils.cppm`
+  - `HalfedgeMesh::Mesh::Edge(HalfedgeHandle)`
+  - `HalfedgeMesh::Mesh::OppositeHalfedge(HalfedgeHandle)`
+  - `HalfedgeMesh::Mesh::NextHalfedge(HalfedgeHandle)` / `PrevHalfedge(...)`
+- `src/Runtime/Geometry/Geometry.HalfedgeMesh.Utils.cppm`
   - `BuildHalfedgeMeshFromIndexedTriangles(...)`
   - `ExtractIndexedTriangles(..., triangleFaceIds)`
 - `src/Runtime/RHI/RHI.Texture.cppm`
@@ -127,7 +127,7 @@ Add a new geometry module pair:
 
 Responsibilities:
 
-- enumerate edge patches from a `Halfedge::Mesh`
+- enumerate edge patches from a `HalfedgeMesh::Mesh`
 - compute resolution buckets
 - store intrinsic triangle metadata
 - build per-patch upload lists
@@ -137,7 +137,7 @@ Responsibilities:
 
 The intended flow is:
 
-1. Build or update a `Halfedge::Mesh`.
+1. Build or update a `HalfedgeMesh::Mesh`.
 2. Enumerate `EdgeHandle`s and allocate one patch per undirected edge.
 3. For each edge, compute a target resolution bucket using a simple area heuristic.
 4. Emit an intrinsic-triangle stream from the halfedge connectivity.

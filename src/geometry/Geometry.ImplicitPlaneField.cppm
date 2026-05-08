@@ -120,7 +120,7 @@ export namespace Geometry::Implicit
     };
 
     [[nodiscard]] std::optional<BuildResult> BuildPlaneField(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const BuildParams& params = {});
 
     [[nodiscard]] std::optional<Grid::DenseGrid> SampleToDenseGrid(
@@ -128,7 +128,7 @@ export namespace Geometry::Implicit
         const Grid::GridDimensions& dims,
         std::string_view scalarPropertyName = "scalar");
 
-    [[nodiscard]] std::optional<Halfedge::Mesh> ExtractMesh(
+    [[nodiscard]] std::optional<HalfedgeMesh::Mesh> ExtractMesh(
         const PlaneField& field,
         const Grid::GridDimensions& dims,
         const MarchingCubes::MarchingCubesParams& mcParams = {},

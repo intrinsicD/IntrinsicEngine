@@ -16,7 +16,7 @@ These primitive-owned passes feed later composition/overlay stages. There are no
 
 - Primitive ownership is explicit: surfaces/lines/points are rendered only by their owning pass.
 - ECS toggle model is presence/absence of typed components (`ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component`).
-- CPU geometry authority is PropertySet-backed (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`).
+- CPU geometry authority is PropertySet-backed (`PointCloud::Cloud`, `Graph`, `HalfedgeMesh::Mesh`).
 - GPU rendering is BDA-driven from shared `GeometryGpuData` buffers.
 - GPU-driven rendering uses one canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
 - Runtime owns CPU scene composition and extraction-side mappings; graphics owns GPU scene buffers and must not store graphics GPU handles in canonical ECS components.

@@ -115,12 +115,12 @@ namespace
 // MakeTriangle forwards to the shared equivalent.
 // MakeTetrahedron uses different vertex coordinates than the shared version
 // (approximate regular tetrahedron vs exact), so it remains local.
-static Geometry::Halfedge::Mesh MakeTriangle() { return MakeRightTriangle(); }
+static Geometry::HalfedgeMesh::Mesh MakeTriangle() { return MakeRightTriangle(); }
 
-static Geometry::Halfedge::Mesh MakeLocalTetrahedron()
+static Geometry::HalfedgeMesh::Mesh MakeLocalTetrahedron()
 {
     using namespace Geometry;
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0.5f, 0, 0.866f));
@@ -132,10 +132,10 @@ static Geometry::Halfedge::Mesh MakeLocalTetrahedron()
     return mesh;
 }
 
-// Extract per-face colors from a Halfedge::Mesh into packed ABGR uint32_t
+// Extract per-face colors from a HalfedgeMesh::Mesh into packed ABGR uint32_t
 // array suitable for Surface::Component::CachedFaceColors.
 // Returns empty vector if "f:color" property doesn't exist.
-static std::vector<uint32_t> ExtractFaceColorsFromMesh(const Geometry::Halfedge::Mesh& mesh)
+static std::vector<uint32_t> ExtractFaceColorsFromMesh(const Geometry::HalfedgeMesh::Mesh& mesh)
 {
     if (!mesh.FaceProperties().Exists("f:color"))
         return {};
@@ -221,7 +221,7 @@ TEST(PerFaceAttr_FlatShading, NoPropertyReturnsEmpty)
 
 TEST(PerFaceAttr_FlatShading, EmptyMeshReturnsEmpty)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto packed = ExtractFaceColorsFromMesh(mesh);
     EXPECT_TRUE(packed.empty());
 }
@@ -617,7 +617,7 @@ TEST(PerFaceAttr_Robustness, PackColorF_InfClampedDeterministically)
 TEST(PerFaceAttr_Robustness, DeletedFacesSkipped)
 {
     using namespace Geometry;
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
@@ -642,7 +642,7 @@ TEST(PerFaceAttr_Robustness, DeletedFacesSkipped)
 TEST(PerFaceAttr_Robustness, GarbageCollectedMeshStillWorks)
 {
     using namespace Geometry;
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
@@ -677,7 +677,7 @@ TEST(PerFaceAttr_Robustness, GarbageCollectedMeshStillWorks)
 TEST(PerFaceAttr_Robustness, LargeMeshScaling)
 {
     using namespace Geometry;
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
 
     // Build a grid mesh with many faces.
     constexpr int N = 20; // 20x20 grid → 800 triangles

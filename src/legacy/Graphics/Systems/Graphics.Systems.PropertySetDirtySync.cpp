@@ -40,7 +40,7 @@ namespace Graphics::Systems::PropertySetDirtySync
 {
     namespace
     {
-        [[nodiscard]] std::vector<glm::vec3> BuildMeshEdgeMidpoints(const Geometry::Halfedge::Mesh& mesh)
+        [[nodiscard]] std::vector<glm::vec3> BuildMeshEdgeMidpoints(const Geometry::HalfedgeMesh::Mesh& mesh)
         {
             std::vector<glm::vec3> positions;
             positions.reserve(mesh.EdgesSize());
@@ -69,7 +69,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             return positions;
         }
 
-        [[nodiscard]] std::vector<glm::vec3> BuildMeshFaceCentroids(const Geometry::Halfedge::Mesh& mesh)
+        [[nodiscard]] std::vector<glm::vec3> BuildMeshFaceCentroids(const Geometry::HalfedgeMesh::Mesh& mesh)
         {
             std::vector<glm::vec3> positions;
             positions.reserve(mesh.FacesSize());

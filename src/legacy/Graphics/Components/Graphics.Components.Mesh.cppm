@@ -39,7 +39,7 @@ export namespace ECS::Mesh
     struct Data
     {
         // ---- Authoritative Data Source ----
-        std::shared_ptr<Geometry::Halfedge::Mesh> MeshRef{};
+        std::shared_ptr<Geometry::HalfedgeMesh::Mesh> MeshRef{};
 
         // ---- Visualization Configuration ----
         // Selects which PropertySet properties drive per-vertex/edge/face colors.

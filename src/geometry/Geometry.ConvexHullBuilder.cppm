@@ -48,7 +48,7 @@ export namespace Geometry::ConvexHullBuilder
     //      f. Delete visible faces.
     //
     //   4. EXTRACTION: Collect hull vertices (renumbered), face planes (H-Rep),
-    //      and optionally a Halfedge::Mesh representation.
+    //      and optionally a HalfedgeMesh::Mesh representation.
     //
     // Complexity:
     //   Expected:   O(n log n) for randomly distributed points.
@@ -72,7 +72,7 @@ export namespace Geometry::ConvexHullBuilder
         // Always true in practice — SDF, SAT, and containment all need planes.
         bool ComputePlanes{true};
 
-        // Whether to produce a Halfedge::Mesh representation of the hull.
+        // Whether to produce a HalfedgeMesh::Mesh representation of the hull.
         // Useful for subsequent mesh operations (smoothing, subdivision, etc.).
         bool BuildMesh{false};
     };
@@ -83,8 +83,8 @@ export namespace Geometry::ConvexHullBuilder
         // and optionally H-Rep (face planes with outward normals).
         Geometry::ConvexHull Hull;
 
-        // Optional Halfedge::Mesh representation (populated if BuildMesh=true).
-        Halfedge::Mesh Mesh;
+        // Optional HalfedgeMesh::Mesh representation (populated if BuildMesh=true).
+        HalfedgeMesh::Mesh Mesh;
 
         // Number of input points.
         std::size_t InputPointCount{0};
@@ -118,13 +118,13 @@ export namespace Geometry::ConvexHullBuilder
         const ConvexHullParams& params = {});
 
     // -------------------------------------------------------------------------
-    // Build the 3D convex hull from a Halfedge::Mesh's vertex positions
+    // Build the 3D convex hull from a HalfedgeMesh::Mesh's vertex positions
     // -------------------------------------------------------------------------
     //
     // Convenience overload that extracts vertex positions from the mesh and
     // delegates to the span-based Build(). Skips deleted vertices.
     [[nodiscard]] std::optional<ConvexHullResult> BuildFromMesh(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const ConvexHullParams& params = {});
 
 } // namespace Geometry::ConvexHullBuilder

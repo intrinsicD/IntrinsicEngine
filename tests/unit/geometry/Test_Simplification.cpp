@@ -15,10 +15,10 @@ import Geometry;
 namespace
 {
     // Subdivided icosahedron: closed mesh with many faces for simplification.
-    Geometry::Halfedge::Mesh MakeDenseMesh()
+    Geometry::HalfedgeMesh::Mesh MakeDenseMesh()
     {
         auto ico = MakeIcosahedron();
-        Geometry::Halfedge::Mesh refined;
+        Geometry::HalfedgeMesh::Mesh refined;
         Geometry::Subdivision::SubdivisionParams sp;
         sp.Iterations = 2; // 20 * 16 = 320 faces
         (void)Geometry::Subdivision::Subdivide(ico, refined, sp);
@@ -104,7 +104,7 @@ TEST(Simplification, ClosedMeshRemainsClosedAfterSimplification)
 
 TEST(Simplification, ReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
 
     Geometry::Simplification::Params params;
     params.TargetFaces = 0;

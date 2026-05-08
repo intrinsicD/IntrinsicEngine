@@ -25,7 +25,7 @@ namespace ECS::Components::GeometrySources
     // =========================================================================
     void PopulateFromMesh(entt::registry& reg,
                           entt::entity   entity,
-                          Geometry::Halfedge::Mesh& mesh)
+                          Geometry::HalfedgeMesh::Mesh& mesh)
     {
         const std::size_t vSize  = mesh.VerticesSize();
         const std::size_t eSize  = mesh.EdgesSize();

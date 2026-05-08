@@ -15,7 +15,7 @@ module Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMeshFwd;
 import Geometry.Properties;
 
-namespace Geometry::Halfedge
+namespace Geometry::HalfedgeMesh
 {
     void Mesh::SetVertexAttributeTransferRules(std::span<const VertexAttributeTransfer> rules)
     {

@@ -436,7 +436,7 @@ export namespace Graphics
     struct HtexPatchPreviewPacket
     {
         uint32_t SourceEntityId = 0;
-        std::optional<Geometry::Halfedge::Mesh> Mesh{};
+        std::optional<Geometry::HalfedgeMesh::Mesh> Mesh{};
         uint64_t KMeansResultRevision = 0;
         std::vector<glm::vec3> KMeansCentroids{};
 

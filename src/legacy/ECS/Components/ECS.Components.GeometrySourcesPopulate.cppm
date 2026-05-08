@@ -46,7 +46,7 @@ export namespace ECS::Components::GeometrySources
     // the non-const VertexProperties() overload for PropertySet copy).
     void PopulateFromMesh(entt::registry& registry,
                           entt::entity   entity,
-                          Geometry::Halfedge::Mesh& mesh);
+                          Geometry::HalfedgeMesh::Mesh& mesh);
 
     // Populate Nodes and Edges from a Graph.
     // Calls graph.GarbageCollection() if HasGarbage() is true, ensuring the

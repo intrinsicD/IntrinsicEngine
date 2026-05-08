@@ -39,7 +39,7 @@ namespace Geometry::HtexPatch
             return std::clamp(kBuckets.back(), minBucket, maxBucket);
         }
 
-        [[nodiscard]] double PolygonArea(const Halfedge::Mesh& mesh, FaceHandle f) noexcept
+        [[nodiscard]] double PolygonArea(const HalfedgeMesh::Mesh& mesh, FaceHandle f) noexcept
         {
             if (!f.IsValid() || mesh.IsDeleted(f))
                 return 0.0;
@@ -100,7 +100,7 @@ namespace Geometry::HtexPatch
             return glm::dot(n, n);
         }
 
-        [[nodiscard]] std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangleImpl(const Halfedge::Mesh& mesh,
+        [[nodiscard]] std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangleImpl(const HalfedgeMesh::Mesh& mesh,
                                                                                      HalfedgeHandle h) noexcept
         {
             HalfedgePatchTriangle tri{};
@@ -189,7 +189,7 @@ namespace Geometry::HtexPatch
     }
 
     std::optional<PatchBuildResult> BuildPatchMetadata(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const PatchBuildParams& params)
     {
         PROFILE_SCOPE("HtexPatch::BuildPatchMetadata");
@@ -267,7 +267,7 @@ namespace Geometry::HtexPatch
         return layout;
     }
 
-    std::optional<glm::vec3> SamplePatchSurfacePoint(const Halfedge::Mesh& mesh,
+    std::optional<glm::vec3> SamplePatchSurfacePoint(const HalfedgeMesh::Mesh& mesh,
                                                      const HalfedgePatchMeta& patch,
                                                      glm::vec2 patchUV) noexcept
     {
@@ -287,7 +287,7 @@ namespace Geometry::HtexPatch
             patch.Halfedge0Index);
     }
 
-    std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangle(const Halfedge::Mesh& mesh,
+    std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangle(const HalfedgeMesh::Mesh& mesh,
                                                                std::uint32_t halfedgeIndex) noexcept
     {
         if (halfedgeIndex == kInvalidIndex)
@@ -297,7 +297,7 @@ namespace Geometry::HtexPatch
     }
 
     std::optional<std::uint32_t> ClassifyPatchSurfacePointToCentroid(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const HalfedgePatchMeta& patch,
         glm::vec2 patchUV,
         std::span<const glm::vec3> centroids) noexcept
@@ -309,7 +309,7 @@ namespace Geometry::HtexPatch
         return ClassifyPointToNearestCentroid(*point, centroids);
     }
 
-    bool BuildCategoricalPatchAtlas(const Halfedge::Mesh& mesh,
+    bool BuildCategoricalPatchAtlas(const HalfedgeMesh::Mesh& mesh,
                                     std::span<const HalfedgePatchMeta> patches,
                                     std::span<const glm::vec3> centroids,
                                     std::vector<std::uint32_t>& outTexels,

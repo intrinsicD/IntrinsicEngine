@@ -625,7 +625,7 @@ namespace Geometry::ConvexHullBuilder
             }
         }
 
-        // Build Halfedge::Mesh representation
+        // Build HalfedgeMesh::Mesh representation
         if (params.BuildMesh)
         {
             result.Mesh.Reserve(result.HullVertexCount,
@@ -655,7 +655,7 @@ namespace Geometry::ConvexHullBuilder
     }
 
     std::optional<ConvexHullResult> BuildFromMesh(
-        const Halfedge::Mesh& mesh,
+        const HalfedgeMesh::Mesh& mesh,
         const ConvexHullParams& params)
     {
         if (mesh.IsEmpty())

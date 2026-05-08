@@ -1062,7 +1062,7 @@ Before the clean design, here are the places where the ideas as stated **can't w
 
 #### ✅ Issue A — PropertySet Duality & ::Data Component Elimination (resolved)
 
-**Resolution — Shared-Ownership Mesh Interface:** Each `GeometrySources` domain component holds its PropertySet via `std::shared_ptr<PropertySet>`. The `Halfedge::MeshView` interface, when created for an entity, takes shared ownership of these PropertySets — it holds `shared_ptr` copies, not raw references. `meshView.VertexProperties()` IS `GeometrySources::Vertices.Properties` — the same heap object, co-owned.
+**Resolution — Shared-Ownership Mesh Interface:** Each `GeometrySources` domain component holds its PropertySet via `std::shared_ptr<PropertySet>`. The `HalfedgeMesh::MeshView` interface, when created for an entity, takes shared ownership of these PropertySets — it holds `shared_ptr` copies, not raw references. `meshView.VertexProperties()` IS `GeometrySources::Vertices.Properties` — the same heap object, co-owned.
 
 Concretely: `GeometrySources::Vertices`, `::Edges`, `::Halfedges`, `::Faces` each store `std::shared_ptr<PropertySet> Properties`. When an algorithm creates a `MeshView`, it copies these `shared_ptr`s. This guarantees lifetime safety: even if entt reallocates its component pools (e.g., emplacing a component on another entity), the PropertySet data remains valid because the `MeshView` holds a shared reference. All reads and writes through the mesh interface operate directly on the ECS-owned PropertySet data. No sync, no copy of the data itself, no duality.
 
@@ -1173,13 +1173,13 @@ Entity
 
 **No `Mesh::Data`, `Graph::Data`, or `PointCloud::Data` components exist.** Entity type is determined solely by `DataAuthority::*Tag`. All persistent data lives in `GeometrySources`. All render state lives on render components. All algorithm state lives on algorithm-specific components.
 
-**Halfedge::Mesh as on-demand computation interface:**
+**HalfedgeMesh::Mesh as on-demand computation interface:**
 
-When an algorithm needs topology traversal (neighbor iteration, valence queries, boundary detection), it creates a `Halfedge::MeshView` that **shares ownership of the entity's GeometrySources PropertySets** via `shared_ptr`:
+When an algorithm needs topology traversal (neighbor iteration, valence queries, boundary detection), it creates a `HalfedgeMesh::MeshView` that **shares ownership of the entity's GeometrySources PropertySets** via `shared_ptr`:
 
 ```cpp
 // Algorithm code — NOT stored on any ECS component
-auto meshView = Halfedge::MeshView(
+auto meshView = HalfedgeMesh::MeshView(
     reg.get<GeometrySources::Vertices>(entity).Properties,    // shared_ptr<PropertySet>
     reg.get<GeometrySources::Edges>(entity).Properties,       // shared_ptr<PropertySet>
     reg.get<GeometrySources::Halfedges>(entity).Properties,   // shared_ptr<PropertySet>
@@ -1615,7 +1615,7 @@ This section is a checklist of breaking changes implied by §15. Nothing in §15
 | M11 | Geometry buffer ownership | Per-entity `GeometryPool` handles | `GpuWorld::GlobalGeometryStore` via `BufferManager` | `GeometryPool`, all lifecycle systems, `GeometryGpuData::CreateAsync` |
 | M12 | GPUScene scope | `Graphics::GPUScene` (instances + AABBs only) | `GpuWorld` (all GPU scene data) | `RenderOrchestrator`, `RenderDriver`, `Graphics.GPUScene` module |
 | M13 | Normal map composition | Priority chain (normal map overrides vertex normals) | Two-stage composition (base normal + normal map perturbation in TBN) | `gbuffer.frag` shader, §4.2 |
-| M14 | On-demand mesh interface | `Mesh::Data::MeshRef` (persistent shared_ptr) | `Halfedge::MeshView` created on stack by algorithm code | All algorithm callsites that use `MeshRef` for topology traversal |
+| M14 | On-demand mesh interface | `Mesh::Data::MeshRef` (persistent shared_ptr) | `HalfedgeMesh::MeshView` created on stack by algorithm code | All algorithm callsites that use `MeshRef` for topology traversal |
 
 **Recommended order:**
 1. **M1** (property authority redirect) — foundational, all algorithms depend on this.

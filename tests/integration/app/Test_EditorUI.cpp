@@ -191,7 +191,7 @@ TEST(EditorUIProcessing, MeshEntityReportsExplicitTopologyDomains)
     auto& reg = scene.GetRegistry();
     const auto entity = reg.create();
 
-    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = mesh->AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = mesh->AddVertex({1.0f, 0.0f, 0.0f});
     const auto v2 = mesh->AddVertex({0.0f, 1.0f, 0.0f});
@@ -222,7 +222,7 @@ TEST(EditorUIProcessing, ColliderBackedMeshFallbackReportsTopologyDomainsWithout
     auto& reg = scene.GetRegistry();
     const auto entity = reg.create();
 
-    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = mesh->AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = mesh->AddVertex({1.0f, 0.0f, 0.0f});
     const auto v2 = mesh->AddVertex({0.0f, 1.0f, 0.0f});
@@ -287,7 +287,7 @@ TEST(EditorUIProcessing, MixedGeometryEntityEnumeratesAllKMeansDomainsInStableOr
     auto& reg = scene.GetRegistry();
     const auto entity = reg.create();
 
-    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     static_cast<void>(mesh->AddVertex({0.0f, 0.0f, 0.0f}));
     static_cast<void>(mesh->AddVertex({1.0f, 0.0f, 0.0f}));
     static_cast<void>(mesh->AddVertex({0.0f, 1.0f, 0.0f}));

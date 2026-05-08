@@ -12,20 +12,32 @@ import Geometry;
 
 #include "Test_MeshBuilders.h"
 
+Geometry::Graph::Graph GetGraph(Geometry::HalfedgeMesh::Mesh& mesh)
+{
+    Geometry::Graph::Graph graph(mesh.VertexProperties(),
+        mesh.EdgeProperties(),
+        mesh.HalfedgeProperties(),
+        mesh.DeletedVertexCount(),
+        mesh.DeletedEdgeCount());
+    return graph;
+}
+
 TEST(ShortestPath, MeshTriangleChoosesDirectEdge)
 {
     auto mesh = MakeSingleTriangle();
     std::vector<Geometry::VertexHandle> sources{Geometry::VertexHandle{0}};
     std::vector<Geometry::VertexHandle> targets{Geometry::VertexHandle{2}};
 
-    auto result = Geometry::ShortestPath::Dijkstra(mesh, sources, targets);
+    Geometry::Graph::Graph graph = GetGraph(mesh);
+
+    auto result = Geometry::ShortestPath::Dijkstra(graph, sources, targets);
     ASSERT_TRUE(result.has_value());
 
     EXPECT_NEAR(result->Distances[Geometry::VertexHandle{0}], 0.0, 1e-9);
     EXPECT_NEAR(result->Distances[Geometry::VertexHandle{2}], 1.0, 1e-6);
     EXPECT_EQ(result->Predecessors[Geometry::VertexHandle{2}], Geometry::VertexHandle{0});
 
-    auto path = Geometry::ShortestPath::ExtractPathGraph(mesh, *result, sources, targets);
+    auto path = Geometry::ShortestPath::ExtractPathGraph(graph, *result, sources, targets);
     ASSERT_TRUE(path.has_value());
     EXPECT_EQ(path->VertexCount(), 2u);
     EXPECT_EQ(path->EdgeCount(), 1u);
@@ -36,17 +48,20 @@ TEST(ShortestPath, ReturnsNulloptWhenBothSetsEmpty)
     auto mesh = MakeSingleTriangle();
     std::vector<Geometry::VertexHandle> empty;
 
-    auto result = Geometry::ShortestPath::Dijkstra(mesh, empty, empty);
+    Geometry::Graph::Graph graph = GetGraph(mesh);
+
+    auto result = Geometry::ShortestPath::Dijkstra(graph, empty, empty);
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(ShortestPath, ReverseTreeWhenStartsEmpty)
 {
     auto mesh = MakeSingleTriangle();
+    Geometry::Graph::Graph graph = GetGraph(mesh);
     std::vector<Geometry::VertexHandle> empty;
     std::vector<Geometry::VertexHandle> targets{Geometry::VertexHandle{2}};
 
-    auto result = Geometry::ShortestPath::Dijkstra(mesh, empty, targets);
+    auto result = Geometry::ShortestPath::Dijkstra(graph, empty, targets);
     ASSERT_TRUE(result.has_value());
 
     EXPECT_NEAR(result->Distances[Geometry::VertexHandle{2}], 0.0, 1e-9);
@@ -55,7 +70,7 @@ TEST(ShortestPath, ReverseTreeWhenStartsEmpty)
     EXPECT_EQ(result->Predecessors[Geometry::VertexHandle{0}], Geometry::VertexHandle{2});
     EXPECT_EQ(result->Predecessors[Geometry::VertexHandle{1}], Geometry::VertexHandle{2});
 
-    auto path = Geometry::ShortestPath::ExtractPathGraph(mesh, *result, empty, targets);
+    auto path = Geometry::ShortestPath::ExtractPathGraph(graph, *result, empty, targets);
     ASSERT_TRUE(path.has_value());
     EXPECT_EQ(path->VertexCount(), 3u);
     EXPECT_EQ(path->EdgeCount(), 2u);
@@ -64,10 +79,11 @@ TEST(ShortestPath, ReverseTreeWhenStartsEmpty)
 TEST(ShortestPath, ForwardTreeWhenTargetsEmpty)
 {
     auto mesh = MakeSingleTriangle();
+    Geometry::Graph::Graph graph = GetGraph(mesh);
     std::vector<Geometry::VertexHandle> sources{Geometry::VertexHandle{0}};
     std::vector<Geometry::VertexHandle> empty;
 
-    auto result = Geometry::ShortestPath::Dijkstra(mesh, sources, empty);
+    auto result = Geometry::ShortestPath::Dijkstra(graph, sources, empty);
     ASSERT_TRUE(result.has_value());
 
     EXPECT_NEAR(result->Distances[Geometry::VertexHandle{0}], 0.0, 1e-9);
@@ -76,7 +92,7 @@ TEST(ShortestPath, ForwardTreeWhenTargetsEmpty)
     EXPECT_EQ(result->Predecessors[Geometry::VertexHandle{1}], Geometry::VertexHandle{0});
     EXPECT_EQ(result->Predecessors[Geometry::VertexHandle{2}], Geometry::VertexHandle{0});
 
-    auto path = Geometry::ShortestPath::ExtractPathGraph(mesh, *result, sources, empty);
+    auto path = Geometry::ShortestPath::ExtractPathGraph(graph, *result, sources, empty);
     ASSERT_TRUE(path.has_value());
     EXPECT_EQ(path->VertexCount(), 3u);
     EXPECT_EQ(path->EdgeCount(), 2u);
@@ -132,11 +148,12 @@ TEST(ShortestPath, MultiGoalExtractionProducesNetwork)
 
 TEST(ShortestPath, ReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
+    Geometry::Graph::Graph graph = GetGraph(mesh);
     std::vector<Geometry::VertexHandle> sources{Geometry::VertexHandle{0}};
     std::vector<Geometry::VertexHandle> targets{Geometry::VertexHandle{1}};
 
-    auto result = Geometry::ShortestPath::Dijkstra(mesh, sources, targets);
+    auto result = Geometry::ShortestPath::Dijkstra(graph, sources, targets);
     EXPECT_FALSE(result.has_value());
 }
 

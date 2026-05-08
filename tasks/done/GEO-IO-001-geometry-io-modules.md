@@ -9,7 +9,7 @@
 - Replace the legacy graphics importer registry in this task.
 
 ## Context
-- `src/geometry/Geometry.MeshIO.cppm` exists as a declaration-only module and is not yet registered in the geometry CMake target.
+- `src/geometry/Geometry.HalfedgeMesh.IO.cppm` exists as a declaration-only module and is not yet registered in the geometry CMake target.
 - Point cloud and graph I/O should be geometry-owned APIs that depend only on `geometry` and `core` error types.
 - Legacy graphics importers contain parsing behavior, but new geometry modules must not depend on `graphics`, `assets`, `runtime`, or live legacy importer registries.
 

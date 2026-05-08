@@ -16,7 +16,7 @@ import Geometry;
 namespace
 {
     // Compute average vertex distance from origin.
-    double AverageRadius(const Geometry::Halfedge::Mesh& mesh)
+    double AverageRadius(const Geometry::HalfedgeMesh::Mesh& mesh)
     {
         double sum = 0.0;
         std::size_t count = 0;
@@ -31,10 +31,10 @@ namespace
     }
 
     // Dense closed mesh suitable for smoothing tests.
-    Geometry::Halfedge::Mesh MakeDenseMesh()
+    Geometry::HalfedgeMesh::Mesh MakeDenseMesh()
     {
         auto ico = MakeIcosahedron();
-        Geometry::Halfedge::Mesh refined;
+        Geometry::HalfedgeMesh::Mesh refined;
         Geometry::Subdivision::SubdivisionParams sp;
         sp.Iterations = 2;
         (void)Geometry::Subdivision::Subdivide(ico, refined, sp);
@@ -77,7 +77,7 @@ TEST(Smoothing, UniformLaplacianCausesShrinkage)
 
 TEST(Smoothing, UniformLaplacianReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     Geometry::Smoothing::SmoothingParams params;
     params.Iterations = 1;
 
@@ -133,7 +133,7 @@ TEST(Smoothing, TaubinPreservesVolume)
 
 TEST(Smoothing, TaubinReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     Geometry::Smoothing::TaubinParams params;
     params.Iterations = 1;
 
@@ -159,7 +159,7 @@ TEST(Smoothing, ImplicitLaplacianConverges)
 
 TEST(Smoothing, ImplicitLaplacianReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     Geometry::Smoothing::ImplicitSmoothingParams params;
 
     auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
@@ -235,7 +235,7 @@ TEST(Smoothing, CotanReducesEdgeLengthVariance)
         mesh.Position(vh) = p + glm::normalize(p) * noise;
     }
 
-    auto edgeLengthVariance = [](const Geometry::Halfedge::Mesh& m) -> double
+    auto edgeLengthVariance = [](const Geometry::HalfedgeMesh::Mesh& m) -> double
     {
         double sum = 0.0, sumSq = 0.0;
         std::size_t count = 0;
@@ -331,7 +331,7 @@ TEST(Smoothing, ImplicitReducesNoise)
         mesh.Position(vh) = p + glm::normalize(p) * noise;
     }
 
-    auto edgeLengthVariance = [](const Geometry::Halfedge::Mesh& m) -> double
+    auto edgeLengthVariance = [](const Geometry::HalfedgeMesh::Mesh& m) -> double
     {
         double sum = 0.0, sumSq = 0.0;
         std::size_t count = 0;
@@ -448,7 +448,7 @@ TEST(Smoothing, ImplicitMultipleIterationsSmootherThanOne)
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->IterationsPerformed, 3u);
 
-    auto edgeLengthVariance = [](const Geometry::Halfedge::Mesh& m) -> double
+    auto edgeLengthVariance = [](const Geometry::HalfedgeMesh::Mesh& m) -> double
     {
         double sum = 0.0, sumSq = 0.0;
         std::size_t count = 0;

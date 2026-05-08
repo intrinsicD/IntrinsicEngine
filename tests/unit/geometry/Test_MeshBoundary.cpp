@@ -11,7 +11,7 @@ import Geometry;
 
 TEST(MeshBoundary, EmptyMeshReturnsEmptyResult)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     Geometry::MeshBoundary::BoundaryParams params;
     auto result = Geometry::MeshBoundary::Boundary(mesh, params);
     ASSERT_TRUE(result.has_value());

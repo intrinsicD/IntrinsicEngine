@@ -89,7 +89,7 @@ export namespace Geometry::SurfaceReconstruction
     struct ReconstructionResult
     {
         // The reconstructed triangle mesh.
-        Halfedge::Mesh OutputMesh;
+        HalfedgeMesh::Mesh OutputMesh;
 
         // Mesh statistics.
         std::size_t OutputVertexCount{0};

@@ -261,7 +261,7 @@ TEST(RuntimeSelection, PickCPU_MeshUsesAuthoritativeVertexAndEdgeIndices)
     collision->Indices = {0u, 1u, 2u, 3u, 4u, 5u};
     collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 0.0f)};
 
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -307,7 +307,7 @@ TEST(RuntimeSelection, PickCPU_MeshQuadFaceIndexIsStableAcrossTriangulation)
     collision->Indices = {0u, 1u, 2u, 0u, 2u, 3u};
     collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 0.0f)};
 
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -342,7 +342,7 @@ TEST(RuntimeSelection, PickCPU_MeshDataWithoutColliderUsesAuthoritativeMeshFallb
     const entt::entity e = scene.CreateEntity("MeshDataOnlyCpuFallback");
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -374,7 +374,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshDataWithoutColliderUsesCpuFa
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
     reg.emplace<ECS::Surface::Component>(e);
 
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -410,7 +410,7 @@ TEST(RuntimeSelection, PickCPU_MeshVertexIndexUsesLocalKdTreeUnderWorldTransform
     reg.get<ECS::Components::Transform::WorldMatrix>(e).Matrix = ECS::Components::Transform::GetMatrix(transform);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({1.0f, 0.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({0.0f, 1.0f, 0.0f});
@@ -458,7 +458,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshUsesAuthoritativeFaceAndVert
     collision->Indices = {0u, 1u, 2u, 3u, 4u, 5u};
     collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 0.0f)};
 
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -507,7 +507,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshUsesCpuFaceAnchorForEdgeMode
     collision->Indices = {0u, 1u, 2u, 3u, 4u, 5u};
     collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(6.0f, 1.0f, 0.0f)};
 
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
@@ -562,7 +562,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshSurfacePrimitiveDoesNotFallb
     collision->Indices = {0u, 1u, 2u, 3u, 4u, 5u};
     collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(6.0f, 1.0f, 0.0f)};
 
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
@@ -608,7 +608,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshEdgeUsesClosestEdgeOnFace)
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -655,7 +655,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshMixedSurfacePointFallbackUse
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -688,7 +688,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshMixedSurfaceLineFallbackUses
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -726,7 +726,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_ContractGuaranteesRequestedModeI
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
@@ -782,7 +782,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_ContractUnsupportedModeStaysUnre
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
@@ -847,7 +847,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshLinePrimitiveRefinesNearestE
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
@@ -898,7 +898,7 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshLinePrimitiveDoesNotFallback
     reg.emplace<ECS::Components::Selection::SelectableTag>(e);
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto sourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
     const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
     const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});

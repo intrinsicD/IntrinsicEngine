@@ -70,7 +70,7 @@ export namespace Graphics
     // Arbitrary additional per-vertex data can be stored in VertexProperties
     // directly under user-defined keys.
     //
-    //   Import:  bytes → GeometryCpuData → Halfedge::Mesh → PopulateFromMesh
+    //   Import:  bytes → GeometryCpuData → HalfedgeMesh::Mesh → PopulateFromMesh
     //               → ECS::Components::GeometrySources   ← runtime authority
     //   Export:  GeometrySources → GeometryCpuData → IAssetExporter → bytes
     //
@@ -132,7 +132,7 @@ export namespace Graphics
         // Local-space nearest-vertex lookup for picker refinement.
         // Element i in LocalVertexLookupPoints maps to authoritative vertex index
         // LocalVertexLookupIndices[i]. When SourceMesh is available these are
-        // Halfedge::VertexHandle::Index values; otherwise they fall back to raw
+        // HalfedgeMesh::VertexHandle::Index values; otherwise they fall back to raw
         // Positions[] indices.
         Geometry::KDTree LocalVertexKdTree{};
         std::vector<glm::vec3> LocalVertexLookupPoints{};
@@ -142,7 +142,7 @@ export namespace Graphics
         std::vector<glm::vec3> Positions{};
         std::vector<glm::vec4> Aux{};
         std::vector<uint32_t> Indices{};
-        std::shared_ptr<Geometry::Halfedge::Mesh> SourceMesh{};
+        std::shared_ptr<Geometry::HalfedgeMesh::Mesh> SourceMesh{};
     };
 
     struct GeometryBufferLayout

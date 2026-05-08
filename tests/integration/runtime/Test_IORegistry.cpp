@@ -997,26 +997,26 @@ TEST(IORegistryImport, FullPipelineWithGLB)
 
 namespace
 {
-    Geometry::Halfedge::Mesh BuildHalfedgeMesh(const Graphics::GeometryCpuData& cpu)
+    Geometry::HalfedgeMesh::Mesh BuildHalfedgeMesh(const Graphics::GeometryCpuData& cpu)
     {
         Geometry::MeshUtils::TriangleSoupBuildParams params;
         params.WeldVertices = false;
         auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions(), cpu.Indices, params);
         EXPECT_TRUE(mesh.has_value());
-        return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
+        return mesh ? std::move(*mesh) : Geometry::HalfedgeMesh::Mesh{};
     }
 
-    Geometry::Halfedge::Mesh BuildWorkflowHalfedgeMesh(const Graphics::GeometryCpuData& cpu)
+    Geometry::HalfedgeMesh::Mesh BuildWorkflowHalfedgeMesh(const Graphics::GeometryCpuData& cpu)
     {
         Geometry::MeshUtils::TriangleSoupBuildParams params;
         params.WeldVertices = true;
         params.WeldEpsilon = 1e-6f;
         auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions(), cpu.Indices, params);
         EXPECT_TRUE(mesh.has_value());
-        return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
+        return mesh ? std::move(*mesh) : Geometry::HalfedgeMesh::Mesh{};
     }
 
-    [[nodiscard]] std::size_t CountBoundaryEdges(const Geometry::Halfedge::Mesh& mesh)
+    [[nodiscard]] std::size_t CountBoundaryEdges(const Geometry::HalfedgeMesh::Mesh& mesh)
     {
         std::size_t boundaryEdges = 0;
         for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
@@ -1034,7 +1034,7 @@ namespace
         return boundaryEdges;
     }
 
-    void ExtractTriangleSoup(Geometry::Halfedge::Mesh& mesh,
+    void ExtractTriangleSoup(Geometry::HalfedgeMesh::Mesh& mesh,
                              std::vector<glm::vec3>& positions,
                              std::vector<uint32_t>& indices)
     {
@@ -1073,7 +1073,7 @@ namespace
         }
     }
 
-    void ExtractWorkflowStyleTriangleSoup(const Geometry::Halfedge::Mesh& mesh,
+    void ExtractWorkflowStyleTriangleSoup(const Geometry::HalfedgeMesh::Mesh& mesh,
                                           std::vector<glm::vec3>& positions,
                                           std::vector<uint32_t>& indices)
     {

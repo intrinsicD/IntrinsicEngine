@@ -59,7 +59,7 @@ TEST(HtexPatch, BoundaryEdgesAreFlaggedAndHaveOneIncidentFace)
 
 TEST(HtexPatch, BuildPatchMetadataRejectsEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     EXPECT_FALSE(Geometry::HtexPatch::BuildPatchMetadata(mesh).has_value());
 }
 
@@ -130,7 +130,7 @@ TEST(HtexPatch, BuildPatchMetadataHandlesReversedResolutionBounds)
 
 TEST(HtexPatch, BuildHalfedgeTriangleKeepsValidSliverFaces)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = mesh.AddVertex({1.0e-5f, 0.0f, 0.0f});
     const auto v2 = mesh.AddVertex({0.0f, 1.0e-5f, 0.0f});
@@ -154,7 +154,7 @@ TEST(HtexPatch, BuildHalfedgeTriangleKeepsValidSliverFaces)
 
 TEST(HtexPatch, BuildCategoricalPatchAtlasHandlesValidSliverTriangles)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = mesh.AddVertex({1.0e-5f, 0.0f, 0.0f});
     const auto v2 = mesh.AddVertex({0.0f, 1.0e-5f, 0.0f});

@@ -38,7 +38,7 @@ namespace Graphics::Systems::PrimitiveBVHBuild
             return bounds;
         }
 
-        [[nodiscard]] bool BuildFromMesh(const Geometry::Halfedge::Mesh& mesh, ECS::PrimitiveBVH::Data& out)
+        [[nodiscard]] bool BuildFromMesh(const Geometry::HalfedgeMesh::Mesh& mesh, ECS::PrimitiveBVH::Data& out)
         {
             out.Clear();
             out.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;

@@ -14,15 +14,15 @@ namespace
 {
     constexpr float kEps = 1e-6f;
 
-    void EnableTexcoordTransfer(Geometry::Halfedge::Mesh& mesh)
+    void EnableTexcoordTransfer(Geometry::HalfedgeMesh::Mesh& mesh)
     {
-        Geometry::Halfedge::Mesh::VertexAttributeTransfer rule;
+        Geometry::HalfedgeMesh::Mesh::VertexAttributeTransfer rule;
         rule.Name = "v:texcoord";
-        rule.Rule = Geometry::Halfedge::Mesh::VertexAttributeTransfer::Policy::Average;
-        mesh.SetVertexAttributeTransferRules(std::span<const Geometry::Halfedge::Mesh::VertexAttributeTransfer>(&rule, 1));
+        rule.Rule = Geometry::HalfedgeMesh::Mesh::VertexAttributeTransfer::Policy::Average;
+        mesh.SetVertexAttributeTransferRules(std::span<const Geometry::HalfedgeMesh::Mesh::VertexAttributeTransfer>(&rule, 1));
     }
 
-    void AssignPlanarTexcoords(Geometry::Halfedge::Mesh& mesh)
+    void AssignPlanarTexcoords(Geometry::HalfedgeMesh::Mesh& mesh)
     {
         auto uv = Geometry::VertexProperty<glm::vec2>(
             mesh.VertexProperties().GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f)));
@@ -40,7 +40,7 @@ namespace
         }
     }
 
-    void ExpectFiniteTexcoords(const Geometry::Halfedge::Mesh& mesh)
+    void ExpectFiniteTexcoords(const Geometry::HalfedgeMesh::Mesh& mesh)
     {
         const auto uv = mesh.VertexProperties().Get<glm::vec2>("v:texcoord");
         ASSERT_TRUE(static_cast<bool>(uv));
@@ -58,7 +58,7 @@ namespace
         }
     }
 
-    Geometry::VertexHandle FindVertexByPosition(const Geometry::Halfedge::Mesh& mesh, const glm::vec3& position)
+    Geometry::VertexHandle FindVertexByPosition(const Geometry::HalfedgeMesh::Mesh& mesh, const glm::vec3& position)
     {
         for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
         {
@@ -84,7 +84,7 @@ TEST(Attributes_TopologyEdits, SplitInterpolatesVertexPropertyAtRequestedPositio
 {
     using namespace Geometry;
 
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
@@ -115,7 +115,7 @@ TEST(Attributes_TopologyEdits, CollapseInterpolatesVertexPropertyAtRequestedPosi
 {
     using namespace Geometry;
 
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
@@ -221,7 +221,7 @@ TEST(Attributes_TriangleSoupBridge, ExtractIndexedTrianglesReportsAuthoritativeF
 {
     using namespace Geometry;
 
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
     const auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
@@ -247,7 +247,7 @@ TEST(Attributes_Subdivision, LoopSubdivisionPreservesTexcoords)
 {
     using namespace Geometry;
 
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
@@ -258,7 +258,7 @@ TEST(Attributes_Subdivision, LoopSubdivisionPreservesTexcoords)
     uv[v1] = glm::vec2(1.0f, 0.0f);
     uv[v2] = glm::vec2(0.0f, 1.0f);
 
-    Halfedge::Mesh out;
+    HalfedgeMesh::Mesh out;
     auto result = Subdivision::Subdivide(mesh, out, {.Iterations = 1});
     ASSERT_TRUE(result.has_value());
 
@@ -275,7 +275,7 @@ TEST(Attributes_Subdivision, CatmullClarkPreservesTexcoords)
 {
     using namespace Geometry;
 
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(1, 1, 0));
@@ -288,7 +288,7 @@ TEST(Attributes_Subdivision, CatmullClarkPreservesTexcoords)
     uv[v2] = glm::vec2(1.0f, 1.0f);
     uv[v3] = glm::vec2(0.0f, 1.0f);
 
-    Halfedge::Mesh out;
+    HalfedgeMesh::Mesh out;
     auto result = CatmullClark::Subdivide(mesh, out, {.Iterations = 1});
     ASSERT_TRUE(result.has_value());
 

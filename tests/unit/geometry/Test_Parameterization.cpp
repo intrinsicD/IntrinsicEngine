@@ -8,9 +8,9 @@ import Geometry;
 #include "Test_MeshBuilders.h"
 
 // Larger disk mesh: subdivided square (4 triangles, 5 vertices)
-static Geometry::Halfedge::Mesh MakeSquareDisk()
+static Geometry::HalfedgeMesh::Mesh MakeSquareDisk()
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     // 5 vertices: 4 corners + center
     auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
@@ -32,7 +32,7 @@ static Geometry::Halfedge::Mesh MakeSquareDisk()
 
 TEST(LSCM, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::Parameterization::ComputeLSCM(mesh);
     EXPECT_FALSE(result.has_value());
 }

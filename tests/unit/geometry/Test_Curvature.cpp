@@ -11,9 +11,9 @@ import Geometry;
 
 namespace
 {
-    Geometry::Halfedge::Mesh MakeInsideOutTetrahedron()
+    Geometry::HalfedgeMesh::Mesh MakeInsideOutTetrahedron()
     {
-        Geometry::Halfedge::Mesh mesh;
+        Geometry::HalfedgeMesh::Mesh mesh;
         auto v0 = mesh.AddVertex({1.0f,  1.0f,  1.0f});
         auto v1 = mesh.AddVertex({1.0f, -1.0f, -1.0f});
         auto v2 = mesh.AddVertex({-1.0f, 1.0f, -1.0f});
@@ -32,7 +32,7 @@ namespace
 
 TEST(Curvature_MeanCurvature, EmptyMesh_ReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::Curvature::ComputeMeanCurvature(mesh);
     EXPECT_FALSE(result.has_value());
 }
@@ -43,7 +43,7 @@ TEST(Curvature_MeanCurvature, EmptyMesh_ReturnsNullopt)
 
 TEST(Curvature_GaussianCurvature, EmptyMesh_ReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::Curvature::ComputeGaussianCurvature(mesh);
     EXPECT_FALSE(result.has_value());
 }

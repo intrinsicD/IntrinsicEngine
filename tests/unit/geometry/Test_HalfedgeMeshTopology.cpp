@@ -14,7 +14,7 @@ import Geometry;
 
 TEST(HalfedgeMesh_Topology, EmptyMesh_HasZeroCounts)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     EXPECT_EQ(mesh.VertexCount(), 0u);
     EXPECT_EQ(mesh.EdgeCount(), 0u);
     EXPECT_EQ(mesh.FaceCount(), 0u);
@@ -24,7 +24,7 @@ TEST(HalfedgeMesh_Topology, EmptyMesh_HasZeroCounts)
 
 TEST(HalfedgeMesh_Topology, AddVertex_IncreasesCount)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex({0, 0, 0});
     EXPECT_EQ(mesh.VertexCount(), 1u);
     EXPECT_EQ(mesh.Position(v0), glm::vec3(0, 0, 0));
@@ -211,7 +211,7 @@ TEST(HalfedgeMesh_Topology, GarbageCollection_CompactsStorage)
 
 TEST(HalfedgeMesh_Topology, SetPosition_UpdatesCorrectly)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto v = mesh.AddVertex({0, 0, 0});
     EXPECT_EQ(mesh.Position(v), glm::vec3(0, 0, 0));
 
@@ -310,7 +310,7 @@ TEST(HalfedgeMesh_Topology, EdgeHalfedge_RoundTrip)
 
 TEST(HalfedgeMesh_Topology, IsolatedVertex_HasNoConnectivity)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto v = mesh.AddVertex({1, 2, 3});
     EXPECT_TRUE(mesh.IsIsolated(v));
     EXPECT_EQ(mesh.Valence(v), 0u);

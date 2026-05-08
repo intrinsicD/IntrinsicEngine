@@ -39,7 +39,7 @@
   not complete in the agent container; report build evidence honestly.
 
 ## Required changes
-- Extend `src/geometry/Geometry.MeshIO.cppm`:
+- Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm`:
   - Add a result enum `MeshIOWriteStatus` with at least:
     `Success`, `EmptyMesh`, `InvalidFace`, `FileWriteError`,
     `InvalidPath`.

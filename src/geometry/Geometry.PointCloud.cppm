@@ -29,7 +29,7 @@ export namespace Geometry::PointCloud
         Cloud &operator=(Cloud &&other) noexcept;
 
         // ---- Submesh view support ----
-        // See Halfedge::Mesh for the full view contract. Span accessors are
+        // See HalfedgeMesh::Mesh for the full view contract. Span accessors are
         // range-restricted; handle-based access uses absolute indices.
 
         [[nodiscard]] bool IsSubmeshView() const noexcept { return m_IsSubmeshView; }
@@ -146,7 +146,7 @@ export namespace Geometry::PointCloud
             return full;
         }
 
-        std::shared_ptr<CloudProperties> m_Properties;
+        std::shared_ptr<Properties> m_Properties;
         Vertices &m_Vertices;
 
         size_t &m_DeletedVertices;

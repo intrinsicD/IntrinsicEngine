@@ -5,13 +5,13 @@
 
 import Geometry;
 
-static Geometry::Halfedge::Mesh MakeCube(float halfExtent, glm::vec3 center)
+static Geometry::HalfedgeMesh::Mesh MakeCube(float halfExtent, glm::vec3 center)
 {
-    auto mesh = Geometry::Halfedge::MakeMesh(Geometry::AABB{
+    auto mesh = Geometry::HalfedgeMesh::MakeMesh(Geometry::AABB{
         .Min = center - glm::vec3{halfExtent},
         .Max = center + glm::vec3{halfExtent},
     });
-    return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
+    return mesh ? std::move(*mesh) : Geometry::HalfedgeMesh::Mesh{};
 }
 
 // =========================================================================
@@ -23,7 +23,7 @@ TEST(BooleanCSG, DisjointUnionAppendsBothMeshes)
     const auto a = MakeCube(1.0f, {-5.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 5.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -39,7 +39,7 @@ TEST(BooleanCSG, DisjointIntersectionReturnsEmptyMesh)
     const auto a = MakeCube(1.0f, {-5.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 5.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Intersection, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -56,7 +56,7 @@ TEST(BooleanCSG, DisjointDifferenceReturnsFirstMesh)
     const auto a = MakeCube(1.0f, {-5.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 5.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Difference, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -74,19 +74,19 @@ TEST(BooleanCSG, DisjointVolumes_AllOperations)
     const auto b = MakeCube(1.0f, { 5.0f, 0.0f, 0.0f});
 
     {
-        Geometry::Halfedge::Mesh out;
+        Geometry::HalfedgeMesh::Mesh out;
         const auto r = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
         ASSERT_TRUE(r.has_value());
         EXPECT_EQ(out.FaceCount(), a.FaceCount() + b.FaceCount());
     }
     {
-        Geometry::Halfedge::Mesh out;
+        Geometry::HalfedgeMesh::Mesh out;
         const auto r = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Intersection, out);
         ASSERT_TRUE(r.has_value());
         EXPECT_EQ(out.FaceCount(), 0u);
     }
     {
-        Geometry::Halfedge::Mesh out;
+        Geometry::HalfedgeMesh::Mesh out;
         const auto r = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Difference, out);
         ASSERT_TRUE(r.has_value());
         EXPECT_EQ(out.FaceCount(), a.FaceCount());
@@ -102,7 +102,7 @@ TEST(BooleanCSG, ContainmentIntersectionReturnsInnerMesh)
     const auto outer = MakeCube(2.0f, {0.0f, 0.0f, 0.0f});
     const auto inner = MakeCube(0.5f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(outer, inner, Geometry::Boolean::Operation::Intersection, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -118,7 +118,7 @@ TEST(BooleanCSG, ContainmentUnionReturnsOuterMesh)
     const auto outer = MakeCube(2.0f, {0.0f, 0.0f, 0.0f});
     const auto inner = MakeCube(0.5f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(outer, inner, Geometry::Boolean::Operation::Union, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -134,7 +134,7 @@ TEST(BooleanCSG, ContainmentDifference_AInsideB_ReturnsEmpty)
     const auto outer = MakeCube(2.0f, {0.0f, 0.0f, 0.0f});
     const auto inner = MakeCube(0.5f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(inner, outer, Geometry::Boolean::Operation::Difference, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -151,7 +151,7 @@ TEST(BooleanCSG, ContainmentDifference_BInsideA_ReturnsNullopt)
     const auto outer = MakeCube(2.0f, {0.0f, 0.0f, 0.0f});
     const auto inner = MakeCube(0.5f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(outer, inner, Geometry::Boolean::Operation::Difference, out);
     EXPECT_FALSE(result.has_value());
 }
@@ -165,7 +165,7 @@ TEST(BooleanCSG, ContainmentIntersection_Reversed)
     const auto outer = MakeCube(2.0f, {0.0f, 0.0f, 0.0f});
     const auto inner = MakeCube(0.5f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(inner, outer, Geometry::Boolean::Operation::Intersection, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -177,7 +177,7 @@ TEST(BooleanCSG, ContainmentUnion_Reversed)
     const auto outer = MakeCube(2.0f, {0.0f, 0.0f, 0.0f});
     const auto inner = MakeCube(0.5f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(inner, outer, Geometry::Boolean::Operation::Union, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -193,7 +193,7 @@ TEST(BooleanCSG, PartialOverlapReturnsNullopt)
     const auto a = MakeCube(1.0f, {-0.3f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 0.3f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
     EXPECT_FALSE(result.has_value());
 }
@@ -203,7 +203,7 @@ TEST(BooleanCSG, PartialOverlapDifferenceReturnsNullopt)
     const auto a = MakeCube(1.0f, {-0.3f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 0.3f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Difference, out);
     EXPECT_FALSE(result.has_value());
 }
@@ -213,7 +213,7 @@ TEST(BooleanCSG, PartialOverlapIntersectionReturnsNullopt)
     const auto a = MakeCube(1.0f, {-0.3f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 0.3f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Intersection, out);
     EXPECT_FALSE(result.has_value());
 }
@@ -224,10 +224,10 @@ TEST(BooleanCSG, PartialOverlapIntersectionReturnsNullopt)
 
 TEST(BooleanCSG, EmptyMeshA_ReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh empty;
+    Geometry::HalfedgeMesh::Mesh empty;
     const auto b = MakeCube(1.0f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(empty, b, Geometry::Boolean::Operation::Union, out);
     EXPECT_FALSE(result.has_value());
 }
@@ -235,19 +235,19 @@ TEST(BooleanCSG, EmptyMeshA_ReturnsNullopt)
 TEST(BooleanCSG, EmptyMeshB_ReturnsNullopt)
 {
     const auto a = MakeCube(1.0f, {0.0f, 0.0f, 0.0f});
-    Geometry::Halfedge::Mesh empty;
+    Geometry::HalfedgeMesh::Mesh empty;
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, empty, Geometry::Boolean::Operation::Union, out);
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(BooleanCSG, BothMeshesEmpty_ReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh a;
-    Geometry::Halfedge::Mesh b;
+    Geometry::HalfedgeMesh::Mesh a;
+    Geometry::HalfedgeMesh::Mesh b;
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Intersection, out);
     EXPECT_FALSE(result.has_value());
 }
@@ -261,7 +261,7 @@ TEST(BooleanCSG, IdenticalMeshes_UnionReturnsOneMesh)
     const auto a = MakeCube(1.0f, {0.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
     // Both are inside each other — containment should apply.
     if (result.has_value())
@@ -276,7 +276,7 @@ TEST(BooleanCSG, IdenticalMeshes_IntersectionReturnsOneMesh)
     const auto a = MakeCube(1.0f, {0.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Intersection, out);
     if (result.has_value())
     {
@@ -296,7 +296,7 @@ TEST(BooleanCSG, FaceContactUnion)
     const auto a = MakeCube(1.0f, { 0.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 2.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
     // Should produce a valid disjoint-style union or return nullopt.
     if (result.has_value())
@@ -312,7 +312,7 @@ TEST(BooleanCSG, EdgeContactUnion)
     const auto a = MakeCube(1.0f, { 0.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 2.0f, 2.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
     if (result.has_value())
     {
@@ -327,7 +327,7 @@ TEST(BooleanCSG, VertexContactUnion)
     const auto a = MakeCube(1.0f, { 0.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 2.0f, 2.0f, 2.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
     if (result.has_value())
     {
@@ -345,7 +345,7 @@ TEST(BooleanCSG, DisjointResult_HasDiagnostic)
     const auto a = MakeCube(1.0f, {-5.0f, 0.0f, 0.0f});
     const auto b = MakeCube(1.0f, { 5.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->VolumesOverlap);
@@ -357,7 +357,7 @@ TEST(BooleanCSG, ContainmentResult_HasDiagnostic)
     const auto outer = MakeCube(2.0f, {0.0f, 0.0f, 0.0f});
     const auto inner = MakeCube(0.5f, {0.0f, 0.0f, 0.0f});
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(outer, inner, Geometry::Boolean::Operation::Intersection, out);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->VolumesOverlap);
@@ -376,7 +376,7 @@ TEST(BooleanCSG, CustomEpsilon_DisjointStillWorks)
     Geometry::Boolean::BooleanParams params;
     params.Epsilon = 1e-3f;
 
-    Geometry::Halfedge::Mesh out;
+    Geometry::HalfedgeMesh::Mesh out;
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out, params);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->ExactResult);
@@ -392,7 +392,7 @@ TEST(BooleanCSG, OutputMeshIsClearedBeforeWrite)
     const auto b = MakeCube(1.0f, { 5.0f, 0.0f, 0.0f});
 
     // Pre-populate the output mesh with existing data.
-    Geometry::Halfedge::Mesh out = MakeCube(3.0f, {0.0f, 0.0f, 0.0f});
+    Geometry::HalfedgeMesh::Mesh out = MakeCube(3.0f, {0.0f, 0.0f, 0.0f});
     ASSERT_GT(out.FaceCount(), 0u);
 
     const auto result = Geometry::Boolean::Compute(a, b, Geometry::Boolean::Operation::Union, out);

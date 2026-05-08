@@ -441,7 +441,7 @@ concept GraphLike = requires(const Domain& d, Geometry::VertexHandle v, Geometry
 };
 
 static_assert(GraphLike<Geometry::Graph::Graph>);
-static_assert(GraphLike<Geometry::Halfedge::Mesh>);
+static_assert(GraphLike<Geometry::HalfedgeMesh::Mesh>);
 
 TEST(GraphCirculators, HalfedgesAroundVertexTraversesIncidentRing)
 {

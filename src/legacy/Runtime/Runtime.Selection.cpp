@@ -277,7 +277,7 @@ namespace Runtime::Selection
             return result;
         }
 
-        [[nodiscard]] inline const Geometry::Halfedge::Mesh* ResolveAuthoritativeMesh(
+        [[nodiscard]] inline const Geometry::HalfedgeMesh::Mesh* ResolveAuthoritativeMesh(
             entt::entity entity,
             const ECS::MeshCollider::Component& collider,
             const entt::registry& reg)
@@ -327,7 +327,7 @@ namespace Runtime::Selection
 
         [[nodiscard]] LocalVertexLookupView BuildLocalVertexLookupView(
             const ECS::MeshCollider::Component* collider,
-            const Geometry::Halfedge::Mesh* mesh)
+            const Geometry::HalfedgeMesh::Mesh* mesh)
         {
             LocalVertexLookupView view{};
 
@@ -378,7 +378,7 @@ namespace Runtime::Selection
 
         [[nodiscard]] uint32_t ResolveNearestVertexIndex(
             const ECS::MeshCollider::Component* collider,
-            const Geometry::Halfedge::Mesh* mesh,
+            const Geometry::HalfedgeMesh::Mesh* mesh,
             const glm::vec3& localPoint,
             float localPickRadius)
         {
@@ -498,7 +498,7 @@ namespace Runtime::Selection
         }
 
         [[nodiscard]] inline Geometry::AABB MeshWorldAABB(
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             const ECS::Components::Transform::Component& transform,
             const entt::registry& reg,
             entt::entity entity)
@@ -560,7 +560,7 @@ namespace Runtime::Selection
             entt::entity entity,
             const ECS::Components::Transform::Component& transform,
             const ECS::MeshCollider::Component* collider,
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             uint32_t gpuFaceIndex,
             const PickRequest& request)
         {
@@ -749,7 +749,7 @@ namespace Runtime::Selection
             const entt::registry& reg,
             entt::entity entity,
             const ECS::Components::Transform::Component& transform,
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             uint32_t gpuEdgeIndex,
             const PickRequest& request)
         {
@@ -821,7 +821,7 @@ namespace Runtime::Selection
             entt::entity entity,
             const ECS::MeshCollider::Component* collider,
             const ECS::PrimitiveBVH::Data* primitiveBvh,
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             const glm::mat4& world,
             const glm::mat4& invWorld,
             const Geometry::Ray& rayLocal,
@@ -1670,7 +1670,7 @@ namespace Runtime::Selection
                 {
                     if (const auto* transform = reg.try_get<ECS::Components::Transform::Component>(entity))
                     {
-                        const Geometry::Halfedge::Mesh* mesh = nullptr;
+                        const Geometry::HalfedgeMesh::Mesh* mesh = nullptr;
                         if (const auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
                             collider != nullptr)
                         {
@@ -1710,7 +1710,7 @@ namespace Runtime::Selection
                     if (const auto* transform = reg.try_get<ECS::Components::Transform::Component>(entity))
                     {
                         const auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
-                        const Geometry::Halfedge::Mesh* mesh = nullptr;
+                        const Geometry::HalfedgeMesh::Mesh* mesh = nullptr;
                         if (collider != nullptr)
                         {
                             mesh = ResolveAuthoritativeMesh(entity, *collider, reg);

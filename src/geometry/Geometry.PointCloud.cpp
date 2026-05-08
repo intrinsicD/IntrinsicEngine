@@ -10,14 +10,14 @@ import Geometry.PointCloudFwd;
 
 namespace Geometry::PointCloud
 {
-    Cloud::Cloud() : m_Properties(std::make_shared<CloudProperties>()), m_Vertices(m_Properties->Vertices),
+    Cloud::Cloud() : m_Properties(std::make_shared<Properties>()), m_Vertices(m_Properties->Vertices),
                      m_DeletedVertices(m_Properties->DeletedVertices)
     {
         // Allocate the mandatory position property up-front.
         EnsureProperties();
     }
 
-    Cloud::Cloud(PropertySet& Vertices, size_t& DeletedVertices) : m_Properties(std::make_shared<CloudProperties>()),
+    Cloud::Cloud(PropertySet& Vertices, size_t& DeletedVertices) : m_Properties(std::make_shared<Properties>()),
                                                                    m_Vertices(Vertices),
                                                                    m_DeletedVertices(DeletedVertices)
     {
@@ -25,7 +25,7 @@ namespace Geometry::PointCloud
     }
 
     Cloud::Cloud(const Cloud& rhs)
-        : m_Properties(std::make_shared<CloudProperties>())
+        : m_Properties(std::make_shared<Properties>())
           , m_Vertices(m_Properties->Vertices)
           , m_DeletedVertices(m_Properties->DeletedVertices)
     {

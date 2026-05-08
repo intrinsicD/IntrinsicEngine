@@ -36,7 +36,7 @@ export namespace Graphics::OverlayEntityFactory
     entt::entity CreateMeshOverlay(
         entt::registry& registry,
         entt::entity parent,
-        std::shared_ptr<Geometry::Halfedge::Mesh> mesh,
+        std::shared_ptr<Geometry::HalfedgeMesh::Mesh> mesh,
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
         RHI::BufferManager& bufferManager,

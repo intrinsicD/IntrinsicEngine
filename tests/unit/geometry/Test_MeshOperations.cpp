@@ -11,10 +11,10 @@ import Geometry;
 
 namespace
 {
-    Geometry::Halfedge::Mesh MakeDenseClosedTriangleMesh(std::size_t iterations = 3)
+    Geometry::HalfedgeMesh::Mesh MakeDenseClosedTriangleMesh(std::size_t iterations = 3)
     {
         auto coarse = MakeIcosahedron();
-        Geometry::Halfedge::Mesh refined;
+        Geometry::HalfedgeMesh::Mesh refined;
 
         Geometry::Subdivision::SubdivisionParams params;
         params.Iterations = iterations;
@@ -25,7 +25,7 @@ namespace
     }
 
     void ExtractTriangleSoup(
-        Geometry::Halfedge::Mesh& mesh,
+        Geometry::HalfedgeMesh::Mesh& mesh,
         std::vector<glm::vec3>& positions,
         std::vector<uint32_t>& indices)
     {
@@ -71,11 +71,11 @@ namespace
         }
     }
 
-    Geometry::Halfedge::Mesh RebuildMeshFromTriangleSoup(
+    Geometry::HalfedgeMesh::Mesh RebuildMeshFromTriangleSoup(
         const std::vector<glm::vec3>& positions,
         const std::vector<uint32_t>& indices)
     {
-        Geometry::Halfedge::Mesh mesh;
+        Geometry::HalfedgeMesh::Mesh mesh;
         std::vector<Geometry::VertexHandle> verts;
         verts.reserve(positions.size());
         for (const auto& p : positions)
@@ -704,7 +704,7 @@ TEST(Simplification_QEM, DenseClosedMeshStaysClosed)
     ASSERT_TRUE(result.has_value());
     ASSERT_GT(result->CollapseCount, 0u);
 
-    auto countBoundaryEdges = [&](const Geometry::Halfedge::Mesh& m)
+    auto countBoundaryEdges = [&](const Geometry::HalfedgeMesh::Mesh& m)
     {
         std::size_t boundaryEdges = 0;
         for (std::size_t ei = 0; ei < m.EdgesSize(); ++ei)
@@ -722,7 +722,7 @@ TEST(Simplification_QEM, DenseClosedMeshStaysClosed)
         return boundaryEdges;
     };
 
-    auto expectClosedSphereTopology = [&](const Geometry::Halfedge::Mesh& m, const char* phase, bool checkVertexManifold)
+    auto expectClosedSphereTopology = [&](const Geometry::HalfedgeMesh::Mesh& m, const char* phase, bool checkVertexManifold)
     {
         EXPECT_EQ(countBoundaryEdges(m), 0u) << phase << " introduced boundary edges";
 
@@ -1097,7 +1097,7 @@ TEST(MeshRepair_HoleFilling, FillsTriangularHole)
 
 TEST(MeshRepair_HoleFilling, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::MeshRepair::FillHoles(mesh);
     EXPECT_FALSE(result.has_value());
 }
@@ -1113,7 +1113,7 @@ TEST(MeshRepair_HoleFilling, ClosedMeshReportsZeroHoles)
 
 TEST(MeshRepair_DegenerateFaces, DetectsZeroAreaTriangle)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     // Create a degenerate triangle (all vertices collinear)
     auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
@@ -1139,7 +1139,7 @@ TEST(MeshRepair_DegenerateFaces, PreservesValidTriangles)
 
 TEST(MeshRepair_DegenerateFaces, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::MeshRepair::RemoveDegenerateFaces(mesh);
     EXPECT_FALSE(result.has_value());
 }
@@ -1156,7 +1156,7 @@ TEST(MeshRepair_Orientation, ClosedMeshIsConsistent)
 
 TEST(MeshRepair_Orientation, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::MeshRepair::MakeConsistentOrientation(mesh);
     EXPECT_FALSE(result.has_value());
 }
@@ -1190,7 +1190,7 @@ TEST(MeshRepair_Combined, RepairValidMesh)
 TEST(MeshRepair_Combined, RepairWithDegenerates)
 {
     // Create mesh with a degenerate triangle among valid ones
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
     auto v2 = mesh.AddVertex({0.5f, 1.0f, 0.0f});
@@ -1209,7 +1209,7 @@ TEST(MeshRepair_Combined, RepairWithDegenerates)
 
 TEST(MeshRepair_Combined, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::MeshRepair::Repair(mesh);
     EXPECT_FALSE(result.has_value());
 }

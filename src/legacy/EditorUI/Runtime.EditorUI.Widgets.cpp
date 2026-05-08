@@ -242,7 +242,7 @@ namespace
     // state and undo command captures.
     [[nodiscard]] bool RestoreMeshState(Runtime::Engine& engine,
                                         entt::entity entity,
-                                        std::shared_ptr<Geometry::Halfedge::Mesh> meshPtr)
+                                        std::shared_ptr<Geometry::HalfedgeMesh::Mesh> meshPtr)
     {
         auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
@@ -340,7 +340,7 @@ namespace
     }
 
     // Loads the current mesh state from ECS for undo snapshot capture.
-    [[nodiscard]] std::optional<Geometry::Halfedge::Mesh> LoadMeshFromECS(
+    [[nodiscard]] std::optional<Geometry::HalfedgeMesh::Mesh> LoadMeshFromECS(
         Runtime::Engine& engine, entt::entity entity)
     {
         auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
@@ -370,7 +370,7 @@ namespace
 
     [[nodiscard]] bool ApplySurfaceMeshOperator(Runtime::Engine& engine,
                                                 entt::entity entity,
-                                                const std::function<void(Geometry::Halfedge::Mesh&)>& op,
+                                                const std::function<void(Geometry::HalfedgeMesh::Mesh&)>& op,
                                                 std::string_view operatorName = {})
     {
         auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
@@ -385,13 +385,13 @@ namespace
             return false;
 
         // Apply the operator
-        Geometry::Halfedge::Mesh mesh = *beforeMesh;
+        Geometry::HalfedgeMesh::Mesh mesh = *beforeMesh;
         if (mesh.VertexProperties().Get<glm::vec2>("v:texcoord"))
         {
-            Geometry::Halfedge::Mesh::VertexAttributeTransfer uvTransfer;
+            Geometry::HalfedgeMesh::Mesh::VertexAttributeTransfer uvTransfer;
             uvTransfer.Name = "v:texcoord";
-            uvTransfer.Rule = Geometry::Halfedge::Mesh::VertexAttributeTransfer::Policy::Average;
-            mesh.SetVertexAttributeTransferRules(std::span<const Geometry::Halfedge::Mesh::VertexAttributeTransfer>(&uvTransfer, 1));
+            uvTransfer.Rule = Geometry::HalfedgeMesh::Mesh::VertexAttributeTransfer::Policy::Average;
+            mesh.SetVertexAttributeTransferRules(std::span<const Geometry::HalfedgeMesh::Mesh::VertexAttributeTransfer>(&uvTransfer, 1));
         }
         else
         {
@@ -402,7 +402,7 @@ namespace
         mesh.GarbageCollection();
 
         // Wrap result in shared_ptr — shared between ECS state and undo command
-        auto newMeshPtr = std::make_shared<Geometry::Halfedge::Mesh>(std::move(mesh));
+        auto newMeshPtr = std::make_shared<Geometry::HalfedgeMesh::Mesh>(std::move(mesh));
 
         // Apply result to ECS + GPU
         if (!RestoreMeshState(engine, entity, newMeshPtr))
@@ -411,7 +411,7 @@ namespace
         // Record undo command if operator name is provided
         if (!operatorName.empty())
         {
-            auto oldMeshPtr = std::make_shared<Geometry::Halfedge::Mesh>(std::move(*beforeMesh));
+            auto oldMeshPtr = std::make_shared<Geometry::HalfedgeMesh::Mesh>(std::move(*beforeMesh));
             auto* enginePtr = &engine;
             const auto ent = entity;
 
@@ -659,7 +659,7 @@ namespace
     };
 
     [[nodiscard]] std::optional<MeshSpectralComputationResult> ComputeMeshSpectralModes(
-        const Geometry::Halfedge::Mesh& mesh,
+        const Geometry::HalfedgeMesh::Mesh& mesh,
         int requestedModeCount,
         int maxIterations,
         float shift,
@@ -793,7 +793,7 @@ namespace
         return result;
     }
 
-    void PublishMeshModeProperty(Geometry::Halfedge::Mesh& mesh,
+    void PublishMeshModeProperty(Geometry::HalfedgeMesh::Mesh& mesh,
                                  std::string_view propertyName,
                                  std::span<const double> mode,
                                  bool normalize)
@@ -1462,7 +1462,7 @@ bool DrawMeshSpectralWidget(Runtime::Engine& engine,
     auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
     auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
 
-    std::shared_ptr<Geometry::Halfedge::Mesh> meshRef;
+    std::shared_ptr<Geometry::HalfedgeMesh::Mesh> meshRef;
     if (meshData && meshData->MeshRef)
         meshRef = meshData->MeshRef;
     else if (collider && collider->CollisionRef && collider->CollisionRef->SourceMesh)
@@ -1693,7 +1693,7 @@ bool DrawRemeshingWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Isotropic Remeshing"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
             Geometry::Remeshing::RemeshingParams params;
             params.TargetLength = ui.TargetLength;
@@ -1708,7 +1708,7 @@ bool DrawRemeshingWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Adaptive Remeshing"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
             Geometry::AdaptiveRemeshing::AdaptiveRemeshingParams params;
             params.MinEdgeLength = ui.TargetLength * 0.5f;
@@ -1798,7 +1798,7 @@ bool DrawSimplificationWidget(Runtime::Engine& engine,
         return false;
 
     const auto ui = state;
-    return ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+    return ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
     {
         Geometry::Simplification::Params params;
         params.TargetFaces = static_cast<std::size_t>(std::max(ui.TargetFaces, 0));
@@ -1844,7 +1844,7 @@ bool DrawSmoothingWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Uniform Laplacian"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
             Geometry::Smoothing::SmoothingParams params;
             params.Iterations = ui.Iterations;
@@ -1856,7 +1856,7 @@ bool DrawSmoothingWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Cotan Laplacian"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
             Geometry::Smoothing::SmoothingParams params;
             params.Iterations = ui.Iterations;
@@ -1868,7 +1868,7 @@ bool DrawSmoothingWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Taubin Smoothing"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
             Geometry::Smoothing::TaubinParams params;
             params.Iterations = ui.Iterations;
@@ -1880,7 +1880,7 @@ bool DrawSmoothingWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Implicit Smoothing"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
             Geometry::Smoothing::ImplicitSmoothingParams params;
             params.Iterations = ui.Iterations;
@@ -1951,9 +1951,9 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Loop Subdivision"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
-            Geometry::Halfedge::Mesh out;
+            Geometry::HalfedgeMesh::Mesh out;
             Geometry::Subdivision::SubdivisionParams params;
             params.Iterations = static_cast<std::size_t>(std::max(ui.Iterations, 1));
             if (ui.EnforceFaceBudget && ui.MaxOutputFaces > 0)
@@ -1967,9 +1967,9 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
     if (ImGui::Button("Run Catmull-Clark Subdivision"))
     {
         const auto ui = state;
-        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
+        changed = ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::HalfedgeMesh::Mesh& mesh)
         {
-            Geometry::Halfedge::Mesh out;
+            Geometry::HalfedgeMesh::Mesh out;
             Geometry::CatmullClark::SubdivisionParams params;
             params.Iterations = ui.Iterations;
             if (Geometry::CatmullClark::Subdivide(mesh, out, params))
@@ -1995,7 +1995,7 @@ bool DrawRepairWidget(Runtime::Engine& engine,
     if (!ImGui::Button("Run Mesh Repair"))
         return false;
 
-    return ApplySurfaceMeshOperator(engine, entity, [](Geometry::Halfedge::Mesh& mesh)
+    return ApplySurfaceMeshOperator(engine, entity, [](Geometry::HalfedgeMesh::Mesh& mesh)
     {
         static_cast<void>(Geometry::MeshRepair::Repair(mesh));
     }, "Mesh Repair");
@@ -2455,14 +2455,14 @@ void TransformAABB(const glm::vec3& lo, const glm::vec3& hi, const glm::mat4& m,
 }
 
 // =========================================================================
-// Helper: Create a standalone mesh entity from a Halfedge::Mesh
+// Helper: Create a standalone mesh entity from a HalfedgeMesh::Mesh
 // =========================================================================
 
 namespace
 {
     [[nodiscard]] entt::entity SpawnMeshEntity(Runtime::Engine& engine,
                                                 const char* name,
-                                                Geometry::Halfedge::Mesh mesh)
+                                                Geometry::HalfedgeMesh::Mesh mesh)
     {
         auto& scene = engine.GetSceneManager().GetScene();
         auto& reg = scene.GetRegistry();
@@ -2489,7 +2489,7 @@ namespace
         collisionRef->Positions = positions;
         collisionRef->Indices = indices;
         collisionRef->Aux = aux;
-        collisionRef->SourceMesh = std::make_shared<Geometry::Halfedge::Mesh>(std::move(mesh));
+        collisionRef->SourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>(std::move(mesh));
 
         if (!positions.empty())
         {
@@ -3103,7 +3103,7 @@ bool DrawBooleanWidget(Runtime::Engine& engine,
 
     // Entity A must be a mesh.
     const auto* meshDataA = reg.try_get<ECS::Mesh::Data>(entity);
-    const Geometry::Halfedge::Mesh* meshA = nullptr;
+    const Geometry::HalfedgeMesh::Mesh* meshA = nullptr;
     if (meshDataA && meshDataA->MeshRef)
         meshA = meshDataA->MeshRef.get();
 
@@ -3259,7 +3259,7 @@ bool DrawBooleanWidget(Runtime::Engine& engine,
         state.LastPartialOverlap = false;
 
         // Resolve mesh B.
-        const Geometry::Halfedge::Mesh* meshB = nullptr;
+        const Geometry::HalfedgeMesh::Mesh* meshB = nullptr;
         if (auto* mdB = reg.try_get<ECS::Mesh::Data>(state.EntityB); mdB && mdB->MeshRef)
             meshB = mdB->MeshRef.get();
         if (!meshB)
@@ -3281,7 +3281,7 @@ bool DrawBooleanWidget(Runtime::Engine& engine,
             Geometry::Boolean::BooleanParams params{};
             params.Epsilon = state.Epsilon;
 
-            Geometry::Halfedge::Mesh outMesh;
+            Geometry::HalfedgeMesh::Mesh outMesh;
             auto result = Geometry::Boolean::Compute(*meshA, *meshB, op, outMesh, params);
 
             if (!result)

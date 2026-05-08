@@ -130,7 +130,7 @@ export namespace Graphics::Passes
         struct PendingPreviewBake;
         std::shared_ptr<PendingPreviewBake> m_PendingBake{};
 
-        [[nodiscard]] static bool BuildPreviewAtlas(const Geometry::Halfedge::Mesh& mesh,
+        [[nodiscard]] static bool BuildPreviewAtlas(const Geometry::HalfedgeMesh::Mesh& mesh,
                                                     const PreviewKMeansData& kmeansData,
                                                     std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
                                                      std::vector<glm::vec4>& outPixels,
@@ -139,7 +139,7 @@ export namespace Graphics::Passes
                                                      uint32_t maxImageDimension2D);
 
         [[nodiscard]] static uint64_t ComputePreviewAtlasSignature(
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             const PreviewKMeansData& kmeansData,
             std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches) noexcept;
     };

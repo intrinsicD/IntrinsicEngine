@@ -14,7 +14,7 @@ import Geometry;
 
 TEST(MeshQuality, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::MeshQuality::ComputeQuality(mesh);
     EXPECT_FALSE(result.has_value());
 }

@@ -525,7 +525,7 @@ TEST(ConvexHull_Mesh, MeshNotBuiltByDefault)
 
 TEST(ConvexHull_FromMesh, TetrahedronMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
     auto v2 = mesh.AddVertex({0.5f, 1.0f, 0.0f});
@@ -547,7 +547,7 @@ TEST(ConvexHull_FromMesh, TetrahedronMesh)
 
 TEST(ConvexHull_FromMesh, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::ConvexHullBuilder::BuildFromMesh(mesh);
     EXPECT_FALSE(result.has_value());
 }

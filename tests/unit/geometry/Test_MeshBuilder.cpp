@@ -12,14 +12,14 @@ import Geometry;
 
 namespace
 {
-    int EulerCharacteristic(const Geometry::Halfedge::Mesh& mesh)
+    int EulerCharacteristic(const Geometry::HalfedgeMesh::Mesh& mesh)
     {
         return static_cast<int>(mesh.VertexCount())
              - static_cast<int>(mesh.EdgeCount())
              + static_cast<int>(mesh.FaceCount());
     }
 
-    void ExpectClosed(const Geometry::Halfedge::Mesh& mesh)
+    void ExpectClosed(const Geometry::HalfedgeMesh::Mesh& mesh)
     {
         for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
         {
@@ -35,7 +35,7 @@ namespace
 
 TEST(MeshBuilder, AABBProducesQuadBox)
 {
-    const auto mesh = Geometry::Halfedge::MakeMesh(Geometry::AABB{
+    const auto mesh = Geometry::HalfedgeMesh::MakeMesh(Geometry::AABB{
         .Min = {-1.0f, -2.0f, -3.0f},
         .Max = { 4.0f,  5.0f,  6.0f},
     });
@@ -50,7 +50,7 @@ TEST(MeshBuilder, AABBProducesQuadBox)
 
 TEST(MeshBuilder, DegenerateAABBReturnsNullopt)
 {
-    EXPECT_FALSE(Geometry::Halfedge::MakeMesh(Geometry::AABB{
+    EXPECT_FALSE(Geometry::HalfedgeMesh::MakeMesh(Geometry::AABB{
         .Min = {0.0f, 0.0f, 0.0f},
         .Max = {0.0f, 1.0f, 1.0f},
     }).has_value());
@@ -63,7 +63,7 @@ TEST(MeshBuilder, OBBProducesQuadBox)
     obb.Extents = {2.0f, 1.0f, 0.75f};
     obb.Rotation = glm::normalize(glm::angleAxis(0.7f, glm::vec3{0.0f, 1.0f, 0.0f}));
 
-    const auto mesh = Geometry::Halfedge::MakeMesh(obb);
+    const auto mesh = Geometry::HalfedgeMesh::MakeMesh(obb);
     ASSERT_TRUE(mesh.has_value());
     EXPECT_EQ(mesh->VertexCount(), 8u);
     EXPECT_EQ(mesh->FaceCount(), 6u);
@@ -79,7 +79,7 @@ TEST(MeshBuilder, SphereSubdivisionZeroMatchesIcosahedronCounts)
         .Radius = 2.5f,
     };
 
-    const auto mesh = Geometry::Halfedge::MakeMesh(sphere, 0);
+    const auto mesh = Geometry::HalfedgeMesh::MakeMesh(sphere, 0);
     ASSERT_TRUE(mesh.has_value());
     EXPECT_EQ(mesh->VertexCount(), 12u);
     EXPECT_EQ(mesh->FaceCount(), 20u);
@@ -105,7 +105,7 @@ TEST(MeshBuilder, SphereSubdivisionZeroMatchesIcosahedronCounts)
 
 TEST(MeshBuilder, DegenerateSphereReturnsNullopt)
 {
-    EXPECT_FALSE(Geometry::Halfedge::MakeMesh(Geometry::Sphere{
+    EXPECT_FALSE(Geometry::HalfedgeMesh::MakeMesh(Geometry::Sphere{
         .Center = {0.0f, 0.0f, 0.0f},
         .Radius = 0.0f,
     }).has_value());
@@ -113,7 +113,7 @@ TEST(MeshBuilder, DegenerateSphereReturnsNullopt)
 
 TEST(MeshBuilder, CylinderProducesClosedMesh)
 {
-    const auto mesh = Geometry::Halfedge::MakeMesh(Geometry::Cylinder{
+    const auto mesh = Geometry::HalfedgeMesh::MakeMesh(Geometry::Cylinder{
         .PointA = {0.0f, -1.0f, 0.0f},
         .PointB = {0.0f,  1.0f, 0.0f},
         .Radius = 0.5f,
@@ -127,7 +127,7 @@ TEST(MeshBuilder, CylinderProducesClosedMesh)
 
 TEST(MeshBuilder, CapsuleZeroAxisFallsBackToSphere)
 {
-    const auto mesh = Geometry::Halfedge::MakeMesh(Geometry::Capsule{
+    const auto mesh = Geometry::HalfedgeMesh::MakeMesh(Geometry::Capsule{
         .PointA = {1.0f, 2.0f, 3.0f},
         .PointB = {1.0f, 2.0f, 3.0f},
         .Radius = 1.25f,
@@ -142,7 +142,7 @@ TEST(MeshBuilder, CapsuleZeroAxisFallsBackToSphere)
 
 TEST(MeshBuilder, CapsuleProducesClosedMesh)
 {
-    const auto mesh = Geometry::Halfedge::MakeMesh(Geometry::Capsule{
+    const auto mesh = Geometry::HalfedgeMesh::MakeMesh(Geometry::Capsule{
         .PointA = {0.0f, -1.0f, 0.0f},
         .PointB = {0.0f,  1.0f, 0.0f},
         .Radius = 0.5f,
@@ -162,7 +162,7 @@ TEST(MeshBuilder, EllipsoidProducesFiniteTransformedSphere)
     ellipsoid.Radii = {2.0f, 1.0f, 0.5f};
     ellipsoid.Rotation = glm::normalize(glm::angleAxis(0.45f, glm::vec3{0.0f, 0.0f, 1.0f}));
 
-    const auto mesh = Geometry::Halfedge::MakeMesh(ellipsoid);
+    const auto mesh = Geometry::HalfedgeMesh::MakeMesh(ellipsoid);
     ASSERT_TRUE(mesh.has_value());
     EXPECT_EQ(mesh->VertexCount(), 642u);
     EXPECT_EQ(mesh->FaceCount(), 1280u);
@@ -184,25 +184,25 @@ TEST(MeshBuilder, EllipsoidProducesFiniteTransformedSphere)
 
 TEST(MeshBuilder, PlatonicSolidCounts)
 {
-    const auto tetra = Geometry::Halfedge::MakeMeshTetrahedron();
+    const auto tetra = Geometry::HalfedgeMesh::MakeMeshTetrahedron();
     EXPECT_EQ(tetra.VertexCount(), 4u);
     EXPECT_EQ(tetra.EdgeCount(), 6u);
     EXPECT_EQ(tetra.FaceCount(), 4u);
     EXPECT_EQ(EulerCharacteristic(tetra), 2);
 
-    const auto octa = Geometry::Halfedge::MakeMeshOctahedron();
+    const auto octa = Geometry::HalfedgeMesh::MakeMeshOctahedron();
     EXPECT_EQ(octa.VertexCount(), 6u);
     EXPECT_EQ(octa.EdgeCount(), 12u);
     EXPECT_EQ(octa.FaceCount(), 8u);
     EXPECT_EQ(EulerCharacteristic(octa), 2);
 
-    const auto icosa = Geometry::Halfedge::MakeMeshIcosahedron();
+    const auto icosa = Geometry::HalfedgeMesh::MakeMeshIcosahedron();
     EXPECT_EQ(icosa.VertexCount(), 12u);
     EXPECT_EQ(icosa.EdgeCount(), 30u);
     EXPECT_EQ(icosa.FaceCount(), 20u);
     EXPECT_EQ(EulerCharacteristic(icosa), 2);
 
-    const auto dodeca = Geometry::Halfedge::MakeMeshDodecahedron();
+    const auto dodeca = Geometry::HalfedgeMesh::MakeMeshDodecahedron();
     EXPECT_EQ(dodeca.VertexCount(), 20u);
     EXPECT_EQ(dodeca.EdgeCount(), 30u);
     EXPECT_EQ(dodeca.FaceCount(), 12u);

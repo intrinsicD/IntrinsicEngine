@@ -90,7 +90,7 @@ namespace Geometry::Graph
         m_VPoint = Geometry::VertexProperty<glm::vec3>(m_Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.0f)));
         m_VConn = Geometry::VertexProperty<VertexConnectivity>(
             m_Vertices.GetOrAdd<VertexConnectivity>("v:connectivity", {}));
-        m_HConn = Geometry::HalfedgeProperty<HalfedgeConnectivity>(
+        m_HConn = Geometry::HalfedgeMeshProperty<HalfedgeConnectivity>(
             m_Halfedges.GetOrAdd<HalfedgeConnectivity>("h:connectivity", {}));
 
         m_VDeleted = Geometry::VertexProperty<bool>(m_Vertices.GetOrAdd<bool>("v:deleted", false));
@@ -377,7 +377,7 @@ namespace Geometry::Graph
         assert(nh <= std::numeric_limits<PropertyIndex>::max());
 
         auto vmap = Geometry::VertexProperty<VertexHandle>(m_Vertices.Add<VertexHandle>("v:garbage-collection", {}));
-        auto hmap = Geometry::HalfedgeProperty<HalfedgeHandle>(m_Halfedges.Add<HalfedgeHandle>("h:garbage-collection", {}));
+        auto hmap = Geometry::HalfedgeMeshProperty<HalfedgeHandle>(m_Halfedges.Add<HalfedgeHandle>("h:garbage-collection", {}));
 
         for (std::size_t i = 0; i < nv; ++i) vmap[VertexHandle{static_cast<PropertyIndex>(i)}] = VertexHandle{static_cast<PropertyIndex>(i)};
         for (std::size_t i = 0; i < nh; ++i) hmap[HalfedgeHandle{static_cast<PropertyIndex>(i)}] = HalfedgeHandle{static_cast<PropertyIndex>(i)};

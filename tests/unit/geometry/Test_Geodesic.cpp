@@ -17,10 +17,10 @@ import Geometry;
 namespace
 {
     // Subdivided icosahedron approximating a unit sphere.
-    Geometry::Halfedge::Mesh MakeSphereMesh()
+    Geometry::HalfedgeMesh::Mesh MakeSphereMesh()
     {
         auto ico = MakeIcosahedron();
-        Geometry::Halfedge::Mesh refined;
+        Geometry::HalfedgeMesh::Mesh refined;
         Geometry::Subdivision::SubdivisionParams sp;
         sp.Iterations = 2;
         (void)Geometry::Subdivision::Subdivide(ico, refined, sp);
@@ -101,7 +101,7 @@ TEST(Geodesic, MultipleSourceVertices)
 
 TEST(Geodesic, ReturnsNulloptForEmptyMesh)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     std::vector<std::size_t> sources = {0};
 
     auto result = Geometry::Geodesic::ComputeDistance(mesh, sources);

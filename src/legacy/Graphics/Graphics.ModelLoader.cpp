@@ -248,7 +248,7 @@ namespace Graphics
 
             if (auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions(), cpu.Indices, cpu.Attrs(), buildParams))
             {
-                collision->SourceMesh = std::make_shared<Geometry::Halfedge::Mesh>(std::move(*mesh));
+                collision->SourceMesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>(std::move(*mesh));
             }
         }
 

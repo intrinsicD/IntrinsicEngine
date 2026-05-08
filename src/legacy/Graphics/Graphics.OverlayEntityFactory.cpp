@@ -36,7 +36,7 @@ namespace
         RHI::BufferManager& bufferManager,
         Graphics::GeometryPool& geometryStorage,
         ECS::Surface::Component& surface,
-        const Geometry::Halfedge::Mesh& mesh)
+        const Geometry::HalfedgeMesh::Mesh& mesh)
     {
         std::vector<glm::vec3> positions;
         std::vector<uint32_t> indices;
@@ -74,7 +74,7 @@ namespace Graphics::OverlayEntityFactory
     entt::entity CreateMeshOverlay(
         entt::registry& registry,
         entt::entity parent,
-        std::shared_ptr<Geometry::Halfedge::Mesh> mesh,
+        std::shared_ptr<Geometry::HalfedgeMesh::Mesh> mesh,
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
         RHI::BufferManager& bufferManager,

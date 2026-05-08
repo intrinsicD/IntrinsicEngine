@@ -15,7 +15,7 @@ import Geometry;
 // =============================================================================
 // Helper: compute edge length statistics
 // =============================================================================
-static void EdgeLengthStats(const Geometry::Halfedge::Mesh& mesh,
+static void EdgeLengthStats(const Geometry::HalfedgeMesh::Mesh& mesh,
                             double& minLen, double& maxLen, double& meanLen)
 {
     minLen = 1e30;
@@ -323,7 +323,7 @@ TEST(Remeshing_Isotropic, TooFewFacesReturnsNullopt)
 
 TEST(Remeshing_Isotropic, EmptyMeshReturnsNullopt)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto result = Geometry::Remeshing::Remesh(mesh);
     EXPECT_FALSE(result.has_value());
 }
@@ -334,7 +334,7 @@ TEST(Remeshing_Isotropic, EmptyMeshReturnsNullopt)
 
 TEST(MeshUtils_CotanLaplacian, EmptyMeshReturnsEmptyVector)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto laplacian = Geometry::MeshUtils::ComputeCotanLaplacian(mesh);
     EXPECT_TRUE(laplacian.empty());
 }
@@ -422,7 +422,7 @@ TEST(MeshUtils_CotanLaplacian, ClosedMeshLaplacianSumsToZero)
 
 TEST(MeshUtils_OneRingCentroid, IsolatedVertexReturnsSelf)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto v = mesh.AddVertex(glm::vec3(1.0f, 2.0f, 3.0f));
 
     auto centroid = Geometry::MeshUtils::ComputeOneRingCentroid(mesh, v);
@@ -479,7 +479,7 @@ TEST(MeshUtils_OneRingCentroid, RegularTetrahedronSymmetry)
 // =============================================================================
 
 // Helper: find the edge index connecting two vertices (or return UINT32_MAX).
-static uint32_t FindEdgeBetween(const Geometry::Halfedge::Mesh& mesh,
+static uint32_t FindEdgeBetween(const Geometry::HalfedgeMesh::Mesh& mesh,
                                 Geometry::VertexHandle v0, Geometry::VertexHandle v1)
 {
     for (auto he : mesh.HalfedgesAroundVertex(v0))
@@ -662,9 +662,9 @@ TEST(EdgeRing, ClosedMeshNoDuplicatesOrOverflow)
 // Creates a central vertex (v0) surrounded by `numSectors` sectors.
 // Even-indexed sectors are quads, odd-indexed are triangles, producing
 // an extraordinary vertex with mixed face types.
-static Geometry::Halfedge::Mesh MakeMixedFanAroundVertex(int numSectors)
+static Geometry::HalfedgeMesh::Mesh MakeMixedFanAroundVertex(int numSectors)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto center = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     const float pi2 = 2.0f * 3.14159265f;
     // Create ring vertices
@@ -944,7 +944,7 @@ TEST(EdgeLoop, DegenerateZeroLengthEdgeDoesNotCrash)
     // Build a triangle with two coincident vertices (zero-length edge).
     // The loop should not crash or produce NaN; it should gracefully
     // fall back to floor-rotation for the degenerate incoming direction.
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     auto v1 = mesh.AddVertex({0.0f, 0.0f, 0.0f}); // coincident with v0
     auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});

@@ -152,7 +152,7 @@ TEST_F(SceneManagerTest, SpawnModelAttachesMeshDataFromCollisionSourceMesh)
     segment->Name = "Duck";
 
     auto collision = std::make_shared<Graphics::GeometryCollisionData>();
-    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    auto mesh = std::make_shared<Geometry::HalfedgeMesh::Mesh>();
     const auto v0 = mesh->AddVertex({0.0f, 0.0f, 0.0f});
     const auto v1 = mesh->AddVertex({1.0f, 0.0f, 0.0f});
     const auto v2 = mesh->AddVertex({0.0f, 1.0f, 0.0f});

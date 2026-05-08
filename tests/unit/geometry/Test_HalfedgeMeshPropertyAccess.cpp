@@ -20,7 +20,7 @@ import Geometry;
 // =============================================================================
 
 // Use shared builders: MakeRightTriangle(), MakeQuadPair(), MakeSingleQuad()
-static Geometry::Halfedge::Mesh MakeTriangle() { return MakeRightTriangle(); }
+static Geometry::HalfedgeMesh::Mesh MakeTriangle() { return MakeRightTriangle(); }
 
 // =============================================================================
 // EdgeProperties() Tests
@@ -195,7 +195,7 @@ TEST(HalfedgeMesh_View, Mesh_BindsDirectPropertySets)
     size_t deletedEdges = 0;
     size_t deletedFaces = 0;
 
-    Halfedge::Mesh mesh(vertices, halfedges, edges, faces, deletedVertices, deletedEdges, deletedFaces);
+    HalfedgeMesh::Mesh mesh(vertices, halfedges, edges, faces, deletedVertices, deletedEdges, deletedFaces);
 
     EXPECT_TRUE(vertices.Exists("v:point"));
     EXPECT_TRUE(halfedges.Exists("h:connectivity"));
@@ -225,7 +225,7 @@ TEST(HalfedgeMesh_View, MoveAssignment_RebindsBuiltInPropertyHandles)
     ASSERT_TRUE(source.IsValid(v1));
     ASSERT_FALSE(source.IsDeleted(v0));
 
-    Geometry::Halfedge::Mesh movedTo;
+    Geometry::HalfedgeMesh::Mesh movedTo;
     movedTo = std::move(source);
 
     EXPECT_TRUE(movedTo.IsValid(v0));
@@ -354,7 +354,7 @@ TEST(HalfedgeMesh_Traversal, VertexOneRingRangesAreEmptyForIsolatedVertex)
 {
     using namespace Geometry;
 
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     const VertexHandle isolated = mesh.AddVertex(glm::vec3(2.0f, 3.0f, 4.0f));
 
     std::size_t halfedgeCount = 0;
@@ -505,7 +505,7 @@ TEST(HalfedgeMesh_EdgeExtraction, SpanOverload_FillsCorrectly)
     auto mesh = MakeQuadPair();
     const std::size_t edgeCount = mesh.EdgeCount();
 
-    std::vector<Geometry::Halfedge::EdgeVertexPair> buffer(edgeCount);
+    std::vector<Geometry::HalfedgeMesh::EdgeVertexPair> buffer(edgeCount);
     std::size_t written = mesh.ExtractEdgeVertexPairs(std::span{buffer});
     EXPECT_EQ(written, edgeCount);
 
@@ -524,14 +524,14 @@ TEST(HalfedgeMesh_EdgeExtraction, SpanOverload_PartialBuffer)
     auto mesh = MakeQuadPair();
 
     // Provide a buffer smaller than the total edge count.
-    std::vector<Geometry::Halfedge::EdgeVertexPair> buffer(2);
+    std::vector<Geometry::HalfedgeMesh::EdgeVertexPair> buffer(2);
     std::size_t written = mesh.ExtractEdgeVertexPairs(std::span{buffer});
     EXPECT_EQ(written, 2u); // only fills what fits
 }
 
 TEST(HalfedgeMesh_EdgeExtraction, EmptyMesh_ReturnsEmpty)
 {
-    Geometry::Halfedge::Mesh mesh;
+    Geometry::HalfedgeMesh::Mesh mesh;
     auto edges = mesh.ExtractEdgeVertexPairs();
     EXPECT_TRUE(edges.empty());
 }
@@ -540,7 +540,7 @@ TEST(HalfedgeMesh_EdgeExtraction, AfterEdgeDelete_SkipsDeletedEdge)
 {
     using namespace Geometry;
 
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
@@ -568,7 +568,7 @@ TEST(HalfedgeMesh_EdgeExtraction, AfterEdgeDelete_SkipsDeletedEdge)
 TEST(HalfedgeMesh_EdgeExtraction, EdgeVertexPair_SizeOf8)
 {
     // The struct must be exactly 8 bytes for GPU SSBO compatibility.
-    static_assert(sizeof(Geometry::Halfedge::EdgeVertexPair) == 8);
+    static_assert(sizeof(Geometry::HalfedgeMesh::EdgeVertexPair) == 8);
 }
 
 // =============================================================================

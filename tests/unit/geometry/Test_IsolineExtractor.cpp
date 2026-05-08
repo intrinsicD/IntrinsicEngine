@@ -17,10 +17,10 @@ using namespace Geometry;
 namespace
 {
     // Build a single triangle: v0=(0,0,0), v1=(1,0,0), v2=(0,1,0)
-    Halfedge::Mesh MakeSingleTriangleWithScalar(const std::string& propName,
+    HalfedgeMesh::Mesh MakeSingleTriangleWithScalar(const std::string& propName,
                                                   float s0, float s1, float s2)
     {
-        Halfedge::Mesh mesh;
+        HalfedgeMesh::Mesh mesh;
         auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
         auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
         auto v2 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
@@ -98,7 +98,7 @@ TEST(IsolineExtractor, TwoTriangleMesh)
     // Two-triangle square: v0=(0,0,0), v1=(1,0,0), v2=(1,1,0), v3=(0,1,0)
     // Triangles: (v0,v1,v2) and (v0,v2,v3)
     // Scalar: 0 at y=0, 1 at y=1 → linear ramp.
-    Halfedge::Mesh mesh;
+    HalfedgeMesh::Mesh mesh;
     auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
     auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
     auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});

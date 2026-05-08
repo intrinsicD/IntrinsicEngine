@@ -81,7 +81,7 @@ Geometry::Octree MakeSimpleOctree()
     return o;
 }
 
-Geometry::Halfedge::Mesh MakeTetraHullMesh()
+Geometry::HalfedgeMesh::Mesh MakeTetraHullMesh()
 {
     std::vector<glm::vec3> points{
         {0.0f, 0.0f, 0.0f},
@@ -95,7 +95,7 @@ Geometry::Halfedge::Mesh MakeTetraHullMesh()
     auto hull = Geometry::ConvexHullBuilder::Build(points, params);
     EXPECT_TRUE(hull.has_value());
     EXPECT_FALSE(hull->Mesh.IsEmpty());
-    return hull ? std::move(hull->Mesh) : Geometry::Halfedge::Mesh{};
+    return hull ? std::move(hull->Mesh) : Geometry::HalfedgeMesh::Mesh{};
 }
 
 } // namespace

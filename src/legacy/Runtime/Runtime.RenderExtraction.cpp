@@ -48,7 +48,7 @@ namespace Runtime
             return 0u;
         }
 
-        [[nodiscard]] const Geometry::Halfedge::Mesh* ResolvePickingMesh(
+        [[nodiscard]] const Geometry::HalfedgeMesh::Mesh* ResolvePickingMesh(
             const entt::registry& registry, entt::entity entity)
         {
             if (const auto* meshData = registry.try_get<ECS::Mesh::Data>(entity))
@@ -75,7 +75,7 @@ namespace Runtime
             return glm::mat4(1.0f);
         }
 
-        void BuildTriangleFaceIds(const Geometry::Halfedge::Mesh& mesh, std::vector<uint32_t>& triangleFaceIds)
+        void BuildTriangleFaceIds(const Geometry::HalfedgeMesh::Mesh& mesh, std::vector<uint32_t>& triangleFaceIds)
         {
             std::vector<glm::vec3> positions;
             std::vector<uint32_t> indices;
@@ -104,7 +104,7 @@ namespace Runtime
                     .EntityId = ResolvePickId(registry, entity),
                 };
 
-                if (const Geometry::Halfedge::Mesh* mesh = ResolvePickingMesh(registry, entity))
+                if (const Geometry::HalfedgeMesh::Mesh* mesh = ResolvePickingMesh(registry, entity))
                     BuildTriangleFaceIds(*mesh, packet.TriangleFaceIds);
 
                 packets.push_back(std::move(packet));
@@ -547,7 +547,7 @@ namespace Runtime
 
             return Graphics::HtexPatchPreviewPacket{
                 .SourceEntityId = static_cast<uint32_t>(*source),
-                .Mesh = Geometry::Halfedge::Mesh{*meshData->MeshRef},
+                .Mesh = Geometry::HalfedgeMesh::Mesh{*meshData->MeshRef},
                 .KMeansResultRevision = meshData->KMeansResultRevision,
                 .KMeansCentroids = meshData->KMeansCentroids,
             };

@@ -13,7 +13,7 @@ import Geometry.HalfedgeMesh;
 // =============================================================================
 // IsolineExtractor — extract contour lines from scalar fields on meshes.
 //
-// Given a Halfedge::Mesh and a scalar vertex property, produces line segments
+// Given a HalfedgeMesh::Mesh and a scalar vertex property, produces line segments
 // at evenly spaced iso-values by linear interpolation along mesh edges.
 // The result is rendered via DebugDraw::AddLines() as transient overlay.
 // =============================================================================
@@ -36,7 +36,7 @@ export namespace Graphics::IsolineExtractor
     /// @param rangeMax       Maximum value for the iso-range
     /// @returns              Line segments (point pairs)
     [[nodiscard]] IsolineResult Extract(
-        const Geometry::Halfedge::Mesh& mesh,
+        const Geometry::HalfedgeMesh::Mesh& mesh,
         const std::string& scalarProperty,
         uint32_t isoCount,
         float rangeMin,

@@ -54,7 +54,7 @@ namespace Graphics::Passes
         std::atomic<bool> Ready{false};
         uint64_t Signature = 0;
         uint64_t Revision = 0;
-        Geometry::Halfedge::Mesh MeshCopy{};
+        Geometry::HalfedgeMesh::Mesh MeshCopy{};
         std::vector<Geometry::HtexPatch::HalfedgePatchMeta> Patches{};
         CachedPreviewAtlas Atlas{};
     };
@@ -101,7 +101,7 @@ namespace Graphics::Passes
         }
 
         [[nodiscard]] float VertexLabelScalar(
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             const Geometry::ConstProperty<uint32_t>& labels,
             Geometry::VertexHandle v) noexcept
         {
@@ -111,7 +111,7 @@ namespace Graphics::Passes
         }
 
         [[nodiscard]] std::vector<glm::vec3> ReconstructPreviewCentroids(
-            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
             const Geometry::ConstProperty<uint32_t>& labels)
         {
             PROFILE_SCOPE("HtexPatchPreview::ReconstructPreviewCentroids");
@@ -153,7 +153,7 @@ namespace Graphics::Passes
             return Geometry::KMeans::RecomputeCentroids(points, pointLabels, clusterCount);
         }
 
-        [[nodiscard]] float FirstPatchVertexLabel(const Geometry::Halfedge::Mesh& mesh,
+        [[nodiscard]] float FirstPatchVertexLabel(const Geometry::HalfedgeMesh::Mesh& mesh,
                                                   const Geometry::HtexPatch::HalfedgePatchMeta& patch,
                                                   const Geometry::ConstProperty<uint32_t>& kmeansLabels) noexcept
         {
@@ -178,7 +178,7 @@ namespace Graphics::Passes
             return sampleHalfedgeLabel(patch.Halfedge1Index);
         }
 
-        [[nodiscard]] float KMeansVertexScalar(const Geometry::Halfedge::Mesh& mesh,
+        [[nodiscard]] float KMeansVertexScalar(const Geometry::HalfedgeMesh::Mesh& mesh,
                                                const Geometry::HtexPatch::HalfedgePatchMeta& patch,
                                                glm::vec2 patchUV,
                                                std::span<const glm::vec3> kmeansCentroids,
@@ -193,7 +193,7 @@ namespace Graphics::Passes
             return FirstPatchVertexLabel(mesh, patch, kmeansLabels);
         }
 
-        [[nodiscard]] float ComputeTileScalarFromPatch(const Geometry::Halfedge::Mesh& mesh,
+        [[nodiscard]] float ComputeTileScalarFromPatch(const Geometry::HalfedgeMesh::Mesh& mesh,
                                                        const Geometry::HtexPatch::HalfedgePatchMeta& patch,
                                                        const PreviewKMeansData& kmeansData) noexcept
         {
@@ -254,7 +254,7 @@ namespace Graphics::Passes
 
 
     [[nodiscard]] uint64_t HtexPatchPreviewPass::ComputePreviewAtlasSignature(
-        const Geometry::Halfedge::Mesh& mesh,
+        const Geometry::HalfedgeMesh::Mesh& mesh,
         const PreviewKMeansData& kmeansData,
         std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches) noexcept
     {
@@ -313,7 +313,7 @@ namespace Graphics::Passes
         return hash;
     }
 
-    [[nodiscard]] bool HtexPatchPreviewPass::BuildPreviewAtlas(const Geometry::Halfedge::Mesh& mesh,
+    [[nodiscard]] bool HtexPatchPreviewPass::BuildPreviewAtlas(const Geometry::HalfedgeMesh::Mesh& mesh,
                                                                const PreviewKMeansData& kmeansData,
                                                                std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
                                                                std::vector<glm::vec4>& outPixels,
@@ -437,7 +437,7 @@ namespace Graphics::Passes
         }
 
         const entt::entity entity = static_cast<entt::entity>(preview->SourceEntityId);
-        const Geometry::Halfedge::Mesh& mesh = *preview->Mesh;
+        const Geometry::HalfedgeMesh::Mesh& mesh = *preview->Mesh;
         const uint32_t maxImageDimension2D = GetMaxPreviewAtlasDimension2D(*m_Device);
 
         if (m_PendingBake && m_PendingBake->Ready.load(std::memory_order_acquire))
@@ -531,7 +531,7 @@ namespace Graphics::Passes
                     auto pending = std::make_shared<PendingPreviewBake>();
                     pending->Signature = desiredSignature;
                     pending->Revision = m_CachedAtlas.Revision != 0u ? (m_CachedAtlas.Revision + 1u) : 1u;
-                    pending->MeshCopy = Geometry::Halfedge::Mesh{mesh};
+                    pending->MeshCopy = Geometry::HalfedgeMesh::Mesh{mesh};
                     pending->Patches = m_CachedPatchBuild.Patches;
                     m_PendingBake = pending;
 

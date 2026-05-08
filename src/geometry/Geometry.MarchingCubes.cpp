@@ -402,12 +402,12 @@ namespace Geometry::MarchingCubes
     // Conversion to HalfedgeMesh
     // =========================================================================
 
-    std::optional<Halfedge::Mesh> ToMesh(const MarchingCubesResult& result)
+    std::optional<HalfedgeMesh::Mesh> ToMesh(const MarchingCubesResult& result)
     {
         if (result.Triangles.empty() || result.VertexCount == 0)
             return std::nullopt;
 
-        Halfedge::Mesh mesh;
+        HalfedgeMesh::Mesh mesh;
         mesh.Reserve(result.VertexCount, result.TriangleCount * 3, result.TriangleCount);
 
         constexpr std::size_t kInvalidIndex = std::numeric_limits<std::size_t>::max();

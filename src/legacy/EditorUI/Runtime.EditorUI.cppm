@@ -804,7 +804,7 @@ export namespace Runtime::EditorUI
         entt::entity m_ConvexHullOverlaySourceEntity = entt::null;
         Graphics::ConvexHullDebugDrawSettings m_CachedConvexHullSettings{};
         glm::mat4 m_CachedConvexHullWorld{1.0f};
-        std::optional<Geometry::Halfedge::Mesh> m_SelectedColliderHullMesh{};
+        std::optional<Geometry::HalfedgeMesh::Mesh> m_SelectedColliderHullMesh{};
         entt::entity m_SelectedHullEntity = entt::null;
 
         // Contact manifold overlay (transient, released every frame).

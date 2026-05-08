@@ -8,7 +8,7 @@ import Geometry;
 #include "Test_MeshBuilders.h"
 
 // =============================================================================
-// Halfedge::Mesh submesh view tests
+// HalfedgeMesh::Mesh submesh view tests
 // =============================================================================
 
 TEST(SubmeshView_Mesh, DefaultMeshIsNotView)
@@ -26,7 +26,7 @@ TEST(SubmeshView_Mesh, CreateViewSharesStorage)
     ASSERT_EQ(mesh.EdgesSize(), 5u);
     ASSERT_EQ(mesh.FacesSize(), 2u);
 
-    auto view = Geometry::Halfedge::Mesh::CreateView(
+    auto view = Geometry::HalfedgeMesh::Mesh::CreateView(
         mesh,
         {.Offset = 0, .Size = 2},  // first 2 vertices
         {.Offset = 0, .Size = 3},  // first 3 edges
@@ -45,7 +45,7 @@ TEST(SubmeshView_Mesh, ViewPositionsReturnSubspan)
     auto mesh = MakeTwoTriangleSquare();
     // Vertices: v0=(0,0,0) v1=(1,0,0) v2=(1,1,0) v3=(0,1,0)
 
-    auto view = Geometry::Halfedge::Mesh::CreateView(
+    auto view = Geometry::HalfedgeMesh::Mesh::CreateView(
         mesh,
         {.Offset = 1, .Size = 2},  // v1 and v2
         {.Offset = 0, .Size = 0},  // full edges (Size=0 → clamp to full)
@@ -64,7 +64,7 @@ TEST(SubmeshView_Mesh, ViewRangeAccessors)
 {
     auto mesh = MakeTwoTriangleSquare();
 
-    auto view = Geometry::Halfedge::Mesh::CreateView(
+    auto view = Geometry::HalfedgeMesh::Mesh::CreateView(
         mesh,
         {.Offset = 1, .Size = 3},
         {.Offset = 2, .Size = 2},
@@ -85,7 +85,7 @@ TEST(SubmeshView_Mesh, ViewClampsToSourceExtent)
     ASSERT_EQ(mesh.VerticesSize(), 3u);
 
     // Request more than available — should clamp
-    auto view = Geometry::Halfedge::Mesh::CreateView(
+    auto view = Geometry::HalfedgeMesh::Mesh::CreateView(
         mesh,
         {.Offset = 1, .Size = 100},  // overflows
         {.Offset = 0, .Size = 100},
@@ -102,7 +102,7 @@ TEST(SubmeshView_Mesh, ViewWithOffsetBeyondSizeGivesEmpty)
     auto mesh = MakeSingleTriangle();
     ASSERT_EQ(mesh.VerticesSize(), 3u);
 
-    auto view = Geometry::Halfedge::Mesh::CreateView(
+    auto view = Geometry::HalfedgeMesh::Mesh::CreateView(
         mesh,
         {.Offset = 100, .Size = 5},
         {.Offset = 100, .Size = 5},
@@ -119,7 +119,7 @@ TEST(SubmeshView_Mesh, ViewSharesPositionDataWithSource)
 {
     auto mesh = MakeSingleTriangle();
 
-    auto view = Geometry::Halfedge::Mesh::CreateView(
+    auto view = Geometry::HalfedgeMesh::Mesh::CreateView(
         mesh,
         {.Offset = 0, .Size = 3},
         {.Offset = 0, .Size = 3},
