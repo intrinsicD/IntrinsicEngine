@@ -31,7 +31,7 @@
   is populated, matching legacy `XYZLoader`.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-xwz1l`.
 - Parent backlog task:
@@ -196,3 +196,68 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Introducing GPU/Vulkan-only verification requirements.
 - Mixing mechanical file moves with semantic refactors.
 - Introducing unrelated feature work.
+
+## Completion
+- Completed: 2026-05-08.
+- Status: done.
+- Implementation commit: `55ac47b`
+  (`GEOIO-002H: harden geometry-owned XYZ/PTS/XYZRGB text importer`).
+- Retired in a follow-up commit on
+  `claude/setup-agentic-workflow-xwz1l`.
+- Verified in this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (98 task files validated; the same 98 after retirement,
+    including this file under `tasks/done/`).
+  - `python3 tools/repo/check_layering.py --root src --strict` — no
+    layering violations; `geometry` imports remain `geometry -> core`
+    only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out
+    docs/api/generated/module_inventory.md` — no diff vs. the
+    pre-existing inventory; this slice adds anonymous-namespace
+    helpers and tightens `LoadXYZ` internally without changing the
+    public `Geometry.PointCloud.IO` module surface, matching
+    `GEOIO-002B`/`C`/`D`/`E`/`F`/`G` precedent.
+- Build/CTest gate not run in this container: `cmake --preset ci`
+  configure fails because `clang-20`/`clang++-20` are not installed
+  in this agent environment (only `clang-18` is available),
+  matching the limitation called out in `Context` and the prior
+  `GEOIO-002A`-`002G` retirement notes. The default CPU correctness
+  gate (`ctest --test-dir build/ci -R 'GeometryIO' -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) should be
+  re-run on a host with the documented C++23 toolchain when
+  available.
+- Notes:
+  - Helpers `ParseXYZPointColor`, `IsXYZScanLineMarker`,
+    `XYZNeedsDelimiterNormalization`, and
+    `XYZNormalizeDelimitedLine` were added to the existing
+    anonymous namespace in
+    `src/geometry/Geometry.PointCloud.IO.cpp` next to the existing
+    `ParseRgb`/`NormalizeColorChannel` helpers.
+  - `LoadXYZ` now performs `;` → space normalization into a
+    caller-owned scratch string before whitespace splitting, skips
+    `LH<digits>` scan-line marker rows before the
+    optional-leading-count check, and replaces both the
+    too-short-row and unparseable-`x`/`y`/`z`-row hard-fails with
+    soft-skip semantics matching the legacy reference. Color
+    extraction now goes through `ParseXYZPointColor`, which
+    prefers trailing-RGB at `tokens.size() - 3` for
+    `tokens.size() >= 7`, falls back to RGB at offset 3 for
+    `tokens.size() >= 6`, and finally treats `tokens.size() == 4`
+    as intensity-as-grey via `NormalizeColorChannel`.
+  - Coverage in `tests/unit/geometry/Test.GeometryIO.cpp` adds
+    five cases: `LoadsXYZRGBTrailingColor`,
+    `LoadsXYZSemicolonDelimited`, `LoadsXYZSkipsScanLineMarkers`,
+    `LoadsXYZSoftSkipsMalformedRows`, and
+    `LoadXYZRejectsAllMalformedInput`. The existing
+    `LoadsXYZWithColor` (canonical 6-token RGB-at-offset-3 layout)
+    remains as a regression case.
+  - Remaining `GEOIO-002` scope (granular
+    `MeshIOReadStatus`/`PointCloudIOReadStatus` diagnostics enums,
+    domain-selection metadata for asset/runtime routing, mesh OFF
+    importer parity hardening, OBJ ASCII parity hardening, TGF
+    graph importer hardening, and packed-`rgb`/`rgba` PCD plus
+    `binary_compressed` LZF decompression) stays tracked under the
+    parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
