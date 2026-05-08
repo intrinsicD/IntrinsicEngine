@@ -1,5 +1,6 @@
 module;
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
@@ -12,6 +13,7 @@ module;
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/geometric.hpp>
 
 #include "Geometry.IOText.hpp"
 
@@ -700,6 +702,105 @@ namespace Geometry::MeshIO
             }
             stream.put('\n');
         }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+        return MeshIOWriteStatus::Success;
+    }
+
+    MeshIOWriteStatus WriteSTL(std::string_view absolute_path, const MeshIOResult& mesh)
+    {
+        if (absolute_path.empty())
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        const auto positionsView = mesh.Vertices.Get<glm::vec3>("v:point");
+        if (!positionsView.IsValid() || positionsView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& positions = positionsView.Vector();
+
+        const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+        if (!facesView.IsValid() || facesView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& faces = facesView.Vector();
+
+        for (const auto& face : faces)
+        {
+            if (face.size() != 3)
+            {
+                return MeshIOWriteStatus::InvalidFace;
+            }
+            for (const auto index : face)
+            {
+                if (static_cast<std::size_t>(index) >= positions.size())
+                {
+                    return MeshIOWriteStatus::InvalidFace;
+                }
+            }
+        }
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        char buffer[256];
+
+        stream << "solid IntrinsicEngine\n";
+
+        for (const auto& face : faces)
+        {
+            const glm::vec3& v0 = positions[face[0]];
+            const glm::vec3& v1 = positions[face[1]];
+            const glm::vec3& v2 = positions[face[2]];
+
+            glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+            if (!std::isfinite(normal.x))
+            {
+                normal = glm::vec3(0.0f, 0.0f, 0.0f);
+            }
+
+            int written = std::snprintf(buffer, sizeof(buffer),
+                                        "  facet normal %.6e %.6e %.6e\n"
+                                        "    outer loop\n",
+                                        static_cast<double>(normal.x),
+                                        static_cast<double>(normal.y),
+                                        static_cast<double>(normal.z));
+            if (written <= 0)
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+
+            const glm::vec3 vertices[3] = {v0, v1, v2};
+            for (const auto& v : vertices)
+            {
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        "      vertex %.6e %.6e %.6e\n",
+                                        static_cast<double>(v.x),
+                                        static_cast<double>(v.y),
+                                        static_cast<double>(v.z));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            stream << "    endloop\n"
+                      "  endfacet\n";
+        }
+
+        stream << "endsolid IntrinsicEngine\n";
 
         stream.flush();
         if (!stream.good())
