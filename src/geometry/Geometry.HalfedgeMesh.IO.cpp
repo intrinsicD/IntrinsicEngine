@@ -1,8 +1,11 @@
 module;
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <ios>
 #include <optional>
@@ -99,6 +102,98 @@ namespace Geometry::MeshIO
         [[nodiscard]] Core::Expected<MeshIOResult> InvalidMeshFormat()
         {
             return Core::Err<MeshIOResult>(Core::ErrorCode::InvalidFormat);
+        }
+
+        [[nodiscard]] bool IsBinarySTL(std::span<const std::byte> data)
+        {
+            if (data.size() < 84)
+            {
+                return false;
+            }
+
+            std::uint32_t triCount = 0;
+            std::memcpy(&triCount, data.data() + 80, sizeof(std::uint32_t));
+
+            const std::size_t expectedSize =
+                std::size_t{84} + static_cast<std::size_t>(triCount) * std::size_t{50};
+            if (expectedSize == data.size())
+            {
+                return true;
+            }
+
+            const std::size_t windowSize = std::min<std::size_t>(data.size(), 1024);
+            const std::string_view window(reinterpret_cast<const char*>(data.data()), windowSize);
+            const std::size_t firstNonWs = window.find_first_not_of(" \t\r\n");
+            if (firstNonWs != std::string_view::npos)
+            {
+                const std::string_view trimmed = window.substr(firstNonWs);
+                const bool startsSolid = trimmed.substr(0, 5) == "solid";
+                const bool hasFacet = window.find("facet") != std::string_view::npos;
+                if (startsSolid && hasFacet)
+                {
+                    return false;
+                }
+            }
+
+            return data.size() >= 84;
+        }
+
+        [[nodiscard]] Core::Expected<MeshIOResult> ParseBinarySTL(std::span<const std::byte> data,
+                                                                  std::string_view absolute_path)
+        {
+            if (data.size() < 84)
+            {
+                return InvalidMeshFormat();
+            }
+
+            std::uint32_t triCount = 0;
+            std::memcpy(&triCount, data.data() + 80, sizeof(std::uint32_t));
+            if (triCount == 0)
+            {
+                return InvalidMeshFormat();
+            }
+
+            const std::size_t expectedSize =
+                std::size_t{84} + static_cast<std::size_t>(triCount) * std::size_t{50};
+            if (data.size() < expectedSize)
+            {
+                return InvalidMeshFormat();
+            }
+
+            std::vector<glm::vec3> vertices;
+            vertices.reserve(static_cast<std::size_t>(triCount) * 3);
+            std::vector<std::vector<std::uint32_t>> faces;
+            faces.reserve(triCount);
+
+            const std::byte* base = data.data() + 84;
+            for (std::uint32_t t = 0; t < triCount; ++t)
+            {
+                const std::byte* record = base + static_cast<std::size_t>(t) * 50;
+                glm::vec3 triangle[3];
+                for (int v = 0; v < 3; ++v)
+                {
+                    float x = 0.0f;
+                    float y = 0.0f;
+                    float z = 0.0f;
+                    const std::byte* vertexPtr = record + 12 + v * 12;
+                    std::memcpy(&x, vertexPtr + 0, sizeof(float));
+                    std::memcpy(&y, vertexPtr + 4, sizeof(float));
+                    std::memcpy(&z, vertexPtr + 8, sizeof(float));
+                    triangle[v] = glm::vec3(x, y, z);
+                }
+                const auto baseIndex = static_cast<std::uint32_t>(vertices.size());
+                vertices.push_back(triangle[0]);
+                vertices.push_back(triangle[1]);
+                vertices.push_back(triangle[2]);
+                faces.push_back({baseIndex, baseIndex + 1u, baseIndex + 2u});
+            }
+
+            MeshIOResult result;
+            const auto pathInfo = MakePathInfo(absolute_path);
+            result.SourcePath = pathInfo.SourcePath;
+            result.BasePath = pathInfo.BasePath;
+            PopulateResult(result, vertices, faces);
+            return result;
         }
     }
 
@@ -415,6 +510,13 @@ namespace Geometry::MeshIO
         if (!text)
         {
             return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+        }
+
+        const std::span<const std::byte> bytes(
+            reinterpret_cast<const std::byte*>(text->data()), text->size());
+        if (IsBinarySTL(bytes))
+        {
+            return ParseBinarySTL(bytes, absolute_path);
         }
 
         std::vector<glm::vec3> vertices;

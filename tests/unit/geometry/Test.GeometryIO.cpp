@@ -14,6 +14,7 @@
 
 #include <glm/glm.hpp>
 
+import Core;
 import Geometry;
 
 namespace
@@ -514,6 +515,148 @@ TEST(GeometryIO_MeshIO, WritePLYRejectsBadPath)
 
     EXPECT_EQ(Geometry::MeshIO::WritePLY(path, mesh),
               Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
+}
+
+namespace
+{
+    [[nodiscard]] std::string WriteBinarySTLFixture(std::span<const std::array<glm::vec3, 3>> triangles,
+                                                   std::uint32_t advertisedTriCount)
+    {
+        static int counter = 0;
+        const char* tmpDir = std::getenv("TEST_TMPDIR");
+        if (tmpDir == nullptr || tmpDir[0] == '\0')
+        {
+            tmpDir = "/tmp";
+        }
+        std::string path = std::string(tmpDir) + "/intrinsic_geometry_io_binstl_" +
+                           std::to_string(static_cast<long long>(getpid())) + "_" +
+                           std::to_string(counter++) + ".stl";
+        std::ofstream out(path, std::ios::binary);
+
+        std::array<char, 80> header{};
+        out.write(header.data(), static_cast<std::streamsize>(header.size()));
+        out.write(reinterpret_cast<const char*>(&advertisedTriCount), sizeof(advertisedTriCount));
+
+        for (const auto& tri : triangles)
+        {
+            const float zeroNormal[3] = {0.0f, 0.0f, 0.0f};
+            out.write(reinterpret_cast<const char*>(zeroNormal), sizeof(zeroNormal));
+            for (const auto& v : tri)
+            {
+                const float xyz[3] = {v.x, v.y, v.z};
+                out.write(reinterpret_cast<const char*>(xyz), sizeof(xyz));
+            }
+            const std::uint16_t attributeByteCount = 0;
+            out.write(reinterpret_cast<const char*>(&attributeByteCount), sizeof(attributeByteCount));
+        }
+
+        return path;
+    }
+
+    struct TempBinarySTL
+    {
+        std::string Path;
+
+        TempBinarySTL(std::span<const std::array<glm::vec3, 3>> triangles,
+                      std::uint32_t advertisedTriCount)
+            : Path(WriteBinarySTLFixture(triangles, advertisedTriCount))
+        {
+        }
+
+        ~TempBinarySTL()
+        {
+            if (!Path.empty())
+            {
+                std::remove(Path.c_str());
+            }
+        }
+    };
+}
+
+TEST(GeometryIO_MeshIO, LoadsBinarySTLSingleTriangle)
+{
+    const std::array<std::array<glm::vec3, 3>, 1> triangles{{
+        {glm::vec3{0.0f, 0.0f, 0.0f},
+         glm::vec3{1.0f, 0.0f, 0.0f},
+         glm::vec3{0.0f, 1.0f, 0.0f}},
+    }};
+    TempBinarySTL file(triangles, 1u);
+
+    const auto result = Geometry::MeshIO::LoadSTL(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+}
+
+TEST(GeometryIO_MeshIO, LoadsBinarySTLTwoTriangles)
+{
+    const std::array<std::array<glm::vec3, 3>, 2> triangles{{
+        {glm::vec3{0.0f, 0.0f, 0.0f},
+         glm::vec3{1.0f, 0.0f, 0.0f},
+         glm::vec3{0.0f, 1.0f, 0.0f}},
+        {glm::vec3{1.0f, 0.0f, 0.0f},
+         glm::vec3{1.0f, 1.0f, 0.0f},
+         glm::vec3{0.0f, 1.0f, 0.0f}},
+    }};
+    TempBinarySTL file(triangles, 2u);
+
+    const auto result = Geometry::MeshIO::LoadSTL(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Vertices.Size(), 6u);
+    EXPECT_EQ(result->Faces.Size(), 2u);
+
+    auto positions = result->Vertices.Get<glm::vec3>("v:point");
+    ASSERT_TRUE(positions.IsValid());
+    ASSERT_EQ(positions.Vector().size(), 6u);
+    EXPECT_EQ(positions[3], glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(positions[5], glm::vec3(0.0f, 1.0f, 0.0f));
+
+    auto faceVertices = result->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(faceVertices.IsValid());
+    ASSERT_EQ(faceVertices.Vector().size(), 2u);
+    ASSERT_EQ(faceVertices[1].size(), 3u);
+    EXPECT_EQ(faceVertices[1][0], 3u);
+    EXPECT_EQ(faceVertices[1][1], 4u);
+    EXPECT_EQ(faceVertices[1][2], 5u);
+}
+
+TEST(GeometryIO_MeshIO, LoadSTLRejectsTruncatedBinaryPayload)
+{
+    const std::array<std::array<glm::vec3, 3>, 1> triangles{{
+        {glm::vec3{0.0f, 0.0f, 0.0f},
+         glm::vec3{1.0f, 0.0f, 0.0f},
+         glm::vec3{0.0f, 1.0f, 0.0f}},
+    }};
+    // Write only one triangle but advertise two: 80 + 4 + 50 = 134 bytes,
+    // size-match for triCount=2 would require 184 bytes, so this disqualifies
+    // the size-match branch and the ASCII fallback (no "facet" / "solid"
+    // tokens in zeroed header), forcing ParseBinarySTL to detect the
+    // shortage.
+    TempBinarySTL file(triangles, 2u);
+
+    const auto result = Geometry::MeshIO::LoadSTL(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadsASCIISTLAfterBinaryDispatch)
+{
+    // Regression: the ASCII fallback inside IsBinarySTL must classify a
+    // canonical ASCII STL as ASCII even after the binary code path was
+    // introduced, so the existing ASCII parser still runs.
+    TempFile file(".stl",
+                  "solid tri\n"
+                  "facet normal 0 0 1\n"
+                  "outer loop\n"
+                  "vertex 0 0 0\n"
+                  "vertex 1 0 0\n"
+                  "vertex 0 1 0\n"
+                  "endloop\n"
+                  "endfacet\n"
+                  "endsolid tri\n");
+
+    const auto result = Geometry::MeshIO::LoadSTL(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
 }
 
 TEST(GeometryIO_MeshIO, WritesSTLTriangle)
