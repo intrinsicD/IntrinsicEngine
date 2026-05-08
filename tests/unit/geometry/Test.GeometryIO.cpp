@@ -87,6 +87,143 @@ TEST(GeometryIO_MeshIO, LoadsOFFTriangle)
     ExpectTriangleMeshProperties(*result);
 }
 
+TEST(GeometryIO_MeshIO, LoadsCOFFTriangleWithVertexColors)
+{
+    TempFile file(".off",
+                  "COFF\n"
+                  "3 1 0\n"
+                  "0 0 0 255 0 0\n"
+                  "1 0 0 0 255 0\n"
+                  "0 1 0 0 0 255\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsCOFFAlphaTokenIsConsumedNotStored)
+{
+    TempFile file(".off",
+                  "COFF\n"
+                  "3 1 0\n"
+                  "0 0 0 255 0 0 128\n"
+                  "1 0 0 0 255 0 64\n"
+                  "0 1 0 0 0 255 32\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsNOFFTriangleWithVertexNormals)
+{
+    TempFile file(".off",
+                  "NOFF\n"
+                  "3 1 0\n"
+                  "0 0 0 0 0 1\n"
+                  "1 0 0 0 0 1\n"
+                  "0 1 0 0 0 1\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(normals.IsValid());
+    ASSERT_EQ(normals.Vector().size(), 3u);
+    EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(normals[1], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(normals[2], glm::vec3(0.0f, 0.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsCNOFFTriangleWithNormalsAndColors)
+{
+    TempFile file(".off",
+                  "CNOFF\n"
+                  "3 1 0\n"
+                  "0 0 0 0 0 1 255 0 0\n"
+                  "1 0 0 0 0 1 0 255 0\n"
+                  "0 1 0 0 0 1 0 0 255\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(normals.IsValid());
+    ASSERT_EQ(normals.Vector().size(), 3u);
+    EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadOFFSkipsDegenerateFaceRows)
+{
+    // The face counts header declares two face rows so the loop
+    // iterates both; the first is degenerate (count < 3) and must be
+    // soft-skipped without aborting the load.
+    TempFile file(".off",
+                  "OFF\n"
+                  "3 2 0\n"
+                  "0 0 0\n"
+                  "1 0 0\n"
+                  "0 1 0\n"
+                  "2 0 1\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Vertices.Size(), 3u);
+    auto faceVertices = result->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(faceVertices.IsValid());
+    ASSERT_EQ(faceVertices.Vector().size(), 1u);
+    ASSERT_EQ(faceVertices[0].size(), 3u);
+    EXPECT_EQ(faceVertices[0][0], 0u);
+    EXPECT_EQ(faceVertices[0][1], 1u);
+    EXPECT_EQ(faceVertices[0][2], 2u);
+}
+
+TEST(GeometryIO_MeshIO, LoadOFFRejectsUnknownMagic)
+{
+    TempFile file(".off", "FOO\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadOFFRejectsOutOfRangeVertexIndex)
+{
+    TempFile file(".off", "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1 5\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
 TEST(GeometryIO_MeshIO, LoadsOBJTriangle)
 {
     TempFile file(".obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");

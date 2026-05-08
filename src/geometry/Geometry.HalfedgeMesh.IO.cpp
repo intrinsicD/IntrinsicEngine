@@ -74,7 +74,8 @@ namespace Geometry::MeshIO
         void PopulateResult(MeshIOResult& result,
                             std::span<const glm::vec3> vertices,
                             std::span<const std::vector<std::uint32_t>> faces,
-                            std::span<const glm::vec3> normals = {})
+                            std::span<const glm::vec3> normals = {},
+                            std::span<const glm::vec4> colors = {})
         {
             result.Vertices.Resize(vertices.size());
             auto positions = result.Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.0f));
@@ -92,6 +93,15 @@ namespace Geometry::MeshIO
                 }
             }
 
+            if (!colors.empty() && colors.size() == vertices.size())
+            {
+                auto colorProperty = result.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                for (std::size_t i = 0; i < colors.size(); ++i)
+                {
+                    colorProperty[i] = colors[i];
+                }
+            }
+
             result.Faces.Resize(faces.size());
             auto faceVertices = result.Faces.GetOrAdd<std::vector<std::uint32_t>>("f:vertices", {});
             for (std::size_t i = 0; i < faces.size(); ++i)
@@ -103,6 +113,28 @@ namespace Geometry::MeshIO
         [[nodiscard]] Core::Expected<MeshIOResult> InvalidMeshFormat()
         {
             return Core::Err<MeshIOResult>(Core::ErrorCode::InvalidFormat);
+        }
+
+        enum class OFFVariant
+        {
+            Standard,
+            COFF,
+            NOFF,
+            CNOFF,
+        };
+
+        [[nodiscard]] std::optional<OFFVariant> ParseOFFMagic(std::string_view line)
+        {
+            if (line == "OFF") return OFFVariant::Standard;
+            if (line == "COFF") return OFFVariant::COFF;
+            if (line == "NOFF") return OFFVariant::NOFF;
+            if (line == "CNOFF") return OFFVariant::CNOFF;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] float NormalizeOFFColorChannel(float value)
+        {
+            return value > 1.0f ? std::clamp(value / 255.0f, 0.0f, 1.0f) : std::clamp(value, 0.0f, 1.0f);
         }
 
         enum class PlyFormat
@@ -734,10 +766,13 @@ namespace Geometry::MeshIO
             }
         } while (line.empty() || line.front() == '#');
 
-        if (line != "OFF")
+        const auto variant = ParseOFFMagic(line);
+        if (!variant)
         {
             return InvalidMeshFormat();
         }
+        const bool hasNormals = (*variant == OFFVariant::NOFF || *variant == OFFVariant::CNOFF);
+        const bool hasColors = (*variant == OFFVariant::COFF || *variant == OFFVariant::CNOFF);
 
         do
         {
@@ -761,6 +796,16 @@ namespace Geometry::MeshIO
 
         std::vector<glm::vec3> vertices;
         vertices.reserve(*vertexCount);
+        std::vector<glm::vec3> normals;
+        if (hasNormals)
+        {
+            normals.reserve(*vertexCount);
+        }
+        std::vector<glm::vec4> colors;
+        if (hasColors)
+        {
+            colors.reserve(*vertexCount);
+        }
         for (std::size_t i = 0; i < *vertexCount; ++i)
         {
             if (!NextLine(*text, cursor, line))
@@ -785,6 +830,49 @@ namespace Geometry::MeshIO
                 return InvalidMeshFormat();
             }
             vertices.emplace_back(*x, *y, *z);
+
+            std::size_t tokenIdx = 3;
+
+            if (hasNormals)
+            {
+                glm::vec3 normal(0.0f, 1.0f, 0.0f);
+                if (tokenIdx + 2 < tokens.size())
+                {
+                    const auto nx = ParseNumber<float>(tokens[tokenIdx]);
+                    const auto ny = ParseNumber<float>(tokens[tokenIdx + 1]);
+                    const auto nz = ParseNumber<float>(tokens[tokenIdx + 2]);
+                    if (nx && ny && nz)
+                    {
+                        normal = glm::vec3(*nx, *ny, *nz);
+                    }
+                }
+                normals.push_back(normal);
+                tokenIdx += 3;
+            }
+
+            if (hasColors)
+            {
+                glm::vec4 color(0.0f, 0.0f, 0.0f, 1.0f);
+                if (tokenIdx + 2 < tokens.size())
+                {
+                    const auto r = ParseNumber<float>(tokens[tokenIdx]);
+                    const auto g = ParseNumber<float>(tokens[tokenIdx + 1]);
+                    const auto b = ParseNumber<float>(tokens[tokenIdx + 2]);
+                    if (r && g && b)
+                    {
+                        color = glm::vec4(NormalizeOFFColorChannel(*r),
+                                          NormalizeOFFColorChannel(*g),
+                                          NormalizeOFFColorChannel(*b),
+                                          1.0f);
+                    }
+                    tokenIdx += 3;
+                    if (tokenIdx < tokens.size())
+                    {
+                        (void)ParseNumber<float>(tokens[tokenIdx]);
+                    }
+                }
+                colors.push_back(color);
+            }
         }
 
         std::vector<std::vector<std::uint32_t>> faces;
@@ -806,7 +894,11 @@ namespace Geometry::MeshIO
                 return InvalidMeshFormat();
             }
             const auto count = ParseNumber<std::size_t>(tokens[0]);
-            if (!count || *count < 3 || tokens.size() < *count + 1)
+            if (!count || *count < 3)
+            {
+                continue;
+            }
+            if (tokens.size() < *count + 1)
             {
                 return InvalidMeshFormat();
             }
@@ -828,7 +920,7 @@ namespace Geometry::MeshIO
         const auto pathInfo = MakePathInfo(absolute_path);
         result.SourcePath = pathInfo.SourcePath;
         result.BasePath = pathInfo.BasePath;
-        PopulateResult(result, vertices, faces);
+        PopulateResult(result, vertices, faces, normals, colors);
         return result;
     }
 
