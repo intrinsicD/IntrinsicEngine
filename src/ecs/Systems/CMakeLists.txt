@@ -9,3 +9,5 @@ target_sources(${target_name}
 )
 
 target_include_directories(${target_name} PUBLIC .)
+
+target_link_libraries(${target_name} PRIVATE ExtrinsicCore)

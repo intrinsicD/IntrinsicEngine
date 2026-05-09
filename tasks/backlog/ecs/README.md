@@ -11,7 +11,7 @@ map.
 ## Tasks
 
 - [HARDEN-060 — Promote ECS scene bootstrap contract](../../active/HARDEN-060-ecs-scene-bootstrap-contract.md) (active).
-- [HARDEN-061 — Promote ECS hierarchy and transform system parity](HARDEN-061-ecs-hierarchy-transform-system-parity.md).
+- [HARDEN-061 — Promote ECS hierarchy and transform system parity](../../active/HARDEN-061-ecs-hierarchy-transform-system-parity.md) (active).
 - [HARDEN-062 — Harden ECS layering and component boundaries](HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
 - [HARDEN-063 — Define promoted ECS event and command seams](HARDEN-063-ecs-events-and-command-seams.md).
 - [HARDEN-064 — Define ECS collider and rigid-body authoring contracts](HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
