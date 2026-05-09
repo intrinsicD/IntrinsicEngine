@@ -49,4 +49,5 @@ python3 tools/docs/check_doc_links.py --root .
 - Adding physics components or rigid-body integration in this task.
 - Adding graphics-owned handles or GPU residency state to ECS components.
 
-
+## Execution log
+- 2026-05-09: Wired `tests/unit/ecs/Test.ECS.SceneRegistry.cpp` into `ECSTestObjs`/`IntrinsicECSTests` with the `ExtrinsicECS` module dep so promoted scene-registry coverage runs in the default ECS test target. Remaining required changes (scene bootstrap API, naming/dirty-tag reconciliation, README/parity docs) are unstarted.

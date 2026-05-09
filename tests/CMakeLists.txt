@@ -212,6 +212,7 @@ set(_ecs_test_files
     Test_RuntimeECS.cpp
     Test_FrameGraphSystems.cpp
     Test_EntityCommands.cpp
+    Test.ECS.SceneRegistry.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
     SEARCH_DIRS unit/ecs contract/ecs integration/runtime
@@ -220,7 +221,7 @@ intrinsic_resolve_test_sources(_ecs_test_sources
 intrinsic_test_object_lib(ECSTestObjs
     SOURCES
         ${_ecs_test_sources}
-    DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry
+    DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry ExtrinsicECS
 )
 
 # --- Contract/build checks ---
@@ -782,7 +783,7 @@ intrinsic_test_executable(IntrinsicCoreTests
 # --- Core + ECS (FrameGraph system integration) ---
 intrinsic_test_executable(IntrinsicECSTests
     OBJECTS  ECSTestObjs
-    LINK_LIBS IntrinsicCore IntrinsicECS
+    LINK_LIBS IntrinsicCore IntrinsicECS ExtrinsicECS
     LABELS unit ecs
 )
 
