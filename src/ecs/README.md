@@ -10,6 +10,7 @@ plain data; systems are stateless functions that operate on components.
 
 - `Extrinsic.ECS.Scene.Handle`
 - `Extrinsic.ECS.Scene.Registry`
+- `Extrinsic.ECS.Scene.Bootstrap`
 
 ### Components
 
@@ -38,6 +39,7 @@ plain data; systems are stateless functions that operate on components.
 ```text
 ECS.Scene.Handle.cppm
 ECS.Scene.Registry.cppm
+ECS.Scene.Bootstrap.{cppm,cpp}
 Components/
   ECS.Component.Transform.Local.cppm
   ECS.Component.Transform.World.cppm

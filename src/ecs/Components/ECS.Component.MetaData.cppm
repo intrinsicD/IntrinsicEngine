@@ -4,7 +4,7 @@ module;
 
 export module Extrinsic.ECS.Component.MetaData;
 
-namespace Extrinsic::ECS::Components
+export namespace Extrinsic::ECS::Components
 {
     struct MetaData
     {

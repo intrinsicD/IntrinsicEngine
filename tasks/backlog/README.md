@@ -41,7 +41,7 @@ Members:
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
 - [`assets/ASSETIO-001-asset-model-texture-ingest-ownership.md`](assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
 - [`geometry/GEOIO-002-geometry-io-parity-hardening.md`](geometry/GEOIO-002-geometry-io-parity-hardening.md)
-- [`ecs/HARDEN-060-ecs-scene-bootstrap-contract.md`](ecs/HARDEN-060-ecs-scene-bootstrap-contract.md)
+- [`ecs/HARDEN-060` (active)](../active/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061-ecs-hierarchy-transform-system-parity.md`](ecs/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
 - [`ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md`](ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
 
@@ -81,7 +81,7 @@ Promote ECS scene/hierarchy/component contracts out of `src/legacy` while
 keeping `ecs -> core` and explicit geometry handles only.
 
 Members:
-- [`ecs/HARDEN-060-ecs-scene-bootstrap-contract.md`](ecs/HARDEN-060-ecs-scene-bootstrap-contract.md).
+- [`ecs/HARDEN-060` (active)](../active/HARDEN-060-ecs-scene-bootstrap-contract.md).
 - [`ecs/HARDEN-061-ecs-hierarchy-transform-system-parity.md`](ecs/HARDEN-061-ecs-hierarchy-transform-system-parity.md).
 - [`ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md`](ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
 - [`ecs/HARDEN-063-ecs-events-and-command-seams.md`](ecs/HARDEN-063-ecs-events-and-command-seams.md).
