@@ -1,47 +1,125 @@
-Work on `/home/alex/Documents/IntrinsicEngine` using the repository’s agentic workflow.
+Operate on this IntrinsicEngine checkout using the repository's agentic workflow. The repo contract beats your prior habits; when in doubt, follow `AGENTS.md`.
 
-Start by reading `/AGENTS.md`; it is authoritative. Then read only the relevant `docs/agent/*` files according to the routing table in `AGENTS.md`:
-- read `docs/agent/task-format.md` before creating/promoting/retiring/updating task files,
-- read `docs/agent/review-checklist.md` before committing or reporting completion,
-- read architecture/method/benchmark/docs-sync guides only when the touched work triggers them.
+# Authority and reading order
 
-Use the available planning subagent first to reassess the current active-task state and recommend the next smallest robust slice.
+Read in this order, only as deep as the touched scope requires:
 
-Then:
-1. Inspect current state before choosing work:
-   - `git status --short --branch`
-   - recent `git log --oneline`
-   - sorted contents of `tasks/active/`
-2. Select the next active task by current status, blockers, urgency, dependency order, and recent history. Prefer the task whose file identifies the next implementation slice unless another active task is clearly more urgent.
-3. Read the selected active task file completely. Treat that file as the source of all task-specific goals, non-goals, required changes, tests, docs, acceptance criteria, verification commands, forbidden changes, and slice plan. Do not embed or invent task-specific policy in this prompt.
-4. Inspect the relevant source, tests, docs, backlog/done task cross-links, and generated files needed for that task until the owning subsystem and layer boundaries are clear.
-5. Work the selected task until either:
-   - the task is complete, verified, task/docs synced, and ready to retire to `tasks/done/`; or
-   - a meaningful, verified, committable slice from the task's slice plan is complete.
-6. If the task is long, split implementation into the smallest robust slices described by the task file or discovered during inspection. Keep each slice independently buildable, testable, and reviewable.
-7. Split commits by logical change. Prefer separate commits for independent implementation/test slices and for non-trivial docs/task synchronization. Never mix mechanical moves with semantic refactors in the same commit.
-8. Before committing, inspect `git status --short`, stage only intentional changes, and avoid including unrelated user/editor/build artifacts. If the environment cannot create commits, leave the working tree in committable groups and report the exact proposed commit boundaries.
-9. Add nonblocking clarification questions to the relevant backlog or active task file instead of blocking implementation when a robust default path is available.
-10. Retire completed active tasks to `tasks/done/` using the repository task format. Promote follow-up backlog tasks to `tasks/active/` only when the current active task is complete or the follow-up is genuinely required now.
-11. Preserve C++23, layer ownership, renderer/RHI/Vulkan boundaries where relevant, docs sync, task sync, and the default CPU/null correctness path unless the selected task explicitly and validly requires otherwise.
-12. When undecided, choose the more robust, deterministic, testable implementation that best satisfies the selected task's acceptance criteria.
+1. `/AGENTS.md` — authoritative contract. Mission, layering invariants, source-tree map, coding rules, method/test/benchmark/docs/CI protocols, task workflow. Re-read at the start of every session.
+2. `tasks/backlog/README.md` — convergence themes and cross-domain dependency anchors. Use this to pick what to work on.
+3. `docs/agent/*` — read only the routing-table entry that applies:
+   - `task-format.md` before creating, promoting, retiring, or materially editing a task file;
+   - `review-checklist.md` before committing or reporting completion;
+   - `architecture-review-checklist.md` when changing dependency boundaries, source layout, or runtime wiring;
+   - `method-workflow.md` / `method-review-checklist.md` for paper/method work under `methods/`;
+   - `benchmark-workflow.md` / `benchmark-review-checklist.md` for benchmark manifests, runners, baselines, or reports;
+   - `docs-sync-policy.md` when moving files, changing public APIs, or refreshing generated inventories.
 
-Verification discipline:
-- Run the selected task's focused verification commands first.
-- Run broader repository gates only when required by the task, by `AGENTS.md`, or by the scope of touched files.
-- Avoid stale/non-default build trees unless you confirm the compiler/toolchain supports the repository’s C++23 requirements.
-- Treat `Testing/Temporary/LastTestsFailed.log` as historical only; current pass/fail comes from the CTest command just run.
-- For noisy commands, use `set -o pipefail`, `tee`, and a bounded `tail`.
-- Prefer task-specific commands over generic examples. When the task requires the default CPU correctness gate, use:
-  ```bash
-  cmake --preset ci
-  cmake --build --preset ci --target IntrinsicTests
-  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-  ```
+Do not load every guide for every task. Do not invent task-specific policy not present in these files.
 
-Before reporting completion:
-- Read `docs/agent/review-checklist.md`.
-- Confirm scope matches the selected task or documented slice.
-- Confirm tests/docs/task records/generated inventories are synchronized for touched areas.
-- Confirm verification commands were run and summarize current results only from commands executed in this session.
-- Report completed commits or, if commits were not possible, the proposed commit split and remaining work.
+# Inspect state before choosing work
+
+```
+git status --short --branch
+git log --oneline -10
+ls tasks/active/
+```
+
+# Pick the next slice
+
+Apply this priority strictly:
+
+1. If `tasks/active/` contains an in-progress task that matches your branch/owner, continue that task.
+2. Otherwise pick from the backlog using `tasks/backlog/README.md` "Convergence themes":
+   - **Theme A — sandbox visible geometry (P0)** outranks all P1 work.
+   - **Theme D — ECS hardening parity** and **Theme E — geometry IO completion** are P0 prerequisites of Theme A.
+   - **Theme F — foundation seeds** is cross-cutting and may be touched alongside any theme.
+   - **Theme C — physics readiness** is gated by `ARCH-001`. Do not start `METHOD-001` runtime/ECS integration or `HARDEN-064` until `ARCH-001` lands.
+   - **Theme B — rendering modernization (GRAPHICS-035..058)** stays planning-only until Theme A is unblocked.
+   - **Theme G — bugs** trumps feature work for any reproducible regression.
+3. Respect cross-domain dependency anchors:
+   - `GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002`
+   - `GRAPHICS-029..034 ⇐ HARDEN-060..062`
+   - `METHOD-001 ⇐ ARCH-001`
+   - `HARDEN-064 ⇐ ARCH-001`
+   - `GRAPHICS-035..058 ⇐ Theme A`
+4. Within a theme, prefer the earliest unblocked task. "Unblocked" means every upstream dependency is either marked done in `tasks/done/` or explicitly recorded as out-of-scope in the candidate task file.
+
+Read the chosen task file completely before touching code. Treat it as the source of all task-specific goals, non-goals, required changes, tests, docs, acceptance criteria, verification commands, forbidden changes, and slice plan.
+
+If you intend to land more than one slice, promote the task into `tasks/active/` with status, owner, branch, and next verification step. Single-slice patches may stay in `tasks/backlog/` while you work them.
+
+# Implement the smallest robust slice
+
+- Preserve buildability and testability at every commit.
+- Never mix mechanical moves and semantic refactors in the same commit.
+- Keep patches scoped to one task unless batching is explicitly allowed by the task file.
+- Preserve the default CPU/null correctness path unless the task explicitly and validly requires otherwise.
+- Add or update tests for any behavior change. Label by category (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
+- Update docs and task records in the same patch as the code that motivates them.
+- Regenerate `docs/api/generated/module_inventory.md` (`python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`) when public module surfaces change.
+- Do not introduce new engine features during reorganization or hardening tasks.
+- Do not introduce backwards-compatibility shims unless the task records a removal task ID and timeline.
+- Do not import across layers in violation of `AGENTS.md` §2; runtime owns composition, graphics never sees live ECS, assets are CPU-only, etc.
+
+# Verify with the strongest relevant subset
+
+Run focused targets first; broaden only when the focused gate passes and the task requires it.
+
+Default CPU gate (when code/tests touched):
+```
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
+Docs/task-only changes:
+```
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+```
+
+Layering-touching changes (in addition to default gate):
+```
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+```
+
+Verification hygiene:
+- For noisy commands use `set -o pipefail`, `tee /tmp/<name>.log`, and a bounded `tail -n 120` so failures stay visible.
+- Do not trust non-default build trees unless their compiler satisfies the C++23 requirement.
+- Treat `Testing/Temporary/LastTestsFailed.log` as historical; current pass/fail comes from the CTest run you just executed.
+- Do not skip GPU/Vulkan tests with a flag rename; only the labels `gpu|vulkan|slow|flaky-quarantine` are exempt by default policy.
+
+# Review before commit
+
+Apply `docs/agent/review-checklist.md` to the touched scope. Confirm:
+- scope matches exactly one task or one documented slice from it,
+- layering invariants intact,
+- tests/docs/task records/generated inventories synchronized,
+- verification commands actually ran in this session,
+- temporary shims tracked with removal task IDs.
+
+# Commit and PR hygiene
+
+- One task per PR unless explicitly batched.
+- Separate commits for independent slices and for non-trivial docs/task synchronization.
+- Stage only intentional changes; never include editor/build artifacts.
+- Never use `--no-verify`, `--amend` on shared history, or force-push to `main`/`master`.
+- Commit messages: imperative subject ≤ 72 chars, body explains *why* and lists verification commands actually run.
+- Retire completed active tasks to `tasks/done/` with completion date (YYYY-MM-DD) and commit/PR reference. Promote follow-up backlog tasks to active only when the current task is complete or the follow-up is genuinely required now.
+
+# When stuck
+
+- Add a nonblocking clarification question to the relevant active/backlog task file rather than blocking; pick the more robust default and continue.
+- Prefer the more deterministic, more testable, smaller-blast-radius option.
+- If a task is too large for one slice, write the slice plan into the task file before implementing.
+- If state on disk surprises you (unfamiliar files, branches, locks), investigate before deleting or overwriting — it may be in-progress work.
+
+# Anti-patterns to refuse
+
+- Picking a Theme B/Theme C task while Theme A prerequisites are open.
+- Mixing mechanical moves with semantic edits in the same commit.
+- Adding speculative abstractions, fallback paths, or "nice-to-have" cleanup outside the selected task.
+- Bypassing the layering check by adding allowlist exceptions without a tracked removal task.
+- Reporting completion without running the task's verification commands in the current session.
+- Embedding task-specific policy into this prompt instead of into the task file.
