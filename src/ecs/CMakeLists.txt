@@ -7,8 +7,12 @@ target_sources(${target_name}
         ECS.Scene.Registry.cppm
         ECS.Scene.Handle.cppm
         ECS.Scene.Bootstrap.cppm
+        Hierarchy/ECS.Hierarchy.Structure.cppm
+        Hierarchy/ECS.Hierarchy.Mutation.cppm
         PRIVATE
         ECS.Scene.Bootstrap.cpp
+        Hierarchy/ECS.Hierarchy.Structure.cpp
+        Hierarchy/ECS.Hierarchy.Mutation.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

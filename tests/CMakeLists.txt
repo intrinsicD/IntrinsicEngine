@@ -214,6 +214,8 @@ set(_ecs_test_files
     Test_EntityCommands.cpp
     Test.ECS.SceneRegistry.cpp
     Test.ECS.SceneBootstrap.cpp
+    Test.ECS.Hierarchy.cpp
+    Test.ECS.TransformHierarchy.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
     SEARCH_DIRS unit/ecs contract/ecs integration/runtime

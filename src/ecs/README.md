@@ -12,6 +12,13 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.Scene.Registry`
 - `Extrinsic.ECS.Scene.Bootstrap`
 
+### Hierarchy
+
+- `Extrinsic.ECS.Hierarchy.Structure` — pure linked-list primitives, descendant
+  walks, and invariant checks. No transform dependency.
+- `Extrinsic.ECS.Hierarchy.Mutation` — public `Attach` / `Detach` API. Composes
+  structural mutation with world-position preservation across reparenting.
+
 ### Components
 
 - `Extrinsic.ECS.Component.Transform`
@@ -40,6 +47,9 @@ plain data; systems are stateless functions that operate on components.
 ECS.Scene.Handle.cppm
 ECS.Scene.Registry.cppm
 ECS.Scene.Bootstrap.{cppm,cpp}
+Hierarchy/
+  ECS.Hierarchy.Structure.{cppm,cpp}
+  ECS.Hierarchy.Mutation.{cppm,cpp}
 Components/
   ECS.Component.Transform.Local.cppm
   ECS.Component.Transform.World.cppm

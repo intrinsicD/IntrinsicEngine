@@ -16,6 +16,17 @@ export namespace Extrinsic::ECS::Components::Transform
         glm::vec3 Scale{1.0f};
     };
 
+    // CPU recompute marker. Producers stamp this when they mutate a local
+    // transform; the promoted TransformHierarchy traversal clears it after
+    // recomputing the world matrix. Distinct from the GPU-sync
+    // Components::DirtyTags::DirtyTransform tag, which is owned by render-sync.
+    struct IsDirtyTag
+    {
+    };
+
+    // Stamped by the promoted TransformHierarchy traversal on every entity
+    // whose world matrix it just rewrote (root or child). Consumers (e.g.,
+    // GPU scene sync) clear it once they have processed the update.
     struct WorldUpdatedTag
     {
     };
