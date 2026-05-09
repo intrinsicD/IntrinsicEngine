@@ -26,8 +26,9 @@ render-sync responsibility.
 pass named `"TransformUpdate"` declaring `Read<Transform::Component>`,
 `Read<Hierarchy::Component>`, `Write<Transform::WorldMatrix>`,
 `Write<Transform::IsDirtyTag>`, `Write<Transform::WorldUpdatedTag>`, and
-`Signal("TransformUpdate")`. The promoted simulate-phase bundle activation
-of this helper is tracked in `tasks/active/HARDEN-061-*` Slice 2.
+`Signal("TransformUpdate")`. Activation from a promoted simulate-phase bundle
+is deferred to a future runtime task; `HARDEN-061` is retired with that gap
+recorded in `docs/migration/nonlegacy-parity-matrix.md`.
 
 ## Render sync boundary
 

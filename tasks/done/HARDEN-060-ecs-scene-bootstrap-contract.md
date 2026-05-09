@@ -9,9 +9,9 @@
 - No mechanical deletion of legacy ECS modules.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/layer: `ecs`.
-- Branch: `claude/setup-agentic-workflow-uMvqx`.
+- Branch: `claude/setup-agentic-workflow-uMvqx` (merged via PR #780).
 - `src/ecs/ECS.Scene.Registry.cppm` currently exposes only create/destroy/clear plus explicit `Raw()` access.
 - Legacy `src/legacy/ECS/ECS.SceneBootstrap.*` defines the default entity contract: name metadata, local transform, world matrix, dirty transform marker, and hierarchy component.
 - Promoted ECS must remain reusable and must not import graphics, platform, runtime, or app layers.
@@ -79,3 +79,18 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Next verification step
 - CI must run `cmake --preset ci` + `cmake --build --preset ci --target IntrinsicECSTests` + `ctest --test-dir build/ci -L 'ecs' --output-on-failure --timeout 60`. Local sandbox lacks `clang-20` (default-preset compiler) so the C++ build is deferred to CI for this slice; structural checks (`tools/agents/check_task_policy.py --strict`, `tools/repo/check_layering.py --strict`, `tools/repo/check_test_layout.py --strict`, `tools/docs/check_doc_links.py`) ran clean in this session.
+
+## Completion
+- Completed: 2026-05-09.
+- Status: done.
+- Implementation commit: `de626eb` (`HARDEN-060: promote ECS scene bootstrap contract (Slice 1)`), merged via PR #781 (`8f38403`).
+- Slice 2 (dirty-transform observer/tag reconciliation) was deliberately scoped as "out of scope here" in the original slice plan and was effectively settled by `HARDEN-061` Slice 1's selection of `Components::Transform::IsDirtyTag` as the CPU recompute marker. The bootstrap contract continues to deliberately omit any dirty-transform tag at create time because newly created entities have identity local TRS = identity world matrix, so no recompute is required; `Test.ECS.SceneBootstrap` locks this absence.
+- Verified in tree at retirement:
+  - `src/ecs/ECS.Scene.Bootstrap.cppm` exports `Extrinsic::ECS::Scene::EmplaceDefaults(Registry&, EntityHandle, std::string_view)` and `CreateDefault(Registry&, std::string_view)`; impl in `src/ecs/ECS.Scene.Bootstrap.cpp` emplaces `MetaData{name}`, `Transform::Component{}`, `Transform::WorldMatrix{}`, and `Hierarchy::Component{}` only.
+  - `Extrinsic.ECS.Component.MetaData` and `Extrinsic.ECS.Component.Hierarchy` namespace blocks are exported.
+  - `tests/unit/ecs/Test.ECS.SceneBootstrap.cpp` is wired into `ECSTestObjs` and exercises default-component presence, custom name, identity world matrix, default hierarchy linkage, dirty-transform tag absence, invalid-handle behavior, and `Destroy`/`Clear` interactions.
+  - `src/ecs/README.md` lists `Extrinsic.ECS.Scene.Bootstrap`; `docs/migration/nonlegacy-parity-matrix.md` ECS row records bootstrap parity.
+  - `python3 tools/agents/check_task_policy.py --root . --strict` — passed at retirement.
+  - `python3 tools/docs/check_doc_links.py --root .` — passed at retirement.
+  - `python3 tools/repo/check_layering.py --root src --strict` — passed at retirement.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` — passed at retirement.

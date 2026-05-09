@@ -41,8 +41,8 @@ Members:
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
 - [`assets/ASSETIO-001-asset-model-texture-ingest-ownership.md`](assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
 - [`geometry/GEOIO-002-geometry-io-parity-hardening.md`](geometry/GEOIO-002-geometry-io-parity-hardening.md)
-- [`ecs/HARDEN-060` (active)](../active/HARDEN-060-ecs-scene-bootstrap-contract.md)
-- [`ecs/HARDEN-061` (active)](../active/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
+- [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
+- [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
 - [`ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md`](ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
 
 ### Theme B — Rendering modernization (P1, gated by Theme A)
@@ -81,8 +81,8 @@ Promote ECS scene/hierarchy/component contracts out of `src/legacy` while
 keeping `ecs -> core` and explicit geometry handles only.
 
 Members:
-- [`ecs/HARDEN-060` (active)](../active/HARDEN-060-ecs-scene-bootstrap-contract.md).
-- [`ecs/HARDEN-061` (active)](../active/HARDEN-061-ecs-hierarchy-transform-system-parity.md).
+- [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md).
+- [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md).
 - [`ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md`](ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
 - [`ecs/HARDEN-063-ecs-events-and-command-seams.md`](ecs/HARDEN-063-ecs-events-and-command-seams.md).
 - [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme C).
@@ -122,7 +122,8 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
 - **GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002.** Asset-backed mesh residency
   depends on promoted asset routing, which depends on geometry decoder parity.
 - **GRAPHICS-029..034 ⇐ HARDEN-060..062.** Sandbox renderable extraction needs
-  promoted ECS scene/hierarchy/transform parity.
+  promoted ECS scene/hierarchy/transform parity. `HARDEN-060` and `HARDEN-061`
+  are retired to `tasks/done/`; `HARDEN-062` remains as the active gate.
 - **METHOD-001 ⇐ ARCH-001.** Rigid-body reference must wait for the physics
   layer ownership decision before runtime/ECS integration.
 - **HARDEN-064 ⇐ ARCH-001.** ECS collider/rigid-body authoring contract must
