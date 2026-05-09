@@ -362,13 +362,26 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   GRAPHICS-029-Impl-A/B/C are identified but not opened; Impl-B depends on
   GRAPHICS-030-Impl-A landing `ProceduralGeometryRef`. Sandbox stays
   policy-light; no GPU-typed ECS components.
-- [GRAPHICS-030 — Procedural-source geometry residency bridge (planning)](GRAPHICS-030-runtime-geometry-residency-bridge.md):
-  planning-only first concrete slice of the GRAPHICS-028 contract; locks down
-  procedural-geometry descriptor shape, cache identity and refcount,
-  generation-tracking sentinel, packer placement, lifecycle ordering, failure
-  modes, diagnostics, and extensibility to other procedural primitives.
-  Implementation child slices (`GRAPHICS-030-Impl-A/B/C/D`) are identified but
-  not opened. Asset-backed mesh residency is deferred to GRAPHICS-034.
+- [GRAPHICS-030 — Procedural-source geometry residency bridge (planning)](../../done/GRAPHICS-030-runtime-geometry-residency-bridge.md):
+  retired planning-only first concrete slice of the GRAPHICS-028 contract; locked
+  the procedural-geometry descriptor shape (closed `ProceduralGeometryKind` enum
+  + POD `ProceduralGeometryParams`), cache identity (`ProceduralGeometryKey =
+  (Kind, ParamsHash)`), `Runtime::ProceduralGeometryCache` placement on
+  `RenderExtractionCache`, refcount/deferred-retire semantics aligned with
+  `Graphics::GpuAssetCache::Tick(currentFrame, framesInFlight)`, the
+  procedural-sentinel rule (default `Assets::AssetId{}` so GRAPHICS-023C
+  observation short-circuits via `HasSourceAsset()`), per-kind packer placement
+  in `Extrinsic.Runtime.ProceduralGeometryPacker`, the
+  detect/EnsureResident/AllocateInstance/refresh/SetInstanceGeometry/transform-
+  drain ordering, fail-closed failure modes and counters
+  (`ProceduralGeometryUploads`/`ReuseHits`/`Releases`/`FreeRetires`/
+  `Failed*`/`MissingPacker`/`InvalidParams`/`RefCountSaturated`/
+  `ProceduralAndAssetSourceConflict`), O(1) steady-state characteristics,
+  contract-test seam (`FindRenderableSidecarForTest`), extensibility to
+  Cube/Quad/Sphere/LineStrip behind enum + packer additions only, and a
+  layering audit confirming `ecs → core` and no new graphics edges.
+  Implementation children `GRAPHICS-030-Impl-A/B/C/D` are identified but not
+  opened. Asset-backed mesh residency is deferred to GRAPHICS-034.
 - [GRAPHICS-031 — Default debug surface material and missing-material fallback (planning)](GRAPHICS-031-default-debug-surface-material.md):
   planning-only definition of a deterministic default/debug surface material
   plus an explicit, testable missing-material fallback policy; locks down
