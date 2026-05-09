@@ -31,9 +31,7 @@ jobs:
       - name: Run benchmark smoke runner
         env:
           GIT_COMMIT: ${{ github.sha }}
-        run: |
-          mkdir -p build/ci/benchmark/IntrinsicBenchmarkSmoke
-          build/ci/IntrinsicBenchmarkSmoke build/ci/benchmark/IntrinsicBenchmarkSmoke/result.json
+        run: cmake --build --preset ci --target IntrinsicBenchmarks
 
       - name: Validate benchmark result JSON
         run: python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark --strict
