@@ -428,6 +428,62 @@ planning task; the current promoted runtime extraction cache already owns the
 partial sidecar for render hints, instance allocation/free, transform/light/
 visualization submission, and consumed `DirtyTransform` clearing.
 
+## Reference scene bootstrap
+
+`GRAPHICS-029` records the planning contract for the runtime-owned, opt-in
+reference scene that produces at least one renderable candidate observable by
+`Runtime.RenderExtraction`. The bootstrap owner is `runtime`: a planned module
+`Extrinsic.Runtime.ReferenceScene` (source `src/runtime/Runtime.ReferenceScene.cppm`)
+exposes an `IReferenceSceneProvider` interface plus a `ReferenceSceneRegistry`
+container; `Engine::Initialize()` resolves a single
+`EngineConfig::ReferenceScene::Selector` value (default
+`ReferenceSceneSelector::Triangle`) and invokes the matching provider after the
+scene registry is constructed but before the first frame. A
+`bool m_ReferenceSceneInstalled` guard rejects double-install; teardown runs in
+`Engine::Shutdown()` before scene tear-down. `Sandbox::main.cpp` does not flip the
+flag — `CreateReferenceEngineConfig()` flips
+`EngineConfig::ReferenceScene::Enabled = true` so sandbox stays policy-light per
+the app/runtime boundary.
+
+The first provider, `TriangleProvider`, creates exactly one entity through the
+HARDEN-060 `ECS::Scene::CreateDefault(scene, "ReferenceTriangle")` API. The
+entity carries `MetaData{ EntityName = "ReferenceTriangle" }`,
+`Transform::Component{}` (identity), `Transform::WorldMatrix{}` (identity),
+`Hierarchy::Component{}` (no parent/children), exactly one
+`Graphics::Components::RenderSurface{ Domain = SourceDomain::Vertex }` render
+hint, and — once GRAPHICS-030-Impl-A lands — the CPU-only
+`ECS::Components::ProceduralGeometryRef{ Kind = ProceduralGeometryKind::Triangle }`
+linking it to the procedural-source residency bridge. No GPU-typed value type
+(`GpuSceneSlot`, `GpuInstanceHandle`, `RHI::*Handle`, bindless index, material
+lease) is attached to the entity; residency state stays in the runtime extraction
+sidecar per GRAPHICS-028. No light is created; the GRAPHICS-031 default debug
+surface material is unlit by contract, so the first milestone composes through
+the null renderer without lighting work.
+
+Camera authorship is forward-compatible with GRAPHICS-017Q `CameraControllers`.
+The provider returns an optional `Graphics::CameraViewInput` value (default
+position `(0, 0, 3)` looking at the origin, 45° vertical FoV, near 0.1, far
+100, aspect from `RenderFrameInput::Viewport`); `Engine::BuildRenderFrameInput()`
+substitutes that value into `RenderFrameInput::Camera` while no controller is
+wired. When `CameraControllers` opens, the seed value becomes its starting
+state with no contract change. Determinism for tests is achieved at the
+content layer through `MetaData::EntityName` and the provider-returned entity
+span, not through `entt::entity` IDs (entt does not promise allocator
+determinism across registries).
+
+The reference scene module imports only ECS scene/component modules,
+`Graphics.Component.RenderGeometry` (CPU-only render-hint value types already
+imported by `Runtime.RenderExtraction`), `Graphics.CameraSnapshots` for
+`CameraViewInput`, and `Core.Config.Engine`. It does not import
+`Extrinsic.Graphics.GpuWorld`, `Extrinsic.Graphics.Renderer`,
+`Extrinsic.Graphics.GpuAssetCache`, any `Extrinsic.RHI.*`,
+`Extrinsic.Asset.*`, or `Extrinsic.Platform.*`, so the AGENTS.md §2 layering
+invariants and the GRAPHICS-028 residency-bridge contract both hold.
+Implementation children GRAPHICS-029-Impl-A (skeleton + config plumbing),
+Impl-B (`TriangleProvider` + camera seed + contract test), and the optional
+Impl-C (additional providers gated on GRAPHICS-030/034) are identified but
+not opened.
+
 ## Graphics asset residency
 
 - `src/graphics/assets/Graphics.GpuAssetCache.cppm` maps promoted

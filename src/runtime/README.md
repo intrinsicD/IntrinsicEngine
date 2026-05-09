@@ -14,11 +14,22 @@ startup/shutdown.
 | `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
 
+Planned modules (decisions recorded, implementation children identified but not yet opened):
+
+| Planned module | Planning task | Responsibility |
+|---|---|---|
+| `Extrinsic.Runtime.ReferenceScene` | [`GRAPHICS-029` (done)](../../tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md) | Opt-in runtime-owned reference scene bootstrap. Exposes `IReferenceSceneProvider` and `ReferenceSceneRegistry`; `Engine::Initialize()` invokes the configured `EngineConfig::ReferenceScene::Selector` provider once, after scene registry construction, before the first frame. Default provider `TriangleProvider` creates one entity through `ECS::Scene::CreateDefault("ReferenceTriangle")` carrying HARDEN-060 default components plus exactly one `Graphics::Components::RenderSurface` and (once GRAPHICS-030-Impl-A lands) `ECS::Components::ProceduralGeometryRef{ Triangle }`. No GPU-typed value type attaches to the entity; camera authorship returns a `CameraViewInput` seed substituted into `RenderFrameInput::Camera` and forward-compatible with the GRAPHICS-017Q `CameraControllers` umbrella. |
+
 `Extrinsic.Runtime.Engine` exports `CreateReferenceEngineConfig()` so reference
 applications can request the standard runtime configuration without importing
 lower-layer `core` config modules directly. Applications may pass the returned
 config to `Engine`; runtime remains responsible for interpreting subsystem
-configuration and composition.
+configuration and composition. Per `GRAPHICS-029`, `CreateReferenceEngineConfig()`
+will flip `EngineConfig::ReferenceScene::Enabled = true` and
+`Selector = ReferenceSceneSelector::Triangle` once
+`Extrinsic.Runtime.ReferenceScene` lands; the default-constructed
+`EngineConfig{}` keeps `Enabled = false` so existing CPU/null tests do not
+regress.
 
 ## Canonical frame loop phases (`Engine::RunFrame`)
 
