@@ -45,6 +45,28 @@ TEST(ShortestPath, MeshBackedGraphViewTriangleChoosesDirectEdge)
     EXPECT_EQ(path->EdgeCount(), 1u);
 }
 
+TEST(ShortestPath, MeshBackedGraphViewReusesSharedConnectivityProperties)
+{
+    auto mesh = MakeSingleTriangle();
+
+    const auto meshVertexConnectivity = mesh.VertexProperties().Get<Geometry::Graph::VertexConnectivity>("v:connectivity");
+    const auto meshHalfedgeConnectivity = mesh.HalfedgeProperties().Get<Geometry::Graph::HalfedgeConnectivity>("h:connectivity");
+    ASSERT_TRUE(meshVertexConnectivity.IsValid());
+    ASSERT_TRUE(meshHalfedgeConnectivity.IsValid());
+
+    Geometry::Graph::Graph graph = MakeMeshBackedGraphView(mesh);
+
+    const auto graphVertexConnectivity = graph.VertexProperties().Get<Geometry::Graph::VertexConnectivity>("v:connectivity");
+    const auto graphHalfedgeConnectivity = graph.HalfedgeProperties().Get<Geometry::Graph::HalfedgeConnectivity>("h:connectivity");
+    ASSERT_TRUE(graphVertexConnectivity.IsValid());
+    ASSERT_TRUE(graphHalfedgeConnectivity.IsValid());
+
+    EXPECT_EQ(meshVertexConnectivity.Handle().Id(), graphVertexConnectivity.Handle().Id());
+    EXPECT_EQ(meshHalfedgeConnectivity.Handle().Id(), graphHalfedgeConnectivity.Handle().Id());
+    EXPECT_FALSE(mesh.VertexProperties().Exists("v:graph_connectivity"));
+    EXPECT_FALSE(mesh.HalfedgeProperties().Exists("h:graph_connectivity"));
+}
+
 TEST(ShortestPath, ReturnsNulloptWhenBothSetsEmpty)
 {
     auto mesh = MakeSingleTriangle();

@@ -33,6 +33,7 @@ export namespace Geometry::HalfedgeMesh
         Mesh();
         Mesh(PropertySet& vertices, PropertySet& halfedges, PropertySet& edges, PropertySet& faces, size_t &deletedVertices, size_t &deletedEdges, size_t &deletedFaces) noexcept;
         Mesh(const Mesh &other);
+        Mesh(Mesh &&other) noexcept;
         ~Mesh();
 
         Mesh &operator=(const Mesh &other) noexcept;
@@ -132,8 +133,8 @@ export namespace Geometry::HalfedgeMesh
         [[nodiscard]] VertexHandle FromVertex(HalfedgeHandle h) const { return ToVertex(OppositeHalfedge(h)); }
         void SetVertex(HalfedgeHandle h, VertexHandle v) { m_HConn[h].Vertex = v; }
 
-        [[nodiscard]] FaceHandle Face(HalfedgeHandle h) const { return m_HConn[h].Face; }
-        void SetFace(HalfedgeHandle h, FaceHandle f) { m_HConn[h].Face = f; }
+        [[nodiscard]] FaceHandle Face(HalfedgeHandle h) const;
+        void SetFace(HalfedgeHandle h, FaceHandle f);
 
         [[nodiscard]] HalfedgeHandle NextHalfedge(HalfedgeHandle h) const { return m_HConn[h].Next; }
         [[nodiscard]] HalfedgeHandle PrevHalfedge(HalfedgeHandle h) const { return m_HConn[h].Prev; }

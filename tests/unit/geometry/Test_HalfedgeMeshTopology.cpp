@@ -279,6 +279,31 @@ TEST(HalfedgeMesh_Topology, FromToVertex_Consistency)
     }
 }
 
+TEST(HalfedgeMesh_Topology, FaceIncidence_IsSeparateFromGraphTraversalConnectivity)
+{
+    auto mesh = MakeSingleTriangle();
+
+    auto graphConnectivity = mesh.HalfedgeProperties().Get<Geometry::Graph::HalfedgeConnectivity>("h:connectivity");
+    auto faceConnectivity = mesh.HalfedgeProperties().Get<Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>("h:face");
+    ASSERT_TRUE(graphConnectivity.IsValid());
+    ASSERT_TRUE(faceConnectivity.IsValid());
+    EXPECT_FALSE(mesh.HalfedgeProperties().Get<Geometry::HalfedgeMesh::HalfedgeFaceConnectivity>("h:connectivity").IsValid());
+
+    const Geometry::FaceHandle face{0};
+    auto h = mesh.Halfedge(face);
+    const auto start = h;
+    std::size_t count = 0;
+    do
+    {
+        EXPECT_EQ(faceConnectivity[h.Index].Face, face);
+        EXPECT_EQ(mesh.Face(h), face);
+        h = mesh.NextHalfedge(h);
+        ++count;
+        ASSERT_LE(count, mesh.HalfedgesSize());
+    } while (h != start);
+    EXPECT_EQ(count, 3u);
+}
+
 // =============================================================================
 // Edge ↔ Halfedge Relationship
 // =============================================================================

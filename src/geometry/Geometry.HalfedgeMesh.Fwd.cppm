@@ -4,22 +4,19 @@ module;
 
 export module Geometry.HalfedgeMesh.Fwd;
 
+export import Geometry.Graph.Fwd;
 import Geometry.Properties;
 
 export namespace Geometry::HalfedgeMesh
 {
-    // PMP-style connectivity
-    struct VertexConnectivity
-    {
-        HalfedgeHandle Halfedge{};
-    };
+    // Graph traversal connectivity is shared with Geometry::Graph so graph views
+    // over mesh property storage can reuse the canonical face-free properties.
+    using VertexConnectivity = Graph::VertexConnectivity;
+    using HalfedgeConnectivity = Graph::HalfedgeConnectivity;
 
-    struct HalfedgeConnectivity
+    struct HalfedgeFaceConnectivity
     {
-        VertexHandle Vertex{};     // to-vertex
         FaceHandle Face{};         // incident face (invalid => boundary)
-        HalfedgeHandle Next{};
-        HalfedgeHandle Prev{};
     };
 
     struct FaceConnectivity

@@ -27,6 +27,20 @@ namespace Geometry::HalfedgeMesh
         m_VertexAttrTransfer.clear();
     }
 
+    FaceHandle Mesh::Face(HalfedgeHandle h) const
+    {
+        auto faceConnectivity = m_Halfedges.Get<HalfedgeFaceConnectivity>("h:face");
+        assert(faceConnectivity.IsValid());
+        return faceConnectivity[h.Index].Face;
+    }
+
+    void Mesh::SetFace(HalfedgeHandle h, FaceHandle f)
+    {
+        auto faceConnectivity = m_Halfedges.Get<HalfedgeFaceConnectivity>("h:face");
+        assert(faceConnectivity.IsValid());
+        faceConnectivity[h.Index].Face = f;
+    }
+
     namespace
     {
         [[nodiscard]] float ComputeTransferParameter(
@@ -197,6 +211,36 @@ namespace Geometry::HalfedgeMesh
         m_AddFaceIsNew = rhs.m_AddFaceIsNew;
         m_AddFaceNeedsAdjust = rhs.m_AddFaceNeedsAdjust;
         m_AddFaceNextCache = rhs.m_AddFaceNextCache;
+        EnsureProperties();
+    }
+
+    Mesh::Mesh(Mesh&& rhs) noexcept
+        : m_Properties(std::make_shared<MeshProperties>())
+          , m_Vertices(m_Properties->Vertices)
+          , m_Halfedges(m_Properties->Halfedges)
+          , m_Edges(m_Properties->Edges)
+          , m_Faces(m_Properties->Faces)
+          , m_DeletedVertices(m_Properties->DeletedVertices)
+          , m_DeletedEdges(m_Properties->DeletedEdges)
+          , m_DeletedFaces(m_Properties->DeletedFaces)
+    {
+        m_Vertices = std::move(rhs.m_Vertices);
+        m_Halfedges = std::move(rhs.m_Halfedges);
+        m_Edges = std::move(rhs.m_Edges);
+        m_Faces = std::move(rhs.m_Faces);
+        m_DeletedVertices = rhs.m_DeletedVertices;
+        m_DeletedEdges = rhs.m_DeletedEdges;
+        m_DeletedFaces = rhs.m_DeletedFaces;
+        m_VertexAttrTransfer = std::move(rhs.m_VertexAttrTransfer);
+        m_AddFaceVertices = std::move(rhs.m_AddFaceVertices);
+        m_AddFaceHalfedges = std::move(rhs.m_AddFaceHalfedges);
+        m_AddFaceIsNew = std::move(rhs.m_AddFaceIsNew);
+        m_AddFaceNeedsAdjust = std::move(rhs.m_AddFaceNeedsAdjust);
+        m_AddFaceNextCache = std::move(rhs.m_AddFaceNextCache);
+        m_IsSubmeshView = rhs.m_IsSubmeshView;
+        m_VertexRange = rhs.m_VertexRange;
+        m_EdgeRange = rhs.m_EdgeRange;
+        m_FaceRange = rhs.m_FaceRange;
         EnsureProperties();
     }
 
@@ -706,6 +750,7 @@ namespace Geometry::HalfedgeMesh
         m_VConn = VertexProperty<VertexConnectivity>(m_Vertices.GetOrAdd<VertexConnectivity>("v:connectivity", {}));
         m_HConn = HalfedgeProperty<HalfedgeConnectivity>(
             m_Halfedges.GetOrAdd<HalfedgeConnectivity>("h:connectivity", {}));
+        (void)m_Halfedges.GetOrAdd<HalfedgeFaceConnectivity>("h:face", {});
         m_FConn = FaceProperty<FaceConnectivity>(m_Faces.GetOrAdd<FaceConnectivity>("f:connectivity", {}));
 
         m_VDeleted = VertexProperty<bool>(m_Vertices.GetOrAdd<bool>("v:deleted", false));
@@ -960,14 +1005,15 @@ namespace Geometry::HalfedgeMesh
         // Prev is rebuilt from Next afterward because Collapse may leave
         // stale Prev pointers (the BCG reference implementation avoids this
         // by not storing Prev at all).
+        auto hFaceConn = HalfedgeProperty<HalfedgeFaceConnectivity>(m_Halfedges.GetOrAdd<HalfedgeFaceConnectivity>("h:face", {}));
         for (std::size_t i = 0; i < nh; ++i)
         {
             auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
             m_HConn[h].Vertex = vmap[VertexHandle{m_HConn[h].Vertex}];
             m_HConn[h].Next = hmap[HalfedgeHandle{m_HConn[h].Next}];
-            if (m_HConn[h].Face.IsValid())
+            if (hFaceConn[h].Face.IsValid())
             {
-                m_HConn[h].Face = fmap[FaceHandle{m_HConn[h].Face}];
+                hFaceConn[h].Face = fmap[FaceHandle{hFaceConn[h].Face}];
             }
         }
 

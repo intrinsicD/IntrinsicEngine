@@ -9,12 +9,21 @@
 - No performance claims without benchmark evidence.
 
 ## Context
-- Status: backlog.
-- Owner/agent: unassigned.
+- Status: done.
+- Owner/agent: GitHub Copilot.
 - Created: 2026-05-09 during BUG-002..BUG-005 hardening follow-up.
+- Completed: 2026-05-09.
+- Commit: this commit (`Split graph and mesh connectivity`).
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - Current issue: `Graph::VertexConnectivity` / `Graph::HalfedgeConnectivity` and `HalfedgeMesh::VertexConnectivity` / `HalfedgeMesh::HalfedgeConnectivity` duplicate graph traversal fields, but mesh halfedge connectivity also stores `FaceHandle`. Mesh-backed graph views currently need compatibility copying when property names collide by type.
 - Desired direction: keep graph connectivity face-free and put mesh face incidence into a separate mesh-owned property, rather than adding `FaceHandle` to `Graph::HalfedgeConnectivity`.
+
+## Implementation notes
+- `HalfedgeMesh::VertexConnectivity` and `HalfedgeMesh::HalfedgeConnectivity` are aliases for the canonical `Graph` traversal connectivity records.
+- Mesh-owned halfedge face incidence is stored in `HalfedgeMesh::HalfedgeFaceConnectivity` under `h:face`.
+- `Graph::EnsureProperties()` no longer imports `HalfedgeMesh` or creates `v:graph_connectivity` / `h:graph_connectivity` compatibility copies.
+- `HalfedgeMesh::Mesh` now has an explicit move constructor so module-boundary return-by-value paths keep mesh property ownership deterministic after the public connectivity surface change.
+- No temporary compatibility alias remains after this migration.
 
 ## Required changes
 - Define shared graph traversal connectivity as the canonical representation for:
@@ -48,14 +57,24 @@
 
 ## Verification
 ```bash
-cmake --preset ci
-cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicTests
+cmake --preset ci -DFETCHCONTENT_BASE_DIR=/home/alex/Documents/IntrinsicEngine/build/ci-agent-deps -DINTRINSIC_DEPS_CACHE_DIR=/home/alex/Documents/IntrinsicEngine/build/ci-agent-deps
+cmake --build --preset ci --target IntrinsicGeometryTests
 ctest --test-dir build/ci --output-on-failure -R 'ShortestPath|HalfedgeMesh|MeshTopology' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
 ```
+
+Results on 2026-05-09:
+
+- Fresh `build/ci` configure and `IntrinsicGeometryTests` build passed.
+- Focused geometry CTest passed: 93/93 tests.
+- `IntrinsicTests` build passed after resuming from the terminal timeout.
+- Default CPU CTest gate completed but failed 14 graphics/runtime graphics tests outside the GEOM-003 touched scope: `GpuAssetCache.*`, `GraphicsMaterialSystem.ResolvesReadyTextureAssetBindingsToBindlessMaterialParams`, and `RendererFrameLifecycle.*`. Geometry tests in the gate passed.
+- Layering, test layout, task policy, and doc link checks passed.
 
 ## Forbidden changes
 - Do not add `FaceHandle` to `Graph::HalfedgeConnectivity`.
