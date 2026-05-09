@@ -2181,7 +2181,14 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
 
         std::optional<Geometry::ShortestPath::ShortestPathResult> result{};
         if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity); meshData && meshData->MeshRef)
-            result = Geometry::ShortestPath::Dijkstra(*meshData->MeshRef, sources, targets, params);
+        {
+            Geometry::Graph::Graph graph(meshData->MeshRef->VertexProperties(),
+                                         meshData->MeshRef->EdgeProperties(),
+                                         meshData->MeshRef->HalfedgeProperties(),
+                                         meshData->MeshRef->DeletedVertexCount(),
+                                         meshData->MeshRef->DeletedEdgeCount());
+            result = Geometry::ShortestPath::Dijkstra(graph, sources, targets, params);
+        }
         else if (auto* graphData = reg.try_get<ECS::Graph::Data>(entity); graphData && graphData->GraphRef)
             result = Geometry::ShortestPath::Dijkstra(*graphData->GraphRef, sources, targets, params);
 
@@ -2265,8 +2272,13 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
             std::optional<Geometry::Graph::Graph> extracted{};
             if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity); meshData && meshData->MeshRef)
             {
-                result = Geometry::ShortestPath::Dijkstra(*meshData->MeshRef, sources, targets, params);
-                if (result) extracted = Geometry::ShortestPath::ExtractPathGraph(*meshData->MeshRef, *result, sources, targets);
+                Geometry::Graph::Graph graph(meshData->MeshRef->VertexProperties(),
+                                             meshData->MeshRef->EdgeProperties(),
+                                             meshData->MeshRef->HalfedgeProperties(),
+                                             meshData->MeshRef->DeletedVertexCount(),
+                                             meshData->MeshRef->DeletedEdgeCount());
+                result = Geometry::ShortestPath::Dijkstra(graph, sources, targets, params);
+                if (result) extracted = Geometry::ShortestPath::ExtractPathGraph(graph, *result, sources, targets);
             }
             else if (auto* graphData = reg.try_get<ECS::Graph::Data>(entity); graphData && graphData->GraphRef)
             {
