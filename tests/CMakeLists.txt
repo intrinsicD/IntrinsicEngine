@@ -241,6 +241,23 @@ intrinsic_test_object_lib(ContractBuildTestObjs
     DEPS IntrinsicCore IntrinsicECS IntrinsicGeometry
 )
 
+# --- ECS contract tests (CPU-only structural checks over src/ecs sources) ---
+# Reads ECS source files via std::filesystem to enforce the
+# ecs -> {core, geometry} dependency contract from /AGENTS.md §2 and to keep
+# canonical components free of higher-layer handles or solver-owned state.
+set(_ecs_contract_test_files
+    Test.ECS.LayeringBoundaries.cpp
+)
+intrinsic_resolve_test_sources(_ecs_contract_test_sources
+    SEARCH_DIRS contract/ecs
+    FILES ${_ecs_contract_test_files}
+)
+intrinsic_test_object_lib(EcsContractTestObjs
+    SOURCES
+        ${_ecs_contract_test_sources}
+    DEPS ExtrinsicCore
+)
+
 # --- Benchmark/SLO checks ---
 set(_benchmark_test_files
     Test_ArchitectureSLO.cpp
@@ -795,6 +812,13 @@ intrinsic_test_executable(IntrinsicContractBuildTests
     OBJECTS  ContractBuildTestObjs
     LINK_LIBS IntrinsicCore IntrinsicECS
     LABELS contract build
+)
+
+# --- ECS contract tests (CPU-only structural checks) ---
+intrinsic_test_executable(IntrinsicEcsContractTests
+    OBJECTS  EcsContractTestObjs
+    LINK_LIBS ExtrinsicCore
+    LABELS contract ecs
 )
 
 # --- Benchmark and SLO checks ---

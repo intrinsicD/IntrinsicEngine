@@ -21,8 +21,15 @@ target_sources(${target_name}
 
 target_include_directories(${target_name} PUBLIC .)
 
+# ExtrinsicECS link policy: only the dependencies actually imported by the
+# component module surface are linked here. The promoted ECS dependency
+# contract is `ecs -> {core, geometry}` (see /AGENTS.md §2). Components import
+# `Geometry.*` types directly (Sphere, AABB, OBB, Octree, ConvexHull,
+# Properties) and use `glm` for transform math; they do not import any
+# `Extrinsic.Asset.*`, `Extrinsic.RHI.*`, `Extrinsic.Graphics.*`,
+# `Extrinsic.Runtime.*`, or `Extrinsic.Platform.*` modules. ExtrinsicCore is
+# linked transitively via `Systems/CMakeLists.txt` for the
+# `Extrinsic.Core.FrameGraph` import in `ECS.System.TransformHierarchy`.
 target_link_libraries(${target_name} PRIVATE
-        ExtrinsicCore
-        ExtrinsicAssets
         IntrinsicGeometry
         glm::glm)
