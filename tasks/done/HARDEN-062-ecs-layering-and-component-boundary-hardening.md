@@ -10,9 +10,9 @@
 - No promotion of `Extrinsic::Assets::AssetId` (the typed `Core::StrongHandle<AssetTag>`) onto ECS components — adopting that type would create an `ecs -> assets` dependency edge that the current contract does not permit (`tools/repo/check_layering.py::ALLOWED_DEPS["ecs"] == {"core", "geometry"}`); recorded as a Slice 2 follow-up architecture decision rather than mechanical work in this slice.
 
 ## Context
-- Status: in-progress (Slice 1).
+- Status: done (Slice 1 merged; Slice 2 deferred — see Completion section).
 - Owner/agent: Claude (HARDEN-062).
-- Branch: `claude/setup-agentic-workflow-TvDlg`.
+- Branch: `claude/setup-agentic-workflow-TvDlg` (Slice 1, merged via PR #784).
 - Owner/layer: `ecs` with architecture review implications.
 - `AGENTS.md` allows `ecs -> core` and only explicitly required geometry handles/types.
 - `src/ecs/Components/CMakeLists.txt` previously linked `ExtrinsicCore`, `ExtrinsicAssets`, `IntrinsicGeometry`, and `glm::glm`. No component module imports any `Extrinsic.Asset.*` or `Extrinsic.Core.*` symbol; ExtrinsicCore enters `ExtrinsicECS` transitively via `Systems/CMakeLists.txt` for the `Extrinsic.Core.FrameGraph` import in `ECS.System.TransformHierarchy`.
@@ -91,3 +91,18 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Next verification step
 - CI must run `cmake --preset ci` + `cmake --build --preset ci --target IntrinsicECSTests IntrinsicContractBuildTests IntrinsicEcsContractTests` + `ctest --test-dir build/ci -L 'ecs|contract' --output-on-failure --timeout 60`. Local sandbox lacks `clang-20` (default-preset compiler) so the C++ build is deferred to CI for this slice.
+
+## Completion
+- Completed: 2026-05-09.
+- Status: done.
+- Implementation commit: `e6bc55c` (`HARDEN-062: promote ECS layering/component boundary hardening (Slice 1)`), merged via PR #784 (`32f4e02`).
+- Slice 2 (architecture decision on whether `ECS.Component.AssetInstance::Source::AssetId` should be promoted from `std::uint32_t` to the typed `Extrinsic::Assets::AssetId`, with conditional follow-up edits to `tools/repo/check_layering.py::ALLOWED_DEPS`, `Runtime.RenderExtraction`, and the contract test) is intentionally deferred. Adopting the typed handle would create a new `ecs -> assets` dependency edge that the current contract does not permit, and the current raw-`std::uint32_t` surface is functional for the runtime to assemble typed handles at the `ecs -> runtime -> graphics` seam. Slice 2 is genuinely a follow-up architecture decision, not a continuation of the boundary-hardening mechanical work in Slice 1, so it belongs to a future architecture task (to be filed if/when the typed-handle promotion is pursued) rather than to HARDEN-062.
+- Verified in tree at retirement:
+  - `src/ecs/Components/CMakeLists.txt` links only `IntrinsicGeometry` and `glm::glm`; the in-file comment records the `ecs -> {core, geometry}` policy and the transitive `ExtrinsicCore` entry via `Systems/CMakeLists.txt` for the `Extrinsic.Core.FrameGraph` import in `ECS.System.TransformHierarchy`.
+  - `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` is present and covers (1) prohibited high-layer imports under `src/ecs` (`Extrinsic.Graphics.*`, `Extrinsic.RHI.*`, `Extrinsic.Runtime.*`, `Extrinsic.Platform.*`, `Extrinsic.App.*`, all `Extrinsic.Asset.*` including `Asset.Registry`); (2) prohibited solver/runtime/RHI symbols anywhere under `src/ecs` (`PhysicsBodyHandle`, `RigidBodyHandle`, `BroadphaseProxyHandle`, `ContactCache`, `IslandId`, `SolverIndex`, `RhiTextureHandle`, `BindlessHandle`, `BindlessIndex`, `AssetService`); (3) `ECS.Component.AssetInstance` remains a CPU-only stable-ID surface; (4) `ECS.Component.Collider` rejects rigid-body / broadphase / contact-cache / island-id state; (5) `ECS.Component.Hierarchy` does not encode collider topology.
+  - `tests/CMakeLists.txt` wires `EcsContractTestObjs` and `IntrinsicEcsContractTests` with labels `contract;ecs`.
+  - `src/ecs/README.md` carries the dependency contract reference to `/AGENTS.md §2`, the contract-test cross-link, the linked-dependencies enumeration, the prohibited-handles list, the geometry-types-allowed enumeration, the AssetInstance raw-`std::uint32_t` follow-up rationale, the collider-vs-rigid-body split (with cross-links to `HARDEN-064` and `ARCH-001`), and the scene-hierarchy-vs-collider-hierarchy separation.
+  - `python3 tools/agents/check_task_policy.py --root . --strict` — passed at retirement.
+  - `python3 tools/docs/check_doc_links.py --root .` — passed at retirement.
+  - `python3 tools/repo/check_layering.py --root src --strict` — passed at retirement.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` — passed at retirement.
