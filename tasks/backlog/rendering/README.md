@@ -382,8 +382,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   layering audit confirming `ecs → core` and no new graphics edges.
   Implementation children `GRAPHICS-030-Impl-A/B/C/D` are identified but not
   opened. Asset-backed mesh residency is deferred to GRAPHICS-034.
-- [GRAPHICS-031 — Default debug surface material and missing-material fallback (planning)](GRAPHICS-031-default-debug-surface-material.md):
-  planning-only first slice of the default-material contract; locked the
+- [GRAPHICS-031 — Default debug surface material and missing-material fallback (planning)](../../done/GRAPHICS-031-default-debug-surface-material.md):
+  retired planning-only first slice of the default-material contract; locked the
   reuse of `kDefaultMaterialSlotIndex = 0u` as the
   `"Material.DefaultDebugSurface"` slot with
   `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
