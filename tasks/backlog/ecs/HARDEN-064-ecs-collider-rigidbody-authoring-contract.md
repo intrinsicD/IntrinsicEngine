@@ -4,16 +4,17 @@
 - Define promoted ECS authoring components for colliders and rigid bodies that can support future physics integration without storing physics-world internals.
 
 ## Non-goals
-- No rigid-body solver, broadphase, narrowphase, constraint solver, or runtime sync implementation.
-- No `src/physics` source layout change before `ARCH-001` is accepted.
+- No rigid-body solver, broadphase, narrowphase, constraint solver, or runtime sync implementation; CPU reference dynamics are owned by [`METHOD-001`](../methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
+- No `src/physics` source layout change before [`ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md) is accepted.
 - No graphics/RHI handle storage and no live runtime sidecars in canonical ECS components.
 - No dynamic concave mesh simulation support in the first collider contract.
 
 ## Context
-- Owner/layer: `ecs`, with architecture dependency on `ARCH-001` for any future `src/physics` layer.
+- Owner/layer: `ecs`, with architecture dependency on [`ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md) for any future `src/physics` layer.
 - Current promoted `src/ecs/Components/ECS.Component.Collider.cppm` stores only `std::vector<Geometry::Sphere>`.
 - Ideal model: `Collider` describes collision shape/material/filtering/trigger intent; `RigidBody` describes motion/mass/velocity/damping/sleep/CCD intent; physics world/runtime sidecars own solver handles, broadphase proxies, islands, contacts, warm-start caches, and writeback scheduling.
 - ECS hierarchy is scene/authoring hierarchy and must not be the implicit physics compound-collider representation.
+- Convergence: part of **Theme C — Physics readiness** and **Theme D — ECS hardening parity** in [`tasks/backlog/README.md`](../README.md). The CPU reference dynamics this contract enables live in [`METHOD-001`](../methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
 
 ## Required changes
 - Define separate ECS authoring components for collision and body motion intent:
