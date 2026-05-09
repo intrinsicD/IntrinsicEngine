@@ -309,6 +309,81 @@ available through the Vulkan 1.2/1.3 feature chain.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 
+## Operational readiness gate (GRAPHICS-033)
+
+The promoted Vulkan backend remains fail-closed until the GRAPHICS-033
+operational gate is implemented and satisfied. `RHI::IDevice::IsOperational()`
+must become `true` only after one Vulkan-owned single-source evaluator reports an
+operational status; runtime, renderer, and app code must not re-derive this from
+CMake options, config flags, bootstrap snapshots, or fallback counters.
+
+Implementation child A owns the exported diagnostic seam:
+`EvaluateVulkanOperationalStatus(const VulkanOperationalInputs&) ->
+VulkanOperationalStatus`. The inputs are backend-public, non-native booleans /
+reason bits (no `Vk*` handles). `VulkanDevice::IsOperational()` and runtime
+startup reconciliation consume this result.
+
+Ordered gate checklist:
+
+1. Build/run gate is reconciled: the Vulkan backend is compiled when requested,
+   `RenderConfig::EnablePromotedVulkanDevice == true`, and runtime requested
+   Vulkan instead of Null.
+2. volk, `VkInstance`, platform surface, selected physical device, and recorded
+   graphics/present/transfer queue-family indices are live.
+3. Logical device, required Vulkan 1.2/1.3 feature chain, `VK_KHR_swapchain`, VMA
+   allocator, and heap-budget diagnostics are live.
+4. Swapchain create/acquire/present/resize/recreate paths satisfy the
+   GRAPHICS-013CQ fullscreen-present contract, including format, color-space,
+   present-mode, and device-lost policy.
+5. Per-frame command pools, primary command buffers, fences, acquire/render
+   semaphores, and the transfer timeline-semaphore path are live for the
+   GRAPHICS-032 minimal recipe.
+6. `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug` recording bodies
+   execute against the real command context and match the CPU/null recipe
+   command contract.
+7. Barrier/layout validation for `SceneColorHDR`, `SceneDepth`, imported
+   backbuffer finalization, and transfer uploads reports no GRAPHICS-022 hard
+   errors.
+8. Public service fallback reconciliation is complete: bindless heap, transfer
+   queue, pipeline manager, swapchain/backbuffer import, and command context all
+   report one consistent operational answer.
+9. Validation-layer policy has run for the gate check; validation errors during
+   the gate force fail-closed status.
+
+Status is append-only and reasoned rather than bool-only:
+`VulkanOperationalStatusCode { NotCompiled, NotRequested,
+RequestedButUnsupported, RequestedButFailedInit, RequestedButValidationFailed,
+RequestedButIncompleteGate, Operational }`. `VulkanOperationalReason` records the
+first failing gate (for example `MissingInstance`, `MissingSurface`,
+`NoSuitablePhysicalDevice`, `MissingRequiredExtension`, `MissingRequiredFeature`,
+`LogicalDeviceFailed`, `AllocatorFailed`, `SwapchainFailed`,
+`CommandSyncFailed`, `MinimalRecipeRecordingMissing`, `BarrierValidationFailed`,
+`PublicServiceReconciliationFailed`, `ValidationLayerError`, `DeviceLost`, or
+`SurfaceLost`). Future gates append reasons without rewriting existing values.
+
+Runtime reconciliation is fixed by this truth table:
+
+| CompiledIn | Requested | HostSupports | InitSucceeded | GateStatus | Effective device | Counter increment | Warn breadcrumb | Runtime result |
+|---|---|---|---|---|---|---|---|---|
+| false | false | n/a | n/a | `NotRequested` | Null | none | no | continue |
+| false | true | n/a | n/a | `NotCompiled` | Null | `VulkanFallbackToNullCount` | `VulkanRequestedButNotOperational` once | continue |
+| true | false | n/a | n/a | `NotRequested` | Null | none | no | continue |
+| true | true | false | false | `RequestedButUnsupported` | Null | `VulkanFallbackToNullCount` | `VulkanRequestedButNotOperational` once | continue |
+| true | true | true | false | `RequestedButFailedInit` | Null | `VulkanFallbackToNullCount`, `VulkanInitFailureCount` | `VulkanRequestedButNotOperational` once | continue |
+| true | true | true | true | `RequestedButValidationFailed` | Null | `VulkanFallbackToNullCount`, `VulkanValidationErrorCount` | `VulkanRequestedButNotOperational` once | continue |
+| true | true | true | true | `RequestedButIncompleteGate` | Null | `VulkanFallbackToNullCount`, `VulkanOperationalGateFailureCount` | `VulkanRequestedButNotOperational` once | continue |
+| true | true | true | true | `Operational` | Vulkan | none | no | continue |
+
+Runtime never aborts solely because requested Vulkan falls back to Null. The
+diagnostic surface is a Vulkan-owned `VulkanOperationalDiagnosticsSnapshot` with
+process-monotonic counters (`VulkanFallbackToNullCount`,
+`VulkanInitFailureCount`, `VulkanValidationErrorCount`,
+`VulkanOperationalGateFailureCount`, `VulkanDeviceLostOperationalDropCount`) and
+a fixed-size reason histogram. Runtime reads the snapshot at startup, after
+device reset/recreate attempts, and after false→true / true→false operational
+transitions; renderer code still gates only on `IDevice::IsOperational()` and
+backend-neutral render-graph stats.
+
 ## Module surface
 
 | Module | Exported API |

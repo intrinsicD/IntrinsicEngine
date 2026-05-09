@@ -36,7 +36,7 @@ Members:
 - [`rendering/GRAPHICS-030` (done)](../done/GRAPHICS-030-runtime-geometry-residency-bridge.md)
 - [`rendering/GRAPHICS-031` (done)](../done/GRAPHICS-031-default-debug-surface-material.md)
 - [`rendering/GRAPHICS-032` (done)](../done/GRAPHICS-032-minimal-surface-present-command-path.md)
-- [`rendering/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](rendering/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)
+- [`rendering/GRAPHICS-033` (done)](../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)
 - [`rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md`](rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
 - [`assets/ASSETIO-001-asset-model-texture-ingest-ownership.md`](assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)

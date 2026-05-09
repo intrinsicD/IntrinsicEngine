@@ -423,13 +423,15 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   recipe-vs-default isolation, failure modes, performance bounds, and layering.
   Implementation child slices (`GRAPHICS-032-Impl-A/B/C/D`) are identified but
   not opened. Vulkan operational-readiness defers to GRAPHICS-033.
-- [GRAPHICS-033 — Vulkan operational readiness and runtime fallback diagnostics (planning)](GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
-  planning-only operational-gate definition for the promoted Vulkan backend;
-  locks down the gate enumeration, single-source `IsOperational` function,
-  reason enum, reconciliation truth table, diagnostic counters and
-  breadcrumbs, validation-layer policy, required-vs-optional extensions,
-  queue-family ownership rules, hot-reload/swapchain transitions, test split,
-  performance characteristics, extensibility, and layering. Implementation
+- [GRAPHICS-033 — Vulkan operational readiness and runtime fallback diagnostics (planning)](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
+  retired planning-only operational-gate definition for the promoted Vulkan
+  backend; locks the ordered gate checklist, single-source
+  `EvaluateVulkanOperationalStatus(...)` status seam, append-only status/reason
+  enums, runtime reconciliation truth table, `VulkanRequestedButNotOperational`
+  startup breadcrumb, Vulkan-owned operational diagnostics snapshot,
+  validation-layer fail-closed policy, required-vs-optional capability split,
+  queue-family ownership rules, swapchain/device-loss transition handling, test
+  split, performance characteristics, extensibility, and layering. Implementation
   child slices (`GRAPHICS-033-Impl-A/B/C/D`) are identified but not opened;
   fail-closed behavior is preserved.
 - [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
