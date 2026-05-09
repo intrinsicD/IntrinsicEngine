@@ -63,3 +63,36 @@ Create a preset/toolchain that pins Clang 20 so developer machines and CI select
 ## Additional container caveat (non-blocking for libs/tests)
 
 Some containers do not provide X11 RandR headers; CMake enables `INTRINSIC_HEADLESS_NO_GLFW=ON` in that case. This disables GLFW-dependent runtime/sandbox modules but still allows core libraries and headless tests to build.
+
+## Dependency cache recovery
+
+The repository centralizes FetchContent checkouts under `external/cache/`. CMake
+serializes dependency population with per-dependency locks and validates required
+marker files before reusing an existing `<name>-src` directory.
+
+If an interrupted configure leaves a partial checkout, an online configure removes
+the incomplete source tree before repopulating it. Offline configures fail closed
+with a deterministic message because `INTRINSIC_OFFLINE_DEPS=ON` must not use the
+network.
+
+Safe manual recovery steps:
+
+```bash
+rm -rf external/cache/glm-src external/cache/glm-build external/cache/glm-subbuild
+rm -rf external/cache/json-src external/cache/json-build external/cache/json-subbuild
+rm -rf external/cache/volk-src external/cache/volk-build external/cache/volk-subbuild
+cmake --preset ci
+```
+
+For offline workflows, repopulate the missing dependency directories first, then
+configure with `INTRINSIC_OFFLINE_DEPS=ON`.
+
+## Blocked follow-on CI steps
+
+Some local CI sweeps intentionally continue after a build failure to collect logs.
+CTest, SLO, and benchmark-result validation are dependent steps: they require the
+producer targets and output directories to exist. Workflows use
+`tools/ci/check_prerequisites.py` to report these as `BLOCKED` prerequisite
+failures instead of presenting missing binaries or missing benchmark directories
+as the root cause.
+

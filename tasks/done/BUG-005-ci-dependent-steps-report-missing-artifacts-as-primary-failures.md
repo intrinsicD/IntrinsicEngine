@@ -9,8 +9,8 @@
 - No broad workflow redesign beyond explicit artifact/dependency guards.
 
 ## Context
-- Status: backlog.
-- Owner/agent: unassigned.
+- Status: done 2026-05-09.
+- Owner/agent: Copilot.
 - Observed: 2026-05-09 while continuing the local CI sweep after earlier build/configure failures.
 - Symptom: downstream checks fail with misleading missing-artifact errors:
   - `ctest --test-dir build/ci ...` reports 19 `*_NOT_BUILT` tests as failed/not run.
@@ -58,4 +58,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - `build/ci-full-logs/ctest_full_cpu.log` reports 19 `*_NOT_BUILT` tests as failed/not run.
 - `build/ci-full-logs/slo_framegraph.log` reports `bash: line 1: build/ci/bin/IntrinsicCoreTests: No such file or directory`.
 - `build/ci-full-logs/validate_benchmark_results.log` reports `ERROR: root path does not exist: build/ci/benchmark`.
+
+## Completion
+- Completed: 2026-05-09.
+- Commit reference: pending.
+- Notes: CI workflows now run `tools/ci/check_prerequisites.py` before CTest/SLO/benchmark dependent steps, benchmark validation reports missing roots as `BLOCKED`, and the nightly benchmark smoke command uses the configured `build/ci/bin` runtime output path.
 

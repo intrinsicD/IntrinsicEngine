@@ -59,7 +59,30 @@ jobs:
         run: python3 tools/repo/check_layering.py --root src --strict
 
       - name: Run full CPU test suite
-        run: ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
+        run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --skip-undeclared \
+            --targets \
+              IntrinsicCoreTests \
+              IntrinsicECSTests \
+              IntrinsicContractBuildTests \
+              IntrinsicEcsContractTests \
+              IntrinsicGeometryTests \
+              IntrinsicAssetUnitTests \
+              IntrinsicCoreWrapperUnitTests \
+              IntrinsicPlatformTests \
+              IntrinsicGraphicsAssetsUnitTests \
+              IntrinsicGraphicsRhiCpuUnitTests \
+              IntrinsicGraphicsRendererCpuUnitTests \
+              IntrinsicGraphicsContractTests \
+              IntrinsicGraphicsContractCpuTests \
+              IntrinsicRuntimeGraphicsCpuTests
+          ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 
       - name: SLO performance gate (FrameGraph 2k-node scenario)
-        run: ./build/ci/bin/IntrinsicCoreTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes
+        run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --targets IntrinsicBenchmarkTests
+          ./build/ci/bin/IntrinsicBenchmarkTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes

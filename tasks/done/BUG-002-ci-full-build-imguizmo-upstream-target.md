@@ -9,8 +9,8 @@
 - No unrelated FetchContent cache cleanup.
 
 ## Context
-- Status: backlog.
-- Owner/agent: unassigned.
+- Status: done 2026-05-09.
+- Owner/agent: Copilot.
 - Observed: 2026-05-09 while collecting local CI failures from `build/ci-full-logs/build_ci_full.log`.
 - Symptom: `cmake --build --preset ci` fails in `external/cache/imguizmo-build/CMakeFiles/imguizmo.dir/...` because upstream ImGuizmo sources include `imgui.h` but the upstream target only has `-I external/cache/imguizmo-src/src`.
 - Expected behavior: the default CI build should build repository targets only, or any exposed ImGuizmo target should have a complete dependency relationship on ImGui.
@@ -51,4 +51,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Captured evidence
 - `build/ci-full-logs/build_ci_full.log` shows failures in `ImGradient.cpp`, `ImSequencer.cpp`, `ImGuizmo.cpp`, `ImCurveEdit.cpp`, `GraphEditor.cpp`, and `ImVectorEditor.cpp` with `fatal error: 'imgui.h' file not found`.
+
+## Completion
+- Completed: 2026-05-09.
+- Commit reference: pending.
+- Notes: `cmake/Dependencies.cmake` now populates ImGuizmo sources without exposing the upstream `imguizmo` all-target; repository consumers continue to use `imguizmo_lib` linked to `imgui_lib`.
 

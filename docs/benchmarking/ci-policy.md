@@ -17,5 +17,7 @@ Benchmark execution is split by cost so CI remains fast while still guarding qua
 ## Failure policy
 
 - Schema validation failures are hard failures.
+- Missing benchmark result roots are reported as blocked prerequisite failures;
+  run the benchmark producer target before treating validation as actionable.
 - Smoke threshold regressions fail PR-fast once enabled in strict mode.
 - Heavy-suite regressions are triaged with explicit follow-up tasks.

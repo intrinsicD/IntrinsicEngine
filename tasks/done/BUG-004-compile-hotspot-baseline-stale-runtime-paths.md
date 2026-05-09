@@ -9,8 +9,8 @@
 - No broad rewrite of the hotspot analysis tool unless needed to handle migrated paths robustly.
 
 ## Context
-- Status: backlog.
-- Owner/agent: unassigned.
+- Status: done 2026-05-09.
+- Owner/agent: Copilot.
 - Observed: 2026-05-09 in `build/ci-full-logs/compile_hotspot_gate.log`.
 - Symptom: `python3 tools/analysis/compile_hotspots.py --build-dir build/ci --top 40 --json-out build/ci/compile_hotspots_report.json --baseline-json tools/analysis/compile_hotspot_baseline.json` exits with status 2 because the baseline requires sources that no longer appear in compile entries:
   - `src/Runtime/Geometry/Geometry.Octree.cppm`
@@ -51,4 +51,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 
 ## Captured evidence
 - `build/ci-full-logs/compile_hotspot_gate.log` shows the analyzer successfully writing `build/ci/compile_hotspots_report.json` before failing on the two missing baseline source entries.
+
+## Completion
+- Completed: 2026-05-09.
+- Commit reference: pending.
+- Notes: `tools/analysis/compile_hotspot_baseline.json` now references `src/geometry/Geometry.Octree.cppm` and `src/legacy/ECS/Systems/ECS.Systems.Transform.cpp`.
 

@@ -2183,8 +2183,8 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
         if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity); meshData && meshData->MeshRef)
         {
             Geometry::Graph::Graph graph(meshData->MeshRef->VertexProperties(),
-                                         meshData->MeshRef->EdgeProperties(),
                                          meshData->MeshRef->HalfedgeProperties(),
+                                         meshData->MeshRef->EdgeProperties(),
                                          meshData->MeshRef->DeletedVertexCount(),
                                          meshData->MeshRef->DeletedEdgeCount());
             result = Geometry::ShortestPath::Dijkstra(graph, sources, targets, params);
@@ -2273,8 +2273,8 @@ bool DrawShortestPathWidget(Runtime::Engine& engine,
             if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity); meshData && meshData->MeshRef)
             {
                 Geometry::Graph::Graph graph(meshData->MeshRef->VertexProperties(),
-                                             meshData->MeshRef->EdgeProperties(),
                                              meshData->MeshRef->HalfedgeProperties(),
+                                             meshData->MeshRef->EdgeProperties(),
                                              meshData->MeshRef->DeletedVertexCount(),
                                              meshData->MeshRef->DeletedEdgeCount());
                 result = Geometry::ShortestPath::Dijkstra(graph, sources, targets, params);

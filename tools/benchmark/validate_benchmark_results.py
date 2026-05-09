@@ -129,8 +129,11 @@ def main() -> int:
     args = parser.parse_args()
 
     if not args.root.exists():
-        print(f"ERROR: root path does not exist: {args.root}")
-        return 2
+        print(f"BLOCKED: benchmark result root does not exist: {args.root}")
+        print("Run the benchmark producer first, for example:")
+        print("  cmake --build --preset ci --target IntrinsicBenchmarks")
+        print("Then rerun benchmark result validation.")
+        return 3
 
     results = _discover_results(args.root)
     if not results:

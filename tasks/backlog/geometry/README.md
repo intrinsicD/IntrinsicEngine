@@ -9,6 +9,7 @@ map.
 
 ## Tasks
 
+- [GEOM-003 — Split shared graph connectivity from mesh face incidence](GEOM-003-shared-graph-mesh-connectivity.md).
 - [GEOIO-002 — Geometry IO parity hardening and exporters](GEOIO-002-geometry-io-parity-hardening.md).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
@@ -18,6 +19,8 @@ map.
   upstream gate for [`assets/ASSETIO-001`](../assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
   and asset-backed mesh residency in **Theme A — Shortest path to sandbox
   visible geometry** (`rendering/GRAPHICS-034`).
+- GEOM-003 is geometry algorithm hardening that keeps graph traversal topology
+  reusable while preserving mesh-owned face incidence.
 - RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.
 - Future geometry algorithm packages should follow
   [`docs/agent/method-workflow.md`](../../../docs/agent/method-workflow.md):

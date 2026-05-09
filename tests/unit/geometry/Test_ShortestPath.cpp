@@ -15,8 +15,8 @@ import Geometry;
 Geometry::Graph::Graph MakeMeshBackedGraphView(Geometry::HalfedgeMesh::Mesh& mesh)
 {
     Geometry::Graph::Graph graph(mesh.VertexProperties(),
-        mesh.EdgeProperties(),
         mesh.HalfedgeProperties(),
+        mesh.EdgeProperties(),
         mesh.DeletedVertexCount(),
         mesh.DeletedEdgeCount());
     return graph;

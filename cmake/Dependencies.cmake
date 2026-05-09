@@ -49,7 +49,7 @@ elseif(NOT INTRINSIC_UPDATE_DEPS)
         "Skip network update checks for already-populated FetchContent sources" FORCE)
 endif()
 
-function(intrinsic_lock_dependency dep_name)
+macro(intrinsic_lock_dependency dep_name)
     set(lock_path "${FETCHCONTENT_BASE_DIR}/.locks/${dep_name}.lock")
     file(LOCK "${lock_path}" GUARD FUNCTION TIMEOUT 600 RESULT_VARIABLE lock_result)
     if(NOT lock_result STREQUAL "0")
@@ -57,7 +57,7 @@ function(intrinsic_lock_dependency dep_name)
             "Timed out waiting for dependency cache lock: ${lock_path}\n"
             "Another configure may be populating '${dep_name}'. Stop stale CMake/Ninja/Git processes or remove the lock after verifying no configure is running.")
     endif()
-endfunction()
+endmacro()
 
 function(intrinsic_require_offline_source dep_name)
     string(TOUPPER "${dep_name}" dep_name_upper)
@@ -90,12 +90,77 @@ function(intrinsic_require_offline_source dep_name)
     endif()
 endfunction()
 
+function(intrinsic_dependency_source_dir out_var dep_name)
+    string(TOUPPER "${dep_name}" dep_name_upper)
+    set(dep_override_var "FETCHCONTENT_SOURCE_DIR_${dep_name_upper}")
+    if(DEFINED ${dep_override_var} AND NOT "${${dep_override_var}}" STREQUAL "")
+        set(${out_var} "${${dep_override_var}}" PARENT_SCOPE)
+    else()
+        set(${out_var} "${FETCHCONTENT_BASE_DIR}/${dep_name}-src" PARENT_SCOPE)
+    endif()
+endfunction()
+
+function(intrinsic_set_dependency_required_files dep_name)
+    set_property(GLOBAL PROPERTY "INTRINSIC_DEP_REQUIRED_FILES_${dep_name}" "${ARGN}")
+endfunction()
+
+function(intrinsic_validate_dependency_source dep_name phase)
+    get_property(required_files GLOBAL PROPERTY "INTRINSIC_DEP_REQUIRED_FILES_${dep_name}")
+    if(NOT required_files)
+        return()
+    endif()
+
+    intrinsic_dependency_source_dir(dep_source_dir ${dep_name})
+    if(NOT IS_DIRECTORY "${dep_source_dir}")
+        if(phase STREQUAL "pre" AND NOT INTRINSIC_OFFLINE_DEPS)
+            return()
+        endif()
+        message(FATAL_ERROR
+            "Dependency cache for '${dep_name}' is incomplete at: ${dep_source_dir}\n"
+            "Missing dependency source directory.\n"
+            "Recovery: remove ${dep_source_dir} and rerun configure with network access, or repopulate external/cache before configuring with INTRINSIC_OFFLINE_DEPS=ON."
+        )
+        return()
+    endif()
+
+    set(missing_files "")
+    foreach(required_file IN LISTS required_files)
+        if(NOT EXISTS "${dep_source_dir}/${required_file}")
+            list(APPEND missing_files "${required_file}")
+        endif()
+    endforeach()
+    if(NOT missing_files)
+        return()
+    endif()
+
+    string(REPLACE ";" "\n  - " missing_file_list "${missing_files}")
+    if(phase STREQUAL "pre" AND NOT INTRINSIC_OFFLINE_DEPS)
+        message(WARNING
+            "Dependency cache for '${dep_name}' is incomplete at: ${dep_source_dir}\n"
+            "Missing required file(s):\n  - ${missing_file_list}\n"
+            "Removing the partial source/build trees before FetchContent repopulates them."
+        )
+        file(REMOVE_RECURSE "${dep_source_dir}")
+        file(REMOVE_RECURSE "${FETCHCONTENT_BASE_DIR}/${dep_name}-build")
+        file(REMOVE_RECURSE "${FETCHCONTENT_BASE_DIR}/${dep_name}-subbuild")
+        return()
+    endif()
+
+    message(FATAL_ERROR
+        "Dependency cache for '${dep_name}' is incomplete at: ${dep_source_dir}\n"
+        "Missing required file(s):\n  - ${missing_file_list}\n"
+        "Recovery: remove ${dep_source_dir} and rerun configure with network access, or repopulate external/cache before configuring with INTRINSIC_OFFLINE_DEPS=ON."
+    )
+endfunction()
+
 function(intrinsic_make_available dep_name)
     intrinsic_lock_dependency(${dep_name})
     if(INTRINSIC_OFFLINE_DEPS)
         intrinsic_require_offline_source(${dep_name})
     endif()
+    intrinsic_validate_dependency_source(${dep_name} pre)
     FetchContent_MakeAvailable(${dep_name})
+    intrinsic_validate_dependency_source(${dep_name} post)
 endfunction()
 
 function(intrinsic_populate_source dep_name)
@@ -103,10 +168,16 @@ function(intrinsic_populate_source dep_name)
     if(INTRINSIC_OFFLINE_DEPS)
         intrinsic_require_offline_source(${dep_name})
     endif()
+    intrinsic_validate_dependency_source(${dep_name} pre)
     FetchContent_GetProperties(${dep_name})
+    intrinsic_dependency_source_dir(dep_source_dir ${dep_name})
+    if(NOT IS_DIRECTORY "${dep_source_dir}")
+        set(${dep_name}_POPULATED FALSE)
+    endif()
     if(NOT ${dep_name}_POPULATED)
         FetchContent_Populate(${dep_name})
     endif()
+    intrinsic_validate_dependency_source(${dep_name} post)
     FetchContent_GetProperties(${dep_name})
     set(${dep_name}_SOURCE_DIR "${${dep_name}_SOURCE_DIR}" PARENT_SCOPE)
     set(${dep_name}_BINARY_DIR "${${dep_name}_BINARY_DIR}" PARENT_SCOPE)
@@ -124,6 +195,13 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/g-truc/glm.git
         GIT_TAG 1.0.0
 )
+intrinsic_set_dependency_required_files(glm
+        CMakeLists.txt
+        glm/glm.hpp
+        glm/detail/setup.hpp
+        glm/detail/type_vec4.inl
+        glm/detail/type_mat4x4.inl
+)
 intrinsic_make_available(glm)
 #target_link_libraries(glm PUBLIC GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_ENABLE_EXPERIMENTAL GLM_RIGHT_HANDED)
 #target_link_libraries(glm PUBLIC IntrinsicConfig)
@@ -138,6 +216,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/google/googletest.git
         GIT_TAG v1.14.0
 )
+intrinsic_set_dependency_required_files(googletest CMakeLists.txt googletest/include/gtest/gtest.h)
 set(gtest_disable_pthreads ON CACHE BOOL "" FORCE)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 intrinsic_make_available(googletest)
@@ -148,6 +227,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/glfw/glfw.git
         GIT_TAG 3.3.9
 )
+intrinsic_set_dependency_required_files(glfw CMakeLists.txt include/GLFW/glfw3.h)
 if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -165,6 +245,7 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
             GIT_REPOSITORY https://github.com/zeux/volk.git
             GIT_TAG vulkan-sdk-1.3.268.0
     )
+    intrinsic_set_dependency_required_files(volk CMakeLists.txt volk.h volk.c)
     intrinsic_make_available(volk)
     find_package(Vulkan REQUIRED)
 
@@ -179,6 +260,7 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
             GIT_TAG v3.1.0
     )
 
+    intrinsic_set_dependency_required_files(vma CMakeLists.txt include/vk_mem_alloc.h)
     intrinsic_make_available(vma)
 endif()
 
@@ -190,6 +272,7 @@ FetchContent_Declare(
         GIT_TAG 5736b15f7ea0ffb08dd38af21067c314d6a3aae9  # 2023-01-30
 )
 
+intrinsic_set_dependency_required_files(stb stb_image.h stb_image_write.h)
 intrinsic_make_available(stb)
 
 add_library(stb INTERFACE)
@@ -200,6 +283,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/skypjack/entt.git
         GIT_TAG v3.13.0 # Use a stable tag
 )
+intrinsic_set_dependency_required_files(entt CMakeLists.txt src/entt/entity/registry.hpp)
 intrinsic_make_available(entt)
 
 # --- JSON (Required for TinyGLTF) ---
@@ -208,6 +292,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/nlohmann/json.git
         GIT_TAG v3.11.3
 )
+intrinsic_set_dependency_required_files(json CMakeLists.txt include/nlohmann/json.hpp single_include/nlohmann/json.hpp)
 intrinsic_make_available(json)
 
 # --- Draco (Required for glTF KHR_draco_mesh_compression) ---
@@ -219,6 +304,15 @@ FetchContent_Declare(
         GIT_TAG 1.5.7
         GIT_SUBMODULES ""
         GIT_SUBMODULES_RECURSE FALSE
+)
+intrinsic_set_dependency_required_files(draco
+        CMakeLists.txt
+        src/draco/compression/encode.h
+        src/draco/core/decoder_buffer.cc
+        src/draco/mesh/mesh.cc
+        src/draco/compression/mesh/mesh_decoder.cc
+        src/draco/io/file_utils.cc
+        src/draco/tools/draco_decoder.cc
 )
 intrinsic_make_available(draco)
 
@@ -238,6 +332,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
         GIT_TAG v2.9.0
 )
+intrinsic_set_dependency_required_files(tinygltf CMakeLists.txt tiny_gltf.h)
 intrinsic_make_available(tinygltf)
 
 # --- ImGui (Docking Branch) ---
@@ -247,6 +342,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
         GIT_TAG v1.92.5-docking
 )
+intrinsic_set_dependency_required_files(imgui imgui.cpp imgui.h backends/imgui_impl_vulkan.cpp)
 
 # ImGui is not a first-class CMake project; depending on CMake policies/version,
 # FetchContent_MakeAvailable(imgui) may not leave us with a reliable imgui_SOURCE_DIR.
@@ -259,7 +355,11 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
             GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
     )
 
-    intrinsic_make_available(imguizmo)
+    # Only populate ImGuizmo sources. Its upstream CMake target is a helper/demo
+    # target that does not know about this repository's ImGui include path; the
+    # repository-owned imguizmo_lib target below supplies the correct dependency.
+    intrinsic_set_dependency_required_files(imguizmo CMakeLists.txt src/ImGuizmo.cpp)
+    intrinsic_populate_source(imguizmo)
 endif()
 
 # Prefer the path returned by FetchContent_Populate; fall back to our offline cache layout.

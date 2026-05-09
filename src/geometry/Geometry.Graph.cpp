@@ -8,6 +8,8 @@ module;
 
 module Geometry.Graph;
 
+import Geometry.HalfedgeMesh.Fwd;
+
 namespace Geometry::Graph
 {
     Graph::Graph() : m_Properties(std::make_shared<GraphProperties>()), m_Vertices(m_Properties->Vertices),
@@ -88,10 +90,54 @@ namespace Geometry::Graph
     void Graph::EnsureProperties()
     {
         m_VPoint = Geometry::VertexProperty<glm::vec3>(m_Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.0f)));
-        m_VConn = Geometry::VertexProperty<VertexConnectivity>(
-            m_Vertices.GetOrAdd<VertexConnectivity>("v:connectivity", {}));
-        m_HConn = Geometry::HalfedgeProperty<HalfedgeConnectivity>(
-            m_Halfedges.GetOrAdd<HalfedgeConnectivity>("h:connectivity", {}));
+
+        auto vertexConnectivity = m_Vertices.Get<VertexConnectivity>("v:connectivity");
+        if (!vertexConnectivity && m_Vertices.Exists("v:connectivity"))
+        {
+            auto meshConnectivity = m_Vertices.Get<HalfedgeMesh::VertexConnectivity>("v:connectivity");
+            if (meshConnectivity)
+            {
+                vertexConnectivity = m_Vertices.GetOrAdd<VertexConnectivity>("v:graph_connectivity", {});
+                vertexConnectivity.Vector().assign(m_Vertices.Size(), VertexConnectivity{});
+                const auto& source = meshConnectivity.Vector();
+                auto& destination = vertexConnectivity.Vector();
+                const std::size_t count = std::min(source.size(), destination.size());
+                for (std::size_t i = 0; i < count; ++i)
+                {
+                    destination[i].Halfedge = source[i].Halfedge;
+                }
+            }
+        }
+        if (!vertexConnectivity)
+        {
+            vertexConnectivity = m_Vertices.GetOrAdd<VertexConnectivity>("v:connectivity", {});
+        }
+        m_VConn = Geometry::VertexProperty<VertexConnectivity>(vertexConnectivity);
+
+        auto halfedgeConnectivity = m_Halfedges.Get<HalfedgeConnectivity>("h:connectivity");
+        if (!halfedgeConnectivity && m_Halfedges.Exists("h:connectivity"))
+        {
+            auto meshConnectivity = m_Halfedges.Get<HalfedgeMesh::HalfedgeConnectivity>("h:connectivity");
+            if (meshConnectivity)
+            {
+                halfedgeConnectivity = m_Halfedges.GetOrAdd<HalfedgeConnectivity>("h:graph_connectivity", {});
+                halfedgeConnectivity.Vector().assign(m_Halfedges.Size(), HalfedgeConnectivity{});
+                const auto& source = meshConnectivity.Vector();
+                auto& destination = halfedgeConnectivity.Vector();
+                const std::size_t count = std::min(source.size(), destination.size());
+                for (std::size_t i = 0; i < count; ++i)
+                {
+                    destination[i].Vertex = source[i].Vertex;
+                    destination[i].Next = source[i].Next;
+                    destination[i].Prev = source[i].Prev;
+                }
+            }
+        }
+        if (!halfedgeConnectivity)
+        {
+            halfedgeConnectivity = m_Halfedges.GetOrAdd<HalfedgeConnectivity>("h:connectivity", {});
+        }
+        m_HConn = Geometry::HalfedgeProperty<HalfedgeConnectivity>(halfedgeConnectivity);
 
         m_VDeleted = Geometry::VertexProperty<bool>(m_Vertices.GetOrAdd<bool>("v:deleted", false));
         m_EDeleted = Geometry::EdgeProperty<bool>(m_Edges.GetOrAdd<bool>("e:deleted", false));

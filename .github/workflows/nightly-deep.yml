@@ -44,7 +44,26 @@ jobs:
         run: cmake --build --preset ci
 
       - name: Run full CPU test suite
-        run: ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|flaky-quarantine" --timeout 60 -j$(nproc)
+        run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --skip-undeclared \
+            --targets \
+              IntrinsicCoreTests \
+              IntrinsicECSTests \
+              IntrinsicContractBuildTests \
+              IntrinsicEcsContractTests \
+              IntrinsicGeometryTests \
+              IntrinsicAssetUnitTests \
+              IntrinsicCoreWrapperUnitTests \
+              IntrinsicPlatformTests \
+              IntrinsicGraphicsAssetsUnitTests \
+              IntrinsicGraphicsRhiCpuUnitTests \
+              IntrinsicGraphicsRendererCpuUnitTests \
+              IntrinsicGraphicsContractTests \
+              IntrinsicGraphicsContractCpuTests \
+              IntrinsicRuntimeGraphicsCpuTests
+          ctest --test-dir build/ci --output-on-failure -LE "gpu|vulkan|flaky-quarantine" --timeout 60 -j$(nproc)
 
       - name: Run sanitizer-extended test pass (ASan)
         run: |
@@ -54,6 +73,10 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=address" \
             -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=address"
           cmake --build --preset ci --target IntrinsicTests
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --skip-undeclared \
+            --targets IntrinsicCoreTests IntrinsicECSTests IntrinsicGeometryTests IntrinsicContractBuildTests IntrinsicEcsContractTests
           ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression" -LE "gpu|vulkan|slow|flaky-quarantine" -j$(nproc)
 
       - name: Run sanitizer-extended test pass (UBSan)
@@ -64,10 +87,18 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=undefined" \
             -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="-fsanitize=undefined"
           cmake --build --preset ci --target IntrinsicTests
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --skip-undeclared \
+            --targets IntrinsicCoreTests IntrinsicECSTests IntrinsicGeometryTests IntrinsicContractBuildTests IntrinsicEcsContractTests
           ctest --test-dir build/ci --output-on-failure -L "unit|contract|integration|regression" -LE "gpu|vulkan|slow|flaky-quarantine" -j$(nproc)
 
       - name: Run SLO/performance tests
-        run: ctest --test-dir build/ci --output-on-failure -L "benchmark|slo"
+        run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --targets IntrinsicBenchmarkTests
+          ctest --test-dir build/ci --output-on-failure -L "benchmark|slo"
 
       - name: Compile hotspot report
         run: |
@@ -90,8 +121,15 @@ jobs:
         env:
           GIT_COMMIT: ${{ github.sha }}
         run: |
+          python3 tools/ci/check_prerequisites.py test-binaries \
+            --build-dir build/ci \
+            --targets IntrinsicBenchmarkSmoke
           mkdir -p build/ci/benchmark/nightly
-          build/ci/IntrinsicBenchmarkSmoke build/ci/benchmark/nightly/smoke_result.json
+          build/ci/bin/IntrinsicBenchmarkSmoke build/ci/benchmark/nightly/smoke_result.json
+          python3 tools/ci/check_prerequisites.py path \
+            --path build/ci/benchmark \
+            --kind dir \
+            --producer-target IntrinsicBenchmarks
           python3 tools/benchmark/validate_benchmark_results.py --root build/ci/benchmark
 
       - name: Upload nightly reports

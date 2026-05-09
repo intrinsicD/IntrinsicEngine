@@ -9,8 +9,8 @@
 - No unrelated build-performance tuning.
 
 ## Context
-- Status: backlog.
-- Owner/agent: unassigned.
+- Status: done 2026-05-09.
+- Owner/agent: Copilot.
 - Observed: 2026-05-09 while retrying CI commands against `build/ci` and `external/cache`.
 - Symptom: after a failed/incomplete population, subsequent configure/build steps fail from corrupted dependency trees:
   - `external/cache/glm-src` is missing headers such as `glm/glm.hpp`, `detail/type_vec3.hpp`, and `detail/setup.hpp`.
@@ -57,4 +57,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - `build/ci-full-logs/build_intrinsic_tests.log` and `build_intrinsic_tests_rerun.log` show missing GLM headers and JSON clone corruption.
 - `build/ci-full-logs/configure_asan.log` shows GLM CMake generation failing because `external/cache/glm-src/CMakeLists.txt` is missing.
 - `build/ci-full-logs/build_benchmark_smoke.log` shows Volk generation failing because `volk.h` is missing.
+
+## Completion
+- Completed: 2026-05-09.
+- Commit reference: pending.
+- Notes: dependency population now validates required source markers under `external/cache/<name>-src`; online configures remove incomplete source trees before repopulation, while offline configures fail with deterministic recovery guidance.
 
