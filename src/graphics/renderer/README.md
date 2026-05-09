@@ -113,6 +113,21 @@ human-readable summary should read `Findings.front().Message`.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
   gates, canonical resource declarations, pass-order introspection, and the
   backend-agnostic graph construction path used by the null renderer.
+- GRAPHICS-032 records `FrameRecipe::MinimalDebugSurface` as a separate opt-in
+  recipe contract with the stable label `recipe.minimal-debug-surface`. The
+  implementation must declare only
+  `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug`, writes
+  `SceneColorHDR`/`SceneDepth`, finalizes the imported `Backbuffer` through the
+  existing fullscreen-triangle `Pass.Present` contract, and never mutates the
+  default recipe's feature gates or skip/no-op expectations. Its CPU/null command
+  contract is property-based (`BeginRenderPass`, pipeline/descriptor/index-buffer
+  binds, `DrawIndexedIndirectCount` for `SurfaceOpaque`, then fullscreen
+  `Draw(3, 1, 0, 0)` for present) so tests assert pass labels, resource names,
+  bucket kind, draw kind, and counts rather than transient allocator/native
+  handles. Renderer diagnostics surface `MinimalSurfacePassExecutions`,
+  `MinimalPresentPassExecutions`, and `MinimalRecipeMissingPrerequisiteCount`;
+  missing material/pipeline, residency, eligible renderable, or attachment/import
+  authorization increments the prerequisite counter instead of silently skipping.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
@@ -605,7 +620,7 @@ human-readable summary should read `Findings.front().Message`.
   changes; `Extrinsic.Graphics.GpuWorld` continues to expose only its
   existing `UploadGeometry`/`FreeGeometry`/`SetInstanceGeometry` API.
 - Per
-  [`GRAPHICS-031`](../../../tasks/backlog/rendering/GRAPHICS-031-default-debug-surface-material.md),
+  [`GRAPHICS-031`](../../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
   the canonical missing-material fallback is the default debug surface
   material at slot 0 (`Extrinsic::Graphics::kDefaultMaterialSlotIndex`),
   registered by `MaterialSystem::Initialize()` as

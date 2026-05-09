@@ -411,14 +411,18 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   repopulation), `GRAPHICS-031-Impl-B` (substitution wiring + diagnostics
   counters), and the optional `GRAPHICS-031-Impl-C` (one additional
   debug variant) are identified but not opened.
-- [GRAPHICS-032 — Minimal surface and present command recording path (planning)](GRAPHICS-032-minimal-surface-present-command-path.md):
-  planning-only definition of the smallest visible-path command recording
-  bodies (recipe identity, pass set, render targets, backbuffer integration,
-  barrier model, CPU-mock command-stream contract, diagnostics, recipe-vs-
-  default isolation, extensibility, performance bounds, test split, failure
-  modes, layering). Implementation child slices
-  (`GRAPHICS-032-Impl-A/B/C/D`) are identified but not opened. Vulkan
-  operational-readiness defers to GRAPHICS-033.
+- [GRAPHICS-032 — Minimal surface and present command recording path (planning)](../../done/GRAPHICS-032-minimal-surface-present-command-path.md):
+  retired planning-only definition of the smallest visible-path command
+  recording bodies. It locks `FrameRecipe::MinimalDebugSurface` with label
+  `recipe.minimal-debug-surface`, the two-pass order
+  `Pass.Surface.MinimalDebug` → `Pass.Present.MinimalDebug`, `SceneColorHDR` +
+  `SceneDepth` target ownership, fullscreen-triangle present finalization,
+  compiler-inferred framegraph barriers, property-based CPU-mock command
+  assertions, diagnostics (`MinimalSurfacePassExecutions`,
+  `MinimalPresentPassExecutions`, `MinimalRecipeMissingPrerequisiteCount`),
+  recipe-vs-default isolation, failure modes, performance bounds, and layering.
+  Implementation child slices (`GRAPHICS-032-Impl-A/B/C/D`) are identified but
+  not opened. Vulkan operational-readiness defers to GRAPHICS-033.
 - [GRAPHICS-033 — Vulkan operational readiness and runtime fallback diagnostics (planning)](GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
   planning-only operational-gate definition for the promoted Vulkan backend;
   locks down the gate enumeration, single-source `IsOperational` function,

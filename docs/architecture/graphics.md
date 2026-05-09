@@ -685,7 +685,7 @@ never owns asset event subscription.
   (`kDefaultMaterialSlotIndex`). Stale or invalid material handles resolve to
   that fallback and increment deterministic CPU-visible diagnostics.
 - Per
-  [`GRAPHICS-031`](../../tasks/backlog/rendering/GRAPHICS-031-default-debug-surface-material.md),
+  [`GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
   slot 0 is registered as `"Material.DefaultDebugSurface"` with
   `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
   `MaterialFlags::Unlit`, and a deterministic non-black `BaseColorFactor`
@@ -705,7 +705,7 @@ never owns asset event subscription.
   debug surface lane consumes the existing `SurfaceOpaque` cull bucket; no
   new bucket, no new pass, no new descriptor set is introduced.
 - Per
-  [`GRAPHICS-031`](../../tasks/backlog/rendering/GRAPHICS-031-default-debug-surface-material.md),
+  [`GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
   the missing-material fallback policy is graphics-owned at snapshot
   consumption time: when the renderer copies a runtime-submitted snapshot
   record whose resolved material slot is unset or out-of-range, it

@@ -56,6 +56,49 @@ Default feature gates:
 
 The imported `Backbuffer` is declared once and finalized only by the `Present` declaration; intermediate passes write transient recipe resources instead of taking backbuffer ownership. At frame execution time the renderer resolves this import through `RHI::IDevice::GetBackbufferHandle(frame)` and never fabricates a placeholder swapchain handle. The renderer owns command-context `Begin()`/`End()` bracketing around render-graph barrier/command recording, while runtime remains responsible for calling `IDevice::Present(frame)` after `IRenderer::EndFrame(frame)`.
 
+### Minimal debug-surface recipe
+
+GRAPHICS-032 records the opt-in `FrameRecipe::MinimalDebugSurface` contract for
+the first visible retained surface path. Its stable diagnostic/test label is
+`recipe.minimal-debug-surface`. The implementation must keep it separate from
+the default recipe and must never mutate default-recipe feature gates, pass
+declarations, or skip/no-op statuses.
+
+The planned recipe declares exactly two passes in order:
+
+1. `Pass.Surface.MinimalDebug` — clears and writes `SceneColorHDR`, clears and
+   writes `SceneDepth`, consumes the `SurfaceOpaque` bucket, and records the
+   GRAPHICS-031 default debug surface material draw.
+2. `Pass.Present.MinimalDebug` — samples `SceneColorHDR` and finalizes the
+   imported `Backbuffer` through the CPU-testable fullscreen-triangle
+   `Pass.Present` form.
+
+There is no depth prepass, shadow, deferred composition, postprocess, debug-view,
+selection-outline, ImGui, copy, or blit path in this contract. `SceneColorHDR` is
+the single transient color target (`R16G16B16A16_SFLOAT`), `SceneDepth` is the
+single transient depth target (device depth format, clear 1.0, `CompareOp =
+Less`, depth-write enabled), and MSAA is fixed at 1×. The imported `Backbuffer`
+is still writable only by the `Present` declaration with `FinalizesBackbuffer =
+true`; backend-native `vkCmdCopyImage` / `vkCmdBlitImage` finalization is not the
+command contract.
+
+The planned recipe uses normal framegraph resource-use declarations and the existing
+compiler barrier inference: `SceneColorHDR` transitions from color-attachment
+write in `Pass.Surface.MinimalDebug` to sampled input in
+`Pass.Present.MinimalDebug`; `SceneDepth` has a transient depth-attachment
+lifetime. Queue-family ownership, acquire, submit, and present synchronization
+remain backend/runtime operational concerns from GRAPHICS-018/033 rather than
+recipe-local policy.
+
+Renderer diagnostics for this recipe contract use three named counters:
+`MinimalSurfacePassExecutions`, `MinimalPresentPassExecutions`, and
+`MinimalRecipeMissingPrerequisiteCount`. Missing default material/pipeline,
+present pipeline, surface residency/bucket, eligible renderable, attachment
+allocation, or imported-backbuffer authorization increments the prerequisite
+counter instead of silently skipping. CPU/null contract tests assert command
+properties (pass labels, resource names, bucket kind, draw kind/count) rather
+than native handles or transient allocation IDs.
+
 ## Picking and sub-element selection contract
 
 `PrimitiveId` is a hint produced by the picking pass, not a replacement for CPU-side geometry authority. Its high four bits encode the `SelectionPrimitiveDomain` (`None=0`, `Entity=1`, `Face=2`, `Edge=3`, `Point=4`) and the low 28 bits encode the domain-local primitive index, matching `EncodedSelectionId::DomainShift = 28u` and the `DomainMask = 0xFu << DomainShift` constants in `Extrinsic.Graphics.SelectionSystem`. Backends pack `(domain << 28) | (payload & 0x0FFFFFFFu)`; the CPU/null contract validates the same packing through `EncodeSelectionId(...)`, which is the single pack/unpack seam shared by graphics and runtime. Selection resolution follows these rules:
