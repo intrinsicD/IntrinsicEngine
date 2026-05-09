@@ -1,5 +1,5 @@
-// tests/Test_ShortestPath.cpp — Dijkstra shortest-path tests for meshes and graphs.
-// Covers: mesh/graph parity, path reconstruction, and empty-set semantics.
+// tests/Test_ShortestPath.cpp — Dijkstra shortest-path tests for graph-domain input.
+// Covers: mesh-backed graph views, pure graphs, path reconstruction, and empty-set semantics.
 
 #include <gtest/gtest.h>
 
@@ -12,7 +12,7 @@ import Geometry;
 
 #include "Test_MeshBuilders.h"
 
-Geometry::Graph::Graph GetGraph(Geometry::HalfedgeMesh::Mesh& mesh)
+Geometry::Graph::Graph MakeMeshBackedGraphView(Geometry::HalfedgeMesh::Mesh& mesh)
 {
     Geometry::Graph::Graph graph(mesh.VertexProperties(),
         mesh.EdgeProperties(),
@@ -22,13 +22,15 @@ Geometry::Graph::Graph GetGraph(Geometry::HalfedgeMesh::Mesh& mesh)
     return graph;
 }
 
-TEST(ShortestPath, MeshTriangleChoosesDirectEdge)
+TEST(ShortestPath, MeshBackedGraphViewTriangleChoosesDirectEdge)
 {
     auto mesh = MakeSingleTriangle();
     std::vector<Geometry::VertexHandle> sources{Geometry::VertexHandle{0}};
     std::vector<Geometry::VertexHandle> targets{Geometry::VertexHandle{2}};
 
-    Geometry::Graph::Graph graph = GetGraph(mesh);
+    // ShortestPath is graph-domain only; mesh-backed coverage passes a graph view
+    // that shares the mesh property storage.
+    Geometry::Graph::Graph graph = MakeMeshBackedGraphView(mesh);
 
     auto result = Geometry::ShortestPath::Dijkstra(graph, sources, targets);
     ASSERT_TRUE(result.has_value());
@@ -48,7 +50,7 @@ TEST(ShortestPath, ReturnsNulloptWhenBothSetsEmpty)
     auto mesh = MakeSingleTriangle();
     std::vector<Geometry::VertexHandle> empty;
 
-    Geometry::Graph::Graph graph = GetGraph(mesh);
+    Geometry::Graph::Graph graph = MakeMeshBackedGraphView(mesh);
 
     auto result = Geometry::ShortestPath::Dijkstra(graph, empty, empty);
     EXPECT_FALSE(result.has_value());
@@ -57,7 +59,7 @@ TEST(ShortestPath, ReturnsNulloptWhenBothSetsEmpty)
 TEST(ShortestPath, ReverseTreeWhenStartsEmpty)
 {
     auto mesh = MakeSingleTriangle();
-    Geometry::Graph::Graph graph = GetGraph(mesh);
+    Geometry::Graph::Graph graph = MakeMeshBackedGraphView(mesh);
     std::vector<Geometry::VertexHandle> empty;
     std::vector<Geometry::VertexHandle> targets{Geometry::VertexHandle{2}};
 
@@ -79,7 +81,7 @@ TEST(ShortestPath, ReverseTreeWhenStartsEmpty)
 TEST(ShortestPath, ForwardTreeWhenTargetsEmpty)
 {
     auto mesh = MakeSingleTriangle();
-    Geometry::Graph::Graph graph = GetGraph(mesh);
+    Geometry::Graph::Graph graph = MakeMeshBackedGraphView(mesh);
     std::vector<Geometry::VertexHandle> sources{Geometry::VertexHandle{0}};
     std::vector<Geometry::VertexHandle> empty;
 
@@ -98,7 +100,7 @@ TEST(ShortestPath, ForwardTreeWhenTargetsEmpty)
     EXPECT_EQ(path->EdgeCount(), 2u);
 }
 
-TEST(ShortestPath, GraphChainMatchesMeshStyleContract)
+TEST(ShortestPath, GraphChainMatchesMeshBackedGraphViewContract)
 {
     Geometry::Graph::Graph graph;
     auto v0 = graph.AddVertex(glm::vec3{0.0f, 0.0f, 0.0f});
@@ -146,10 +148,10 @@ TEST(ShortestPath, MultiGoalExtractionProducesNetwork)
     EXPECT_EQ(path->EdgeCount(), 2u);
 }
 
-TEST(ShortestPath, ReturnsNulloptForEmptyMesh)
+TEST(ShortestPath, ReturnsNulloptForEmptyMeshBackedGraphView)
 {
     Geometry::HalfedgeMesh::Mesh mesh;
-    Geometry::Graph::Graph graph = GetGraph(mesh);
+    Geometry::Graph::Graph graph = MakeMeshBackedGraphView(mesh);
     std::vector<Geometry::VertexHandle> sources{Geometry::VertexHandle{0}};
     std::vector<Geometry::VertexHandle> targets{Geometry::VertexHandle{1}};
 

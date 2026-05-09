@@ -36,7 +36,9 @@ export namespace Geometry::ShortestPath
         bool Converged{false};
         bool EarlyTerminated{false};
     };
-    // Compute a shortest-path tree on a mesh or graph.
+    // Compute a shortest-path tree on a graph-domain view.
+    // Mesh-backed callers should construct a Graph::Graph view from the mesh
+    // property sets before calling into this API.
     //
     // Empty-set semantics:
     //   - startVertices empty, endVertices empty -> std::nullopt (do nothing)
