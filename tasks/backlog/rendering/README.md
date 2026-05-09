@@ -394,6 +394,123 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   (`GRAPHICS-034-Impl-A/B/C/D/E`) are identified but not opened. Depends on
   GRAPHICS-028, GRAPHICS-030, and ASSETIO-001 ingest ownership.
 
+### Modernization roadmap (GRAPHICS-035..058)
+
+The tasks below form the agreed phased path from the current 2025-era
+foundation to a 2026+ feature set. The umbrella index is GRAPHICS-035; each
+leaf task is a planning-only slice following the GRAPHICS-029..034 pattern
+(implementation children identified but not opened). Phases are independently
+testable; each phase derisks the next.
+
+- [GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index)](GRAPHICS-035-modernization-roadmap.md):
+  records the agreed phased roadmap (Phase 1 frame structure, Phase 2 shader
+  & material modernization, Phase 3 RT & GI, Phase 4 research differentiators,
+  Phase 5 frontier). Parent of GRAPHICS-036..058. No implementation, no
+  shader/pipeline changes, no CMake option growth.
+
+#### Phase 1 — Modern frame structure
+
+- [GRAPHICS-036 — Pipelined frames and double-buffered render world (planning)](GRAPHICS-036-pipelined-frames-extraction-doublebuffer.md):
+  locks the contract for sim-N / render-N-1 pipelining against an immutable
+  double-buffered render world. Owner layers: `runtime` (pool + swap),
+  `graphics/renderer` (consumer). Depends on GRAPHICS-002, GRAPHICS-016.
+- [GRAPHICS-037 — Async compute and multi-queue scheduling in the frame graph (planning)](GRAPHICS-037-async-compute-multi-queue-rendergraph.md):
+  locks `QueueAffinity` enum, partitioning, cross-queue timeline-semaphore
+  edges, ownership transfer, and CPU-testable null-RHI mocks. Depends on
+  GRAPHICS-022, GRAPHICS-018T.
+- [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (planning)](GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
+  locks HZB resource shape + build pass + phase-1/phase-2 cull shader
+  extension preserving the 8-bucket lane contract. Depends on GRAPHICS-007.
+- [GRAPHICS-039 — Clustered light binning (planning)](GRAPHICS-039-clustered-light-binning.md):
+  locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
+  binding. Depends on GRAPHICS-009.
+- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (planning)](GRAPHICS-040-taa-and-reconstructor-interface.md):
+  locks sub-pixel jitter, motion-vector buffer, history color buffer, and the
+  vendor-agnostic `IReconstructor` seam (DLSS/FSR/XeSS/MetalFX/NRD plug-in
+  point). Depends on GRAPHICS-013A, GRAPHICS-036.
+
+#### Phase 2 — Shader & material modernization
+
+- [GRAPHICS-041 — Slang as canonical shading language with module compilation and hot reload (planning)](GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md):
+  locks offline Slang compilation under `tools/`, module/generic system,
+  hot-reload retire-deadline wiring, autodiff annotation policy. Depends on
+  GRAPHICS-006, GRAPHICS-023.
+- [GRAPHICS-042 — PBR feature completeness and IBL (planning)](GRAPHICS-042-pbr-feature-completeness-and-ibl.md):
+  locks GGX multi-scatter compensation, sheen, anisotropy, clear-coat, and
+  split-sum IBL with prefiltered envmap + DFG LUT. Depends on GRAPHICS-006,
+  GRAPHICS-009.
+- [GRAPHICS-043 — Visibility buffer recipe and deferred materialization (planning)](GRAPHICS-043-visibility-buffer-deferred-materialization.md):
+  locks vis-buffer encoding, tile classification, per-material compute
+  materialization kernels with bindless sampling. Depends on GRAPHICS-008,
+  GRAPHICS-041, GRAPHICS-044.
+- [GRAPHICS-044 — Meshlet geometry representation in GpuGeometryRecord (planning)](GRAPHICS-044-meshlet-geometry-representation.md):
+  locks meshlet table extension on `GpuGeometryRecord` (≤ 64 vertices, ≤ 124
+  primitives, bounding sphere + normal cone), authoring-time meshletization
+  in `assets/`. Depends on GRAPHICS-004.
+
+#### Phase 3 — Ray tracing and global illumination
+
+- [GRAPHICS-045 — Ray tracing RHI extension (IRayTracingDevice) (planning)](GRAPHICS-045-ray-tracing-rhi-extension.md):
+  locks the optional `IRayTracingDevice` capability surface (BLAS/TLAS,
+  inline RT in compute, ray pipelines + SBT) and the `GRAPHICS-033`
+  operational-gate extension policy. Depends on GRAPHICS-033.
+- [GRAPHICS-046 — Hybrid GI: ReSTIR DI/GI hardware path and software fallback (planning)](GRAPHICS-046-hybrid-gi-restir-and-fallback.md):
+  locks `GiPathKind` recipe selection, ReSTIR DI/GI passes + reservoir
+  buffers (HW), DDGI probe volume + screen-space probes (SW). Depends on
+  GRAPHICS-039, GRAPHICS-045.
+- [GRAPHICS-047 — Virtual Shadow Maps to replace cascade atlas (planning)](GRAPHICS-047-virtual-shadow-maps.md):
+  locks 16K virtual address space, 128² page allocation, page-table
+  encoding, and meshlet-cluster caster culling. Depends on GRAPHICS-009,
+  GRAPHICS-038, GRAPHICS-044.
+
+#### Phase 4 — Research differentiators
+
+- [GRAPHICS-048 — 3D Gaussian Splatting rasterizer pass over the PointCloud primitive (planning)](GRAPHICS-048-gaussian-splatting-rasterizer.md):
+  locks extended point record (anisotropic covariance + opacity + SH coeffs),
+  tile-based sort + composite, `.gsplat` shipping format. Depends on
+  GRAPHICS-014, GRAPHICS-030.
+- [GRAPHICS-049 — Neural radiance cache slot in the GI path (planning)](GRAPHICS-049-neural-radiance-cache-slot.md):
+  locks small-MLP shape, online training pass, cache invalidation, GI
+  consumer seam. Depends on GRAPHICS-041, GRAPHICS-046.
+- [GRAPHICS-050 — Neural texture compression with random-access decode (planning)](GRAPHICS-050-neural-texture-compression.md):
+  locks `.ntc` shipping format + per-material decoder Slang module + BCn
+  fallback. Depends on GRAPHICS-041, GRAPHICS-042.
+- [GRAPHICS-051 — Differentiable rendering mode (planning)](GRAPHICS-051-differentiable-rendering-mode.md):
+  locks forward+backward render-graph compile, adjoint buffer lifetime,
+  `Pass.Loss` + gradient sink, build-time gating to keep production unchanged.
+  Depends on GRAPHICS-041.
+- [GRAPHICS-052 — Deltaful GPU-resident scene (planning)](GRAPHICS-052-deltaful-gpu-resident-scene.md):
+  locks per-change delta records, persistent GPU scene buffer, apply-deltas
+  pass, full-extract fallback. Promoted from `GRAPHICS-004Q`. Depends on
+  GRAPHICS-002, GRAPHICS-004, GRAPHICS-016, GRAPHICS-036.
+
+#### Phase 5 — Frontier
+
+- [GRAPHICS-053 — Mesh shaders RHI extension (IMeshShaderDevice) (planning)](GRAPHICS-053-mesh-shaders-rhi-extension.md):
+  locks the optional `IMeshShaderDevice` capability surface (task→mesh
+  pipeline, indirect dispatch, payload limits) and recipe-selection
+  fallback to `MeshletViaCompute`. Depends on GRAPHICS-033, GRAPHICS-044.
+- [GRAPHICS-054 — Work graphs RHI extension (IWorkGraphDevice) (planning, long-horizon)](GRAPHICS-054-work-graphs-rhi-extension.md):
+  locks the optional `IWorkGraphDevice` capability surface and recipe-slot
+  reservation. Explicitly long-horizon: no implementation children opened
+  until backend support and at least one consumer exist. Depends on
+  GRAPHICS-053.
+- [GRAPHICS-055 — Streaming Virtual Textures (planning)](GRAPHICS-055-streaming-virtual-textures.md):
+  locks 128² virtual page table, feedback pass, runtime page resolver,
+  KTX2/Basis Universal UASTC shipping format. Depends on GRAPHICS-018T,
+  GRAPHICS-026, GRAPHICS-041.
+- [GRAPHICS-056 — Virtualized meshes with cluster DAG and continuous LOD (planning, bounded scope)](GRAPHICS-056-virtualized-meshes-cluster-lod.md):
+  locks DAG record shape + LOD selector pass + HZB integration. Bounded
+  scope: explicitly NOT Nanite parity (no SW raster, no cluster-page
+  streaming). Depends on GRAPHICS-038, GRAPHICS-044, GRAPHICS-053.
+- [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (planning)](GRAPHICS-057-directstorage-gpu-decompression.md):
+  locks `IGpuDecompressionTransferQueue` capability surface, GDeflate/Zstd
+  payload formats, CPU-fallback rule. Depends on GRAPHICS-018T, GRAPHICS-026.
+- [GRAPHICS-058 — Frame generation pass (planning)](GRAPHICS-058-frame-generation-pass.md):
+  locks `IFrameGenerator` interface (interpolation/extrapolation), reference
+  motion-blend interpolator, presentation pacing in `runtime/`. Depends on
+  GRAPHICS-013C, GRAPHICS-040.
+
 ## Agent selection rules
 
 When picking the next rendering task to promote to active:
