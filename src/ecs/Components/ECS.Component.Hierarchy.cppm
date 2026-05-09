@@ -6,7 +6,7 @@ export module Extrinsic.ECS.Component.Hierarchy;
 
 import Extrinsic.ECS.Scene.Handle;
 
-namespace Extrinsic::ECS::Components::Hierarchy
+export namespace Extrinsic::ECS::Components::Hierarchy
 {
     struct Component
     {

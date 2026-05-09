@@ -6,6 +6,9 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         ECS.Scene.Registry.cppm
         ECS.Scene.Handle.cppm
+        ECS.Scene.Bootstrap.cppm
+        PRIVATE
+        ECS.Scene.Bootstrap.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

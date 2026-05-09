@@ -9,9 +9,9 @@
 - No broader Editor UI refactor.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: Copilot Coding Agent.
-- Branch/PR: `copilot/fix-shortest-path-graph-view` / PR #778.
+- Branch/PR: `copilot/fix-shortest-path-graph-view` / PR #778 (merged).
 - Symptom: `Runtime.EditorUI.Widgets.cpp` passes `*meshData->MeshRef` into exported graph-domain shortest-path APIs, causing the clang CI build to fail.
 - Expected behavior: mesh-backed shortest-path flows construct a `Geometry::Graph::Graph` view from the mesh-bound property sets and call the graph-domain API with that view.
 - Impact: the Editor UI shortest-path widget does not build in CI, and the intended domain contract is under-specified in tests.
@@ -56,3 +56,13 @@ python3 tools/repo/check_test_layout.py --root . --strict
 
 ## Next verification step
 - Run the final review/security validation and rely on CI to compile the restored Editor UI path with the full clang workflow environment.
+
+## Completion
+- Completed: 2026-05-09.
+- Status: done.
+- Implementation commit: `e073223` (`fix: pass graph view to shortest path ui mesh path`), merged via PR #778 (`79f2292`).
+- Verified in tree on `claude/setup-agentic-workflow-uMvqx` after retirement:
+  - `src/legacy/EditorUI/Runtime.EditorUI.Widgets.cpp:2185` and `:2275` construct a `Geometry::Graph::Graph` view from mesh property sets before calling `Geometry::ShortestPath::Dijkstra` / `ExtractPathGraph`.
+  - `tests/unit/geometry/Test_ShortestPath.cpp:1` documents the graph-view contract; `MakeMeshBackedGraphView` (`:15`) builds the view used by all mesh-backed cases.
+  - `python3 tools/agents/check_task_policy.py --root . --strict` — passed at retirement.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` — passed at retirement.

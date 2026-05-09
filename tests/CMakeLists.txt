@@ -213,6 +213,7 @@ set(_ecs_test_files
     Test_FrameGraphSystems.cpp
     Test_EntityCommands.cpp
     Test.ECS.SceneRegistry.cpp
+    Test.ECS.SceneBootstrap.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
     SEARCH_DIRS unit/ecs contract/ecs integration/runtime
