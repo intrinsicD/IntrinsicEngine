@@ -43,7 +43,7 @@ Members:
 - [`geometry/GEOIO-002-geometry-io-parity-hardening.md`](geometry/GEOIO-002-geometry-io-parity-hardening.md)
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
-- [`ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md`](ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
+- [`ecs/HARDEN-062` (active)](../active/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
 
 ### Theme B — Rendering modernization (P1, gated by Theme A)
 
@@ -83,7 +83,7 @@ keeping `ecs -> core` and explicit geometry handles only.
 Members:
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md).
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md).
-- [`ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md`](ecs/HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
+- [`ecs/HARDEN-062` (active)](../active/HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
 - [`ecs/HARDEN-063-ecs-events-and-command-seams.md`](ecs/HARDEN-063-ecs-events-and-command-seams.md).
 - [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme C).
 
