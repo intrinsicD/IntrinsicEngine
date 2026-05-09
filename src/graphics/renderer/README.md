@@ -604,6 +604,44 @@ human-readable summary should read `Findings.front().Message`.
   GRAPHICS-023C/D observation discriminator. No graphics-module surface
   changes; `Extrinsic.Graphics.GpuWorld` continues to expose only its
   existing `UploadGeometry`/`FreeGeometry`/`SetInstanceGeometry` API.
+- Per
+  [`GRAPHICS-031`](../../../tasks/backlog/rendering/GRAPHICS-031-default-debug-surface-material.md),
+  the canonical missing-material fallback is the default debug surface
+  material at slot 0 (`Extrinsic::Graphics::kDefaultMaterialSlotIndex`),
+  registered by `MaterialSystem::Initialize()` as
+  `"Material.DefaultDebugSurface"` with
+  `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
+  `MaterialFlags::Unlit`, and a deterministic non-black `BaseColorFactor`
+  (`{0.55, 0.20, 0.85, 1.0}`). The shader pair lives at
+  `assets/shaders/forward/default_debug_surface.vert/frag` and reads
+  position `vec3` + optional packed RGBA8 vertex color `uint32` from the
+  existing scene-table BDA push constants and the `MaterialBuffer` SSBO at
+  `set = 3, binding = 0`; no per-material descriptor set or new cull
+  bucket is introduced (the lane reuses `SurfaceOpaque`). The pipeline
+  state is locked at `CullMode = Back`, `DepthCompareOp = Less` (or
+  `Equal` after `Pass.DepthPrepass`), `BlendEnabled = false`,
+  `PolygonMode = Fill`, `PrimitiveTopology = TriangleList`,
+  `MSAA samples = 1`, dynamic state `{Viewport, Scissor}`, with the
+  pipeline created once at renderer init and republished byte-identical by
+  `RebuildGpuResources()`. The graphics-owned snapshot-consumption
+  substitution at the renderer span-copy step replaces unset/out-of-range
+  material slots with `kDefaultMaterialSlotIndex` and increments one of
+  three additive `MaterialSystemDiagnostics` counters:
+  `MissingMaterialFallbackCount` (sentinel-unset authoring),
+  `InvalidMaterialSlotCount` (out-of-range/stale slot integers), and
+  `DefaultDebugSurfaceUses` (total per-frame uses of slot 0 after
+  substitution). Runtime stays agnostic of graphics-side slot identity;
+  the existing `MaterialSystemDiagnostics::FallbackSlotResolveCount`
+  continues to track the separate `GetMaterialSlot()` stale-handle path.
+  Follow-up debug-material variants (`Wireframe`, `Line`, `Point`,
+  `Normals`, `UVs`, `Depth`, `InstanceId`) attach as additional
+  `MaterialTypeDesc` registrations and additional well-known slot
+  constants under the naming family `Material.DefaultDebug<Variant>` /
+  `kDefaultDebug<Variant>MaterialSlotIndex`; they are identified but not
+  opened. Implementation children GRAPHICS-031-Impl-A (shader sources +
+  pipeline + slot-0 repopulation), Impl-B (substitution wiring + the
+  three diagnostics counters), and the optional Impl-C (one additional
+  debug variant) are identified but not opened.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.

@@ -383,12 +383,34 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   Implementation children `GRAPHICS-030-Impl-A/B/C/D` are identified but not
   opened. Asset-backed mesh residency is deferred to GRAPHICS-034.
 - [GRAPHICS-031 — Default debug surface material and missing-material fallback (planning)](GRAPHICS-031-default-debug-surface-material.md):
-  planning-only definition of a deterministic default/debug surface material
-  plus an explicit, testable missing-material fallback policy; locks down
-  identity/slot, shader pair, pipeline state, vertex format, descriptor
-  layout, fallback ownership, diagnostics, visibility guarantees,
-  extensibility, performance bounds, and layering. Implementation child
-  slices (`GRAPHICS-031-Impl-A/B/C`) are identified but not opened.
+  planning-only first slice of the default-material contract; locked the
+  reuse of `kDefaultMaterialSlotIndex = 0u` as the
+  `"Material.DefaultDebugSurface"` slot with
+  `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
+  `MaterialFlags::Unlit`, and a deterministic non-black `BaseColorFactor`
+  (`{0.55, 0.20, 0.85, 1.0}`); the shader pair location
+  (`assets/shaders/forward/default_debug_surface.vert/frag`); vertex format
+  (position `vec3` + optional packed RGBA8 `uint32`, matching
+  GRAPHICS-030-Impl-A's `Triangle` packer); descriptor/push-constant reuse
+  (canonical scene-table BDA + `MaterialBuffer` SSBO at `set 3, binding 0`,
+  no per-material descriptor set); pipeline state (`CullMode = Back`,
+  `DepthCompareOp = Less`/`Equal`, `BlendEnabled = false`,
+  `PolygonMode = Fill`, `TriangleList`, 1× MSAA, dynamic
+  `{Viewport, Scissor}`); graphics-owned snapshot-consumption substitution
+  at the renderer span-copy step with three additive
+  `MaterialSystemDiagnostics` counters (`MissingMaterialFallbackCount`,
+  `InvalidMaterialSlotCount`, `DefaultDebugSurfaceUses`); fail-closed
+  visibility guarantee tied to a pixel-readback test; performance bounds
+  (≤ 32 vertex / ≤ 16 fragment SPIR-V instructions, one pipeline at init,
+  no per-frame state churn); extensibility family
+  (`Material.DefaultDebug<Variant>` /
+  `kDefaultDebug<Variant>MaterialSlotIndex` for `Wireframe`, `Line`,
+  `Point`, `Normals`, `UVs`, `Depth`, `InstanceId`); and a layering audit
+  confirming zero new dependency edges. Implementation children
+  `GRAPHICS-031-Impl-A` (shader sources + pipeline + slot-0
+  repopulation), `GRAPHICS-031-Impl-B` (substitution wiring + diagnostics
+  counters), and the optional `GRAPHICS-031-Impl-C` (one additional
+  debug variant) are identified but not opened.
 - [GRAPHICS-032 — Minimal surface and present command recording path (planning)](GRAPHICS-032-minimal-surface-present-command-path.md):
   planning-only definition of the smallest visible-path command recording
   bodies (recipe identity, pass set, render targets, backbuffer integration,
