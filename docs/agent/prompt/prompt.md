@@ -31,17 +31,17 @@ Apply this priority strictly:
 1. If `tasks/active/` contains an in-progress task that matches your branch/owner, continue that task.
 2. Otherwise pick from the backlog using `tasks/backlog/README.md` "Convergence themes":
    - **Theme A — sandbox visible geometry (P0)** outranks all P1 work.
-   - **Theme D — ECS hardening parity** and **Theme E — geometry IO completion** are P0 prerequisites of Theme A.
+   - Specific tasks inside **Theme D (ECS hardening)** and **Theme E (geometry IO completion)** gate specific Theme A tasks; see the anchors in step 3. Do not treat all of Theme D or Theme E as a prerequisite of Theme A — `HARDEN-063` and `HARDEN-064` do not gate any current Theme A task, and `GEOIO-002` only gates `GRAPHICS-034` (not the rest of Theme A).
    - **Theme F — foundation seeds** is cross-cutting and may be touched alongside any theme.
    - **Theme C — physics readiness** is gated by `ARCH-001`. Do not start `METHOD-001` runtime/ECS integration or `HARDEN-064` until `ARCH-001` lands.
    - **Theme B — rendering modernization (GRAPHICS-035..058)** stays planning-only until Theme A is unblocked.
    - **Theme G — bugs** trumps feature work for any reproducible regression.
-3. Respect cross-domain dependency anchors:
-   - `GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002`
-   - `GRAPHICS-029..034 ⇐ HARDEN-060..062`
-   - `METHOD-001 ⇐ ARCH-001`
-   - `HARDEN-064 ⇐ ARCH-001`
-   - `GRAPHICS-035..058 ⇐ Theme A`
+3. Respect cross-domain dependency anchors. These are the only theme-crossing gates; treat anything not listed here as independent:
+   - `GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002` (`GRAPHICS-029..033` do not depend on `GEOIO-002` or `ASSETIO-001`).
+   - `GRAPHICS-029..034 ⇐ HARDEN-060..062` (only this ECS subset; `HARDEN-063` and `HARDEN-064` are independent of Theme A).
+   - `METHOD-001 ⇐ ARCH-001`.
+   - `HARDEN-064 ⇐ ARCH-001`.
+   - `GRAPHICS-035..058 ⇐ Theme A`.
 4. Within a theme, prefer the earliest unblocked task. "Unblocked" means every upstream dependency is either marked done in `tasks/done/` or explicitly recorded as out-of-scope in the candidate task file.
 
 Read the chosen task file completely before touching code. Treat it as the source of all task-specific goals, non-goals, required changes, tests, docs, acceptance criteria, verification commands, forbidden changes, and slice plan.
