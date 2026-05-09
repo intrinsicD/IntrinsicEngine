@@ -9,9 +9,9 @@
 - No physics transform ownership or rigid-body integration.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/layer: `ecs`.
-- Branch: `claude/setup-agentic-workflow-MinZP`.
+- Branch: `claude/setup-agentic-workflow-MinZP` (merged via PR #782).
 - Promoted `src/ecs/Components/ECS.Component.Hierarchy.cppm` currently defines only data fields.
 - Promoted `src/ecs/Systems/ECS.System.TransformHierarchy.*` is an empty placeholder.
 - Legacy behavior exists in `src/legacy/ECS/Components/ECS.Components.Hierarchy.*`, `src/legacy/ECS/Systems/ECS.HierarchyTraversal.*`, and `src/legacy/ECS/Systems/ECS.Systems.Transform.*`.
@@ -85,3 +85,19 @@ python3 tools/docs/check_doc_links.py --root .
 ## Next verification step
 - CI must run `cmake --preset ci` + `cmake --build --preset ci --target IntrinsicECSTests` + `ctest --test-dir build/ci -L 'ecs' --output-on-failure --timeout 60`. Local sandbox lacks `clang-20` (default-preset compiler) so the C++ build is deferred to CI for this slice.
 
+## Completion
+- Completed: 2026-05-09.
+- Status: done.
+- Implementation commit: `8d05428` (`HARDEN-061: promote ECS hierarchy and transform system parity (Slice 1)`), merged via PR #782 (`93af42d`).
+- Slice 2 (FrameGraph activation of `RegisterSystem` from a promoted simulate-phase bundle, a promoted system-feature catalog or pass-token registry, and reconciliation of GPU-sync `DirtyTags::DirtyTransform` emission with the promoted CPU update) is intentionally deferred. The work depends on a promoted simulate-phase bundle that has not yet landed in `src/runtime`, so it is genuinely follow-up work and belongs to a future runtime/render-sync task rather than to HARDEN-061. Until that follow-up is opened, `docs/migration/nonlegacy-parity-matrix.md` records the gap.
+- Verified in tree at retirement:
+  - `Extrinsic.ECS.Component.Transform` exports `IsDirtyTag` (CPU recompute marker) and `WorldUpdatedTag`; module comment documents the GPU-sync separation from `Components::DirtyTags::DirtyTransform`.
+  - `src/ecs/Hierarchy/ECS.Hierarchy.Structure.cppm` and `src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cppm` provide structural primitives and the public `Attach`/`Detach` API with cycle rejection, sibling-chain maintenance, world-position preservation across reparenting, and singular-parent identity fallback.
+  - `src/ecs/Systems/ECS.System.TransformHierarchy.{cppm,cpp}` implement `OnUpdate(entt::registry&)` (root-rooted DFS, parent-aware dirty propagation, `WorldUpdatedTag` emission, `IsDirtyTag` clearing) and `RegisterSystem(FrameGraph&, registry&)` declaring the documented `Read`/`Write`/`Signal("TransformUpdate")` set.
+  - `tests/unit/ecs/Test.ECS.Hierarchy.cpp` and `tests/unit/ecs/Test.ECS.TransformHierarchy.cpp` are wired into `ECSTestObjs` and cover attach/detach/cycle/sibling-chain/reparent/world-preservation/singular-parent/Validate/IsDescendant and root recompute, clean-skip, child = parent × local, parent-dirty propagation, GPU-sync isolation, and transformless-entity safety respectively.
+  - `src/ecs/CMakeLists.txt` wires the new modules; `src/ecs/Systems/CMakeLists.txt` links `ExtrinsicCore` for the FrameGraph import.
+  - `src/ecs/README.md`, `src/ecs/Systems/README.md`, the ECS row of `docs/migration/nonlegacy-parity-matrix.md`, and the backlog convergence map are updated; `docs/api/generated/module_inventory.md` is regenerated.
+  - `python3 tools/agents/check_task_policy.py --root . --strict` — passed at retirement.
+  - `python3 tools/docs/check_doc_links.py --root .` — passed at retirement.
+  - `python3 tools/repo/check_layering.py --root src --strict` — passed at retirement.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` — passed at retirement.
