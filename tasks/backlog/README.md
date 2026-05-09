@@ -33,7 +33,7 @@ path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/
 
 Members:
 - [`rendering/GRAPHICS-029` (done)](../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
-- [`rendering/GRAPHICS-030-runtime-geometry-residency-bridge.md`](rendering/GRAPHICS-030-runtime-geometry-residency-bridge.md)
+- [`rendering/GRAPHICS-030` (done)](../done/GRAPHICS-030-runtime-geometry-residency-bridge.md)
 - [`rendering/GRAPHICS-031-default-debug-surface-material.md`](rendering/GRAPHICS-031-default-debug-surface-material.md)
 - [`rendering/GRAPHICS-032-minimal-surface-present-command-path.md`](rendering/GRAPHICS-032-minimal-surface-present-command-path.md)
 - [`rendering/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](rendering/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)

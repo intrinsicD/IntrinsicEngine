@@ -589,6 +589,21 @@ human-readable summary should read `Findings.front().Message`.
   sidecar state. ECS dirty tags remain CPU-only semantics; runtime maps them to
   `GpuWorld::GeometryUploadDesc` uploads, `GpuSceneSlot::NamedBuffers`, or
   per-instance updates according to the active domain packer.
+- Per
+  [`GRAPHICS-030`](../../../tasks/done/GRAPHICS-030-runtime-geometry-residency-bridge.md),
+  the procedural-source first slice of that bridge keeps `GpuWorld`
+  domain-agnostic: a runtime-owned `ProceduralGeometryCache` (lives on
+  `RenderExtractionCache`) deduplicates `(Kind, Hash(Params))` keys, the
+  per-kind packer in `Extrinsic.Runtime.ProceduralGeometryPacker` produces
+  the existing `GpuWorld::GeometryUploadDesc`, and refcount-zero entries
+  defer `GpuWorld::FreeGeometry()` until `framesInFlight` ticks have
+  elapsed (matched to `Graphics::GpuAssetCache::Tick(currentFrame,
+  framesInFlight)`). Procedural sources never participate in
+  `GpuAssetCache` generation tracking — `GpuSceneSlot::SourceAsset` stays
+  default-constructed, and the existing `HasSourceAsset()` check is the
+  GRAPHICS-023C/D observation discriminator. No graphics-module surface
+  changes; `Extrinsic.Graphics.GpuWorld` continues to expose only its
+  existing `UploadGeometry`/`FreeGeometry`/`SetInstanceGeometry` API.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.
