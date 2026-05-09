@@ -345,13 +345,23 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   static-vs-dynamic split, dirty-tag drain order, hierarchy decomposition,
   per-domain packers (mesh / graph / point cloud), and primitive-instancing
   policy. Follow-up implementation remains separate from this docs-only slice.
-- [GRAPHICS-029 — Reference scene bootstrap and minimal renderable extraction (planning)](GRAPHICS-029-runtime-reference-scene-bootstrap.md):
-  planning-only follow-up to the 2026-05-08 sandbox geometry rendering gap
-  analysis; locks down module placement, bootstrap-seam shape, renderable
-  composition, camera/light policy, lifetime, extensibility, and performance
-  bounds for an opt-in reference scene observable by `Runtime.RenderExtraction`.
-  Implementation child slices (`GRAPHICS-029-Impl-A/B/C`) are identified but
-  not opened. Sandbox stays policy-light; no GPU-typed ECS components.
+- [GRAPHICS-029 — Reference scene bootstrap and minimal renderable extraction](../../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md):
+  retired planning slice that locks down module placement
+  (`Extrinsic.Runtime.ReferenceScene` at `src/runtime/Runtime.ReferenceScene.cppm`),
+  bootstrap-seam shape (`IReferenceSceneProvider` + `ReferenceSceneRegistry`,
+  one default `TriangleProvider`), renderable composition (HARDEN-060 default
+  components plus `Graphics::Components::RenderSurface` and a future
+  `ECS::Components::ProceduralGeometryRef` from GRAPHICS-030-Impl-A), camera
+  authorship (provider-seeded `CameraViewInput` written into
+  `RenderFrameInput::Camera`, forward-compatible with GRAPHICS-017Q
+  `CameraControllers`), unlit-only first milestone, deterministic content via
+  `MetaData::EntityName` (not `entt::entity` IDs), once-per-init lifetime with
+  double-install guard, `EngineConfig::ReferenceScene::{Enabled, Selector}`
+  default-off plumbing, O(1) steady-state extraction overhead, and a layering
+  audit confirming no new graphics/RHI/asset edges. Implementation children
+  GRAPHICS-029-Impl-A/B/C are identified but not opened; Impl-B depends on
+  GRAPHICS-030-Impl-A landing `ProceduralGeometryRef`. Sandbox stays
+  policy-light; no GPU-typed ECS components.
 - [GRAPHICS-030 — Procedural-source geometry residency bridge (planning)](GRAPHICS-030-runtime-geometry-residency-bridge.md):
   planning-only first concrete slice of the GRAPHICS-028 contract; locks down
   procedural-geometry descriptor shape, cache identity and refcount,

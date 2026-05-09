@@ -32,7 +32,7 @@ Render real geometry from `Sandbox::App` through the promoted runtime/graphics
 path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
 
 Members:
-- [`rendering/GRAPHICS-029-runtime-reference-scene-bootstrap.md`](rendering/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
+- [`rendering/GRAPHICS-029` (done)](../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
 - [`rendering/GRAPHICS-030-runtime-geometry-residency-bridge.md`](rendering/GRAPHICS-030-runtime-geometry-residency-bridge.md)
 - [`rendering/GRAPHICS-031-default-debug-surface-material.md`](rendering/GRAPHICS-031-default-debug-surface-material.md)
 - [`rendering/GRAPHICS-032-minimal-surface-present-command-path.md`](rendering/GRAPHICS-032-minimal-surface-present-command-path.md)
