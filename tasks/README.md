@@ -31,6 +31,10 @@ None. `tasks/active/` should contain only currently in-progress or blocked task 
 
 Recently archived trackers:
 
+- [ARCH-003 — Cross-domain backlog convergence map](done/ARCH-003-cross-domain-convergence-map.md):
+  added the convergence map in [`tasks/backlog/README.md`](backlog/README.md)
+  and per-category READMEs so agents pick tasks against a shared engine
+  direction rather than diverging by category.
 - [RORG-0000 — Repository Reorganization Tracker](done/0000-repo-reorganization-tracker.md)
 - [HARDEN-001 — Post-Reorganization Hardening Tracker](done/0001-post-reorganization-hardening-tracker.md)
 

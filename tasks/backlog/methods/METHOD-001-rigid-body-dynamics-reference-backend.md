@@ -6,7 +6,8 @@
 ## Non-goals
 - No optimized CPU backend.
 - No GPU backend.
-- No runtime/ECS integration until `ARCH-001` defines physics layer ownership.
+- No runtime/ECS integration until [`ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md) defines physics layer ownership.
+- No ECS authoring component changes; that is owned by [`HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
 - No performance claims without benchmark baselines.
 
 ## Context
@@ -15,6 +16,7 @@
 - Geometry already has contact and overlap primitives, but rigid-body dynamics needs state integration, mass/inertia, contacts, constraints, solver iterations, diagnostics, and determinism guarantees.
 - The reference method should model collision shapes separately from rigid-body state so future ECS authoring components and physics-world integration can compare against the same collider/body split.
 - This task follows `docs/agent/method-workflow.md`: paper/method intake, CPU reference first, correctness tests, benchmark harness/manifests, then documentation.
+- Convergence: part of **Theme C — Physics readiness** in [`tasks/backlog/README.md`](../README.md). The physics layer ownership decision in [`ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md) and the ECS authoring contract in [`HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) bound where state and runtime sync ultimately live.
 
 ## Required changes
 - [ ] Intake paper(s) or textbook method references and define the method contract.
