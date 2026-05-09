@@ -130,12 +130,17 @@ The promoted GPU scene is organized around these canonical buffers:
 - `Bounds/Culling` buffer: local/world-space bounds, culling flags, shadow participation, and visibility metadata indexed by the same instance slot; any compacted visible list is an indirection over instance slots.
 - `Material` buffer: graphics-owned `Extrinsic.Graphics.MaterialSystem` slots
   populated from runtime-extracted CPU material descriptions or asset IDs.
-  Slot `0` is the default/fallback material, and layout version `1` is a
-  128-byte `RHI::GpuMaterialSlot` with four custom `vec4` slots plus four
-  bindless texture references (`Albedo`, `Normal`, `MetallicRoughness`,
-  `Emissive`). Asset IDs are resolved to material leases/slots by runtime or
-  graphics asset sidecars; canonical ECS components do not store graphics-owned
-  material-slot indices.
+  Slot `0` (`kDefaultMaterialSlotIndex`) is the default/fallback material; per
+  `GRAPHICS-031`, that slot is registered as `"Material.DefaultDebugSurface"`
+  with `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
+  `MaterialFlags::Unlit`, deterministic non-black `BaseColorFactor`, and is
+  the substitution target when a runtime-submitted snapshot record carries an
+  unset or invalid material slot. Layout version `1` is a 128-byte
+  `RHI::GpuMaterialSlot` with four custom `vec4` slots plus four bindless
+  texture references (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`).
+  Asset IDs are resolved to material leases/slots by runtime or graphics asset
+  sidecars; canonical ECS components do not store graphics-owned material-slot
+  indices.
 - `Geometry` records: graphics-owned references to uploaded geometry views/buffers, shared by renderable instances through generation-checked handles.
 - `Light` buffer / `LightEnvironmentPacket`: runtime-extracted light descriptions, directional/ambient parameters, deterministic fallback directional light state, and upload diagnostics consumed by lighting and shadow passes. Unsupported light enum values are dropped from the GPU light buffer and counted in `LightSyncDiagnostics`; when a frame has no directional light snapshot, `LightSystem` uploads the configured directional fallback so ambient/directional defaults remain deterministic.
 - Scene table / descriptor set: the backend binding point that exposes the renderable, transform, bounds/culling, material, geometry, and light buffers to passes.

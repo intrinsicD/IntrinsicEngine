@@ -684,6 +684,50 @@ never owns asset event subscription.
 - Slot `0` is the immutable fallback/default material slot
   (`kDefaultMaterialSlotIndex`). Stale or invalid material handles resolve to
   that fallback and increment deterministic CPU-visible diagnostics.
+- Per
+  [`GRAPHICS-031`](../../tasks/backlog/rendering/GRAPHICS-031-default-debug-surface-material.md),
+  slot 0 is registered as `"Material.DefaultDebugSurface"` with
+  `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
+  `MaterialFlags::Unlit`, and a deterministic non-black `BaseColorFactor`
+  (`{0.55, 0.20, 0.85, 1.0}`); the slot is pre-populated by
+  `MaterialSystem::Initialize()` and republished byte-identical by
+  `MaterialSystem::RebuildGpuResources()`. The shader pair lives at
+  `assets/shaders/forward/default_debug_surface.vert/frag` and consumes the
+  canonical `GpuScenePushConstants` scene-table BDA + the existing
+  `MaterialBuffer` SSBO at `set = 3, binding = 0`; no per-material descriptor
+  set is added. The vertex format is position `vec3` + optional packed RGBA8
+  vertex color `uint32`, matching the `Triangle` packer planned in
+  GRAPHICS-030-Impl-A. The forward graphics pipeline is created once at
+  renderer init with `CullMode = Back`, `DepthCompareOp = Less` (or `Equal`
+  when running after `Pass.DepthPrepass`), `BlendEnabled = false`,
+  `PolygonMode = Fill`, `PrimitiveTopology = TriangleList`,
+  `MSAA samples = 1`, and dynamic state `{Viewport, Scissor}`. The default
+  debug surface lane consumes the existing `SurfaceOpaque` cull bucket; no
+  new bucket, no new pass, no new descriptor set is introduced.
+- Per
+  [`GRAPHICS-031`](../../tasks/backlog/rendering/GRAPHICS-031-default-debug-surface-material.md),
+  the missing-material fallback policy is graphics-owned at snapshot
+  consumption time: when the renderer copies a runtime-submitted snapshot
+  record whose resolved material slot is unset or out-of-range, it
+  substitutes `kDefaultMaterialSlotIndex` and increments one of three
+  additive `MaterialSystemDiagnostics` counters —
+  `MissingMaterialFallbackCount` (sentinel-unset authoring),
+  `InvalidMaterialSlotCount` (out-of-range/stale slot integers), and
+  `DefaultDebugSurfaceUses` (total per-frame uses of slot 0 after
+  substitution). The substitution lives at the same renderer span-copy step
+  that already drains `InvalidSnapshotRecordCount`, so runtime stays
+  agnostic of graphics-side slot identity. Runtime authoring may also
+  request the default explicitly through a sentinel "unset material"
+  description; the renderer-side substitution and counter increments are
+  identical. There are no silent-skip fallback paths, and
+  `MaterialSystemDiagnostics::FallbackSlotResolveCount` continues to track
+  the separate stale-handle resolution path inside `GetMaterialSlot()`.
+- Follow-up debug-material variants (`Wireframe`, `Line`, `Point`, `Normals`,
+  `UVs`, `Depth`, `InstanceId`) attach as additional `MaterialTypeDesc`
+  registrations and additional well-known slot constants under the naming
+  family `Material.DefaultDebug<Variant>` /
+  `kDefaultDebug<Variant>MaterialSlotIndex`, sharing the same descriptor
+  layout family; they are identified but not opened by GRAPHICS-031.
 - The canonical material SSBO layout is versioned by
   `kMaterialLayoutVersion == 1` and described by
   `GetCanonicalMaterialLayoutContract()`: one 128-byte `RHI::GpuMaterialSlot`
