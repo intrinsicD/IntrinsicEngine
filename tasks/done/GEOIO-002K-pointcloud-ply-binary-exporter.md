@@ -131,9 +131,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-10.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-hTttQ`.
-- Implementation commit: filled in after this slice lands on the
-  feature branch; commit reference will be appended to this section in
-  the same push that adds the file under `tasks/done/`.
+- Implementation commit: `1f61788`
+  (`GEOIO-002K: add geometry-owned binary PLY point-cloud exporter`).
 - Verified in this session:
   - `cmake --preset ci` — configure succeeded.
   - `cmake --build --preset ci --target IntrinsicGeometryTests` —
