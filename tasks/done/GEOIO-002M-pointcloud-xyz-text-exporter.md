@@ -147,8 +147,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-10.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-ZGCu4`.
-- Implementation commit: TBD (filled in a follow-up commit on the same
-  branch, mirroring the `GEOIO-002L` retirement pattern).
+- Implementation commit: `debb364`
+  (`GEOIO-002M: add geometry-owned text XYZ point-cloud exporter`).
 - Verified in this session:
   - `python3 tools/repo/check_layering.py --root src --strict` — no
     layering violations; `geometry` imports remain `geometry -> core`
