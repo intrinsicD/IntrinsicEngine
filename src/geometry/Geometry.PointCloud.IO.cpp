@@ -1683,6 +1683,166 @@ namespace Geometry::PointCloudIO
         }
         return PointCloudIOWriteStatus::Success;
     }
+
+    PointCloudIOWriteStatus WritePCD(std::string_view absolute_path, const PointCloudIOResult& cloud)
+    {
+        if (absolute_path.empty())
+        {
+            return PointCloudIOWriteStatus::InvalidPath;
+        }
+
+        const auto& source = cloud.Cloud;
+        if (source.IsEmpty())
+        {
+            return PointCloudIOWriteStatus::EmptyCloud;
+        }
+
+        const auto positions = source.Positions();
+        const std::size_t pointCount = positions.size();
+
+        const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
+        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return PointCloudIOWriteStatus::InvalidPath;
+        }
+
+        char buffer[256];
+
+        stream << "# .PCD v0.7\n";
+        stream << "VERSION 0.7\n";
+
+        stream << "FIELDS x y z";
+        if (hasNormals)
+        {
+            stream << " normal_x normal_y normal_z";
+        }
+        if (hasColors)
+        {
+            stream << " r g b";
+        }
+        stream.put('\n');
+
+        stream << "SIZE 4 4 4";
+        if (hasNormals)
+        {
+            stream << " 4 4 4";
+        }
+        if (hasColors)
+        {
+            stream << " 4 4 4";
+        }
+        stream.put('\n');
+
+        stream << "TYPE F F F";
+        if (hasNormals)
+        {
+            stream << " F F F";
+        }
+        if (hasColors)
+        {
+            stream << " F F F";
+        }
+        stream.put('\n');
+
+        stream << "COUNT 1 1 1";
+        if (hasNormals)
+        {
+            stream << " 1 1 1";
+        }
+        if (hasColors)
+        {
+            stream << " 1 1 1";
+        }
+        stream.put('\n');
+
+        {
+            const int written = std::snprintf(buffer, sizeof(buffer),
+                                              "WIDTH %zu\n",
+                                              pointCount);
+            if (written <= 0)
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+        }
+        stream << "HEIGHT 1\n";
+        stream << "VIEWPOINT 0 0 0 1 0 0 0\n";
+        {
+            const int written = std::snprintf(buffer, sizeof(buffer),
+                                              "POINTS %zu\n",
+                                              pointCount);
+            if (written <= 0)
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+        }
+        stream << "DATA ascii\n";
+
+        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+
+        auto clampUnit = [](float channel) -> float {
+            return channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
+        };
+
+        for (std::size_t i = 0; i < pointCount; ++i)
+        {
+            const auto& p = positions[i];
+            int written = std::snprintf(buffer, sizeof(buffer),
+                                        "%.6f %.6f %.6f",
+                                        static_cast<double>(p.x),
+                                        static_cast<double>(p.y),
+                                        static_cast<double>(p.z));
+            if (written <= 0)
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+
+            if (hasNormals)
+            {
+                const auto& n = normals[i];
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        " %.6f %.6f %.6f",
+                                        static_cast<double>(n.x),
+                                        static_cast<double>(n.y),
+                                        static_cast<double>(n.z));
+                if (written <= 0)
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            if (hasColors)
+            {
+                const auto& c = colors[i];
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        " %.6f %.6f %.6f",
+                                        static_cast<double>(clampUnit(c.r)),
+                                        static_cast<double>(clampUnit(c.g)),
+                                        static_cast<double>(clampUnit(c.b)));
+                if (written <= 0)
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            stream.put('\n');
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
+        return PointCloudIOWriteStatus::Success;
+    }
 }
 
 

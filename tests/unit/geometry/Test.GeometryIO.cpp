@@ -2373,3 +2373,125 @@ TEST(GeometryIO_PointCloudIO, WriteXYZRejectsBadPath)
     EXPECT_EQ(Geometry::PointCloudIO::WriteXYZ(path, cloud),
               Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
 }
+
+TEST(GeometryIO_PointCloudIO, WritesPCDPositionsOnly)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.AddPoint(glm::vec3(1.0f, 0.0f, 0.0f));
+    cloud.Cloud.AddPoint(glm::vec3(0.0f, 1.0f, 0.0f));
+
+    TempFile file(".pcd", "");
+    const auto status = Geometry::PointCloudIO::WritePCD(file.Path, cloud);
+    EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("FIELDS x y z\n"), std::string::npos);
+    EXPECT_NE(contents.find("SIZE 4 4 4\n"), std::string::npos);
+    EXPECT_NE(contents.find("TYPE F F F\n"), std::string::npos);
+    EXPECT_NE(contents.find("COUNT 1 1 1\n"), std::string::npos);
+    EXPECT_NE(contents.find("WIDTH 3\n"), std::string::npos);
+    EXPECT_NE(contents.find("HEIGHT 1\n"), std::string::npos);
+    EXPECT_NE(contents.find("POINTS 3\n"), std::string::npos);
+    EXPECT_NE(contents.find("DATA ascii\n"), std::string::npos);
+
+    const auto loaded = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ASSERT_EQ(loaded->Cloud.VerticesSize(), 3u);
+    EXPECT_FALSE(loaded->Cloud.HasNormals());
+    EXPECT_FALSE(loaded->Cloud.HasColors());
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, WritesPCDWithNormalsAndColorsRoundTrips)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.EnableNormals();
+    cloud.Cloud.EnableColors(glm::vec4(1.0f));
+
+    const auto v0 = cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.Normal(v0) = glm::vec3(1.0f, 0.0f, 0.0f);
+    cloud.Cloud.Color(v0) = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+    const auto v1 = cloud.Cloud.AddPoint(glm::vec3(1.0f, 0.5f, 0.0f));
+    cloud.Cloud.Normal(v1) = glm::vec3(0.0f, 0.0f, 1.0f);
+    cloud.Cloud.Color(v1) = glm::vec4(0.0f, 0.5f, 1.0f, 1.0f);
+
+    TempFile file(".pcd", "");
+    const auto status = Geometry::PointCloudIO::WritePCD(file.Path, cloud);
+    EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("FIELDS x y z normal_x normal_y normal_z r g b\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("SIZE 4 4 4 4 4 4 4 4 4\n"), std::string::npos);
+    EXPECT_NE(contents.find("TYPE F F F F F F F F F\n"), std::string::npos);
+    EXPECT_NE(contents.find("COUNT 1 1 1 1 1 1 1 1 1\n"), std::string::npos);
+    EXPECT_NE(contents.find("WIDTH 2\n"), std::string::npos);
+    EXPECT_NE(contents.find("POINTS 2\n"), std::string::npos);
+    EXPECT_NE(contents.find("DATA ascii\n"), std::string::npos);
+
+    const auto loaded = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ASSERT_EQ(loaded->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(loaded->Cloud.HasNormals());
+    EXPECT_TRUE(loaded->Cloud.HasColors());
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.5f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Normal(Geometry::VertexHandle{0}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Normal(Geometry::VertexHandle{1}), glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loaded->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loaded->Cloud.Color(Geometry::VertexHandle{1}), glm::vec4(0.0f, 0.5f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, WritesPCDIgnoresRadii)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.EnableRadii(0.0f);
+
+    const auto v0 = cloud.Cloud.AddPoint(glm::vec3(2.0f, 3.0f, 4.0f));
+    cloud.Cloud.Radius(v0) = 0.25f;
+
+    TempFile file(".pcd", "");
+    const auto status = Geometry::PointCloudIO::WritePCD(file.Path, cloud);
+    EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("FIELDS x y z\n"), std::string::npos);
+    EXPECT_EQ(contents.find("radius"), std::string::npos);
+    EXPECT_EQ(contents.find("normal_x"), std::string::npos);
+    EXPECT_EQ(contents.find(" r g b"), std::string::npos);
+
+    const auto loaded = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ASSERT_EQ(loaded->Cloud.VerticesSize(), 1u);
+    EXPECT_FALSE(loaded->Cloud.HasNormals());
+    EXPECT_FALSE(loaded->Cloud.HasColors());
+    EXPECT_FALSE(loaded->Cloud.HasRadii());
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(2.0f, 3.0f, 4.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, WritePCDRejectsEmptyCloud)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    TempFile file(".pcd", "");
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCD(file.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::EmptyCloud);
+}
+
+TEST(GeometryIO_PointCloudIO, WritePCDRejectsBadPath)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCD({}, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
+
+    const std::string path =
+        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_pcd_") +
+        std::to_string(static_cast<long long>(getpid())) + ".pcd";
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCD(path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
+}
