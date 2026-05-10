@@ -1843,6 +1843,162 @@ namespace Geometry::PointCloudIO
         }
         return PointCloudIOWriteStatus::Success;
     }
+
+    PointCloudIOWriteStatus WritePCDBinary(std::string_view absolute_path, const PointCloudIOResult& cloud)
+    {
+        if (absolute_path.empty())
+        {
+            return PointCloudIOWriteStatus::InvalidPath;
+        }
+
+        const auto& source = cloud.Cloud;
+        if (source.IsEmpty())
+        {
+            return PointCloudIOWriteStatus::EmptyCloud;
+        }
+
+        const auto positions = source.Positions();
+        const std::size_t pointCount = positions.size();
+
+        const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
+        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return PointCloudIOWriteStatus::InvalidPath;
+        }
+
+        char buffer[256];
+
+        stream << "# .PCD v0.7\n";
+        stream << "VERSION 0.7\n";
+
+        stream << "FIELDS x y z";
+        if (hasNormals)
+        {
+            stream << " normal_x normal_y normal_z";
+        }
+        if (hasColors)
+        {
+            stream << " r g b";
+        }
+        stream.put('\n');
+
+        stream << "SIZE 4 4 4";
+        if (hasNormals)
+        {
+            stream << " 4 4 4";
+        }
+        if (hasColors)
+        {
+            stream << " 4 4 4";
+        }
+        stream.put('\n');
+
+        stream << "TYPE F F F";
+        if (hasNormals)
+        {
+            stream << " F F F";
+        }
+        if (hasColors)
+        {
+            stream << " F F F";
+        }
+        stream.put('\n');
+
+        stream << "COUNT 1 1 1";
+        if (hasNormals)
+        {
+            stream << " 1 1 1";
+        }
+        if (hasColors)
+        {
+            stream << " 1 1 1";
+        }
+        stream.put('\n');
+
+        {
+            const int written = std::snprintf(buffer, sizeof(buffer),
+                                              "WIDTH %zu\n",
+                                              pointCount);
+            if (written <= 0)
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+        }
+        stream << "HEIGHT 1\n";
+        stream << "VIEWPOINT 0 0 0 1 0 0 0\n";
+        {
+            const int written = std::snprintf(buffer, sizeof(buffer),
+                                              "POINTS %zu\n",
+                                              pointCount);
+            if (written <= 0)
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+        }
+        stream << "DATA binary\n";
+
+        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+
+        auto clampUnit = [](float channel) -> float {
+            return channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
+        };
+
+        constexpr bool hostBigEndian = std::endian::native == std::endian::big;
+
+        auto writeFloatLE = [&](float value) -> bool {
+            std::array<std::byte, 4> bytes{};
+            std::memcpy(bytes.data(), &value, 4);
+            if constexpr (hostBigEndian)
+            {
+                std::swap(bytes[0], bytes[3]);
+                std::swap(bytes[1], bytes[2]);
+            }
+            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
+            return stream.good();
+        };
+
+        for (std::size_t i = 0; i < pointCount; ++i)
+        {
+            const auto& p = positions[i];
+            if (!writeFloatLE(p.x) || !writeFloatLE(p.y) || !writeFloatLE(p.z))
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+
+            if (hasNormals)
+            {
+                const auto& n = normals[i];
+                if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+            }
+
+            if (hasColors)
+            {
+                const auto& c = colors[i];
+                if (!writeFloatLE(clampUnit(c.r)) ||
+                    !writeFloatLE(clampUnit(c.g)) ||
+                    !writeFloatLE(clampUnit(c.b)))
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+            }
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
+        return PointCloudIOWriteStatus::Success;
+    }
 }
 
 

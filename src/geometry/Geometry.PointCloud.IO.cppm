@@ -34,5 +34,6 @@ export namespace Geometry::PointCloudIO
     PointCloudIOWriteStatus WritePLYBinary(std::string_view absolute_path, const PointCloudIOResult& cloud);
     PointCloudIOWriteStatus WriteXYZ(std::string_view absolute_path, const PointCloudIOResult& cloud);
     PointCloudIOWriteStatus WritePCD(std::string_view absolute_path, const PointCloudIOResult& cloud);
+    PointCloudIOWriteStatus WritePCDBinary(std::string_view absolute_path, const PointCloudIOResult& cloud);
 }
 
