@@ -40,4 +40,5 @@ export namespace Geometry::MeshIO
     MeshIOWriteStatus WritePLY(std::string_view absolute_path, const MeshIOResult& mesh);
     MeshIOWriteStatus WritePLYBinary(std::string_view absolute_path, const MeshIOResult& mesh);
     MeshIOWriteStatus WriteSTL(std::string_view absolute_path, const MeshIOResult& mesh);
+    MeshIOWriteStatus WriteSTLBinary(std::string_view absolute_path, const MeshIOResult& mesh);
 }
