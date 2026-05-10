@@ -36,7 +36,7 @@
   re-create `v:id` from those decimal strings on round trip.
 
 ## Context
-- Status: backlog (single-slice patch).
+- Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-hLR8v`.
 - Parent backlog task:
@@ -181,3 +181,82 @@ python3 tools/docs/check_doc_links.py --root .
   serialization in this slice.
 - Emitting isolated (edge-less) vertices into the edge-list file
   via synthesized self-loops or any other workaround.
+
+## Completion
+- Completed: 2026-05-10.
+- Status: done.
+- Branch: `claude/setup-agentic-workflow-hLR8v`.
+- Implementation commit: `27d33f8`
+  (`GEOIO-002Q: add geometry-owned text edge-list graph exporter`).
+- Verified in this session:
+  - `python3 tools/repo/check_layering.py --root src --strict` —
+    no layering violations; `geometry` imports remain
+    `geometry -> core` only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (146 task files validated before the move; the
+    file rename does not change the file count after the move).
+  - `python3 tools/docs/check_doc_links.py --root .` — 0 broken
+    relative links.
+  - `python3 tools/repo/generate_module_inventory.py --root src
+    --out docs/api/generated/module_inventory.md` — 420 modules;
+    no diff (the new exported function lives inside the existing
+    `Geometry.Graph.IO` module surface and the inventory tracks
+    modules, not individual functions).
+- CPU build/test gate not exercised: this container lacks
+  `clang-20` and `clang-scan-deps` 20+, which the `ci` preset
+  hard-codes. `cmake --preset ci` therefore fails at the compiler
+  detection step, mirroring the constraint already recorded by
+  `GEOIO-002L`/`GEOIO-002M`/`GEOIO-002N`/`GEOIO-002O`/`GEOIO-002P`
+  and earlier slices. Build verification therefore needs to be
+  re-run on a CI host with the correct toolchain prior to merge.
+- Notes:
+  - `Geometry::GraphIO::WriteEdgeList` is exported from
+    `src/geometry/Geometry.Graph.IO.cppm` and implemented in
+    `src/geometry/Geometry.Graph.IO.cpp`. It reuses the existing
+    `GraphIOWriteStatus` enum (`Success`, `InvalidPath`,
+    `EmptyGraph`, `FileWriteError`) introduced by `GEOIO-002N`.
+  - The on-disk encoding is plain ASCII text. Each surviving edge
+    emits one `<from_index> <to_index>[ <weight>][ <label>]\n`
+    line where the indices are the source `VertexHandle::Index`
+    values rendered as decimal strings, the weight column is
+    `%.6f`, and a trailing label is appended only when `e:label`
+    is present and the per-edge value is non-empty. The weight
+    column is emitted whenever `e:weight` is present, or whenever
+    an `e:label` would be emitted (using the property's default
+    value `1.0f` if no weight property is set), so the reader's
+    number-vs-label disambiguation at token[2] always parses as
+    expected.
+  - Deleted edges are skipped (their handle indices are not
+    emitted), which means edge IDs in the file may be
+    non-contiguous; the reader stores IDs as strings and looks
+    them up via an `unordered_map`, so non-contiguity is benign.
+    Isolated vertices (no surviving incident edge) are silently
+    omitted because edge-list format only represents the union of
+    its edges.
+  - Empty vertex graphs (`Graph.VertexCount() == 0`) and
+    edge-less graphs (`Graph.EdgeCount() == 0`) yield
+    `EmptyGraph`. Empty `absolute_path` and paths under
+    non-existent directories yield `InvalidPath` (the
+    `std::ofstream` open fails).
+  - Tests in `tests/unit/geometry/Test.GeometryIO.cpp`
+    (`GeometryIO_GraphIO`) add
+    `WritesEdgeListRoundTripsEdges`,
+    `WritesEdgeListRoundTripsLabelsAndWeight`,
+    `WritesEdgeListEmitsWeightWhenLabelOnly`,
+    `WritesEdgeListSkipsDeletedEdges`,
+    `WriteEdgeListRejectsEmptyGraph`,
+    `WriteEdgeListRejectsEdgelessGraph`, and
+    `WriteEdgeListRejectsBadPath`.
+  - `docs/migration/nonlegacy-parity-matrix.md` gains a new
+    `Edge-list (.edges) graph export` row recording the
+    geometry-owned writer. No legacy edge-list exporter exists,
+    so this slice introduces the promoted writer as new
+    authority rather than retiring a legacy one.
+  - Remaining `GEOIO-002` scope (granular reader-side
+    `MeshIOReadStatus`/`PointCloudIOReadStatus` diagnostics;
+    OBJ ASCII parity hardening; packed-`rgb`/`rgba` PCD plus
+    `binary_compressed` LZF decompression; binary PCD writer)
+    stays tracked under the parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
