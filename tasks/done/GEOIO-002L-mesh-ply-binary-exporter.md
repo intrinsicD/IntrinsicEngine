@@ -160,7 +160,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-10.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-n82W8`.
-- Implementation commit: TBD (this PR).
+- Implementation commit: `d2b5654`
+  (`GEOIO-002L: add geometry-owned binary PLY mesh exporter`).
 - Verified in this session:
   - `python3 tools/repo/check_layering.py --root src --strict` — no
     layering violations; `geometry` imports remain `geometry -> core`
