@@ -20,5 +20,15 @@ export namespace Geometry::GraphIO
 
     Core::Expected<GraphIOResult> LoadTGF(std::string_view absolute_path);
     Core::Expected<GraphIOResult> LoadEdgeList(std::string_view absolute_path);
+
+    enum class GraphIOWriteStatus
+    {
+        Success,
+        InvalidPath,
+        EmptyGraph,
+        FileWriteError,
+    };
+
+    GraphIOWriteStatus WriteTGF(std::string_view absolute_path, const GraphIOResult& graph);
 }
 
