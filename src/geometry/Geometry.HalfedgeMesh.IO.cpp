@@ -10,6 +10,7 @@ module;
 #include <cstring>
 #include <fstream>
 #include <ios>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -1620,6 +1621,143 @@ namespace Geometry::MeshIO
         }
 
         stream << "endsolid IntrinsicEngine\n";
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+        return MeshIOWriteStatus::Success;
+    }
+
+    MeshIOWriteStatus WriteSTLBinary(std::string_view absolute_path, const MeshIOResult& mesh)
+    {
+        if (absolute_path.empty())
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        const auto positionsView = mesh.Vertices.Get<glm::vec3>("v:point");
+        if (!positionsView.IsValid() || positionsView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& positions = positionsView.Vector();
+
+        const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+        if (!facesView.IsValid() || facesView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& faces = facesView.Vector();
+
+        for (const auto& face : faces)
+        {
+            if (face.size() != 3)
+            {
+                return MeshIOWriteStatus::InvalidFace;
+            }
+            for (const auto index : face)
+            {
+                if (static_cast<std::size_t>(index) >= positions.size())
+                {
+                    return MeshIOWriteStatus::InvalidFace;
+                }
+            }
+        }
+
+        if (faces.size() > static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return MeshIOWriteStatus::InvalidFace;
+        }
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        constexpr bool hostBigEndian = std::endian::native == std::endian::big;
+
+        auto writeFloatLE = [&](float value) -> bool {
+            std::array<std::byte, 4> bytes{};
+            std::memcpy(bytes.data(), &value, 4);
+            if constexpr (hostBigEndian)
+            {
+                std::swap(bytes[0], bytes[3]);
+                std::swap(bytes[1], bytes[2]);
+            }
+            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
+            return stream.good();
+        };
+
+        auto writeUInt32LE = [&](std::uint32_t value) -> bool {
+            std::array<std::byte, 4> bytes{};
+            std::memcpy(bytes.data(), &value, 4);
+            if constexpr (hostBigEndian)
+            {
+                std::swap(bytes[0], bytes[3]);
+                std::swap(bytes[1], bytes[2]);
+            }
+            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
+            return stream.good();
+        };
+
+        auto writeUInt16LE = [&](std::uint16_t value) -> bool {
+            std::array<std::byte, 2> bytes{};
+            std::memcpy(bytes.data(), &value, 2);
+            if constexpr (hostBigEndian)
+            {
+                std::swap(bytes[0], bytes[1]);
+            }
+            stream.write(reinterpret_cast<const char*>(bytes.data()), 2);
+            return stream.good();
+        };
+
+        std::array<char, 80> header{};
+        constexpr std::string_view tag = "IntrinsicEngine binary STL";
+        std::memcpy(header.data(), tag.data(), tag.size());
+        stream.write(header.data(), static_cast<std::streamsize>(header.size()));
+        if (!stream.good())
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
+        if (!writeUInt32LE(static_cast<std::uint32_t>(faces.size())))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
+        for (const auto& face : faces)
+        {
+            const glm::vec3& v0 = positions[face[0]];
+            const glm::vec3& v1 = positions[face[1]];
+            const glm::vec3& v2 = positions[face[2]];
+
+            glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+            if (!std::isfinite(normal.x) || !std::isfinite(normal.y) || !std::isfinite(normal.z))
+            {
+                normal = glm::vec3(0.0f, 0.0f, 0.0f);
+            }
+
+            if (!writeFloatLE(normal.x) || !writeFloatLE(normal.y) || !writeFloatLE(normal.z))
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+
+            for (const glm::vec3& v : {v0, v1, v2})
+            {
+                if (!writeFloatLE(v.x) || !writeFloatLE(v.y) || !writeFloatLE(v.z))
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+            }
+
+            if (!writeUInt16LE(0u))
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+        }
 
         stream.flush();
         if (!stream.good())
