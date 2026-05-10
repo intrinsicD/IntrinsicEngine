@@ -189,9 +189,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-10.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-xMjLy`.
-- Implementation commit: pending — to be filled with the SHA of
-  the `GEOIO-002P: add geometry-owned binary STL mesh exporter`
-  commit on this branch in a follow-up commit on the same branch.
+- Implementation commit: `8b0ab5a`
+  (`GEOIO-002P: add geometry-owned binary STL mesh exporter`).
 - Verified in this session:
   - `python3 tools/repo/check_layering.py --root src --strict` —
     no layering violations; `geometry` imports remain
