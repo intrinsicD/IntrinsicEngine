@@ -21,5 +21,15 @@ export namespace Geometry::PointCloudIO
     Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path);
     Core::Expected<PointCloudIOResult> LoadPCD(std::string_view absolute_path);
     Core::Expected<PointCloudIOResult> LoadPLY(std::string_view absolute_path);
+
+    enum class PointCloudIOWriteStatus
+    {
+        Success = 0,
+        EmptyCloud,
+        InvalidPath,
+        FileWriteError,
+    };
+
+    PointCloudIOWriteStatus WritePLY(std::string_view absolute_path, const PointCloudIOResult& cloud);
 }
 

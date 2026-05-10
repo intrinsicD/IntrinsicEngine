@@ -1800,3 +1800,101 @@ TEST(GeometryIO_PointCloudIO, LoadPCDRejectsZeroSizeField)
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
 }
+
+TEST(GeometryIO_PointCloudIO, WritesPLYPointCloud)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.AddPoint(glm::vec3(1.0f, 0.0f, 0.0f));
+    cloud.Cloud.AddPoint(glm::vec3(0.0f, 1.0f, 0.0f));
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::PointCloudIO::WritePLY(file.Path, cloud);
+    EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
+
+    const auto loaded = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Cloud.VerticesSize(), 3u);
+    EXPECT_FALSE(loaded->Cloud.HasNormals());
+    EXPECT_FALSE(loaded->Cloud.HasColors());
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{1}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Position(Geometry::VertexHandle{2}), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, WritesPLYPointCloudWithNormalsAndColors)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.EnableNormals();
+    cloud.Cloud.EnableColors(glm::vec4(1.0f));
+
+    const auto v0 = cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.Normal(v0) = glm::vec3(0.0f, 0.0f, 1.0f);
+    cloud.Cloud.Color(v0) = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+    const auto v1 = cloud.Cloud.AddPoint(glm::vec3(1.0f, 0.0f, 0.0f));
+    cloud.Cloud.Normal(v1) = glm::vec3(0.0f, 1.0f, 0.0f);
+    cloud.Cloud.Color(v1) = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::PointCloudIO::WritePLY(file.Path, cloud);
+    EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("property float nx\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar red\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar green\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar blue\n"), std::string::npos);
+
+    const auto loaded = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ASSERT_EQ(loaded->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(loaded->Cloud.HasNormals());
+    EXPECT_TRUE(loaded->Cloud.HasColors());
+    EXPECT_EQ(loaded->Cloud.Normal(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loaded->Cloud.Normal(Geometry::VertexHandle{1}), glm::vec3(0.0f, 1.0f, 0.0f));
+    EXPECT_EQ(loaded->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loaded->Cloud.Color(Geometry::VertexHandle{1}), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, WritesPLYPointCloudWithRadiiEmitsRadiusProperty)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.EnableRadii(0.0f);
+    const auto v0 = cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.Radius(v0) = 0.25f;
+    const auto v1 = cloud.Cloud.AddPoint(glm::vec3(1.0f, 0.0f, 0.0f));
+    cloud.Cloud.Radius(v1) = 0.5f;
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::PointCloudIO::WritePLY(file.Path, cloud);
+    EXPECT_EQ(status, Geometry::PointCloudIO::PointCloudIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("property float radius\n"), std::string::npos);
+    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 0.250000\n"), std::string::npos);
+    EXPECT_NE(contents.find("1.000000 0.000000 0.000000 0.500000\n"), std::string::npos);
+}
+
+TEST(GeometryIO_PointCloudIO, WritePLYPointCloudRejectsEmptyCloud)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    TempFile file(".ply", "");
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(file.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::EmptyCloud);
+}
+
+TEST(GeometryIO_PointCloudIO, WritePLYPointCloudRejectsBadPath)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLY({}, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
+
+    const std::string path =
+        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_") +
+        std::to_string(static_cast<long long>(getpid())) + ".ply";
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
+}
