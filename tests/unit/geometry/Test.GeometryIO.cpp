@@ -598,6 +598,158 @@ TEST(GeometryIO_GraphIO, WriteTGFRejectsBadPath)
               Geometry::GraphIO::GraphIOWriteStatus::InvalidPath);
 }
 
+TEST(GeometryIO_GraphIO, WritesEdgeListRoundTripsEdges)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto c = source.Graph.AddVertex(glm::vec3(0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    ASSERT_TRUE(c.IsValid());
+    ASSERT_TRUE(source.Graph.AddEdge(a, b).has_value());
+    ASSERT_TRUE(source.Graph.AddEdge(b, c).has_value());
+
+    TempFile file(".edges", "");
+    const auto status = Geometry::GraphIO::WriteEdgeList(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    const auto loaded = Geometry::GraphIO::LoadEdgeList(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.VertexCount(), 3u);
+    EXPECT_EQ(loaded->Graph.EdgeCount(), 2u);
+
+    auto vertexIds = loaded->Graph.VertexProperties().Get<std::string>("v:id");
+    ASSERT_TRUE(vertexIds.IsValid());
+    EXPECT_EQ(vertexIds[0], "0");
+    EXPECT_EQ(vertexIds[1], "1");
+    EXPECT_EQ(vertexIds[2], "2");
+}
+
+TEST(GeometryIO_GraphIO, WritesEdgeListRoundTripsLabelsAndWeight)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    const auto edge = source.Graph.AddEdge(a, b);
+    ASSERT_TRUE(edge.has_value());
+    auto edgeWeights = source.Graph.GetOrAddEdgeProperty<float>("e:weight", 1.0f);
+    auto edgeLabels = source.Graph.GetOrAddEdgeProperty<std::string>("e:label", {});
+    edgeWeights[*edge] = 3.25f;
+    edgeLabels[*edge] = "first";
+
+    TempFile file(".edges", "");
+    const auto status = Geometry::GraphIO::WriteEdgeList(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    const auto loaded = Geometry::GraphIO::LoadEdgeList(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.VertexCount(), 2u);
+    EXPECT_EQ(loaded->Graph.EdgeCount(), 1u);
+
+    auto loadedWeights = loaded->Graph.EdgeProperties().Get<float>("e:weight");
+    ASSERT_TRUE(loadedWeights.IsValid());
+    EXPECT_FLOAT_EQ(loadedWeights[0], 3.25f);
+
+    auto loadedLabels = loaded->Graph.EdgeProperties().Get<std::string>("e:label");
+    ASSERT_TRUE(loadedLabels.IsValid());
+    EXPECT_EQ(loadedLabels[0], "first");
+}
+
+TEST(GeometryIO_GraphIO, WritesEdgeListEmitsWeightWhenLabelOnly)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    const auto edge = source.Graph.AddEdge(a, b);
+    ASSERT_TRUE(edge.has_value());
+    auto edgeLabels = source.Graph.GetOrAddEdgeProperty<std::string>("e:label", {});
+    edgeLabels[*edge] = "named";
+
+    TempFile file(".edges", "");
+    const auto status = Geometry::GraphIO::WriteEdgeList(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    std::ifstream in(file.Path, std::ios::binary);
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    const std::string contents = buffer.str();
+    EXPECT_NE(contents.find(" 1.000000 "), std::string::npos);
+    EXPECT_NE(contents.find("named"), std::string::npos);
+
+    const auto loaded = Geometry::GraphIO::LoadEdgeList(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.EdgeCount(), 1u);
+    auto loadedLabels = loaded->Graph.EdgeProperties().Get<std::string>("e:label");
+    ASSERT_TRUE(loadedLabels.IsValid());
+    EXPECT_EQ(loadedLabels[0], "named");
+}
+
+TEST(GeometryIO_GraphIO, WritesEdgeListSkipsDeletedEdges)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto c = source.Graph.AddVertex(glm::vec3(0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    ASSERT_TRUE(c.IsValid());
+    const auto e0 = source.Graph.AddEdge(a, b);
+    const auto e1 = source.Graph.AddEdge(b, c);
+    ASSERT_TRUE(e0.has_value());
+    ASSERT_TRUE(e1.has_value());
+    source.Graph.DeleteEdge(*e0);
+    EXPECT_TRUE(source.Graph.IsDeleted(*e0));
+    EXPECT_EQ(source.Graph.EdgeCount(), 1u);
+
+    TempFile file(".edges", "");
+    const auto status = Geometry::GraphIO::WriteEdgeList(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    const auto loaded = Geometry::GraphIO::LoadEdgeList(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.EdgeCount(), 1u);
+}
+
+TEST(GeometryIO_GraphIO, WriteEdgeListRejectsEmptyGraph)
+{
+    Geometry::GraphIO::GraphIOResult source;
+
+    TempFile file(".edges", "");
+    const auto status = Geometry::GraphIO::WriteEdgeList(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::EmptyGraph);
+}
+
+TEST(GeometryIO_GraphIO, WriteEdgeListRejectsEdgelessGraph)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto v = source.Graph.AddVertex(glm::vec3(0.0f));
+    ASSERT_TRUE(v.IsValid());
+
+    TempFile file(".edges", "");
+    const auto status = Geometry::GraphIO::WriteEdgeList(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::EmptyGraph);
+}
+
+TEST(GeometryIO_GraphIO, WriteEdgeListRejectsBadPath)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    ASSERT_TRUE(source.Graph.AddEdge(a, b).has_value());
+
+    EXPECT_EQ(Geometry::GraphIO::WriteEdgeList("", source),
+              Geometry::GraphIO::GraphIOWriteStatus::InvalidPath);
+    EXPECT_EQ(Geometry::GraphIO::WriteEdgeList("/nonexistent_geometry_io_dir_xyz/out.edges", source),
+              Geometry::GraphIO::GraphIOWriteStatus::InvalidPath);
+}
+
 namespace
 {
     void PopulateTriangleMesh(Geometry::MeshIO::MeshIOResult& mesh,
