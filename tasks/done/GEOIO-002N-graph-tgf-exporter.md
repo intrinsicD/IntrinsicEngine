@@ -180,8 +180,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-10.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-6ZFQb`.
-- Implementation commit: pending (recorded in the same commit as
-  this task file move from `backlog/` to `done/`).
+- Implementation commit: `94c44c8`
+  (`GEOIO-002N: add geometry-owned text TGF graph exporter`).
 - Verified in this session:
   - `python3 tools/repo/check_layering.py --root src --strict` — no
     layering violations; `geometry` imports remain `geometry -> core`
