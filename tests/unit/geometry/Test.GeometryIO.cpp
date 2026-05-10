@@ -751,6 +751,135 @@ TEST(GeometryIO_MeshIO, WritePLYRejectsBadPath)
               Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
 }
 
+TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangle)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::MeshIO::WritePLYBinary(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("format binary_little_endian 1.0\n"), std::string::npos);
+    EXPECT_NE(contents.find("property list uchar int vertex_indices\n"), std::string::npos);
+    EXPECT_NE(contents.find("end_header\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+}
+
+TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangleWithNormals)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, normals);
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::MeshIO::WritePLYBinary(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("format binary_little_endian 1.0\n"), std::string::npos);
+    EXPECT_NE(contents.find("property float nx\n"), std::string::npos);
+    EXPECT_NE(contents.find("property float ny\n"), std::string::npos);
+    EXPECT_NE(contents.find("property float nz\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+}
+
+TEST(GeometryIO_MeshIO, WritesPLYBinaryQuadRoundTripsFaceArity)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 4> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u, 3u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::MeshIO::WritePLYBinary(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Vertices.Size(), 4u);
+    EXPECT_EQ(loaded->Faces.Size(), 1u);
+
+    auto faceVertices = loaded->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(faceVertices.IsValid());
+    ASSERT_EQ(faceVertices.Vector().size(), 1u);
+    EXPECT_EQ(faceVertices.Vector()[0].size(), 4u);
+    EXPECT_EQ(faceVertices.Vector()[0][3], 3u);
+}
+
+TEST(GeometryIO_MeshIO, WritePLYBinaryRejectsEmptyMesh)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    TempFile file(".ply", "");
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(file.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::EmptyMesh);
+}
+
+TEST(GeometryIO_MeshIO, WritePLYBinaryRejectsOutOfRangeIndex)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 99u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".ply", "");
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(file.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::InvalidFace);
+}
+
+TEST(GeometryIO_MeshIO, WritePLYBinaryRejectsBadPath)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary({}, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
+
+    const std::string path =
+        std::string("/this/directory/does/not/exist/intrinsic_geometry_io_bin_mesh_") +
+        std::to_string(static_cast<long long>(getpid())) + ".ply";
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
+}
+
 namespace
 {
     [[nodiscard]] std::string WriteBinarySTLFixture(std::span<const std::array<glm::vec3, 3>> triangles,

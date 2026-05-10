@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1362,6 +1363,163 @@ namespace Geometry::MeshIO
                 stream.write(buffer, written);
             }
             stream.put('\n');
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+        return MeshIOWriteStatus::Success;
+    }
+
+    MeshIOWriteStatus WritePLYBinary(std::string_view absolute_path, const MeshIOResult& mesh)
+    {
+        if (absolute_path.empty())
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        const auto positionsView = mesh.Vertices.Get<glm::vec3>("v:point");
+        if (!positionsView.IsValid() || positionsView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& positions = positionsView.Vector();
+
+        const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+        if (!facesView.IsValid() || facesView.Vector().empty())
+        {
+            return MeshIOWriteStatus::EmptyMesh;
+        }
+        const auto& faces = facesView.Vector();
+
+        for (const auto& face : faces)
+        {
+            if (face.size() < 3)
+            {
+                return MeshIOWriteStatus::InvalidFace;
+            }
+            if (face.size() > 255u)
+            {
+                return MeshIOWriteStatus::InvalidFace;
+            }
+            for (const auto index : face)
+            {
+                if (static_cast<std::size_t>(index) >= positions.size())
+                {
+                    return MeshIOWriteStatus::InvalidFace;
+                }
+            }
+        }
+
+        const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
+        const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return MeshIOWriteStatus::InvalidPath;
+        }
+
+        char headerBuffer[192];
+
+        stream << "ply\n";
+        stream << "format binary_little_endian 1.0\n";
+        stream << "comment Exported by IntrinsicEngine\n";
+        {
+            const int written = std::snprintf(headerBuffer, sizeof(headerBuffer),
+                                              "element vertex %zu\n",
+                                              positions.size());
+            if (written <= 0)
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            stream.write(headerBuffer, written);
+        }
+        stream << "property float x\n";
+        stream << "property float y\n";
+        stream << "property float z\n";
+        if (hasNormals)
+        {
+            stream << "property float nx\n";
+            stream << "property float ny\n";
+            stream << "property float nz\n";
+        }
+        {
+            const int written = std::snprintf(headerBuffer, sizeof(headerBuffer),
+                                              "element face %zu\n",
+                                              faces.size());
+            if (written <= 0)
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            stream.write(headerBuffer, written);
+        }
+        stream << "property list uchar int vertex_indices\n";
+        stream << "end_header\n";
+
+        constexpr bool hostBigEndian = std::endian::native == std::endian::big;
+
+        auto writeFloatLE = [&](float value) -> bool {
+            std::array<std::byte, 4> bytes{};
+            std::memcpy(bytes.data(), &value, 4);
+            if constexpr (hostBigEndian)
+            {
+                std::swap(bytes[0], bytes[3]);
+                std::swap(bytes[1], bytes[2]);
+            }
+            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
+            return stream.good();
+        };
+
+        auto writeInt32LE = [&](std::int32_t value) -> bool {
+            std::array<std::byte, 4> bytes{};
+            std::memcpy(bytes.data(), &value, 4);
+            if constexpr (hostBigEndian)
+            {
+                std::swap(bytes[0], bytes[3]);
+                std::swap(bytes[1], bytes[2]);
+            }
+            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
+            return stream.good();
+        };
+
+        auto writeUInt8 = [&](std::uint8_t value) -> bool {
+            stream.write(reinterpret_cast<const char*>(&value), 1);
+            return stream.good();
+        };
+
+        for (std::size_t i = 0; i < positions.size(); ++i)
+        {
+            const auto& p = positions[i];
+            if (!writeFloatLE(p.x) || !writeFloatLE(p.y) || !writeFloatLE(p.z))
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            if (hasNormals)
+            {
+                const auto& n = normalsView.Vector()[i];
+                if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+            }
+        }
+
+        for (const auto& face : faces)
+        {
+            if (!writeUInt8(static_cast<std::uint8_t>(face.size())))
+            {
+                return MeshIOWriteStatus::FileWriteError;
+            }
+            for (const auto index : face)
+            {
+                if (!writeInt32LE(static_cast<std::int32_t>(index)))
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+            }
         }
 
         stream.flush();
