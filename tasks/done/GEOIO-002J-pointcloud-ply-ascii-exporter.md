@@ -22,8 +22,10 @@
 - No GPU/Vulkan requirement in the default CPU gate.
 
 ## Context
+- Status: done.
 - Owner/agent: `geometry -> core` only.
-- Branch: `claude/setup-agentic-workflow-aHpQ0`.
+- Branch: `claude/setup-agentic-workflow-aHpQ0` (implementation),
+  `claude/setup-agentic-workflow-58MLx` (retirement).
 - Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-001`/`GEOIO-002F`/`GEOIO-002G`/`GEOIO-002H` cover ASCII+binary
   PLY/PCD/XYZ point-cloud importers in
@@ -107,3 +109,46 @@ python3 tools/docs/check_doc_links.py --root .
 - Mixing mechanical legacy deletion with semantic IO implementation.
 - Adding binary PLY point-cloud emission in this slice (separate follow-up).
 - Adding PCD or XYZ exporters in this slice.
+
+## Completion
+- Completed: 2026-05-10.
+- Status: done.
+- Implementation commit: `df157ae`
+  (`GEOIO-002J: add geometry-owned ASCII PLY point-cloud exporter`).
+- Retired in a follow-up commit on
+  `claude/setup-agentic-workflow-58MLx`. The implementation commit on
+  `claude/setup-agentic-workflow-aHpQ0` (PR #790) merged without moving
+  the task file out of `tasks/backlog/geometry/`; this retirement closes
+  that gap with no source/test changes.
+- Verified in this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings after this retirement (139 task files validated).
+  - `python3 tools/repo/check_layering.py --root src --strict` — no
+    layering violations; `geometry` imports remain `geometry -> core`
+    only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/docs/check_doc_links.py --root .` — 0 broken links.
+- Build/CTest gate not re-run in this retirement: no source/test files
+  change. The implementation commit `df157ae` already recorded a clean
+  focused gate (`ctest -R 'GeometryIO' -LE 'gpu|vulkan|slow|flaky-quarantine'`
+  passing 70/70) on the originating session host.
+- Notes:
+  - `Geometry::PointCloudIO::WritePLY` plus
+    `PointCloudIOWriteStatus { Success, EmptyCloud, InvalidPath, FileWriteError }`
+    are exported from `src/geometry/Geometry.PointCloud.IO.cppm` and
+    implemented in `src/geometry/Geometry.PointCloud.IO.cpp`.
+  - Coverage in `tests/unit/geometry/Test.GeometryIO.cpp` (`GeometryIO_PointCloudIO`)
+    adds `WritesPLYPointCloud`,
+    `WritesPLYPointCloudWithNormalsAndColorsAndRadii`,
+    `WritePLYPointCloudRejectsEmptyCloud`, and
+    `WritePLYPointCloudRejectsBadPath`.
+  - `docs/migration/nonlegacy-parity-matrix.md` (`GRAPHICS-019` row,
+    OBJ/PLY/STL exporters) records the new geometry-owned ASCII PLY
+    point-cloud writer.
+  - Remaining `GEOIO-002` scope (binary PLY point-cloud writer; PCD and
+    XYZ point-cloud writers; TGF graph writer; granular reader-side
+    `MeshIOReadStatus`/`PointCloudIOReadStatus` diagnostics; OBJ ASCII
+    parity hardening; packed-`rgb`/`rgba` PCD plus `binary_compressed`
+    LZF decompression) stays tracked under the parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
