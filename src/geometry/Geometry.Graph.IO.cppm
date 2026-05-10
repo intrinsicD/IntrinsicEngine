@@ -30,5 +30,6 @@ export namespace Geometry::GraphIO
     };
 
     GraphIOWriteStatus WriteTGF(std::string_view absolute_path, const GraphIOResult& graph);
+    GraphIOWriteStatus WriteEdgeList(std::string_view absolute_path, const GraphIOResult& graph);
 }
 

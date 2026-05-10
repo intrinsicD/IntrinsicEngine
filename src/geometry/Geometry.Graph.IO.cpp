@@ -403,5 +403,84 @@ namespace Geometry::GraphIO
         }
         return GraphIOWriteStatus::Success;
     }
+
+    GraphIOWriteStatus WriteEdgeList(std::string_view absolute_path, const GraphIOResult& graph)
+    {
+        if (absolute_path.empty())
+        {
+            return GraphIOWriteStatus::InvalidPath;
+        }
+
+        const auto& source = graph.Graph;
+        if (source.VertexCount() == 0 || source.EdgeCount() == 0)
+        {
+            return GraphIOWriteStatus::EmptyGraph;
+        }
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return GraphIOWriteStatus::InvalidPath;
+        }
+
+        const auto edgeWeights = source.EdgeProperties().Get<float>("e:weight");
+        const auto edgeLabels = source.EdgeProperties().Get<std::string>("e:label");
+        const bool hasEdgeWeights = edgeWeights.IsValid();
+        const bool hasEdgeLabels = edgeLabels.IsValid();
+
+        char buffer[256];
+        const std::size_t edgeSlots = source.EdgesSize();
+        for (std::size_t i = 0; i < edgeSlots; ++i)
+        {
+            const EdgeHandle e{static_cast<PropertyIndex>(i)};
+            if (source.IsDeleted(e))
+            {
+                continue;
+            }
+            const auto endpoints = source.EdgeVertices(e);
+            const std::size_t fromIndex = endpoints.first.Index;
+            const std::size_t toIndex = endpoints.second.Index;
+
+            int written = std::snprintf(buffer, sizeof(buffer),
+                                        "%zu %zu",
+                                        fromIndex,
+                                        toIndex);
+            if (written <= 0)
+            {
+                return GraphIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+
+            const bool labelPresent = hasEdgeLabels && !edgeLabels[e.Index].empty();
+            if (hasEdgeWeights || labelPresent)
+            {
+                const float weight = hasEdgeWeights ? edgeWeights[e.Index] : 1.0f;
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        " %.6f",
+                                        static_cast<double>(weight));
+                if (written <= 0)
+                {
+                    return GraphIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            if (labelPresent)
+            {
+                const std::string& label = edgeLabels[e.Index];
+                stream.put(' ');
+                stream.write(label.data(), static_cast<std::streamsize>(label.size()));
+            }
+
+            stream.put('\n');
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return GraphIOWriteStatus::FileWriteError;
+        }
+        return GraphIOWriteStatus::Success;
+    }
 }
 
