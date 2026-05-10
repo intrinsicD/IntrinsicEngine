@@ -42,7 +42,7 @@
 - No GPU/Vulkan requirement in the default CPU gate.
 
 ## Context
-- Status: backlog.
+- Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-EP5PN`.
 - Parent backlog task:
@@ -191,3 +191,82 @@ python3 tools/docs/check_doc_links.py --root .
   implementation.
 - Promoting arbitrary user-defined per-point property
   serialization in this slice.
+
+## Completion
+- Completed: 2026-05-10.
+- Status: done.
+- Branch: `claude/setup-agentic-workflow-EP5PN`.
+- Implementation commit: `48cbc84`
+  (`GEOIO-002R: add geometry-owned binary PCD point-cloud exporter`).
+- Verified in this session:
+  - `python3 tools/repo/check_layering.py --root src --strict` —
+    no layering violations; `geometry` imports remain
+    `geometry -> core` only.
+  - `python3 tools/repo/check_test_layout.py --root . --strict` —
+    0 findings.
+  - `python3 tools/agents/check_task_policy.py --root . --strict` —
+    0 findings (147 task files validated before the move; the
+    file rename does not change the file count after the move).
+  - `python3 tools/docs/check_doc_links.py --root .` — 0 broken
+    relative links.
+  - `python3 tools/repo/generate_module_inventory.py --root src
+    --out docs/api/generated/module_inventory.md` — 420 modules;
+    no diff (the new exported function lives inside the existing
+    `Geometry.PointCloud.IO` module surface and the inventory
+    tracks modules, not individual functions).
+- CPU build/test gate not exercised: this container lacks
+  `clang-20` and `clang-scan-deps` 20+, which the `ci` preset
+  hard-codes. `cmake --preset ci` therefore fails at the compiler
+  detection step, mirroring the constraint already recorded by
+  `GEOIO-002L`/`GEOIO-002M`/`GEOIO-002N`/`GEOIO-002O`/`GEOIO-002P`/`GEOIO-002Q`
+  and earlier slices. Build verification needs to re-run on a CI
+  host with the correct toolchain prior to merge.
+- Notes:
+  - `Geometry::PointCloudIO::WritePCDBinary` is exported from
+    `src/geometry/Geometry.PointCloud.IO.cppm` and implemented in
+    `src/geometry/Geometry.PointCloud.IO.cpp`. It reuses the
+    existing `PointCloudIOWriteStatus` enum.
+  - The on-disk header matches `WritePCD` (`GEOIO-002O`)
+    byte-for-byte except for the final framing line: it emits
+    `# .PCD v0.7`, `VERSION 0.7`, `FIELDS x y z` (extending with
+    `normal_x normal_y normal_z` when the cloud has matching-size
+    normals, and `r g b` when it has matching-size colors), the
+    matching `SIZE`/`TYPE`/`COUNT` lines using `4`/`F`/`1`,
+    `WIDTH <N>`, `HEIGHT 1`, `VIEWPOINT 0 0 0 1 0 0 0`,
+    `POINTS <N>`, and `DATA binary`. The packed body emits
+    little-endian 4-byte floats for `x, y, z`, then optional
+    `nx, ny, nz`, then optional `r, g, b` per point.
+  - Float endianness is byte-swapped on big-endian hosts using
+    the same `std::endian::native == std::endian::big` pattern
+    as `WritePLYBinary`.
+  - Color channels are clamped to `[0, 1]` before serialization,
+    which keeps the round-trip inside `NormalizeColorChannel`'s
+    no-op branch in `LoadPCD` (values `> 1.0` get divided by
+    `255.0`; values in `[0, 1]` are clamped only). Choosing the
+    float `SIZE 4 TYPE F` color layout (instead of the
+    `uchar SIZE 1 TYPE U` layout used by the existing binary PCD
+    reader test fixtures) keeps `WritePCD` and `WritePCDBinary`
+    semantically identical and lets the same float-typed reader
+    path decode both writers' output.
+  - `Cloud::HasRadii()` is intentionally ignored: the writer
+    emits only the `x/y/z`, optional normals, and optional RGB
+    fields the reader recognizes, so radii are not encoded.
+  - Empty clouds (`Cloud::IsEmpty()`) yield `EmptyCloud`. Empty
+    `absolute_path` and paths under non-existent directories
+    yield `InvalidPath` (the `std::ofstream` open fails).
+  - Tests in `tests/unit/geometry/Test.GeometryIO.cpp`
+    (`GeometryIO_PointCloudIO`) add
+    `WritesPCDBinaryPositionsOnly`,
+    `WritesPCDBinaryWithNormalsAndColorsRoundTrips`,
+    `WritesPCDBinaryIgnoresRadii`,
+    `WritePCDBinaryRejectsEmptyCloud`, and
+    `WritePCDBinaryRejectsBadPath`.
+  - `docs/migration/nonlegacy-parity-matrix.md` updates the
+    existing `OBJ/PLY/STL exporters` row to record the new
+    geometry-owned binary PCD writer.
+  - Remaining `GEOIO-002` scope (granular reader-side
+    `MeshIOReadStatus`/`PointCloudIOReadStatus` diagnostics;
+    OBJ ASCII parity hardening; packed-`rgb`/`rgba` PCD plus
+    `binary_compressed` LZF decompression) stays tracked under
+    the parent backlog task
+    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
