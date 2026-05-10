@@ -1,5 +1,8 @@
 module;
 
+#include <cstdio>
+#include <fstream>
+#include <ios>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -283,6 +286,122 @@ namespace Geometry::GraphIO
             return InvalidGraphFormat();
         }
         return result;
+    }
+
+    GraphIOWriteStatus WriteTGF(std::string_view absolute_path, const GraphIOResult& graph)
+    {
+        if (absolute_path.empty())
+        {
+            return GraphIOWriteStatus::InvalidPath;
+        }
+
+        const auto& source = graph.Graph;
+        if (source.VertexCount() == 0)
+        {
+            return GraphIOWriteStatus::EmptyGraph;
+        }
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return GraphIOWriteStatus::InvalidPath;
+        }
+
+        const auto vertexLabels = source.VertexProperties().Get<std::string>("v:label");
+        const auto edgeWeights = source.EdgeProperties().Get<float>("e:weight");
+        const auto edgeLabels = source.EdgeProperties().Get<std::string>("e:label");
+        const bool hasEdgeLabels = edgeLabels.IsValid();
+        const bool hasEdgeWeights = edgeWeights.IsValid();
+
+        char buffer[256];
+        const std::size_t vertexSlots = source.VerticesSize();
+        for (std::size_t i = 0; i < vertexSlots; ++i)
+        {
+            const VertexHandle v{static_cast<PropertyIndex>(i)};
+            if (source.IsDeleted(v))
+            {
+                continue;
+            }
+            const glm::vec3 p = source.VertexPosition(v);
+            int written = std::snprintf(buffer, sizeof(buffer),
+                                        "%zu %.6f %.6f %.6f",
+                                        i,
+                                        static_cast<double>(p.x),
+                                        static_cast<double>(p.y),
+                                        static_cast<double>(p.z));
+            if (written <= 0)
+            {
+                return GraphIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+
+            if (vertexLabels.IsValid())
+            {
+                const std::string& label = vertexLabels[v.Index];
+                if (!label.empty())
+                {
+                    stream.put(' ');
+                    stream.write(label.data(), static_cast<std::streamsize>(label.size()));
+                }
+            }
+            stream.put('\n');
+        }
+
+        stream.write("#\n", 2);
+
+        const std::size_t edgeSlots = source.EdgesSize();
+        for (std::size_t i = 0; i < edgeSlots; ++i)
+        {
+            const EdgeHandle e{static_cast<PropertyIndex>(i)};
+            if (source.IsDeleted(e))
+            {
+                continue;
+            }
+            const auto endpoints = source.EdgeVertices(e);
+            const std::size_t fromIndex = endpoints.first.Index;
+            const std::size_t toIndex = endpoints.second.Index;
+
+            int written = std::snprintf(buffer, sizeof(buffer),
+                                        "%zu %zu",
+                                        fromIndex,
+                                        toIndex);
+            if (written <= 0)
+            {
+                return GraphIOWriteStatus::FileWriteError;
+            }
+            stream.write(buffer, written);
+
+            const bool labelPresent = hasEdgeLabels && !edgeLabels[e.Index].empty();
+            const bool weightPresent = hasEdgeWeights;
+            if (weightPresent || labelPresent)
+            {
+                const float weight = weightPresent ? edgeWeights[e.Index] : 1.0f;
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        " %.6f",
+                                        static_cast<double>(weight));
+                if (written <= 0)
+                {
+                    return GraphIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            if (labelPresent)
+            {
+                const std::string& label = edgeLabels[e.Index];
+                stream.put(' ');
+                stream.write(label.data(), static_cast<std::streamsize>(label.size()));
+            }
+
+            stream.put('\n');
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return GraphIOWriteStatus::FileWriteError;
+        }
+        return GraphIOWriteStatus::Success;
     }
 }
 

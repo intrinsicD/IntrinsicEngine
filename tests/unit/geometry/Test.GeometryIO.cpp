@@ -469,6 +469,135 @@ TEST(GeometryIO_GraphIO, LoadsEdgeListWithImplicitVertices)
     EXPECT_FLOAT_EQ(edgeWeights[1], 2.0f);
 }
 
+TEST(GeometryIO_GraphIO, WritesTGFRoundTripsVerticesAndEdges)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(1.0f, 2.0f, 3.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(4.0f, 5.0f, 6.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    ASSERT_TRUE(source.Graph.AddEdge(a, b).has_value());
+
+    TempFile file(".tgf", "");
+    const auto status = Geometry::GraphIO::WriteTGF(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    const auto loaded = Geometry::GraphIO::LoadTGF(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.VertexCount(), 2u);
+    EXPECT_EQ(loaded->Graph.EdgeCount(), 1u);
+    EXPECT_EQ(loaded->Graph.VertexPosition(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(loaded->Graph.VertexPosition(Geometry::VertexHandle{1}), glm::vec3(4.0f, 5.0f, 6.0f));
+}
+
+TEST(GeometryIO_GraphIO, WritesTGFRoundTripsLabelsAndWeight)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(0.0f, 0.0f, 0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    auto vertexLabels = source.Graph.GetOrAddVertexProperty<std::string>("v:label", {});
+    vertexLabels[a] = "first";
+    vertexLabels[b] = "second";
+    const auto edge = source.Graph.AddEdge(a, b);
+    ASSERT_TRUE(edge.has_value());
+    auto edgeWeights = source.Graph.GetOrAddEdgeProperty<float>("e:weight", 1.0f);
+    auto edgeLabels = source.Graph.GetOrAddEdgeProperty<std::string>("e:label", {});
+    edgeWeights[*edge] = 2.5f;
+    edgeLabels[*edge] = "edge label";
+
+    TempFile file(".tgf", "");
+    const auto status = Geometry::GraphIO::WriteTGF(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    const auto loaded = Geometry::GraphIO::LoadTGF(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.VertexCount(), 2u);
+    EXPECT_EQ(loaded->Graph.EdgeCount(), 1u);
+
+    auto loadedVertexLabels = loaded->Graph.VertexProperties().Get<std::string>("v:label");
+    ASSERT_TRUE(loadedVertexLabels.IsValid());
+    EXPECT_EQ(loadedVertexLabels[0], "first");
+    EXPECT_EQ(loadedVertexLabels[1], "second");
+
+    auto loadedEdgeWeights = loaded->Graph.EdgeProperties().Get<float>("e:weight");
+    ASSERT_TRUE(loadedEdgeWeights.IsValid());
+    EXPECT_FLOAT_EQ(loadedEdgeWeights[0], 2.5f);
+
+    auto loadedEdgeLabels = loaded->Graph.EdgeProperties().Get<std::string>("e:label");
+    ASSERT_TRUE(loadedEdgeLabels.IsValid());
+    EXPECT_EQ(loadedEdgeLabels[0], "edge label");
+}
+
+TEST(GeometryIO_GraphIO, WritesTGFEmitsSeparatorEvenWithoutEdges)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto v = source.Graph.AddVertex(glm::vec3(7.0f, 8.0f, 9.0f));
+    ASSERT_TRUE(v.IsValid());
+
+    TempFile file(".tgf", "");
+    const auto status = Geometry::GraphIO::WriteTGF(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    std::ifstream in(file.Path, std::ios::binary);
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    const std::string contents = buffer.str();
+    EXPECT_NE(contents.find("\n#\n"), std::string::npos);
+
+    const auto loaded = Geometry::GraphIO::LoadTGF(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.VertexCount(), 1u);
+    EXPECT_EQ(loaded->Graph.EdgeCount(), 0u);
+    EXPECT_EQ(loaded->Graph.VertexPosition(Geometry::VertexHandle{0}), glm::vec3(7.0f, 8.0f, 9.0f));
+}
+
+TEST(GeometryIO_GraphIO, WritesTGFSkipsDeletedVertices)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(2.0f, 0.0f, 0.0f));
+    const auto c = source.Graph.AddVertex(glm::vec3(3.0f, 0.0f, 0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    ASSERT_TRUE(c.IsValid());
+    source.Graph.DeleteVertex(b);
+    EXPECT_TRUE(source.Graph.IsDeleted(b));
+    EXPECT_EQ(source.Graph.VertexCount(), 2u);
+
+    TempFile file(".tgf", "");
+    const auto status = Geometry::GraphIO::WriteTGF(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::Success);
+
+    const auto loaded = Geometry::GraphIO::LoadTGF(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ(loaded->Graph.VertexCount(), 2u);
+    EXPECT_EQ(loaded->Graph.VertexPosition(Geometry::VertexHandle{0}), glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(loaded->Graph.VertexPosition(Geometry::VertexHandle{1}), glm::vec3(3.0f, 0.0f, 0.0f));
+}
+
+TEST(GeometryIO_GraphIO, WriteTGFRejectsEmptyGraph)
+{
+    Geometry::GraphIO::GraphIOResult source;
+
+    TempFile file(".tgf", "");
+    const auto status = Geometry::GraphIO::WriteTGF(file.Path, source);
+    EXPECT_EQ(status, Geometry::GraphIO::GraphIOWriteStatus::EmptyGraph);
+}
+
+TEST(GeometryIO_GraphIO, WriteTGFRejectsBadPath)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto v = source.Graph.AddVertex(glm::vec3(0.0f));
+    ASSERT_TRUE(v.IsValid());
+
+    EXPECT_EQ(Geometry::GraphIO::WriteTGF("", source),
+              Geometry::GraphIO::GraphIOWriteStatus::InvalidPath);
+    EXPECT_EQ(Geometry::GraphIO::WriteTGF("/nonexistent_geometry_io_dir_xyz/out.tgf", source),
+              Geometry::GraphIO::GraphIOWriteStatus::InvalidPath);
+}
+
 namespace
 {
     void PopulateTriangleMesh(Geometry::MeshIO::MeshIOResult& mesh,
