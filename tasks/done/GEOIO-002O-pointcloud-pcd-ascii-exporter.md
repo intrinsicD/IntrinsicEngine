@@ -177,7 +177,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-10.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-rHAVf`.
-- Implementation commit: to be set after commit.
+- Implementation commit: `7b14964`
+  (`GEOIO-002O: add geometry-owned ASCII PCD point-cloud exporter`).
 - Verified in this session:
   - `python3 tools/repo/check_layering.py --root src --strict` —
     no layering violations; `geometry` imports remain
