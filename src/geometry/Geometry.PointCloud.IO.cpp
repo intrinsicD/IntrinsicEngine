@@ -1477,6 +1477,143 @@ namespace Geometry::PointCloudIO
         }
         return PointCloudIOWriteStatus::Success;
     }
+
+    PointCloudIOWriteStatus WritePLYBinary(std::string_view absolute_path, const PointCloudIOResult& cloud)
+    {
+        if (absolute_path.empty())
+        {
+            return PointCloudIOWriteStatus::InvalidPath;
+        }
+
+        const auto& source = cloud.Cloud;
+        if (source.IsEmpty())
+        {
+            return PointCloudIOWriteStatus::EmptyCloud;
+        }
+
+        const auto positions = source.Positions();
+        const std::size_t pointCount = positions.size();
+
+        const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
+        const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+        const bool hasRadii = source.HasRadii() && source.Radii().size() == pointCount;
+
+        std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
+        if (!stream)
+        {
+            return PointCloudIOWriteStatus::InvalidPath;
+        }
+
+        char headerBuffer[256];
+
+        stream << "ply\n";
+        stream << "format binary_little_endian 1.0\n";
+        stream << "comment Exported by IntrinsicEngine\n";
+        {
+            const int written = std::snprintf(headerBuffer, sizeof(headerBuffer),
+                                              "element vertex %zu\n",
+                                              pointCount);
+            if (written <= 0)
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+            stream.write(headerBuffer, written);
+        }
+        stream << "property float x\n";
+        stream << "property float y\n";
+        stream << "property float z\n";
+        if (hasNormals)
+        {
+            stream << "property float nx\n";
+            stream << "property float ny\n";
+            stream << "property float nz\n";
+        }
+        if (hasColors)
+        {
+            stream << "property uchar red\n";
+            stream << "property uchar green\n";
+            stream << "property uchar blue\n";
+        }
+        if (hasRadii)
+        {
+            stream << "property float radius\n";
+        }
+        stream << "end_header\n";
+
+        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+        const auto radii = hasRadii ? source.Radii() : std::span<const float>{};
+
+        auto encodeColorChannel = [](float channel) -> std::uint8_t {
+            const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
+            const float scaled = clamped * 255.0f + 0.5f;
+            const unsigned int rounded = static_cast<unsigned int>(scaled);
+            return static_cast<std::uint8_t>(rounded > 255u ? 255u : rounded);
+        };
+
+        constexpr bool hostBigEndian = std::endian::native == std::endian::big;
+
+        auto writeFloatLE = [&](float value) -> bool {
+            std::array<std::byte, 4> bytes{};
+            std::memcpy(bytes.data(), &value, 4);
+            if constexpr (hostBigEndian)
+            {
+                std::swap(bytes[0], bytes[3]);
+                std::swap(bytes[1], bytes[2]);
+            }
+            stream.write(reinterpret_cast<const char*>(bytes.data()), 4);
+            return stream.good();
+        };
+
+        auto writeUInt8 = [&](std::uint8_t value) -> bool {
+            stream.write(reinterpret_cast<const char*>(&value), 1);
+            return stream.good();
+        };
+
+        for (std::size_t i = 0; i < pointCount; ++i)
+        {
+            const auto& p = positions[i];
+            if (!writeFloatLE(p.x) || !writeFloatLE(p.y) || !writeFloatLE(p.z))
+            {
+                return PointCloudIOWriteStatus::FileWriteError;
+            }
+
+            if (hasNormals)
+            {
+                const auto& n = normals[i];
+                if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+            }
+
+            if (hasColors)
+            {
+                const auto& c = colors[i];
+                if (!writeUInt8(encodeColorChannel(c.r)) ||
+                    !writeUInt8(encodeColorChannel(c.g)) ||
+                    !writeUInt8(encodeColorChannel(c.b)))
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+            }
+
+            if (hasRadii)
+            {
+                if (!writeFloatLE(radii[i]))
+                {
+                    return PointCloudIOWriteStatus::FileWriteError;
+                }
+            }
+        }
+
+        stream.flush();
+        if (!stream.good())
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
+        return PointCloudIOWriteStatus::Success;
+    }
 }
 
 
