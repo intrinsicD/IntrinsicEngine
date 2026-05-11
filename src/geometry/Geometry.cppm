@@ -31,6 +31,7 @@ export import Geometry.Circulators;
 export import Geometry.HalfedgeMesh;
 export import Geometry.HtexPatch;
 export import Geometry.HalfedgeMesh.Builder;
+export import Geometry.IO;
 export import Geometry.HalfedgeMesh.IO;
 export import Geometry.Graph;
 export import Geometry.Graph.Utils;

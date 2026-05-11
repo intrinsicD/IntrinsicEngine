@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 36 |
 | `ecs` | 21 |
-| `geometry` | 76 |
+| `geometry` | 77 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 50 |
@@ -133,6 +133,7 @@ Root scanned: `src`
 | `Geometry.HalfedgeMesh` | `src/geometry/Geometry.HalfedgeMesh.cppm` | `geometry` |
 | `Geometry.Handle` | `src/geometry/Geometry.Handle.cppm` | `geometry` |
 | `Geometry.HtexPatch` | `src/geometry/Geometry.HtexPatch.cppm` | `geometry` |
+| `Geometry.IO` | `src/geometry/Geometry.IO.cppm` | `geometry` |
 | `Geometry.ImplicitPlaneField` | `src/geometry/Geometry.ImplicitPlaneField.cppm` | `geometry` |
 | `Geometry.KDTree` | `src/geometry/Geometry.KDTree.cppm` | `geometry` |
 | `Geometry.KMeans` | `src/geometry/Geometry.KMeans.cppm` | `geometry` |
@@ -447,4 +448,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **420**
+Total modules: **421**

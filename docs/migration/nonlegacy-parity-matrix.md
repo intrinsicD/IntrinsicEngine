@@ -9,7 +9,7 @@ claim that legacy retirement is complete.
 ## Sources and scope
 
 - Module list source: `docs/api/generated/module_inventory.md` generated on
-  2026-05-03 by `tools/repo/generate_module_inventory.py`.
+  2026-05-11 by `tools/repo/generate_module_inventory.py`.
 - Promoted source roots inspected: `src/core`, `src/assets`, `src/ecs`,
   `src/geometry`, `src/graphics/{framegraph,renderer,rhi,vulkan}`,
   `src/platform`, `src/runtime`, and `src/app`.
@@ -46,7 +46,7 @@ registries.
 
 | Legacy graphics feature | Promoted owner decision | Follow-up gate |
 | --- | --- | --- |
-| `Graphics.IORegistry` extension dispatch and backend byte transport | `assets` owns CPU import/export orchestration and typed payload registration; `core` keeps `Core.IOBackend`; geometry owns format codecs. | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) |
+| `Graphics.IORegistry` extension dispatch and backend byte transport | `assets` owns CPU import/export orchestration and typed payload registration; `core` keeps `Core.IOBackend`; geometry owns format codecs. Geometry-owned import/export domain metadata for supported OBJ/OFF/STL/PLY/XYZ/PTS/XYZRGB/PCD/TGF/edge-list routing was added under `GEOIO-002X`; assets/runtime still own byte transport, file IO orchestration, and ambiguity policy. | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) |
 | OBJ/OFF/STL mesh import and mesh PLY import | `geometry` mesh IO. Minimal loaders exist from `GEOIO-001`; parity hardening remains geometry-owned. OBJ ASCII vertex-normal lockstep import (`vn` lines round-tripping through `WriteOBJ`) added under `GEOIO-002S`. OBJ ASCII vertex-texcoord lockstep import (`vt u v [w]` lines emitting a `v:texcoord` `glm::vec2` property when the texcoord count matches the position count; the optional third `w` component is silently dropped) added under `GEOIO-002T`. Mesh PLY vertex normal/color import (`nx ny nz` and `red green blue [alpha]` properties in ASCII or binary PLY) added under `GEOIO-002W`. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
 | PCD/XYZ/PTS/XYZRGB point-cloud import and point-cloud PLY import | `geometry` point-cloud IO; assets/runtime own extension alias routing and import-hint/domain selection. ASCII and binary PCD import now accepts separate `r g b` fields and packed `rgb`/`rgba` color fields under `GEOIO-002V`. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md), [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) |
 | TGF graph import | `geometry` graph IO. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |

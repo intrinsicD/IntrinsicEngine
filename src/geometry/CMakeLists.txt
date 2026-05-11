@@ -44,6 +44,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.cppm
         Geometry.Handle.cppm
         Geometry.HtexPatch.cppm
+        Geometry.IO.cppm
         Geometry.ImplicitPlaneField.cppm
         Geometry.KDTree.cppm
         Geometry.KMeans.cppm

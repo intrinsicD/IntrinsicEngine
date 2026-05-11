@@ -79,6 +79,53 @@ namespace
     }
 }
 
+TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
+{
+    using Geometry::IO::ExportDomainsForExtension;
+    using Geometry::IO::FindGeometryIOFormat;
+    using Geometry::IO::GeometryIODomain;
+    using Geometry::IO::GeometryIOFormatKind;
+    using Geometry::IO::ImportDomainsForExtension;
+    using Geometry::IO::SupportedGeometryIOFormats;
+    using Geometry::IO::SupportsExportDomain;
+    using Geometry::IO::SupportsImportDomain;
+
+    EXPECT_EQ(SupportedGeometryIOFormats().size(), 10u);
+
+    const auto* ply = FindGeometryIOFormat(".PLY");
+    ASSERT_NE(ply, nullptr);
+    EXPECT_EQ(ply->Kind, GeometryIOFormatKind::PLY);
+    EXPECT_TRUE(ply->SupportsBinaryImport);
+    EXPECT_TRUE(ply->SupportsBinaryExport);
+
+    const auto plyImportDomains = ImportDomainsForExtension("ply");
+    ASSERT_EQ(plyImportDomains.size(), 2u);
+    EXPECT_EQ(plyImportDomains[0], GeometryIODomain::Mesh);
+    EXPECT_EQ(plyImportDomains[1], GeometryIODomain::PointCloud);
+    EXPECT_TRUE(SupportsImportDomain("ply", GeometryIODomain::Mesh));
+    EXPECT_TRUE(SupportsImportDomain("ply", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsExportDomain("ply", GeometryIODomain::Mesh));
+    EXPECT_TRUE(SupportsExportDomain("ply", GeometryIODomain::PointCloud));
+
+    EXPECT_TRUE(SupportsImportDomain("obj", GeometryIODomain::Mesh));
+    EXPECT_FALSE(SupportsImportDomain("obj", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsExportDomain("obj", GeometryIODomain::Mesh));
+
+    EXPECT_TRUE(SupportsImportDomain("off", GeometryIODomain::Mesh));
+    EXPECT_FALSE(SupportsExportDomain("off", GeometryIODomain::Mesh));
+
+    EXPECT_TRUE(SupportsImportDomain("pts", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsImportDomain("xyzrgb", GeometryIODomain::PointCloud));
+    EXPECT_FALSE(SupportsExportDomain("pts", GeometryIODomain::PointCloud));
+    EXPECT_FALSE(SupportsExportDomain("xyzrgb", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(SupportsExportDomain("pcd", GeometryIODomain::PointCloud));
+
+    EXPECT_TRUE(SupportsImportDomain("tgf", GeometryIODomain::Graph));
+    EXPECT_TRUE(SupportsExportDomain("edges", GeometryIODomain::Graph));
+    EXPECT_TRUE(ExportDomainsForExtension("gltf").empty());
+    EXPECT_TRUE(ImportDomainsForExtension("").empty());
+}
+
 TEST(GeometryIO_MeshIO, LoadsOFFTriangle)
 {
     TempFile file(".off", "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2\n");
