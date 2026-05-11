@@ -139,6 +139,11 @@ namespace Geometry::MeshIO
             return value > 1.0f ? std::clamp(value / 255.0f, 0.0f, 1.0f) : std::clamp(value, 0.0f, 1.0f);
         }
 
+        [[nodiscard]] float NormalizePLYColorChannel(float value)
+        {
+            return value > 1.0f ? std::clamp(value / 255.0f, 0.0f, 1.0f) : std::clamp(value, 0.0f, 1.0f);
+        }
+
         enum class PlyFormat
         {
             Ascii,
@@ -299,8 +304,67 @@ namespace Geometry::MeshIO
                 return InvalidMeshFormat();
             }
 
+            const PlyElement* vertexElement = nullptr;
+            for (const auto& el : elements)
+            {
+                if (el.Name == "vertex" && vertexElement == nullptr)
+                {
+                    vertexElement = &el;
+                    break;
+                }
+            }
+            if (vertexElement == nullptr)
+            {
+                return InvalidMeshFormat();
+            }
+            for (const auto& property : vertexElement->Properties)
+            {
+                if (property.IsList)
+                {
+                    return InvalidMeshFormat();
+                }
+            }
+
+            auto propertyIndex = [&](std::string_view name) -> std::optional<std::size_t>
+            {
+                for (std::size_t i = 0; i < vertexElement->Properties.size(); ++i)
+                {
+                    if (vertexElement->Properties[i].Name == name)
+                    {
+                        return i;
+                    }
+                }
+                return std::nullopt;
+            };
+            const auto xIndex = propertyIndex("x");
+            const auto yIndex = propertyIndex("y");
+            const auto zIndex = propertyIndex("z");
+            if (!xIndex || !yIndex || !zIndex)
+            {
+                return InvalidMeshFormat();
+            }
+            const auto nxIndex = propertyIndex("nx");
+            const auto nyIndex = propertyIndex("ny");
+            const auto nzIndex = propertyIndex("nz");
+            const auto rIndex = propertyIndex("red");
+            const auto gIndex = propertyIndex("green");
+            const auto bIndex = propertyIndex("blue");
+            const auto aIndex = propertyIndex("alpha");
+            const bool hasNormals = nxIndex && nyIndex && nzIndex;
+            const bool hasColors = rIndex && gIndex && bIndex;
+
             std::vector<glm::vec3> vertices;
             vertices.reserve(vertexCount);
+            std::vector<glm::vec3> normals;
+            if (hasNormals)
+            {
+                normals.reserve(vertexCount);
+            }
+            std::vector<glm::vec4> colors;
+            if (hasColors)
+            {
+                colors.reserve(vertexCount);
+            }
             std::string_view line;
             for (std::size_t i = 0; i < vertexCount; ++i)
             {
@@ -309,18 +373,44 @@ namespace Geometry::MeshIO
                     return InvalidMeshFormat();
                 }
                 const auto tokens = SplitWhitespace(line);
-                if (tokens.size() < 3)
+                if (tokens.size() < vertexElement->Properties.size())
                 {
                     return InvalidMeshFormat();
                 }
-                const auto x = ParseNumber<float>(tokens[0]);
-                const auto y = ParseNumber<float>(tokens[1]);
-                const auto z = ParseNumber<float>(tokens[2]);
+                const auto x = ParseNumber<float>(tokens[*xIndex]);
+                const auto y = ParseNumber<float>(tokens[*yIndex]);
+                const auto z = ParseNumber<float>(tokens[*zIndex]);
                 if (!x || !y || !z)
                 {
                     return InvalidMeshFormat();
                 }
                 vertices.emplace_back(*x, *y, *z);
+                if (hasNormals)
+                {
+                    const auto nx = ParseNumber<float>(tokens[*nxIndex]);
+                    const auto ny = ParseNumber<float>(tokens[*nyIndex]);
+                    const auto nz = ParseNumber<float>(tokens[*nzIndex]);
+                    if (!nx || !ny || !nz)
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    normals.emplace_back(*nx, *ny, *nz);
+                }
+                if (hasColors)
+                {
+                    const auto r = ParseNumber<float>(tokens[*rIndex]);
+                    const auto g = ParseNumber<float>(tokens[*gIndex]);
+                    const auto b = ParseNumber<float>(tokens[*bIndex]);
+                    const std::optional<float> a = aIndex ? ParseNumber<float>(tokens[*aIndex]) : std::optional<float>{1.0f};
+                    if (!r || !g || !b || !a)
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    colors.emplace_back(NormalizePLYColorChannel(*r),
+                                        NormalizePLYColorChannel(*g),
+                                        NormalizePLYColorChannel(*b),
+                                        NormalizePLYColorChannel(*a));
+                }
             }
 
             std::vector<std::vector<std::uint32_t>> faces;
@@ -359,7 +449,7 @@ namespace Geometry::MeshIO
             const auto pathInfo = MakePathInfo(absolute_path);
             result.SourcePath = pathInfo.SourcePath;
             result.BasePath = pathInfo.BasePath;
-            PopulateResult(result, vertices, faces);
+            PopulateResult(result, vertices, faces, normals, colors);
             return result;
         }
 
@@ -393,6 +483,13 @@ namespace Geometry::MeshIO
             int xIndex = -1;
             int yIndex = -1;
             int zIndex = -1;
+            int nxIndex = -1;
+            int nyIndex = -1;
+            int nzIndex = -1;
+            int rIndex = -1;
+            int gIndex = -1;
+            int bIndex = -1;
+            int aIndex = -1;
             std::size_t vertexStride = 0;
             for (std::size_t i = 0; i < vertexElement->Properties.size(); ++i)
             {
@@ -413,12 +510,42 @@ namespace Geometry::MeshIO
                 {
                     zIndex = static_cast<int>(i);
                 }
+                else if (p.Name == "nx" && p.ScalarType == PlyScalar::Float32)
+                {
+                    nxIndex = static_cast<int>(i);
+                }
+                else if (p.Name == "ny" && p.ScalarType == PlyScalar::Float32)
+                {
+                    nyIndex = static_cast<int>(i);
+                }
+                else if (p.Name == "nz" && p.ScalarType == PlyScalar::Float32)
+                {
+                    nzIndex = static_cast<int>(i);
+                }
+                else if (p.Name == "red" && p.ScalarType == PlyScalar::UInt8)
+                {
+                    rIndex = static_cast<int>(i);
+                }
+                else if (p.Name == "green" && p.ScalarType == PlyScalar::UInt8)
+                {
+                    gIndex = static_cast<int>(i);
+                }
+                else if (p.Name == "blue" && p.ScalarType == PlyScalar::UInt8)
+                {
+                    bIndex = static_cast<int>(i);
+                }
+                else if (p.Name == "alpha" && p.ScalarType == PlyScalar::UInt8)
+                {
+                    aIndex = static_cast<int>(i);
+                }
                 vertexStride += PlyScalarBytes(p.ScalarType);
             }
             if (xIndex < 0 || yIndex < 0 || zIndex < 0)
             {
                 return InvalidMeshFormat();
             }
+            const bool hasNormals = nxIndex >= 0 && nyIndex >= 0 && nzIndex >= 0;
+            const bool hasColors = rIndex >= 0 && gIndex >= 0 && bIndex >= 0;
 
             int faceListIndex = -1;
             for (std::size_t i = 0; i < faceElement->Properties.size(); ++i)
@@ -450,6 +577,16 @@ namespace Geometry::MeshIO
 
             std::vector<glm::vec3> vertices;
             vertices.reserve(vertexElement->Count);
+            std::vector<glm::vec3> normals;
+            if (hasNormals)
+            {
+                normals.reserve(vertexElement->Count);
+            }
+            std::vector<glm::vec4> colors;
+            if (hasColors)
+            {
+                colors.reserve(vertexElement->Count);
+            }
             std::vector<std::vector<std::uint32_t>> faces;
             faces.reserve(faceElement->Count);
 
@@ -462,6 +599,12 @@ namespace Geometry::MeshIO
                 }
                 float v = 0.0f;
                 std::memcpy(&v, tmp.data(), 4);
+                return v;
+            };
+
+            auto readUInt8 = [&](const std::byte* base, std::size_t offset) -> std::uint8_t {
+                std::uint8_t v = 0;
+                std::memcpy(&v, base + offset, 1);
                 return v;
             };
 
@@ -480,6 +623,23 @@ namespace Geometry::MeshIO
                         vertices.emplace_back(readFloat(base, vertexOffsets[xIndex]),
                                               readFloat(base, vertexOffsets[yIndex]),
                                               readFloat(base, vertexOffsets[zIndex]));
+                        if (hasNormals)
+                        {
+                            normals.emplace_back(readFloat(base, vertexOffsets[nxIndex]),
+                                                 readFloat(base, vertexOffsets[nyIndex]),
+                                                 readFloat(base, vertexOffsets[nzIndex]));
+                        }
+                        if (hasColors)
+                        {
+                            const float r = static_cast<float>(readUInt8(base, vertexOffsets[rIndex]));
+                            const float g = static_cast<float>(readUInt8(base, vertexOffsets[gIndex]));
+                            const float b = static_cast<float>(readUInt8(base, vertexOffsets[bIndex]));
+                            const float a = aIndex >= 0 ? static_cast<float>(readUInt8(base, vertexOffsets[aIndex])) : 255.0f;
+                            colors.emplace_back(NormalizePLYColorChannel(r),
+                                                NormalizePLYColorChannel(g),
+                                                NormalizePLYColorChannel(b),
+                                                NormalizePLYColorChannel(a));
+                        }
                     }
                     cursor += total;
                 }
@@ -575,7 +735,7 @@ namespace Geometry::MeshIO
             const auto pathInfo = MakePathInfo(absolute_path);
             result.SourcePath = pathInfo.SourcePath;
             result.BasePath = pathInfo.BasePath;
-            PopulateResult(result, vertices, faces);
+            PopulateResult(result, vertices, faces, normals, colors);
             return result;
         }
 

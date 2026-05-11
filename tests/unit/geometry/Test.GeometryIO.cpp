@@ -434,6 +434,48 @@ TEST(GeometryIO_MeshIO, LoadsASCIIPLYTriangle)
     ExpectTriangleMeshProperties(*result);
 }
 
+TEST(GeometryIO_MeshIO, LoadsASCIIPLYTriangleWithVertexNormalsAndColors)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 3\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "property float nx\n"
+                  "property float ny\n"
+                  "property float nz\n"
+                  "property uchar red\n"
+                  "property uchar green\n"
+                  "property uchar blue\n"
+                  "element face 1\n"
+                  "property list uchar int vertex_indices\n"
+                  "end_header\n"
+                  "0 0 0 0 0 1 255 0 0\n"
+                  "1 0 0 0 1 0 0 255 0\n"
+                  "0 1 0 1 0 0 0 0 255\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(normals.IsValid());
+    ASSERT_EQ(normals.Vector().size(), 3u);
+    EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(normals[1], glm::vec3(0.0f, 1.0f, 0.0f));
+    EXPECT_EQ(normals[2], glm::vec3(1.0f, 0.0f, 0.0f));
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
 TEST(GeometryIO_MeshIO, LoadsASCIISTLTriangle)
 {
     TempFile file(".stl",
@@ -1310,6 +1352,14 @@ TEST(GeometryIO_MeshIO, WritesPLYTriangleWithNormals)
     const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
     ASSERT_TRUE(loaded.has_value());
     ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedNormals = loaded->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(loadedNormals.IsValid());
+    ASSERT_EQ(loadedNormals.Vector().size(), 3u);
+    for (std::size_t i = 0; i < normals.size(); ++i)
+    {
+        EXPECT_EQ(loadedNormals[i], normals[i]);
+    }
 }
 
 TEST(GeometryIO_MeshIO, WritesPLYQuadRoundTripsFaceArity)
@@ -1437,6 +1487,14 @@ TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangleWithNormals)
     const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
     ASSERT_TRUE(loaded.has_value());
     ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedNormals = loaded->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(loadedNormals.IsValid());
+    ASSERT_EQ(loadedNormals.Vector().size(), 3u);
+    for (std::size_t i = 0; i < normals.size(); ++i)
+    {
+        EXPECT_EQ(loadedNormals[i], normals[i]);
+    }
 }
 
 TEST(GeometryIO_MeshIO, WritesPLYBinaryQuadRoundTripsFaceArity)
@@ -2098,6 +2156,13 @@ TEST(GeometryIO_MeshIO, LoadsBinaryLittleEndianPLYWithExtraVertexProperties)
     const auto result = Geometry::MeshIO::LoadPLY(file.Path);
     ASSERT_TRUE(result.has_value());
     ExpectTriangleMeshProperties(*result);
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }
 
 TEST(GeometryIO_MeshIO, LoadPLYRejectsTruncatedBinaryBody)
