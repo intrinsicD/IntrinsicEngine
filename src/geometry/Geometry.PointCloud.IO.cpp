@@ -9,6 +9,7 @@ module;
 #include <cstdio>
 #include <cstring>
 #include <ios>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -705,6 +706,66 @@ namespace Geometry::PointCloudIO
             return nullptr;
         }
 
+        [[nodiscard]] bool IsSupportedPackedPCDColorField(const PcdField& field)
+        {
+            return field.Count == 1 && field.Size == 4 &&
+                   (field.Type == 'F' || field.Type == 'I' || field.Type == 'U');
+        }
+
+        [[nodiscard]] glm::vec4 DecodePCDPackedColor(std::uint32_t packed, bool hasAlpha)
+        {
+            const auto r = static_cast<float>((packed >> 16u) & 0xffu);
+            const auto g = static_cast<float>((packed >> 8u) & 0xffu);
+            const auto b = static_cast<float>(packed & 0xffu);
+            const auto a = hasAlpha ? static_cast<float>((packed >> 24u) & 0xffu) : 255.0f;
+            return {NormalizeColorChannel(r),
+                    NormalizeColorChannel(g),
+                    NormalizeColorChannel(b),
+                    NormalizeColorChannel(a)};
+        }
+
+        [[nodiscard]] std::optional<glm::vec4> ParsePCDAsciiPackedColor(std::string_view token,
+                                                                        const PcdField& field)
+        {
+            if (!IsSupportedPackedPCDColorField(field))
+            {
+                return std::nullopt;
+            }
+
+            std::uint32_t packed = 0;
+            if (field.Type == 'F')
+            {
+                const auto value = ParseNumber<float>(token);
+                if (!value)
+                {
+                    return std::nullopt;
+                }
+                packed = std::bit_cast<std::uint32_t>(*value);
+            }
+            else if (field.Type == 'I')
+            {
+                const auto value = ParseNumber<std::int64_t>(token);
+                if (!value ||
+                    *value < static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::min()) ||
+                    *value > static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()))
+                {
+                    return std::nullopt;
+                }
+                packed = static_cast<std::uint32_t>(static_cast<std::int32_t>(*value));
+            }
+            else
+            {
+                const auto value = ParseNumber<std::uint64_t>(token);
+                if (!value || *value > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+                {
+                    return std::nullopt;
+                }
+                packed = static_cast<std::uint32_t>(*value);
+            }
+
+            return DecodePCDPackedColor(packed, field.Name == "rgba");
+        }
+
         [[nodiscard]] std::optional<PcdHeader> ParsePCDHeader(std::string_view text, std::size_t& cursor)
         {
             PcdHeader header;
@@ -915,6 +976,28 @@ namespace Geometry::PointCloudIO
                 return std::nullopt;
             }
         }
+
+        [[nodiscard]] std::optional<glm::vec4> ReadPCDBinaryPackedColor(std::span<const std::byte> pointBytes,
+                                                                        const PcdField& field)
+        {
+            if (!IsSupportedPackedPCDColorField(field) || field.ByteOffset + field.Size > pointBytes.size())
+            {
+                return std::nullopt;
+            }
+
+            const std::byte* ptr = pointBytes.data() + field.ByteOffset;
+            std::uint32_t packed = 0;
+            if (field.Type == 'F' || field.Type == 'U')
+            {
+                packed = ReadPCDIntegerScalar<std::uint32_t>(ptr);
+            }
+            else
+            {
+                const auto signedValue = ReadPCDIntegerScalar<std::int32_t>(ptr);
+                packed = static_cast<std::uint32_t>(signedValue);
+            }
+            return DecodePCDPackedColor(packed, field.Name == "rgba");
+        }
     }
 
     Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path)
@@ -1042,8 +1125,13 @@ namespace Geometry::PointCloudIO
         const auto* rField = FindPCDField(header.Fields, "r");
         const auto* gField = FindPCDField(header.Fields, "g");
         const auto* bField = FindPCDField(header.Fields, "b");
+        const auto* packedRgbField = FindPCDField(header.Fields, "rgb");
+        const auto* packedRgbaField = FindPCDField(header.Fields, "rgba");
+        const auto* packedColorField = packedRgbField != nullptr ? packedRgbField : packedRgbaField;
         const bool hasNormals = nxField && nyField && nzField;
-        const bool hasColors = rField && gField && bField;
+        const bool hasSeparateColors = rField && gField && bField;
+        const bool hasPackedColors = !hasSeparateColors && packedColorField != nullptr;
+        const bool hasColors = hasSeparateColors || hasPackedColors;
 
         PointCloudIOResult result;
         ApplyPathInfo(result, absolute_path);
@@ -1094,7 +1182,7 @@ namespace Geometry::PointCloudIO
                     }
                     result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
                 }
-                if (hasColors)
+                if (hasSeparateColors)
                 {
                     const auto r = ParseNumber<float>(tokens[rField->ScalarOffset]);
                     const auto g = ParseNumber<float>(tokens[gField->ScalarOffset]);
@@ -1108,6 +1196,16 @@ namespace Geometry::PointCloudIO
                         NormalizeColorChannel(*g),
                         NormalizeColorChannel(*b),
                         1.0f);
+                }
+                else if (hasPackedColors)
+                {
+                    const auto color = ParsePCDAsciiPackedColor(tokens[packedColorField->ScalarOffset],
+                                                                *packedColorField);
+                    if (!color)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Color(point) = *color;
                 }
 
                 if (header.Points > 0 && result.Cloud.VerticesSize() >= header.Points)
@@ -1175,7 +1273,7 @@ namespace Geometry::PointCloudIO
                     }
                     result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
                 }
-                if (hasColors)
+                if (hasSeparateColors)
                 {
                     const auto r = ReadPCDBinaryScalar(pointBytes, *rField);
                     const auto g = ReadPCDBinaryScalar(pointBytes, *gField);
@@ -1189,6 +1287,15 @@ namespace Geometry::PointCloudIO
                         NormalizeColorChannel(*g),
                         NormalizeColorChannel(*b),
                         1.0f);
+                }
+                else if (hasPackedColors)
+                {
+                    const auto color = ReadPCDBinaryPackedColor(pointBytes, *packedColorField);
+                    if (!color)
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Color(point) = *color;
                 }
             }
         }

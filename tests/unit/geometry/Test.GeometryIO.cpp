@@ -1,11 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <bit>
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
+#include <limits>
 #include <span>
 #include <sstream>
 #include <string>
@@ -560,6 +563,58 @@ TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithNormalsAndColor)
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 1.0f, 2.0f));
     EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{0}), glm::vec3(0.0f, 0.0f, 1.0f));
     EXPECT_EQ(result->Cloud.Color(Geometry::VertexHandle{0}), glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithPackedFloatRgb)
+{
+    const float packedRgb = std::bit_cast<float>(std::uint32_t{0x00ff8000u});
+    std::ostringstream contents;
+    contents << "# .PCD v0.7\n"
+             << "FIELDS x y z rgb\n"
+             << "SIZE 4 4 4 4\n"
+             << "TYPE F F F F\n"
+             << "COUNT 1 1 1 1\n"
+             << "WIDTH 1\n"
+             << "HEIGHT 1\n"
+             << "POINTS 1\n"
+             << "DATA ascii\n"
+             << "0 1 2 " << std::setprecision(std::numeric_limits<float>::max_digits10) << packedRgb << "\n";
+    TempFile file(".pcd", contents.str());
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(0.0f, 1.0f, 2.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).r, 1.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).g, 128.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).b, 0.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).a, 1.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithSignedPackedRgba)
+{
+    const auto packedRgba = std::bit_cast<std::int32_t>(std::uint32_t{0x80402010u});
+    TempFile file(".pcd",
+                  "# .PCD v0.7\n"
+                  "FIELDS x y z rgba\n"
+                  "SIZE 4 4 4 4\n"
+                  "TYPE F F F I\n"
+                  "COUNT 1 1 1 1\n"
+                  "WIDTH 1\n"
+                  "HEIGHT 1\n"
+                  "POINTS 1\n"
+                  "DATA ascii\n"
+                  "0 1 2 " + std::to_string(packedRgba) + "\n");
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).r, 64.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).g, 32.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).b, 16.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).a, 128.0f / 255.0f, 1.0e-6f);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsVertexOnlyASCIIPLY)
@@ -2540,6 +2595,49 @@ TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudWithNormalsAndColor)
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).x, 1.0f, 1.0e-6f);
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).z, 0.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudWithPackedRgba)
+{
+    std::string contents =
+        "# .PCD v0.7\n"
+        "FIELDS x y z rgba\n"
+        "SIZE 4 4 4 4\n"
+        "TYPE F F F U\n"
+        "COUNT 1 1 1 1\n"
+        "WIDTH 1\n"
+        "HEIGHT 1\n"
+        "POINTS 1\n"
+        "DATA binary\n";
+
+    auto appendUint32LE = [&](std::uint32_t value)
+    {
+        contents.push_back(static_cast<char>(value & 0xffu));
+        contents.push_back(static_cast<char>((value >> 8u) & 0xffu));
+        contents.push_back(static_cast<char>((value >> 16u) & 0xffu));
+        contents.push_back(static_cast<char>((value >> 24u) & 0xffu));
+    };
+    auto appendFloatLE = [&](float value)
+    {
+        appendUint32LE(std::bit_cast<std::uint32_t>(value));
+    };
+
+    appendFloatLE(1.0f);
+    appendFloatLE(2.0f);
+    appendFloatLE(3.0f);
+    appendUint32LE(0x80402010u);
+
+    TempFile file(".pcd", contents);
+
+    const auto result = Geometry::PointCloudIO::LoadPCD(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Cloud.VerticesSize(), 1u);
+    EXPECT_TRUE(result->Cloud.HasColors());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).r, 64.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).g, 32.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).b, 16.0f / 255.0f, 1.0e-6f);
+    EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).a, 128.0f / 255.0f, 1.0e-6f);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsBinaryPCDPointCloudSkipsExtraScalars)
