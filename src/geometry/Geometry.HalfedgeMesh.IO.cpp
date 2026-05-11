@@ -681,6 +681,7 @@ namespace Geometry::MeshIO
         }
 
         std::vector<glm::vec3> vertices;
+        std::vector<glm::vec3> normals;
         std::vector<std::vector<std::uint32_t>> faces;
         std::size_t cursor = 0;
         std::string_view line;
@@ -716,6 +717,21 @@ namespace Geometry::MeshIO
                 }
                 vertices.emplace_back(*x, *y, *z);
             }
+            else if (tokens[0] == "vn")
+            {
+                if (tokens.size() < 4)
+                {
+                    return InvalidMeshFormat();
+                }
+                const auto x = ParseNumber<float>(tokens[1]);
+                const auto y = ParseNumber<float>(tokens[2]);
+                const auto z = ParseNumber<float>(tokens[3]);
+                if (!x || !y || !z)
+                {
+                    return InvalidMeshFormat();
+                }
+                normals.emplace_back(*x, *y, *z);
+            }
             else if (tokens[0] == "f")
             {
                 if (tokens.size() < 4)
@@ -746,7 +762,9 @@ namespace Geometry::MeshIO
         const auto pathInfo = MakePathInfo(absolute_path);
         result.SourcePath = pathInfo.SourcePath;
         result.BasePath = pathInfo.BasePath;
-        PopulateResult(result, vertices, faces);
+        const std::span<const glm::vec3> normalsSpan =
+            normals.size() == vertices.size() ? std::span<const glm::vec3>(normals) : std::span<const glm::vec3>{};
+        PopulateResult(result, vertices, faces, normalsSpan);
         return result;
     }
 

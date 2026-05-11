@@ -251,6 +251,59 @@ TEST(GeometryIO_MeshIO, LoadsOBJTriangle)
     ExpectTriangleMeshProperties(*result);
 }
 
+TEST(GeometryIO_MeshIO, LoadsOBJTriangleWithVertexNormals)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 0 1 0\n"
+                  "vn 0 0 1\n"
+                  "vn 0 0 1\n"
+                  "vn 1 0 0\n"
+                  "f 1//1 2//2 3//3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(normals.IsValid());
+    ASSERT_EQ(normals.Vector().size(), 3u);
+    EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(normals[1], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(normals[2], glm::vec3(1.0f, 0.0f, 0.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJIgnoresMismatchedVertexNormalCount)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 0 1 0\n"
+                  "vn 0 0 1\n"
+                  "vn 0 0 1\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+    EXPECT_FALSE(result->Vertices.Get<glm::vec3>("v:normal").IsValid());
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJRejectsMalformedVertexNormal)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 0 1 0\n"
+                  "vn 0 0\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
 TEST(GeometryIO_MeshIO, LoadsASCIIPLYTriangle)
 {
     TempFile file(".ply",
@@ -836,6 +889,14 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithNormals)
     const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
     ASSERT_TRUE(loaded.has_value());
     ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedNormals = loaded->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(loadedNormals.IsValid());
+    ASSERT_EQ(loadedNormals.Vector().size(), 3u);
+    for (std::size_t i = 0; i < normals.size(); ++i)
+    {
+        EXPECT_EQ(loadedNormals[i], normals[i]);
+    }
 }
 
 TEST(GeometryIO_MeshIO, WritesOBJQuadRoundTripsFaceArity)

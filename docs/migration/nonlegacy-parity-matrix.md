@@ -47,7 +47,7 @@ registries.
 | Legacy graphics feature | Promoted owner decision | Follow-up gate |
 | --- | --- | --- |
 | `Graphics.IORegistry` extension dispatch and backend byte transport | `assets` owns CPU import/export orchestration and typed payload registration; `core` keeps `Core.IOBackend`; geometry owns format codecs. | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) |
-| OBJ/OFF/STL mesh import and mesh PLY import | `geometry` mesh IO. Minimal loaders exist from `GEOIO-001`; parity hardening remains geometry-owned. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
+| OBJ/OFF/STL mesh import and mesh PLY import | `geometry` mesh IO. Minimal loaders exist from `GEOIO-001`; parity hardening remains geometry-owned. OBJ ASCII vertex-normal lockstep import (`vn` lines round-tripping through `WriteOBJ`) added under `GEOIO-002S`. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
 | PCD/XYZ/PTS/XYZRGB point-cloud import and point-cloud PLY import | `geometry` point-cloud IO; assets/runtime own extension alias routing and import-hint/domain selection. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md), [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) |
 | TGF graph import | `geometry` graph IO. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
 | TGF graph export | `geometry` graph IO. Text TGF graph writer added under `GEOIO-002N`. | [`GEOIO-002`](../../tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md) |
