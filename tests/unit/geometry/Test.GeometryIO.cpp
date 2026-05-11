@@ -523,6 +523,94 @@ TEST(GeometryIO_MeshIO, LoadsASCIIPLYTriangleWithVertexNormalsAndColors)
     EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }
 
+TEST(GeometryIO_MeshIO, LoadsASCIIPLYTriangleWithVertexTexcoords)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 3\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "property float s\n"
+                  "property float t\n"
+                  "element face 1\n"
+                  "property list uchar int vertex_indices\n"
+                  "end_header\n"
+                  "0 0 0 0.25 0.75\n"
+                  "1 0 0 1.0 0.5\n"
+                  "0 1 0 0.0 1.0\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+    EXPECT_EQ(texcoords[0], glm::vec2(0.25f, 0.75f));
+    EXPECT_EQ(texcoords[1], glm::vec2(1.0f, 0.5f));
+    EXPECT_EQ(texcoords[2], glm::vec2(0.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsASCIIPLYTriangleWithTextureUVAliases)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 3\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "property float texture_u\n"
+                  "property float texture_v\n"
+                  "element face 1\n"
+                  "property list uchar int vertex_indices\n"
+                  "end_header\n"
+                  "0 0 0 0.1 0.2\n"
+                  "1 0 0 0.3 0.4\n"
+                  "0 1 0 0.5 0.6\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+    EXPECT_EQ(texcoords[0], glm::vec2(0.1f, 0.2f));
+    EXPECT_EQ(texcoords[1], glm::vec2(0.3f, 0.4f));
+    EXPECT_EQ(texcoords[2], glm::vec2(0.5f, 0.6f));
+}
+
+TEST(GeometryIO_MeshIO, LoadASCIIPLYIgnoresPartialTexcoordAxis)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 3\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "property float s\n"
+                  "element face 1\n"
+                  "property list uchar int vertex_indices\n"
+                  "end_header\n"
+                  "0 0 0 0.25\n"
+                  "1 0 0 0.5\n"
+                  "0 1 0 0.75\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    EXPECT_FALSE(texcoords.IsValid());
+}
+
 TEST(GeometryIO_MeshIO, LoadsASCIISTLTriangle)
 {
     TempFile file(".stl",
@@ -2314,6 +2402,80 @@ TEST(GeometryIO_MeshIO, LoadsBinaryLittleEndianPLYWithExtraVertexProperties)
     EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
     EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsBinaryPLYTriangleWithVertexTexcoords)
+{
+    static int counter = 0;
+    const char* tmpDir = std::getenv("TEST_TMPDIR");
+    if (tmpDir == nullptr || tmpDir[0] == '\0')
+    {
+        tmpDir = "/tmp";
+    }
+    const std::string path = std::string(tmpDir) + "/intrinsic_geometry_io_binply_texcoord_" +
+                             std::to_string(static_cast<long long>(getpid())) + "_" +
+                             std::to_string(counter++) + ".ply";
+
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.25f, 0.75f},
+        glm::vec2{1.0f, 0.5f},
+        glm::vec2{0.0f, 1.0f},
+    };
+    const std::array<std::uint32_t, 3> faceIndices{0u, 1u, 2u};
+
+    {
+        std::ofstream out(path, std::ios::binary);
+        out << "ply\n";
+        out << "format binary_little_endian 1.0\n";
+        out << "comment Test fixture\n";
+        out << "element vertex " << positions.size() << "\n";
+        out << "property float x\n";
+        out << "property float y\n";
+        out << "property float z\n";
+        out << "property float s\n";
+        out << "property float t\n";
+        out << "element face 1\n";
+        out << "property list uchar int vertex_indices\n";
+        out << "end_header\n";
+        for (std::size_t i = 0; i < positions.size(); ++i)
+        {
+            const auto x = EncodeFloat(positions[i].x, BinaryPlyEndian::Little);
+            const auto y = EncodeFloat(positions[i].y, BinaryPlyEndian::Little);
+            const auto z = EncodeFloat(positions[i].z, BinaryPlyEndian::Little);
+            const auto s = EncodeFloat(texcoords[i].x, BinaryPlyEndian::Little);
+            const auto t = EncodeFloat(texcoords[i].y, BinaryPlyEndian::Little);
+            out.write(reinterpret_cast<const char*>(x.data()), 4);
+            out.write(reinterpret_cast<const char*>(y.data()), 4);
+            out.write(reinterpret_cast<const char*>(z.data()), 4);
+            out.write(reinterpret_cast<const char*>(s.data()), 4);
+            out.write(reinterpret_cast<const char*>(t.data()), 4);
+        }
+        const std::uint8_t countByte = static_cast<std::uint8_t>(faceIndices.size());
+        out.write(reinterpret_cast<const char*>(&countByte), 1);
+        for (const auto idx : faceIndices)
+        {
+            const auto bytes = EncodeUint32(idx, BinaryPlyEndian::Little);
+            out.write(reinterpret_cast<const char*>(bytes.data()), 4);
+        }
+    }
+
+    const auto result = Geometry::MeshIO::LoadPLY(path);
+    std::remove(path.c_str());
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto loadedTexcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(loadedTexcoords.IsValid());
+    ASSERT_EQ(loadedTexcoords.Vector().size(), 3u);
+    for (std::size_t i = 0; i < texcoords.size(); ++i)
+    {
+        EXPECT_EQ(loadedTexcoords[i], texcoords[i]);
+    }
 }
 
 TEST(GeometryIO_MeshIO, LoadPLYRejectsTruncatedBinaryBody)
