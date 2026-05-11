@@ -1501,6 +1501,9 @@ namespace Geometry::MeshIO
         const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
         const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
 
+        const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
+        const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -1531,6 +1534,12 @@ namespace Geometry::MeshIO
             stream << "property float ny\n";
             stream << "property float nz\n";
         }
+        if (hasColors)
+        {
+            stream << "property uchar red\n";
+            stream << "property uchar green\n";
+            stream << "property uchar blue\n";
+        }
         {
             const int written = std::snprintf(buffer, sizeof(buffer),
                                               "element face %zu\n",
@@ -1544,35 +1553,58 @@ namespace Geometry::MeshIO
         stream << "property list uchar int vertex_indices\n";
         stream << "end_header\n";
 
+        auto encodeColorChannel = [](float channel) -> unsigned int {
+            const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
+            const float scaled = clamped * 255.0f + 0.5f;
+            const unsigned int rounded = static_cast<unsigned int>(scaled);
+            return rounded > 255u ? 255u : rounded;
+        };
+
         for (std::size_t i = 0; i < positions.size(); ++i)
         {
             const auto& p = positions[i];
-            int written = 0;
-            if (hasNormals)
-            {
-                const auto& n = normalsView.Vector()[i];
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        "%.6f %.6f %.6f %.6f %.6f %.6f\n",
-                                        static_cast<double>(p.x),
-                                        static_cast<double>(p.y),
-                                        static_cast<double>(p.z),
-                                        static_cast<double>(n.x),
-                                        static_cast<double>(n.y),
-                                        static_cast<double>(n.z));
-            }
-            else
-            {
-                written = std::snprintf(buffer, sizeof(buffer),
-                                        "%.6f %.6f %.6f\n",
+            int written = std::snprintf(buffer, sizeof(buffer),
+                                        "%.6f %.6f %.6f",
                                         static_cast<double>(p.x),
                                         static_cast<double>(p.y),
                                         static_cast<double>(p.z));
-            }
             if (written <= 0)
             {
                 return MeshIOWriteStatus::FileWriteError;
             }
             stream.write(buffer, written);
+
+            if (hasNormals)
+            {
+                const auto& n = normalsView.Vector()[i];
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        " %.6f %.6f %.6f",
+                                        static_cast<double>(n.x),
+                                        static_cast<double>(n.y),
+                                        static_cast<double>(n.z));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            if (hasColors)
+            {
+                const auto& c = colorsView.Vector()[i];
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        " %u %u %u",
+                                        encodeColorChannel(c.r),
+                                        encodeColorChannel(c.g),
+                                        encodeColorChannel(c.b));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            stream.put('\n');
         }
 
         for (const auto& face : faces)
@@ -1647,6 +1679,9 @@ namespace Geometry::MeshIO
         const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
         const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
 
+        const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
+        const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -1676,6 +1711,12 @@ namespace Geometry::MeshIO
             stream << "property float nx\n";
             stream << "property float ny\n";
             stream << "property float nz\n";
+        }
+        if (hasColors)
+        {
+            stream << "property uchar red\n";
+            stream << "property uchar green\n";
+            stream << "property uchar blue\n";
         }
         {
             const int written = std::snprintf(headerBuffer, sizeof(headerBuffer),
@@ -1721,6 +1762,13 @@ namespace Geometry::MeshIO
             return stream.good();
         };
 
+        auto encodeColorChannel = [](float channel) -> std::uint8_t {
+            const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
+            const float scaled = clamped * 255.0f + 0.5f;
+            const unsigned int rounded = static_cast<unsigned int>(scaled);
+            return static_cast<std::uint8_t>(rounded > 255u ? 255u : rounded);
+        };
+
         for (std::size_t i = 0; i < positions.size(); ++i)
         {
             const auto& p = positions[i];
@@ -1732,6 +1780,16 @@ namespace Geometry::MeshIO
             {
                 const auto& n = normalsView.Vector()[i];
                 if (!writeFloatLE(n.x) || !writeFloatLE(n.y) || !writeFloatLE(n.z))
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+            }
+            if (hasColors)
+            {
+                const auto& c = colorsView.Vector()[i];
+                if (!writeUInt8(encodeColorChannel(c.r)) ||
+                    !writeUInt8(encodeColorChannel(c.g)) ||
+                    !writeUInt8(encodeColorChannel(c.b)))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }

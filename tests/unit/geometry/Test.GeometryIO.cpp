@@ -1409,6 +1409,66 @@ TEST(GeometryIO_MeshIO, WritesPLYTriangleWithNormals)
     }
 }
 
+TEST(GeometryIO_MeshIO, WritesPLYTriangleWithVertexColors)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    const std::array<glm::vec4, 3> colors{
+        glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, normals);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        colorProperty[i] = colors[i];
+    }
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::MeshIO::WritePLY(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("property uchar red\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar green\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar blue\n"), std::string::npos);
+    EXPECT_EQ(contents.find("property uchar alpha\n"), std::string::npos);
+    // Header order: normals before colors.
+    const auto nzPos = contents.find("property float nz\n");
+    const auto redPos = contents.find("property uchar red\n");
+    ASSERT_NE(nzPos, std::string::npos);
+    ASSERT_NE(redPos, std::string::npos);
+    EXPECT_LT(nzPos, redPos);
+    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 0.000000 0.000000 1.000000 255 0 0\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("1.000000 0.000000 0.000000 0.000000 0.000000 1.000000 0 255 0\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("0.000000 1.000000 0.000000 0.000000 0.000000 1.000000 0 0 255\n"),
+              std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedColors = loaded->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(loadedColors.IsValid());
+    ASSERT_EQ(loadedColors.Vector().size(), 3u);
+    EXPECT_EQ(loadedColors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loadedColors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loadedColors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
 TEST(GeometryIO_MeshIO, WritesPLYQuadRoundTripsFaceArity)
 {
     Geometry::MeshIO::MeshIOResult mesh;
@@ -1542,6 +1602,50 @@ TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangleWithNormals)
     {
         EXPECT_EQ(loadedNormals[i], normals[i]);
     }
+}
+
+TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangleWithVertexColors)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec4, 3> colors{
+        glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        colorProperty[i] = colors[i];
+    }
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::MeshIO::WritePLYBinary(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("format binary_little_endian 1.0\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar red\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar green\n"), std::string::npos);
+    EXPECT_NE(contents.find("property uchar blue\n"), std::string::npos);
+    EXPECT_EQ(contents.find("property uchar alpha\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedColors = loaded->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(loadedColors.IsValid());
+    ASSERT_EQ(loadedColors.Vector().size(), 3u);
+    EXPECT_EQ(loadedColors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loadedColors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(loadedColors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }
 
 TEST(GeometryIO_MeshIO, WritesPLYBinaryQuadRoundTripsFaceArity)
