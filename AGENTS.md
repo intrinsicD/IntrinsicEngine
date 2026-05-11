@@ -26,6 +26,7 @@ The following dependency boundaries are mandatory:
 - `ecs` -> `core`; may use geometry handles/types only when explicitly required.
 - `graphics/rhi` -> `core`.
 - `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic.
+- `graphics/vulkan` -> `core`, `graphics/rhi`, backend-local Vulkan dependencies (`Vulkan::Vulkan`, `volk`, `VulkanMemoryAllocator`, `glfw`); no ECS, runtime, or live asset-service knowledge, and no `Vk*` types through RHI/renderer APIs.
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views; **no live ECS knowledge**.
 - `platform` -> `core`.
 - `runtime` -> all lower layers; owns composition/wiring.
@@ -53,6 +54,7 @@ Target source layout:
 Supporting architecture roots are mandatory parts of the system contract:
 
 - `methods/`, `benchmarks/`, `tests/`, `docs/`, `tasks/`, `tools/`, `cmake/`, `.github/workflows/`.
+- `assets/` contains checked-in shaders/models/fonts used by app, graphics, and tests; `external/cache/` and `third_party/` contain dependency sources/cache state and are not engine layers.
 
 ## 4. Layering rules
 
@@ -63,6 +65,8 @@ Agents must enforce ownership and dependency flow:
 - Graphics subsystems operate on snapshots/views, not live gameplay ownership.
 - `assets` is CPU-only and GPU-agnostic; GPU-side asset state lives in `src/graphics/assets/` and is wired by `runtime` from asset events.
 - `platform` exposes window/input ports and explicit backends; it must not import `graphics`, `ecs`, or `runtime`.
+- Platform backend selection is explicit: `INTRINSIC_PLATFORM_BACKEND=Auto|Null|Glfw`; use `Null`/`INTRINSIC_HEADLESS_NO_GLFW=ON` for headless work unless a task specifically needs GLFW/Vulkan surface coverage.
+- Runtime owns graphics backend selection. Promoted Vulkan is opt-in only when `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` and `RenderConfig::EnablePromotedVulkanDevice` are both enabled; otherwise Vulkan requests fall back to the Null device. Renderer/runtime code must gate on `RHI::IDevice::IsOperational()`, not Vulkan diagnostics.
 - `src/legacy` may contain transitional exceptions only when tracked in migration docs/tasks.
 
 Every new dependency edge must be justifiable by layer policy and reflected in docs when architectural.
@@ -76,6 +80,7 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 - Keep patches small and scoped to one task when possible.
 - Prefer deterministic, testable APIs with explicit ownership and failure states.
 - Use out-of-source CMake presets only; `CMakeLists.txt` rejects in-source configure. Default agent build setup is `cmake --preset ci` followed by `cmake --build --preset ci --target IntrinsicTests`.
+- Presets pin `clang-20` / `clang++-20`; C++ module configuration also requires a matching `clang-scan-deps` (`clang-scan-deps-20` or newer). Do not treat GCC or stale non-preset build trees as valid verification for module changes.
 - Add C++23 module libraries with `intrinsic_add_module_library(...)` from `cmake/IntrinsicModule.cmake` and declare module interfaces via `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
 - FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated.
 
@@ -98,7 +103,7 @@ For each change:
 - Run the strongest relevant subset of repository verification commands.
 - Add/update tests for behavior changes.
 - Preserve or improve pass rate unless a temporary shim is documented.
-- Label tests by category as layout migration progresses (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`).
+- Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (`unit`, `contract`, `integration`, `regression`, `benchmark`, subsystem labels, backend/capability labels such as `gpu`/`vulkan`, and opt-in labels such as `slow`/`flaky-quarantine`). New labels must update both files in the same change.
 - New C++ test files use `Test.<Name>.cpp`; existing `Test_*.cpp` files are compatibility carryover and should only be renamed by explicit mechanical cleanup tasks.
 - Verification hygiene:
   - Prefer configured presets and task-specific focused targets before broad or long-running targets.
@@ -112,6 +117,7 @@ For each change:
   ```
 
   GPU/Vulkan, slow, and explicitly quarantined tests are opt-in and must be justified by label policy.
+- `CMakePresets.json` defines configure/build presets but no CTest presets; invoke CTest with `--test-dir build/ci` rather than `ctest --preset ci`.
 
 ## 8. Benchmarking protocol
 
