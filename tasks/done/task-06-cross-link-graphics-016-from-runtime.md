@@ -22,30 +22,30 @@ GRAPHICS-016 is filed under `tasks/backlog/rendering` but its owner is `src/runt
 
 ## Required changes
 
-1. Create a small cross-link task or README note under `tasks/backlog/runtime/`.
+- [x] Create a small cross-link task or README note under `tasks/backlog/runtime/`.
 
    Preferred:
-   - Create `tasks/backlog/runtime/RUNTIME-RENDERING-EXTRACTION-GATE.md` only if the repo already allows non-numbered cross-link notes.
+   - [x] Create `tasks/backlog/runtime/RUNTIME-RENDERING-EXTRACTION-GATE.md` only if the repo already allows non-numbered cross-link notes.
 
    Alternative:
-   - Update `tasks/backlog/runtime/README.md` if it exists.
+   - [x] Update `tasks/backlog/runtime/README.md` if it exists.
 
    Alternative:
-   - If no runtime README exists, create `tasks/backlog/runtime/README.md`.
+   - [x] If no runtime README exists, create `tasks/backlog/runtime/README.md`.
 
-2. The runtime note should:
-   - Link to GRAPHICS-016.
-   - State that runtime owns ECS access, extraction, sidecar mappings, dirty-domain interpretation, deletion events, and compaction-relocation handoff.
-   - State that graphics must not import live ECS ownership.
-   - State that GRAPHICS-016 must land before most rendering pass implementation work.
+- [x] The runtime note should:
+   - [x] Link to GRAPHICS-016.
+   - [x] State that runtime owns ECS access, extraction, sidecar mappings, dirty-domain interpretation, deletion events, and compaction-relocation handoff.
+   - [x] State that graphics must not import live ECS ownership.
+   - [x] State that GRAPHICS-016 must land before most rendering pass implementation work.
 
-3. Do not duplicate the full task content.
+- [x] Do not duplicate the full task content.
 
 ## Acceptance criteria
 
-- Runtime backlog readers can discover GRAPHICS-016.
-- No duplicate implementation task is created.
-- Links resolve.
+- [x] Runtime backlog readers can discover GRAPHICS-016.
+- [x] No duplicate implementation task is created.
+- [x] Links resolve.
 
 ## Verification
 

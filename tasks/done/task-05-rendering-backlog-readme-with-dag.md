@@ -63,9 +63,9 @@ Create:
 
 ## Acceptance criteria
 
-- A human or agent can determine the next valid task without reading every file.
-- The README does not conflict with GRAPHICS-001.
-- Docs links resolve.
+- [x] A human or agent can determine the next valid task without reading every file.
+- [x] The README does not conflict with GRAPHICS-001.
+- [x] Docs links resolve.
 
 ## Verification
 

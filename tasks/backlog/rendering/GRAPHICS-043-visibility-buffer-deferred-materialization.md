@@ -30,9 +30,9 @@ Lock down the contract for an alternative surface-rendering recipe that writes a
 12. **Layering.** No live ECS. No new RHI surfaces beyond what the existing framegraph supports.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-043-Impl-A** — Vis-buffer pass + ID encoding + `contract;graphics` decode tests.
@@ -42,21 +42,21 @@ Lock down the contract for an alternative surface-rendering recipe that writes a
 - **GRAPHICS-043-Impl-E** — Opt-in `gpu;vulkan` smoke shading-equivalence test.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` with the vis-buffer recipe and decoder spec.
-- Update `src/graphics/renderer/README.md` material-system + recipe section.
+- [ ] Update `docs/architecture/rendering-three-pass.md` with the vis-buffer recipe and decoder spec.
+- [ ] Update `src/graphics/renderer/README.md` material-system + recipe section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Forward and classic-deferred recipes remain default and unchanged.
-- 8-bucket lane contract preserved.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Forward and classic-deferred recipes remain default and unchanged.
+- [ ] 8-bucket lane contract preserved.
 
 ## Verification
 ```bash

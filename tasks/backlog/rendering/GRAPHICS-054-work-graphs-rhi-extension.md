@@ -30,9 +30,9 @@ Lock down the contract for an optional `IWorkGraphDevice` capability extension o
 11. **Long-horizon flag.** Explicitly record this task as long-horizon; no implementation child slices are opened until backend support and at least one consumer recipe exist.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice. Long-horizon flag applies: implementation children remain unopened until backend support and at least one consumer recipe exist.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice. Long-horizon flag applies: implementation children remain unopened until backend support and at least one consumer recipe exist.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-054-Impl-A** — `IWorkGraphDevice` interface + null-RHI mock + capability tests.
@@ -41,21 +41,21 @@ Lock down the contract for an optional `IWorkGraphDevice` capability extension o
 - **GRAPHICS-054-Impl-D** — Operational-gate extension in `GRAPHICS-033` reason enum + diagnostic wiring.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` RHI capability section with the long-horizon flag.
-- Update `src/graphics/rhi/README.md` capability surface.
+- [ ] Update `docs/architecture/graphics.md` RHI capability section with the long-horizon flag.
+- [ ] Update `src/graphics/rhi/README.md` capability surface.
 
 ## Acceptance criteria
-- Eleven decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Long-horizon flag is recorded; no implementation timing is committed.
-- Engine compiles and runs without work-graph-capable backends.
+- [ ] Eleven decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Long-horizon flag is recorded; no implementation timing is committed.
+- [ ] Engine compiles and runs without work-graph-capable backends.
 
 ## Verification
 ```bash

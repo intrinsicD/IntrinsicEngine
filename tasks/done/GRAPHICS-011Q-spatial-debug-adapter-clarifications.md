@@ -114,19 +114,19 @@
 - Concrete adapters for `Geometry::BVH`, `Geometry::KDTree`, `Geometry::Octree`, convex-hull mesh outputs, and editor/debug tooling should live in the owning layer that already has access to those structures.
 
 ## Required changes
-- Decide the owning layer for concrete BVH/KD-tree/octree/convex-hull adapters (geometry helper API, runtime extraction helper, or app/editor-only utility).
-- Document adapter naming, output limit policy, and diagnostics handoff into `SpatialDebugVisualizerDiagnostics`.
-- Clarify whether adapter tests belong under geometry unit tests, runtime integration tests, or app/editor tests.
+- [x] Decide the owning layer for concrete BVH/KD-tree/octree/convex-hull adapters (geometry helper API, runtime extraction helper, or app/editor-only utility).
+- [x] Document adapter naming, output limit policy, and diagnostics handoff into `SpatialDebugVisualizerDiagnostics`.
+- [x] Clarify whether adapter tests belong under geometry unit tests, runtime integration tests, or app/editor tests.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless docs tooling changes.
+- [x] Documentation/checker only; no C++ tests required unless docs tooling changes.
 
 ## Docs
-- Update `docs/architecture/graphics.md` and any geometry/runtime architecture docs touched by the adapter ownership decision.
+- [x] Update `docs/architecture/graphics.md` and any geometry/runtime architecture docs touched by the adapter ownership decision.
 
 ## Acceptance criteria
-- Concrete adapter ownership is clear without adding prohibited graphics dependencies.
-- Future adapter work can proceed without changing the graphics packet-builder contract.
+- [x] Concrete adapter ownership is clear without adding prohibited graphics dependencies.
+- [x] Future adapter work can proceed without changing the graphics packet-builder contract.
 
 ## Verification
 ```bash

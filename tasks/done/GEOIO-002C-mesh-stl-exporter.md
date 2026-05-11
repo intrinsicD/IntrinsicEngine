@@ -53,26 +53,26 @@
   container.
 
 ## Required changes
-- Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm`:
-  - Add a function declaration
+- [x] Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm`:
+  - [x] Add a function declaration
     `MeshIOWriteStatus WriteSTL(std::string_view absolute_path,
                                  const MeshIOResult& mesh);`
-  - Reuse the existing `MeshIOWriteStatus` enum unchanged.
-  - Keep all existing `Load*` / `WriteOBJ` / `WritePLY` declarations
+  - [x] Reuse the existing `MeshIOWriteStatus` enum unchanged.
+  - [x] Keep all existing `Load*` / `WriteOBJ` / `WritePLY` declarations
     bit-for-bit.
-- Implement `WriteSTL` in `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
-  - Add `#include <cmath>` and `#include <glm/geometric.hpp>` to the
+- [x] Implement `WriteSTL` in `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
+  - [x] Add `#include <cmath>` and `#include <glm/geometric.hpp>` to the
     module preamble (needed for `std::isfinite`, `glm::cross`,
     `glm::normalize`).
-  - Reject empty paths with `InvalidPath`.
-  - Reject empty meshes (no `v:point` property, zero vertices, no
+  - [x] Reject empty paths with `InvalidPath`.
+  - [x] Reject empty meshes (no `v:point` property, zero vertices, no
     `f:vertices` property, or zero faces) with `EmptyMesh`.
-  - Reject any face with `size() != 3` (STL is strictly triangles) or
+  - [x] Reject any face with `size() != 3` (STL is strictly triangles) or
     any out-of-range index with `InvalidFace`. No mutation of input.
-  - Open the output stream with `std::ios::binary | std::ios::trunc`;
+  - [x] Open the output stream with `std::ios::binary | std::ios::trunc`;
     on `!stream` return `InvalidPath`; on post-write `!stream.good()`
     return `FileWriteError`.
-  - Write the canonical ASCII STL framing:
+  - [x] Write the canonical ASCII STL framing:
     ```
     solid IntrinsicEngine
       facet normal <nx> <ny> <nz>
@@ -85,58 +85,58 @@
       ...
     endsolid IntrinsicEngine
     ```
-  - For each triangle face, compute
+  - [x] For each triangle face, compute
     `normal = glm::normalize(glm::cross(v1 - v0, v2 - v0))` and substitute
     `glm::vec3(0.0f)` when `!std::isfinite(normal.x)` (degenerate
     triangle), matching the legacy `STLExporter::Export` ASCII branch.
-  - Use `%.6e` formatting for both the per-facet normal and each vertex
+  - [x] Use `%.6e` formatting for both the per-facet normal and each vertex
     line to match the legacy ASCII STL output style.
-- Do not change importer behavior, do not introduce new module imports,
+- [x] Do not change importer behavior, do not introduce new module imports,
   and do not touch any file outside `src/geometry/`,
   `tests/unit/geometry/`, `tasks/`, and the generated module inventory.
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `WritesSTLTriangle`: write a synthetic triangle `MeshIOResult`,
+  - [x] `WritesSTLTriangle`: write a synthetic triangle `MeshIOResult`,
     re-import via `LoadSTL`, verify topology and vertex equivalence via
     `ExpectTriangleMeshProperties`.
-  - `WritesSTLTriangleEmitsFacetNormal`: write a triangle whose normal
+  - [x] `WritesSTLTriangleEmitsFacetNormal`: write a triangle whose normal
     is `+Z`; verify the file contents contain `solid IntrinsicEngine`,
     `endsolid IntrinsicEngine`, an `outer loop` block, and a
     `facet normal 0.000000e+00 0.000000e+00 1.000000e+00` line.
-  - `WriteSTLRejectsQuadFace`: a single quad face returns `InvalidFace`
+  - [x] `WriteSTLRejectsQuadFace`: a single quad face returns `InvalidFace`
     (this is the slice's distinguishing behavior — STL is triangles
     only).
-  - `WriteSTLRejectsEmptyMesh`: empty `MeshIOResult` returns `EmptyMesh`.
-  - `WriteSTLRejectsOutOfRangeIndex`: a face referencing an out-of-range
+  - [x] `WriteSTLRejectsEmptyMesh`: empty `MeshIOResult` returns `EmptyMesh`.
+  - [x] `WriteSTLRejectsOutOfRangeIndex`: a face referencing an out-of-range
     vertex returns `InvalidFace`.
-  - `WriteSTLRejectsBadPath`: a path under a non-existent directory
+  - [x] `WriteSTLRejectsBadPath`: a path under a non-existent directory
     returns `InvalidPath`.
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module surfaces
+- [x] Update `docs/api/generated/module_inventory.md` only if module surfaces
   changed in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding a single new exported
   function to the existing `Geometry.MeshIO` module is expected to update
   the inventory; if the regenerator only changes the date, leave it
   untouched (matches `GEOIO-002B` precedent).
-- No additional architecture/migration doc edits required for this
+- [x] No additional architecture/migration doc edits required for this
   slice; parity-matrix updates remain part of the parent `GEOIO-002`
   task once asset/runtime routing actually drops the legacy graphics
   exporters.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::WriteSTL` exists, is callable from `unit;geometry`
+- [x] `Geometry::MeshIO::WriteSTL` exists, is callable from `unit;geometry`
   tests, and round-trips a triangle through `LoadSTL` without topology
   loss.
-- Exporter rejects empty paths, empty meshes, non-triangle face arity,
+- [x] Exporter rejects empty paths, empty meshes, non-triangle face arity,
   out-of-range face indices, and non-writable paths with the documented
   `MeshIOWriteStatus` values.
-- `src/geometry/*` imports remain layered (`geometry -> core` only); no
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only); no
   new asset/runtime/graphics imports introduced.
-- Existing `LoadOBJ`/`LoadOFF`/`LoadPLY`/`LoadSTL`,
+- [x] Existing `LoadOBJ`/`LoadOFF`/`LoadPLY`/`LoadSTL`,
   `PointCloudIO`/`GraphIO`, `WriteOBJ*`, and `WritePLY*` tests continue
   to pass.
 

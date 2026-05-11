@@ -18,31 +18,31 @@
 - `ASSETIO-001` remains responsible for byte transport, asset payload registration, ambiguity policy, and higher-layer routing decisions.
 
 ## Required changes
-- `src/geometry/Geometry.IO.cppm`:
-  - Add `Geometry::IO::GeometryIODomain` for mesh, point-cloud, and graph domains.
-  - Add `Geometry::IO::GeometryIOFormatKind` and `GeometryIOFormatInfo` for supported promoted geometry formats.
-  - Add constexpr lookup helpers for supported formats, extension lookup, import-domain lookup, export-domain lookup, and import/export domain predicates.
-  - Keep extension matching deterministic, ASCII case-insensitive, and tolerant of leading `.` prefixes.
-- `src/geometry/CMakeLists.txt` and `src/geometry/Geometry.cppm`:
-  - Register and umbrella-export `Geometry.IO`.
-- `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - Add metadata coverage for mesh, point-cloud, graph, binary-capability, unsupported-domain, and unknown-extension cases.
+- [x] `src/geometry/Geometry.IO.cppm`:
+  - [x] Add `Geometry::IO::GeometryIODomain` for mesh, point-cloud, and graph domains.
+  - [x] Add `Geometry::IO::GeometryIOFormatKind` and `GeometryIOFormatInfo` for supported promoted geometry formats.
+  - [x] Add constexpr lookup helpers for supported formats, extension lookup, import-domain lookup, export-domain lookup, and import/export domain predicates.
+  - [x] Keep extension matching deterministic, ASCII case-insensitive, and tolerant of leading `.` prefixes.
+- [x] `src/geometry/CMakeLists.txt` and `src/geometry/Geometry.cppm`:
+  - [x] Register and umbrella-export `Geometry.IO`.
+- [x] `tests/unit/geometry/Test.GeometryIO.cpp`:
+  - [x] Add metadata coverage for mesh, point-cloud, graph, binary-capability, unsupported-domain, and unknown-extension cases.
 
 ## Tests
-- Added `GeometryIO_Metadata.ReportsSupportedImportAndExportDomains` under existing `unit;geometry` GeometryIO coverage.
+- [x] Added `GeometryIO_Metadata.ReportsSupportedImportAndExportDomains` under existing `unit;geometry` GeometryIO coverage.
 
 ## Docs
-- Updated `docs/migration/nonlegacy-parity-matrix.md` to record `GEOIO-002X` as geometry-owned IO domain metadata evidence and to preserve asset/runtime ownership of routing orchestration.
-- Regenerated `docs/api/generated/module_inventory.md` after adding the public `Geometry.IO` module.
+- [x] Updated `docs/migration/nonlegacy-parity-matrix.md` to record `GEOIO-002X` as geometry-owned IO domain metadata evidence and to preserve asset/runtime ownership of routing orchestration.
+- [x] Regenerated `docs/api/generated/module_inventory.md` after adding the public `Geometry.IO` module.
 
 ## Acceptance criteria
-- `Geometry.IO` exposes supported import/export domains for OBJ, OFF, STL, PLY, XYZ, PTS, XYZRGB, PCD, TGF, and edge-list formats.
-- OFF reports mesh import support but no geometry-owned export support.
-- PLY reports both mesh and point-cloud import/export support.
-- PTS and XYZRGB report point-cloud import support only; the geometry-owned text exporter remains the canonical XYZ writer.
-- Unknown or empty extensions report no domains.
-- `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
-- The module inventory and migration matrix are synchronized.
+- [x] `Geometry.IO` exposes supported import/export domains for OBJ, OFF, STL, PLY, XYZ, PTS, XYZRGB, PCD, TGF, and edge-list formats.
+- [x] OFF reports mesh import support but no geometry-owned export support.
+- [x] PLY reports both mesh and point-cloud import/export support.
+- [x] PTS and XYZRGB report point-cloud import support only; the geometry-owned text exporter remains the canonical XYZ writer.
+- [x] Unknown or empty extensions report no domains.
+- [x] `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
+- [x] The module inventory and migration matrix are synchronized.
 
 ## Verification
 ```bash

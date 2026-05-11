@@ -28,21 +28,21 @@ Legacy retirement is explicitly deferred. Any temporary legacy exception must re
 
 ## Required changes
 
-- Create this active tracker under `tasks/active/`.
-- Record the full post-reorganization hardening scope and explicit non-goals.
-- Track every `HARDEN-*` task with a status board and owner task ID.
-- Record current full-test status, runtime/GPU failure list, temporary skips/quarantines, temporary naming aliases, and final acceptance checklist.
-- Link this tracker from `tasks/README.md` or `docs/migration/active-status.md`.
+- [x] Create this active tracker under `tasks/active/`.
+- [x] Record the full post-reorganization hardening scope and explicit non-goals.
+- [x] Track every `HARDEN-*` task with a status board and owner task ID.
+- [x] Record current full-test status, runtime/GPU failure list, temporary skips/quarantines, temporary naming aliases, and final acceptance checklist.
+- [x] Link this tracker from `tasks/README.md` or `docs/migration/active-status.md`.
 
 ## Tests
 
-- Structural task policy validation must pass in strict mode.
-- Documentation links must pass in strict mode after the tracker is linked.
+- [x] Structural task policy validation must pass in strict mode.
+- [x] Documentation links must pass in strict mode after the tracker is linked.
 
 ## Docs
 
-- `tasks/README.md` linked this tracker while the post-RORG hardening phase was active; after closure, it lists no active trackers and this record is archived under `tasks/done/`.
-- Follow-up reports and docs created by later hardening tasks must link back to this tracker when they change active hardening status.
+- [x] `tasks/README.md` linked this tracker while the post-RORG hardening phase was active; after closure, it lists no active trackers and this record is archived under `tasks/done/`.
+- [x] Follow-up reports and docs created by later hardening tasks must link back to this tracker when they change active hardening status.
 
 ## Acceptance criteria
 

@@ -71,57 +71,57 @@
   check remain in place.
 
 ## Required changes
-- `src/geometry/Geometry.HalfedgeMesh.IO.cpp::LoadOBJ`:
-  - Add a `std::vector<glm::vec3> normals;` local alongside
+- [x] `src/geometry/Geometry.HalfedgeMesh.IO.cpp::LoadOBJ`:
+  - [x] Add a `std::vector<glm::vec3> normals;` local alongside
     `vertices`/`faces`.
-  - Add an `else if (tokens[0] == "vn")` branch that requires
+  - [x] Add an `else if (tokens[0] == "vn")` branch that requires
     `tokens.size() >= 4`, parses three floats via
     `ParseNumber<float>`, and pushes a `glm::vec3` onto
     `normals`. Reject malformed values with `InvalidMeshFormat`
     matching the existing `v` line behavior.
-  - After the parse loop, build a `std::span<const glm::vec3>`
+  - [x] After the parse loop, build a `std::span<const glm::vec3>`
     that wraps `normals` only when
     `normals.size() == vertices.size()` and pass it to
     `PopulateResult(result, vertices, faces, normalsSpan)`.
     Use the existing default for the `colors` span.
 
 ## Tests
-- Add `unit;geometry` cases to
+- [x] Add `unit;geometry` cases to
   `tests/unit/geometry/Test.GeometryIO.cpp::GeometryIO_MeshIO`
   next to the existing `LoadsOBJTriangle` test:
-  - `LoadsOBJTriangleWithVertexNormals` — ASCII OBJ with three
+  - [x] `LoadsOBJTriangleWithVertexNormals` — ASCII OBJ with three
     `v` lines, three `vn` lines (last one differs from the
     others), and `f 1//1 2//2 3//3` succeeds and returns a
     `v:normal` property of size 3 whose values match the
     `vn` lines.
-  - `LoadOBJIgnoresMismatchedVertexNormalCount` — three `v`
+  - [x] `LoadOBJIgnoresMismatchedVertexNormalCount` — three `v`
     lines, two `vn` lines, and a non-attributed face succeeds
     but returns no `v:normal` property.
-  - `LoadOBJRejectsMalformedVertexNormal` — `vn 0 0` with two
+  - [x] `LoadOBJRejectsMalformedVertexNormal` — `vn 0 0` with two
     components yields `Core::ErrorCode::InvalidFormat`
     (matches the `v` line strictness).
-- Extend `WritesOBJTriangleWithNormals` to assert that the
+- [x] Extend `WritesOBJTriangleWithNormals` to assert that the
   re-imported mesh exposes the same `v:normal` values it was
   written with (closes the existing latent round-trip gap).
 
 ## Docs
-- Update the
+- [x] Update the
   `OBJ/OFF/STL mesh import and mesh PLY import` row in
   `docs/migration/nonlegacy-parity-matrix.md` to record the
   new OBJ vertex-normal lockstep import added under
   `GEOIO-002S`.
-- Regenerate `docs/api/generated/module_inventory.md` only if
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if
   the generator picks up changes to the existing
   `Geometry.HalfedgeMesh.IO` module surface. If the regenerator
   changes only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::LoadOBJ` round-trips a `v:normal` property
+- [x] `Geometry::MeshIO::LoadOBJ` round-trips a `v:normal` property
   through `WriteOBJ` for the lockstep case the writer produces.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into
   `src/geometry/*`.
-- Parity matrix records the new OBJ vn lockstep import.
+- [x] Parity matrix records the new OBJ vn lockstep import.
 
 ## Verification
 ```bash

@@ -11,18 +11,18 @@
 - Geometry remains a core subsystem target for migration and future methods/paper integration.
 
 ## Required changes
-- Track geometry subsystem migration and test ownership tasks.
-- Track alignment with future `methods/geometry` package requirements.
-- Preserve architecture rule: canonical geometry implementation exits legacy location when promotion tasks complete.
+- [ ] Track geometry subsystem migration and test ownership tasks.
+- [ ] Track alignment with future `methods/geometry` package requirements.
+- [ ] Preserve architecture rule: canonical geometry implementation exits legacy location when promotion tasks complete.
 
 ## Tests
-- Ensure this file follows task template structure.
+- [ ] Ensure this file follows task template structure.
 
 ## Docs
-- Maintain alignment with `docs/architecture/geometry.md` and method workflow docs.
+- [ ] Maintain alignment with `docs/architecture/geometry.md` and method workflow docs.
 
 ## Acceptance criteria
-- Geometry backlog exists as a structured task file under `tasks/backlog/geometry/`.
+- [ ] Geometry backlog exists as a structured task file under `tasks/backlog/geometry/`.
 
 ## Verification
 ```bash

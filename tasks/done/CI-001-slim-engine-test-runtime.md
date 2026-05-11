@@ -212,116 +212,116 @@ verifiable on its own.
 
 ### Slice 1 — Label hygiene (low risk, immediate PR-CI win)
 
-- In `tests/CMakeLists.txt`, add `slow` to the `LABELS` list of executables
+- [x] In `tests/CMakeLists.txt`, add `slow` to the `LABELS` list of executables
   that boot the full headless engine and/or initialize Vulkan in the default
   CPU path. At minimum:
-  - the integration runtime executable hosting `Test_RuntimeGraphics.cpp`,
+  - [x] the integration runtime executable hosting `Test_RuntimeGraphics.cpp`,
     `Test.RuntimeRenderExtraction.cpp`, `Test_RuntimeRHI.cpp`,
     `Test.RuntimeStreamingExecutor.cpp`, `Test.RuntimeRenderExtraction.cpp`.
-  - the runtime asset/IO executable hosting `Test_IORegistry.cpp` and
+  - [x] the runtime asset/IO executable hosting `Test_IORegistry.cpp` and
     `Test.AssetLoadPipeline.cpp` (real-glTF parse paths).
-  - the `tests/benchmark/slo/Test_ArchitectureSLO.cpp` 2,000-node FrameGraph
+  - [x] the `tests/benchmark/slo/Test_ArchitectureSLO.cpp` 2,000-node FrameGraph
     and scheduler-contention SLOs.
-- Do not retag pure CPU contract tests as `slow`.
-- Update `tests/README.md` to document the `slow` and `flaky-quarantine`
+- [x] Do not retag pure CPU contract tests as `slow`.
+- [x] Update `tests/README.md` to document the `slow` and `flaky-quarantine`
   labels and when to apply them.
-- Confirm `.github/workflows/*.yml` already excludes `slow` in the
+- [x] Confirm `.github/workflows/*.yml` already excludes `slow` in the
   Linux-clang gate; if not, add the exclusion. Ensure `nightly-deep`
   includes everything (`-LE "flaky-quarantine"` only).
 
 ### Slice 2 — Shared engine/Vulkan fixture (largest runtime win)
 
-- Introduce a `::testing::Environment` (or static `SetUpTestSuite` on a
+- [x] Introduce a `::testing::Environment` (or static `SetUpTestSuite` on a
   shared fixture base) under `tests/support/` that constructs the headless
   engine + Vulkan device + transfer manager + descriptor pools once per
   executable and tears them down once at exit.
-- Migrate `Test_RuntimeGraphics.cpp`, `Test.RuntimeRenderExtraction.cpp`,
+- [x] Migrate `Test_RuntimeGraphics.cpp`, `Test.RuntimeRenderExtraction.cpp`,
   `Test_RuntimeRHI.cpp`, `Test_RuntimeFrameLoop.cpp`,
   `Test_HeadlessEngine.cpp`, `Test.RuntimeStreamingExecutor.cpp` to consume
   the shared fixture instead of constructing per-test engines.
-- Per-test state (scenes, asset registrations, framegraph compositions) must
+- [x] Per-test state (scenes, asset registrations, framegraph compositions) must
   reset between tests; document the reset contract in `tests/support/`.
-- Preserve `GTEST_SKIP()` semantics on hosts without Vulkan.
-- Do not move tests across executables in this slice; layering boundaries
+- [x] Preserve `GTEST_SKIP()` semantics on hosts without Vulkan.
+- [x] Do not move tests across executables in this slice; layering boundaries
   are unchanged.
 
 ### Slice 3 — Parameterize duplicated fixtures with `TEST_P`
 
-- Collapse `Test_RuntimeSelection.cpp` and `Test_RuntimeSelection_Multi.cpp`
+- [x] Collapse `Test_RuntimeSelection.cpp` and `Test_RuntimeSelection_Multi.cpp`
   into a single parameterized fixture varying `PickMode` (`Replace`, `Add`,
   `Toggle`, plus single-vs-multi entity arity).
-- Audit the geometry validator suites for the same pattern (same mesh,
+- [x] Audit the geometry validator suites for the same pattern (same mesh,
   varied algorithm options) and convert obvious duplicates to `TEST_P`. Do
   not invent new coverage; only consolidate existing assertions.
-- Each `INSTANTIATE_TEST_SUITE_P` must enumerate exactly the cases that
+- [x] Each `INSTANTIATE_TEST_SUITE_P` must enumerate exactly the cases that
   existed before so coverage is preserved.
 
 ### Slice 4 — Re-layer CPU-only assertions
 
-- Identify integration tests that assert pure-CPU logic (dirty flags,
+- [x] Identify integration tests that assert pure-CPU logic (dirty flags,
   registry lookups, mode transitions) but pay full engine-boot cost.
   Concrete starting set flagged by the audit:
-  - overlap between `Test.SelectionSystemContracts.cpp`,
+  - [x] overlap between `Test.SelectionSystemContracts.cpp`,
     `Test.SelectionPassContracts.cpp`, and
     `Test_RuntimeSelection.cpp` selection-mode assertions.
-  - material dirty-flag assertions duplicated across runtime integration
+  - [x] material dirty-flag assertions duplicated across runtime integration
     and graphics contract layers.
-- Move CPU-only assertions down to `tests/unit/` or `tests/contract/`. Keep
+- [x] Move CPU-only assertions down to `tests/unit/` or `tests/contract/`. Keep
   one integration smoke per system to prove wiring.
-- Layer ownership rules from `AGENTS.md` §2 must hold: contract tests stay
+- [x] Layer ownership rules from `AGENTS.md` §2 must hold: contract tests stay
   CPU-only and must not import live runtime services.
 
 ### Slice 5 — CTest knobs
 
-- In `cmake/` (or the `intrinsic_add_test(...)` helper), set a default
+- [x] In `cmake/` (or the `intrinsic_add_test(...)` helper), set a default
   per-test `TIMEOUT 30` (down from the implicit 60s) and allow `slow`-
   labeled executables to override to a higher value.
-- Document `ctest --preset ci -j$(nproc)` in `tests/README.md`.
+- [x] Document `ctest --preset ci -j$(nproc)` in `tests/README.md`.
 
 ## Tests
 
-- All existing GTest cases must still register and pass; `ctest --preset ci`
+- [x] All existing GTest cases must still register and pass; `ctest --preset ci`
   case count must not decrease except where `TEST_P` instantiations replace
   N previously separate `TEST()` cases with the same N parameterized cases.
-- Add a guard in the `intrinsic_add_test(...)` helper (or a Python check
+- [x] Add a guard in the `intrinsic_add_test(...)` helper (or a Python check
   under `tools/agents/`) that fails configuration if a CTest label outside
   the documented set is used. Documented set lives in `tests/README.md`.
-- Per-slice verification commands are listed under **Verification**.
+- [x] Per-slice verification commands are listed under **Verification**.
 
 ## Docs
 
-- Update `tests/README.md` with:
-  - the documented label set (`unit`, `contract`, `integration`,
+- [x] Update `tests/README.md` with:
+  - [x] the documented label set (`unit`, `contract`, `integration`,
     `regression`, `benchmark`, `slo`, `assets`, `build`, `core`, `ecs`,
     `geometry`, `graphics`, `headless`, `platform`, `runtime`, `glfw`, `gpu`,
     `vulkan`, `slow`, `flaky-quarantine`).
-  - guidance for when to apply `slow` (any test that boots the full engine
+  - [x] guidance for when to apply `slow` (any test that boots the full engine
     or initializes Vulkan in a non-`gpu`-labeled executable, or any test
     > 1 s wall-clock on the reference Linux-clang runner).
-  - the shared-engine fixture contract introduced in slice 2.
-- No changes to `AGENTS.md` or `docs/agent/`; this task does not alter
+  - [x] the shared-engine fixture contract introduced in slice 2.
+- [x] No changes to `AGENTS.md` or `docs/agent/`; this task does not alter
   policy, only test infrastructure.
 
 ## Acceptance criteria
 
-- Baseline wall-clock for `pr-fast` and `ci-linux-clang` gates is recorded
+- [x] Baseline wall-clock for `pr-fast` and `ci-linux-clang` gates is recorded
   on the branch before slice 1 and after each subsequent slice using
   `ctest --test-dir build/ci ...` (matching `.github/workflows/`).
-- After slice 1: `ci-linux-clang` excludes the newly tagged `slow`
+- [x] After slice 1: `ci-linux-clang` excludes the newly tagged `slow`
   executables and the gate completes without losing any case the prior
   green run produced (case count unchanged at the union of `pr-fast` +
   `ci-linux-clang` + `nightly-deep`).
-- After slice 2: the integration runtime executable wall-clock is reduced
+- [x] After slice 2: the integration runtime executable wall-clock is reduced
   by ≥ 3× on the reference Linux-clang runner, with no test failure
   reintroduced.
-- After slice 3: the consolidated parameterized suites enumerate exactly
+- [x] After slice 3: the consolidated parameterized suites enumerate exactly
   the cases the prior split files enumerated; CTest case count is
   preserved (or strictly increased).
-- After slice 4: integration runtime executable line count drops measurably
+- [x] After slice 4: integration runtime executable line count drops measurably
   while `unit/` and `contract/` line counts increase by a comparable
   amount; no assertion is lost (verify via diff of `EXPECT_*` /
   `ASSERT_*` call sites pre- and post-move).
-- Final: `nightly-deep` total wall-clock drops below 45 min on the
+- [x] Final: `nightly-deep` total wall-clock drops below 45 min on the
   reference runner.
 
 ## Verification

@@ -19,19 +19,19 @@
 - Owner: primarily `src/graphics/renderer` for visualization packets, with geometry/core helpers only through allowed public APIs.
 - Legacy spatial debug draw modules identify expected visualization categories but should not be copied.
 ## Required changes
-- Define data-only debug visualization packet builders or adapters for supported spatial structures.
-- Route output through transient line/point/triangle debug primitive contracts from `GRAPHICS-010`.
-- Add diagnostics for unsupported structures, excessive primitive counts, and invalid bounds.
+- [x] Define data-only debug visualization packet builders or adapters for supported spatial structures.
+- [x] Route output through transient line/point/triangle debug primitive contracts from `GRAPHICS-010`.
+- [x] Add diagnostics for unsupported structures, excessive primitive counts, and invalid bounds.
 ## Tests
-- Add unit tests for deterministic packet generation from minimal BVH/bounds/KD-tree/octree/convex-hull fixtures.
-- Add clamp/limit tests for large or invalid debug visualizations.
-- Label spatial debug visualizer unit tests `unit;graphics` so they run in the default CPU gate.
+- [x] Add unit tests for deterministic packet generation from minimal BVH/bounds/KD-tree/octree/convex-hull fixtures.
+- [x] Add clamp/limit tests for large or invalid debug visualizations.
+- [x] Label spatial debug visualizer unit tests `unit;graphics` so they run in the default CPU gate.
 ## Docs
-- Document supported spatial debug visualization inputs and graphics-layer ownership boundaries.
+- [x] Document supported spatial debug visualization inputs and graphics-layer ownership boundaries.
 ## Acceptance criteria
-- Spatial debug visualizers produce render snapshots without legacy modules.
-- Debug visualization output is bounded and deterministic.
-- Ownership remains compatible with graphics layer rules.
+- [x] Spatial debug visualizers produce render snapshots without legacy modules.
+- [x] Debug visualization output is bounded and deterministic.
+- [x] Ownership remains compatible with graphics layer rules.
 ## Verification
 ```bash
 cmake --preset ci

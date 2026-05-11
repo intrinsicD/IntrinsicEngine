@@ -68,90 +68,90 @@
   honestly; the focused gate may not run in the agent container.
 
 ## Required changes
-- Extend `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
-  - Add `<cstring>` and `<span>` (already included) for `std::memcpy` and
+- [x] Extend `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
+  - [x] Add `<cstring>` and `<span>` (already included) for `std::memcpy` and
     spans of `std::byte`.
-  - Inside the existing anonymous namespace, add two helpers:
-    - `bool IsBinarySTL(std::span<const std::byte> data)` matching the
+  - [x] Inside the existing anonymous namespace, add two helpers:
+    - [x] `bool IsBinarySTL(std::span<const std::byte> data)` matching the
       legacy detection rule documented in Context.
-    - `Core::Expected<MeshIOResult> ParseBinarySTL(std::span<const std::byte>
+    - [x] `Core::Expected<MeshIOResult> ParseBinarySTL(std::span<const std::byte>
       data, std::string_view absolute_path)` that:
-      - Returns `InvalidMeshFormat()` when `data.size() < 84`.
-      - Decodes `triCount` via `std::memcpy` from `data.data() + 80`.
-      - Returns `InvalidMeshFormat()` when `triCount == 0` or when
+      - [x] Returns `InvalidMeshFormat()` when `data.size() < 84`.
+      - [x] Decodes `triCount` via `std::memcpy` from `data.data() + 80`.
+      - [x] Returns `InvalidMeshFormat()` when `triCount == 0` or when
         `data.size() < 80 + 4 + triCount * 50`.
-      - Iterates `triCount` triangles. For each, decodes three `vec3`
+      - [x] Iterates `triCount` triangles. For each, decodes three `vec3`
         positions via `std::memcpy` (offsets 12, 24, 36 within the
         50-byte record), pushes them into `vertices`, and pushes a
         `{3i, 3i+1, 3i+2}` triangle into `faces`.
-      - Calls `PopulateResult(result, vertices, faces)` and assigns
+      - [x] Calls `PopulateResult(result, vertices, faces)` and assigns
         `SourcePath`/`BasePath` via `MakePathInfo`.
-  - Modify `LoadSTL` to:
-    - Read the file once via `ReadTextFile` (already opens binary mode).
-    - Form a `std::span<const std::byte>` over the resulting string's
+  - [x] Modify `LoadSTL` to:
+    - [x] Read the file once via `ReadTextFile` (already opens binary mode).
+    - [x] Form a `std::span<const std::byte>` over the resulting string's
       bytes.
-    - Dispatch: `IsBinarySTL(bytes)` → `ParseBinarySTL(bytes, absolute_path)`;
+    - [x] Dispatch: `IsBinarySTL(bytes)` → `ParseBinarySTL(bytes, absolute_path)`;
       otherwise fall through to the existing ASCII parser unchanged.
-- Do not change importer behavior for OBJ/OFF/PLY, do not introduce new
+- [x] Do not change importer behavior for OBJ/OFF/PLY, do not introduce new
   module imports, and do not touch any file outside
   `src/geometry/Geometry.HalfedgeMesh.IO.cpp`,
   `tests/unit/geometry/Test.GeometryIO.cpp`, and `tasks/`.
-- Public module surface (`Geometry.HalfedgeMesh.IO.cppm`) does not
+- [x] Public module surface (`Geometry.HalfedgeMesh.IO.cppm`) does not
   change; the inventory should remain identical apart from the
   regeneration date (matches `GEOIO-002B`/`C` precedent).
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `LoadsBinarySTLSingleTriangle`: build a 134-byte fixture (80-byte
+  - [x] `LoadsBinarySTLSingleTriangle`: build a 134-byte fixture (80-byte
     header + `uint32_t` count = 1 + one 50-byte triangle record encoding
     `(0,0,0)`, `(1,0,0)`, `(0,1,0)`); load and assert
     `ExpectTriangleMeshProperties(*result)` (3 vertices, 1 triangle face
     `{0,1,2}`, first vertex at the origin).
-  - `LoadsBinarySTLTwoTriangles`: build a 184-byte fixture with two
+  - [x] `LoadsBinarySTLTwoTriangles`: build a 184-byte fixture with two
     triangles; verify 6 vertices, 2 faces, and that face 1 indices are
     `{3,4,5}` (triangle-soup ordering).
-  - `LoadSTLRejectsTruncatedBinaryPayload`: header advertises
+  - [x] `LoadSTLRejectsTruncatedBinaryPayload`: header advertises
     `triCount == 2` but only one triangle's bytes follow; expect
     `Core::ErrorCode::InvalidFormat`. The exact size (134 bytes when
     `triCount == 2` is advertised) is what disqualifies the size-match
     branch and forces the size-shortage check to trigger
     `InvalidMeshFormat()`.
-  - `LoadsASCIISTLAfterBinaryDispatch`: regression — ensure that the
+  - [x] `LoadsASCIISTLAfterBinaryDispatch`: regression — ensure that the
     existing ASCII fixture still parses through the new dispatch path
     (the trimmed prefix starts with `solid` and contains `facet`, so
     `IsBinarySTL` returns `false`).
-- Helper: add a `WriteBinarySTLFile` test fixture writer that takes a
+- [x] Helper: add a `WriteBinarySTLFile` test fixture writer that takes a
   `std::span<const std::array<glm::vec3, 3>>` and emits the canonical
   layout via packed `std::memcpy`-style writes (use
   `std::ofstream(..., std::ios::binary)` and explicit byte writes; do
   not rely on `operator<<`).
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module surfaces
+- [x] Update `docs/api/generated/module_inventory.md` only if module surfaces
   changed in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding internal helpers and
   expanding a function body is not expected to change the inventory; if
   the regenerator only changes the date, leave it untouched (matches
   `GEOIO-002B`/`C` precedent).
-- No additional architecture/migration doc edits required for this
+- [x] No additional architecture/migration doc edits required for this
   slice; parity-matrix updates remain part of the parent `GEOIO-002`
   task once asset/runtime routing actually drops the legacy graphics
   importers.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::LoadSTL` returns a populated `MeshIOResult` for a
+- [x] `Geometry::MeshIO::LoadSTL` returns a populated `MeshIOResult` for a
   well-formed binary STL fixture, with positions equal to the input
   triangles and face indices in triangle-soup order.
-- `LoadSTL` continues to accept ASCII STL fixtures (existing
+- [x] `LoadSTL` continues to accept ASCII STL fixtures (existing
   `LoadsASCIISTLTriangle` test still passes, plus the new
   `LoadsASCIISTLAfterBinaryDispatch` regression).
-- A truncated binary payload produces `Core::ErrorCode::InvalidFormat`
+- [x] A truncated binary payload produces `Core::ErrorCode::InvalidFormat`
   rather than out-of-bounds reads or partial parses.
-- `src/geometry/*` imports remain layered (`geometry -> core` only); no
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only); no
   new asset/runtime/graphics imports introduced.
-- Existing `LoadOBJ`/`LoadOFF`/`LoadPLY`,
+- [x] Existing `LoadOBJ`/`LoadOFF`/`LoadPLY`,
   `PointCloudIO`/`GraphIO`, and all `Write*` tests continue to pass.
 
 ## Verification

@@ -12,20 +12,20 @@ Produce a factual audit of remaining non-taxonomic test directories and map each
 Owned by tests/docs under post-reorganization hardening. This task is documentation-first and prepares HARDEN-041/HARDEN-042 by inventorying the old wrapper test directories that are currently excluded from active CTest registration.
 
 ## Required changes
-- Create `docs/reports/test-taxonomy-audit-2026-04-29.md` with:
-  - Current canonical taxonomy roots in `tests/`.
-  - Remaining non-taxonomic directories and file inventories.
-  - Current registration status and rationale.
-  - Concrete follow-up action mapping to HARDEN-041 and HARDEN-042.
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-040.
+- [x] Create `docs/reports/test-taxonomy-audit-2026-04-29.md` with:
+  - [x] Current canonical taxonomy roots in `tests/`.
+  - [x] Remaining non-taxonomic directories and file inventories.
+  - [x] Current registration status and rationale.
+  - [x] Concrete follow-up action mapping to HARDEN-041 and HARDEN-042.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-040.
 
 ## Tests
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- Add the new audit report in `docs/reports/`.
-- Synchronize hardening tracker status and evidence log.
+- [x] Add the new audit report in `docs/reports/`.
+- [x] Synchronize hardening tracker status and evidence log.
 
 ## Acceptance criteria
 - [x] Audit report exists with directory-by-directory disposition.

@@ -67,23 +67,23 @@
   printable token works).
 
 ## Required changes
-- Extend `src/geometry/Geometry.Graph.IO.cppm`:
-  - Add a `GraphIOWriteStatus WriteEdgeList(std::string_view absolute_path,
+- [x] Extend `src/geometry/Geometry.Graph.IO.cppm`:
+  - [x] Add a `GraphIOWriteStatus WriteEdgeList(std::string_view absolute_path,
                                               const GraphIOResult& graph);`
     declaration in the `Geometry::GraphIO` namespace, reusing the
     existing `GraphIOWriteStatus` enum unchanged.
-- Implement `WriteEdgeList` in
+- [x] Implement `WriteEdgeList` in
   `src/geometry/Geometry.Graph.IO.cpp` adjacent to the existing
   `WriteTGF`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject graphs whose `Graph.VertexCount() == 0` or whose
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject graphs whose `Graph.VertexCount() == 0` or whose
     `Graph.EdgeCount() == 0` with `EmptyGraph`. The reader
     rejects both conditions, so the writer mirrors that contract
     and avoids producing files that cannot be re-imported.
-  - Open the output stream with
+  - [x] Open the output stream with
     `std::ios::binary | std::ios::trunc`; return `InvalidPath` if
     the stream cannot be opened.
-  - Iterate edges in handle index order from `0` up to
+  - [x] Iterate edges in handle index order from `0` up to
     `EdgesSize()`, skipping `IsDeleted(EdgeHandle)` entries. For
     each edge, look up endpoints with `EdgeVertices(e)` and emit
     `"<from_index> <to_index>"` using `std::snprintf`. If
@@ -92,72 +92,72 @@
     `EdgeProperty<std::string>` and the per-edge label is
     non-empty, append `" "` and the label as-is. Terminate each
     line with `\n`.
-  - When an edge has a non-empty label but no weight, the reader
+  - [x] When an edge has a non-empty label but no weight, the reader
     interprets token[2] as a label only if it cannot be parsed as
     a number. The writer therefore always emits a numeric weight
     column when emitting a label, defaulting to the property's
     default value (`1.0f`) for edges that lack an explicit weight.
     This keeps the label round-trip unambiguous and matches the
     reader's `e:weight`/`e:label` contract.
-  - Flush and report `FileWriteError` if `stream.good()` is false
+  - [x] Flush and report `FileWriteError` if `stream.good()` is false
     at end.
-- No additional public exports beyond `WriteEdgeList`; helper
+- [x] No additional public exports beyond `WriteEdgeList`; helper
   logic stays inside the existing translation-unit anonymous
   namespace or local to the function.
-- No new imports on the module interface; `<cstdio>` and
+- [x] No new imports on the module interface; `<cstdio>` and
   `<fstream>` are already pulled in by the existing `WriteTGF`
   translation unit.
 
 ## Tests
-- Add `unit;geometry` cases to
+- [x] Add `unit;geometry` cases to
   `tests/unit/geometry/Test.GeometryIO.cpp` under
   `GeometryIO_GraphIO`:
-  - `WritesEdgeListRoundTripsEdges` — build a graph with three
+  - [x] `WritesEdgeListRoundTripsEdges` — build a graph with three
     vertices and two edges (no labels, no weight); write via
     `WriteEdgeList`, re-import via `LoadEdgeList`, verify vertex
     count, edge count, and that endpoint IDs (`v:id`) match the
     original handle indices rendered as decimal strings.
-  - `WritesEdgeListRoundTripsLabelsAndWeight` — build a graph
+  - [x] `WritesEdgeListRoundTripsLabelsAndWeight` — build a graph
     with two vertices and one edge that has both `e:weight` and
     `e:label`; write, re-import, verify label and weight round-
     trip exactly.
-  - `WritesEdgeListEmitsWeightWhenLabelOnly` — build a graph with
+  - [x] `WritesEdgeListEmitsWeightWhenLabelOnly` — build a graph with
     an edge that has only `e:label` (no `e:weight` property at
     all); write, assert the on-disk line contains a numeric
     weight column before the label so the reader's
     number-vs-label disambiguation parses the label correctly;
     re-import and verify the label round-trips.
-  - `WritesEdgeListSkipsDeletedEdges` — build a graph with three
+  - [x] `WritesEdgeListSkipsDeletedEdges` — build a graph with three
     vertices and two edges, delete one edge, and verify the
     writer does not emit a line for the deleted edge (re-import
     preserves the surviving edge count).
-  - `WriteEdgeListRejectsEmptyGraph` — default-constructed
+  - [x] `WriteEdgeListRejectsEmptyGraph` — default-constructed
     `GraphIOResult` (zero vertices) yields `EmptyGraph`.
-  - `WriteEdgeListRejectsEdgelessGraph` — a graph with vertices
+  - [x] `WriteEdgeListRejectsEdgelessGraph` — a graph with vertices
     but no edges yields `EmptyGraph` (mirrors the reader's
     rejection of edge-less files).
-  - `WriteEdgeListRejectsBadPath` — empty `absolute_path` yields
+  - [x] `WriteEdgeListRejectsBadPath` — empty `absolute_path` yields
     `InvalidPath`; a path under a non-existent directory yields
     `InvalidPath`.
-- Use the existing `TempFile` helper in the test file; do not
+- [x] Use the existing `TempFile` helper in the test file; do not
   introduce new test-only headers.
 
 ## Docs
-- Update the `TGF graph export` row of
+- [x] Update the `TGF graph export` row of
   `docs/migration/nonlegacy-parity-matrix.md` (or add an adjacent
   row) to record that text edge-list (`.edges`) graph export is
   now geometry-owned and added under `GEOIO-002Q`.
-- Regenerate `docs/api/generated/module_inventory.md` only if the
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if the
   generator picks up changes to the existing
   `Geometry.Graph.IO` module surface. If the regenerator changes
   only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::GraphIO::WriteEdgeList` compiles and is exported
+- [x] `Geometry::GraphIO::WriteEdgeList` compiles and is exported
   from `Geometry.Graph.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into `src/geometry/*`.
-- Parity matrix records the new geometry-owned edge-list writer.
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into `src/geometry/*`.
+- [x] Parity matrix records the new geometry-owned edge-list writer.
 
 ## Verification
 ```bash

@@ -16,25 +16,25 @@
 - `graphics/renderer` may depend on asset IDs from `Asset.Registry`; it must not import live `AssetService`, ECS, runtime, or `graphics/assets` cache internals for this value type.
 
 ## Required changes
-- Extend `src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm` with `Assets::AssetId SourceAsset{}` and `std::uint64_t LastSeenAssetGeneration = 0`.
-- Add small helper methods for source-asset presence, binding/updating generation, and clearing the binding.
-- Add focused CPU graphics unit tests for default invalid state, binding generation metadata, preserving instance/geometry handles, named-buffer behavior, and clearing asset metadata.
-- Register the new test source in `tests/CMakeLists.txt`.
-- Update renderer architecture/readme docs only if needed to reflect the landed field names.
+- [x] Extend `src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm` with `Assets::AssetId SourceAsset{}` and `std::uint64_t LastSeenAssetGeneration = 0`.
+- [x] Add small helper methods for source-asset presence, binding/updating generation, and clearing the binding.
+- [x] Add focused CPU graphics unit tests for default invalid state, binding generation metadata, preserving instance/geometry handles, named-buffer behavior, and clearing asset metadata.
+- [x] Register the new test source in `tests/CMakeLists.txt`.
+- [x] Update renderer architecture/readme docs only if needed to reflect the landed field names.
 
 ## Tests
-- Add/update `unit;graphics` coverage only.
-- No GPU/Vulkan tests are required.
+- [x] Add/update `unit;graphics` coverage only.
+- [x] No GPU/Vulkan tests are required.
 
 ## Docs
-- Keep `docs/architecture/graphics.md` and `src/graphics/renderer/README.md` factual if the field names differ from the existing planning text.
-- Keep rendering backlog links synchronized.
+- [x] Keep `docs/architecture/graphics.md` and `src/graphics/renderer/README.md` factual if the field names differ from the existing planning text.
+- [x] Keep rendering backlog links synchronized.
 
 ## Acceptance criteria
-- `GpuSceneSlot` stores source asset identity and last-seen generation without adding any ECS dependency or live asset-service dependency.
-- Default-constructed slots represent dynamic/non-asset geometry with an invalid `SourceAsset` and generation `0`.
-- Tests prove binding, generation update, clearing, and existing handle/named-buffer helpers work together.
-- Layering and test-layout checks pass.
+- [x] `GpuSceneSlot` stores source asset identity and last-seen generation without adding any ECS dependency or live asset-service dependency.
+- [x] Default-constructed slots represent dynamic/non-asset geometry with an invalid `SourceAsset` and generation `0`.
+- [x] Tests prove binding, generation update, clearing, and existing handle/named-buffer helpers work together.
+- [x] Layering and test-layout checks pass.
 
 ## Verification
 ```bash

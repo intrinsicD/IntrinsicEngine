@@ -40,58 +40,58 @@
   `Normals()`, `HasColors()`, `Colors()`, `HasRadii()`, `Radii()`).
 
 ## Required changes
-- Extend `Geometry.PointCloud.IO.cppm` with a `PointCloudIOWriteStatus`
+- [x] Extend `Geometry.PointCloud.IO.cppm` with a `PointCloudIOWriteStatus`
   enum (`Success`, `EmptyCloud`, `InvalidPath`, `FileWriteError`) and a
   `WritePLY(std::string_view absolute_path, const PointCloudIOResult& cloud)`
   declaration in the `Geometry::PointCloudIO` namespace.
-- Implement `WritePLY` in `Geometry.PointCloud.IO.cpp`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject empty clouds (`Cloud.IsEmpty()`) with `EmptyCloud`.
-  - Open the file with `std::ofstream(... std::ios::binary | std::ios::trunc)`;
+- [x] Implement `WritePLY` in `Geometry.PointCloud.IO.cpp`:
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject empty clouds (`Cloud.IsEmpty()`) with `EmptyCloud`.
+  - [x] Open the file with `std::ofstream(... std::ios::binary | std::ios::trunc)`;
     return `InvalidPath` if the stream cannot be opened.
-  - Emit ASCII PLY 1.0 header with `format ascii 1.0`, a comment line,
+  - [x] Emit ASCII PLY 1.0 header with `format ascii 1.0`, a comment line,
     `element vertex N`, `property float x/y/z`, optional
     `property float nx/ny/nz` when `HasNormals()`, optional
     `property uchar red/green/blue` when `HasColors()` (clamp 0..1 channels
     to `0..255` integers), optional `property float radius` when
     `HasRadii()`, then `end_header`.
-  - Write one point per line in declared property order using
+  - [x] Write one point per line in declared property order using
     `snprintf` for deterministic float formatting; map normal/color/radius
     spans by index.
-  - Flush and report `FileWriteError` if `stream.good()` is false at end.
-- No additional public exports from `Geometry.PointCloud.IO.cppm`; all helper
+  - [x] Flush and report `FileWriteError` if `stream.good()` is false at end.
+- [x] No additional public exports from `Geometry.PointCloud.IO.cppm`; all helper
   logic stays inside the existing translation-unit anonymous namespace.
 
 ## Tests
-- Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp` under
+- [x] Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp` under
   `GeometryIO_PointCloudIO`:
-  - `WritesPLYPointCloud` — three-point cloud, round-trip via `LoadPLY` and
+  - [x] `WritesPLYPointCloud` — three-point cloud, round-trip via `LoadPLY` and
     verify positions match.
-  - `WritesPLYPointCloudWithNormalsAndColorsAndRadii` — round-trip preserves
+  - [x] `WritesPLYPointCloudWithNormalsAndColorsAndRadii` — round-trip preserves
     normals, color channels (255-mapped), and radius scalar.
-  - `WritePLYPointCloudRejectsEmptyCloud` — empty cloud yields
+  - [x] `WritePLYPointCloudRejectsEmptyCloud` — empty cloud yields
     `PointCloudIOWriteStatus::EmptyCloud`.
-  - `WritePLYPointCloudRejectsBadPath` — empty `absolute_path` yields
+  - [x] `WritePLYPointCloudRejectsBadPath` — empty `absolute_path` yields
     `PointCloudIOWriteStatus::InvalidPath`; non-creatable directory path
     yields `InvalidPath`.
-- Use `std::filesystem::temp_directory_path()` plus a unique file name
+- [x] Use `std::filesystem::temp_directory_path()` plus a unique file name
   pattern (mirroring existing mesh writer tests) for round-trip targets;
   clean up via `std::filesystem::remove`.
 
 ## Docs
-- Update the `geometry` row of `docs/migration/nonlegacy-parity-matrix.md` to
+- [x] Update the `geometry` row of `docs/migration/nonlegacy-parity-matrix.md` to
   note that point-cloud PLY ASCII export is now geometry-owned.
-- No module surface inventory regeneration is required because no new
+- [x] No module surface inventory regeneration is required because no new
   module is introduced.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::WritePLY` compiles and is exported from
+- [x] `Geometry::PointCloudIO::WritePLY` compiles and is exported from
   `Geometry.PointCloud.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into `src/geometry/*`.
-- Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.PLY.{cppm,cpp}`
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into `src/geometry/*`.
+- [x] Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.PLY.{cppm,cpp}`
   remains untouched (reference only).
-- Parity matrix row reflects the new exporter ownership.
+- [x] Parity matrix row reflects the new exporter ownership.
 
 ## Verification
 ```bash

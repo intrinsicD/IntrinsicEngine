@@ -108,33 +108,33 @@ are recorded so reviewers can see what was rejected and why.
     - The promoted layering invariants `core ← geometry`, `core ← assets`, `core ← ecs`, `core, asset-IDs, RHI ← graphics`, "no live ECS in graphics", and "no graphics handles in canonical ECS components" all hold without exception.
 
 ## Required changes
-- ✅ Recorded the twelve design decisions above with explicit answers, rejected-alternative rationale, and exact identifier references to the current codebase.
-- ✅ Cross-linked decisions with GRAPHICS-006/006Q (material registry / slot policy), GRAPHICS-007Q (cull-bucket lane policy), GRAPHICS-008/008Q (depth/surface/G-buffer renderpass attachment ownership), GRAPHICS-013AQ (descriptor-bind seam), GRAPHICS-015 / 015Q (residency fallback pattern), GRAPHICS-029 (reference scene bootstrap), GRAPHICS-030 (procedural-source vertex-format consumer + sentinel rule), GRAPHICS-032 (downstream consumer of the default).
-- ✅ Identified follow-up implementation children (do **not** open here):
-  - **GRAPHICS-031-Impl-A** — author `assets/shaders/forward/default_debug_surface.vert/frag`, register the `kMaterialTypeID_DefaultDebugSurface` constant in `Graphics.Material.cppm`, register the `"Material.DefaultDebugSurface"` `MaterialTypeDesc` at `MaterialSystem::Initialize()`, populate slot 0 with the Decision 4 / 9 params (replacing the old StandardPBR opaque-white population), build-wire the SPIR-V output, and create the single graphics pipeline at renderer init. No fallback logic, no new diagnostics counters, no extraction wiring lands here. Tests: `unit;graphics` covering slot identity (`MaterialLayoutContract::DefaultSlot == kDefaultMaterialSlotIndex`), registered type name, registered type ID, and `BaseColorFactor` value byte-equal to the Decision 9 constant.
-  - **GRAPHICS-031-Impl-B** — wire the Decision 7 path-(b) substitution at `Graphics.Renderer.cpp:355..415` (snapshot copy step), append `MissingMaterialFallbackCount` / `InvalidMaterialSlotCount` / `DefaultDebugSurfaceUses` to `MaterialSystemDiagnostics`, route increments through the existing `MaterialSystem::GetDiagnostics()` surface, and add the Decision 8 reset cadence. Tests: `contract;graphics` asserting (i) a renderable submitted with sentinel-unset material renders with slot 0 and `MissingMaterialFallbackCount` increments by 1; (ii) a renderable submitted with an out-of-range slot integer renders with slot 0 and `InvalidMaterialSlotCount` increments by 1; (iii) `DefaultDebugSurfaceUses` equals `(authored-default + MissingMaterialFallbackCount + InvalidMaterialSlotCount)` per frame; (iv) the pipeline state and `kDefaultMaterialSlotIndex` survive `RebuildGpuResources()` without identity churn (slot value identical, type ID identical, params byte-equal). A `contract;runtime` test covers the optional Decision 7 path-(a) authoring shorthand: an entity with geometry + no material descriptor reaches the renderer with the sentinel "unset" runtime field.
-  - **GRAPHICS-031-Impl-C** *(optional, gated)* — open one additional debug material variant from Decision 10 (suggested first: `Material.DefaultDebugWireframe`, since it shares the vertex format and only flips `PolygonMode = Line` and `CullMode = None`). Each future variant requires its own planning slice; this Impl-C is a forecast, not a commitment.
+- [x] ✅ Recorded the twelve design decisions above with explicit answers, rejected-alternative rationale, and exact identifier references to the current codebase.
+- [x] ✅ Cross-linked decisions with GRAPHICS-006/006Q (material registry / slot policy), GRAPHICS-007Q (cull-bucket lane policy), GRAPHICS-008/008Q (depth/surface/G-buffer renderpass attachment ownership), GRAPHICS-013AQ (descriptor-bind seam), GRAPHICS-015 / 015Q (residency fallback pattern), GRAPHICS-029 (reference scene bootstrap), GRAPHICS-030 (procedural-source vertex-format consumer + sentinel rule), GRAPHICS-032 (downstream consumer of the default).
+- [x] ✅ Identified follow-up implementation children (do **not** open here):
+  - [x] **GRAPHICS-031-Impl-A** — author `assets/shaders/forward/default_debug_surface.vert/frag`, register the `kMaterialTypeID_DefaultDebugSurface` constant in `Graphics.Material.cppm`, register the `"Material.DefaultDebugSurface"` `MaterialTypeDesc` at `MaterialSystem::Initialize()`, populate slot 0 with the Decision 4 / 9 params (replacing the old StandardPBR opaque-white population), build-wire the SPIR-V output, and create the single graphics pipeline at renderer init. No fallback logic, no new diagnostics counters, no extraction wiring lands here. Tests: `unit;graphics` covering slot identity (`MaterialLayoutContract::DefaultSlot == kDefaultMaterialSlotIndex`), registered type name, registered type ID, and `BaseColorFactor` value byte-equal to the Decision 9 constant.
+  - [x] **GRAPHICS-031-Impl-B** — wire the Decision 7 path-(b) substitution at `Graphics.Renderer.cpp:355..415` (snapshot copy step), append `MissingMaterialFallbackCount` / `InvalidMaterialSlotCount` / `DefaultDebugSurfaceUses` to `MaterialSystemDiagnostics`, route increments through the existing `MaterialSystem::GetDiagnostics()` surface, and add the Decision 8 reset cadence. Tests: `contract;graphics` asserting (i) a renderable submitted with sentinel-unset material renders with slot 0 and `MissingMaterialFallbackCount` increments by 1; (ii) a renderable submitted with an out-of-range slot integer renders with slot 0 and `InvalidMaterialSlotCount` increments by 1; (iii) `DefaultDebugSurfaceUses` equals `(authored-default + MissingMaterialFallbackCount + InvalidMaterialSlotCount)` per frame; (iv) the pipeline state and `kDefaultMaterialSlotIndex` survive `RebuildGpuResources()` without identity churn (slot value identical, type ID identical, params byte-equal). A `contract;runtime` test covers the optional Decision 7 path-(a) authoring shorthand: an entity with geometry + no material descriptor reaches the renderer with the sentinel "unset" runtime field.
+  - [x] **GRAPHICS-031-Impl-C** *(optional, gated)* — open one additional debug material variant from Decision 10 (suggested first: `Material.DefaultDebugWireframe`, since it shares the vertex format and only flips `PolygonMode = Line` and `CullMode = None`). Each future variant requires its own planning slice; this Impl-C is a forecast, not a commitment.
 
 ## Tests
-- Planning slice (this task): task-policy, doc-link, and layering validators only — no engine behavior or test-source changes land here.
-- Implementation children must add `contract;graphics` tests asserting:
-  - Default material is registered at renderer construction with a stable slot (`kDefaultMaterialSlotIndex`).
-  - A renderable submitted with an unset/missing material slot is rendered with the default and the appropriate fallback counter increments deterministically.
-  - The default's pipeline state survives material-registry rebuild without identity churn.
-- A `contract;runtime` test must cover the Decision 7 path-(a) extraction-side authoring shorthand (entity with geometry + no material reaches the renderer with the sentinel "unset" runtime field).
-- GPU coverage is opt-in `gpu;vulkan` (pixel readback for the Decision 9 documented default color), outside the CPU gate.
+- [x] Planning slice (this task): task-policy, doc-link, and layering validators only — no engine behavior or test-source changes land here.
+- [x] Implementation children must add `contract;graphics` tests asserting:
+  - [x] Default material is registered at renderer construction with a stable slot (`kDefaultMaterialSlotIndex`).
+  - [x] A renderable submitted with an unset/missing material slot is rendered with the default and the appropriate fallback counter increments deterministically.
+  - [x] The default's pipeline state survives material-registry rebuild without identity churn.
+- [x] A `contract;runtime` test must cover the Decision 7 path-(a) extraction-side authoring shorthand (entity with geometry + no material reaches the renderer with the sentinel "unset" runtime field).
+- [x] GPU coverage is opt-in `gpu;vulkan` (pixel readback for the Decision 9 documented default color), outside the CPU gate.
 
 ## Docs
-- Update `docs/architecture/graphics.md` with the default debug material identity (slot 0 repurposed), the two-counter / one-uses policy, and the substitution location at `Graphics.Renderer.cpp:355..415`.
-- Update `docs/architecture/rendering-three-pass.md` Material-buffer paragraph to record that slot 0 is the GRAPHICS-031 default debug surface (unlit deterministic-color), preserving the existing "Slot `0` is the default/fallback material" claim with a more specific identity.
-- Update `src/graphics/renderer/README.md` describing the slot constant, the registered material type ID, the substitution path, the three new counters, and the cross-link to GRAPHICS-032 / GRAPHICS-034.
-- Update `tasks/backlog/rendering/README.md` DAG entry between GRAPHICS-030 and GRAPHICS-032 so the GRAPHICS-031 entry summarizes the locked decisions.
+- [x] Update `docs/architecture/graphics.md` with the default debug material identity (slot 0 repurposed), the two-counter / one-uses policy, and the substitution location at `Graphics.Renderer.cpp:355..415`.
+- [x] Update `docs/architecture/rendering-three-pass.md` Material-buffer paragraph to record that slot 0 is the GRAPHICS-031 default debug surface (unlit deterministic-color), preserving the existing "Slot `0` is the default/fallback material" claim with a more specific identity.
+- [x] Update `src/graphics/renderer/README.md` describing the slot constant, the registered material type ID, the substitution path, the three new counters, and the cross-link to GRAPHICS-032 / GRAPHICS-034.
+- [x] Update `tasks/backlog/rendering/README.md` DAG entry between GRAPHICS-030 and GRAPHICS-032 so the GRAPHICS-031 entry summarizes the locked decisions.
 
 ## Acceptance criteria
-- All twelve decisions are recorded with explicit answers and trade-off rationales. ✅
-- Implementation children are identified with scope and dependency gates but not opened. ✅
-- Architecture and README cross-links updated. ✅
-- No engine behavior, no shaders, no pipeline state added to the build in this slice. ✅
+- [x] All twelve decisions are recorded with explicit answers and trade-off rationales. ✅
+- [x] Implementation children are identified with scope and dependency gates but not opened. ✅
+- [x] Architecture and README cross-links updated. ✅
+- [x] No engine behavior, no shaders, no pipeline state added to the build in this slice. ✅
 
 ## Verification
 ```bash

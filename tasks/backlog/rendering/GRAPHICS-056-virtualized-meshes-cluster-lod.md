@@ -30,9 +30,9 @@ Lock down the contract for an opt-in virtualized-mesh pipeline that extends the 
 12. **Layering.** No live ECS. `assets/` owns the builder; graphics consumes baked DAGs.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales, including the bounded-scope marker that explicitly excludes Nanite parity (no software rasterization, no cluster-page streaming).
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales, including the bounded-scope marker that explicitly excludes Nanite parity (no software rasterization, no cluster-page streaming).
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-056-Impl-A** — `GpuGeometryRecord` extension + `contract;graphics` shape tests.
@@ -42,22 +42,22 @@ Lock down the contract for an opt-in virtualized-mesh pipeline that extends the 
 - **GRAPHICS-056-Impl-E** — Opt-in `gpu;vulkan` continuous-LOD smoke.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` geometry-pipeline section with the bounded-scope marker.
-- Update `src/graphics/rhi/README.md` `GpuGeometryRecord` section.
-- Update `src/graphics/renderer/README.md` LOD section.
+- [ ] Update `docs/architecture/graphics.md` geometry-pipeline section with the bounded-scope marker.
+- [ ] Update `src/graphics/rhi/README.md` `GpuGeometryRecord` section.
+- [ ] Update `src/graphics/renderer/README.md` LOD section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Bounded-scope marker is explicit and cited in docs.
-- Implementation child slices are identified but not opened.
-- Legacy indexed-triangle and basic meshlet paths remain the unconditional default.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Bounded-scope marker is explicit and cited in docs.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Legacy indexed-triangle and basic meshlet paths remain the unconditional default.
 
 ## Verification
 ```bash

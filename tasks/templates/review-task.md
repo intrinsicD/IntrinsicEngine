@@ -16,14 +16,14 @@
 - [ ] CI/workflow impact review.
 
 ## Tests
-- 
+- [ ] <review verification requirement>
 
 ## Docs
-- 
+- [ ] <review documentation update>
 
 ## Acceptance criteria
-- Review findings are recorded with pass/fail decisions.
-- Follow-up tasks are created for each unresolved issue.
+- [ ] Review findings are recorded with pass/fail decisions.
+- [ ] Follow-up tasks are created for each unresolved issue.
 
 ## Verification
 ```bash

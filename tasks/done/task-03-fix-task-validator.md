@@ -34,21 +34,21 @@ But `tools/agents/validate_tasks.py` currently does not require Context or Forbi
 
 ## Required changes
 
-1. Update `tools/agents/validate_tasks.py`:
-   - Add `Context` to `REQUIRED_SECTIONS`.
-   - Add `Forbidden changes` to `REQUIRED_SECTIONS`.
-2. Run strict validation.
-3. Fix any structured task files that now fail by adding missing sections.
-   - Keep edits minimal and factual.
-   - Do not rewrite unrelated task content.
-4. Add or update a small validator test if the repo already has tests for `tools/agents` validators.
-   - If there is no existing test harness for this script, do not create a large new framework; just keep the script change and validation output.
+- [x] Update `tools/agents/validate_tasks.py`:
+   - [x] Add `Context` to `REQUIRED_SECTIONS`.
+   - [x] Add `Forbidden changes` to `REQUIRED_SECTIONS`.
+- [x] Run strict validation.
+- [x] Fix any structured task files that now fail by adding missing sections.
+   - [x] Keep edits minimal and factual.
+   - [x] Do not rewrite unrelated task content.
+- [x] Add or update a small validator test if the repo already has tests for `tools/agents` validators.
+   - [x] If there is no existing test harness for this script, do not create a large new framework; just keep the script change and validation output.
 
 ## Acceptance criteria
 
-- `validate_tasks.py` enforces the same required section list as `docs/agent/task-format.md`.
-- Existing structured task files pass strict validation.
-- No task loses information.
+- [x] `validate_tasks.py` enforces the same required section list as `docs/agent/task-format.md`.
+- [x] Existing structured task files pass strict validation.
+- [x] No task loses information.
 
 ## Verification
 

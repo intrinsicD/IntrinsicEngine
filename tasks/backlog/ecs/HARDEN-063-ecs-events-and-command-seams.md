@@ -15,24 +15,24 @@
 - Lower layers must not know about runtime/editor/UI behavior, but runtime composition needs stable data contracts for mutation and observation.
 
 ## Required changes
-- Inventory legacy ECS event types and classify each as: promote to `ecs`, move to `runtime`, move to graphics/runtime extraction, or retire.
-- If any events are promoted, define minimal CPU-only event payload modules in `src/ecs` that do not import graphics/runtime/platform/app.
-- Define whether entity mutation commands belong in ECS as pure data/operations or in runtime/editor as composition behavior.
-- Add focused tests for event payload construction and any promoted command invariants.
-- Record unpromoted legacy events as explicit non-goals or follow-up tasks.
+- [ ] Inventory legacy ECS event types and classify each as: promote to `ecs`, move to `runtime`, move to graphics/runtime extraction, or retire.
+- [ ] If any events are promoted, define minimal CPU-only event payload modules in `src/ecs` that do not import graphics/runtime/platform/app.
+- [ ] Define whether entity mutation commands belong in ECS as pure data/operations or in runtime/editor as composition behavior.
+- [ ] Add focused tests for event payload construction and any promoted command invariants.
+- [ ] Record unpromoted legacy events as explicit non-goals or follow-up tasks.
 
 ## Tests
-- Add/update `tests/unit/ecs/Test.ECS.Events.cpp` for pure ECS events, or `tests/contract/runtime/` tests if ownership moves to runtime.
-- Add structural tests if needed to enforce that promoted ECS events remain CPU-only and layer-clean.
+- [ ] Add/update `tests/unit/ecs/Test.ECS.Events.cpp` for pure ECS events, or `tests/contract/runtime/` tests if ownership moves to runtime.
+- [ ] Add structural tests if needed to enforce that promoted ECS events remain CPU-only and layer-clean.
 
 ## Docs
-- Update `src/ecs/README.md` with the event/command ownership decision.
-- Update `docs/migration/nonlegacy-parity-matrix.md` with factual readiness and remaining retirement blockers.
+- [ ] Update `src/ecs/README.md` with the event/command ownership decision.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` with factual readiness and remaining retirement blockers.
 
 ## Acceptance criteria
-- Legacy ECS event surface has an explicit promoted-owner decision.
-- Any promoted ECS events are deterministic payload types with no graphics/runtime dependencies.
-- Runtime/editor-specific behaviors are not placed in the ECS layer for convenience.
+- [ ] Legacy ECS event surface has an explicit promoted-owner decision.
+- [ ] Any promoted ECS events are deterministic payload types with no graphics/runtime dependencies.
+- [ ] Runtime/editor-specific behaviors are not placed in the ECS layer for convenience.
 
 ## Verification
 ```bash

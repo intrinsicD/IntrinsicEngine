@@ -32,9 +32,9 @@ Lock down the contract for an optional `IRayTracingDevice` capability extension 
 13. **Layering.** No live ECS access. Graphics never imports a vendor RT SDK (RTXDI / FidelityFX-RT) directly.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-045-Impl-A** — `IRayTracingDevice` interface + null-RHI mock + `contract;graphics` capability tests.
@@ -44,23 +44,23 @@ Lock down the contract for an optional `IRayTracingDevice` capability extension 
 - **GRAPHICS-045-Impl-E** — Operational-gate extension in `GRAPHICS-033` reason enum + diagnostic wiring.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
-- Optional GPU smoke: `-L 'gpu|vulkan'`.
+- [ ] Optional GPU smoke: `-L 'gpu|vulkan'`.
 
 ## Docs
-- Update `docs/architecture/graphics.md` RHI capability section.
-- Update `src/graphics/rhi/README.md` capability surface.
-- Update `src/graphics/vulkan/README.md` operational-gate section.
+- [ ] Update `docs/architecture/graphics.md` RHI capability section.
+- [ ] Update `src/graphics/rhi/README.md` capability surface.
+- [ ] Update `src/graphics/vulkan/README.md` operational-gate section.
 
 ## Acceptance criteria
-- Thirteen decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Engine compiles and runs without RT-capable hardware.
-- `GRAPHICS-033` operational-gate extension policy is preserved.
+- [ ] Thirteen decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Engine compiles and runs without RT-capable hardware.
+- [ ] `GRAPHICS-033` operational-gate extension policy is preserved.
 
 ## Verification
 ```bash

@@ -27,34 +27,34 @@ Their headings disambiguate them as RORG-031A and RORG-031B, but filenames do no
 
 ## Required changes
 
-1. Rename the architecture seed file to:
+- [x] Rename the architecture seed file to:
 
    `tasks/backlog/architecture/RORG-031A-architecture-foundation.md`
 
-2. Rename or retire the rendering seed:
+- [x] Rename or retire the rendering seed:
 
    Preferred option:
-   - Move `tasks/backlog/rendering/RORG-031-rendering-pipeline.md` to:
+   - [x] Move `tasks/backlog/rendering/RORG-031-rendering-pipeline.md` to:
      `tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`
-   - Add completion metadata in the done task:
-     - completion date
-     - commit reference placeholder
-     - note that it is superseded by GRAPHICS-001 through GRAPHICS-020.
+   - [x] Add completion metadata in the done task:
+     - [x] completion date
+     - [x] commit reference placeholder
+     - [x] note that it is superseded by GRAPHICS-001 through GRAPHICS-020.
 
    Acceptable alternative:
-   - Rename it to `tasks/backlog/rendering/RORG-031B-rendering-pipeline.md`
-   - Add a clear note that GRAPHICS-001 is the canonical rendering index.
+   - [x] Rename it to `tasks/backlog/rendering/RORG-031B-rendering-pipeline.md`
+   - [x] Add a clear note that GRAPHICS-001 is the canonical rendering index.
 
-3. Update every markdown link/reference to the old filenames.
-4. Ensure GRAPHICS-001 references the final disposition of RORG-031B:
-   - If moved to done: mention it as superseded historical seed.
-   - If kept in backlog: mention it as parent seed only, not executable implementation work.
+- [x] Update every markdown link/reference to the old filenames.
+- [x] Ensure GRAPHICS-001 references the final disposition of RORG-031B:
+   - [x] If moved to done: mention it as superseded historical seed.
+   - [x] If kept in backlog: mention it as parent seed only, not executable implementation work.
 
 ## Acceptance criteria
 
-- No file under `tasks/backlog` starts with ambiguous bare `RORG-031-`.
-- RORG-031B can no longer be mistaken for the active rendering implementation plan.
-- All doc links resolve.
+- [x] No file under `tasks/backlog` starts with ambiguous bare `RORG-031-`.
+- [x] RORG-031B can no longer be mistaken for the active rendering implementation plan.
+- [x] All doc links resolve.
 
 ## Verification
 

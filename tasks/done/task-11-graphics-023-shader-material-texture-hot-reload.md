@@ -39,21 +39,21 @@ The parity matrix lists shader registry/hot reload and material/texture hot relo
 
 ## Tests
 
-- `unit;graphics` tests for cache-key stability and invalidation decisions.
-- `contract;graphics` tests for failure fallback diagnostics.
-- Optional `gpu;vulkan` tests for actual shader pipeline reload where supported.
+- [x] `unit;graphics` tests for cache-key stability and invalidation decisions.
+- [x] `contract;graphics` tests for failure fallback diagnostics.
+- [x] Optional `gpu;vulkan` tests for actual shader pipeline reload where supported.
 
 ## Docs
 
-- Update `docs/architecture/graphics.md`.
-- Update `docs/migration/nonlegacy-parity-matrix.md`.
-- Cross-link GRAPHICS-006 and GRAPHICS-015.
+- [x] Update `docs/architecture/graphics.md`.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md`.
+- [x] Cross-link GRAPHICS-006 and GRAPHICS-015.
 
 ## Acceptance criteria
 
-- Hot reload has a promoted task home.
-- GRAPHICS-006 can focus on registry/material/pipeline contracts without swallowing file watching and live reload end-to-end.
-- Failed reload does not destroy the last working runtime state.
+- [x] Hot reload has a promoted task home.
+- [x] GRAPHICS-006 can focus on registry/material/pipeline contracts without swallowing file watching and live reload end-to-end.
+- [x] Failed reload does not destroy the last working runtime state.
 
 ## Verification
 

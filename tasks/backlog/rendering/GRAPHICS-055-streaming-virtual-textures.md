@@ -30,9 +30,9 @@ Lock down the contract for a Streaming Virtual Texture (SVT) system: a virtual t
 12. **Layering.** No live ECS. `assets/` owns shipping format; `runtime/` owns resolver; `graphics/` owns sampler + atlas.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-055-Impl-A** — Page-table + physical atlas resources + frame-graph lifetime + null-RHI shape tests.
@@ -42,21 +42,21 @@ Lock down the contract for a Streaming Virtual Texture (SVT) system: a virtual t
 - **GRAPHICS-055-Impl-E** — Opt-in `gpu;vulkan` end-to-end smoke.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` texture-streaming section.
-- Update `src/graphics/renderer/README.md` material/sampler section.
-- Update `src/graphics/assets/README.md` upload-path section.
+- [ ] Update `docs/architecture/graphics.md` texture-streaming section.
+- [ ] Update `src/graphics/renderer/README.md` material/sampler section.
+- [ ] Update `src/graphics/assets/README.md` upload-path section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Direct-residency texture path remains the unconditional default.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Direct-residency texture path remains the unconditional default.
 
 ## Verification
 ```bash

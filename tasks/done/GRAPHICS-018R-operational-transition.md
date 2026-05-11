@@ -26,31 +26,31 @@ This is a blocking follow-up for the next `GRAPHICS-018` slice that can make `Vu
 
 ## Required changes
 
-- Add a documented renderer reset/rebind hook for device-becomes-operational transitions.
-- Done 2026-05-04: reinitialize culling GPU buffers/pipeline and depth-prepass pipeline state through existing RHI managers.
-- Done 2026-05-04: reallocate/synchronize the material GPU buffer and refresh `GpuWorld` material-buffer binding.
-- Reconcile bindless slot accounting for material/texture fallback paths in the future `GRAPHICS-018` Vulkan operational bring-up slice that replaces fail-closed fallback services.
-- Done 2026-05-04: wire the hook from runtime composition, not from lower graphics layers.
-- Done 2026-05-04: preserve CPU/null behavior when devices are operational from initial renderer construction.
+- [x] Add a documented renderer reset/rebind hook for device-becomes-operational transitions.
+- [x] Done 2026-05-04: reinitialize culling GPU buffers/pipeline and depth-prepass pipeline state through existing RHI managers.
+- [x] Done 2026-05-04: reallocate/synchronize the material GPU buffer and refresh `GpuWorld` material-buffer binding.
+- [x] Reconcile bindless slot accounting for material/texture fallback paths in the future `GRAPHICS-018` Vulkan operational bring-up slice that replaces fail-closed fallback services.
+- [x] Done 2026-05-04: wire the hook from runtime composition, not from lower graphics layers.
+- [x] Done 2026-05-04: preserve CPU/null behavior when devices are operational from initial renderer construction.
 
 ## Tests
 
-- Done 2026-05-04: `RendererFrameLifecycle.OperationalRebuildAfterNonOperationalStartupRecordsRoutedCommands` covers a renderer initialized with a non-operational device and then reset against an operational mock device.
-- Done 2026-05-04: the same test asserts culling/depth-prepass command stats move from skipped non-operational to recorded after reset.
-- Done 2026-05-04: the same test asserts material/GpuWorld GPU handles and material capacity are rebound after reset.
+- [x] Done 2026-05-04: `RendererFrameLifecycle.OperationalRebuildAfterNonOperationalStartupRecordsRoutedCommands` covers a renderer initialized with a non-operational device and then reset against an operational mock device.
+- [x] Done 2026-05-04: the same test asserts culling/depth-prepass command stats move from skipped non-operational to recorded after reset.
+- [x] Done 2026-05-04: the same test asserts material/GpuWorld GPU handles and material capacity are rebound after reset.
 
 ## Docs
 
-- Done 2026-05-04: updated `docs/architecture/graphics.md` with operational-transition ownership and call order.
-- Done 2026-05-04: updated `src/graphics/vulkan/README.md` to note the reset seam is available while Vulkan itself remains non-operational.
-- Done 2026-05-04: updated `tasks/active/GRAPHICS-018-vulkan-renderer-integration.md` status when the blocker was resolved.
+- [x] Done 2026-05-04: updated `docs/architecture/graphics.md` with operational-transition ownership and call order.
+- [x] Done 2026-05-04: updated `src/graphics/vulkan/README.md` to note the reset seam is available while Vulkan itself remains non-operational.
+- [x] Done 2026-05-04: updated `tasks/active/GRAPHICS-018-vulkan-renderer-integration.md` status when the blocker was resolved.
 
 ## Acceptance criteria
 
-- `GRAPHICS-018` can mark Vulkan operational only after this reset path exists and is tested.
-- Renderer code still depends only on RHI/backend-neutral seams; no Vulkan special cases are introduced.
-- CPU/null default gate remains Vulkan-free.
-- Temporary fail-closed material/culling/bindless shims have a concrete removal/reconciliation path.
+- [x] `GRAPHICS-018` can mark Vulkan operational only after this reset path exists and is tested.
+- [x] Renderer code still depends only on RHI/backend-neutral seams; no Vulkan special cases are introduced.
+- [x] CPU/null default gate remains Vulkan-free.
+- [x] Temporary fail-closed material/culling/bindless shims have a concrete removal/reconciliation path.
 
 ## Verification
 

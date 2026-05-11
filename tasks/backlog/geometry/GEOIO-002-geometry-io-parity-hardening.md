@@ -11,22 +11,22 @@
 - `GRAPHICS-019` assigns legacy `Graphics.Importers.*` and `Graphics.Exporters.*` retirement to promoted geometry/assets owners.
 - Legacy exporters exist for OBJ, PLY, and STL under `src/legacy/Graphics/Exporters` and remain behavioral references only.
 ## Required changes
-- Add or harden geometry-owned importer parity for OBJ, OFF, STL, mesh PLY, point-cloud PLY, PCD, XYZ/PTS/XYZRGB-style text point clouds, and TGF.
-- Record or implement domain-selection metadata needed by asset/runtime import routing without making geometry depend on assets/runtime.
-- Add geometry-owned OBJ, PLY, and STL exporter APIs for supported mesh/point-cloud data shapes.
-- Add deterministic diagnostics for malformed headers, unsupported properties, invalid topology, out-of-range indices, unsupported binary/ASCII variants, and partial/empty data.
-- Preserve public geometry API boundaries and update generated module inventory if module surfaces change.
+- [ ] Add or harden geometry-owned importer parity for OBJ, OFF, STL, mesh PLY, point-cloud PLY, PCD, XYZ/PTS/XYZRGB-style text point clouds, and TGF.
+- [ ] Record or implement domain-selection metadata needed by asset/runtime import routing without making geometry depend on assets/runtime.
+- [ ] Add geometry-owned OBJ, PLY, and STL exporter APIs for supported mesh/point-cloud data shapes.
+- [ ] Add deterministic diagnostics for malformed headers, unsupported properties, invalid topology, out-of-range indices, unsupported binary/ASCII variants, and partial/empty data.
+- [ ] Preserve public geometry API boundaries and update generated module inventory if module surfaces change.
 ## Tests
-- Add `unit;geometry` importer/exporter round-trip and negative-path tests under `tests/unit/geometry`.
-- Cover OBJ/OFF/STL/PLY mesh import, PLY/PCD/XYZ point-cloud import, TGF graph import, and OBJ/PLY/STL export behavior.
-- Add regression cases for extension aliases or domain ambiguity only as CPU-only metadata tests.
+- [ ] Add `unit;geometry` importer/exporter round-trip and negative-path tests under `tests/unit/geometry`.
+- [ ] Cover OBJ/OFF/STL/PLY mesh import, PLY/PCD/XYZ point-cloud import, TGF graph import, and OBJ/PLY/STL export behavior.
+- [ ] Add regression cases for extension aliases or domain ambiguity only as CPU-only metadata tests.
 ## Docs
-- Update `docs/migration/nonlegacy-parity-matrix.md` and `docs/api/generated/module_inventory.md` when public module surfaces change.
-- Cross-link `GRAPHICS-019` and `ASSETIO-001` from completion notes.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` and `docs/api/generated/module_inventory.md` when public module surfaces change.
+- [ ] Cross-link `GRAPHICS-019` and `ASSETIO-001` from completion notes.
 ## Acceptance criteria
-- Geometry IO parity is sufficient for asset/runtime import routing to stop depending on legacy graphics importers/exporters for supported geometry formats.
-- `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
-- Exporter APIs and tests cover OBJ, PLY, and STL or explicitly document unsupported data shapes and failure diagnostics.
+- [ ] Geometry IO parity is sufficient for asset/runtime import routing to stop depending on legacy graphics importers/exporters for supported geometry formats.
+- [ ] `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
+- [ ] Exporter APIs and tests cover OBJ, PLY, and STL or explicitly document unsupported data shapes and failure diagnostics.
 ## Verification
 ```bash
 cmake --preset ci

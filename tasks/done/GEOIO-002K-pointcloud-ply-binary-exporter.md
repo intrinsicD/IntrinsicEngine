@@ -44,67 +44,67 @@
   ASCII writer, even though the reader currently skips it.
 
 ## Required changes
-- Extend `src/geometry/Geometry.PointCloud.IO.cppm` with a
+- [x] Extend `src/geometry/Geometry.PointCloud.IO.cppm` with a
   `WritePLYBinary(std::string_view absolute_path, const PointCloudIOResult& cloud)`
   declaration in the `Geometry::PointCloudIO` namespace, returning the
   existing `PointCloudIOWriteStatus` enum.
-- Implement `WritePLYBinary` in
+- [x] Implement `WritePLYBinary` in
   `src/geometry/Geometry.PointCloud.IO.cpp`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject empty clouds (`Cloud.IsEmpty()`) with `EmptyCloud`.
-  - Open the file with `std::ofstream(... std::ios::binary | std::ios::trunc)`;
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject empty clouds (`Cloud.IsEmpty()`) with `EmptyCloud`.
+  - [x] Open the file with `std::ofstream(... std::ios::binary | std::ios::trunc)`;
     return `InvalidPath` if the stream cannot be opened.
-  - Emit ASCII PLY 1.0 header lines (`ply`, `format binary_little_endian 1.0`,
+  - [x] Emit ASCII PLY 1.0 header lines (`ply`, `format binary_little_endian 1.0`,
     `comment Exported by IntrinsicEngine`, `element vertex N`,
     `property float x/y/z`, optional `nx/ny/nz`, optional
     `uchar red/green/blue` (clamp 0..1 channels to `0..255`),
     optional `property float radius`, `end_header`) terminated by `\n`.
-  - Write packed little-endian binary vertex records in declared
+  - [x] Write packed little-endian binary vertex records in declared
     property order. Float properties are stored as IEEE 754 32-bit
     little-endian; color channels as `uint8`.
-  - Detect host endianness with a 32-bit value and byte-swap floats
+  - [x] Detect host endianness with a 32-bit value and byte-swap floats
     on big-endian hosts so the on-disk encoding stays
     `binary_little_endian` regardless of platform.
-  - Flush and report `FileWriteError` if `stream.good()` is false at
+  - [x] Flush and report `FileWriteError` if `stream.good()` is false at
     end.
-- No additional public exports beyond `WritePLYBinary`; helper logic stays
+- [x] No additional public exports beyond `WritePLYBinary`; helper logic stays
   inside the existing translation-unit anonymous namespace.
 
 ## Tests
-- Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
+- [x] Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
   under `GeometryIO_PointCloudIO`:
-  - `WritesPLYBinaryPointCloud` — three-point cloud, round-trip via
+  - [x] `WritesPLYBinaryPointCloud` — three-point cloud, round-trip via
     `LoadPLY` and verify positions match exactly.
-  - `WritesPLYBinaryPointCloudWithNormalsAndColors` — round-trip
+  - [x] `WritesPLYBinaryPointCloudWithNormalsAndColors` — round-trip
     preserves normals and color channels (255-mapped). Header text is
     asserted to declare `format binary_little_endian 1.0` and the
     expected property names.
-  - `WritesPLYBinaryPointCloudWithRadiiEmitsRadiusProperty` — header
+  - [x] `WritesPLYBinaryPointCloudWithRadiiEmitsRadiusProperty` — header
     declares `property float radius`; reader still ignores it (parity
     with ASCII writer test).
-  - `WritePLYBinaryPointCloudRejectsEmptyCloud` — empty cloud yields
+  - [x] `WritePLYBinaryPointCloudRejectsEmptyCloud` — empty cloud yields
     `PointCloudIOWriteStatus::EmptyCloud`.
-  - `WritePLYBinaryPointCloudRejectsBadPath` — empty `absolute_path`
+  - [x] `WritePLYBinaryPointCloudRejectsBadPath` — empty `absolute_path`
     yields `PointCloudIOWriteStatus::InvalidPath`; non-creatable
     directory path yields `InvalidPath`.
 
 ## Docs
-- Update the `OBJ/PLY/STL exporters` row of
+- [x] Update the `OBJ/PLY/STL exporters` row of
   `docs/migration/nonlegacy-parity-matrix.md` to record that
   binary-little-endian PLY point-cloud export is now geometry-owned and
   added under `GEOIO-002K`.
-- No module surface inventory regeneration is required because no new
+- [x] No module surface inventory regeneration is required because no new
   module is introduced. Public surface of `Geometry.PointCloud.IO` gains
   a single new exported function in the existing namespace.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::WritePLYBinary` compiles and is exported from
+- [x] `Geometry::PointCloudIO::WritePLYBinary` compiles and is exported from
   `Geometry.PointCloud.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into `src/geometry/*`.
-- Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.PLY.{cppm,cpp}`
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into `src/geometry/*`.
+- [x] Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.PLY.{cppm,cpp}`
   remains untouched (reference only).
-- Parity matrix row reflects the new exporter ownership.
+- [x] Parity matrix row reflects the new exporter ownership.
 
 ## Verification
 ```bash

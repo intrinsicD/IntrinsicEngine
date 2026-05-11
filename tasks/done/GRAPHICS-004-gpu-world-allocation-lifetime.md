@@ -21,22 +21,22 @@
 - `GpuWorld::Diagnostics` reports retained-buffer byte pressure, vertex/index overflow, light overflow, and null-device mode.
 - Added CPU graphics contract tests for deferred instance reuse, stale/invalid diagnostics, geometry overflow, and null-device lifetime observability.
 ## Required changes
-- Replace bump-only allocation assumptions with tracked ranges and stable handles.
-- Define generation-checked handles and a shared instance-slot space that indexes renderable, transform, bounds/culling, material-reference, picking, and draw-bucket records consistently.
-- Add explicit free/deferred-free behavior suitable for multiple frames in flight.
-- Keep ECS-to-GPU handle mappings in runtime-owned sidecar/extraction state, not in canonical ECS components.
-- Report allocation overflow, stale handles, null-device behavior, and leak diagnostics.
+- [x] Replace bump-only allocation assumptions with tracked ranges and stable handles.
+- [x] Define generation-checked handles and a shared instance-slot space that indexes renderable, transform, bounds/culling, material-reference, picking, and draw-bucket records consistently.
+- [x] Add explicit free/deferred-free behavior suitable for multiple frames in flight.
+- [x] Keep ECS-to-GPU handle mappings in runtime-owned sidecar/extraction state, not in canonical ECS components.
+- [x] Report allocation overflow, stale handles, null-device behavior, and leak diagnostics.
 ## Tests
-- Add unit tests for allocate/free/reuse, stale handles, overflow, frame-delayed deletion, and null backend behavior.
-- Add regression coverage for deterministic diagnostics.
-- Label allocator unit tests `unit;graphics` and diagnostics regression tests `regression;graphics` so both run in the default CPU gate.
-- Added `Test.GpuWorldLifetimeContract.cpp` to the CPU graphics contract target for the current retained-pool lifetime/diagnostics slice.
+- [x] Add unit tests for allocate/free/reuse, stale handles, overflow, frame-delayed deletion, and null backend behavior.
+- [x] Add regression coverage for deterministic diagnostics.
+- [x] Label allocator unit tests `unit;graphics` and diagnostics regression tests `regression;graphics` so both run in the default CPU gate.
+- [x] Added `Test.GpuWorldLifetimeContract.cpp` to the CPU graphics contract target for the current retained-pool lifetime/diagnostics slice.
 ## Docs
-- Update `docs/migration/nonlegacy-parity-matrix.md` and any GPU-world architecture notes touched by the implementation.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` and any GPU-world architecture notes touched by the implementation.
 ## Acceptance criteria
-- Geometry, instance, transform, bounds/culling, material, and light frees are observable and ranges can be reused after the configured safety window.
-- Invalid handles fail deterministically for every GPU scene pool without corrupting other allocations.
-- Diagnostics make retained-buffer pressure visible.
+- [x] Geometry, instance, transform, bounds/culling, material, and light frees are observable and ranges can be reused after the configured safety window.
+- [x] Invalid handles fail deterministically for every GPU scene pool without corrupting other allocations.
+- [x] Diagnostics make retained-buffer pressure visible.
 ## Verification
 Current slice checks:
 

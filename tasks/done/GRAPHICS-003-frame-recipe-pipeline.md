@@ -20,20 +20,20 @@
 - Optional picking, shadow, selection-outline, debug-view, postprocess, ImGui, and depth-prepass resources are gated by `FrameRecipeFeatures`; disabled optional resources are omitted from graph construction.
 - The imported `Backbuffer` is accepted only through `FrameRecipeImports` and is finalized by the `Present` declaration.
 ## Required changes
-- Define a typed `FrameRecipe` or equivalent policy object for forward, deferred, hybrid, debug, selection, and post-process feature gates.
-- Build the default render graph from pass modules and canonical resource names.
-- Add introspection hooks for pass order, resource producers/consumers, and imported-resource write policy.
+- [x] Define a typed `FrameRecipe` or equivalent policy object for forward, deferred, hybrid, debug, selection, and post-process feature gates.
+- [x] Build the default render graph from pass modules and canonical resource names.
+- [x] Add introspection hooks for pass order, resource producers/consumers, and imported-resource write policy.
 ## Tests
-- Add contract tests for default pass order, optional-resource gating, imported backbuffer policy, and missing-resource diagnostics.
-- Use null/mock backend seams for CPU-supported tests.
-- Label CPU contract tests `contract;graphics` so they run in the default CPU gate.
-- Added `Test.FrameRecipeContract.cpp` to `IntrinsicGraphicsContractCpuTests`.
+- [x] Add contract tests for default pass order, optional-resource gating, imported backbuffer policy, and missing-resource diagnostics.
+- [x] Use null/mock backend seams for CPU-supported tests.
+- [x] Label CPU contract tests `contract;graphics` so they run in the default CPU gate.
+- [x] Added `Test.FrameRecipeContract.cpp` to `IntrinsicGraphicsContractCpuTests`.
 ## Docs
-- Update the frame recipe and pass table in `docs/architecture/rendering-three-pass.md`.
+- [x] Update the frame recipe and pass table in `docs/architecture/rendering-three-pass.md`.
 ## Acceptance criteria
-- The null renderer can report or execute the canonical graph through reusable pipeline code.
-- Optional resources are omitted when their features are disabled.
-- Backbuffer writes are restricted to the present/finalization step.
+- [x] The null renderer can report or execute the canonical graph through reusable pipeline code.
+- [x] Optional resources are omitted when their features are disabled.
+- [x] Backbuffer writes are restricted to the present/finalization step.
 ## Verification
 Completed checks:
 

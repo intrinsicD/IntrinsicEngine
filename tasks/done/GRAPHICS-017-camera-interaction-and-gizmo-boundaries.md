@@ -20,21 +20,21 @@
 - Owner: `src/runtime` and `src/platform` for input/orchestration, with `src/graphics/renderer` owning only camera/view packets consumed by rendering.
 - Legacy camera, interaction, and transform gizmo modules are references for behavior and UX expectations, not code sources.
 ## Required changes
-- Define camera/view packet data consumed by graphics and input/update ownership outside graphics.
-- Define camera frustum-plane extraction and view/projection snapshot fields consumed by culling and picking.
-- Define transform-gizmo render/debug packets separately from mutation/application logic.
-- Document which layer owns camera motion, picking requests, gizmo hit testing, and transform application.
+- [x] Define camera/view packet data consumed by graphics and input/update ownership outside graphics.
+- [x] Define camera frustum-plane extraction and view/projection snapshot fields consumed by culling and picking.
+- [x] Define transform-gizmo render/debug packets separately from mutation/application logic.
+- [x] Document which layer owns camera motion, picking requests, gizmo hit testing, and transform application.
 ## Tests
-- Add unit/contract tests for camera packet defaults, projection/view validity, gizmo render packets, and invalid input handling.
-- Add runtime integration tests for input-to-pick-request handoff when implementation lands.
-- Label graphics-only contract tests `contract;graphics` and runtime input/handoff integration tests `integration;runtime;graphics` so both run in the default CPU gate.
+- [x] Add unit/contract tests for camera packet defaults, projection/view validity, gizmo render packets, and invalid input handling.
+- [x] Add runtime integration tests for input-to-pick-request handoff when implementation lands.
+- [x] Label graphics-only contract tests `contract;graphics` and runtime input/handoff integration tests `integration;runtime;graphics` so both run in the default CPU gate.
 ## Docs
-- Update graphics, runtime, and platform boundary docs for camera/interaction/gizmo ownership.
+- [x] Update graphics, runtime, and platform boundary docs for camera/interaction/gizmo ownership.
 ## Acceptance criteria
-- Graphics receives camera/gizmo data as snapshots and never mutates scene ownership.
-- Culling and picking inputs come from camera/view snapshots, not platform input state or live camera objects.
-- Runtime/platform ownership of input and transform application is explicit.
-- Legacy interaction behavior has a promoted-task path without layer violations.
+- [x] Graphics receives camera/gizmo data as snapshots and never mutates scene ownership.
+- [x] Culling and picking inputs come from camera/view snapshots, not platform input state or live camera objects.
+- [x] Runtime/platform ownership of input and transform application is explicit.
+- [x] Legacy interaction behavior has a promoted-task path without layer violations.
 ## Verification
 ```bash
 cmake --preset ci

@@ -28,33 +28,33 @@ The rendering backlog now has GRAPHICS-001 through GRAPHICS-020, but several doc
 
 ## Required changes
 
-- Add GRAPHICS-021 with the standard task sections:
-  - Goal
-  - Non-goals
-  - Context
-  - Required changes
-  - Tests
-  - Docs
-  - Acceptance criteria
-  - Verification
-  - Forbidden changes
-- Scope GRAPHICS-021 to workflow/task/doc cleanup only.
-- Explicitly list follow-up cleanup areas:
-  1. RORG-031A/RORG-031B filename collision.
-  2. Retire or cross-link stale RORG-031B rendering seed.
-  3. Add configure step to GRAPHICS verification blocks.
-  4. Fix stale legacy-todo.md references in docs.
-  5. Add dependency metadata / README for rendering backlog.
-  6. Split over-scoped GRAPHICS-013.
-  7. Add missing task homes for rendergraph diagnostics, hot reload, overlays/presentation, hybrid path.
-  8. Make GRAPHICS-016/runtime extraction a hard first implementation gate.
-- Do not implement renderer features.
+- [x] Add GRAPHICS-021 with the standard task sections:
+  - [x] Goal
+  - [x] Non-goals
+  - [x] Context
+  - [x] Required changes
+  - [x] Tests
+  - [x] Docs
+  - [x] Acceptance criteria
+  - [x] Verification
+  - [x] Forbidden changes
+- [x] Scope GRAPHICS-021 to workflow/task/doc cleanup only.
+- [x] Explicitly list follow-up cleanup areas:
+  - [x] RORG-031A/RORG-031B filename collision.
+  - [x] Retire or cross-link stale RORG-031B rendering seed.
+  - [x] Add configure step to GRAPHICS verification blocks.
+  - [x] Fix stale legacy-todo.md references in docs.
+  - [x] Add dependency metadata / README for rendering backlog.
+  - [x] Split over-scoped GRAPHICS-013.
+  - [x] Add missing task homes for rendergraph diagnostics, hot reload, overlays/presentation, hybrid path.
+  - [x] Make GRAPHICS-016/runtime extraction a hard first implementation gate.
+- [x] Do not implement renderer features.
 
 ## Acceptance criteria
 
-- GRAPHICS-021 exists and passes task policy validation.
-- It is clear that it is a cleanup/meta-task, not a rendering implementation task.
-- It points future agents to GRAPHICS-001 as the rendering backlog index.
+- [x] GRAPHICS-021 exists and passes task policy validation.
+- [x] It is clear that it is a cleanup/meta-task, not a rendering implementation task.
+- [x] It points future agents to GRAPHICS-001 as the rendering backlog index.
 
 ## Verification
 

@@ -29,6 +29,16 @@ REQUIRED_SECTIONS = [
     "Forbidden changes",
 ]
 
+ACTIONABLE_TODO_SECTIONS = [
+    "Required changes",
+    "Tests",
+    "Docs",
+    "Acceptance criteria",
+]
+
+TODO_RE = re.compile(r"^\s*- \[[ xX]\]\s+.+", re.MULTILINE)
+OPEN_TODO_RE = re.compile(r"^\s*- \[ \]\s+.+", re.MULTILINE)
+
 SKIP_FILENAMES = {
     "README.md",
     "index.md",
@@ -58,6 +68,7 @@ class ParsedTask:
     path: Path
     task_id: str | None
     sections: set[str]
+    section_bodies: dict[str, str]
     content: str
 
 
@@ -76,12 +87,26 @@ def parse_task(path: Path) -> ParsedTask:
         break
 
     sections: set[str] = set()
+    section_bodies: dict[str, str] = {}
+    current_section: str | None = None
+    current_body: list[str] = []
+
     for line in lines:
         m = SECTION_RE.match(line.strip())
         if m:
-            sections.add(m.group(1))
+            if current_section is not None:
+                section_bodies[current_section] = "\n".join(current_body)
+            current_section = m.group(1)
+            current_body = []
+            sections.add(current_section)
+            continue
+        if current_section is not None:
+            current_body.append(line)
 
-    return ParsedTask(path=path, task_id=task_id, sections=sections, content=content)
+    if current_section is not None:
+        section_bodies[current_section] = "\n".join(current_body)
+
+    return ParsedTask(path=path, task_id=task_id, sections=sections, section_bodies=section_bodies, content=content)
 
 
 def find_markdown_files(root: Path) -> list[Path]:
@@ -122,6 +147,29 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
 
     if is_active and "Acceptance criteria" not in parsed.sections:
         findings.append(Finding("error", rel_path, "active task must include `## Acceptance criteria`."))
+
+    for section in ACTIONABLE_TODO_SECTIONS:
+        body = parsed.section_bodies.get(section, "")
+        if section in parsed.sections and not TODO_RE.search(body):
+            findings.append(
+                Finding(
+                    "error",
+                    rel_path,
+                    f"`## {section}` must contain markable checkbox todo(s) (`- [ ]` or `- [x]`).",
+                )
+            )
+
+    if is_done:
+        for section in ACTIONABLE_TODO_SECTIONS:
+            body = parsed.section_bodies.get(section, "")
+            if OPEN_TODO_RE.search(body):
+                findings.append(
+                    Finding(
+                        "error",
+                        rel_path,
+                        f"done task has unchecked todo(s) in `## {section}`; move open work to a follow-up task.",
+                    )
+                )
 
     if is_done:
         has_completion_date = bool(DATE_RE.search(parsed.content))

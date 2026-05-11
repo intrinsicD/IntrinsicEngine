@@ -131,20 +131,20 @@
 - Remaining questions affect shader-side visualization modes, descriptor binding, UI selection plumbing, and backend formatting and should not be mixed with CPU/null contracts.
 
 ## Required changes
-- Clarify shader visualization modes for color, depth, integer ID, normal, material, and shadow atlas resources.
-- Clarify descriptor binding ownership for the selected sampled resource and `DebugViewRGBA` output.
-- Clarify how runtime/editor UI names map to `FrameRecipeIntrospection` resource names without adding platform/window ownership to graphics.
-- Clarify whether unsupported buffer resources should later expose textual/statistical inspection outside the fullscreen preview path.
+- [x] Clarify shader visualization modes for color, depth, integer ID, normal, material, and shadow atlas resources.
+- [x] Clarify descriptor binding ownership for the selected sampled resource and `DebugViewRGBA` output.
+- [x] Clarify how runtime/editor UI names map to `FrameRecipeIntrospection` resource names without adding platform/window ownership to graphics.
+- [x] Clarify whether unsupported buffer resources should later expose textual/statistical inspection outside the fullscreen preview path.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless docs tooling changes.
+- [x] Documentation/checker only; no C++ tests required unless docs tooling changes.
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md`, renderer docs, and backend notes with selected debug-view backend policies.
+- [x] Update `docs/architecture/rendering-three-pass.md`, renderer docs, and backend notes with selected debug-view backend policies.
 
 ## Acceptance criteria
-- Backend/UI debug-view work can proceed without changing the CPU/null graphics contracts from `GRAPHICS-013B`.
-- Graphics remains decoupled from platform/window ownership and ImGui policy.
+- [x] Backend/UI debug-view work can proceed without changing the CPU/null graphics contracts from `GRAPHICS-013B`.
+- [x] Graphics remains decoupled from platform/window ownership and ImGui policy.
 
 ## Verification
 ```bash

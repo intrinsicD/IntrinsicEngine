@@ -55,71 +55,71 @@
   this slice introduces the geometry-owned writer as new authority.
 
 ## Required changes
-- Extend `src/geometry/Geometry.PointCloud.IO.cppm` with a
+- [x] Extend `src/geometry/Geometry.PointCloud.IO.cppm` with a
   `PointCloudIOWriteStatus WriteXYZ(std::string_view absolute_path,
                                     const PointCloudIOResult& cloud);`
   declaration in the `Geometry::PointCloudIO` namespace, reusing the
   existing `PointCloudIOWriteStatus` enum unchanged.
-- Implement `WriteXYZ` in `src/geometry/Geometry.PointCloud.IO.cpp`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject empty clouds (`Cloud.IsEmpty()`) with `EmptyCloud`.
-  - Open the output stream with
+- [x] Implement `WriteXYZ` in `src/geometry/Geometry.PointCloud.IO.cpp`:
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject empty clouds (`Cloud.IsEmpty()`) with `EmptyCloud`.
+  - [x] Open the output stream with
     `std::ios::binary | std::ios::trunc`; return `InvalidPath` if the
     stream cannot be opened.
-  - When `Cloud.HasColors()` and `Colors().size() == Positions().size()`,
+  - [x] When `Cloud.HasColors()` and `Colors().size() == Positions().size()`,
     emit lines of the form `x y z r g b` with all six values formatted
     via `std::snprintf` using `%.6f` precision, channels written in
     `[0, 1]` directly (no scale by 255). Otherwise emit lines of the
     form `x y z`.
-  - Do not emit a `LH...` scan marker, a row-count prefix, a `#` header
+  - [x] Do not emit a `LH...` scan marker, a row-count prefix, a `#` header
     comment, or any normal/radius columns.
-  - Lines are terminated with `\n`.
-  - Flush and report `FileWriteError` if `stream.good()` is false at
+  - [x] Lines are terminated with `\n`.
+  - [x] Flush and report `FileWriteError` if `stream.good()` is false at
     end.
-- No additional public exports beyond `WriteXYZ`; helper logic stays
+- [x] No additional public exports beyond `WriteXYZ`; helper logic stays
   inside the existing translation-unit anonymous namespace or local to
   the function.
 
 ## Tests
-- Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
+- [x] Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
   under `GeometryIO_PointCloudIO`:
-  - `WritesXYZPositionsOnly` — three-point cloud without colors;
+  - [x] `WritesXYZPositionsOnly` — three-point cloud without colors;
     re-import via `LoadXYZ` and verify positions; assert the on-disk
     file is plain `x y z` (no `r g b` columns) by inspecting line
     contents.
-  - `WritesXYZWithColorsRoundTrips` — two-point cloud with colors;
+  - [x] `WritesXYZWithColorsRoundTrips` — two-point cloud with colors;
     re-import via `LoadXYZ` and verify positions and colors round-trip
     exactly because writer emits channels in `[0, 1]` and reader keeps
     them as-is via `NormalizeColorChannel`.
-  - `WritesXYZIgnoresRadiiAndNormals` — cloud has normals/radii enabled
+  - [x] `WritesXYZIgnoresRadiiAndNormals` — cloud has normals/radii enabled
     but the writer emits only `x y z` (or `x y z r g b` if colors are
     set); re-import via `LoadXYZ` and verify positions match and the
     re-imported cloud has no normals/radii.
-  - `WriteXYZRejectsEmptyCloud` — empty cloud yields `EmptyCloud`.
-  - `WriteXYZRejectsBadPath` — empty `absolute_path` yields
+  - [x] `WriteXYZRejectsEmptyCloud` — empty cloud yields `EmptyCloud`.
+  - [x] `WriteXYZRejectsBadPath` — empty `absolute_path` yields
     `InvalidPath`; a path under a non-existent directory yields
     `InvalidPath`.
-- Use the existing `TempFile` helper and `ReadFileContents` in the test
+- [x] Use the existing `TempFile` helper and `ReadFileContents` in the test
   file; do not introduce new test-only headers.
 
 ## Docs
-- Update the `OBJ/PLY/STL exporters` row of
+- [x] Update the `OBJ/PLY/STL exporters` row of
   `docs/migration/nonlegacy-parity-matrix.md` to note that the
   geometry-owned text XYZ point-cloud exporter was added under
   `GEOIO-002M`.
-- Regenerate `docs/api/generated/module_inventory.md` only if the
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if the
   generator picks up changes to the existing
   `Geometry.PointCloud.IO` module surface. If the regenerator changes
   only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::WriteXYZ` compiles and is exported from
+- [x] `Geometry::PointCloudIO::WriteXYZ` compiles and is exported from
   `Geometry.PointCloud.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into `src/geometry/*`.
-- Legacy `src/legacy/Graphics/Importers/Graphics.Importers.XYZ.{cppm,cpp}`
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into `src/geometry/*`.
+- [x] Legacy `src/legacy/Graphics/Importers/Graphics.Importers.XYZ.{cppm,cpp}`
   remains untouched (reference only).
-- Parity matrix row reflects the new exporter ownership.
+- [x] Parity matrix row reflects the new exporter ownership.
 
 ## Verification
 ```bash

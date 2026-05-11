@@ -20,28 +20,28 @@
 - The point-cloud PLY writer (`Geometry::PointCloudIO::WritePLY` / `WritePLYBinary`) emits `uchar red/green/blue` (no alpha) when colors exist. This slice mirrors that convention for the mesh writers.
 
 ## Required changes
-- `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
-  - In `WritePLY` (ASCII), detect a `v:color` `glm::vec4` property whose size matches the position count. When present, declare `property uchar red`, `property uchar green`, and `property uchar blue` in the vertex element header (between any normal declarations and the face element). Emit `r g b` integer triples after each vertex's `x y z` (and optional `nx ny nz`) tokens, encoding each channel by clamping to `[0, 1]`, scaling by 255, and rounding to nearest with saturation to 255.
-  - In `WritePLYBinary`, declare the same three `uchar` properties in the header and write three single-byte values per vertex after the position bytes (and optional `float32` normals) using the same `[0, 1]`-clamp-scale-round-saturate encoding.
-  - Share the encoding helper with the point-cloud writers' convention (local lambda is acceptable; do not export a public helper).
-- `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - Add `GeometryIO_MeshIO.WritesPLYTriangleWithVertexColors` covering the ASCII writer: emits `property uchar red/green/blue`, writes `0 255 0`-style tokens, and round-trips `v:color` rgb values through `LoadPLY` (alpha defaults to 1.0 on import).
-  - Add `GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexColors` covering the binary writer: emits the same header tokens and round-trips `v:color` rgb values via `LoadPLY`.
-  - Add coverage for the combined-normals-and-colors case in at least one of the two new tests so the header order (`nx ny nz` before `red green blue`) is locked.
+- [x] `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
+  - [x] In `WritePLY` (ASCII), detect a `v:color` `glm::vec4` property whose size matches the position count. When present, declare `property uchar red`, `property uchar green`, and `property uchar blue` in the vertex element header (between any normal declarations and the face element). Emit `r g b` integer triples after each vertex's `x y z` (and optional `nx ny nz`) tokens, encoding each channel by clamping to `[0, 1]`, scaling by 255, and rounding to nearest with saturation to 255.
+  - [x] In `WritePLYBinary`, declare the same three `uchar` properties in the header and write three single-byte values per vertex after the position bytes (and optional `float32` normals) using the same `[0, 1]`-clamp-scale-round-saturate encoding.
+  - [x] Share the encoding helper with the point-cloud writers' convention (local lambda is acceptable; do not export a public helper).
+- [x] `tests/unit/geometry/Test.GeometryIO.cpp`:
+  - [x] Add `GeometryIO_MeshIO.WritesPLYTriangleWithVertexColors` covering the ASCII writer: emits `property uchar red/green/blue`, writes `0 255 0`-style tokens, and round-trips `v:color` rgb values through `LoadPLY` (alpha defaults to 1.0 on import).
+  - [x] Add `GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexColors` covering the binary writer: emits the same header tokens and round-trips `v:color` rgb values via `LoadPLY`.
+  - [x] Add coverage for the combined-normals-and-colors case in at least one of the two new tests so the header order (`nx ny nz` before `red green blue`) is locked.
 
 ## Tests
-- New `GeometryIO_MeshIO.WritesPLYTriangleWithVertexColors` and `GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexColors` unit tests under `tests/unit/geometry/Test.GeometryIO.cpp` exercising the ASCII and binary writer color paths plus a normals+colors round-trip.
+- [x] New `GeometryIO_MeshIO.WritesPLYTriangleWithVertexColors` and `GeometryIO_MeshIO.WritesPLYBinaryTriangleWithVertexColors` unit tests under `tests/unit/geometry/Test.GeometryIO.cpp` exercising the ASCII and binary writer color paths plus a normals+colors round-trip.
 
 ## Docs
-- Update `docs/migration/nonlegacy-parity-matrix.md` to record mesh PLY vertex color export parity under `GEOIO-002Y` in the exporter row.
-- No `docs/api/generated/module_inventory.md` refresh required because no public module declarations, module files, or exported names change.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` to record mesh PLY vertex color export parity under `GEOIO-002Y` in the exporter row.
+- [x] No `docs/api/generated/module_inventory.md` refresh required because no public module declarations, module files, or exported names change.
 
 ## Acceptance criteria
-- `WritePLY` and `WritePLYBinary` emit `uchar red/green/blue` vertex properties exactly when `v:color` is present and matches the position count; otherwise output remains byte-identical to the prior writer.
-- The new round-trip tests pass: `v:color` rgb values written by the mesh PLY writers reload through `LoadPLY` within standard 8-bit-quantization tolerance (`0.0`, `1.0`, primary colors).
-- A mesh with both `v:normal` and `v:color` emits the normal properties before the color properties (matching point-cloud convention).
-- `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
-- The migration matrix records the new parity evidence.
+- [x] `WritePLY` and `WritePLYBinary` emit `uchar red/green/blue` vertex properties exactly when `v:color` is present and matches the position count; otherwise output remains byte-identical to the prior writer.
+- [x] The new round-trip tests pass: `v:color` rgb values written by the mesh PLY writers reload through `LoadPLY` within standard 8-bit-quantization tolerance (`0.0`, `1.0`, primary colors).
+- [x] A mesh with both `v:normal` and `v:color` emits the normal properties before the color properties (matching point-cloud convention).
+- [x] `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
+- [x] The migration matrix records the new parity evidence.
 
 ## Verification
 ```bash

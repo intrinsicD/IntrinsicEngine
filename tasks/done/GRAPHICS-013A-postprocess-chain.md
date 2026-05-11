@@ -19,26 +19,26 @@
 - Owner: `src/graphics/renderer/Passes`, framegraph resource model, and backend-agnostic pass contracts.
 - Legacy postprocess modules are behavioral reference only.
 ## Required changes
-- Own and specify:
-  - bloom
-  - FXAA
-  - SMAA
-  - tone map
-  - histogram
-  - HDR to LDR chain
-  - postprocess resource lifetime
-- Declare temporary/intermediate resources for postprocess effects and histogram diagnostics.
-- Add deterministic diagnostics for missing required postprocess resources and unsupported effect combinations.
+- [x] Own and specify:
+  - [x] bloom
+  - [x] FXAA
+  - [x] SMAA
+  - [x] tone map
+  - [x] histogram
+  - [x] HDR to LDR chain
+  - [x] postprocess resource lifetime
+- [x] Declare temporary/intermediate resources for postprocess effects and histogram diagnostics.
+- [x] Add deterministic diagnostics for missing required postprocess resources and unsupported effect combinations.
 ## Tests
-- Add `contract;graphics` tests for pass order, HDR-to-LDR conversion contract, and resource lifetime boundaries.
-- Add `unit;graphics` tests for postprocess diagnostics formatting/consistency when applicable.
-- Keep optional GPU smoke tests behind `gpu;vulkan` labels only.
+- [x] Add `contract;graphics` tests for pass order, HDR-to-LDR conversion contract, and resource lifetime boundaries.
+- [x] Add `unit;graphics` tests for postprocess diagnostics formatting/consistency when applicable.
+- [x] Keep optional GPU smoke tests behind `gpu;vulkan` labels only.
 ## Docs
-- Update postprocess chain architecture docs and renderer docs for public contract changes.
+- [x] Update postprocess chain architecture docs and renderer docs for public contract changes.
 ## Acceptance criteria
-- `SceneColorHDR` ownership, transformation, and `SceneColorLDR` outputs are explicit and testable.
-- Postprocess intermediate resource ownership/lifetime is explicit and deterministic.
-- Postprocess diagnostics are backend-agnostic and testable without Vulkan.
+- [x] `SceneColorHDR` ownership, transformation, and `SceneColorLDR` outputs are explicit and testable.
+- [x] Postprocess intermediate resource ownership/lifetime is explicit and deterministic.
+- [x] Postprocess diagnostics are backend-agnostic and testable without Vulkan.
 ## Verification
 ```bash
 cmake --preset ci

@@ -20,23 +20,23 @@
 - Impact: failure triage is noisy, and missing-artifact follow-on errors can obscure the first actionable build or dependency defect.
 
 ## Required changes
-- Audit CI scripts/workflows and local verification helpers for steps that assume `IntrinsicTests`, `IntrinsicCoreTests`, `IntrinsicBenchmarkSmoke`, `IntrinsicBenchmarks`, or `build/ci/benchmark` already exist.
-- Add explicit prerequisite checks before CTest, architecture SLO, and benchmark-result validation steps.
-- Prefer messages that point back to the missing build target and prior log rather than registering placeholder `*_NOT_BUILT` tests as primary failures.
-- Keep the default CPU-supported correctness gate unchanged when prerequisites are present.
+- [x] Audit CI scripts/workflows and local verification helpers for steps that assume `IntrinsicTests`, `IntrinsicCoreTests`, `IntrinsicBenchmarkSmoke`, `IntrinsicBenchmarks`, or `build/ci/benchmark` already exist.
+- [x] Add explicit prerequisite checks before CTest, architecture SLO, and benchmark-result validation steps.
+- [x] Prefer messages that point back to the missing build target and prior log rather than registering placeholder `*_NOT_BUILT` tests as primary failures.
+- [x] Keep the default CPU-supported correctness gate unchanged when prerequisites are present.
 
 ## Tests
-- Add script/tool tests for missing-artifact handling if the guards live in repository tools.
-- Verify that a complete build still runs CTest, SLO, benchmark smoke, and benchmark-result validation normally.
+- [x] Add script/tool tests for missing-artifact handling if the guards live in repository tools.
+- [x] Verify that a complete build still runs CTest, SLO, benchmark smoke, and benchmark-result validation normally.
 
 ## Docs
-- Update CI/troubleshooting docs if local CI collection commands now have explicit prerequisite behavior.
-- No architecture docs are expected.
+- [x] Update CI/troubleshooting docs if local CI collection commands now have explicit prerequisite behavior.
+- [x] No architecture docs are expected.
 
 ## Acceptance criteria
-- Running CTest before test binaries exist produces a clear blocked/prerequisite message or is not scheduled as a primary verification step.
-- Architecture SLO and benchmark-validation steps check for their required binaries/directories before execution.
-- CI reports retain the first actionable build/configure failure and do not inflate the failure list with expected missing-artifact consequences.
+- [x] Running CTest before test binaries exist produces a clear blocked/prerequisite message or is not scheduled as a primary verification step.
+- [x] Architecture SLO and benchmark-validation steps check for their required binaries/directories before execution.
+- [x] CI reports retain the first actionable build/configure failure and do not inflate the failure list with expected missing-artifact consequences.
 
 ## Verification
 ```bash

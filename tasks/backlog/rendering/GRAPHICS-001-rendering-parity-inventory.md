@@ -37,49 +37,49 @@ Coverage decision for the accepted GPU-driven direction:
 - Assets/geometry coverage includes file IO, model loading, PropertySet authority, spatial structures, and geometry algorithms.
 
 ## Required changes
-- Audit `src/legacy/Graphics`, `src/legacy/RHI`, and legacy runtime render-extraction modules for feature coverage.
-- Audit existing `src/graphics` modules and identify gaps against the canonical pass/resource contract.
-- Keep this task updated as the index for `GRAPHICS-002` and later reimplementation tasks.
+- [ ] Audit `src/legacy/Graphics`, `src/legacy/RHI`, and legacy runtime render-extraction modules for feature coverage.
+- [ ] Audit existing `src/graphics` modules and identify gaps against the canonical pass/resource contract.
+- [ ] Keep this task updated as the index for `GRAPHICS-002` and later reimplementation tasks.
 
 Task index and intended order:
 
-1. `GRAPHICS-002` render-world/frame-input snapshot contract.
-2. `GRAPHICS-016` runtime extraction and graphics handoff, because CPU composition and sidecar mapping ownership must be fixed before GPU-scene implementation.
-3. `GRAPHICS-003` frame recipe and default pipeline.
-4. `GRAPHICS-004` GPU-world allocation/lifetime before retained-geometry-heavy work.
-5. `GRAPHICS-005` optional GPU-world compaction after allocation metadata exists.
-6. `GRAPHICS-006` material/shader/pipeline registry before pass shading integration.
-7. `GRAPHICS-007` culling and draw buckets before primitive, shadow, and selection passes.
-8. `GRAPHICS-008` depth/surface/G-buffer passes.
-9. `GRAPHICS-009` deferred lighting and shadows after G-buffer and bucket contracts.
-10. `GRAPHICS-010` line/point/transient debug primitive passes.
-11. `GRAPHICS-011` spatial debug visualizers on top of debug primitive packets.
-12. `GRAPHICS-012` picking and selection outline after primitive pass contracts.
-13. `GRAPHICS-013A` postprocess chain (bloom, FXAA, SMAA, tone map, histogram, HDR→LDR, and postprocess lifetimes).
-14. `GRAPHICS-013B` debug-view and render-target inspection contracts.
-15. `GRAPHICS-013C` ImGui overlay and present/finalization contracts.
-16. `GRAPHICS-014` visualization attributes and overlays.
-17. `GRAPHICS-015` GPU assets/textures/residency.
-18. `GRAPHICS-017` camera, interaction, and gizmo ownership boundaries.
-19. `GRAPHICS-018` Vulkan renderer integration after CPU/null contracts stabilize.
-20. `GRAPHICS-019` legacy graphics IO boundary split to assets/geometry owners.
-21. `GRAPHICS-020` legacy graphics retirement gates.
-22. `GRAPHICS-022` rendergraph diagnostics and validation (infrastructure hardening for deterministic contract failures).
-23. `GRAPHICS-023` shader/material/texture hot reload.
-24. `GRAPHICS-024` overlays, presentation adjacency, and editor handoff.
-25. `GRAPHICS-025` hybrid/transparent/special-material forward path follow-up.
+- [ ] `GRAPHICS-002` render-world/frame-input snapshot contract.
+- [ ] `GRAPHICS-016` runtime extraction and graphics handoff, because CPU composition and sidecar mapping ownership must be fixed before GPU-scene implementation.
+- [ ] `GRAPHICS-003` frame recipe and default pipeline.
+- [ ] `GRAPHICS-004` GPU-world allocation/lifetime before retained-geometry-heavy work.
+- [ ] `GRAPHICS-005` optional GPU-world compaction after allocation metadata exists.
+- [ ] `GRAPHICS-006` material/shader/pipeline registry before pass shading integration.
+- [ ] `GRAPHICS-007` culling and draw buckets before primitive, shadow, and selection passes.
+- [ ] `GRAPHICS-008` depth/surface/G-buffer passes.
+- [ ] `GRAPHICS-009` deferred lighting and shadows after G-buffer and bucket contracts.
+- [ ] `GRAPHICS-010` line/point/transient debug primitive passes.
+- [ ] `GRAPHICS-011` spatial debug visualizers on top of debug primitive packets.
+- [ ] `GRAPHICS-012` picking and selection outline after primitive pass contracts.
+- [ ] `GRAPHICS-013A` postprocess chain (bloom, FXAA, SMAA, tone map, histogram, HDR→LDR, and postprocess lifetimes).
+- [ ] `GRAPHICS-013B` debug-view and render-target inspection contracts.
+- [ ] `GRAPHICS-013C` ImGui overlay and present/finalization contracts.
+- [ ] `GRAPHICS-014` visualization attributes and overlays.
+- [ ] `GRAPHICS-015` GPU assets/textures/residency.
+- [ ] `GRAPHICS-017` camera, interaction, and gizmo ownership boundaries.
+- [ ] `GRAPHICS-018` Vulkan renderer integration after CPU/null contracts stabilize.
+- [ ] `GRAPHICS-019` legacy graphics IO boundary split to assets/geometry owners.
+- [ ] `GRAPHICS-020` legacy graphics retirement gates.
+- [ ] `GRAPHICS-022` rendergraph diagnostics and validation (infrastructure hardening for deterministic contract failures).
+- [ ] `GRAPHICS-023` shader/material/texture hot reload.
+- [ ] `GRAPHICS-024` overlays, presentation adjacency, and editor handoff.
+- [ ] `GRAPHICS-025` hybrid/transparent/special-material forward path follow-up.
 
 ## Tests
-- Run task policy validation after adding or updating backlog files.
-- Run documentation link validation when adding markdown links.
+- [ ] Run task policy validation after adding or updating backlog files.
+- [ ] Run documentation link validation when adding markdown links.
 
 ## Docs
-- Keep this task aligned with `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, and `docs/migration/nonlegacy-parity-matrix.md`.
+- [ ] Keep this task aligned with `docs/architecture/graphics.md`, `docs/architecture/rendering-three-pass.md`, and `docs/migration/nonlegacy-parity-matrix.md`.
 
 ## Acceptance criteria
-- Legacy-inspired graphics feature areas are represented by scoped follow-up tasks.
-- Each follow-up task identifies owner layer, non-goals, tests, docs, and forbidden changes.
-- Work ordering and dependency gates are clear enough for future active-task selection.
+- [ ] Legacy-inspired graphics feature areas are represented by scoped follow-up tasks.
+- [ ] Each follow-up task identifies owner layer, non-goals, tests, docs, and forbidden changes.
+- [ ] Work ordering and dependency gates are clear enough for future active-task selection.
 
 ## Verification
 ```bash

@@ -11,17 +11,17 @@
 - Runtime ownership and lifecycle gates are critical to the reorganization but were previously embedded in a broad narrative backlog.
 
 ## Required changes
-- Track composition-root ownership (`begin_frame`, extraction, prepare, execute, end) as explicit runtime backlog work.
-- Track shutdown determinism and subsystem wiring responsibilities under runtime ownership.
+- [ ] Track composition-root ownership (`begin_frame`, extraction, prepare, execute, end) as explicit runtime backlog work.
+- [ ] Track shutdown determinism and subsystem wiring responsibilities under runtime ownership.
 
 ## Tests
-- Ensure the task file uses repository task template sections.
+- [ ] Ensure the task file uses repository task template sections.
 
 ## Docs
-- Keep runtime architecture docs synchronized when this backlog item is executed.
+- [ ] Keep runtime architecture docs synchronized when this backlog item is executed.
 
 ## Acceptance criteria
-- Runtime backlog exists as a structured task file under `tasks/backlog/runtime/`.
+- [ ] Runtime backlog exists as a structured task file under `tasks/backlog/runtime/`.
 
 ## Verification
 ```bash

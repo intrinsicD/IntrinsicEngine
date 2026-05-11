@@ -66,17 +66,17 @@
   remain in place.
 
 ## Required changes
-- `src/geometry/Geometry.HalfedgeMesh.IO.cpp::LoadOBJ`:
-  - Add a `std::vector<glm::vec2> texcoords;` local alongside
+- [x] `src/geometry/Geometry.HalfedgeMesh.IO.cpp::LoadOBJ`:
+  - [x] Add a `std::vector<glm::vec2> texcoords;` local alongside
     `vertices`/`normals`/`faces`.
-  - Add an `else if (tokens[0] == "vt")` branch that requires
+  - [x] Add an `else if (tokens[0] == "vt")` branch that requires
     `tokens.size() >= 3`, parses two floats via
     `ParseNumber<float>`, and pushes a `glm::vec2` onto
     `texcoords`. Reject malformed values with
     `InvalidMeshFormat` matching the existing `v` / `vn` line
     behavior. The optional third `w` component is accepted but
     not read.
-  - After the existing `PopulateResult(result, vertices, faces,
+  - [x] After the existing `PopulateResult(result, vertices, faces,
     normalsSpan)` call, if `texcoords.size() == vertices.size()`,
     write a `v:texcoord` property via
     `result.Vertices.GetOrAdd<glm::vec2>("v:texcoord",
@@ -84,47 +84,47 @@
     counts skip the property silently.
 
 ## Tests
-- Add `unit;geometry` cases to
+- [x] Add `unit;geometry` cases to
   `tests/unit/geometry/Test.GeometryIO.cpp::GeometryIO_MeshIO`
   next to the existing OBJ vertex-normal tests:
-  - `LoadsOBJTriangleWithVertexTexcoords` — three `v` lines,
+  - [x] `LoadsOBJTriangleWithVertexTexcoords` — three `v` lines,
     three `vt u v` lines, and `f 1/1 2/2 3/3` succeed and return
     a `v:texcoord` property of size 3 whose values match the
     `vt` lines.
-  - `LoadsOBJVertexTexcoordWithOptionalThirdComponent` — `vt u v w`
+  - [x] `LoadsOBJVertexTexcoordWithOptionalThirdComponent` — `vt u v w`
     lines with three components succeed; the result keeps a
     `glm::vec2` `v:texcoord` property storing only the first two
     components.
-  - `LoadOBJIgnoresMismatchedVertexTexcoordCount` — three `v`
+  - [x] `LoadOBJIgnoresMismatchedVertexTexcoordCount` — three `v`
     lines, two `vt` lines, and a non-attributed face succeeds
     but returns no `v:texcoord` property.
-  - `LoadOBJRejectsMalformedVertexTexcoord` — `vt 0` with one
+  - [x] `LoadOBJRejectsMalformedVertexTexcoord` — `vt 0` with one
     component yields `Core::ErrorCode::InvalidFormat`
     (matches `v` / `vn` strictness).
-  - `LoadOBJVertexTexcoordAndNormalCoexist` — three `v`, `vt`,
+  - [x] `LoadOBJVertexTexcoordAndNormalCoexist` — three `v`, `vt`,
     and `vn` lines plus `f 1/1/1 2/2/2 3/3/3` produce both
     `v:texcoord` and `v:normal` properties with the expected
     values, exercising the joint lockstep ingest.
 
 ## Docs
-- Update the
+- [x] Update the
   `OBJ/OFF/STL mesh import and mesh PLY import` row in
   `docs/migration/nonlegacy-parity-matrix.md` to record the
   new OBJ vertex-texcoord lockstep import added under
   `GEOIO-002T`.
-- Regenerate `docs/api/generated/module_inventory.md` only if
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if
   the generator picks up changes to the existing
   `Geometry.HalfedgeMesh.IO` module surface. If the regenerator
   changes only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::LoadOBJ` accepts `vt u v [w]` lines and
+- [x] `Geometry::MeshIO::LoadOBJ` accepts `vt u v [w]` lines and
   surfaces a `glm::vec2` `v:texcoord` property when the
   texcoord count equals the position count.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into
   `src/geometry/*`.
-- Parity matrix records the new OBJ vt lockstep import.
+- [x] Parity matrix records the new OBJ vt lockstep import.
 
 ## Verification
 ```bash

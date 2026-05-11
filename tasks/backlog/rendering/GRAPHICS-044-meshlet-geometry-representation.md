@@ -30,9 +30,9 @@ Lock down the contract for adding a meshlet table (vertex offset, triangle offse
 11. **Layering.** Meshletization tooling lives in `assets/`. Graphics consumes meshlet data; it does not generate it.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-044-Impl-A** — `GpuGeometryRecord` extension + `contract;graphics` shape tests under null RHI.
@@ -41,22 +41,22 @@ Lock down the contract for adding a meshlet table (vertex offset, triangle offse
 - **GRAPHICS-044-Impl-D** — `Pass.Culling` extension to consume meshlet bounds + diagnostic counters (gated by `GRAPHICS-038`).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` geometry-pipeline section.
-- Update `src/graphics/rhi/README.md` `GpuGeometryRecord` section.
-- Update `src/graphics/assets/README.md` upload-path section.
+- [ ] Update `docs/architecture/graphics.md` geometry-pipeline section.
+- [ ] Update `src/graphics/rhi/README.md` `GpuGeometryRecord` section.
+- [ ] Update `src/graphics/assets/README.md` upload-path section.
 
 ## Acceptance criteria
-- Eleven decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Legacy indexed-triangle path remains the unconditional default.
-- Backward compatibility: `MeshletCount == 0` legacy meshes render unchanged.
+- [ ] Eleven decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Legacy indexed-triangle path remains the unconditional default.
+- [ ] Backward compatibility: `MeshletCount == 0` legacy meshes render unchanged.
 
 ## Verification
 ```bash

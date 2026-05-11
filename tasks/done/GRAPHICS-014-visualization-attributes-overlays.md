@@ -22,20 +22,20 @@
 - Owner: `src/graphics/renderer` and `src/graphics/assets` where GPU-resident visualization data is needed.
 - Legacy color mapper, colormap, property enumerator, isoline extractor, vector field, and overlay factory modules define feature coverage to re-own cleanly.
 ## Required changes
-- Define scalar/color/vector attribute packet contracts and GPU upload/update seams.
-- Define auxiliary GPU resource descriptors for per-domain attribute buffers, centroid/label data, vector-field/isoline output packets, and Htex patch-preview atlas textures.
-- Define per-fragment bake descriptors that can target either existing mesh texcoords or an Htex patch atlas. UV-backed bakes require texcoord data; Htex-backed bakes must be possible even when UVs are present and may request Htex regeneration.
-- Complete colormap system, isoline packet generation, vector-field overlay packets, and overlay snapshot interfaces.
-- Add diagnostics for missing attributes, mismatched domains, invalid ranges, and unsupported colormap IDs.
+- [x] Define scalar/color/vector attribute packet contracts and GPU upload/update seams.
+- [x] Define auxiliary GPU resource descriptors for per-domain attribute buffers, centroid/label data, vector-field/isoline output packets, and Htex patch-preview atlas textures.
+- [x] Define per-fragment bake descriptors that can target either existing mesh texcoords or an Htex patch atlas. UV-backed bakes require texcoord data; Htex-backed bakes must be possible even when UVs are present and may request Htex regeneration.
+- [x] Complete colormap system, isoline packet generation, vector-field overlay packets, and overlay snapshot interfaces.
+- [x] Add diagnostics for missing attributes, mismatched domains, invalid ranges, and unsupported colormap IDs.
 ## Tests
-- Add unit/integration tests for scalar/color BDA config, colormap selection, isoline defaults, vector-field packets, and overlay split from geometry ownership.
-- Label graphics-only unit tests `unit;graphics` and runtime/overlay handoff tests `integration;runtime;graphics` so both run in the default CPU gate.
+- [x] Add unit/integration tests for scalar/color BDA config, colormap selection, isoline defaults, vector-field packets, and overlay split from geometry ownership.
+- [x] Label graphics-only unit tests `unit;graphics` and runtime/overlay handoff tests `integration;runtime;graphics` so both run in the default CPU gate.
 ## Docs
-- Update visualization sections in rendering architecture docs and the non-legacy parity matrix.
+- [x] Update visualization sections in rendering architecture docs and the non-legacy parity matrix.
 ## Acceptance criteria
-- Visualization works through promoted graphics snapshot/API boundaries.
-- Attribute-domain mismatches fail deterministically.
-- Overlay data does not require live ECS ownership in graphics.
+- [x] Visualization works through promoted graphics snapshot/API boundaries.
+- [x] Attribute-domain mismatches fail deterministically.
+- [x] Overlay data does not require live ECS ownership in graphics.
 ## Verification
 ```bash
 cmake --preset ci

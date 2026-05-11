@@ -21,30 +21,30 @@
 - The OBJ importer (`Geometry::MeshIO::LoadOBJ`) already attaches a `v:texcoord` `glm::vec2` property when `vt` lockstep matches the vertex count (`GEOIO-002T`), and the OBJ writer (`Geometry::MeshIO::WriteOBJ`) round-trips that property (`GEOIO-002U`). Adding PLY texcoord import lets mesh data flow between OBJ and PLY without losing UVs through the geometry seam.
 
 ## Required changes
-- `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
-  - In `ParseAsciiPLY`, after the existing `nx/ny/nz` and `red/green/blue/alpha` property lookups, add a paired texcoord lookup that picks the first matching U-alias from `{s, u, texture_u, texcoord_u, u0}` and the first matching V-alias from `{t, v, texture_v, texcoord_v, v0}`. Treat texcoords as present only when both indices are valid. Parse the two tokens as `float` for each vertex; reject malformed values with `InvalidMeshFormat()`. After the vertex/face loop, attach a `v:texcoord` `glm::vec2` vertex property when the parsed texcoord count matches the position count.
-  - In `ParseBinaryPLY`, mirror the same alias detection for `Float32` properties only (consistent with the existing `nx/ny/nz` Float32 gate). Track separate `texUIndex` / `texVIndex` int32s defaulting to `-1`. After per-vertex reads, attach the same `v:texcoord` `glm::vec2` vertex property when both indices were found.
-  - Do not introduce a new public helper; keep the alias list as local `static constexpr` arrays inside the parser scope.
-- `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - Add `GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexTexcoords` covering ASCII PLY with `property float s` / `property float t` between positions and the face element; expect `v:texcoord` populated with the written values.
-  - Add `GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithTextureUVAliases` covering the `texture_u` / `texture_v` alias pair on ASCII PLY.
-  - Add `GeometryIO_MeshIO.LoadsBinaryPLYTriangleWithVertexTexcoords` covering binary little-endian PLY with `s` / `t` Float32 properties immediately after `x y z`; build the binary body inline (matching the existing binary PLY load test fixture style) and assert `v:texcoord` round-trips with bit-exact float values.
-  - Add a negative test `GeometryIO_MeshIO.LoadASCIIPLYIgnoresPartialTexcoordAxis` that declares only `property float s` (no `t` partner) and confirms `v:texcoord` is **not** attached and that positions/faces still load.
+- [x] `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
+  - [x] In `ParseAsciiPLY`, after the existing `nx/ny/nz` and `red/green/blue/alpha` property lookups, add a paired texcoord lookup that picks the first matching U-alias from `{s, u, texture_u, texcoord_u, u0}` and the first matching V-alias from `{t, v, texture_v, texcoord_v, v0}`. Treat texcoords as present only when both indices are valid. Parse the two tokens as `float` for each vertex; reject malformed values with `InvalidMeshFormat()`. After the vertex/face loop, attach a `v:texcoord` `glm::vec2` vertex property when the parsed texcoord count matches the position count.
+  - [x] In `ParseBinaryPLY`, mirror the same alias detection for `Float32` properties only (consistent with the existing `nx/ny/nz` Float32 gate). Track separate `texUIndex` / `texVIndex` int32s defaulting to `-1`. After per-vertex reads, attach the same `v:texcoord` `glm::vec2` vertex property when both indices were found.
+  - [x] Do not introduce a new public helper; keep the alias list as local `static constexpr` arrays inside the parser scope.
+- [x] `tests/unit/geometry/Test.GeometryIO.cpp`:
+  - [x] Add `GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexTexcoords` covering ASCII PLY with `property float s` / `property float t` between positions and the face element; expect `v:texcoord` populated with the written values.
+  - [x] Add `GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithTextureUVAliases` covering the `texture_u` / `texture_v` alias pair on ASCII PLY.
+  - [x] Add `GeometryIO_MeshIO.LoadsBinaryPLYTriangleWithVertexTexcoords` covering binary little-endian PLY with `s` / `t` Float32 properties immediately after `x y z`; build the binary body inline (matching the existing binary PLY load test fixture style) and assert `v:texcoord` round-trips with bit-exact float values.
+  - [x] Add a negative test `GeometryIO_MeshIO.LoadASCIIPLYIgnoresPartialTexcoordAxis` that declares only `property float s` (no `t` partner) and confirms `v:texcoord` is **not** attached and that positions/faces still load.
 
 ## Tests
-- New unit tests in `tests/unit/geometry/Test.GeometryIO.cpp` listed above.
-- Existing PLY mesh tests (`LoadsASCIIPLYTriangle`, `LoadsASCIIPLYTriangleWithVertexNormalsAndColors`, `WritesPLYBinaryTriangle*`) must continue to pass unchanged; the import addition is gated on both U and V alias presence, so PLY files without texcoord properties produce byte-identical `v:texcoord` absence.
+- [x] New unit tests in `tests/unit/geometry/Test.GeometryIO.cpp` listed above.
+- [x] Existing PLY mesh tests (`LoadsASCIIPLYTriangle`, `LoadsASCIIPLYTriangleWithVertexNormalsAndColors`, `WritesPLYBinaryTriangle*`) must continue to pass unchanged; the import addition is gated on both U and V alias presence, so PLY files without texcoord properties produce byte-identical `v:texcoord` absence.
 
 ## Docs
-- Update `docs/migration/nonlegacy-parity-matrix.md` to record mesh PLY vertex texcoord import parity under `GEOIO-002Z` in the mesh import row.
-- No `docs/api/generated/module_inventory.md` refresh required because no public module declarations or exported names change.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` to record mesh PLY vertex texcoord import parity under `GEOIO-002Z` in the mesh import row.
+- [x] No `docs/api/generated/module_inventory.md` refresh required because no public module declarations or exported names change.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::LoadPLY` attaches a `v:texcoord` `glm::vec2` vertex property when the vertex element carries any of the supported U/V alias pairs and the parsed count matches the position count; otherwise `v:texcoord` is absent.
-- Partial texcoord declarations (only U or only V) are silently ignored and do not regress `v:color` / `v:normal` behavior or fail the load.
-- Binary PLY import accepts `Float32` texcoord properties only; non-Float32 texcoord declarations leave `v:texcoord` absent rather than erroring out (matching the existing normal-property gate).
-- `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
-- The migration matrix records the new parity evidence.
+- [x] `Geometry::MeshIO::LoadPLY` attaches a `v:texcoord` `glm::vec2` vertex property when the vertex element carries any of the supported U/V alias pairs and the parsed count matches the position count; otherwise `v:texcoord` is absent.
+- [x] Partial texcoord declarations (only U or only V) are silently ignored and do not regress `v:color` / `v:normal` behavior or fail the load.
+- [x] Binary PLY import accepts `Float32` texcoord properties only; non-Float32 texcoord declarations leave `v:texcoord` absent rather than erroring out (matching the existing normal-property gate).
+- [x] `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
+- [x] The migration matrix records the new parity evidence.
 
 ## Verification
 ```bash

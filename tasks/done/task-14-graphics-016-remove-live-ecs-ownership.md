@@ -26,48 +26,48 @@ The current graphics renderer target links against `ExtrinsicECS` and several gr
 
 ## Required changes
 
-1. Audit `src/graphics/renderer` for:
-   - `#include <entt/...>`
-   - `entt::registry&`
-   - imports or target links to `ExtrinsicECS`
-   - graphics components storing GPU handles/leases as ECS component state.
+- [x] Audit `src/graphics/renderer` for:
+   - [x] `#include <entt/...>`
+   - [x] `entt::registry&`
+   - [x] imports or target links to `ExtrinsicECS`
+   - [x] graphics components storing GPU handles/leases as ECS component state.
 
-2. Create a minimal runtime-owned extraction-side type or adapter if needed.
+- [x] Create a minimal runtime-owned extraction-side type or adapter if needed.
 
    Suggested direction:
-   - runtime owns ECS query and sidecar mappings;
-   - graphics systems receive typed spans/packets/records;
-   - do not store graphics GPU handles in canonical `src/ecs` components.
+   - [x] runtime owns ECS query and sidecar mappings;
+   - [x] graphics systems receive typed spans/packets/records;
+   - [x] do not store graphics GPU handles in canonical `src/ecs` components.
 
-3. First patch should target API boundaries only:
-   - `TransformSyncSystem`
-   - `LightSystem`
-   - `VisualizationSyncSystem`
-   - renderer CMake dependency
-   - any obvious README/doc updates
+- [x] First patch should target API boundaries only:
+   - [x] `TransformSyncSystem`
+   - [x] `LightSystem`
+   - [x] `VisualizationSyncSystem`
+   - [x] renderer CMake dependency
+   - [x] any obvious README/doc updates
 
-4. If full removal is too large:
-   - Create a staged compatibility shim under runtime or a clearly named temporary migration file.
-   - Document the temporary exception in an active/backlog task with a removal follow-up.
-   - Do not leave an undocumented exception.
+- [x] If full removal is too large:
+   - [x] Create a staged compatibility shim under runtime or a clearly named temporary migration file.
+   - [x] Document the temporary exception in an active/backlog task with a removal follow-up.
+   - [x] Do not leave an undocumented exception.
 
-5. Tests:
-   - Add or update `contract;graphics` tests proving graphics headers/modules do not require ECS.
-   - Add or update `integration;runtime;graphics` tests proving runtime can still extract and feed graphics through the new seam.
-   - Keep CPU-only tests independent of Vulkan.
+- [x] Tests:
+   - [x] Add or update `contract;graphics` tests proving graphics headers/modules do not require ECS.
+   - [x] Add or update `integration;runtime;graphics` tests proving runtime can still extract and feed graphics through the new seam.
+   - [x] Keep CPU-only tests independent of Vulkan.
 
 ## Docs
 
-- Update GRAPHICS-016 with the implemented staging decision.
-- Update `docs/architecture/graphics.md` if the snapshot/extraction API becomes more concrete.
-- Update `src/graphics/renderer/README.md` if public ownership changes.
+- [x] Update GRAPHICS-016 with the implemented staging decision.
+- [x] Update `docs/architecture/graphics.md` if the snapshot/extraction API becomes more concrete.
+- [x] Update `src/graphics/renderer/README.md` if public ownership changes.
 
 ## Acceptance criteria
 
-- Promoted graphics public APIs no longer require live `entt::registry` access, or any remaining access is explicitly marked as temporary with a removal task.
-- `ExtrinsicGraphics` should not publicly link `ExtrinsicECS` unless a documented temporary exception remains.
-- Runtime owns extraction/wiring.
-- Tests cover the new boundary.
+- [x] Promoted graphics public APIs no longer require live `entt::registry` access, or any remaining access is explicitly marked as temporary with a removal task.
+- [x] `ExtrinsicGraphics` should not publicly link `ExtrinsicECS` unless a documented temporary exception remains.
+- [x] Runtime owns extraction/wiring.
+- [x] Tests cover the new boundary.
 
 ## Verification
 

@@ -174,21 +174,21 @@
 - Runtime still owns asset event translation and producer sidecars; graphics consumes `AssetId` values and cache views only.
 
 ## Required changes
-- Clarify whether future cache capacity policy should stay non-evicting, use explicit budgets, or support LRU/priority eviction with frames-in-flight retire guarantees.
-- Clarify streaming mip/reupload behavior and how it should use `TextureManager::Reupload()` versus full texture lease replacement.
-- Clarify fallback texture content policy for color, normal, metallic/roughness, emissive, and visualization/Htex atlas references.
-- Clarify backend descriptor flush cadence for bindless texture slots and sampler changes.
-- Clarify runtime ownership for initializing fallback textures and scheduling texture uploads from decoded asset payloads.
+- [x] Clarify whether future cache capacity policy should stay non-evicting, use explicit budgets, or support LRU/priority eviction with frames-in-flight retire guarantees.
+- [x] Clarify streaming mip/reupload behavior and how it should use `TextureManager::Reupload()` versus full texture lease replacement.
+- [x] Clarify fallback texture content policy for color, normal, metallic/roughness, emissive, and visualization/Htex atlas references.
+- [x] Clarify backend descriptor flush cadence for bindless texture slots and sampler changes.
+- [x] Clarify runtime ownership for initializing fallback textures and scheduling texture uploads from decoded asset payloads.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless policy docs introduce checked manifests.
+- [x] Documentation/checker only; no C++ tests required unless policy docs introduce checked manifests.
 
 ## Docs
-- Update graphics architecture and graphics-assets README with the selected policies.
+- [x] Update graphics architecture and graphics-assets README with the selected policies.
 
 ## Acceptance criteria
-- Future Vulkan/runtime texture residency work has unambiguous ownership, fallback content, streaming, descriptor flush, and capacity policies.
-- No live `AssetService`, ECS, importer, or editor dependency is introduced into graphics layers.
+- [x] Future Vulkan/runtime texture residency work has unambiguous ownership, fallback content, streaming, descriptor flush, and capacity policies.
+- [x] No live `AssetService`, ECS, importer, or editor dependency is introduced into graphics layers.
 
 ## Verification
 ```bash

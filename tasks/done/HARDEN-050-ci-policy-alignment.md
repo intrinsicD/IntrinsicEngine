@@ -17,16 +17,16 @@ Most workflows already follow this policy. Follow-up HARDEN-050B found `ci-sanit
 `-L "unit|contract|integration"` without the canonical exclusion/timeout policy, which left sanitizer CI inconsistent with documented CPU-supported gating.
 
 ## Required changes
-- Update `.github/workflows/pr-fast.yml` to set `--timeout 60` on the unit/contract test command.
-- Update `.github/workflows/ci-sanitizers.yml` selected CPU test command to include `-LE "gpu|vulkan|slow|flaky-quarantine"` and `--timeout 60`.
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status and evidence entries for HARDEN-050.
+- [x] Update `.github/workflows/pr-fast.yml` to set `--timeout 60` on the unit/contract test command.
+- [x] Update `.github/workflows/ci-sanitizers.yml` selected CPU test command to include `-LE "gpu|vulkan|slow|flaky-quarantine"` and `--timeout 60`.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status and evidence entries for HARDEN-050.
 
 ## Tests
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- Keep hardening tracker status/evidence synchronized.
+- [x] Keep hardening tracker status/evidence synchronized.
 
 ## Acceptance criteria
 - [x] `pr-fast.yml` unit/contract CTest step includes `--timeout 60`.

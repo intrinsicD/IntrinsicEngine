@@ -57,18 +57,18 @@ Define the follow-up architecture and implementation path for the real hybrid re
 
 ## Tests
 
-- Planning task only initially:
-  - task policy and docs-link checks.
-- Future implementation subtasks must add `contract;graphics` and optional `gpu;vulkan` tests.
+- [x] Planning task only initially:
+  - [x] task policy and docs-link checks.
+- [x] Future implementation subtasks must add `contract;graphics` and optional `gpu;vulkan` tests.
 
 ## Docs
 
-- Update rendering-three-pass hybrid section to point to this task.
+- [x] Update rendering-three-pass hybrid section to point to this task.
 
 ## Acceptance criteria
 
-- Hybrid is no longer an unowned TODO hidden in architecture prose.
-- Deferred, forward, and hybrid terms are not ambiguous for future Codex work.
+- [x] Hybrid is no longer an unowned TODO hidden in architecture prose.
+- [x] Deferred, forward, and hybrid terms are not ambiguous for future Codex work.
 
 ## Verification
 

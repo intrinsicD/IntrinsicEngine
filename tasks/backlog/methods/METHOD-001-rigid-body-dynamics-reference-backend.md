@@ -29,19 +29,19 @@
 - [ ] Document diagnostics, unit conventions, numerical tolerances, and known limitations.
 
 ## Tests
-- Add analytic tests for free fall, constant acceleration, angular integration sanity, elastic/inelastic collision toy cases, resting contact stability, and deterministic repeatability.
-- Add degenerate-input tests: zero/negative mass rejection, invalid inertia, NaN state rejection, huge/small scale tolerances, and overlapping-start diagnostics.
-- Keep tests CPU-only and independent of runtime/ECS.
+- [ ] Add analytic tests for free fall, constant acceleration, angular integration sanity, elastic/inelastic collision toy cases, resting contact stability, and deterministic repeatability.
+- [ ] Add degenerate-input tests: zero/negative mass rejection, invalid inertia, NaN state rejection, huge/small scale tolerances, and overlapping-start diagnostics.
+- [ ] Keep tests CPU-only and independent of runtime/ECS.
 
 ## Docs
-- Add `methods/physics/rigid_body_reference/README.md` with method contract, references, backend identity, limitations, and diagnostics.
-- Add or update benchmark manifests under `benchmarks/` only for smoke/reference metrics, not performance claims.
+- [ ] Add `methods/physics/rigid_body_reference/README.md` with method contract, references, backend identity, limitations, and diagnostics.
+- [ ] Add or update benchmark manifests under `benchmarks/` only for smoke/reference metrics, not performance claims.
 
 ## Acceptance criteria
-- CPU reference implementation is present and tested.
-- Benchmarks and manifests are present or explicitly stubbed with stable IDs.
-- Numerical limitations and diagnostics are documented.
-- Future `src/physics` or runtime integration can compare against this reference backend.
+- [ ] CPU reference implementation is present and tested.
+- [ ] Benchmarks and manifests are present or explicitly stubbed with stable IDs.
+- [ ] Numerical limitations and diagnostics are documented.
+- [ ] Future `src/physics` or runtime integration can compare against this reference backend.
 
 ## Verification
 ```bash

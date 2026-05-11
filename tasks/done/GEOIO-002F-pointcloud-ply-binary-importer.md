@@ -54,32 +54,32 @@
   container.
 
 ## Required changes
-- Edit `src/geometry/Geometry.PointCloud.IO.cpp` only:
-  - Inside the existing anonymous namespace, add small helpers:
-    - `enum class PlyFormat { Ascii, BinaryLittleEndian, BinaryBigEndian }`.
-    - `enum class PlyScalar { Int8, UInt8, Int16, UInt16, Int32,
+- [x] Edit `src/geometry/Geometry.PointCloud.IO.cpp` only:
+  - [x] Inside the existing anonymous namespace, add small helpers:
+    - [x] `enum class PlyFormat { Ascii, BinaryLittleEndian, BinaryBigEndian }`.
+    - [x] `enum class PlyScalar { Int8, UInt8, Int16, UInt16, Int32,
       UInt32, Float32, Float64 }` plus `PlyScalarBytes(PlyScalar)` and
       `ParsePlyScalarType(std::string_view)` (token aliases match the
       legacy reference and the GEOIO-002E mesh-side helpers).
-    - `struct PlyProperty { std::string Name; bool IsList; PlyScalar
+    - [x] `struct PlyProperty { std::string Name; bool IsList; PlyScalar
       ScalarType; PlyScalar ListCountType; }`.
-    - `struct PlyElement { std::string Name; std::size_t Count;
+    - [x] `struct PlyElement { std::string Name; std::size_t Count;
       std::vector<PlyProperty> Properties; }`.
-    - `void ByteSwap(std::byte*, std::size_t)`.
-    - `template <typename T> T ReadScalarAs(const std::byte*& cursor,
+    - [x] `void ByteSwap(std::byte*, std::size_t)`.
+    - [x] `template <typename T> T ReadScalarAs(const std::byte*& cursor,
       PlyScalar, bool bigEndian)` decoding the scalar via `std::memcpy`
       plus optional byte-swap, then casting through the declared type
       to `T`.
-  - Refactor `LoadPLY` to:
-    - Read the file once via the existing `ReadTextFile`.
-    - Parse the header into a `PlyFormat` and
+  - [x] Refactor `LoadPLY` to:
+    - [x] Read the file once via the existing `ReadTextFile`.
+    - [x] Parse the header into a `PlyFormat` and
       `std::vector<PlyElement>`, tracking the byte offset of the first
       byte after `end_header\n`. Reject malformed
       `format`/`element`/`property` lines as `InvalidPointCloudFormat()`.
-    - Dispatch ASCII to a `ParseAsciiPLY` helper holding the existing
+    - [x] Dispatch ASCII to a `ParseAsciiPLY` helper holding the existing
       ASCII vertex parsing logic byte-for-byte, keyed by the parsed
       `vertex` element count and property names.
-    - Dispatch binary little/big-endian to a `ParseBinaryPLY` helper
+    - [x] Dispatch binary little/big-endian to a `ParseBinaryPLY` helper
       that walks elements in declaration order, locates the position
       property indices (`x`/`y`/`z` as `Float32`), and optionally the
       normal property indices (`nx`/`ny`/`nz` as `Float32`) and color
@@ -92,7 +92,7 @@
       skipped only when their properties are all scalars; encountering
       a list property in a non-vertex element is rejected (matches the
       mesh-side conservative posture for non-`face` elements).
-  - Diagnostics: return `InvalidPointCloudFormat()` (i.e.
+  - [x] Diagnostics: return `InvalidPointCloudFormat()` (i.e.
     `Core::ErrorCode::InvalidFormat`) for missing `format` line,
     missing `end_header`, missing/zero-count `vertex` element,
     missing/non-`float` x/y/z, presence of a list property inside the
@@ -100,81 +100,81 @@
     element, or a truncated/oversized binary body. A 0-byte short
     field or off-the-end stride must reject rather than read past the
     buffer.
-- Do not change `LoadXYZ`/`LoadPCD` behavior, do not introduce new
+- [x] Do not change `LoadXYZ`/`LoadPCD` behavior, do not introduce new
   module imports, and do not touch any file outside
   `src/geometry/Geometry.PointCloud.IO.cpp`,
   `tests/unit/geometry/Test.GeometryIO.cpp`, and `tasks/`.
-- Public module surface (`Geometry.PointCloud.IO.cppm`) does not
+- [x] Public module surface (`Geometry.PointCloud.IO.cppm`) does not
   change; the inventory should remain identical apart from the
   regeneration date (matches `GEOIO-002B`/`C`/`D`/`E` precedent).
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `LoadsBinaryLittleEndianPLYPointCloud`: build a fixture with the
+  - [x] `LoadsBinaryLittleEndianPLYPointCloud`: build a fixture with the
     canonical point-cloud PLY binary little-endian header
     (`property float x`, `property float y`, `property float z`,
     no `face` element) and three vertices; load via `LoadPLY` and
     assert positions match.
-  - `LoadsBinaryBigEndianPLYPointCloud`: same vertex layout but
+  - [x] `LoadsBinaryBigEndianPLYPointCloud`: same vertex layout but
     byte-swap the float positions, with
     `format binary_big_endian 1.0`.
-  - `LoadsBinaryPLYPointCloudWithNormalsAndColor`: vertex layout has
+  - [x] `LoadsBinaryPLYPointCloudWithNormalsAndColor`: vertex layout has
     `float x/y/z`, `float nx/ny/nz`, `uchar red/green/blue`; assert
     positions, `HasNormals`, normals, `HasColors`, and color channels
     normalized via `NormalizeColorChannel`.
-  - `LoadsBinaryPLYPointCloudSkipsExtraScalars`: vertex layout has
+  - [x] `LoadsBinaryPLYPointCloudSkipsExtraScalars`: vertex layout has
     `float x/y/z` followed by `float intensity` (a single extra
     scalar) and `uchar red/green/blue`; positions and colors must
     still parse correctly when an extra scalar appears between the
     position and color blocks.
-  - `LoadPLYPointCloudRejectsTruncatedBinaryBody`: header advertises
+  - [x] `LoadPLYPointCloudRejectsTruncatedBinaryBody`: header advertises
     `vertex 4` but the body only contains one vertex worth of bytes;
     expect `Core::ErrorCode::InvalidFormat`.
-  - `LoadPLYPointCloudRejectsListPropertyInVertex`: vertex element
+  - [x] `LoadPLYPointCloudRejectsListPropertyInVertex`: vertex element
     declares `property list uchar int unsupported` after `x/y/z`;
     expect `Core::ErrorCode::InvalidFormat`.
-  - `LoadsAsciiPLYPointCloudAfterBinaryDispatch`: regression — the
+  - [x] `LoadsAsciiPLYPointCloudAfterBinaryDispatch`: regression — the
     existing ASCII fixture (`LoadsVertexOnlyASCIIPLY`) must continue
     to round-trip through the refactored dispatch path.
-- Helper: add a `WriteBinaryPLYPointCloudFixture` test fixture writer
+- [x] Helper: add a `WriteBinaryPLYPointCloudFixture` test fixture writer
   alongside the existing mesh `WriteBinaryPLYFixture` which:
-  - Takes positions, optional normals, optional uchar colors, an
+  - [x] Takes positions, optional normals, optional uchar colors, an
     optional extra-`float intensity` flag, an endianness flag, and
     truncation/list-injection flags for negative-path tests.
-  - Emits the ASCII header up to `end_header\n`, then writes the
+  - [x] Emits the ASCII header up to `end_header\n`, then writes the
     binary body via `std::ofstream(..., std::ios::binary)` and
     explicit byte-level `write` calls (no `operator<<` for binary
     scalars). For big-endian fixtures the writer byte-swaps the
     four-byte floats manually before writing.
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module
+- [x] Update `docs/api/generated/module_inventory.md` only if module
   surfaces change in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding internal helpers
   and expanding a function body is not expected to change the
   inventory; if the regenerator only changes the date, leave it
   untouched (matches `GEOIO-002B`/`C`/`D`/`E` precedent).
-- No additional architecture/migration doc edits required for this
+- [x] No additional architecture/migration doc edits required for this
   slice; parity-matrix updates remain part of the parent `GEOIO-002`
   task once asset/runtime routing actually drops the legacy graphics
   importers.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::LoadPLY` returns a populated
+- [x] `Geometry::PointCloudIO::LoadPLY` returns a populated
   `PointCloudIOResult` for well-formed binary little-endian and binary
   big-endian PLY point-cloud fixtures, with positions equal to the
   input vertices and, when present, normals and normalized colors.
-- `LoadPLY` continues to accept ASCII PLY fixtures (existing
+- [x] `LoadPLY` continues to accept ASCII PLY fixtures (existing
   `LoadsVertexOnlyASCIIPLY` and the new
   `LoadsAsciiPLYPointCloudAfterBinaryDispatch` regression both pass).
-- A truncated binary payload, or a list property inside the `vertex`
+- [x] A truncated binary payload, or a list property inside the `vertex`
   element, produces `Core::ErrorCode::InvalidFormat` rather than
   out-of-bounds reads or partial parses.
-- `src/geometry/*` imports remain layered (`geometry -> core` only);
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only);
   no new asset/runtime/graphics imports introduced.
-- Existing `LoadXYZ`/`LoadPCD`, mesh `LoadPLY`, and all `Write*`
+- [x] Existing `LoadXYZ`/`LoadPCD`, mesh `LoadPLY`, and all `Write*`
   tests continue to pass.
 
 ## Verification

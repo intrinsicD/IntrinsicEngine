@@ -16,29 +16,29 @@
 - Runtime will later obtain `GpuAssetView::Generation` from `Graphics.GpuAssetCache`, but the renderer component should only compare asset identity and generation values passed in by runtime.
 
 ## Required changes
-- Add a small public decision enum/function to `src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm` that classifies:
-  - no source asset bound,
-  - observed asset mismatch,
-  - pending/unknown generation,
-  - generation already current,
-  - generation advanced and rebind required.
-- Extend `tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp` with focused cases for each decision state.
-- Update `docs/architecture/graphics.md`, `src/graphics/renderer/README.md`, and `tasks/backlog/rendering/README.md` only to reflect the landed helper and task status.
+- [x] Add a small public decision enum/function to `src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm` that classifies:
+  - [x] no source asset bound,
+  - [x] observed asset mismatch,
+  - [x] pending/unknown generation,
+  - [x] generation already current,
+  - [x] generation advanced and rebind required.
+- [x] Extend `tests/unit/graphics/Test.Graphics.GpuSceneSlot.cpp` with focused cases for each decision state.
+- [x] Update `docs/architecture/graphics.md`, `src/graphics/renderer/README.md`, and `tasks/backlog/rendering/README.md` only to reflect the landed helper and task status.
 
 ## Tests
-- Add/update `unit;graphics` coverage only.
-- No GPU/Vulkan tests are required.
+- [x] Add/update `unit;graphics` coverage only.
+- [x] No GPU/Vulkan tests are required.
 
 ## Docs
-- Keep docs factual about the decision helper and non-goals.
-- Keep rendering backlog links synchronized.
+- [x] Keep docs factual about the decision helper and non-goals.
+- [x] Keep rendering backlog links synchronized.
 
 ## Acceptance criteria
-- Runtime callers can ask a `GpuSceneSlot` whether an observed `(AssetId, Generation)` requires rebind without importing `Graphics.GpuAssetCache` into `GpuSceneSlot`.
-- Default/dynamic slots do not request rebind.
-- Asset mismatch and unknown generation are deterministic non-rebind states.
-- Advanced generation is the only state that requests rebind.
-- Tests cover all decision states and existing `GpuSceneSlot` behavior remains intact.
+- [x] Runtime callers can ask a `GpuSceneSlot` whether an observed `(AssetId, Generation)` requires rebind without importing `Graphics.GpuAssetCache` into `GpuSceneSlot`.
+- [x] Default/dynamic slots do not request rebind.
+- [x] Asset mismatch and unknown generation are deterministic non-rebind states.
+- [x] Advanced generation is the only state that requests rebind.
+- [x] Tests cover all decision states and existing `GpuSceneSlot` behavior remains intact.
 
 ## Completion
 - Completed: 2026-05-07.

@@ -38,22 +38,22 @@ tracked in `tasks/done/GRAPHICS-002-render-world-contract.md`.
 - Stage C (dependency cleanup): remove any remaining downstream test/runtime convenience dependencies on ECS once Stage B callsites are migrated; keep any temporary shim time-bounded in `tasks/active/`.
 
 ## Required changes
-- Define extraction records for mesh, graph, point-cloud, material, transform, lighting, selection, visualization, and debug inputs.
-- Define runtime-owned sidecar/cache mappings from ECS entities, asset IDs, and geometry source handles to graphics instance, geometry, material, transform, bounds/culling, and light handles.
-- Extract transforms, materials, lights, world-space bounds, render flags, visibility/layer masks, dirty domains, deletion events, and compaction relocation handoffs.
-- Route lifecycle/sync decisions through runtime-owned handoff APIs.
-- Add compatibility shims only if they are tracked and time-bounded by active tasks.
+- [x] Define extraction records for mesh, graph, point-cloud, material, transform, lighting, selection, visualization, and debug inputs.
+- [x] Define runtime-owned sidecar/cache mappings from ECS entities, asset IDs, and geometry source handles to graphics instance, geometry, material, transform, bounds/culling, and light handles.
+- [x] Extract transforms, materials, lights, world-space bounds, render flags, visibility/layer masks, dirty domains, deletion events, and compaction relocation handoffs.
+- [x] Route lifecycle/sync decisions through runtime-owned handoff APIs.
+- [x] Add compatibility shims only if they are tracked and time-bounded by active tasks.
 ## Tests
-- Added runtime/graphics integration tests using the null renderer and extracted snapshots.
-- Covered creation, update, deletion, dirty transform-domain clearing, visualization extraction, light extraction, and destroyed-entity filtering.
-- Labeled extraction-handoff integration tests `integration;runtime;graphics` through `IntrinsicRuntimeGraphicsCpuTests` so they are not excluded by the default CPU gate.
+- [x] Added runtime/graphics integration tests using the null renderer and extracted snapshots.
+- [x] Covered creation, update, deletion, dirty transform-domain clearing, visualization extraction, light extraction, and destroyed-entity filtering.
+- [x] Labeled extraction-handoff integration tests `integration;runtime;graphics` through `IntrinsicRuntimeGraphicsCpuTests` so they are not excluded by the default CPU gate.
 ## Docs
-- Update runtime subsystem boundaries, graphics architecture, and migration parity docs.
+- [x] Update runtime subsystem boundaries, graphics architecture, and migration parity docs.
 ## Acceptance criteria
-- Graphics consumes snapshots/views only for promoted paths.
-- Runtime owns live ECS access and renderer wiring.
-- Runtime owns mappings from ECS/source data to graphics instance/material/geometry/transform/bounds/light handles, and those mappings are not canonical ECS component state.
-- Integration tests prove lifecycle handoff without Vulkan.
+- [x] Graphics consumes snapshots/views only for promoted paths.
+- [x] Runtime owns live ECS access and renderer wiring.
+- [x] Runtime owns mappings from ECS/source data to graphics instance/material/geometry/transform/bounds/light handles, and those mappings are not canonical ECS component state.
+- [x] Integration tests prove lifecycle handoff without Vulkan.
 ## Verification
 ```bash
 cmake --preset ci

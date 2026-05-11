@@ -12,25 +12,25 @@ Execute the final hardening audit with command-backed evidence for every accepta
 This is the closing audit for the post-reorganization hardening series tracked by `tasks/done/0001-post-reorganization-hardening-tracker.md`. It records command-backed pass/fail evidence for every acceptance item in `HARDEN-001` and routes any unresolved blockers (e.g. GPU/runtime opt-in gate failures) to explicit follow-up tasks.
 
 ## Required changes
-- Re-run hardening validators in strict mode and record exact outcomes.
-- Re-run CI preset configure gate evidence and record pass/fail.
-- Update hardening tracker status and blockers from fresh command outcomes.
+- [x] Re-run hardening validators in strict mode and record exact outcomes.
+- [x] Re-run CI preset configure gate evidence and record pass/fail.
+- [x] Update hardening tracker status and blockers from fresh command outcomes.
 
 ## Tests
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
-- `python3 tools/repo/check_layering.py --root src --strict`
-- `python3 tools/repo/check_layering_allowlist_quality.py --root . --strict`
-- `python3 tools/repo/check_test_layout.py --root . --strict`
-- `python3 tools/repo/check_stale_src` + `_new_references.py --root . --strict`
-- `python3 tools/agents/check_codex_config.py --root . --strict`
-- `python3 tools/agents/validate_method_manifests.py --root methods --strict`
-- `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict`
-- `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/repo/check_layering.py --root src --strict`
+- [x] `python3 tools/repo/check_layering_allowlist_quality.py --root . --strict`
+- [x] `python3 tools/repo/check_test_layout.py --root . --strict`
+- [x] `python3 tools/repo/check_stale_src` + `_new_references.py --root . --strict`
+- [x] `python3 tools/agents/check_codex_config.py --root . --strict`
+- [x] `python3 tools/agents/validate_method_manifests.py --root methods --strict`
+- [x] `python3 tools/benchmark/validate_benchmark_manifests.py --root benchmarks --strict`
+- [x] `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`
 
 ## Docs
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` with latest HARDEN-051 evidence and blocker status.
-- Add follow-up task for unresolved blocker if closure evidence is still incomplete.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` with latest HARDEN-051 evidence and blocker status.
+- [x] Add follow-up task for unresolved blocker if closure evidence is still incomplete.
 
 ## Acceptance criteria
 - [x] Final audit artifact exists at `tasks/done/final-post-reorganization-hardening-audit.md`.

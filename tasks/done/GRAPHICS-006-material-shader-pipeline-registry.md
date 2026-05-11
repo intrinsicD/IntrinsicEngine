@@ -40,21 +40,21 @@
 - Owner: `src/graphics/renderer`, `src/graphics/rhi`, and backend-specific implementations where required.
 - Legacy material registry, shader registry, shader compiler, hot reload, and pipeline library behavior are references for feature coverage only.
 ## Required changes
-- Define shader module identities, pipeline cache keys, material parameter layout contracts, and reload invalidation behavior.
-- Define the canonical material SSBO layout, material-slot lifetime, fallback material slot, texture/bindless references, and material dirty-update path.
-- Route backend-specific compilation/pipeline creation behind RHI/backend seams.
-- Add structured diagnostics for missing shaders, incompatible material layouts, and failed pipeline creation.
+- [x] Define shader module identities, pipeline cache keys, material parameter layout contracts, and reload invalidation behavior.
+- [x] Define the canonical material SSBO layout, material-slot lifetime, fallback material slot, texture/bindless references, and material dirty-update path.
+- [x] Route backend-specific compilation/pipeline creation behind RHI/backend seams.
+- [x] Add structured diagnostics for missing shaders, incompatible material layouts, and failed pipeline creation.
 ## Tests
-- Add unit/contract tests for shader registration, cache-key stability, reload invalidation, material defaults, and failure diagnostics.
-- Keep Vulkan shader compilation as opt-in when it requires GPU or external tooling.
-- Label registry behavior tests `unit;graphics` and `contract;graphics` for the default CPU gate; label any backend shader-compilation smoke tests `gpu;vulkan` so they stay opt-in.
+- [x] Add unit/contract tests for shader registration, cache-key stability, reload invalidation, material defaults, and failure diagnostics.
+- [x] Keep Vulkan shader compilation as opt-in when it requires GPU or external tooling.
+- [x] Label registry behavior tests `unit;graphics` and `contract;graphics` for the default CPU gate; label any backend shader-compilation smoke tests `gpu;vulkan` so they stay opt-in.
 ## Docs
-- Document shader asset ownership, hot-reload lifecycle, material parameter layout, and pipeline-cache policy.
+- [x] Document shader asset ownership, hot-reload lifecycle, material parameter layout, and pipeline-cache policy.
 ## Acceptance criteria
-- Renderer passes can request pipelines/material layouts without legacy registry modules.
-- Runtime/extraction can resolve CPU material descriptions or asset IDs into graphics-owned material slots without storing those slots in canonical ECS components.
-- Registry failures are deterministic and testable in CPU-only CI.
-- Backend-specific work remains behind declared RHI/backend integration points.
+- [x] Renderer passes can request pipelines/material layouts without legacy registry modules.
+- [x] Runtime/extraction can resolve CPU material descriptions or asset IDs into graphics-owned material slots without storing those slots in canonical ECS components.
+- [x] Registry failures are deterministic and testable in CPU-only CI.
+- [x] Backend-specific work remains behind declared RHI/backend integration points.
 ## Verification
 ```bash
 cmake --preset ci

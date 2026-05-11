@@ -40,28 +40,28 @@
   - If rejected, document the rationale and remove the `Extrinsic.Asset.Registry` entry from the contract test's prohibited-import list with a targeted comment so the rule remains current.
 
 ## Required changes
-- Run and review the strict layering check for `src` (no new violations introduced).
-- Remove unnecessary ECS link dependencies if they are not required by promoted modules.
-- Replace untyped asset IDs in ECS components with the promoted asset registry ID type only if that preserves the documented `ecs` dependency policy; otherwise record a follow-up architecture exception instead of adding an ad hoc type.
-- Document which geometry types ECS components may store directly and why.
-- Document that scene hierarchy and collider hierarchy are separate concepts: ECS parent/child relationships do not implicitly become compound-collider topology.
-- Add checks or docs that prohibit `PhysicsBodyHandle`, broadphase proxy handles, contact caches, island IDs, solver indices, runtime sync sidecars, graphics handles, and RHI handles from canonical ECS components.
-- Add a contract test or structural check coverage for prohibited ECS imports into graphics, runtime, platform, app, and live asset services.
+- [x] Run and review the strict layering check for `src` (no new violations introduced).
+- [x] Remove unnecessary ECS link dependencies if they are not required by promoted modules.
+- [x] Replace untyped asset IDs in ECS components with the promoted asset registry ID type only if that preserves the documented `ecs` dependency policy; otherwise record a follow-up architecture exception instead of adding an ad hoc type.
+- [x] Document which geometry types ECS components may store directly and why.
+- [x] Document that scene hierarchy and collider hierarchy are separate concepts: ECS parent/child relationships do not implicitly become compound-collider topology.
+- [x] Add checks or docs that prohibit `PhysicsBodyHandle`, broadphase proxy handles, contact caches, island IDs, solver indices, runtime sync sidecars, graphics handles, and RHI handles from canonical ECS components.
+- [x] Add a contract test or structural check coverage for prohibited ECS imports into graphics, runtime, platform, app, and live asset services.
 
 ## Tests
-- Add/update a contract test under `tests/contract/ecs/` if existing tooling does not already cover the import/dependency rule.
-- Keep tests CPU-only and label them `contract;ecs`.
+- [x] Add/update a contract test under `tests/contract/ecs/` if existing tooling does not already cover the import/dependency rule.
+- [x] Keep tests CPU-only and label them `contract;ecs`.
 
 ## Docs
-- Update `src/ecs/README.md` dependency notes.
-- Update `docs/migration/nonlegacy-parity-matrix.md` only if readiness or blockers change.
-- Update `tasks/README.md` only if a new task prefix/category convention is introduced.
+- [x] Update `src/ecs/README.md` dependency notes.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` only if readiness or blockers change.
+- [x] Update `tasks/README.md` only if a new task prefix/category convention is introduced.
 
 ## Acceptance criteria
-- ECS CMake dependencies match actual promoted module imports.
-- ECS component docs explicitly separate CPU scene data from runtime/graphics/physics sidecars.
-- ECS component docs explicitly separate collider descriptors from rigid-body descriptors and defer solver-owned state to the future physics/runtime integration boundary.
-- Structural checks catch accidental high-layer imports into ECS.
+- [x] ECS CMake dependencies match actual promoted module imports.
+- [x] ECS component docs explicitly separate CPU scene data from runtime/graphics/physics sidecars.
+- [x] ECS component docs explicitly separate collider descriptors from rigid-body descriptors and defer solver-owned state to the future physics/runtime integration boundary.
+- [x] Structural checks catch accidental high-layer imports into ECS.
 
 ## Verification
 ```bash

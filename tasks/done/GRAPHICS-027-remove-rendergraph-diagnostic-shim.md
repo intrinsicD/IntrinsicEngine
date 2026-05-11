@@ -27,27 +27,27 @@ Owned by `graphics/framegraph` and `graphics/renderer`. `GRAPHICS-022` introduce
 
 ## Required changes
 
-- Audit in-repository call sites of `RenderGraphCompiler::GetLastCompileDiagnostic()` and `RenderGraph::GetLastCompileDiagnostic()`.
-- Replace caller assertions/reporting with `GetLastCompileValidationResult()` or `CompiledRenderGraph::ValidationFindings` where appropriate.
-- Remove the string shim API and thread-local/member storage once no longer used.
-- Update diagnostics docs and task references that mention the compatibility shim.
+- [x] Audit in-repository call sites of `RenderGraphCompiler::GetLastCompileDiagnostic()` and `RenderGraph::GetLastCompileDiagnostic()`.
+- [x] Replace caller assertions/reporting with `GetLastCompileValidationResult()` or `CompiledRenderGraph::ValidationFindings` where appropriate.
+- [x] Remove the string shim API and thread-local/member storage once no longer used.
+- [x] Update diagnostics docs and task references that mention the compatibility shim.
 
 ## Tests
 
-- Update any tests that assert the string shim to assert structured validation findings instead.
-- Preserve CPU-only coverage for compile hard errors and successful compile warnings.
+- [x] Update any tests that assert the string shim to assert structured validation findings instead.
+- [x] Preserve CPU-only coverage for compile hard errors and successful compile warnings.
 
 ## Docs
 
-- Update `docs/architecture/rendering-three-pass.md` and `src/graphics/renderer/README.md` to remove compatibility-shim language.
-- Refresh generated module inventory if exported symbols are removed.
+- [x] Update `docs/architecture/rendering-three-pass.md` and `src/graphics/renderer/README.md` to remove compatibility-shim language.
+- [x] Refresh generated module inventory if exported symbols are removed.
 
 ## Acceptance criteria
 
-- No production or test code calls `GetLastCompileDiagnostic()`.
-- Compile failures remain inspectable via `RenderGraphValidationResult` findings.
-- Focused rendergraph validation tests pass.
-- Default CPU correctness gate remains green.
+- [x] No production or test code calls `GetLastCompileDiagnostic()`.
+- [x] Compile failures remain inspectable via `RenderGraphValidationResult` findings.
+- [x] Focused rendergraph validation tests pass.
+- [x] Default CPU correctness gate remains green.
 
 ## Verification
 

@@ -104,37 +104,37 @@ are recorded so reviewers can see what was rejected and why.
     - Rejected alternative: letting renderer or app inspect Vulkan diagnostics to choose alternate passes — rejected because it creates a graphics/app backdoor around the RHI seam and would violate AGENTS.md §2 layering.
 
 ## Required changes
-- ✅ Recorded all fourteen decisions above, including the ordered gate checklist and the full runtime reconciliation truth table.
-- ✅ Cross-linked with GRAPHICS-013CQ (present), GRAPHICS-018 / 018Q / 018R / 018S / 018T / 026, GRAPHICS-022 (rendergraph diagnostics), GRAPHICS-027 (post-shim cleanup), GRAPHICS-032 (minimal recipe consumer), and the [2026-05-08 sandbox visible-geometry review](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
-- ✅ Identified follow-up implementation children (do **not** open here):
-  - **GRAPHICS-033-Impl-A** — add `VulkanOperationalStatusCode`, `VulkanOperationalReason`, `VulkanOperationalInputs`, `VulkanOperationalStatus`, `EvaluateVulkanOperationalStatus(...)`, and CPU `contract;graphics` tests for the gate order and reconciliation matrix. No runtime breadcrumb wiring and no command-recording bodies land here.
-  - **GRAPHICS-033-Impl-B** — add `VulkanOperationalDiagnosticsSnapshot`, process-monotonic counters, reason histogram, `VulkanRequestedButNotOperational` startup breadcrumb wiring, and `contract;runtime` tests for requested-Vulkan → Null fallback diagnostics.
-  - **GRAPHICS-033-Impl-C** — implement Vulkan command-recording bodies for the GRAPHICS-032 `FrameRecipe::MinimalDebugSurface` recipe once GRAPHICS-018R's operational-transition reset seam is available; add CPU command-sequence parity tests and keep real-device execution opt-in.
-  - **GRAPHICS-033-Impl-D** — add the opt-in `gpu;vulkan` visible-triangle smoke fixture that exercises one GRAPHICS-032 frame on hosts with Vulkan support and asserts `Operational` only after all gate prerequisites are met.
+- [x] ✅ Recorded all fourteen decisions above, including the ordered gate checklist and the full runtime reconciliation truth table.
+- [x] ✅ Cross-linked with GRAPHICS-013CQ (present), GRAPHICS-018 / 018Q / 018R / 018S / 018T / 026, GRAPHICS-022 (rendergraph diagnostics), GRAPHICS-027 (post-shim cleanup), GRAPHICS-032 (minimal recipe consumer), and the [2026-05-08 sandbox visible-geometry review](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
+- [x] ✅ Identified follow-up implementation children (do **not** open here):
+  - [x] **GRAPHICS-033-Impl-A** — add `VulkanOperationalStatusCode`, `VulkanOperationalReason`, `VulkanOperationalInputs`, `VulkanOperationalStatus`, `EvaluateVulkanOperationalStatus(...)`, and CPU `contract;graphics` tests for the gate order and reconciliation matrix. No runtime breadcrumb wiring and no command-recording bodies land here.
+  - [x] **GRAPHICS-033-Impl-B** — add `VulkanOperationalDiagnosticsSnapshot`, process-monotonic counters, reason histogram, `VulkanRequestedButNotOperational` startup breadcrumb wiring, and `contract;runtime` tests for requested-Vulkan → Null fallback diagnostics.
+  - [x] **GRAPHICS-033-Impl-C** — implement Vulkan command-recording bodies for the GRAPHICS-032 `FrameRecipe::MinimalDebugSurface` recipe once GRAPHICS-018R's operational-transition reset seam is available; add CPU command-sequence parity tests and keep real-device execution opt-in.
+  - [x] **GRAPHICS-033-Impl-D** — add the opt-in `gpu;vulkan` visible-triangle smoke fixture that exercises one GRAPHICS-032 frame on hosts with Vulkan support and asserts `Operational` only after all gate prerequisites are met.
 
 ## Tests
-- Planning slice: validators only.
-- Implementation children must add the matrix, diagnostic, and smoke tests as enumerated above.
-- Verification gate (CPU-only):
+- [x] Planning slice: validators only.
+- [x] Implementation children must add the matrix, diagnostic, and smoke tests as enumerated above.
+- [x] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
-- Optional GPU smoke gate (only on hosts with Vulkan):
+- [x] Optional GPU smoke gate (only on hosts with Vulkan):
   ```bash
   ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
   ```
 
 ## Docs
-- Update `src/graphics/vulkan/README.md` to record the gate enumeration, reason enum, and diagnostic surface.
-- Update `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md` with the operational-readiness gates and reconciliation rule.
-- Update `docs/migration/nonlegacy-parity-matrix.md` rows for Vulkan operational status.
-- Update `tasks/backlog/rendering/README.md` DAG after GRAPHICS-032.
+- [x] Update `src/graphics/vulkan/README.md` to record the gate enumeration, reason enum, and diagnostic surface.
+- [x] Update `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md` with the operational-readiness gates and reconciliation rule.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` rows for Vulkan operational status.
+- [x] Update `tasks/backlog/rendering/README.md` DAG after GRAPHICS-032.
 
 ## Acceptance criteria
-- All fourteen decisions recorded with explicit answers and trade-off rationales; the gate checklist and the truth table are fully enumerated. ✅
-- Implementation children identified with scope and dependency gates but not opened. ✅
-- Backend remains fail-closed in this slice; no engine behavior changes land. ✅
-- Layering invariants hold. ✅
+- [x] All fourteen decisions recorded with explicit answers and trade-off rationales; the gate checklist and the truth table are fully enumerated. ✅
+- [x] Implementation children identified with scope and dependency gates but not opened. ✅
+- [x] Backend remains fail-closed in this slice; no engine behavior changes land. ✅
+- [x] Layering invariants hold. ✅
 
 ## Verification
 ```bash

@@ -31,9 +31,9 @@ Lock down the contract for replacing the current per-frame full re-extraction of
 12. **Performance bound.** Delta-apply CPU cost is bounded by O(changed records); GPU dispatch cost is bounded by O(changed records). Recorded in benchmarks.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-052-Impl-A** — Delta record shape + field-mask encoding + `contract;runtime` shape tests.
@@ -43,22 +43,22 @@ Lock down the contract for replacing the current per-frame full re-extraction of
 - **GRAPHICS-052-Impl-E** — Pipelined-frame interaction wiring (gated by `GRAPHICS-036`).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` snapshot-extraction section to record the delta shape.
-- Update `src/runtime/README.md` extraction section.
-- Update `src/graphics/renderer/README.md` scene-buffer section.
+- [ ] Update `docs/architecture/graphics.md` snapshot-extraction section to record the delta shape.
+- [ ] Update `src/runtime/README.md` extraction section.
+- [ ] Update `src/graphics/renderer/README.md` scene-buffer section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Snapshot-extraction boundary is preserved.
-- Full-extract path remains the unconditional default until Impl-D ships.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Snapshot-extraction boundary is preserved.
+- [ ] Full-extract path remains the unconditional default until Impl-D ships.
 
 ## Verification
 ```bash

@@ -82,19 +82,19 @@
   container.
 
 ## Required changes
-- Edit `src/geometry/Geometry.PointCloud.IO.cpp` only:
-  - Inside the existing anonymous namespace, add small helpers
+- [x] Edit `src/geometry/Geometry.PointCloud.IO.cpp` only:
+  - [x] Inside the existing anonymous namespace, add small helpers
     (placed near the existing PLY helpers; the PCD helpers stay
     independent of `PlyScalar`/`PlyProperty` to keep the two parsers
     decoupled):
-    - `struct PcdField { std::string Name; std::size_t Size; char
+    - [x] `struct PcdField { std::string Name; std::size_t Size; char
       Type; std::size_t Count; std::size_t ByteOffset; std::size_t
       ScalarOffset; }`.
-    - `struct PcdHeader { std::vector<PcdField> Fields; std::size_t
+    - [x] `struct PcdHeader { std::vector<PcdField> Fields; std::size_t
       Points; std::size_t Width; std::size_t Height; std::size_t
       PointStride; std::size_t ScalarValueCount; std::string
       DataEncoding; }`.
-    - `[[nodiscard]] std::optional<PcdHeader> ParsePCDHeader(
+    - [x] `[[nodiscard]] std::optional<PcdHeader> ParsePCDHeader(
       std::string_view text, std::size_t& cursor)` — recognizes
       `FIELDS`, `SIZE`, `TYPE`, `COUNT`, `POINTS`, `WIDTH`,
       `HEIGHT`, `DATA`; ignores comments and blank lines; computes
@@ -104,9 +104,9 @@
       `Points = Width * Height` if `POINTS` is absent. Rejects
       mismatched FIELDS/SIZE/TYPE counts, zero `Size`, zero
       `Count`, missing `DATA` line.
-    - `[[nodiscard]] const PcdField* FindPCDField(
+    - [x] `[[nodiscard]] const PcdField* FindPCDField(
       std::span<const PcdField>, std::string_view)`.
-    - `[[nodiscard]] std::optional<float> ReadPCDBinaryScalar(
+    - [x] `[[nodiscard]] std::optional<float> ReadPCDBinaryScalar(
       std::span<const std::byte> pointBytes, const PcdField&)` — the
       direct port of `ReadBinaryFieldValue` from the legacy
       reference, using `std::memcpy` plus a host-endian byte-swap
@@ -114,21 +114,21 @@
       `std::endian::native == std::endian::big`. Floats use
       `std::bit_cast<float>(std::uint32_t)` on the byte-swapped
       bits.
-  - Refactor `LoadPCD` to:
-    - Read the file via the existing `ReadTextFile` (no change).
-    - Replace the inline header loop with `ParsePCDHeader`. Reject
+  - [x] Refactor `LoadPCD` to:
+    - [x] Read the file via the existing `ReadTextFile` (no change).
+    - [x] Replace the inline header loop with `ParsePCDHeader`. Reject
       with `InvalidPointCloudFormat()` if the parse fails.
-    - Locate `x`, `y`, `z` fields (mandatory) and the optional
+    - [x] Locate `x`, `y`, `z` fields (mandatory) and the optional
       `normal_x/normal_y/normal_z` and `r/g/b` fields via
       `FindPCDField`, mirroring the existing ASCII path.
-    - Branch on `header.DataEncoding`:
-      - `"ascii"` — preserve the existing ASCII row loop byte-for-
+    - [x] Branch on `header.DataEncoding`:
+      - [x] `"ascii"` — preserve the existing ASCII row loop byte-for-
         byte (using the existing `ParseNumber<float>` + scalar-index
         lookup against `tokens`). The lookup index for each field is
         `field.ScalarOffset` (which equals the previous direct-FIELD
         index for the common all-`COUNT 1` case, so existing
         fixtures continue to parse identically).
-      - `"binary"` — take the bytes from `cursor` to end as the body
+      - [x] `"binary"` — take the bytes from `cursor` to end as the body
         span, reject if `header.PointStride == 0`, and walk
         `header.Points` rows. If `Points == 0` and `Width*Height == 0`
         as well, reject. For each row, slice a per-row
@@ -138,56 +138,56 @@
         channels (matching the ASCII path). A truncated body
         (`remainingBytes < pointCount * pointStride`) rejects with
         `InvalidPointCloudFormat()`.
-      - Anything else (including `"binary_compressed"`) rejects with
+      - [x] Anything else (including `"binary_compressed"`) rejects with
         `InvalidPointCloudFormat()`.
-    - Final empty-cloud / mismatched-count rejection at the end of
+    - [x] Final empty-cloud / mismatched-count rejection at the end of
       the function continues to apply to both branches.
-- Public module surface (`Geometry.PointCloud.IO.cppm`) does not
+- [x] Public module surface (`Geometry.PointCloud.IO.cppm`) does not
   change; the inventory should remain identical apart from the
   regeneration date (matches `GEOIO-002B`/`C`/`D`/`E`/`F` precedent).
-- Do not change `LoadXYZ`/`LoadPLY` behavior, do not introduce new
+- [x] Do not change `LoadXYZ`/`LoadPLY` behavior, do not introduce new
   module imports, and do not touch any file outside
   `src/geometry/Geometry.PointCloud.IO.cpp`,
   `tests/unit/geometry/Test.GeometryIO.cpp`, and `tasks/`.
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `LoadsBinaryPCDPointCloud`: minimal `FIELDS x y z` /
+  - [x] `LoadsBinaryPCDPointCloud`: minimal `FIELDS x y z` /
     `SIZE 4 4 4` / `TYPE F F F` / `COUNT 1 1 1` /
     `WIDTH N` / `HEIGHT 1` / `POINTS N` / `DATA binary` followed by
     binary float positions for three vertices; assert positions
     match.
-  - `LoadsBinaryPCDPointCloudWithNormalsAndColor`: layout includes
+  - [x] `LoadsBinaryPCDPointCloudWithNormalsAndColor`: layout includes
     `normal_x normal_y normal_z` (Float32) and `r g b` (UInt8);
     assert positions, `HasNormals`, normals, `HasColors`, and color
     channels normalized via `NormalizeColorChannel`.
-  - `LoadsBinaryPCDPointCloudSkipsExtraScalars`: layout includes an
+  - [x] `LoadsBinaryPCDPointCloudSkipsExtraScalars`: layout includes an
     unrecognized `intensity` Float32 field between the position and
     color fields; positions and colors must still parse correctly.
-  - `LoadsBinaryPCDPointCloudFromWidthHeight`: `POINTS` line is
+  - [x] `LoadsBinaryPCDPointCloudFromWidthHeight`: `POINTS` line is
     absent; the loader must derive `Points = Width * Height`.
-  - `LoadPCDRejectsTruncatedBinaryBody`: header advertises four
+  - [x] `LoadPCDRejectsTruncatedBinaryBody`: header advertises four
     points but only one point's worth of bytes is written; expect
     `Core::ErrorCode::InvalidFormat`.
-  - `LoadPCDRejectsBinaryCompressed`: header is otherwise valid but
+  - [x] `LoadPCDRejectsBinaryCompressed`: header is otherwise valid but
     `DATA binary_compressed`; expect
     `Core::ErrorCode::InvalidFormat`.
-  - `LoadPCDRejectsZeroSizeField`: `SIZE 0 4 4` makes the per-field
+  - [x] `LoadPCDRejectsZeroSizeField`: `SIZE 0 4 4` makes the per-field
     size zero for `x`; expect `Core::ErrorCode::InvalidFormat`.
-  - Regression: the existing
+  - [x] Regression: the existing
     `LoadsASCIIPCDWithNormalsAndColor` (line 151) must continue to
     pass through the refactored dispatch path.
-- Helper: add a `WriteBinaryPCDFixture` test fixture writer
+- [x] Helper: add a `WriteBinaryPCDFixture` test fixture writer
   alongside `WriteBinaryPLYPointCloudFixture` (line 1053) that:
-  - Takes positions, optional normals, optional uchar `r/g/b`
+  - [x] Takes positions, optional normals, optional uchar `r/g/b`
     colors, an optional extra-`float intensity` flag, an
     `advertisedPointCountOverride`, an `omitPointsLine` flag (for
     the WIDTH/HEIGHT-derived case), a `dataEncoding` string
     (`"binary"` / `"binary_compressed"` / etc.), an
     `overrideXSize` knob (for the zero-size negative test), and a
     truncation-after-first-point flag.
-  - Emits the ASCII header up through `DATA <encoding>\n`, then
+  - [x] Emits the ASCII header up through `DATA <encoding>\n`, then
     writes the binary body via `std::ofstream(..., std::ios::binary)`
     and explicit byte-level `write` calls. Floats are written by
     `std::memcpy`-ing the host float into a four-byte buffer
@@ -197,31 +197,31 @@
     and the colors (if any).
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module
+- [x] Update `docs/api/generated/module_inventory.md` only if module
   surfaces change in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding internal helpers
   and expanding a function body is not expected to change the
   inventory; if the regenerator only changes the date, leave it
   untouched (matches `GEOIO-002B`/`C`/`D`/`E`/`F` precedent).
-- No additional architecture/migration doc edits required for this
+- [x] No additional architecture/migration doc edits required for this
   slice; parity-matrix updates remain part of the parent
   `GEOIO-002` task once asset/runtime routing actually drops the
   legacy graphics importers.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::LoadPCD` returns a populated
+- [x] `Geometry::PointCloudIO::LoadPCD` returns a populated
   `PointCloudIOResult` for well-formed binary PCD point-cloud
   fixtures, with positions equal to the input vertices and, when
   present, normals and normalized colors.
-- `LoadPCD` continues to accept ASCII PCD fixtures (existing
+- [x] `LoadPCD` continues to accept ASCII PCD fixtures (existing
   `LoadsASCIIPCDWithNormalsAndColor` continues to pass).
-- A truncated binary payload, a `binary_compressed` encoding, or a
+- [x] A truncated binary payload, a `binary_compressed` encoding, or a
   zero-size field declaration produces `Core::ErrorCode::InvalidFormat`
   rather than out-of-bounds reads or partial parses.
-- `src/geometry/*` imports remain layered (`geometry -> core` only);
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only);
   no new asset/runtime/graphics imports introduced.
-- Existing `LoadXYZ`, mesh `LoadPLY`/`LoadOBJ`/`LoadOFF`/`LoadSTL`,
+- [x] Existing `LoadXYZ`, mesh `LoadPLY`/`LoadOBJ`/`LoadOFF`/`LoadSTL`,
   point-cloud `LoadPLY`, and all `Write*` tests continue to pass.
 
 ## Verification

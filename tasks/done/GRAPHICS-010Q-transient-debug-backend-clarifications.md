@@ -108,20 +108,20 @@
 - Remaining questions affect backend upload strategy and should not block spatial debug visualizer packet generation in `GRAPHICS-011`.
 
 ## Required changes
-- Decide whether transient debug packets are expanded into dedicated per-frame GPU buffers or folded into canonical `GpuWorld`/culling buckets by a staging upload system.
-- Clarify whether debug triangles reuse the surface/G-buffer path, a dedicated debug-surface pass, or a future hybrid/overlay path.
-- Clarify per-packet depth-tested versus overlay lane routing and whether that becomes separate buckets or pipeline variants.
-- Clarify diagnostics/limits for excessive transient primitive counts and backend allocation failures.
+- [x] Decide whether transient debug packets are expanded into dedicated per-frame GPU buffers or folded into canonical `GpuWorld`/culling buckets by a staging upload system.
+- [x] Clarify whether debug triangles reuse the surface/G-buffer path, a dedicated debug-surface pass, or a future hybrid/overlay path.
+- [x] Clarify per-packet depth-tested versus overlay lane routing and whether that becomes separate buckets or pipeline variants.
+- [x] Clarify diagnostics/limits for excessive transient primitive counts and backend allocation failures.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless docs tooling changes.
+- [x] Documentation/checker only; no C++ tests required unless docs tooling changes.
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` and `src/graphics/renderer/README.md` with the chosen upload and backend routing policy.
+- [x] Update `docs/architecture/rendering-three-pass.md` and `src/graphics/renderer/README.md` with the chosen upload and backend routing policy.
 
 ## Acceptance criteria
-- Later Vulkan/backend work can implement transient debug packet upload without changing graphics/runtime ownership boundaries.
-- Spatial visualizer work can generate packet spans without depending on backend upload internals.
+- [x] Later Vulkan/backend work can implement transient debug packet upload without changing graphics/runtime ownership boundaries.
+- [x] Spatial visualizer work can generate packet spans without depending on backend upload internals.
 
 ## Verification
 ```bash

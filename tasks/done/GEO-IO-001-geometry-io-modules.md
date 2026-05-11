@@ -14,21 +14,21 @@
 - Legacy graphics importers contain parsing behavior, but new geometry modules must not depend on `graphics`, `assets`, `runtime`, or live legacy importer registries.
 
 ## Required changes
-- Register and implement `Geometry.HalfedgeMesh.IO`.
-- Add `Geometry.PointCloud.IO` with text point cloud loaders.
-- Add `Geometry.Graph.IO` with text graph loaders.
-- Re-export the new I/O modules from the aggregate `Geometry` module.
+- [x] Register and implement `Geometry.HalfedgeMesh.IO`.
+- [x] Add `Geometry.PointCloud.IO` with text point cloud loaders.
+- [x] Add `Geometry.Graph.IO` with text graph loaders.
+- [x] Re-export the new I/O modules from the aggregate `Geometry` module.
 
 ## Tests
-- Add focused unit coverage for mesh, point cloud, and graph I/O under `tests/unit/geometry`.
+- [x] Add focused unit coverage for mesh, point cloud, and graph I/O under `tests/unit/geometry`.
 
 ## Docs
-- Refresh generated module inventory after adding module surfaces.
+- [x] Refresh generated module inventory after adding module surfaces.
 
 ## Acceptance criteria
-- Geometry I/O modules build as part of `IntrinsicGeometry`.
-- New loaders return deterministic geometry/property containers and `Core::Expected` failures.
-- No new dependency edge from `geometry` to graphics/assets/runtime.
+- [x] Geometry I/O modules build as part of `IntrinsicGeometry`.
+- [x] New loaders return deterministic geometry/property containers and `Core::Expected` failures.
+- [x] No new dependency edge from `geometry` to graphics/assets/runtime.
 
 ## Verification
 ```bash

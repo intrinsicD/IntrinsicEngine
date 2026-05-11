@@ -81,76 +81,76 @@
   focused gate may not run in the agent container.
 
 ## Required changes
-- Edit `src/geometry/Geometry.HalfedgeMesh.IO.cpp` only:
-  - Inside the existing anonymous namespace at the top of the file, add:
-    - `enum class OFFVariant { Standard, COFF, NOFF, CNOFF };` placed
+- [x] Edit `src/geometry/Geometry.HalfedgeMesh.IO.cpp` only:
+  - [x] Inside the existing anonymous namespace at the top of the file, add:
+    - [x] `enum class OFFVariant { Standard, COFF, NOFF, CNOFF };` placed
       near other small mesh-IO helpers (above `LoadOFF`).
-    - `[[nodiscard]] std::optional<OFFVariant> ParseOFFMagic(std::string_view line);`
+    - [x] `[[nodiscard]] std::optional<OFFVariant> ParseOFFMagic(std::string_view line);`
       returning the variant for `"OFF"`, `"COFF"`, `"NOFF"`, `"CNOFF"` and
       `std::nullopt` otherwise.
-    - `[[nodiscard]] float NormalizeOFFColorChannel(float value);` mirroring
+    - [x] `[[nodiscard]] float NormalizeOFFColorChannel(float value);` mirroring
       the `Geometry.PointCloud.IO.cpp` `NormalizeColorChannel` helper:
       `value > 1.0f ? std::clamp(value / 255.0f, 0.0f, 1.0f) : std::clamp(value, 0.0f, 1.0f)`.
-  - Refactor `LoadOFF`:
-    - Replace the `line != "OFF"` check with `ParseOFFMagic(line)`; on
+  - [x] Refactor `LoadOFF`:
+    - [x] Replace the `line != "OFF"` check with `ParseOFFMagic(line)`; on
       `std::nullopt` return `InvalidMeshFormat()`. Derive
       `hasNormals = (variant == NOFF || variant == CNOFF)` and
       `hasColors = (variant == COFF || variant == CNOFF)`.
-    - In the vertex loop, after parsing `x y z` from `tokens[0..2]`,
+    - [x] In the vertex loop, after parsing `x y z` from `tokens[0..2]`,
       read three optional normal tokens at `tokens[3..5]` when
       `hasNormals` and `tokens.size() >= 6`, defaulting to `(0, 1, 0)` on
       missing/unparseable values to match legacy behavior. Track a
       `tokenIdx` cursor so colors read from the correct offset
       (`tokenIdx == 3` when no normals, `tokenIdx == 6` when normals were
       consumed).
-    - Read three optional color tokens at `tokens[tokenIdx..tokenIdx+2]`
+    - [x] Read three optional color tokens at `tokens[tokenIdx..tokenIdx+2]`
       when `hasColors` and the row has at least three remaining tokens.
       Normalize via `NormalizeOFFColorChannel` and store as
       `glm::vec4(r, g, b, 1.0f)`; default to `glm::vec4(0, 0, 0, 1)` on
       missing/unparseable values to match the legacy default.
-    - Consume an optional fourth alpha token if present (parse via
+    - [x] Consume an optional fourth alpha token if present (parse via
       `ParseNumber<float>` and discard) so a stray alpha does not
       contaminate downstream parsing. Do not store it.
-    - Replace the `*count < 3` hard-fail in the face loop with
+    - [x] Replace the `*count < 3` hard-fail in the face loop with
       `continue` (soft-skip degenerate face rows). Keep the
       `tokens.size() < count + 1` and out-of-range-index hard-fails.
-    - After the existing `PopulateResult(result, vertices, faces, normals)`
+    - [x] After the existing `PopulateResult(result, vertices, faces, normals)`
       call (extend the existing `normals` argument so `PopulateResult`
       writes `v:normal` only when `hasNormals` and the per-vertex normal
       vector is the same length as positions), populate `v:color` if
       `hasColors` by allocating a `glm::vec4` property and copying the
       `colors` vector. The existing `PopulateResult` already gates
       normal writes on a non-empty span of equal length; reuse that.
-  - Local containers `std::vector<glm::vec3> normals` and
+  - [x] Local containers `std::vector<glm::vec3> normals` and
     `std::vector<glm::vec4> colors` are sized to `*vertexCount` only when
     `hasNormals`/`hasColors` is true, mirroring the legacy
     `outData.Normals().resize(*nVertices, ...)` /
     `outData.Attrs().resize(*nVertices, ...)` defaults.
-- Public module surface (`Geometry.HalfedgeMesh.IO.cppm`) does not change;
+- [x] Public module surface (`Geometry.HalfedgeMesh.IO.cppm`) does not change;
   the inventory should remain identical apart from the regeneration date
   (matches `GEOIO-002B`/`C`/`D`/`E`/`F`/`G`/`H` precedent).
-- Do not touch any file outside
+- [x] Do not touch any file outside
   `src/geometry/Geometry.HalfedgeMesh.IO.cpp`,
   `tests/unit/geometry/Test.GeometryIO.cpp`, and `tasks/`.
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `LoadsCOFFTriangleWithVertexColors`: `COFF` magic, 6-token vertex rows
+  - [x] `LoadsCOFFTriangleWithVertexColors`: `COFF` magic, 6-token vertex rows
     (`x y z r g b` with `r,g,b` integer 0..255). Asserts `Vertices.Size()
     == 3`, `v:point` matches positions, `v:color` is populated with
     channel-normalized values and `alpha == 1.0`.
-  - `LoadsCOFFAlphaTokenIsConsumedNotStored`: `COFF` magic, 7-token vertex
+  - [x] `LoadsCOFFAlphaTokenIsConsumedNotStored`: `COFF` magic, 7-token vertex
     rows (`x y z r g b a`). Asserts the load succeeds, `v:color` stores the
     RGB-normalized triplet with `alpha == 1.0` (the trailing `a` is read
     via `ParseNumber` but discarded).
-  - `LoadsNOFFTriangleWithVertexNormals`: `NOFF` magic, 6-token vertex rows
+  - [x] `LoadsNOFFTriangleWithVertexNormals`: `NOFF` magic, 6-token vertex rows
     (`x y z nx ny nz`). Asserts `v:normal` is populated and matches the
     file's normals.
-  - `LoadsCNOFFTriangleWithNormalsAndColors`: `CNOFF` magic, 9-token vertex
+  - [x] `LoadsCNOFFTriangleWithNormalsAndColors`: `CNOFF` magic, 9-token vertex
     rows. Asserts both `v:normal` and `v:color` are populated correctly
     with colors normalized.
-  - `LoadOFFSkipsDegenerateFaceRows`: file declares one `2 0 1` face plus
+  - [x] `LoadOFFSkipsDegenerateFaceRows`: file declares one `2 0 1` face plus
     one valid `3 0 1 2` face in the face block (with the face count line
     declaring `2`). Asserts the load succeeds with one face populated and
     `v:point` containing all three vertices. (Note: the second declared
@@ -158,43 +158,43 @@
     it without aborting and leaves a single populated `f:vertices`
     entry. To keep `*faceCount` honored, we declare two face rows in the
     counts header so the loop iterates both.)
-  - `LoadOFFRejectsUnknownMagic`: file with magic `"FOO"` returns
+  - [x] `LoadOFFRejectsUnknownMagic`: file with magic `"FOO"` returns
     `Core::ErrorCode::InvalidFormat`.
-  - `LoadOFFRejectsOutOfRangeVertexIndex`: face references a vertex index
+  - [x] `LoadOFFRejectsOutOfRangeVertexIndex`: face references a vertex index
     `>= vertexCount`; returns `InvalidFormat` (preserves existing
     strictness).
-  - Regression: existing `LoadsOFFTriangle` continues to pass on the
+  - [x] Regression: existing `LoadsOFFTriangle` continues to pass on the
     canonical `OFF` (Standard) magic.
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module surfaces
+- [x] Update `docs/api/generated/module_inventory.md` only if module surfaces
   change in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding internal helpers and
   tightening `LoadOFF` is not expected to change the inventory; if the
   regenerator only changes the date, leave it untouched (matches
   `GEOIO-002B`/`C`/`D`/`E`/`F`/`G`/`H` precedent).
-- No additional architecture/migration doc edits required for this slice;
+- [x] No additional architecture/migration doc edits required for this slice;
   parity-matrix updates remain part of the parent `GEOIO-002` task once
   asset/runtime routing actually drops the legacy graphics importers.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::LoadOFF` returns a populated `MeshIOResult` for `.off`
+- [x] `Geometry::MeshIO::LoadOFF` returns a populated `MeshIOResult` for `.off`
   fixtures covering: canonical `OFF` magic, `COFF` magic with 6-token and
   7-token (alpha-bearing) vertex rows, `NOFF` magic with 6-token vertex
   rows, and `CNOFF` magic with 9-token vertex rows.
-- For `COFF`/`CNOFF`, the resulting `MeshIOResult.Vertices` contains a
+- [x] For `COFF`/`CNOFF`, the resulting `MeshIOResult.Vertices` contains a
   `glm::vec4 v:color` property whose RGB channels are normalized through
   `NormalizeOFFColorChannel`; alpha is `1.0`.
-- For `NOFF`/`CNOFF`, the resulting `MeshIOResult.Vertices` contains a
+- [x] For `NOFF`/`CNOFF`, the resulting `MeshIOResult.Vertices` contains a
   `glm::vec3 v:normal` property matching the file's normals.
-- A face row with declared count `< 3` is soft-skipped rather than
+- [x] A face row with declared count `< 3` is soft-skipped rather than
   aborting the load. Out-of-range vertex indices and short face rows
   remain hard failures (`InvalidFormat`).
-- An unknown magic header returns `Core::ErrorCode::InvalidFormat`.
-- Existing `LoadsOFFTriangle` continues to pass on the canonical `OFF`
+- [x] An unknown magic header returns `Core::ErrorCode::InvalidFormat`.
+- [x] Existing `LoadsOFFTriangle` continues to pass on the canonical `OFF`
   magic.
-- `src/geometry/*` imports remain layered (`geometry -> core` only); no
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only); no
   new asset/runtime/graphics imports introduced.
 
 ## Verification

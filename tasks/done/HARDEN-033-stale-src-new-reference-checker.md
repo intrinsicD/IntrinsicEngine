@@ -13,25 +13,25 @@
 - `docs/migration/src-new-reference-audit.md` already classifies remaining references as active-stale, migration-ok, or historical-ok.
 
 ## Required changes
-- Add a repository checker script that scans tracked text files for stale `src_new` variants.
-- Add an allowlist file containing migration/historical paths that are intentionally exempt.
-- Wire the checker into CI docs/policy validation.
-- Update `tools/repo/README.md` and hardening tracker status/evidence.
+- [x] Add a repository checker script that scans tracked text files for stale `src_new` variants.
+- [x] Add an allowlist file containing migration/historical paths that are intentionally exempt.
+- [x] Wire the checker into CI docs/policy validation.
+- [x] Update `tools/repo/README.md` and hardening tracker status/evidence.
 
 ## Tests
-- `python3 tools/repo/check_stale_src_new_references.py --root . --strict`
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/repo/check_stale_src_new_references.py --root . --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- `tools/repo/README.md`
-- `tasks/done/0001-post-reorganization-hardening-tracker.md`
+- [x] `tools/repo/README.md`
+- [x] `tasks/done/0001-post-reorganization-hardening-tracker.md`
 
 ## Acceptance criteria
-- Checker fails strict mode when non-allowlisted stale references are present.
-- Checker passes strict mode on current repository state.
-- CI docs workflow runs the checker.
-- Hardening tracker marks `HARDEN-033` done with concrete evidence.
+- [x] Checker fails strict mode when non-allowlisted stale references are present.
+- [x] Checker passes strict mode on current repository state.
+- [x] CI docs workflow runs the checker.
+- [x] Hardening tracker marks `HARDEN-033` done with concrete evidence.
 
 ## Verification
 ```bash

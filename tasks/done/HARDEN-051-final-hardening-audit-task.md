@@ -12,15 +12,15 @@ Create the final hardening audit task definition that captures exact closure evi
 The hardening tracker originally marked HARDEN-051 as `not-started` and required a final audit artifact, now archived at `tasks/done/final-post-reorganization-hardening-audit.md`. This task scoped only the creation of that audit task definition so a follow-up execution step could record pass/fail closure evidence without mixing unrelated changes.
 
 ## Required changes
-- Add this active task file under `tasks/active/`.
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` to point HARDEN-051 at this task file and record creation evidence.
+- [x] Add this active task file under `tasks/active/`.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` to point HARDEN-051 at this task file and record creation evidence.
 
 ## Tests
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- Keep the HARDEN-001 tracker status board and evidence log synchronized with this task creation.
+- [x] Keep the HARDEN-001 tracker status board and evidence log synchronized with this task creation.
 
 ## Acceptance criteria
 - [x] Active task file exists for HARDEN-051.

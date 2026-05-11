@@ -31,9 +31,9 @@ Lock down the contract for a clustered (froxel-grid) light culling pass that bin
 12. **Layering audit.** No live ECS access. No new RHI surfaces.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-039-Impl-A** — Cluster grid resource + build pass + null-RHI shape tests.
@@ -42,20 +42,20 @@ Lock down the contract for a clustered (froxel-grid) light culling pass that bin
 - **GRAPHICS-039-Impl-D** — Async-compute affinity wiring (gated by `GRAPHICS-037`).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` with the clustered-shading section.
-- Update `src/graphics/renderer/README.md` light-system section.
+- [ ] Update `docs/architecture/rendering-three-pass.md` with the clustered-shading section.
+- [ ] Update `src/graphics/renderer/README.md` light-system section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- No new RHI surfaces.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] No new RHI surfaces.
 
 ## Verification
 ```bash

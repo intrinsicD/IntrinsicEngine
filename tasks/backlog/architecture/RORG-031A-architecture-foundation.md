@@ -12,19 +12,19 @@
 - Reorganization requires small, reviewable tasks with explicit acceptance and verification.
 
 ## Required changes
-- Track canonical architecture-doc normalization and taxonomy completion tasks under `tasks/backlog/architecture/`.
-- Track layering-checker, docs-sync-checker, and module-inventory tasks as explicit architecture governance work.
-- Record dependencies on migration and CI tasks where relevant.
+- [ ] Track canonical architecture-doc normalization and taxonomy completion tasks under `tasks/backlog/architecture/`.
+- [ ] Track layering-checker, docs-sync-checker, and module-inventory tasks as explicit architecture governance work.
+- [ ] Record dependencies on migration and CI tasks where relevant.
 
 ## Tests
-- Ensure task file structure follows repository task template headings.
+- [ ] Ensure task file structure follows repository task template headings.
 
 ## Docs
-- Keep references aligned with `AGENTS.md` and `docs/architecture/index.md`.
+- [ ] Keep references aligned with `AGENTS.md` and `docs/architecture/index.md`.
 
 ## Acceptance criteria
-- Architecture backlog is represented by at least one structured task file under `tasks/backlog/architecture/`.
-- This task file includes all required sections (Goal, Non-goals, Context, Required changes, Tests, Docs, Acceptance criteria, Verification, Forbidden changes).
+- [ ] Architecture backlog is represented by at least one structured task file under `tasks/backlog/architecture/`.
+- [ ] This task file includes all required sections (Goal, Non-goals, Context, Required changes, Tests, Docs, Acceptance criteria, Verification, Forbidden changes).
 
 ## Verification
 ```bash

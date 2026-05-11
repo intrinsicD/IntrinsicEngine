@@ -24,30 +24,30 @@ Owned by `graphics/rhi` and `graphics/vulkan`. Before this task, `RHI::SamplerDe
 
 ## Required changes
 
-- Add a backend-neutral border-color enum/field to `RHI::SamplerDesc`.
-- Map the enum to Vulkan `VkBorderColor` in `Backends.Vulkan.Mappings` or the sampler creation path.
-- Preserve the current opaque-black default for existing callers.
-- Update source-grep/linkage guards that mention sampler creation.
-- Done 2026-05-04: all required changes landed; no Vulkan types were exposed through RHI.
+- [x] Add a backend-neutral border-color enum/field to `RHI::SamplerDesc`.
+- [x] Map the enum to Vulkan `VkBorderColor` in `Backends.Vulkan.Mappings` or the sampler creation path.
+- [x] Preserve the current opaque-black default for existing callers.
+- [x] Update source-grep/linkage guards that mention sampler creation.
+- [x] Done 2026-05-04: all required changes landed; no Vulkan types were exposed through RHI.
 
 ## Tests
 
-- Add RHI/Vulkan mapping contract tests for default opaque black and at least one alternate border color.
-- Preserve default CPU gate compatibility; tests must not require a live Vulkan device.
-- Done 2026-05-04: `RHISamplerManager.DefaultSamplerBorderColorPreservesOpaqueBlack` and `RHISamplerManager.BorderColorParticipatesInDedupKey` cover the RHI default and dedup key; `RendererRhiBoundary.SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend` guards the backend-neutral RHI surface and Vulkan mapping/use path without GPU execution.
+- [x] Add RHI/Vulkan mapping contract tests for default opaque black and at least one alternate border color.
+- [x] Preserve default CPU gate compatibility; tests must not require a live Vulkan device.
+- [x] Done 2026-05-04: `RHISamplerManager.DefaultSamplerBorderColorPreservesOpaqueBlack` and `RHISamplerManager.BorderColorParticipatesInDedupKey` cover the RHI default and dedup key; `RendererRhiBoundary.SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend` guards the backend-neutral RHI surface and Vulkan mapping/use path without GPU execution.
 
 ## Docs
 
-- Update `docs/architecture/graphics.md` if the sampler contract is described there.
-- Update `src/graphics/vulkan/README.md` to remove the temporary hard-coded-border-color note.
-- Update `GRAPHICS-018`/`GRAPHICS-026` task links if this lands while either is active.
-- Done 2026-05-04: updated `docs/architecture/graphics.md`, `src/graphics/vulkan/README.md`, active `GRAPHICS-018`, and `GRAPHICS-018Q`; `GRAPHICS-026` was already done and did not require active-task link changes.
+- [x] Update `docs/architecture/graphics.md` if the sampler contract is described there.
+- [x] Update `src/graphics/vulkan/README.md` to remove the temporary hard-coded-border-color note.
+- [x] Update `GRAPHICS-018`/`GRAPHICS-026` task links if this lands while either is active.
+- [x] Done 2026-05-04: updated `docs/architecture/graphics.md`, `src/graphics/vulkan/README.md`, active `GRAPHICS-018`, and `GRAPHICS-018Q`; `GRAPHICS-026` was already done and did not require active-task link changes.
 
 ## Acceptance criteria
 
-- `RHI::SamplerDesc` can represent border color without exposing Vulkan types.
-- Vulkan sampler creation honors the new field when operational.
-- Existing sampler behavior remains unchanged by default.
+- [x] `RHI::SamplerDesc` can represent border color without exposing Vulkan types.
+- [x] Vulkan sampler creation honors the new field when operational.
+- [x] Existing sampler behavior remains unchanged by default.
 
 ## Verification
 

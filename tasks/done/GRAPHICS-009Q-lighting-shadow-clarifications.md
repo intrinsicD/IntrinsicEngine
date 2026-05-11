@@ -97,20 +97,20 @@
 - The remaining questions are documentation/decision records so later backend work can wire resources without changing ownership boundaries.
 
 ## Required changes
-- Decide whether frame-recipe shadow atlas sizing remains viewport-sized until backend integration or receives a typed shadow-sizing input separate from `FrameRecipeFeatures`.
-- Clarify the exact backend binding seam for `ShadowAtlas` sampler state and comparison mode.
-- Clarify runtime/shadow extraction ownership for texel-snapped cascade view-projection calculation and missing shadow-caster diagnostics.
-- Clarify whether deferred lighting push constants remain scene-table-only or gain a typed debug/lighting-mode field in a later task.
+- [x] Decide whether frame-recipe shadow atlas sizing remains viewport-sized until backend integration or receives a typed shadow-sizing input separate from `FrameRecipeFeatures`.
+- [x] Clarify the exact backend binding seam for `ShadowAtlas` sampler state and comparison mode.
+- [x] Clarify runtime/shadow extraction ownership for texel-snapped cascade view-projection calculation and missing shadow-caster diagnostics.
+- [x] Clarify whether deferred lighting push constants remain scene-table-only or gain a typed debug/lighting-mode field in a later task.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless docs tooling changes.
+- [x] Documentation/checker only; no C++ tests required unless docs tooling changes.
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` and any backend integration doc that references shadow atlas sizing or binding.
+- [x] Update `docs/architecture/rendering-three-pass.md` and any backend integration doc that references shadow atlas sizing or binding.
 
 ## Acceptance criteria
-- Follow-up decisions are captured without changing implementation behavior.
-- Later Vulkan/backend tasks can consume the documented shadow/lighting seams without live ECS access or graphics-layer ownership violations.
+- [x] Follow-up decisions are captured without changing implementation behavior.
+- [x] Later Vulkan/backend tasks can consume the documented shadow/lighting seams without live ECS access or graphics-layer ownership violations.
 
 ## Verification
 ```bash

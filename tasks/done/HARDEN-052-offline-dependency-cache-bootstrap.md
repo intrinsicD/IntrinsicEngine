@@ -11,18 +11,18 @@ Unblock the CI preset offline configure requirement by populating `external/cach
 HARDEN-051 closure was blocked because the CI preset requires `INTRINSIC_OFFLINE_DEPS=ON` configure success against a populated `external/cache/*-src` dependency snapshot. This task supplies the reproducible bootstrap procedure and CPU-supported gate evidence so the canonical hardening tracker can record fresh pass/fail status for the offline configure/build/test pipeline.
 
 ## Required changes
-- Add/verify documented bootstrap steps for dependency cache population.
-- Validate offline configure success after cache bootstrap.
-- Record build/ctest evidence needed to close HARDEN-051.
+- [x] Add/verify documented bootstrap steps for dependency cache population.
+- [x] Validate offline configure success after cache bootstrap.
+- [x] Record build/ctest evidence needed to close HARDEN-051.
 
 ## Tests
-- `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`
-- `cmake --build --preset ci --target IntrinsicTests`
-- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- [x] `cmake --preset ci -DINTRINSIC_OFFLINE_DEPS=ON`
+- [x] `cmake --build --preset ci --target IntrinsicTests`
+- [x] `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
 
 ## Docs
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` with bootstrap and gate results.
-- Update `tasks/done/final-post-reorganization-hardening-audit.md` when blocker is resolved.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` with bootstrap and gate results.
+- [x] Update `tasks/done/final-post-reorganization-hardening-audit.md` when blocker is resolved.
 
 ## Acceptance criteria
 - [x] Offline dependency cache bootstrap steps are documented and reproducible.

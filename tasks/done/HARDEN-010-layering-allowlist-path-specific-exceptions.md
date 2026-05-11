@@ -13,24 +13,24 @@
 - Current `tools/repo/layering_allowlist.yaml` uses broad `src/legacy/**` exceptions for every legacy->promoted layer edge.
 
 ## Required changes
-- Replace each broad `src/legacy/**` exception with path-specific `file_glob` scopes anchored to concrete legacy subdirectories.
-- Keep existing task/expiry metadata explicit and temporary.
-- Update `tools/repo/README.md` and hardening tracker status/evidence to reflect the narrowed policy.
+- [x] Replace each broad `src/legacy/**` exception with path-specific `file_glob` scopes anchored to concrete legacy subdirectories.
+- [x] Keep existing task/expiry metadata explicit and temporary.
+- [x] Update `tools/repo/README.md` and hardening tracker status/evidence to reflect the narrowed policy.
 
 ## Tests
-- `python3 tools/repo/check_layering.py --root src --strict`
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/repo/check_layering.py --root src --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- `tools/repo/README.md`
-- `tasks/done/0001-post-reorganization-hardening-tracker.md`
+- [x] `tools/repo/README.md`
+- [x] `tasks/done/0001-post-reorganization-hardening-tracker.md`
 
 ## Acceptance criteria
-- No `src/legacy/**` wildcard remains in `tools/repo/layering_allowlist.yaml`.
-- All temporary exceptions are tied to concrete legacy paths and keep task/expiry notes.
-- Strict layering check still passes.
-- Hardening tracker marks `HARDEN-010` done with dated command evidence.
+- [x] No `src/legacy/**` wildcard remains in `tools/repo/layering_allowlist.yaml`.
+- [x] All temporary exceptions are tied to concrete legacy paths and keep task/expiry notes.
+- [x] Strict layering check still passes.
+- [x] Hardening tracker marks `HARDEN-010` done with dated command evidence.
 
 ## Verification
 ```bash

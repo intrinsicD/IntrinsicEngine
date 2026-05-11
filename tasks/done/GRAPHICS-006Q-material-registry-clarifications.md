@@ -27,19 +27,19 @@ Track open clarification questions that should be resolved before completing the
 - Created from the 2026-05-03 `GRAPHICS-006` CPU-only `RHI::PipelineRegistry` slice.
 
 ## Required changes
-- Decide whether promoted material-slot allocation should live in a renderer-level registry or remain in `Graphics.MaterialSystem` with additional layout helpers.
-- Decide the canonical material parameter layout versioning policy for texture/bindless references before `GRAPHICS-015` GPU texture residency lands.
-- Decide whether shader identity should remain path-based or migrate to `Asset.Registry` IDs after asset hot-reload ownership is finalized.
+- [x] Decide whether promoted material-slot allocation should live in a renderer-level registry or remain in `Graphics.MaterialSystem` with additional layout helpers.
+- [x] Decide the canonical material parameter layout versioning policy for texture/bindless references before `GRAPHICS-015` GPU texture residency lands.
+- [x] Decide whether shader identity should remain path-based or migrate to `Asset.Registry` IDs after asset hot-reload ownership is finalized.
 
 ## Tests
-- No tests required for this clarification-only backlog task.
+- [x] No tests required for this clarification-only backlog task.
 
 ## Docs
-- Update `docs/architecture/graphics.md` and dependent rendering backlog tasks after decisions are made.
+- [x] Update `docs/architecture/graphics.md` and dependent rendering backlog tasks after decisions are made.
 
 ## Acceptance criteria
-- Each question has a documented decision or a follow-up implementation task.
-- `GRAPHICS-006` remaining scope can be completed without adding cross-layer ownership ambiguity.
+- [x] Each question has a documented decision or a follow-up implementation task.
+- [x] `GRAPHICS-006` remaining scope can be completed without adding cross-layer ownership ambiguity.
 
 ## Verification
 ```bash

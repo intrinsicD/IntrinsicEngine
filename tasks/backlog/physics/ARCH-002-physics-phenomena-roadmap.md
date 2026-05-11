@@ -15,31 +15,31 @@
 - The method protocol requires CPU reference parity, tests, benchmark manifests, optimized CPU later, and GPU only after reference parity.
 
 ## Required changes
-- Inventory candidate phenomena and classify likely implementation path:
-  - Rigid bodies and articulated constraints.
-  - Particles and mass-spring systems.
-  - Cloth and shells.
-  - Soft bodies/FEM/PBD/XPBD.
-  - Fluids: SPH, grid-based incompressible flow, FLIP/APIC, shallow water.
-  - Fracture/damage and contact-rich granular materials.
-  - Thermal diffusion or other scalar/vector PDE fields.
-- For each phenomenon, record required data model, coupling to ECS/runtime, geometry prerequisites, expected diagnostics, benchmark shape, and visualization hooks.
-- Rank the first three method packages by engine value, complexity, and verification tractability.
-- Define which phenomena are research-method packages only versus candidates for engine runtime systems.
-- Create follow-up `METHOD-*`, `ARCH-*`, or `HARDEN-*` tasks for the top-ranked items.
+- [ ] Inventory candidate phenomena and classify likely implementation path:
+  - [ ] Rigid bodies and articulated constraints.
+  - [ ] Particles and mass-spring systems.
+  - [ ] Cloth and shells.
+  - [ ] Soft bodies/FEM/PBD/XPBD.
+  - [ ] Fluids: SPH, grid-based incompressible flow, FLIP/APIC, shallow water.
+  - [ ] Fracture/damage and contact-rich granular materials.
+  - [ ] Thermal diffusion or other scalar/vector PDE fields.
+- [ ] For each phenomenon, record required data model, coupling to ECS/runtime, geometry prerequisites, expected diagnostics, benchmark shape, and visualization hooks.
+- [ ] Rank the first three method packages by engine value, complexity, and verification tractability.
+- [ ] Define which phenomena are research-method packages only versus candidates for engine runtime systems.
+- [ ] Create follow-up `METHOD-*`, `ARCH-*`, or `HARDEN-*` tasks for the top-ranked items.
 
 ## Tests
-- No code tests required unless tooling/docs change.
-- Validate task policy and documentation links.
+- [ ] No code tests required unless tooling/docs change.
+- [ ] Validate task policy and documentation links.
 
 ## Docs
-- Update `methods/physics/README.md` with the roadmap and selection criteria.
-- Add a docs page under `docs/methods/` or `docs/architecture/` if the roadmap affects engine architecture.
+- [ ] Update `methods/physics/README.md` with the roadmap and selection criteria.
+- [ ] Add a docs page under `docs/methods/` or `docs/architecture/` if the roadmap affects engine architecture.
 
 ## Acceptance criteria
-- The repository has a factual physics roadmap separating rigid-body dynamics from other phenomena.
-- Each candidate phenomenon has an explicit reference-first verification path.
-- No phenomenon is approved for GPU/backend optimization before a CPU reference plan exists.
+- [ ] The repository has a factual physics roadmap separating rigid-body dynamics from other phenomena.
+- [ ] Each candidate phenomenon has an explicit reference-first verification path.
+- [ ] No phenomenon is approved for GPU/backend optimization before a CPU reference plan exists.
 
 ## Verification
 ```bash

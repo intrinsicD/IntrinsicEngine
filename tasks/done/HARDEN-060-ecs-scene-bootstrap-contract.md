@@ -33,25 +33,25 @@
 - **Slice 2 (follow-up, gated by HARDEN-061)** — Reconcile dirty-transform observer/tag semantics when the promoted hierarchy system actually consumes/emits transform tags. Out of scope here.
 
 ## Required changes
-- Wire existing promoted ECS registry coverage, including `tests/unit/ecs/Test.ECS.SceneRegistry.cpp`, into the appropriate ECS test target before relying on it as verification evidence.
-- Add a promoted scene bootstrap API under `src/ecs` that creates or initializes an entity with the documented default components.
-- Decide and document the promoted naming component contract (`Components::MetaData::EntityName` versus legacy `NameTag::Component`).
-- Reconcile dirty-transform naming between promoted `DirtyTags::DirtyTransform`, `Transform::WorldUpdatedTag`, and legacy `Transform::IsDirtyTag` before porting tests.
-- Keep `Registry::Raw()` as the explicit privileged escape hatch; do not hide broad entt access behind convenience APIs unless each API has a tested lifecycle contract.
-- Update `src/ecs/README.md` and `docs/migration/nonlegacy-parity-matrix.md` if the public module surface changes.
+- [x] Wire existing promoted ECS registry coverage, including `tests/unit/ecs/Test.ECS.SceneRegistry.cpp`, into the appropriate ECS test target before relying on it as verification evidence.
+- [x] Add a promoted scene bootstrap API under `src/ecs` that creates or initializes an entity with the documented default components.
+- [x] Decide and document the promoted naming component contract (`Components::MetaData::EntityName` versus legacy `NameTag::Component`).
+- [x] Reconcile dirty-transform naming between promoted `DirtyTags::DirtyTransform`, `Transform::WorldUpdatedTag`, and legacy `Transform::IsDirtyTag` before porting tests.
+- [x] Keep `Registry::Raw()` as the explicit privileged escape hatch; do not hide broad entt access behind convenience APIs unless each API has a tested lifecycle contract.
+- [x] Update `src/ecs/README.md` and `docs/migration/nonlegacy-parity-matrix.md` if the public module surface changes.
 
 ## Tests
-- Add or update `tests/unit/ecs/Test.ECS.SceneBootstrap.cpp`.
-- Cover default component presence, custom entity name, dirty-transform marker, world matrix initialization, hierarchy initialization, invalid-handle behavior, and interaction with `Registry::Destroy`/`Registry::Clear`.
+- [x] Add or update `tests/unit/ecs/Test.ECS.SceneBootstrap.cpp`.
+- [x] Cover default component presence, custom entity name, dirty-transform marker, world matrix initialization, hierarchy initialization, invalid-handle behavior, and interaction with `Registry::Destroy`/`Registry::Clear`.
 
 ## Docs
-- Update `src/ecs/README.md` with the scene bootstrap module/API.
-- Update migration parity notes only with factual current state and remaining blockers.
+- [x] Update `src/ecs/README.md` with the scene bootstrap module/API.
+- [x] Update migration parity notes only with factual current state and remaining blockers.
 
 ## Acceptance criteria
-- Promoted ECS can create a fully initialized scene entity without importing legacy `ECS`.
-- Default entity semantics are tested outside legacy `Test_RuntimeECS.cpp` compatibility coverage.
-- No new dependency edge from `ecs` to graphics, platform, runtime, or app is introduced.
+- [x] Promoted ECS can create a fully initialized scene entity without importing legacy `ECS`.
+- [x] Default entity semantics are tested outside legacy `Test_RuntimeECS.cpp` compatibility coverage.
+- [x] No new dependency edge from `ecs` to graphics, platform, runtime, or app is introduced.
 
 ## Verification
 ```bash

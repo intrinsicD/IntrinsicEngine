@@ -19,23 +19,23 @@
 - Owner: renderer overlay/finalization pass contract and imported backbuffer write policy.
 - Runtime/platform remain responsible for window/swapchain lifecycle wiring.
 ## Required changes
-- Own and specify:
-  - ImGui draw-data import
-  - overlay load/store behavior
-  - final present/finalization pass
-  - imported backbuffer write policy
-- Enforce that imported `Backbuffer` writes happen only in present/finalization per architecture policy.
-- Add structured diagnostics for invalid overlay/present resource state.
+- [x] Own and specify:
+  - [x] ImGui draw-data import
+  - [x] overlay load/store behavior
+  - [x] final present/finalization pass
+  - [x] imported backbuffer write policy
+- [x] Enforce that imported `Backbuffer` writes happen only in present/finalization per architecture policy.
+- [x] Add structured diagnostics for invalid overlay/present resource state.
 ## Tests
-- Add `contract;graphics` tests for ImGui import contract, overlay composition behavior, and final backbuffer write policy.
-- Add `unit;graphics` tests for deterministic present/finalization diagnostics formatting where applicable.
-- Keep optional `gpu;vulkan` smoke tests opt-in.
+- [x] Add `contract;graphics` tests for ImGui import contract, overlay composition behavior, and final backbuffer write policy.
+- [x] Add `unit;graphics` tests for deterministic present/finalization diagnostics formatting where applicable.
+- [x] Keep optional `gpu;vulkan` smoke tests opt-in.
 ## Docs
-- Update present/finalization and overlay ownership sections in architecture/renderer docs.
+- [x] Update present/finalization and overlay ownership sections in architecture/renderer docs.
 ## Acceptance criteria
-- Overlay and present/finalization ownership are explicit and testable without Vulkan.
-- Imported `Backbuffer` write policy is enforced or represented in deterministic diagnostics.
-- Graphics layer remains decoupled from platform window ownership.
+- [x] Overlay and present/finalization ownership are explicit and testable without Vulkan.
+- [x] Imported `Backbuffer` write policy is enforced or represented in deterministic diagnostics.
+- [x] Graphics layer remains decoupled from platform window ownership.
 ## Verification
 ```bash
 cmake --preset ci

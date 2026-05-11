@@ -20,18 +20,18 @@
 - Owner: `src/graphics/assets`, `src/graphics/rhi`, and renderer material integration.
 - Legacy texture loader and global resource behavior are references for feature coverage, while final ownership must respect asset IDs and graphics layer boundaries.
 ## Required changes
-- Define texture asset handles, upload requests, residency states, sampler descriptors, fallback textures, and failure diagnostics.
-- Integrate GPU asset cache with material/shader registry contracts without importing higher layers.
-- Add bounded cache/eviction or explicit non-eviction diagnostics as appropriate.
+- [x] Define texture asset handles, upload requests, residency states, sampler descriptors, fallback textures, and failure diagnostics.
+- [x] Integrate GPU asset cache with material/shader registry contracts without importing higher layers.
+- [x] Add bounded cache/eviction or explicit non-eviction diagnostics as appropriate.
 ## Tests
-- Add unit tests for cache hits/misses, fallback texture behavior, sampler keys, failed uploads, residency transitions, and null backend behavior.
-- Label GPU asset cache unit tests `unit;graphics` so they run in the default CPU gate.
+- [x] Add unit tests for cache hits/misses, fallback texture behavior, sampler keys, failed uploads, residency transitions, and null backend behavior.
+- [x] Label GPU asset cache unit tests `unit;graphics` so they run in the default CPU gate.
 ## Docs
-- Document graphics asset residency, fallback resources, and texture upload lifecycle.
+- [x] Document graphics asset residency, fallback resources, and texture upload lifecycle.
 ## Acceptance criteria
-- Materials and passes can reference GPU textures through promoted graphics asset APIs.
-- Missing or failed texture assets have deterministic fallbacks and diagnostics.
-- Cache behavior is CPU-testable without requiring Vulkan.
+- [x] Materials and passes can reference GPU textures through promoted graphics asset APIs.
+- [x] Missing or failed texture assets have deterministic fallbacks and diagnostics.
+- [x] Cache behavior is CPU-testable without requiring Vulkan.
 ## Verification
 ```bash
 cmake --preset ci

@@ -151,20 +151,20 @@
 - Remaining questions affect concrete Dear ImGui backend translation, descriptor buffers/textures, swapchain finalization implementation, and runtime/platform wiring.
 
 ## Required changes
-- Clarify how runtime/editor translates `ImDrawData` into `ImGuiOverlayFrame` records and when those records are submitted.
-- Clarify overlay vertex/index buffer upload ownership, font/user texture descriptor policy, and backend pipeline state.
-- Clarify whether present/finalization uses fullscreen draw, texture copy, or backend-native swapchain resolve once concrete backends are wired.
-- Clarify platform/backend responsibility boundaries for acquire/present timing, swapchain image ownership, and resize handling.
+- [x] Clarify how runtime/editor translates `ImDrawData` into `ImGuiOverlayFrame` records and when those records are submitted.
+- [x] Clarify overlay vertex/index buffer upload ownership, font/user texture descriptor policy, and backend pipeline state.
+- [x] Clarify whether present/finalization uses fullscreen draw, texture copy, or backend-native swapchain resolve once concrete backends are wired.
+- [x] Clarify platform/backend responsibility boundaries for acquire/present timing, swapchain image ownership, and resize handling.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless docs tooling changes.
+- [x] Documentation/checker only; no C++ tests required unless docs tooling changes.
 
 ## Docs
-- Update renderer/backend docs and `docs/architecture/rendering-three-pass.md` with selected backend/runtime handoff policies.
+- [x] Update renderer/backend docs and `docs/architecture/rendering-three-pass.md` with selected backend/runtime handoff policies.
 
 ## Acceptance criteria
-- Concrete backend/runtime ImGui and present work can proceed without changing the CPU/null graphics contracts from `GRAPHICS-013C`.
-- Graphics remains decoupled from platform/window ownership.
+- [x] Concrete backend/runtime ImGui and present work can proceed without changing the CPU/null graphics contracts from `GRAPHICS-013C`.
+- [x] Graphics remains decoupled from platform/window ownership.
 
 ## Verification
 ```bash

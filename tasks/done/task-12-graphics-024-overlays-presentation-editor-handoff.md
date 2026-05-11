@@ -52,20 +52,20 @@ Legacy modules include `Graphics.OverlayEntityFactory` and `Graphics.Presentatio
 
 ## Tests
 
-- `contract;runtime;graphics` or `integration;runtime;graphics` tests for deterministic overlay extraction.
-- `contract;graphics` tests for overlay packet defaults.
-- No editor UI test implementation unless existing UI test seams make it small.
+- [x] `contract;runtime;graphics` or `integration;runtime;graphics` tests for deterministic overlay extraction.
+- [x] `contract;graphics` tests for overlay packet defaults.
+- [x] No editor UI test implementation unless existing UI test seams make it small.
 
 ## Docs
 
-- Update `docs/architecture/vectorfield-overlay-lifecycle-invariants.md` if ownership changes.
-- Update `docs/migration/nonlegacy-parity-matrix.md`.
+- [x] Update `docs/architecture/vectorfield-overlay-lifecycle-invariants.md` if ownership changes.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md`.
 
 ## Acceptance criteria
 
-- Overlay/presentation/editor-adjacent legacy behavior has a clear promoted owner.
-- Graphics does not own editor mutation, ECS mutation, or platform presentation policy.
-- GRAPHICS-020 can map overlay/presentation modules to this task.
+- [x] Overlay/presentation/editor-adjacent legacy behavior has a clear promoted owner.
+- [x] Graphics does not own editor mutation, ECS mutation, or platform presentation policy.
+- [x] GRAPHICS-020 can map overlay/presentation modules to this task.
 
 ## Verification
 

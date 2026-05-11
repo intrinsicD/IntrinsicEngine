@@ -125,20 +125,20 @@
 - Remaining questions affect concrete shaders, GPU readback, runtime ECS selection resolution, and editor policy and should not be mixed with pass-contract work.
 
 ## Required changes
-- Document exact shader-side encoding for `EntityId` and `PrimitiveId`, including authoritative face/edge/point payload sources.
-- Clarify the backend readback mechanism from `Picking.Readback` into `SelectionSystem::PublishPickResult()` / `PublishNoHit()`.
-- Clarify runtime ownership for resolving `StableEntityId` into ECS selection state and selection-outline inputs.
-- Clarify how transparent/special forward materials affect picking eligibility once those lanes exist.
+- [x] Document exact shader-side encoding for `EntityId` and `PrimitiveId`, including authoritative face/edge/point payload sources.
+- [x] Clarify the backend readback mechanism from `Picking.Readback` into `SelectionSystem::PublishPickResult()` / `PublishNoHit()`.
+- [x] Clarify runtime ownership for resolving `StableEntityId` into ECS selection state and selection-outline inputs.
+- [x] Clarify how transparent/special forward materials affect picking eligibility once those lanes exist.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless docs tooling changes.
+- [x] Documentation/checker only; no C++ tests required unless docs tooling changes.
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` and runtime/selection docs with the chosen backend/runtime handoff policy.
+- [x] Update `docs/architecture/rendering-three-pass.md` and runtime/selection docs with the chosen backend/runtime handoff policy.
 
 ## Acceptance criteria
-- Backend and runtime work can implement real GPU picking/readback without changing the CPU/null graphics contracts.
-- Graphics remains free of ECS mutation and editor selection policy.
+- [x] Backend and runtime work can implement real GPU picking/readback without changing the CPU/null graphics contracts.
+- [x] Graphics remains free of ECS mutation and editor selection policy.
 
 ## Verification
 ```bash

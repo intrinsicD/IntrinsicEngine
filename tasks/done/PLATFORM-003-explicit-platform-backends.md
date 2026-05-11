@@ -21,32 +21,32 @@ Add explicit platform backend modules for null/headless and GLFW window ownershi
 - Existing promoted platform surface is `Extrinsic.Platform.Window` and `Extrinsic.Platform.Input`; concrete behavior is currently hidden in `LinuxGlfwVulkan` implementation files or absent in headless builds.
 
 ## Required changes
-- Add explicit backend module files under `src/platform/backends/null/` and `src/platform/backends/glfw/`.
-- Preserve backend-neutral public modules `Platform.IWindow.cppm` and `Platform.Input.cppm`.
-- Provide a deterministic null/headless window backend selected for headless builds.
-- Keep GLFW backend ownership explicit and isolate Vulkan surface creation policy from graphics/runtime imports.
-- Update CMake wiring to select the null or GLFW backend explicitly.
-- Add or update structural checks/tests for forbidden Platform imports.
+- [x] Add explicit backend module files under `src/platform/backends/null/` and `src/platform/backends/glfw/`.
+- [x] Preserve backend-neutral public modules `Platform.IWindow.cppm` and `Platform.Input.cppm`.
+- [x] Provide a deterministic null/headless window backend selected for headless builds.
+- [x] Keep GLFW backend ownership explicit and isolate Vulkan surface creation policy from graphics/runtime imports.
+- [x] Update CMake wiring to select the null or GLFW backend explicitly.
+- [x] Add or update structural checks/tests for forbidden Platform imports.
 
 ## Tests
-- Add headless/null platform unit tests.
-- Add a GLFW backend smoke test behind opt-in labels.
-- Ensure Platform-to-Graphics and Platform-to-Runtime imports are rejected by verification.
-- New tests in this task use the `Test.<Name>.cpp` naming format documented in `tests/README.md`.
+- [x] Add headless/null platform unit tests.
+- [x] Add a GLFW backend smoke test behind opt-in labels.
+- [x] Ensure Platform-to-Graphics and Platform-to-Runtime imports are rejected by verification.
+- [x] New tests in this task use the `Test.<Name>.cpp` naming format documented in `tests/README.md`.
 
 ## Docs
-- Update `src/platform/README.md` with current backend layout and selection policy.
-- Add `tests/README.md` guidance that new C++ tests should use `Test.<Name>.cpp`, not `Test_<Name>.cpp`.
-- Regenerate `docs/api/generated/module_inventory.md` after adding modules.
+- [x] Update `src/platform/README.md` with current backend layout and selection policy.
+- [x] Add `tests/README.md` guidance that new C++ tests should use `Test.<Name>.cpp`, not `Test_<Name>.cpp`.
+- [x] Regenerate `docs/api/generated/module_inventory.md` after adding modules.
 
 ## Acceptance criteria
-- `src/platform/backends/null/Platform.Backend.Null.cppm` exists and implements deterministic headless behavior.
-- `src/platform/backends/glfw/Platform.Backend.Glfw.cppm` exists and owns GLFW window/input behavior.
-- `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` exists and contains GLFW Vulkan surface policy without graphics/runtime imports.
-- `tests/unit/platform/Test.NullPlatform.cpp`, `tests/contract/platform/Test.PlatformLayering.cpp`, and `tests/integration/platform/Test.GlfwPlatformSmoke.cpp` use the `Test.<Name>.cpp` naming format.
-- Headless/null tests build and pass in a null backend configuration.
-- GLFW smoke coverage is registered with opt-in labels and is excluded from the default CPU gate.
-- Documentation and task verification records are synchronized.
+- [x] `src/platform/backends/null/Platform.Backend.Null.cppm` exists and implements deterministic headless behavior.
+- [x] `src/platform/backends/glfw/Platform.Backend.Glfw.cppm` exists and owns GLFW window/input behavior.
+- [x] `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` exists and contains GLFW Vulkan surface policy without graphics/runtime imports.
+- [x] `tests/unit/platform/Test.NullPlatform.cpp`, `tests/contract/platform/Test.PlatformLayering.cpp`, and `tests/integration/platform/Test.GlfwPlatformSmoke.cpp` use the `Test.<Name>.cpp` naming format.
+- [x] Headless/null tests build and pass in a null backend configuration.
+- [x] GLFW smoke coverage is registered with opt-in labels and is excluded from the default CPU gate.
+- [x] Documentation and task verification records are synchronized.
 
 ## Verification
 ```bash

@@ -19,22 +19,22 @@
 - Impact: structural/performance CI checks fail even when the compile log can be parsed and the report is emitted.
 
 ## Required changes
-- Inspect `tools/analysis/compile_hotspot_baseline.json` and map stale paths to the current owning source files or remove entries that no longer represent valid targets.
-- If source migration aliases are intentional, teach `compile_hotspots.py` to resolve them explicitly and document the mapping.
-- Regenerate or manually update the baseline with current paths only, keeping the change mechanical and reviewable.
+- [x] Inspect `tools/analysis/compile_hotspot_baseline.json` and map stale paths to the current owning source files or remove entries that no longer represent valid targets.
+- [x] If source migration aliases are intentional, teach `compile_hotspots.py` to resolve them explicitly and document the mapping.
+- [x] Regenerate or manually update the baseline with current paths only, keeping the change mechanical and reviewable.
 
 ## Tests
-- Add/update tool coverage for stale-baseline diagnostics if the analyzer behavior changes.
-- Re-run the compile-hotspot command against a successfully built `build/ci` tree.
+- [x] Add/update tool coverage for stale-baseline diagnostics if the analyzer behavior changes.
+- [x] Re-run the compile-hotspot command against a successfully built `build/ci` tree.
 
 ## Docs
-- Update analysis/tool docs if baseline refresh procedure or migration alias policy changes.
-- Mention the refreshed baseline in the task completion record when fixed.
+- [x] Update analysis/tool docs if baseline refresh procedure or migration alias policy changes.
+- [x] Mention the refreshed baseline in the task completion record when fixed.
 
 ## Acceptance criteria
-- The compile-hotspot gate no longer reports missing `src/Runtime/...` sources after a normal CI build.
-- The refreshed baseline references source paths that exist in the current repository or are documented aliases handled by the tool.
-- The generated JSON report remains machine-readable and the gate still fails on genuine hotspot regressions.
+- [x] The compile-hotspot gate no longer reports missing `src/Runtime/...` sources after a normal CI build.
+- [x] The refreshed baseline references source paths that exist in the current repository or are documented aliases handled by the tool.
+- [x] The generated JSON report remains machine-readable and the gate still fails on genuine hotspot regressions.
 
 ## Verification
 ```bash

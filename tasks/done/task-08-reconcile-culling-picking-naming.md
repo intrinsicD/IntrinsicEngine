@@ -31,34 +31,34 @@ But docs/tasks describe culling as internal/implicit and picking as one logical 
 
 ## Required changes
 
-1. Update `docs/architecture/rendering-three-pass.md`:
-   - Define `CullingPass` or `Visibility/Culling stage` explicitly.
-   - Clarify whether it is a real rendergraph pass or a helper stage.
-   - If the source keeps `Pass.Culling`, document it as the canonical module name.
+- [x] Update `docs/architecture/rendering-three-pass.md`:
+   - [x] Define `CullingPass` or `Visibility/Culling stage` explicitly.
+   - [x] Clarify whether it is a real rendergraph pass or a helper stage.
+   - [x] If the source keeps `Pass.Culling`, document it as the canonical module name.
 
-2. Update GRAPHICS-007:
-   - Explicitly mention `Pass.Culling`.
-   - State whether GRAPHICS-007 owns culling pass command contracts, draw-bucket contracts, or both.
-   - Add tests for `Pass.Culling` pass contract if not already listed.
+- [x] Update GRAPHICS-007:
+   - [x] Explicitly mention `Pass.Culling`.
+   - [x] State whether GRAPHICS-007 owns culling pass command contracts, draw-bucket contracts, or both.
+   - [x] Add tests for `Pass.Culling` pass contract if not already listed.
 
-3. Update GRAPHICS-012:
-   - Define `PickingPass` as a logical picking/selection stage composed of:
-     - `Pass.Selection.EntityId`
-     - `Pass.Selection.FaceId`
-     - `Pass.Selection.EdgeId`
-     - `Pass.Selection.PointId`
-     - readback/result seam
-     - `Pass.Selection.Outline`
-   - Do not require source consolidation unless there is a strong architectural reason.
-   - Add acceptance criteria that docs and pass module names agree.
+- [x] Update GRAPHICS-012:
+   - [x] Define `PickingPass` as a logical picking/selection stage composed of:
+     - [x] `Pass.Selection.EntityId`
+     - [x] `Pass.Selection.FaceId`
+     - [x] `Pass.Selection.EdgeId`
+     - [x] `Pass.Selection.PointId`
+     - [x] readback/result seam
+     - [x] `Pass.Selection.Outline`
+   - [x] Do not require source consolidation unless there is a strong architectural reason.
+   - [x] Add acceptance criteria that docs and pass module names agree.
 
-4. Update `tasks/backlog/rendering/README.md` dependency notes if needed.
+- [x] Update `tasks/backlog/rendering/README.md` dependency notes if needed.
 
 ## Acceptance criteria
 
-- Agents can tell whether culling is a pass, a helper, or a stage.
-- Agents can tell that split selection modules are acceptable implementation units under the logical picking/selection stage.
-- No source file renames are required in this task.
+- [x] Agents can tell whether culling is a pass, a helper, or a stage.
+- [x] Agents can tell that split selection modules are acceptable implementation units under the logical picking/selection stage.
+- [x] No source file renames are required in this task.
 
 ## Verification
 

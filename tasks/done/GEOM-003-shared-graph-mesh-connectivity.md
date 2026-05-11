@@ -26,34 +26,34 @@
 - No temporary compatibility alias remains after this migration.
 
 ## Required changes
-- Define shared graph traversal connectivity as the canonical representation for:
-  - `Vertex -> representative HalfedgeHandle`.
-  - `Halfedge -> to VertexHandle, Next HalfedgeHandle, Prev HalfedgeHandle`.
-- Split mesh face incidence into a mesh-only type/property such as `HalfedgeMesh::HalfedgeFaceConnectivity` containing `FaceHandle`.
-- Migrate `HalfedgeMesh` internals to use the shared graph-compatible connectivity for traversal and the mesh-only face property for face ownership.
-- Update graph-view construction and callers so mesh-backed graph views no longer need graph-specific compatibility copies.
-- Keep property names and migration shims reviewable; document any temporary compatibility aliases with removal criteria.
+- [x] Define shared graph traversal connectivity as the canonical representation for:
+  - [x] `Vertex -> representative HalfedgeHandle`.
+  - [x] `Halfedge -> to VertexHandle, Next HalfedgeHandle, Prev HalfedgeHandle`.
+- [x] Split mesh face incidence into a mesh-only type/property such as `HalfedgeMesh::HalfedgeFaceConnectivity` containing `FaceHandle`.
+- [x] Migrate `HalfedgeMesh` internals to use the shared graph-compatible connectivity for traversal and the mesh-only face property for face ownership.
+- [x] Update graph-view construction and callers so mesh-backed graph views no longer need graph-specific compatibility copies.
+- [x] Keep property names and migration shims reviewable; document any temporary compatibility aliases with removal criteria.
 
 ## Tests
-- Update `tests/unit/geometry/Test_ShortestPath.cpp` to prove mesh-backed graph views reuse shared connectivity without compatibility-copy properties.
-- Add or update mesh topology tests covering face incidence after the split.
-- Run focused geometry tests:
+- [x] Update `tests/unit/geometry/Test_ShortestPath.cpp` to prove mesh-backed graph views reuse shared connectivity without compatibility-copy properties.
+- [x] Add or update mesh topology tests covering face incidence after the split.
+- [x] Run focused geometry tests:
   ```bash
   cmake --build --preset ci --target IntrinsicGeometryTests
   ctest --test-dir build/ci --output-on-failure -R 'ShortestPath|HalfedgeMesh|MeshTopology' --timeout 60
   ```
 
 ## Docs
-- Update geometry architecture/API docs if public connectivity type names or property names change.
-- Update `docs/api/generated/module_inventory.md` if module surfaces change.
-- Update this task with the final migration notes and any compatibility alias removal follow-up.
+- [x] Update geometry architecture/API docs if public connectivity type names or property names change.
+- [x] Update `docs/api/generated/module_inventory.md` if module surfaces change.
+- [x] Update this task with the final migration notes and any compatibility alias removal follow-up.
 
 ## Acceptance criteria
-- `Graph::HalfedgeConnectivity` remains face-free.
-- `HalfedgeMesh` stores `FaceHandle` incidence separately from graph traversal connectivity.
-- Mesh-backed graph views can traverse mesh topology without copying graph compatibility connectivity.
-- Existing graph and mesh topology tests pass.
-- No new dependency edge outside `geometry -> core` is introduced.
+- [x] `Graph::HalfedgeConnectivity` remains face-free.
+- [x] `HalfedgeMesh` stores `FaceHandle` incidence separately from graph traversal connectivity.
+- [x] Mesh-backed graph views can traverse mesh topology without copying graph compatibility connectivity.
+- [x] Existing graph and mesh topology tests pass.
+- [x] No new dependency edge outside `geometry -> core` is introduced.
 
 ## Verification
 ```bash

@@ -31,9 +31,9 @@ Lock down the contract for replacing the existing horizontal-strip cascade atlas
 12. **Layering.** No live ECS access. No new vendor dependencies.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-047-Impl-A** — Page-table + page-pool resources + frame-graph lifetime + null-RHI shape tests.
@@ -43,20 +43,20 @@ Lock down the contract for replacing the existing horizontal-strip cascade atlas
 - **GRAPHICS-047-Impl-E** — Optional sparse-residency backend (gated by `IDevice` capability).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` shadow section.
-- Update `src/graphics/renderer/README.md` shadow-system section.
+- [ ] Update `docs/architecture/rendering-three-pass.md` shadow section.
+- [ ] Update `src/graphics/renderer/README.md` shadow-system section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Cascade-atlas path remains the unconditional default until Impl-D ships.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Cascade-atlas path remains the unconditional default until Impl-D ships.
 
 ## Verification
 ```bash

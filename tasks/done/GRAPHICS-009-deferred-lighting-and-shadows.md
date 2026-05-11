@@ -19,22 +19,22 @@
 - Owner: `src/graphics/renderer`, `src/graphics/renderer/Passes`, and shader/pipeline registry seams.
 - Depends on render snapshot contracts, frame recipe, material/pipeline registry, culling buckets, and surface/G-buffer resources.
 ## Required changes
-- Define and upload directional/ambient light packets, shadow params, cascade data, and atlas resource metadata.
-- Define extraction from CPU light descriptions into `LightEnvironmentPacket` and GPU light-buffer records; graphics must consume light snapshots and must not query live ECS light components.
-- Define fallback/diagnostic behavior for unsupported light types, missing shadow-caster data, and disabled lighting paths.
-- Fill `LightSystem`, `ShadowSystem`, `Pass.Shadows`, and `Pass.Deferred.Lighting` command/resource behavior.
-- Add structured diagnostics for unsupported cascade counts, missing depth resources, and disabled shadow state.
+- [x] Define and upload directional/ambient light packets, shadow params, cascade data, and atlas resource metadata.
+- [x] Define extraction from CPU light descriptions into `LightEnvironmentPacket` and GPU light-buffer records; graphics must consume light snapshots and must not query live ECS light components.
+- [x] Define fallback/diagnostic behavior for unsupported light types, missing shadow-caster data, and disabled lighting paths.
+- [x] Fill `LightSystem`, `ShadowSystem`, `Pass.Shadows`, and `Pass.Deferred.Lighting` command/resource behavior.
+- [x] Add structured diagnostics for unsupported cascade counts, missing depth resources, and disabled shadow state.
 ## Tests
-- Add contract tests for light defaults, cascade packet defaults, atlas sizing, shadow bucket use, and fullscreen lighting dispatch/draw behavior.
-- Add optional GPU/Vulkan smoke tests only behind appropriate labels.
-- Label CPU contract tests `contract;graphics` for the default CPU gate; label optional shadow/lighting smoke tests `gpu;vulkan` so they stay opt-in.
+- [x] Add contract tests for light defaults, cascade packet defaults, atlas sizing, shadow bucket use, and fullscreen lighting dispatch/draw behavior.
+- [x] Add optional GPU/Vulkan smoke tests only behind appropriate labels.
+- [x] Label CPU contract tests `contract;graphics` for the default CPU gate; label optional shadow/lighting smoke tests `gpu;vulkan` so they stay opt-in.
 ## Docs
-- Update lighting, shadow, and deferred composition sections in `docs/architecture/rendering-three-pass.md`.
+- [x] Update lighting, shadow, and deferred composition sections in `docs/architecture/rendering-three-pass.md`.
 ## Acceptance criteria
-- Directional/ambient lighting and shadow atlas contracts are non-legacy tested.
-- Graphics has no live ECS light access and unsupported light types produce deterministic fallback diagnostics.
-- Deferred lighting consumes canonical G-buffer resources and produces `SceneColorHDR`.
-- Disabled shadows avoid unnecessary resources and commands.
+- [x] Directional/ambient lighting and shadow atlas contracts are non-legacy tested.
+- [x] Graphics has no live ECS light access and unsupported light types produce deterministic fallback diagnostics.
+- [x] Deferred lighting consumes canonical G-buffer resources and produces `SceneColorHDR`.
+- [x] Disabled shadows avoid unnecessary resources and commands.
 ## Verification
 ```bash
 cmake --preset ci

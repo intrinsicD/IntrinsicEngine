@@ -29,9 +29,9 @@ Lock down the contract for an optional `IMeshShaderDevice` capability extension 
 11. **Layering.** No live ECS. No vendor SDK.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-053-Impl-A** — `IMeshShaderDevice` interface + null-RHI mock + capability tests.
@@ -41,21 +41,21 @@ Lock down the contract for an optional `IMeshShaderDevice` capability extension 
 - **GRAPHICS-053-Impl-E** — Operational-gate extension in `GRAPHICS-033` reason enum + diagnostic wiring.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` RHI capability section.
-- Update `src/graphics/rhi/README.md` capability surface.
-- Update `src/graphics/vulkan/README.md` operational-gate section.
+- [ ] Update `docs/architecture/graphics.md` RHI capability section.
+- [ ] Update `src/graphics/rhi/README.md` capability surface.
+- [ ] Update `src/graphics/vulkan/README.md` operational-gate section.
 
 ## Acceptance criteria
-- Eleven decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Engine compiles and runs without mesh-shader-capable hardware.
+- [ ] Eleven decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Engine compiles and runs without mesh-shader-capable hardware.
 
 ## Verification
 ```bash

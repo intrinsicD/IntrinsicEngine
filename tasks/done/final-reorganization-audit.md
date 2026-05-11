@@ -12,16 +12,16 @@ Confirm the repository now matches the final target configuration and enforcemen
 This task is the closing audit gate for the IntrinsicEngine reorganization. It validates that structural migration, policy consolidation, CI split, and strict validation tooling are all in place and synchronized.
 
 ## Required changes
-- Add this audit task file under `tasks/active/` with explicit completion checklist items.
-- Track pass/fail evidence for each final-state requirement.
-- Record remaining temporary exceptions (if any) with task IDs and owners.
+- [x] Add this audit task file under `tasks/active/` with explicit completion checklist items.
+- [x] Track pass/fail evidence for each final-state requirement.
+- [x] Record remaining temporary exceptions (if any) with task IDs and owners.
 
 ## Tests
-- Run strict task policy validation on `tasks/` metadata/sections.
-- Run top-level expected-layout check in strict mode.
+- [x] Run strict task policy validation on `tasks/` metadata/sections.
+- [x] Run top-level expected-layout check in strict mode.
 
 ## Docs
-- Keep this audit task synchronized with the RORG tracker final-state status.
+- [x] Keep this audit task synchronized with the RORG tracker final-state status.
 
 ## Acceptance criteria
 - [x] Root layout matches target.

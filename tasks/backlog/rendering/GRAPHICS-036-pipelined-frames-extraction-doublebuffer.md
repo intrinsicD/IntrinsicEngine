@@ -29,9 +29,9 @@ Lock down the contract for running simulation of frame N concurrently with rende
 10. **Layering audit.** `runtime` owns the pool and the swap; `graphics` only sees `const ImmutableRenderWorld&`. No graphics-side mutation of pool state.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-036-Impl-A** — `Runtime.RenderWorldPool` value type + atomic swap primitives + reclamation queue + `contract;runtime` tests.
@@ -40,25 +40,25 @@ Lock down the contract for running simulation of frame N concurrently with rende
 - **GRAPHICS-036-Impl-D** — Synchronous-mode test seam + opt-in deterministic CPU integration test.
 
 ## Tests
-- Planning slice: validators only.
-- Implementation children:
-  - `contract;runtime` — pool swap atomicity, reclamation against `framesInFlight`, back-pressure rules.
-  - `contract;graphics` — renderer reads only `const ImmutableRenderWorld&`; no mutation paths exist.
-  - `integration` — opt-in deterministic test that validates render-of-N-1 against expected snapshot N-1 fields.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Implementation children:
+  - [ ] `contract;runtime` — pool swap atomicity, reclamation against `framesInFlight`, back-pressure rules.
+  - [ ] `contract;graphics` — renderer reads only `const ImmutableRenderWorld&`; no mutation paths exist.
+  - [ ] `integration` — opt-in deterministic test that validates render-of-N-1 against expected snapshot N-1 fields.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` and `src/runtime/README.md` with the pipeline shape and diagnostic counters once Impl-A lands.
-- Update `docs/architecture/rendering-three-pass.md` only if the snapshot lifetime callout changes.
+- [ ] Update `docs/architecture/graphics.md` and `src/runtime/README.md` with the pipeline shape and diagnostic counters once Impl-A lands.
+- [ ] Update `docs/architecture/rendering-three-pass.md` only if the snapshot lifetime callout changes.
 
 ## Acceptance criteria
-- Ten decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified with scope and dependency gates but not opened.
-- No code or shader changes land in this slice.
-- Layering invariants (`AGENTS.md` §2 and §4) hold.
+- [ ] Ten decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified with scope and dependency gates but not opened.
+- [ ] No code or shader changes land in this slice.
+- [ ] Layering invariants (`AGENTS.md` §2 and §4) hold.
 
 ## Verification
 ```bash

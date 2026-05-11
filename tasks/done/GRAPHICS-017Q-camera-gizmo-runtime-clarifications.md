@@ -185,21 +185,21 @@
 - Runtime/platform/editor layers still need ownership policy for producing these snapshots and applying interaction results.
 
 ## Required changes
-- Clarify runtime camera controller ownership and how platform input is translated into camera motion without graphics dependencies.
-- Clarify input-to-pick-request scheduling and whether pick requests are single-shot, queued, or coalesced per frame.
-- Clarify transform-gizmo hit testing ownership, interaction state storage, and transform application/undo policy.
-- Clarify how editor/runtime producers convert gizmo interaction state into data-only `TransformGizmoRenderPacket` spans.
-- Clarify legacy interaction behavior that must become promoted implementation tasks before legacy retirement.
+- [x] Clarify runtime camera controller ownership and how platform input is translated into camera motion without graphics dependencies.
+- [x] Clarify input-to-pick-request scheduling and whether pick requests are single-shot, queued, or coalesced per frame.
+- [x] Clarify transform-gizmo hit testing ownership, interaction state storage, and transform application/undo policy.
+- [x] Clarify how editor/runtime producers convert gizmo interaction state into data-only `TransformGizmoRenderPacket` spans.
+- [x] Clarify legacy interaction behavior that must become promoted implementation tasks before legacy retirement.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless policy docs introduce checked manifests.
+- [x] Documentation/checker only; no C++ tests required unless policy docs introduce checked manifests.
 
 ## Docs
-- Update runtime, platform, graphics, and migration docs with selected ownership policies.
+- [x] Update runtime, platform, graphics, and migration docs with selected ownership policies.
 
 ## Acceptance criteria
-- Future runtime/editor implementation work can produce camera, pick, and gizmo snapshots without changing graphics ownership boundaries.
-- Graphics remains free of input polling, live ECS/editor mutation, and transform application.
+- [x] Future runtime/editor implementation work can produce camera, pick, and gizmo snapshots without changing graphics ownership boundaries.
+- [x] Graphics remains free of input polling, live ECS/editor mutation, and transform application.
 
 ## Verification
 ```bash

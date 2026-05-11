@@ -158,20 +158,20 @@
 - Remaining questions affect runtime/geometry producers, concrete GPU upload, and backend shader/resource binding.
 
 ## Required changes
-- Clarify runtime ownership for translating PropertySet attributes, KMeans labels, isoline results, vector fields, and Htex metadata into `RuntimeRenderSnapshotBatch` visualization packet spans.
-- Clarify whether invalid visualization packets are dropped by runtime producers, filtered by future upload stages, or surfaced as diagnostics-only records in tooling.
-- Clarify backend upload strategy for vector-field/isoline overlays after texture residency lands, including line/point bucket expansion versus auxiliary draw resources.
-- Clarify UV-backed versus Htex-backed fragment bake selection policy in UI/runtime terms, including when user-requested Htex regeneration is scheduled.
+- [x] Clarify runtime ownership for translating PropertySet attributes, KMeans labels, isoline results, vector fields, and Htex metadata into `RuntimeRenderSnapshotBatch` visualization packet spans.
+- [x] Clarify whether invalid visualization packets are dropped by runtime producers, filtered by future upload stages, or surfaced as diagnostics-only records in tooling.
+- [x] Clarify backend upload strategy for vector-field/isoline overlays after texture residency lands, including line/point bucket expansion versus auxiliary draw resources.
+- [x] Clarify UV-backed versus Htex-backed fragment bake selection policy in UI/runtime terms, including when user-requested Htex regeneration is scheduled.
 
 ## Tests
-- Documentation/checker only; no C++ tests required unless docs tooling changes.
+- [x] Documentation/checker only; no C++ tests required unless docs tooling changes.
 
 ## Docs
-- Update rendering architecture, graphics architecture, and runtime extraction docs with chosen producer/upload responsibilities.
+- [x] Update rendering architecture, graphics architecture, and runtime extraction docs with chosen producer/upload responsibilities.
 
 ## Acceptance criteria
-- Runtime/geometry/backend work can implement concrete visualization uploads without changing the CPU/null graphics contracts from `GRAPHICS-014`.
-- Graphics remains free of live ECS, geometry algorithm, and editor widget ownership.
+- [x] Runtime/geometry/backend work can implement concrete visualization uploads without changing the CPU/null graphics contracts from `GRAPHICS-014`.
+- [x] Graphics remains free of live ECS, geometry algorithm, and editor widget ownership.
 
 ## Verification
 ```bash

@@ -111,30 +111,30 @@ Each decision below is locked for downstream implementation children. Trade-offs
     - `src/graphics/*` is unchanged — `GpuWorld` continues to expose only its existing surface (Decision 6); no graphics module imports `Extrinsic.Runtime.*`. `assets` is untouched. The promoted layering invariants `ecs → core`, `runtime → core, ecs, graphics-value-types`, and "no live ECS in graphics" all hold.
 
 ## Required changes
-- ✅ Recorded the fourteen design decisions above with explicit answers, rejected-alternative rationale, and exact identifier references to the current codebase.
-- ✅ Cross-linked decisions with GRAPHICS-004 (GpuWorld allocation/lifetime), GRAPHICS-016 (extraction handoff), GRAPHICS-023A/B/C/D (asset-generation observation/rebind/acknowledgment, and the Decision 5 procedural-sentinel rule), and GRAPHICS-028 (residency planning).
-- ✅ Identified follow-up implementation children (do **not** open them here):
-  - **GRAPHICS-030-Impl-A** — author `Extrinsic.ECS.Component.ProceduralGeometryRef`, `Extrinsic.Runtime.ProceduralGeometry` (descriptor types, key+hash, `ProceduralGeometryCache` value type with `EnsureResident`/`Release` and the deferred-retire list), and `Extrinsic.Runtime.ProceduralGeometryPacker` (Triangle packer only, sized scratch buffer). No extraction wiring lands here. Tests: `contract;runtime` covering descriptor identity, dedup hits, refcount-only behavior driven directly against `ProceduralGeometryCache` (no `IRenderer`).
-  - **GRAPHICS-030-Impl-B** — wire `RenderExtractionCache::ExtractAndSubmit()` to detect `ProceduralGeometryRef`, drive `EnsureResident` → `AllocateInstance` → `SetInstanceGeometry` per Decision 8, refresh `GpuSceneSlot`, and consume `DirtyTransform`. Tests: `contract;runtime` (and `contract;graphics` for the bind path) — exactly one renderable produces an instance bound to a triangle geometry handle, two renderables sharing the same key produce one geometry handle and two instance handles, and the new diagnostics counters (Decision 10) reach the values asserted.
-  - **GRAPHICS-030-Impl-C** — refcount/free path + retire-queue ordering test. Tests: removing the last referencing entity does not free the geometry handle until `framesInFlight` ticks have elapsed; resurrecting the same key inside the retire window cancels the retirement; `ProceduralGeometryFreeRetires` increments exactly once per actual `GpuWorld::FreeGeometry` call.
-  - **GRAPHICS-030-Impl-D** *(optional, gated)* — open one additional packer (Cube or Quad) once Impl-A/B/C land. Gated behind a follow-up review per Decision 13.
+- [x] ✅ Recorded the fourteen design decisions above with explicit answers, rejected-alternative rationale, and exact identifier references to the current codebase.
+- [x] ✅ Cross-linked decisions with GRAPHICS-004 (GpuWorld allocation/lifetime), GRAPHICS-016 (extraction handoff), GRAPHICS-023A/B/C/D (asset-generation observation/rebind/acknowledgment, and the Decision 5 procedural-sentinel rule), and GRAPHICS-028 (residency planning).
+- [x] ✅ Identified follow-up implementation children (do **not** open them here):
+  - [x] **GRAPHICS-030-Impl-A** — author `Extrinsic.ECS.Component.ProceduralGeometryRef`, `Extrinsic.Runtime.ProceduralGeometry` (descriptor types, key+hash, `ProceduralGeometryCache` value type with `EnsureResident`/`Release` and the deferred-retire list), and `Extrinsic.Runtime.ProceduralGeometryPacker` (Triangle packer only, sized scratch buffer). No extraction wiring lands here. Tests: `contract;runtime` covering descriptor identity, dedup hits, refcount-only behavior driven directly against `ProceduralGeometryCache` (no `IRenderer`).
+  - [x] **GRAPHICS-030-Impl-B** — wire `RenderExtractionCache::ExtractAndSubmit()` to detect `ProceduralGeometryRef`, drive `EnsureResident` → `AllocateInstance` → `SetInstanceGeometry` per Decision 8, refresh `GpuSceneSlot`, and consume `DirtyTransform`. Tests: `contract;runtime` (and `contract;graphics` for the bind path) — exactly one renderable produces an instance bound to a triangle geometry handle, two renderables sharing the same key produce one geometry handle and two instance handles, and the new diagnostics counters (Decision 10) reach the values asserted.
+  - [x] **GRAPHICS-030-Impl-C** — refcount/free path + retire-queue ordering test. Tests: removing the last referencing entity does not free the geometry handle until `framesInFlight` ticks have elapsed; resurrecting the same key inside the retire window cancels the retirement; `ProceduralGeometryFreeRetires` increments exactly once per actual `GpuWorld::FreeGeometry` call.
+  - [x] **GRAPHICS-030-Impl-D** *(optional, gated)* — open one additional packer (Cube or Quad) once Impl-A/B/C land. Gated behind a follow-up review per Decision 13.
 
 ## Tests
-- Planning slice (this task): task-policy, doc-link, and layering validators only — no engine behavior or test-source changes land here.
-- Future implementation children must add `contract;runtime` (and `contract;graphics` where they cross into renderer state) tests covering: descriptor identity, dedup hits, instance/geometry binding, refcount free under retire-queue rules, failure-mode counters.
-- GPU coverage stays opt-in `gpu;vulkan` and outside the default CPU gate.
+- [x] Planning slice (this task): task-policy, doc-link, and layering validators only — no engine behavior or test-source changes land here.
+- [x] Future implementation children must add `contract;runtime` (and `contract;graphics` where they cross into renderer state) tests covering: descriptor identity, dedup hits, instance/geometry binding, refcount free under retire-queue rules, failure-mode counters.
+- [x] GPU coverage stays opt-in `gpu;vulkan` and outside the default CPU gate.
 
 ## Docs
-- Update `docs/architecture/graphics.md` "ECS renderable residency bridge" section with the procedural-source plan and the asset-source deferral to GRAPHICS-034.
-- Update `src/runtime/README.md` Public-module-surface "Planned modules" table with rows for `Extrinsic.Runtime.ProceduralGeometry`, `Extrinsic.Runtime.ProceduralGeometryPacker`, and `Extrinsic.ECS.Component.ProceduralGeometryRef`.
-- Update `src/graphics/renderer/README.md` cross-link to the new procedural-source path; no graphics-module surface change.
-- Update `tasks/backlog/rendering/README.md` and `tasks/backlog/README.md` so the GRAPHICS-030 entry points to `tasks/done/`.
+- [x] Update `docs/architecture/graphics.md` "ECS renderable residency bridge" section with the procedural-source plan and the asset-source deferral to GRAPHICS-034.
+- [x] Update `src/runtime/README.md` Public-module-surface "Planned modules" table with rows for `Extrinsic.Runtime.ProceduralGeometry`, `Extrinsic.Runtime.ProceduralGeometryPacker`, and `Extrinsic.ECS.Component.ProceduralGeometryRef`.
+- [x] Update `src/graphics/renderer/README.md` cross-link to the new procedural-source path; no graphics-module surface change.
+- [x] Update `tasks/backlog/rendering/README.md` and `tasks/backlog/README.md` so the GRAPHICS-030 entry points to `tasks/done/`.
 
 ## Acceptance criteria
-- All fourteen decisions are recorded with explicit answers and trade-off rationales. ✅
-- Implementation children are identified with scope and dependency gates but not opened. ✅
-- Layering invariants and source-tree placement are unambiguous. ✅
-- No engine behavior or build changes land in this slice. ✅
+- [x] All fourteen decisions are recorded with explicit answers and trade-off rationales. ✅
+- [x] Implementation children are identified with scope and dependency gates but not opened. ✅
+- [x] Layering invariants and source-tree placement are unambiguous. ✅
+- [x] No engine behavior or build changes land in this slice. ✅
 
 ## Verification
 ```bash

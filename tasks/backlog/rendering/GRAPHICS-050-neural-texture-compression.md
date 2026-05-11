@@ -30,9 +30,9 @@ Lock down the contract for a Neural Texture Compression (NTC) format that pairs 
 11. **Layering.** Encoder lives in `tools/`. Decoder Slang modules live in `src/graphics/renderer/`. No vendor SDK.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-050-Impl-A** — `.ntc` shipping format + offline encoder under `tools/` + `unit` PSNR tests.
@@ -42,21 +42,21 @@ Lock down the contract for a Neural Texture Compression (NTC) format that pairs 
 - **GRAPHICS-050-Impl-E** — Opt-in `gpu;vulkan` smoke on fixture set.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` material/texture pipeline section.
-- Update `src/graphics/renderer/README.md` material-system section.
-- Update `src/graphics/assets/README.md` upload-path section.
+- [ ] Update `docs/architecture/graphics.md` material/texture pipeline section.
+- [ ] Update `src/graphics/renderer/README.md` material-system section.
+- [ ] Update `src/graphics/assets/README.md` upload-path section.
 
 ## Acceptance criteria
-- Eleven decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- BCn shipping path remains the unconditional default.
+- [ ] Eleven decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] BCn shipping path remains the unconditional default.
 
 ## Verification
 ```bash

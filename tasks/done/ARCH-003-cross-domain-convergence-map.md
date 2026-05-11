@@ -24,26 +24,26 @@
 - `AGENTS.md` is authoritative for the engine mission and layering invariants. This task records how the *current* backlog converges to that mission so each backlog category's local DAG stays self-consistent and globally aligned.
 
 ## Required changes
-- Add a "Convergence themes" section to `tasks/backlog/README.md` listing current cross-domain themes, mapping each backlog category to its theme(s), and recording the cross-domain dependency anchors agents must respect.
-- Add minimal `README.md` entries to each backlog category that lacks one (`architecture/`, `bugs/`, `ecs/`, `geometry/`, `methods/`, `physics/`, `ui/`) so every category links back to the convergence map.
-- Cross-link related tasks (`METHOD-001 ↔ ARCH-001 ↔ HARDEN-064`) bidirectionally where current files only reference one direction.
-- Keep all additions factual about the current backlog state; do not introduce aspirational tasks or inflate scope.
+- [x] Add a "Convergence themes" section to `tasks/backlog/README.md` listing current cross-domain themes, mapping each backlog category to its theme(s), and recording the cross-domain dependency anchors agents must respect.
+- [x] Add minimal `README.md` entries to each backlog category that lacks one (`architecture/`, `bugs/`, `ecs/`, `geometry/`, `methods/`, `physics/`, `ui/`) so every category links back to the convergence map.
+- [x] Cross-link related tasks (`METHOD-001 ↔ ARCH-001 ↔ HARDEN-064`) bidirectionally where current files only reference one direction.
+- [x] Keep all additions factual about the current backlog state; do not introduce aspirational tasks or inflate scope.
 
 ## Tests
-- N/A; this is a docs/task-organization change. Repository structural checks below cover format/links.
+- [x] N/A; this is a docs/task-organization change. Repository structural checks below cover format/links.
 
 ## Docs
-- Update `tasks/backlog/README.md` with the convergence map.
-- Add `README.md` to each backlog category directory that lacks one.
-- No `AGENTS.md` change required; this slice does not introduce a new layering invariant.
-- No `docs/architecture/*` change required; this slice does not change subsystem architecture.
+- [x] Update `tasks/backlog/README.md` with the convergence map.
+- [x] Add `README.md` to each backlog category directory that lacks one.
+- [x] No `AGENTS.md` change required; this slice does not introduce a new layering invariant.
+- [x] No `docs/architecture/*` change required; this slice does not change subsystem architecture.
 
 ## Acceptance criteria
-- `tasks/backlog/README.md` contains a convergence themes section that names all current cross-domain themes and maps each category to themes.
-- Every backlog category directory has a `README.md` linking back to the convergence map.
-- Tasks already known to share cross-domain dependencies (`METHOD-001`, `ARCH-001`, `HARDEN-064`) cross-link each other.
-- `tools/agents/check_task_policy.py --strict` and `tools/docs/check_doc_links.py` remain green.
-- The active file under `tasks/active/` is retired to `tasks/done/` once changes are committed.
+- [x] `tasks/backlog/README.md` contains a convergence themes section that names all current cross-domain themes and maps each category to themes.
+- [x] Every backlog category directory has a `README.md` linking back to the convergence map.
+- [x] Tasks already known to share cross-domain dependencies (`METHOD-001`, `ARCH-001`, `HARDEN-064`) cross-link each other.
+- [x] `tools/agents/check_task_policy.py --strict` and `tools/docs/check_doc_links.py` remain green.
+- [x] The active file under `tasks/active/` is retired to `tasks/done/` once changes are committed.
 
 ## Verification
 ```bash

@@ -13,18 +13,18 @@
 - HARDEN-043 closes the gap by adding an automated strict checker so regressions are blocked in CI.
 
 ## Required changes
-- Add `tools/repo/check_test_layout.py` to enforce allowed test source roots and block legacy wrapper test source directories.
-- Wire the checker into `.github/workflows/ci-docs.yml` strict validation.
-- Document checker usage in `tools/repo/README.md`.
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-043.
+- [x] Add `tools/repo/check_test_layout.py` to enforce allowed test source roots and block legacy wrapper test source directories.
+- [x] Wire the checker into `.github/workflows/ci-docs.yml` strict validation.
+- [x] Document checker usage in `tools/repo/README.md`.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-043.
 
 ## Tests
-- Run `python3 tools/repo/check_test_layout.py --root . --strict`.
-- Run strict task/doc checks after task and tracker updates.
+- [x] Run `python3 tools/repo/check_test_layout.py --root . --strict`.
+- [x] Run strict task/doc checks after task and tracker updates.
 
 ## Docs
-- `tools/repo/README.md` checker inventory update.
-- `tasks/done/0001-post-reorganization-hardening-tracker.md` status board and evidence log update.
+- [x] `tools/repo/README.md` checker inventory update.
+- [x] `tasks/done/0001-post-reorganization-hardening-tracker.md` status board and evidence log update.
 
 ## Acceptance criteria
 - [x] Strict test layout checker exists and validates the final taxonomy layout.

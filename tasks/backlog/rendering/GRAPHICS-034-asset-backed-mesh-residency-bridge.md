@@ -43,31 +43,31 @@ Lock down the design for the asset-source residency path that bridges `ECS::Comp
 14. **Layering audit.** Confirm: `src/ecs/*` adds no graphics or assets imports; `src/graphics/*` does not access live ECS or `Asset.Service`; `src/runtime/*` is the only writer of the asset-geometry cache; `src/graphics/assets/Graphics.GpuAssetCache` is consumed through its public surface only.
 
 ## Required changes
-- Capture all fourteen decisions as explicit recorded answers, including the state-machine table in (5), the ordering in (6), and the fallback rule in (10).
-- Cross-link with ASSETIO-001 (asset ingest ownership), GRAPHICS-015 / 015Q (texture residency analogue), GRAPHICS-019 (legacy IO boundaries), GRAPHICS-023A/B/C/D (generation tracking + acknowledgment), GRAPHICS-028 (residency planning), GRAPHICS-029 (bootstrap), GRAPHICS-030 (procedural source + placeholder geometry source), GRAPHICS-031 (default debug material for failure fallback).
-- Identify follow-up implementation children (do **not** open here):
-  - **GRAPHICS-034-Impl-A** — `Runtime::NormalizeAssetInstanceId` + `Runtime::AssetGeometryCache` skeleton + diagnostics; no extraction wiring yet.
-  - **GRAPHICS-034-Impl-B** — extraction wiring for `NotRequested → CpuPending → GpuUploading → Ready` happy path; contract tests.
-  - **GRAPHICS-034-Impl-C** — `Failed` fallback path + stuck-pending diagnostic + cleanup regression tests.
-  - **GRAPHICS-034-Impl-D** — generation rebind via GRAPHICS-023D acknowledgment integration.
-  - **GRAPHICS-034-Impl-E** (optional) — non-mesh asset-backed geometry packers (graph, point cloud) gated behind GRAPHICS-014 / 011 readiness.
+- [ ] Capture all fourteen decisions as explicit recorded answers, including the state-machine table in (5), the ordering in (6), and the fallback rule in (10).
+- [ ] Cross-link with ASSETIO-001 (asset ingest ownership), GRAPHICS-015 / 015Q (texture residency analogue), GRAPHICS-019 (legacy IO boundaries), GRAPHICS-023A/B/C/D (generation tracking + acknowledgment), GRAPHICS-028 (residency planning), GRAPHICS-029 (bootstrap), GRAPHICS-030 (procedural source + placeholder geometry source), GRAPHICS-031 (default debug material for failure fallback).
+- [ ] Identify follow-up implementation children (do **not** open here):
+  - [ ] **GRAPHICS-034-Impl-A** — `Runtime::NormalizeAssetInstanceId` + `Runtime::AssetGeometryCache` skeleton + diagnostics; no extraction wiring yet.
+  - [ ] **GRAPHICS-034-Impl-B** — extraction wiring for `NotRequested → CpuPending → GpuUploading → Ready` happy path; contract tests.
+  - [ ] **GRAPHICS-034-Impl-C** — `Failed` fallback path + stuck-pending diagnostic + cleanup regression tests.
+  - [ ] **GRAPHICS-034-Impl-D** — generation rebind via GRAPHICS-023D acknowledgment integration.
+  - [ ] **GRAPHICS-034-Impl-E** (optional) — non-mesh asset-backed geometry packers (graph, point cloud) gated behind GRAPHICS-014 / 011 readiness.
 
 ## Tests
-- Planning slice: validators only.
-- Implementation children must add `contract;runtime` tests covering the full state machine (including `Failed` fallback and stuck-pending diagnostics), refcount cleanup, generation rebinds, and asset-id normalization unit coverage.
-- GPU coverage stays opt-in `gpu;vulkan` and outside the default CPU gate.
+- [ ] Planning slice: validators only.
+- [ ] Implementation children must add `contract;runtime` tests covering the full state machine (including `Failed` fallback and stuck-pending diagnostics), refcount cleanup, generation rebinds, and asset-id normalization unit coverage.
+- [ ] GPU coverage stays opt-in `gpu;vulkan` and outside the default CPU gate.
 
 ## Docs
-- Update `docs/architecture/graphics.md` "ECS renderable residency bridge" section with the asset-source plan and its composition with GRAPHICS-023A/B/C/D and GRAPHICS-030.
-- Update `src/runtime/README.md`, `src/graphics/assets/README.md`, and `src/graphics/renderer/README.md` cross-links once decisions are recorded.
-- Update `docs/migration/nonlegacy-parity-matrix.md` rows for asset-backed renderable residency.
-- Update `tasks/backlog/rendering/README.md` DAG after GRAPHICS-030 (and after ASSETIO-001 ingest ownership lands).
+- [ ] Update `docs/architecture/graphics.md` "ECS renderable residency bridge" section with the asset-source plan and its composition with GRAPHICS-023A/B/C/D and GRAPHICS-030.
+- [ ] Update `src/runtime/README.md`, `src/graphics/assets/README.md`, and `src/graphics/renderer/README.md` cross-links once decisions are recorded.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` rows for asset-backed renderable residency.
+- [ ] Update `tasks/backlog/rendering/README.md` DAG after GRAPHICS-030 (and after ASSETIO-001 ingest ownership lands).
 
 ## Acceptance criteria
-- All fourteen decisions recorded with explicit answers and trade-off rationales; state-machine table and ordering are fully enumerated.
-- Implementation children identified with scope and dependency gates but not opened.
-- No new ingest / loader / format work scheduled here; ASSETIO-001 retains ownership of asset ingest.
-- Layering invariants hold; no engine behavior changes land in this slice.
+- [ ] All fourteen decisions recorded with explicit answers and trade-off rationales; state-machine table and ordering are fully enumerated.
+- [ ] Implementation children identified with scope and dependency gates but not opened.
+- [ ] No new ingest / loader / format work scheduled here; ASSETIO-001 retains ownership of asset ingest.
+- [ ] Layering invariants hold; no engine behavior changes land in this slice.
 
 ## Verification
 ```bash

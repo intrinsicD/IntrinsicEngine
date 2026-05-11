@@ -33,57 +33,57 @@
   `tasks/backlog/rendering/GRAPHICS-023-shader-material-texture-hot-reload.md`.
 
 ## Required changes
-- Extend `src/runtime/Runtime.RenderExtraction.cppm` with a CPU-testable helper
+- [x] Extend `src/runtime/Runtime.RenderExtraction.cppm` with a CPU-testable helper
   `Runtime::AcknowledgeRenderableAssetRebind(slot, observation)` that:
-  - Returns a deterministic result enum
+  - [x] Returns a deterministic result enum
     (`Acknowledged`, `SkippedNoObservedGeneration`, `SkippedAssetMismatch`,
     `SkippedNoSourceAsset`).
-  - Updates `slot.LastSeenAssetGeneration` only when the observation reports a
+  - [x] Updates `slot.LastSeenAssetGeneration` only when the observation reports a
     non-zero `ObservedGeneration` for the slot's current `SourceAsset`.
-  - Does not introduce any new `Graphics`/RHI/ECS dependency edges and is
+  - [x] Does not introduce any new `Graphics`/RHI/ECS dependency edges and is
     implementable from existing imports.
-- Extend `RuntimeRenderExtractionStats` with a single new counter
+- [x] Extend `RuntimeRenderExtractionStats` with a single new counter
   `SourceAssetRebindAcknowledgedCount` so future callers (and tests) can
   account for explicit acknowledgments.
-- Keep `RenderExtractionCache::ExtractAndSubmit` behavior bit-for-bit
+- [x] Keep `RenderExtractionCache::ExtractAndSubmit` behavior bit-for-bit
   identical: it must continue to observe but not acknowledge until a future
   rebind slice wires the upload/rebind side.
 
 ## Tests
-- Add focused `integration;runtime;graphics` CPU coverage in
+- [x] Add focused `integration;runtime;graphics` CPU coverage in
   `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp`:
-  - Acknowledging a `RebindRequired` observation transitions the next
+  - [x] Acknowledging a `RebindRequired` observation transitions the next
     observation to `UpToDate` and updates `LastSeenAssetGeneration`.
-  - Acknowledging an `UpToDate` observation is a no-op on
+  - [x] Acknowledging an `UpToDate` observation is a no-op on
     `LastSeenAssetGeneration` and reports `Acknowledged`.
-  - Acknowledging when the observation reports `CacheUnavailable`/zero
+  - [x] Acknowledging when the observation reports `CacheUnavailable`/zero
     generation returns `SkippedNoObservedGeneration` and does not mutate.
-  - Acknowledging an observation whose `SourceAsset` no longer matches the
+  - [x] Acknowledging an observation whose `SourceAsset` no longer matches the
     slot returns `SkippedAssetMismatch` and does not mutate.
-- No GPU/Vulkan tests are required.
+- [x] No GPU/Vulkan tests are required.
 
 ## Docs
-- Update `docs/architecture/graphics.md` GRAPHICS-023C paragraph to mention the
+- [x] Update `docs/architecture/graphics.md` GRAPHICS-023C paragraph to mention the
   GRAPHICS-023D acknowledgment closure and remaining non-goals (file watching,
   shader reload, texture residency reload still deferred).
-- Update `src/graphics/renderer/README.md` runtime-owned-observation bullet to
+- [x] Update `src/graphics/renderer/README.md` runtime-owned-observation bullet to
   cross-reference GRAPHICS-023D.
-- Update `tasks/backlog/rendering/README.md` to list GRAPHICS-023D under the
+- [x] Update `tasks/backlog/rendering/README.md` to list GRAPHICS-023D under the
   parent GRAPHICS-023 child series.
 
 ## Acceptance criteria
-- A runtime caller holding a `GpuSceneSlot` and a
+- [x] A runtime caller holding a `GpuSceneSlot` and a
   `RuntimeRenderableAssetGenerationObservation` can call
   `AcknowledgeRenderableAssetRebind` to advance `LastSeenAssetGeneration` to
   the observed generation when the asset identity matches.
-- Subsequent `ObserveRenderableAssetGeneration` of the same `(asset,
+- [x] Subsequent `ObserveRenderableAssetGeneration` of the same `(asset,
   generation)` reports `UpToDate` without mutation.
-- Acknowledgment of a stale or asset-mismatched observation never mutates the
+- [x] Acknowledgment of a stale or asset-mismatched observation never mutates the
   slot and is reported as a typed skip result.
-- `RuntimeRenderExtractionStats` exposes a new
+- [x] `RuntimeRenderExtractionStats` exposes a new
   `SourceAssetRebindAcknowledgedCount` counter; the default
   `ExtractAndSubmit` path continues to leave it at zero.
-- Tests prove the helper behavior on the CPU/default path.
+- [x] Tests prove the helper behavior on the CPU/default path.
 
 ## Completion
 - Completed: 2026-05-08.

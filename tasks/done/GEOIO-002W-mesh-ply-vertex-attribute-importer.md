@@ -19,33 +19,33 @@
 - This slice keeps the existing `MeshIOResult` property contract: positions in `v:point`, optional normals in `v:normal`, and optional colors in `v:color`.
 
 ## Required changes
-- `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
-  - Add mesh PLY color normalization for `red green blue [alpha]` values.
-  - Teach the ASCII PLY mesh parser to locate vertex properties by header name rather than assuming `x y z` are the first three tokens only.
-  - Populate `v:normal` when `nx ny nz` are present on every vertex row.
-  - Populate `v:color` when `red green blue` are present, defaulting alpha to opaque and honoring an optional `alpha` channel.
-  - Teach the binary PLY mesh parser to preserve `float32` `nx ny nz` and `uint8` `red green blue [alpha]` properties while continuing to skip unrelated scalar vertex properties.
-- `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - Add ASCII mesh PLY coverage for vertex normals and colors.
-  - Strengthen ASCII and binary PLY writer-normal round-trip checks.
-  - Strengthen the existing binary mesh PLY extra-vertex-property fixture to assert imported vertex colors.
+- [x] `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
+  - [x] Add mesh PLY color normalization for `red green blue [alpha]` values.
+  - [x] Teach the ASCII PLY mesh parser to locate vertex properties by header name rather than assuming `x y z` are the first three tokens only.
+  - [x] Populate `v:normal` when `nx ny nz` are present on every vertex row.
+  - [x] Populate `v:color` when `red green blue` are present, defaulting alpha to opaque and honoring an optional `alpha` channel.
+  - [x] Teach the binary PLY mesh parser to preserve `float32` `nx ny nz` and `uint8` `red green blue [alpha]` properties while continuing to skip unrelated scalar vertex properties.
+- [x] `tests/unit/geometry/Test.GeometryIO.cpp`:
+  - [x] Add ASCII mesh PLY coverage for vertex normals and colors.
+  - [x] Strengthen ASCII and binary PLY writer-normal round-trip checks.
+  - [x] Strengthen the existing binary mesh PLY extra-vertex-property fixture to assert imported vertex colors.
 
 ## Tests
-- Added `GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexNormalsAndColors`.
-- Updated `GeometryIO_MeshIO.WritesPLYTriangleWithNormals` to assert imported `v:normal` data.
-- Updated `GeometryIO_MeshIO.WritesPLYBinaryTriangleWithNormals` to assert imported `v:normal` data.
-- Updated `GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYWithExtraVertexProperties` to assert imported `v:color` data.
+- [x] Added `GeometryIO_MeshIO.LoadsASCIIPLYTriangleWithVertexNormalsAndColors`.
+- [x] Updated `GeometryIO_MeshIO.WritesPLYTriangleWithNormals` to assert imported `v:normal` data.
+- [x] Updated `GeometryIO_MeshIO.WritesPLYBinaryTriangleWithNormals` to assert imported `v:normal` data.
+- [x] Updated `GeometryIO_MeshIO.LoadsBinaryLittleEndianPLYWithExtraVertexProperties` to assert imported `v:color` data.
 
 ## Docs
-- Updated `docs/migration/nonlegacy-parity-matrix.md` to record mesh PLY vertex normal/color import parity under `GEOIO-002W`.
-- No `docs/api/generated/module_inventory.md` refresh required because no public module declarations, module files, or exported names changed.
+- [x] Updated `docs/migration/nonlegacy-parity-matrix.md` to record mesh PLY vertex normal/color import parity under `GEOIO-002W`.
+- [x] No `docs/api/generated/module_inventory.md` refresh required because no public module declarations, module files, or exported names changed.
 
 ## Acceptance criteria
-- ASCII mesh PLY files with `nx ny nz` and `red green blue` vertex properties populate `v:normal` and `v:color`.
-- Binary mesh PLY files with `float32` normal properties or `uint8` color properties populate `v:normal` and `v:color`.
-- Existing mesh PLY topology, binary endian, and negative-path tests continue to pass.
-- `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
-- The migration matrix records the new parity evidence.
+- [x] ASCII mesh PLY files with `nx ny nz` and `red green blue` vertex properties populate `v:normal` and `v:color`.
+- [x] Binary mesh PLY files with `float32` normal properties or `uint8` color properties populate `v:normal` and `v:color`.
+- [x] Existing mesh PLY topology, binary endian, and negative-path tests continue to pass.
+- [x] `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
+- [x] The migration matrix records the new parity evidence.
 
 ## Verification
 ```bash

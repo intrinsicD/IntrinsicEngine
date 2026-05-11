@@ -14,21 +14,21 @@
 - Impact: GLFW/Vulkan-enabled build trees could not reload, and IDE compiler information failed as follow-on noise after configure stopped.
 
 ## Required changes
-- Resolve ImGuizmo from the documented `INTRINSIC_IMGUIZMO_SOURCE_DIR` override, the FetchContent source directory, or the shared `external/cache` fallback.
-- Accept both `${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp` and `${IMGUIZMO_SOURCE_DIR}/src/ImGuizmo.cpp`.
-- Use the resolved source/include directory when defining `imguizmo_lib`.
+- [x] Resolve ImGuizmo from the documented `INTRINSIC_IMGUIZMO_SOURCE_DIR` override, the FetchContent source directory, or the shared `external/cache` fallback.
+- [x] Accept both `${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp` and `${IMGUIZMO_SOURCE_DIR}/src/ImGuizmo.cpp`.
+- [x] Use the resolved source/include directory when defining `imguizmo_lib`.
 
 ## Tests
-- No C++ test is required; this is configure-time dependency resolution.
-- Verify with a fresh CMake configure and focused dependency target build.
+- [x] No C++ test is required; this is configure-time dependency resolution.
+- [x] Verify with a fresh CMake configure and focused dependency target build.
 
 ## Docs
-- This task record documents the build/dependency behavior change.
+- [x] This task record documents the build/dependency behavior change.
 
 ## Acceptance criteria
-- CMake configure succeeds with the existing populated ImGuizmo cache.
-- `imguizmo_lib` builds from the resolved source path.
-- No layering or runtime behavior changes are introduced.
+- [x] CMake configure succeeds with the existing populated ImGuizmo cache.
+- [x] `imguizmo_lib` builds from the resolved source path.
+- [x] No layering or runtime behavior changes are introduced.
 
 ## Verification
 ```bash

@@ -28,22 +28,22 @@
 - Owner: `src/graphics/renderer` with runtime handoff expectations.
 - This depends on `GRAPHICS-004` so allocations and frees have stable metadata.
 ## Required changes
-- Define compaction thresholds, planning API, execution result, and relocation table contract.
-- Ensure compaction is opt-in and safe around frames in flight.
-- Keep compaction disabled unless `PlanManagedBufferCompaction()` / `ApplyManagedBufferCompaction()` are called explicitly.
-- Report relocations to runtime-owned sidecar/extraction caches; graphics must not patch canonical ECS components directly.
-- Preserve geometry, material, transform, bounds/culling, light, and instance references through generation checks or explicit relocation tables.
-- Expose diagnostics for fragmentation and bytes moved.
+- [x] Define compaction thresholds, planning API, execution result, and relocation table contract.
+- [x] Ensure compaction is opt-in and safe around frames in flight.
+- [x] Keep compaction disabled unless `PlanManagedBufferCompaction()` / `ApplyManagedBufferCompaction()` are called explicitly.
+- [x] Report relocations to runtime-owned sidecar/extraction caches; graphics must not patch canonical ECS components directly.
+- [x] Preserve geometry, material, transform, bounds/culling, light, and instance references through generation checks or explicit relocation tables.
+- [x] Expose diagnostics for fragmentation and bytes moved.
 ## Tests
-- Add unit tests for fragmentation thresholds, relocation table correctness, skipped compaction, and stale relocation rejection.
-- Label compaction unit tests `unit;graphics` so they run in the default CPU gate.
+- [x] Add unit tests for fragmentation thresholds, relocation table correctness, skipped compaction, and stale relocation rejection.
+- [x] Label compaction unit tests `unit;graphics` so they run in the default CPU gate.
 ## Docs
-- Document the compaction contract and runtime handoff expectations in graphics/runtime architecture docs.
+- [x] Document the compaction contract and runtime handoff expectations in graphics/runtime architecture docs.
 ## Acceptance criteria
-- Runtime can update extracted snapshots or handles using graphics-provided relocation results.
-- Geometry/material/instance references remain valid through generation checks or explicit relocation reports.
-- Compaction can be tested without Vulkan or live ECS.
-- Disabled compaction preserves existing allocation behavior.
+- [x] Runtime can update extracted snapshots or handles using graphics-provided relocation results.
+- [x] Geometry/material/instance references remain valid through generation checks or explicit relocation reports.
+- [x] Compaction can be tested without Vulkan or live ECS.
+- [x] Disabled compaction preserves existing allocation behavior.
 ## Verification
 ```bash
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check

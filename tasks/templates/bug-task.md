@@ -12,17 +12,17 @@
 - Impact:
 
 ## Required changes
-- 
+- [ ] <fix or diagnostic change>
 
 ## Tests
-- Add regression coverage under `tests/regression/` when appropriate.
+- [ ] Add regression coverage under `tests/regression/` when appropriate.
 
 ## Docs
-- Update relevant architecture/migration/task docs if behavior or policy changes.
+- [ ] Update relevant architecture/migration/task docs if behavior or policy changes.
 
 ## Acceptance criteria
-- Repro is documented and reliably covered by automated test(s).
-- Fix does not introduce layering violations.
+- [ ] Repro is documented and reliably covered by automated test(s).
+- [ ] Fix does not introduce layering violations.
 
 ## Verification
 ```bash

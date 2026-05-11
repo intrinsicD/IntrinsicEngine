@@ -12,26 +12,26 @@ Remove obsolete wrapper test subdirectory build stubs after HARDEN-041 source re
 HARDEN-041 mechanically relocated all wrapper `*.cpp` sources from `tests/{Asset,Core,ECS,Graphics,Runtime}` into taxonomy directories. The remaining wrapper directories still contained stale `CMakeLists.txt` files pointing to removed `Extrinsic*` test targets, plus one shared helper header in `tests/Graphics/MockRHI.hpp`.
 
 ## Required changes
-- Remove obsolete wrapper `CMakeLists.txt` files under:
-  - `tests/Asset/`
-  - `tests/Core/`
-  - `tests/ECS/`
-  - `tests/Graphics/`
-  - `tests/Runtime/`
-- Relocate `tests/Graphics/MockRHI.hpp` into `tests/support/MockRHI.hpp`.
-- Keep the patch mechanical only and avoid semantic test behavior changes.
-- Update the hardening tracker (`tasks/done/0001-post-reorganization-hardening-tracker.md`) status/evidence for HARDEN-042.
+- [x] Remove obsolete wrapper `CMakeLists.txt` files under:
+  - [x] `tests/Asset/`
+  - [x] `tests/Core/`
+  - [x] `tests/ECS/`
+  - [x] `tests/Graphics/`
+  - [x] `tests/Runtime/`
+- [x] Relocate `tests/Graphics/MockRHI.hpp` into `tests/support/MockRHI.hpp`.
+- [x] Keep the patch mechanical only and avoid semantic test behavior changes.
+- [x] Update the hardening tracker (`tasks/done/0001-post-reorganization-hardening-tracker.md`) status/evidence for HARDEN-042.
 
 ## Tests
-- `rg -n "ExtrinsicAssetTests|ExtrinsicCoreTests|ExtrinsicECSTests|ExtrinsicGraphicsTests|ExtrinsicRuntimeTests" tests`
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `rg -n "ExtrinsicAssetTests|ExtrinsicCoreTests|ExtrinsicECSTests|ExtrinsicGraphicsTests|ExtrinsicRuntimeTests" tests`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md`:
-  - status board row for HARDEN-042.
-  - temporary wrapper subdirectory note under temporary test skips/quarantines.
-  - evidence log entries for HARDEN-042 execution.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md`:
+  - [x] status board row for HARDEN-042.
+  - [x] temporary wrapper subdirectory note under temporary test skips/quarantines.
+  - [x] evidence log entries for HARDEN-042 execution.
 
 ## Acceptance criteria
 - [x] No wrapper `CMakeLists.txt` remain under `tests/Asset`, `tests/Core`, `tests/ECS`, `tests/Graphics`, `tests/Runtime`.

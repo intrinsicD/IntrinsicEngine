@@ -20,49 +20,49 @@ GRAPHICS-013 bundles bloom, FXAA, SMAA, tone-map, histogram, debug view, ImGui o
 
 ## Required changes
 
-1. Keep GRAPHICS-013 as an umbrella/index task OR retire it into done as superseded planning.
+- [x] Keep GRAPHICS-013 as an umbrella/index task OR retire it into done as superseded planning.
 
    Preferred:
-   - Keep GRAPHICS-013 as umbrella planning task with no implementation.
-   - Add links to split tasks.
+   - [x] Keep GRAPHICS-013 as umbrella planning task with no implementation.
+   - [x] Add links to split tasks.
 
-2. Create:
-   - `tasks/backlog/rendering/GRAPHICS-013A-postprocess-chain.md`
-   - `tasks/backlog/rendering/GRAPHICS-013B-debug-view-and-render-target-inspection.md`
-   - `tasks/backlog/rendering/GRAPHICS-013C-imgui-overlay-and-present.md`
+- [x] Create:
+   - [x] `tasks/backlog/rendering/GRAPHICS-013A-postprocess-chain.md`
+   - [x] `tasks/backlog/rendering/GRAPHICS-013B-debug-view-and-render-target-inspection.md`
+   - [x] `tasks/backlog/rendering/GRAPHICS-013C-imgui-overlay-and-present.md`
 
-3. GRAPHICS-013A should own:
-   - bloom
-   - FXAA
-   - SMAA
-   - tone map
-   - histogram
-   - HDR to LDR chain
-   - postprocess resource lifetime
+- [x] GRAPHICS-013A should own:
+   - [x] bloom
+   - [x] FXAA
+   - [x] SMAA
+   - [x] tone map
+   - [x] histogram
+   - [x] HDR to LDR chain
+   - [x] postprocess resource lifetime
 
-4. GRAPHICS-013B should own:
-   - debug-view sampled-resource selection
-   - render-target inspection hooks
-   - debug preview output
-   - diagnostics for missing sampled resources
+- [x] GRAPHICS-013B should own:
+   - [x] debug-view sampled-resource selection
+   - [x] render-target inspection hooks
+   - [x] debug preview output
+   - [x] diagnostics for missing sampled resources
 
-5. GRAPHICS-013C should own:
-   - ImGui draw-data import
-   - overlay load/store behavior
-   - final present/finalization pass
-   - imported backbuffer write policy
+- [x] GRAPHICS-013C should own:
+   - [x] ImGui draw-data import
+   - [x] overlay load/store behavior
+   - [x] final present/finalization pass
+   - [x] imported backbuffer write policy
 
-6. Update GRAPHICS-001 task index:
-   - Replace GRAPHICS-013 with GRAPHICS-013A/B/C in intended order.
-   - Keep dependencies clear.
+- [x] Update GRAPHICS-001 task index:
+   - [x] Replace GRAPHICS-013 with GRAPHICS-013A/B/C in intended order.
+   - [x] Keep dependencies clear.
 
-7. Update `tasks/backlog/rendering/README.md` dependency DAG.
+- [x] Update `tasks/backlog/rendering/README.md` dependency DAG.
 
 ## Acceptance criteria
 
-- No single split task owns unrelated feature families.
-- Each split task has complete required sections.
-- GRAPHICS-001 and rendering README point to the split tasks.
+- [x] No single split task owns unrelated feature families.
+- [x] Each split task has complete required sections.
+- [x] GRAPHICS-001 and rendering README point to the split tasks.
 
 ## Verification
 

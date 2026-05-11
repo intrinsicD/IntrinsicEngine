@@ -31,9 +31,9 @@ Lock down the contract for bringing the analytic surface BRDF up to modern PBR f
 12. **Layering.** `graphics/` consumes precomputed assets; `assets/` owns authoring/transcoding. No live ECS access.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-042-Impl-A** — `MaterialParams` extension + `MaterialTypeDesc` capability flags + null-RHI shape tests.
@@ -43,21 +43,21 @@ Lock down the contract for bringing the analytic surface BRDF up to modern PBR f
 - **GRAPHICS-042-Impl-E** — White-furnace + reciprocity unit tests for energy conservation.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` lighting section with PBR + IBL.
-- Update `src/graphics/renderer/README.md` material-system section.
-- Update `docs/migration/nonlegacy-parity-matrix.md` PBR rows.
+- [ ] Update `docs/architecture/rendering-three-pass.md` lighting section with PBR + IBL.
+- [ ] Update `src/graphics/renderer/README.md` material-system section.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` PBR rows.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Backward compatibility: legacy materials with zero-init new fields render identically.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Backward compatibility: legacy materials with zero-init new fields render identically.
 
 ## Verification
 ```bash

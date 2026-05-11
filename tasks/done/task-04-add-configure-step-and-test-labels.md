@@ -20,9 +20,9 @@ Normalize verification blocks and test-label expectations in rendering backlog t
 
 ## Required changes
 
-1. For every implementation-oriented rendering task:
-   - `tasks/backlog/rendering/GRAPHICS-002-*.md` through `GRAPHICS-018-*.md`
-   - and any other rendering task with CMake/CTest verification
+- [x] For every implementation-oriented rendering task:
+   - [x] `tasks/backlog/rendering/GRAPHICS-002-*.md` through `GRAPHICS-018-*.md`
+   - [x] and any other rendering task with CMake/CTest verification
 
    update Verification to include:
 
@@ -32,27 +32,27 @@ Normalize verification blocks and test-label expectations in rendering backlog t
    ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
    ```
 
-2. For GPU/Vulkan optional tasks, keep optional GPU command after the CPU gate, e.g.:
+- [x] For GPU/Vulkan optional tasks, keep optional GPU command after the CPU gate, e.g.:
 
    ```bash
    # Optional when hardware/driver support is available:
    ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
    ```
 
-3. In each task's Tests section, add explicit label guidance:
-   - CPU-only graphics unit tests: `unit;graphics`
-   - graphics contract tests: `contract;graphics`
-   - runtime extraction integration tests: `integration;runtime;graphics`
-   - Vulkan/GPU smoke tests: `gpu;vulkan`
-   - regression tests: `regression;graphics` or `regression;runtime;graphics`
-4. Do not invent test filenames unless the task already names concrete files.
-5. Do not change CMake behavior in this task.
+- [x] In each task's Tests section, add explicit label guidance:
+   - [x] CPU-only graphics unit tests: `unit;graphics`
+   - [x] graphics contract tests: `contract;graphics`
+   - [x] runtime extraction integration tests: `integration;runtime;graphics`
+   - [x] Vulkan/GPU smoke tests: `gpu;vulkan`
+   - [x] regression tests: `regression;graphics` or `regression;runtime;graphics`
+- [x] Do not invent test filenames unless the task already names concrete files.
+- [x] Do not change CMake behavior in this task.
 
 ## Acceptance criteria
 
-- All rendering implementation tasks include configure + build + CTest.
-- Test label expectations are explicit enough that future tests do not violate taxonomy.
-- Optional Vulkan/GPU checks remain excluded from the default CPU gate.
+- [x] All rendering implementation tasks include configure + build + CTest.
+- [x] Test label expectations are explicit enough that future tests do not violate taxonomy.
+- [x] Optional Vulkan/GPU checks remain excluded from the default CPU gate.
 
 ## Verification
 

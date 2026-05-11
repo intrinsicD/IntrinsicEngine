@@ -100,9 +100,9 @@ Adjacent tasks that depend on the decisions in this task:
 
 This task is planning-only. It produces:
 
-1. An inventory document and decision matrix.
-2. Promoted snapshot/packet contract sketches (text only).
-3. Cross-link updates that wire retirement gating to those decisions.
+- [x] An inventory document and decision matrix.
+- [x] Promoted snapshot/packet contract sketches (text only).
+- [x] Cross-link updates that wire retirement gating to those decisions.
 
 ### 1. Inventory and decision matrix
 
@@ -111,13 +111,13 @@ linked file under `docs/migration/`) that lists, for each legacy module
 above and any sibling legacy overlay/presentation behavior, the following
 columns:
 
-- legacy module path,
-- behavior summary (≤1 sentence),
-- promoted owner (`runtime/editor/app`, `graphics`, or `platform`),
-- promoted module/path (existing or proposed),
-- snapshot/packet hand-off shape (immutable struct name or "TBD"),
-- retirement gate (`GRAPHICS-020` row reference),
-- open questions (free text).
+- [x] legacy module path,
+- [x] behavior summary (≤1 sentence),
+- [x] promoted owner (`runtime/editor/app`, `graphics`, or `platform`),
+- [x] promoted module/path (existing or proposed),
+- [x] snapshot/packet hand-off shape (immutable struct name or "TBD"),
+- [x] retirement gate (`GRAPHICS-020` row reference),
+- [x] open questions (free text).
 
 The decision matrix must cover at minimum:
 
@@ -143,27 +143,27 @@ Sketch the shape (markdown only — no `.cppm` edits in this task) of the
 immutable overlay snapshot/packet contracts that runtime should produce and
 graphics should consume:
 
-- `OverlayLineSnapshot`: per-line endpoints (object-space), color, width,
+- [x] `OverlayLineSnapshot`: per-line endpoints (object-space), color, width,
   selection-outline eligibility flag, z-bias hint, dirty-domain stamp.
-- `OverlayPointSnapshot`: positions, radii, colors, selection-outline
+- [x] `OverlayPointSnapshot`: positions, radii, colors, selection-outline
   eligibility flag, dirty-domain stamp.
-- `OverlayTriangleSnapshot` (only if needed by an existing overlay use
+- [x] `OverlayTriangleSnapshot` (only if needed by an existing overlay use
   case — keep optional and cross-link the use case).
-- `OverlayVectorFieldSnapshot`: parent reference, sample positions,
+- [x] `OverlayVectorFieldSnapshot`: parent reference, sample positions,
   vectors, color/scale parameters, child-overlay invariants stamp.
-- `PresentSnapshot`: presentation source resource name (e.g.
+- [x] `PresentSnapshot`: presentation source resource name (e.g.
   `SceneColorLDR`), backbuffer state expectations, optional ImGui-overlay
   attachment flag.
 
 Each sketch must call out:
 
-- which side owns mutation (always runtime/editor/app for these),
-- which side owns GPU translation (always graphics),
-- the dirty-domain stamp scheme (must satisfy invariant B),
-- parent/child closure expectations (must satisfy invariant C),
-- selection-outline parity (must satisfy invariant D),
-- extraction determinism guarantees (must satisfy invariant E),
-- where invalid-packet diagnostics surface (graphics-side, structured).
+- [x] which side owns mutation (always runtime/editor/app for these),
+- [x] which side owns GPU translation (always graphics),
+- [x] the dirty-domain stamp scheme (must satisfy invariant B),
+- [x] parent/child closure expectations (must satisfy invariant C),
+- [x] selection-outline parity (must satisfy invariant D),
+- [x] extraction determinism guarantees (must satisfy invariant E),
+- [x] where invalid-packet diagnostics surface (graphics-side, structured).
 
 ### 3. Lifecycle invariant alignment
 
@@ -178,14 +178,14 @@ required, split it into a new task rather than amending invariants here.
 Edit each of the following task files to add a one-paragraph cross-link to
 this task's owner decisions, scoped to the part each task owns:
 
-- `tasks/done/GRAPHICS-010-lines-points-debug-primitives.md` — cross-link
+- [x] `tasks/done/GRAPHICS-010-lines-points-debug-primitives.md` — cross-link
   in a "Follow-ups" or "Related" subsection (do not change acceptance
   state).
-- `tasks/done/GRAPHICS-011-spatial-debug-visualizers.md` — same.
-- `tasks/done/GRAPHICS-014-visualization-attributes-overlays.md` — same.
-- `tasks/done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md` —
+- [x] `tasks/done/GRAPHICS-011-spatial-debug-visualizers.md` — same.
+- [x] `tasks/done/GRAPHICS-014-visualization-attributes-overlays.md` — same.
+- [x] `tasks/done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md` —
   same.
-- `tasks/backlog/rendering/GRAPHICS-020-legacy-graphics-retirement-gates.md`
+- [x] `tasks/backlog/rendering/GRAPHICS-020-legacy-graphics-retirement-gates.md`
   — add this task as the source of overlay/presentation/editor handoff
   ownership decisions to evaluate during retirement gating.
 
@@ -196,23 +196,23 @@ stay valid.
 
 ### 5. Architecture doc updates
 
-- `docs/architecture/graphics.md` — if any new promoted overlay packet
+- [x] `docs/architecture/graphics.md` — if any new promoted overlay packet
   contracts become public, add a single paragraph in the existing overlay
   section. Do not introduce a new top-level architecture section without
   explicit follow-up.
-- `docs/architecture/runtime-subsystem-boundaries.md` — add a subsection
+- [x] `docs/architecture/runtime-subsystem-boundaries.md` — add a subsection
   cross-linking this task and listing the runtime-owned overlay
   responsibilities derived in §1.
 
 ### 6. Forbidden-during-this-task behaviors
 
-- No new `.cppm` / `.cpp` files in `src/graphics/*` or `src/runtime/*`.
-- No edits to `Graphics.VisualizationPackets.cppm`,
+- [x] No new `.cppm` / `.cpp` files in `src/graphics/*` or `src/runtime/*`.
+- [x] No edits to `Graphics.VisualizationPackets.cppm`,
   `Graphics.VisualizationSyncSystem.cppm`,
   `Graphics.ImGuiOverlaySystem.cppm`, or any other promoted-layer module.
-- No edits to `src/legacy/Graphics/Graphics.OverlayEntityFactory.{cppm,cpp}`
+- [x] No edits to `src/legacy/Graphics/Graphics.OverlayEntityFactory.{cppm,cpp}`
   or `src/legacy/Graphics/Graphics.Presentation.{cppm,cpp}`.
-- No CMakeLists changes.
+- [x] No CMakeLists changes.
 
 When the inventory uncovers a behavior that needs an immediate API change,
 file a separate task under `tasks/backlog/rendering/` (or
@@ -223,50 +223,50 @@ sneak the change in here.
 
 Planning-only verification:
 
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 When follow-up implementation tasks are filed for runtime/editor or
 graphics work derived from this matrix, those tasks own their own:
 
-- `contract;runtime;graphics` or `integration;runtime;graphics` tests for
+- [x] `contract;runtime;graphics` or `integration;runtime;graphics` tests for
   deterministic overlay extraction (per invariants A–E).
-- `contract;graphics` tests for overlay packet defaults and invalid-packet
+- [x] `contract;graphics` tests for overlay packet defaults and invalid-packet
   diagnostics surfaced by graphics-side packet consumers.
-- Optional `gpu;vulkan` smoke coverage; the default CPU gate must remain
+- [x] Optional `gpu;vulkan` smoke coverage; the default CPU gate must remain
   the primary correctness signal.
 
 ## Docs
 
-- `docs/migration/nonlegacy-parity-matrix.md` — overlay/presentation/editor
+- [x] `docs/migration/nonlegacy-parity-matrix.md` — overlay/presentation/editor
   handoff rows updated with the matrix from §1.
-- `docs/architecture/vectorfield-overlay-lifecycle-invariants.md` — only
+- [x] `docs/architecture/vectorfield-overlay-lifecycle-invariants.md` — only
   edited if §3 surfaces invariant-relevant changes.
-- `docs/architecture/graphics.md` — minimal update only if §5 conditions
+- [x] `docs/architecture/graphics.md` — minimal update only if §5 conditions
   are met.
-- `docs/architecture/runtime-subsystem-boundaries.md` — runtime overlay
+- [x] `docs/architecture/runtime-subsystem-boundaries.md` — runtime overlay
   ownership subsection update.
-- `tasks/done/GRAPHICS-010|011|014|017-*.md` — cross-link appendix only.
-- `tasks/backlog/rendering/GRAPHICS-020-legacy-graphics-retirement-gates.md`
+- [x] `tasks/done/GRAPHICS-010|011|014|017-*.md` — cross-link appendix only.
+- [x] `tasks/backlog/rendering/GRAPHICS-020-legacy-graphics-retirement-gates.md`
   — cross-link to this task as overlay/presentation owner source.
 
 ## Acceptance criteria
 
-- Every legacy overlay/presentation/editor-adjacent behavior in the
+- [x] Every legacy overlay/presentation/editor-adjacent behavior in the
   inventory has a single named promoted owner (runtime/editor/app,
   graphics, or platform) and a follow-up task or explicit "no follow-up
   needed" decision.
-- Graphics is documented as not owning editor mutation, ECS mutation,
+- [x] Graphics is documented as not owning editor mutation, ECS mutation,
   platform presentation policy, or window/input state.
-- `GRAPHICS-020` retirement gating can mechanically map every legacy
+- [x] `GRAPHICS-020` retirement gating can mechanically map every legacy
   overlay/presentation module to a promoted owner via this task's matrix.
-- Runtime/editor-to-graphics overlay handoff is documented as
+- [x] Runtime/editor-to-graphics overlay handoff is documented as
   snapshot/packet based, deterministic, and consistent with the five
   vector-field/overlay lifecycle invariants.
-- All five invariants (A–E) in
+- [x] All five invariants (A–E) in
   `docs/architecture/vectorfield-overlay-lifecycle-invariants.md` remain
   intact (or are explicitly strengthened with documented rationale).
-- Doc-link and task-policy checks pass in strict mode.
+- [x] Doc-link and task-policy checks pass in strict mode.
 
 ## Verification
 

@@ -109,21 +109,21 @@
 - Owner: `src/graphics/vulkan`, `src/graphics/rhi`, `src/graphics/framegraph`, and renderer backend wiring.
 - CPU/null contracts should be stable before Vulkan execution is tightened.
 ## Required changes
-- Connect Vulkan swapchain, descriptors, pipelines, barriers, transfer, and profiler support to canonical frame execution. Guarded instance/surface/physical-device probing, required Vulkan 1.2/1.3 feature negotiation, logical-device/queue/allocator/per-frame command/sync acquisition, swapchain image/view/handle registration, live internal service handoff, and direct SPIR-V pipeline creation are present and must remain fail-closed from renderer/RHI-manager execution until the remaining operational prerequisites land.
-- Implement Vulkan descriptor/scene-table integration for renderable-instance, transform, bounds/culling, material, geometry, and light SSBOs.
-- Add operational resize, swapchain recreation, presentation, acquire/submit, and backend-failure diagnostics using the fail-closed lifecycle taxonomy already exposed by `GetVulkanFrameLifecycleDiagnosticsSnapshot()`.
-- Keep backend-specific code behind RHI/backend seams.
+- [x] Connect Vulkan swapchain, descriptors, pipelines, barriers, transfer, and profiler support to canonical frame execution. Guarded instance/surface/physical-device probing, required Vulkan 1.2/1.3 feature negotiation, logical-device/queue/allocator/per-frame command/sync acquisition, swapchain image/view/handle registration, live internal service handoff, and direct SPIR-V pipeline creation are present and must remain fail-closed from renderer/RHI-manager execution until the remaining operational prerequisites land.
+- [x] Implement Vulkan descriptor/scene-table integration for renderable-instance, transform, bounds/culling, material, geometry, and light SSBOs.
+- [x] Add operational resize, swapchain recreation, presentation, acquire/submit, and backend-failure diagnostics using the fail-closed lifecycle taxonomy already exposed by `GetVulkanFrameLifecycleDiagnosticsSnapshot()`.
+- [x] Keep backend-specific code behind RHI/backend seams.
 ## Tests
-- Add opt-in `gpu`/`vulkan` tests for device creation, swapchain lifecycle, command recording, barriers, transfer, resize, and presentation where environment support exists.
-- Add opt-in Vulkan smoke coverage for scene-table descriptor binding and GPU-driven culling/draw-bucket execution.
-- Preserve CPU/null tests for all backend-independent behavior.
-- Label Vulkan/GPU smoke tests `gpu;vulkan` so they remain opt-in; keep backend-independent CPU tests under `unit;graphics` or `contract;graphics` so they continue to run in the default CPU gate.
+- [x] Add opt-in `gpu`/`vulkan` tests for device creation, swapchain lifecycle, command recording, barriers, transfer, resize, and presentation where environment support exists.
+- [x] Add opt-in Vulkan smoke coverage for scene-table descriptor binding and GPU-driven culling/draw-bucket execution.
+- [x] Preserve CPU/null tests for all backend-independent behavior.
+- [x] Label Vulkan/GPU smoke tests `gpu;vulkan` so they remain opt-in; keep backend-independent CPU tests under `unit;graphics` or `contract;graphics` so they continue to run in the default CPU gate.
 ## Docs
-- Document GPU verification requirements, headless/fallback behavior, and Vulkan label policy.
+- [x] Document GPU verification requirements, headless/fallback behavior, and Vulkan label policy.
 ## Acceptance criteria
-- Vulkan backend can execute the canonical frame recipe when opt-in GPU tests are enabled.
-- CPU-supported tests remain independent of Vulkan availability.
-- Backend failures are surfaced through structured diagnostics.
+- [x] Vulkan backend can execute the canonical frame recipe when opt-in GPU tests are enabled.
+- [x] CPU-supported tests remain independent of Vulkan availability.
+- [x] Backend failures are surfaced through structured diagnostics.
 ## Verification
 
 Final evidence (2026-05-05):

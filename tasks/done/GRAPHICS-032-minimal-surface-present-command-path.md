@@ -79,32 +79,32 @@ bring up Vulkan without changing the backend-agnostic recipe contract.
     - Rationale/rejected alternatives: adding a graphics-side ECS query, platform-window dependency, live `AssetService` lookup, or runtime import was rejected because each violates `AGENTS.md` layering invariants and would undermine the GRAPHICS-029..031 ownership chain.
 
 ## Required changes
-- ✅ Recorded all thirteen decisions above with explicit answers and rejected-alternative rationale.
-- ✅ Cross-linked the decisions with GRAPHICS-003 (frame recipe), GRAPHICS-007Q (buckets/visibility), GRAPHICS-008/008Q (depth/surface attachment ownership), GRAPHICS-013C/CQ (present), GRAPHICS-018 / 018R (Vulkan integration), GRAPHICS-022 (rendergraph diagnostics), GRAPHICS-030 (residency), GRAPHICS-031 (default material), and GRAPHICS-033 (Vulkan operational follow-up).
-- ✅ Identified follow-up implementation children (do **not** open here):
-  - **GRAPHICS-032-Impl-A** — add `FrameRecipe::MinimalDebugSurface`, recipe registration, `recipe.minimal-debug-surface` label gating, and the three renderer diagnostics counters. No pass-body command content. Tests: `contract;graphics` recipe introspection asserts the two-pass declaration, resource set, label, and default-recipe isolation.
-  - **GRAPHICS-032-Impl-B** — implement `Pass.Surface.MinimalDebug` CPU-mock command recording against `SurfaceOpaque`, the GRAPHICS-031 default material/pipeline, `SceneColorHDR`, and `SceneDepth`. Tests: `contract;graphics` surface opcode/property assertions plus missing-prerequisite counter coverage for material/residency gaps.
-  - **GRAPHICS-032-Impl-C** — implement `Pass.Present.MinimalDebug` CPU-mock command recording and the end-to-end CPU acceptance test from recipe → snapshot → command stream. Tests also assert non-minimal recipes retain current skip/no-op statuses.
-  - **GRAPHICS-032-Impl-D** — add the opt-in `gpu;vulkan` smoke fixture for the same recipe after GRAPHICS-033 operational readiness lands; label `gpu;vulkan` and keep it outside the default CPU gate.
+- [x] ✅ Recorded all thirteen decisions above with explicit answers and rejected-alternative rationale.
+- [x] ✅ Cross-linked the decisions with GRAPHICS-003 (frame recipe), GRAPHICS-007Q (buckets/visibility), GRAPHICS-008/008Q (depth/surface attachment ownership), GRAPHICS-013C/CQ (present), GRAPHICS-018 / 018R (Vulkan integration), GRAPHICS-022 (rendergraph diagnostics), GRAPHICS-030 (residency), GRAPHICS-031 (default material), and GRAPHICS-033 (Vulkan operational follow-up).
+- [x] ✅ Identified follow-up implementation children (do **not** open here):
+  - [x] **GRAPHICS-032-Impl-A** — add `FrameRecipe::MinimalDebugSurface`, recipe registration, `recipe.minimal-debug-surface` label gating, and the three renderer diagnostics counters. No pass-body command content. Tests: `contract;graphics` recipe introspection asserts the two-pass declaration, resource set, label, and default-recipe isolation.
+  - [x] **GRAPHICS-032-Impl-B** — implement `Pass.Surface.MinimalDebug` CPU-mock command recording against `SurfaceOpaque`, the GRAPHICS-031 default material/pipeline, `SceneColorHDR`, and `SceneDepth`. Tests: `contract;graphics` surface opcode/property assertions plus missing-prerequisite counter coverage for material/residency gaps.
+  - [x] **GRAPHICS-032-Impl-C** — implement `Pass.Present.MinimalDebug` CPU-mock command recording and the end-to-end CPU acceptance test from recipe → snapshot → command stream. Tests also assert non-minimal recipes retain current skip/no-op statuses.
+  - [x] **GRAPHICS-032-Impl-D** — add the opt-in `gpu;vulkan` smoke fixture for the same recipe after GRAPHICS-033 operational readiness lands; label `gpu;vulkan` and keep it outside the default CPU gate.
 
 ## Tests
-- Planning slice: validators only.
-- Implementation children must add the `contract;graphics` minimal-surface acceptance test and the regression guard for non-minimal recipes; the GPU smoke stays opt-in.
-- Verification gate (CPU-only):
+- [x] Planning slice: validators only.
+- [x] Implementation children must add the `contract;graphics` minimal-surface acceptance test and the regression guard for non-minimal recipes; the GPU smoke stays opt-in.
+- [x] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- ✅ Updated `docs/architecture/rendering-three-pass.md` with the minimal-triangle recipe entry, label policy, render-target/present/barrier policy, and diagnostic counters.
-- ✅ Updated `src/graphics/renderer/README.md` and `src/graphics/framegraph/README.md` with recipe ownership, command-stream/test vocabulary, and the recipe-vs-default isolation rule.
-- ✅ Updated `tasks/backlog/README.md` and `tasks/backlog/rendering/README.md` DAG entries between GRAPHICS-031 and GRAPHICS-033.
+- [x] ✅ Updated `docs/architecture/rendering-three-pass.md` with the minimal-triangle recipe entry, label policy, render-target/present/barrier policy, and diagnostic counters.
+- [x] ✅ Updated `src/graphics/renderer/README.md` and `src/graphics/framegraph/README.md` with recipe ownership, command-stream/test vocabulary, and the recipe-vs-default isolation rule.
+- [x] ✅ Updated `tasks/backlog/README.md` and `tasks/backlog/rendering/README.md` DAG entries between GRAPHICS-031 and GRAPHICS-033.
 
 ## Acceptance criteria
-- All thirteen decisions recorded with explicit answers and trade-off rationales. ✅
-- Implementation children identified with scope and dependency gates but not opened. ✅
-- No engine behavior, no command stream additions, no recipe registration land in this slice. ✅
-- Layering invariants hold; existing renderer lifecycle tests are not regressed by this planning slice. ✅
+- [x] All thirteen decisions recorded with explicit answers and trade-off rationales. ✅
+- [x] Implementation children identified with scope and dependency gates but not opened. ✅
+- [x] No engine behavior, no command stream additions, no recipe registration land in this slice. ✅
+- [x] Layering invariants hold; existing renderer lifecycle tests are not regressed by this planning slice. ✅
 
 ## Verification
 ```bash

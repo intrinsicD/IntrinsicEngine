@@ -31,9 +31,9 @@ Lock down the contract for a differentiable-rendering execution mode in which th
 12. **Forbidden in production.** Differentiable mode never runs in production builds by default. Record the build-time gating rule.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-051-Impl-A** — Forward+backward graph compiler + adjoint buffer lifetime + null-RHI shape tests.
@@ -43,22 +43,22 @@ Lock down the contract for a differentiable-rendering execution mode in which th
 - **GRAPHICS-051-Impl-E** — Determinism + finite-difference parity unit tests.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/agent/method-workflow.md` with the differentiable-rendering hookpoint reference.
-- Update `docs/architecture/graphics.md` with the bidirectional-side-channel rule.
-- Update `src/graphics/framegraph/README.md` with the forward+backward compile shape.
+- [ ] Update `docs/agent/method-workflow.md` with the differentiable-rendering hookpoint reference.
+- [ ] Update `docs/architecture/graphics.md` with the bidirectional-side-channel rule.
+- [ ] Update `src/graphics/framegraph/README.md` with the forward+backward compile shape.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Production recipes remain unchanged and unaffected.
-- Build-time gating prevents differentiable mode from shipping by default.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Production recipes remain unchanged and unaffected.
+- [ ] Build-time gating prevents differentiable mode from shipping by default.
 
 ## Verification
 ```bash

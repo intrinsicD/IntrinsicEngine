@@ -12,14 +12,14 @@ Fix the CI CMake regeneration blocker caused by a stale geometry test source fil
 `tests/CMakeLists.txt` referenced `Test_HalfedgePropertyAccess.cpp`, but the repository contains `tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp`. During `cmake --build --preset ci --target ExtrinsicSandbox`, CMake regeneration failed while resolving geometry test sources.
 
 ## Required changes
-- Update the geometry test source list in `tests/CMakeLists.txt` to use the existing `Test_HalfedgeMeshPropertyAccess.cpp` filename.
+- [x] Update the geometry test source list in `tests/CMakeLists.txt` to use the existing `Test_HalfedgeMeshPropertyAccess.cpp` filename.
 
 ## Tests
-- Re-run the sandbox build command that exposed the configure blocker.
-- Run test layout and task policy checks.
+- [x] Re-run the sandbox build command that exposed the configure blocker.
+- [x] Run test layout and task policy checks.
 
 ## Docs
-- No docs changes required beyond this task record.
+- [x] No docs changes required beyond this task record.
 
 ## Acceptance criteria
 - [x] CMake can resolve the halfedge mesh property access test source name.

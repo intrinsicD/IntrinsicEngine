@@ -36,29 +36,29 @@ Owned by `graphics/vulkan`, with API constraints from `graphics/rhi` and upload 
 
 ## Required changes
 
-- Define the RHI/backend policy for uploading multiple mips/layers/cube faces.
-- Batch `VkBufferImageCopy` regions where possible instead of issuing one blocking one-shot submission per subresource.
-- Track per-subresource layouts or document a whole-image layout policy.
-- Route runtime/streaming uploads through `ITransferQueue` rather than blocking graphics-queue one-shots.
-- Preserve deterministic diagnostics for unsupported depth-stencil or mismatched upload sizes.
+- [x] Define the RHI/backend policy for uploading multiple mips/layers/cube faces.
+- [x] Batch `VkBufferImageCopy` regions where possible instead of issuing one blocking one-shot submission per subresource.
+- [x] Track per-subresource layouts or document a whole-image layout policy.
+- [x] Route runtime/streaming uploads through `ITransferQueue` rather than blocking graphics-queue one-shots.
+- [x] Preserve deterministic diagnostics for unsupported depth-stencil or mismatched upload sizes.
 
 ## Tests
 
-- Add CPU-testable validation/mapping tests for byte-size and subresource-region calculations.
-- Add opt-in `gpu;vulkan` smoke tests for multi-mip/layer uploads when hardware support is available.
-- Preserve the default CPU gate.
+- [x] Add CPU-testable validation/mapping tests for byte-size and subresource-region calculations.
+- [x] Add opt-in `gpu;vulkan` smoke tests for multi-mip/layer uploads when hardware support is available.
+- [x] Preserve the default CPU gate.
 
 ## Docs
 
-- Update `src/graphics/vulkan/README.md` with the chosen batching/layout policy.
-- Update `docs/architecture/graphics.md` if the upload contract becomes visible above the backend.
-- Update `GRAPHICS-018Q` when the texture-upload policy question is resolved.
+- [x] Update `src/graphics/vulkan/README.md` with the chosen batching/layout policy.
+- [x] Update `docs/architecture/graphics.md` if the upload contract becomes visible above the backend.
+- [x] Update `GRAPHICS-018Q` when the texture-upload policy question is resolved.
 
 ## Acceptance criteria
 
-- Multi-mip/multi-layer texture uploads have an explicit, tested policy.
-- Runtime uploads avoid queue-stalling one-shot helpers.
-- Vulkan/GPU smoke tests remain opt-in with `gpu;vulkan` labels.
+- [x] Multi-mip/multi-layer texture uploads have an explicit, tested policy.
+- [x] Runtime uploads avoid queue-stalling one-shot helpers.
+- [x] Vulkan/GPU smoke tests remain opt-in with `gpu;vulkan` labels.
 
 ## Verification
 

@@ -31,9 +31,9 @@ Lock down a temporal anti-aliasing pass with sub-pixel jitter, motion-vector buf
 12. **Test-mode determinism.** A "no-jitter / no-history" mode for golden-image tests. Recorded as a recipe flag.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-040-Impl-A** — Camera jitter + motion-vector buffer + null-RHI shape tests.
@@ -42,22 +42,22 @@ Lock down a temporal anti-aliasing pass with sub-pixel jitter, motion-vector buf
 - **GRAPHICS-040-Impl-D** — Optional vendor backend hookpoints (one child per vendor; opened only when actually integrated).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` post-process section with the reconstructor seam.
-- Update `src/graphics/renderer/README.md` post-process / AA section.
-- Update `docs/migration/nonlegacy-parity-matrix.md` AA row.
+- [ ] Update `docs/architecture/rendering-three-pass.md` post-process section with the reconstructor seam.
+- [ ] Update `src/graphics/renderer/README.md` post-process / AA section.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` AA row.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- The promoted graphics layer requires no vendor SDK to compile.
-- FXAA / SMAA recipes continue to compile and pass without modification.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] The promoted graphics layer requires no vendor SDK to compile.
+- [ ] FXAA / SMAA recipes continue to compile and pass without modification.
 
 ## Verification
 ```bash

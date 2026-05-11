@@ -13,31 +13,31 @@
 - `docs/migration/src-new-reference-audit.md` classifies the active-stale references that must be cleaned up by this task.
 
 ## Required changes
-- Update active source-layer README files to describe current `src/<layer>` ownership without `src_new` terminology.
-- Update canonical documentation navigation (`docs/index.md`, architecture cross-links, roadmap) to avoid stale `src_new` naming and links.
-- Update backlog navigation/docs entries that still reference `tasks/backlog/src-new/`.
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for `HARDEN-032`.
+- [x] Update active source-layer README files to describe current `src/<layer>` ownership without `src_new` terminology.
+- [x] Update canonical documentation navigation (`docs/index.md`, architecture cross-links, roadmap) to avoid stale `src_new` naming and links.
+- [x] Update backlog navigation/docs entries that still reference `tasks/backlog/src-new/`.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for `HARDEN-032`.
 
 ## Tests
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- `docs/index.md`
-- `docs/architecture/task-graphs.md`
-- `docs/roadmap.md`
-- `docs/architecture/patterns.md`
-- Layer README docs under `src/*/README.md`
-- `tasks/backlog/README.md`
-- `tasks/backlog/legacy-todo.md`
-- `tasks/backlog/rendering/RORG-031-rendering-pipeline.md`
-- `tasks/done/0001-post-reorganization-hardening-tracker.md`
+- [x] `docs/index.md`
+- [x] `docs/architecture/task-graphs.md`
+- [x] `docs/roadmap.md`
+- [x] `docs/architecture/patterns.md`
+- [x] Layer README docs under `src/*/README.md`
+- [x] `tasks/backlog/README.md`
+- [x] `tasks/backlog/legacy-todo.md`
+- [x] `tasks/backlog/rendering/RORG-031-rendering-pipeline.md`
+- [x] `tasks/done/0001-post-reorganization-hardening-tracker.md`
 
 ## Acceptance criteria
-- Active-stale `src_new`/`src-new` references listed for these files in `docs/migration/src-new-reference-audit.md` are removed or renamed to current terminology.
-- Strict task policy validation passes.
-- Strict docs-link validation passes.
-- `HARDEN-032` status is updated with concrete evidence in the hardening tracker.
+- [x] Active-stale `src_new`/`src-new` references listed for these files in `docs/migration/src-new-reference-audit.md` are removed or renamed to current terminology.
+- [x] Strict task policy validation passes.
+- [x] Strict docs-link validation passes.
+- [x] `HARDEN-032` status is updated with concrete evidence in the hardening tracker.
 
 ## Verification
 ```bash

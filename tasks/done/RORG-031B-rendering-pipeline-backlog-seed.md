@@ -31,18 +31,18 @@ executable plan.
 - The migration plan expects isolated tasks with explicit verification.
 
 ## Required changes
-- Track frame-pipeline hardening work (render prep ownership, submission ownership, frame-context ownership, task-graph/barrier hardening).
-- Track dependencies between prep/submission/lifetime work and parallelization steps.
-- Keep scope aligned to architecture hardening, not feature expansion.
+- [x] Track frame-pipeline hardening work (render prep ownership, submission ownership, frame-context ownership, task-graph/barrier hardening).
+- [x] Track dependencies between prep/submission/lifetime work and parallelization steps.
+- [x] Keep scope aligned to architecture hardening, not feature expansion.
 
 ## Tests
-- Ensure this task file is parseable by the task template structure.
+- [x] Ensure this task file is parseable by the task template structure.
 
 ## Docs
-- Maintain references to `docs/architecture/rendering-target-architecture.md` and related runtime/frame-loop docs while they remain active.
+- [x] Maintain references to `docs/architecture/rendering-target-architecture.md` and related runtime/frame-loop docs while they remain active.
 
 ## Acceptance criteria
-- Rendering backlog is represented by a structured task file under `tasks/backlog/rendering/` with required sections.
+- [x] Rendering backlog is represented by a structured task file under `tasks/backlog/rendering/` with required sections.
 
 ## Verification
 ```bash

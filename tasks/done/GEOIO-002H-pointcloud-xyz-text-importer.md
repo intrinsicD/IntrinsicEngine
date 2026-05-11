@@ -75,96 +75,96 @@
   honestly; the focused gate may not run in the agent container.
 
 ## Required changes
-- Edit `src/geometry/Geometry.PointCloud.IO.cpp` only:
-  - Inside the existing anonymous namespace, add small XYZ-specific
+- [x] Edit `src/geometry/Geometry.PointCloud.IO.cpp` only:
+  - [x] Inside the existing anonymous namespace, add small XYZ-specific
     helpers placed near the existing `ParseRgb`/`NormalizeColorChannel`
     helpers:
-    - `[[nodiscard]] std::optional<glm::vec4> ParseXYZPointColor(
+    - [x] `[[nodiscard]] std::optional<glm::vec4> ParseXYZPointColor(
       std::span<const std::string_view> tokens)` mirroring legacy
       `ParsePointColor`: trailing-RGB at `tokens.size() - 3` for
       `tokens.size() >= 7`, RGB at offset 3 for `tokens.size() >= 6`,
       intensity-as-grey at offset 3 for `tokens.size() == 4`.
-    - `[[nodiscard]] bool IsXYZScanLineMarker(
+    - [x] `[[nodiscard]] bool IsXYZScanLineMarker(
       std::span<const std::string_view> tokens)` mirroring legacy
       `IsScanLineMarker`: `tokens.size() == 1`, starts with `"LH"`,
       remainder all decimal digits.
-    - `[[nodiscard]] bool XYZNeedsDelimiterNormalization(
+    - [x] `[[nodiscard]] bool XYZNeedsDelimiterNormalization(
       std::string_view line)` returns `line.find(';') !=
       std::string_view::npos`.
-    - `void XYZNormalizeDelimitedLine(std::string_view line,
+    - [x] `void XYZNormalizeDelimitedLine(std::string_view line,
       std::string& scratch)` substitutes every `;` with `' '` into a
       caller-owned scratch string.
-  - Refactor `LoadXYZ`:
-    - Apply `;`-normalization (via the scratch string) before the
+  - [x] Refactor `LoadXYZ`:
+    - [x] Apply `;`-normalization (via the scratch string) before the
       whitespace split.
-    - After splitting, skip empty token vectors and skip scan-line
+    - [x] After splitting, skip empty token vectors and skip scan-line
       markers via `IsXYZScanLineMarker`.
-    - Replace the hard-fail on `tokens.size() < 3` with a soft-skip
+    - [x] Replace the hard-fail on `tokens.size() < 3` with a soft-skip
       (`continue`) and replace the hard-fail on unparseable
       `x`/`y`/`z` numbers with a soft-skip, matching legacy behavior.
-    - Replace the inline color-extraction block with
+    - [x] Replace the inline color-extraction block with
       `ParseXYZPointColor(tokens)`.
-    - Preserve the existing `result.Cloud.Reserve(expectedCount)`
+    - [x] Preserve the existing `result.Cloud.Reserve(expectedCount)`
       behavior on the optional leading point-count line.
-    - Preserve early-termination once `expectedCount > 0` and
+    - [x] Preserve early-termination once `expectedCount > 0` and
       `result.Cloud.VerticesSize() >= expectedCount`.
-    - Preserve the empty-cloud → `InvalidPointCloudFormat()` final
+    - [x] Preserve the empty-cloud → `InvalidPointCloudFormat()` final
       rejection.
-- Public module surface (`Geometry.PointCloud.IO.cppm`) does not
+- [x] Public module surface (`Geometry.PointCloud.IO.cppm`) does not
   change; the inventory should remain identical apart from the
   regeneration date (matches `GEOIO-002B`/`C`/`D`/`E`/`F`/`G`
   precedent).
-- Do not touch any file outside
+- [x] Do not touch any file outside
   `src/geometry/Geometry.PointCloud.IO.cpp`,
   `tests/unit/geometry/Test.GeometryIO.cpp`, and `tasks/`.
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `LoadsXYZRGBTrailingColor`: file with `x y z` and the last three
+  - [x] `LoadsXYZRGBTrailingColor`: file with `x y z` and the last three
     tokens carrying integer RGB; positions and normalized colors
     must match.
-  - `LoadsXYZSemicolonDelimited`: rows of the form
+  - [x] `LoadsXYZSemicolonDelimited`: rows of the form
     `1.0;2.0;3.0;255;0;0` round-trip into positions and colors.
-  - `LoadsXYZSkipsScanLineMarkers`: file contains `LH001` /
+  - [x] `LoadsXYZSkipsScanLineMarkers`: file contains `LH001` /
     `LH42` rows interleaved with payload rows; the scan-line
     rows must not contribute points and must not abort the load.
-  - `LoadsXYZSoftSkipsMalformedRows`: a single non-numeric or
+  - [x] `LoadsXYZSoftSkipsMalformedRows`: a single non-numeric or
     too-short row in the middle of the file must be skipped,
     not aborted; subsequent payload rows must still load.
-  - `LoadXYZRejectsAllMalformedInput`: a file with no parseable
+  - [x] `LoadXYZRejectsAllMalformedInput`: a file with no parseable
     payload rows (e.g., only `#` comments and `LH###` markers) must
     return `Core::ErrorCode::InvalidFormat` because the cloud is
     empty.
-  - Regression: existing `LoadsXYZWithColor` (line 139) must keep
+  - [x] Regression: existing `LoadsXYZWithColor` (line 139) must keep
     passing on the canonical 6-token RGB-at-offset-3 layout.
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module
+- [x] Update `docs/api/generated/module_inventory.md` only if module
   surfaces change in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding internal helpers
   and tightening `LoadXYZ` is not expected to change the inventory;
   if the regenerator only changes the date, leave it untouched
   (matches `GEOIO-002B`/`C`/`D`/`E`/`F`/`G` precedent).
-- No additional architecture/migration doc edits required for this
+- [x] No additional architecture/migration doc edits required for this
   slice; parity-matrix updates remain part of the parent
   `GEOIO-002` task once asset/runtime routing actually drops the
   legacy graphics importers.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::LoadXYZ` returns a populated
+- [x] `Geometry::PointCloudIO::LoadXYZ` returns a populated
   `PointCloudIOResult` for `.xyz`, `.pts`, `.xyzrgb`, and `.txt`
   fixtures covering: canonical 3-token, 4-token intensity, 6-token
   RGB-at-offset-3, 7+-token trailing-RGB, `;`-delimited rows, and
   files that intersperse `LH<digits>` scan-line marker rows.
-- A row that is too short or carries non-numeric `x`/`y`/`z`
+- [x] A row that is too short or carries non-numeric `x`/`y`/`z`
   tokens is skipped rather than aborting the load.
-- A file with no parseable payload rows still returns
+- [x] A file with no parseable payload rows still returns
   `Core::ErrorCode::InvalidFormat` (existing empty-cloud guard).
-- Existing `LoadsXYZWithColor` continues to pass on the canonical
+- [x] Existing `LoadsXYZWithColor` continues to pass on the canonical
   6-token RGB-at-offset-3 layout.
-- `src/geometry/*` imports remain layered (`geometry -> core` only);
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only);
   no new asset/runtime/graphics imports introduced.
 
 ## Verification

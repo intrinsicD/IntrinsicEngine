@@ -28,9 +28,9 @@ Lock down the contract for a DirectStorage-analog asset I/O hookpoint that strea
 10. **Layering.** Vendor SDK (DirectStorage) lives behind a non-promoted backend module if integrated; not in `src/graphics/`. In-engine GDeflate Slang module lives in `src/graphics/renderer/`.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-057-Impl-A** — `IGpuDecompressionTransferQueue` capability surface + null-RHI mock + capability tests.
@@ -40,22 +40,22 @@ Lock down the contract for a DirectStorage-analog asset I/O hookpoint that strea
 - **GRAPHICS-057-Impl-E** — Operational-gate extension + diagnostic wiring.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` streaming/transfer section.
-- Update `src/graphics/rhi/README.md` capability surface.
-- Update `src/graphics/vulkan/README.md` operational-gate section.
+- [ ] Update `docs/architecture/graphics.md` streaming/transfer section.
+- [ ] Update `src/graphics/rhi/README.md` capability surface.
+- [ ] Update `src/graphics/vulkan/README.md` operational-gate section.
 
 ## Acceptance criteria
-- Ten decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- CPU-decompress + standard-upload path remains the unconditional baseline.
-- No vendor SDK imports in promoted graphics layers.
+- [ ] Ten decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] CPU-decompress + standard-upload path remains the unconditional baseline.
+- [ ] No vendor SDK imports in promoted graphics layers.
 
 ## Verification
 ```bash

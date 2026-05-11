@@ -18,15 +18,15 @@
 - [ ] Document diagnostics and known limitations.
 
 ## Tests
-- 
+- [ ] <method test requirement>
 
 ## Docs
-- 
+- [ ] <method documentation update>
 
 ## Acceptance criteria
-- CPU reference implementation is present and tested.
-- Benchmarks and manifests are present or explicitly stubbed.
-- Numerical limitations and diagnostics are documented.
+- [ ] CPU reference implementation is present and tested.
+- [ ] Benchmarks and manifests are present or explicitly stubbed.
+- [ ] Numerical limitations and diagnostics are documented.
 
 ## Verification
 ```bash

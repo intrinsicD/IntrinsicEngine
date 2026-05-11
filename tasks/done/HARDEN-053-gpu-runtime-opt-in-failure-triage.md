@@ -74,21 +74,21 @@ On 2026-04-30 the deterministic groups were fixed or aligned with the current do
 | Null renderer debug dump | Updated expectation for conditional pass construction: optional passes are absent and `CulledPassCount` is zero in the baseline path. |
 
 ## Required changes
-- Classify the 38 failing tests into deterministic defect groups.
-- Fix defects or add capability-based skip/guard behavior with explicit reasons.
-- Keep labels accurate for `gpu`, `vulkan`, `runtime`, `integration`, and related categories.
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` and this task with command-backed results.
+- [x] Classify the 38 failing tests into deterministic defect groups.
+- [x] Fix defects or add capability-based skip/guard behavior with explicit reasons.
+- [x] Keep labels accurate for `gpu`, `vulkan`, `runtime`, `integration`, and related categories.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` and this task with command-backed results.
 
 ## Tests
-- `cmake --build --preset ci --target IntrinsicTests`
-- `ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan|runtime' -LE 'slow|flaky-quarantine' --timeout 60`
-- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `cmake --build --preset ci --target IntrinsicTests`
+- [x] `ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan|runtime' -LE 'slow|flaky-quarantine' --timeout 60`
+- [x] `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- Keep the hardening tracker final acceptance checklist synchronized.
-- Record exact failure groups and closure evidence.
+- [x] Keep the hardening tracker final acceptance checklist synchronized.
+- [x] Record exact failure groups and closure evidence.
 
 ## Acceptance criteria
 - [x] GPU/Vulkan/runtime opt-in gate is green, or unsupported capabilities are skipped with explicit capability-based reasons.

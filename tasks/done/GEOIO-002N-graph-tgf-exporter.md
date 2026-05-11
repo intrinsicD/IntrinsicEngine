@@ -56,24 +56,24 @@
   printable token works).
 
 ## Required changes
-- Extend `src/geometry/Geometry.Graph.IO.cppm`:
-  - Add a `GraphIOWriteStatus` enum class in the
+- [x] Extend `src/geometry/Geometry.Graph.IO.cppm`:
+  - [x] Add a `GraphIOWriteStatus` enum class in the
     `Geometry::GraphIO` namespace with values `Success`,
     `InvalidPath`, `EmptyGraph`, `FileWriteError`. Reuse the same
     naming pattern as `MeshIOWriteStatus` /
     `PointCloudIOWriteStatus`.
-  - Add `GraphIOWriteStatus WriteTGF(std::string_view absolute_path,
+  - [x] Add `GraphIOWriteStatus WriteTGF(std::string_view absolute_path,
                                       const GraphIOResult& graph);`
     declaration in the `Geometry::GraphIO` namespace.
-- Implement `WriteTGF` in `src/geometry/Geometry.Graph.IO.cpp`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject graphs whose `Graph.VertexCount() == 0` with
+- [x] Implement `WriteTGF` in `src/geometry/Geometry.Graph.IO.cpp`:
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject graphs whose `Graph.VertexCount() == 0` with
     `EmptyGraph`. Empty edge sets are allowed (the reader only
     rejects empty graphs that have zero vertices).
-  - Open the output stream with
+  - [x] Open the output stream with
     `std::ios::binary | std::ios::trunc`; return `InvalidPath` if
     the stream cannot be opened.
-  - Iterate vertices in handle index order from `0` up to
+  - [x] Iterate vertices in handle index order from `0` up to
     `VerticesSize()`, skipping `IsDeleted(VertexHandle)` entries.
     Emit `"<index> <x> <y> <z>"` using
     `std::snprintf` with `%.6f` for floats. If `v:label` is a
@@ -81,10 +81,10 @@
     is non-empty, append `" "` followed by the label as-is (the
     reader joins tokens with spaces, so embedded spaces survive
     round-trip). Terminate each line with `\n`.
-  - Emit a single `"#\n"` separator line after the vertex section,
+  - [x] Emit a single `"#\n"` separator line after the vertex section,
     even when there are no edges (so the reader does not
     accidentally interpret edge lines as additional vertex lines).
-  - Iterate edges in handle index order from `0` up to
+  - [x] Iterate edges in handle index order from `0` up to
     `EdgesSize()`, skipping `IsDeleted(EdgeHandle)` entries. For
     each edge, look up endpoints with `EdgeVertices(e)` and emit
     `"<from_index> <to_index>"`. If `e:weight` is a valid
@@ -93,65 +93,65 @@
     `EdgeProperty<std::string>` and the per-edge label is
     non-empty, append `" "` and the label as-is. Terminate with
     `\n`.
-  - Flush and report `FileWriteError` if `stream.good()` is false
+  - [x] Flush and report `FileWriteError` if `stream.good()` is false
     at end.
-  - When an edge has a non-empty label but no weight, the reader
+  - [x] When an edge has a non-empty label but no weight, the reader
     interprets token[2] as a label only if it cannot be parsed as
     a number. The writer therefore always emits a numeric weight
     column when emitting a label, defaulting to the property's
     default value (`1.0f`) for edges that lack an explicit weight.
     This keeps the label round-trip unambiguous and matches the
     reader's `v:label`/`e:label`/`e:weight` contract.
-- No additional public exports beyond `WriteTGF` and the new
+- [x] No additional public exports beyond `WriteTGF` and the new
   `GraphIOWriteStatus` enum; helper logic stays inside the
   existing translation-unit anonymous namespace or local to the
   function.
-- Add `<cstdio>` and `<fstream>` to the implementation translation
+- [x] Add `<cstdio>` and `<fstream>` to the implementation translation
   unit if not already pulled in transitively. Do not add new
   imports to the module interface.
 
 ## Tests
-- Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
+- [x] Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
   under `GeometryIO_GraphIO`:
-  - `WritesTGFRoundTripsVerticesAndEdges` — build a graph with two
+  - [x] `WritesTGFRoundTripsVerticesAndEdges` — build a graph with two
     vertices and one edge (no labels, no weight); write via
     `WriteTGF`, re-import via `LoadTGF`, verify vertex count, edge
     count, and per-vertex positions.
-  - `WritesTGFRoundTripsLabelsAndWeight` — build a graph with two
+  - [x] `WritesTGFRoundTripsLabelsAndWeight` — build a graph with two
     vertices that have `v:label`, one edge with both `e:weight` and
     `e:label`; write, re-import, verify labels/weight round-trip
     exactly.
-  - `WritesTGFEmitsSeparatorEvenWithoutEdges` — graph with one
+  - [x] `WritesTGFEmitsSeparatorEvenWithoutEdges` — graph with one
     vertex and no edges; assert the on-disk file contains a `#`
     separator line and re-imports cleanly.
-  - `WritesTGFSkipsDeletedVertices` — build a graph with three
+  - [x] `WritesTGFSkipsDeletedVertices` — build a graph with three
     vertices, delete one, and verify the writer does not emit a
     line for the deleted vertex (re-import preserves the surviving
     vertex count).
-  - `WriteTGFRejectsEmptyGraph` — default-constructed
+  - [x] `WriteTGFRejectsEmptyGraph` — default-constructed
     `GraphIOResult` (zero vertices) yields `EmptyGraph`.
-  - `WriteTGFRejectsBadPath` — empty `absolute_path` yields
+  - [x] `WriteTGFRejectsBadPath` — empty `absolute_path` yields
     `InvalidPath`; a path under a non-existent directory yields
     `InvalidPath`.
-- Use the existing `TempFile` helper and `ReadFileContents` in the
+- [x] Use the existing `TempFile` helper and `ReadFileContents` in the
   test file; do not introduce new test-only headers.
 
 ## Docs
-- Add a `Graph exporters` row to
+- [x] Add a `Graph exporters` row to
   `docs/migration/nonlegacy-parity-matrix.md` after the existing
   `TGF graph import` row, recording that the geometry-owned TGF
   writer was added under `GEOIO-002N`.
-- Regenerate `docs/api/generated/module_inventory.md` only if the
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if the
   generator picks up changes to the existing
   `Geometry.Graph.IO` module surface. If the regenerator changes
   only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::GraphIO::WriteTGF` and `Geometry::GraphIO::GraphIOWriteStatus`
+- [x] `Geometry::GraphIO::WriteTGF` and `Geometry::GraphIO::GraphIOWriteStatus`
   compile and are exported from `Geometry.Graph.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into `src/geometry/*`.
-- Parity matrix gains a graph-export row reflecting the new
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into `src/geometry/*`.
+- [x] Parity matrix gains a graph-export row reflecting the new
   geometry-owned writer.
 
 ## Verification

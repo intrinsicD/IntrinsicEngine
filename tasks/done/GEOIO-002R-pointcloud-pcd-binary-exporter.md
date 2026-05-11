@@ -74,21 +74,21 @@
   using the same pattern as `WritePLYBinary`.
 
 ## Required changes
-- Extend `src/geometry/Geometry.PointCloud.IO.cppm`:
-  - Add a
+- [x] Extend `src/geometry/Geometry.PointCloud.IO.cppm`:
+  - [x] Add a
     `PointCloudIOWriteStatus WritePCDBinary(std::string_view absolute_path,
                                               const PointCloudIOResult& cloud);`
     declaration in the `Geometry::PointCloudIO` namespace
     after the existing `WritePCD` declaration. Reuse the
     existing `PointCloudIOWriteStatus` enum.
-- Implement `WritePCDBinary` in
+- [x] Implement `WritePCDBinary` in
   `src/geometry/Geometry.PointCloud.IO.cpp` after `WritePCD`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject empty clouds (`source.IsEmpty()`) with `EmptyCloud`.
-  - Open the output stream with
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject empty clouds (`source.IsEmpty()`) with `EmptyCloud`.
+  - [x] Open the output stream with
     `std::ios::binary | std::ios::trunc`; return `InvalidPath`
     if the stream cannot be opened.
-  - Emit the header (in order):
+  - [x] Emit the header (in order):
     `# .PCD v0.7`,
     `VERSION 0.7`,
     `FIELDS x y z` (plus `normal_x normal_y normal_z` when
@@ -103,7 +103,7 @@
     `VIEWPOINT 0 0 0 1 0 0 0`,
     `POINTS <N>`,
     `DATA binary`.
-  - For each point, emit the packed scalar block in field
+  - [x] For each point, emit the packed scalar block in field
     order: little-endian 4-byte float `x`, `y`, `z`, then
     optionally `nx`, `ny`, `nz`, then optionally `r`, `g`, `b`.
     Color channels are clamped to `[0, 1]` before writing so
@@ -111,58 +111,58 @@
     no-op branch. Float endianness uses the same swap pattern
     as `WritePLYBinary` (`std::memcpy` into a 4-byte buffer
     and byte-swap when `std::endian::native == std::endian::big`).
-  - Flush and report `FileWriteError` if `stream.good()` is
+  - [x] Flush and report `FileWriteError` if `stream.good()` is
     false after writing the body.
-- No additional public exports beyond `WritePCDBinary`; helper
+- [x] No additional public exports beyond `WritePCDBinary`; helper
   logic stays inside the existing translation-unit anonymous
   namespace or local to the function.
-- No new module imports in
+- [x] No new module imports in
   `src/geometry/Geometry.PointCloud.IO.cppm`.
 
 ## Tests
-- Add `unit;geometry` cases to
+- [x] Add `unit;geometry` cases to
   `tests/unit/geometry/Test.GeometryIO.cpp` under
   `GeometryIO_PointCloudIO` after the existing `WritesPCD*`
   tests:
-  - `WritesPCDBinaryPositionsOnly` — three positions only;
+  - [x] `WritesPCDBinaryPositionsOnly` — three positions only;
     expect success, header includes `FIELDS x y z`,
     `WIDTH 3`, `POINTS 3`, `DATA binary`; re-import via
     `LoadPCD` returns three points without normals/colors and
     with positions matching the originals.
-  - `WritesPCDBinaryWithNormalsAndColorsRoundTrips` — two
+  - [x] `WritesPCDBinaryWithNormalsAndColorsRoundTrips` — two
     points with normals and colors enabled; expect header
     includes `FIELDS x y z normal_x normal_y normal_z r g b`
     and `DATA binary`; re-import returns matching positions,
     normals, and colors (within float exactness, since values
     are stored as exact 4-byte floats).
-  - `WritesPCDBinaryIgnoresRadii` — one point with radii
+  - [x] `WritesPCDBinaryIgnoresRadii` — one point with radii
     enabled and no normals/colors; expect header has only
     `x y z` fields and re-import has no radii/normals/colors.
-  - `WritePCDBinaryRejectsEmptyCloud` — default-constructed
+  - [x] `WritePCDBinaryRejectsEmptyCloud` — default-constructed
     cloud yields `EmptyCloud`.
-  - `WritePCDBinaryRejectsBadPath` — empty `absolute_path`
+  - [x] `WritePCDBinaryRejectsBadPath` — empty `absolute_path`
     yields `InvalidPath`; a path under a non-existent
     directory yields `InvalidPath`.
-- Use the existing `TempFile` helper and `ReadFileContents`
+- [x] Use the existing `TempFile` helper and `ReadFileContents`
   in the test file; do not introduce new test-only headers.
 
 ## Docs
-- Update the `OBJ/PLY/STL exporters` row in
+- [x] Update the `OBJ/PLY/STL exporters` row in
   `docs/migration/nonlegacy-parity-matrix.md` so it also
   records the new geometry-owned binary PCD writer added
   under `GEOIO-002R`.
-- Regenerate `docs/api/generated/module_inventory.md` only if
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if
   the generator picks up changes to the existing
   `Geometry.PointCloud.IO` module surface. If the regenerator
   changes only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::WritePCDBinary` compiles and is
+- [x] `Geometry::PointCloudIO::WritePCDBinary` compiles and is
   exported from `Geometry.PointCloud.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into
   `src/geometry/*`.
-- Parity matrix records the new geometry-owned binary PCD
+- [x] Parity matrix records the new geometry-owned binary PCD
   writer.
 
 ## Verification

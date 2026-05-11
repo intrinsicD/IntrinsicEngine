@@ -97,34 +97,34 @@ Each decision below is locked for downstream implementation children. Trade-offs
     - Promoted layering invariants therefore hold: `runtime → core, ecs, graphics-value-types`; no new graphics or asset traffic; no live-ECS leak into graphics.
 
 ## Required changes
-- ✅ Recorded the eleven design decisions above with explicit answers and rejected-alternative rationale.
-- ✅ Cross-linked the decisions into `docs/architecture/graphics.md` (new "Reference scene bootstrap" subsection adjacent to the residency-bridge section) and `src/runtime/README.md` (planned-module entry).
-- ✅ Identified split points for the implementation follow-up children (do **not** open them in this slice):
-  - **GRAPHICS-029-Impl-A** — author `Extrinsic.Runtime.ReferenceScene` skeleton: `IReferenceSceneProvider` interface, `ReferenceSceneRegistry`, `EngineConfig::ReferenceScene::{Enabled, Selector}` field with `ReferenceSceneSelector` enum, default `Selector = Triangle`, `CreateReferenceEngineConfig()` flips `Enabled = true`, `Engine::Initialize()` invokes the selected provider after scene construction. No provider implementation lands here; the registry resolves to a no-op default. Tests: `contract;runtime` assertion that with `Enabled = false`, `RenderExtractionCache::ExtractAndSubmit` reports zero renderable candidates.
-  - **GRAPHICS-029-Impl-B** — implement `TriangleProvider`: creates the entity per Decision 3, returns the entity handle list, returns `CameraViewInput` per Decision 4. Wire `Engine::BuildRenderFrameInput()` to substitute the seeded camera. Tests: `contract;runtime` assertions that with `Enabled = true`, extraction reports exactly one renderable candidate carrying `RenderSurface`, `Transform::WorldMatrix`, `MetaData::EntityName == "ReferenceTriangle"`, and (once GRAPHICS-030-Impl-A lands) `ProceduralGeometryRef::Kind == Triangle`. Extraction stats assert `CandidateRenderableCount == 1` and `AllocatedInstanceCount == 1`. Tests run against the null renderer; no GPU coverage.
-  - **GRAPHICS-029-Impl-C** *(optional, gated)* — open additional provider candidates (`Cube`, `MultiPrimitive`, `HierarchyDemo`). `Cube` gates on GRAPHICS-034 asset-backed mesh residency. `MultiPrimitive` gates on GRAPHICS-030 procedural-residency cube/quad packer. `HierarchyDemo` is unblocked once Impl-B lands. Each provider gets its own contract test asserting the candidate count and component composition.
-- ✅ Cross-linked decisions with GRAPHICS-016 (extraction handoff), GRAPHICS-017Q (camera ownership forward-compat), GRAPHICS-028 (residency bridge planning), GRAPHICS-030 (procedural geometry reference type), HARDEN-060 (`CreateDefault` bootstrap), HARDEN-061 (`TransformHierarchy` system), and the 2026-05-08 review.
+- [x] ✅ Recorded the eleven design decisions above with explicit answers and rejected-alternative rationale.
+- [x] ✅ Cross-linked the decisions into `docs/architecture/graphics.md` (new "Reference scene bootstrap" subsection adjacent to the residency-bridge section) and `src/runtime/README.md` (planned-module entry).
+- [x] ✅ Identified split points for the implementation follow-up children (do **not** open them in this slice):
+  - [x] **GRAPHICS-029-Impl-A** — author `Extrinsic.Runtime.ReferenceScene` skeleton: `IReferenceSceneProvider` interface, `ReferenceSceneRegistry`, `EngineConfig::ReferenceScene::{Enabled, Selector}` field with `ReferenceSceneSelector` enum, default `Selector = Triangle`, `CreateReferenceEngineConfig()` flips `Enabled = true`, `Engine::Initialize()` invokes the selected provider after scene construction. No provider implementation lands here; the registry resolves to a no-op default. Tests: `contract;runtime` assertion that with `Enabled = false`, `RenderExtractionCache::ExtractAndSubmit` reports zero renderable candidates.
+  - [x] **GRAPHICS-029-Impl-B** — implement `TriangleProvider`: creates the entity per Decision 3, returns the entity handle list, returns `CameraViewInput` per Decision 4. Wire `Engine::BuildRenderFrameInput()` to substitute the seeded camera. Tests: `contract;runtime` assertions that with `Enabled = true`, extraction reports exactly one renderable candidate carrying `RenderSurface`, `Transform::WorldMatrix`, `MetaData::EntityName == "ReferenceTriangle"`, and (once GRAPHICS-030-Impl-A lands) `ProceduralGeometryRef::Kind == Triangle`. Extraction stats assert `CandidateRenderableCount == 1` and `AllocatedInstanceCount == 1`. Tests run against the null renderer; no GPU coverage.
+  - [x] **GRAPHICS-029-Impl-C** *(optional, gated)* — open additional provider candidates (`Cube`, `MultiPrimitive`, `HierarchyDemo`). `Cube` gates on GRAPHICS-034 asset-backed mesh residency. `MultiPrimitive` gates on GRAPHICS-030 procedural-residency cube/quad packer. `HierarchyDemo` is unblocked once Impl-B lands. Each provider gets its own contract test asserting the candidate count and component composition.
+- [x] ✅ Cross-linked decisions with GRAPHICS-016 (extraction handoff), GRAPHICS-017Q (camera ownership forward-compat), GRAPHICS-028 (residency bridge planning), GRAPHICS-030 (procedural geometry reference type), HARDEN-060 (`CreateDefault` bootstrap), HARDEN-061 (`TransformHierarchy` system), and the 2026-05-08 review.
 
 ## Tests
-- Planning slice (this task): task-policy, doc-link, and layering validators only — no engine behavior or test-source changes land here.
-- Future implementation children (GRAPHICS-029-Impl-A/B) must add `contract;runtime` tests asserting:
-  - With `EngineConfig::ReferenceScene::Enabled = false`, extraction reports zero renderable candidates (regression guard for sandbox staying policy-light).
-  - With `Enabled = true` and `Selector = Triangle`, extraction reports exactly one renderable candidate with the expected components and `MetaData::EntityName == "ReferenceTriangle"`.
-  - The provider's reported entity span has length 1 and the same `MetaData::EntityName` across two consecutive bootstraps in the same test (deterministic content even though `entt::entity` values differ).
-  - Double-install rejection: a second `Engine::Initialize()` without `Engine::Shutdown()` is rejected via the `m_ReferenceSceneInstalled` guard.
-- GPU coverage stays opt-in `gpu;vulkan` and is **not** introduced by GRAPHICS-029-Impl-A/B; visible-pass coverage belongs to GRAPHICS-032.
+- [x] Planning slice (this task): task-policy, doc-link, and layering validators only — no engine behavior or test-source changes land here.
+- [x] Future implementation children (GRAPHICS-029-Impl-A/B) must add `contract;runtime` tests asserting:
+  - [x] With `EngineConfig::ReferenceScene::Enabled = false`, extraction reports zero renderable candidates (regression guard for sandbox staying policy-light).
+  - [x] With `Enabled = true` and `Selector = Triangle`, extraction reports exactly one renderable candidate with the expected components and `MetaData::EntityName == "ReferenceTriangle"`.
+  - [x] The provider's reported entity span has length 1 and the same `MetaData::EntityName` across two consecutive bootstraps in the same test (deterministic content even though `entt::entity` values differ).
+  - [x] Double-install rejection: a second `Engine::Initialize()` without `Engine::Shutdown()` is rejected via the `m_ReferenceSceneInstalled` guard.
+- [x] GPU coverage stays opt-in `gpu;vulkan` and is **not** introduced by GRAPHICS-029-Impl-A/B; visible-pass coverage belongs to GRAPHICS-032.
 
 ## Docs
-- Update `docs/architecture/graphics.md` with the bootstrap-seam decision and cross-link to this task.
-- Update `src/runtime/README.md` Public-module-surface table with a planned-module row for `Extrinsic.Runtime.ReferenceScene`.
-- Update `docs/migration/nonlegacy-parity-matrix.md` `app` row to reference GRAPHICS-029 as the planning gate for promoted reference-content authoring.
-- Update `tasks/backlog/rendering/README.md` and `tasks/backlog/README.md` to reflect that the planning slice is complete and the implementation children are gated as recorded.
+- [x] Update `docs/architecture/graphics.md` with the bootstrap-seam decision and cross-link to this task.
+- [x] Update `src/runtime/README.md` Public-module-surface table with a planned-module row for `Extrinsic.Runtime.ReferenceScene`.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` `app` row to reference GRAPHICS-029 as the planning gate for promoted reference-content authoring.
+- [x] Update `tasks/backlog/rendering/README.md` and `tasks/backlog/README.md` to reflect that the planning slice is complete and the implementation children are gated as recorded.
 
 ## Acceptance criteria
-- All eleven design decisions above have explicit recorded answers in the task body before any implementation child is opened. ✅
-- Implementation follow-up children (Impl-A/B/C) are identified with scope, dependency gates, and test expectations but not opened. ✅
-- Architecture and source-tree docs reference the bootstrap-seam decision; layering invariants are unchanged. ✅
-- No engine behavior, no new modules in the build, and no test changes land in this slice. ✅
+- [x] All eleven design decisions above have explicit recorded answers in the task body before any implementation child is opened. ✅
+- [x] Implementation follow-up children (Impl-A/B/C) are identified with scope, dependency gates, and test expectations but not opened. ✅
+- [x] Architecture and source-tree docs reference the bootstrap-seam decision; layering invariants are unchanged. ✅
+- [x] No engine behavior, no new modules in the build, and no test changes land in this slice. ✅
 
 ## Verification
 ```bash

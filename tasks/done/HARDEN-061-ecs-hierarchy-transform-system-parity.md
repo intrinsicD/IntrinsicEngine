@@ -36,25 +36,25 @@
 - **Slice 2 (follow-up)** — Activate the promoted `RegisterSystem` from the promoted simulate-phase bundle once that surface lands; introduce a promoted system-feature catalog or pass-token registry if shared identifiers are needed; reconcile GPU-sync `DirtyTags::DirtyTransform` emission with the promoted update.
 
 ## Required changes
-- Add promoted hierarchy `Attach`/`Detach` APIs and structural primitives in `src/ecs`.
-- Preserve cycle rejection, self-parent rejection, reparenting, null-parent detach, sibling-chain maintenance, child-count invariants, and singular-parent fallback in mutation.
-- Implement promoted transform hierarchy update over local transform, world matrix, hierarchy, `IsDirtyTag`, and `WorldUpdatedTag`.
-- Expose the promoted `RegisterSystem` against `Extrinsic.Core.FrameGraph`; initial activation is gated on Slice 2's simulate-phase bundle wiring.
-- Replace stale migration-era comments in promoted ECS system files with current-state documentation.
+- [x] Add promoted hierarchy `Attach`/`Detach` APIs and structural primitives in `src/ecs`.
+- [x] Preserve cycle rejection, self-parent rejection, reparenting, null-parent detach, sibling-chain maintenance, child-count invariants, and singular-parent fallback in mutation.
+- [x] Implement promoted transform hierarchy update over local transform, world matrix, hierarchy, `IsDirtyTag`, and `WorldUpdatedTag`.
+- [x] Expose the promoted `RegisterSystem` against `Extrinsic.Core.FrameGraph`; initial activation is gated on Slice 2's simulate-phase bundle wiring.
+- [x] Replace stale migration-era comments in promoted ECS system files with current-state documentation.
 
 ## Tests
-- Add or update `tests/unit/ecs/Test.ECS.Hierarchy.cpp`.
-- Add or update `tests/unit/ecs/Test.ECS.TransformHierarchy.cpp`.
-- Port the relevant non-legacy assertions from `tests/unit/ecs/Test_RuntimeECS.cpp`: attach/detach, reparenting, cycle detection, dirty propagation, world matrix update, singular parent rejection, and world-position preservation.
+- [x] Add or update `tests/unit/ecs/Test.ECS.Hierarchy.cpp`.
+- [x] Add or update `tests/unit/ecs/Test.ECS.TransformHierarchy.cpp`.
+- [x] Port the relevant non-legacy assertions from `tests/unit/ecs/Test_RuntimeECS.cpp`: attach/detach, reparenting, cycle detection, dirty propagation, world matrix update, singular parent rejection, and world-position preservation.
 
 ## Docs
-- Update `src/ecs/README.md` and `src/ecs/Systems/README.md` with factual status for hierarchy/transform systems.
-- Update `docs/migration/nonlegacy-parity-matrix.md` when promoted tests prove parity.
+- [x] Update `src/ecs/README.md` and `src/ecs/Systems/README.md` with factual status for hierarchy/transform systems.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` when promoted tests prove parity.
 
 ## Acceptance criteria
-- Promoted ECS hierarchy mutations and transform traversal work without importing legacy `ECS`.
-- Transform updates are deterministic for root and child entities and clear/emit the documented dirty tags.
-- Existing legacy compatibility tests may remain, but promoted tests cover the new source surface directly.
+- [x] Promoted ECS hierarchy mutations and transform traversal work without importing legacy `ECS`.
+- [x] Transform updates are deterministic for root and child entities and clear/emit the documented dirty tags.
+- [x] Existing legacy compatibility tests may remain, but promoted tests cover the new source surface directly.
 
 ## Verification
 ```bash

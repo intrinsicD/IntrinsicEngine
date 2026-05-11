@@ -32,9 +32,9 @@ Lock down the contract for a hybrid global illumination system providing (a) a h
 13. **Layering.** No live ECS. Vendor SDKs (RTXDI, FidelityFX-Brixelizer) live behind the same kind of `IReconstructor`-style seam as `GRAPHICS-040` if integrated; not in promoted layers by default.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-046-Impl-A** — `GiPathKind` recipe selection + path-fallback rule + `contract;graphics` tests.
@@ -44,22 +44,22 @@ Lock down the contract for a hybrid global illumination system providing (a) a h
 - **GRAPHICS-046-Impl-E** — Optional vendor denoiser hookpoint via `IReconstructor` (one child per vendor; opened only when actually integrated).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` lighting / GI section.
-- Update `src/graphics/renderer/README.md` GI section.
-- Update `docs/migration/nonlegacy-parity-matrix.md` GI rows.
+- [ ] Update `docs/architecture/rendering-three-pass.md` lighting / GI section.
+- [ ] Update `src/graphics/renderer/README.md` GI section.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` GI rows.
 
 ## Acceptance criteria
-- Thirteen decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Software-fallback path is the unconditional default until Impl-C ships.
-- Engine renders without GI when `GiPathKind::Disabled`.
+- [ ] Thirteen decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Software-fallback path is the unconditional default until Impl-C ships.
+- [ ] Engine renders without GI when `GiPathKind::Disabled`.
 
 ## Verification
 ```bash

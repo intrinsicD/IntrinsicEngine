@@ -13,10 +13,10 @@
 - `GEOIO-001` already promoted minimal geometry-owned loaders for mesh (`OBJ`, `OFF`, `PLY`, `STL`), point cloud (`XYZ`, `PCD`, `PLY`), and graph (`TGF`, edge list) under `src/geometry` without depending on graphics/assets/runtime.
 - Promoted `assets` modules own CPU asset identity, payload storage, path lookup, load-state transitions, and events. Runtime owns composition/wiring from assets and geometry payloads into ECS and graphics residency. `src/graphics/assets` owns GPU-side asset cache state only.
 ## Required changes
-- Inventory OBJ, PLY, STL, OFF, PCD, TGF, XYZ, GLTF, texture, and model-loader behavior currently under legacy graphics.
-- Create or update follow-up geometry/assets tasks for importer/exporter/model ownership as needed.
-- Define the graphics-facing asset/geometry GPU-view handoff required by rendering tasks.
-- Update migration parity docs to state that legacy graphics IO is retired through assets/geometry/runtime ownership, not promoted graphics imports.
+- [x] Inventory OBJ, PLY, STL, OFF, PCD, TGF, XYZ, GLTF, texture, and model-loader behavior currently under legacy graphics.
+- [x] Create or update follow-up geometry/assets tasks for importer/exporter/model ownership as needed.
+- [x] Define the graphics-facing asset/geometry GPU-view handoff required by rendering tasks.
+- [x] Update migration parity docs to state that legacy graphics IO is retired through assets/geometry/runtime ownership, not promoted graphics imports.
 ## Ownership inventory
 | Legacy feature/source | Promoted owner decision | Existing promoted coverage | Follow-up gate |
 | --- | --- | --- | --- |
@@ -38,20 +38,20 @@
 - `src/graphics/assets` may cache/upload GPU resources keyed by `Assets::AssetId`; runtime is responsible for translating asset events and CPU payload availability into cache requests.
 - Runtime is the only layer that may import both asset/geometry CPU authority and graphics residency surfaces for composition.
 ## Tests
-- Run task policy and docs-link checks after adding ownership tasks.
-- Run layering checks because this task changes ownership-boundary documentation.
-- Future implementation tasks must add parser/exporter unit tests under the owning subsystem.
-- `ASSETIO-001` must add asset/runtime integration coverage for import routing, CPU payload registration, texture decode metadata, and runtime-to-GPU-residency handoff without graphics owning file IO.
-- `GEOIO-002` must add geometry-owned importer/exporter parity tests without assets/runtime/graphics imports.
+- [x] Run task policy and docs-link checks after adding ownership tasks.
+- [x] Run layering checks because this task changes ownership-boundary documentation.
+- [x] Future implementation tasks must add parser/exporter unit tests under the owning subsystem.
+- [x] `ASSETIO-001` must add asset/runtime integration coverage for import routing, CPU payload registration, texture decode metadata, and runtime-to-GPU-residency handoff without graphics owning file IO.
+- [x] `GEOIO-002` must add geometry-owned importer/exporter parity tests without assets/runtime/graphics imports.
 ## Docs
-- Update migration parity docs to state that legacy graphics IO is retired through assets/geometry/runtime ownership, not promoted graphics imports.
-- Update rendering backlog links after promoting this task to active/done.
-- Add backlog category docs for new assets follow-up tasks.
+- [x] Update migration parity docs to state that legacy graphics IO is retired through assets/geometry/runtime ownership, not promoted graphics imports.
+- [x] Update rendering backlog links after promoting this task to active/done.
+- [x] Add backlog category docs for new assets follow-up tasks.
 ## Acceptance criteria
-- Every legacy graphics IO feature has an owning subsystem decision.
-- Rendering tasks depend only on asset IDs, geometry GPU views, runtime-submitted snapshots, or promoted graphics asset residency APIs.
-- No final graphics task requires direct model/texture file parsing or exporter ownership.
-- Follow-up tasks exist for unproven geometry exporter/import parity and asset model/texture ingest/runtime handoff.
+- [x] Every legacy graphics IO feature has an owning subsystem decision.
+- [x] Rendering tasks depend only on asset IDs, geometry GPU views, runtime-submitted snapshots, or promoted graphics asset residency APIs.
+- [x] No final graphics task requires direct model/texture file parsing or exporter ownership.
+- [x] Follow-up tasks exist for unproven geometry exporter/import parity and asset model/texture ingest/runtime handoff.
 ## Verification
 ```bash
 python3 tools/agents/check_task_policy.py --root . --strict

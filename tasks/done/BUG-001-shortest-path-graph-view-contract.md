@@ -17,21 +17,21 @@
 - Impact: the Editor UI shortest-path widget does not build in CI, and the intended domain contract is under-specified in tests.
 
 ## Required changes
-- Update the mesh branch for "Compute Shortest Path" in `src/legacy/EditorUI/Runtime.EditorUI.Widgets.cpp` to build a graph view from mesh property storage before calling `Geometry::ShortestPath::Dijkstra`.
-- Update the mesh branch for "Extract Path Graph" in the same file to build the same graph view before calling `Geometry::ShortestPath::Dijkstra` and `Geometry::ShortestPath::ExtractPathGraph`.
-- Tighten `tests/unit/geometry/Test_ShortestPath.cpp` naming/comments so mesh-backed coverage explicitly uses a graph view.
+- [x] Update the mesh branch for "Compute Shortest Path" in `src/legacy/EditorUI/Runtime.EditorUI.Widgets.cpp` to build a graph view from mesh property storage before calling `Geometry::ShortestPath::Dijkstra`.
+- [x] Update the mesh branch for "Extract Path Graph" in the same file to build the same graph view before calling `Geometry::ShortestPath::Dijkstra` and `Geometry::ShortestPath::ExtractPathGraph`.
+- [x] Tighten `tests/unit/geometry/Test_ShortestPath.cpp` naming/comments so mesh-backed coverage explicitly uses a graph view.
 
 ## Tests
-- Keep mesh-backed shortest-path tests graph-view based.
-- Re-run focused structural/test checks relevant to the touched files.
+- [x] Keep mesh-backed shortest-path tests graph-view based.
+- [x] Re-run focused structural/test checks relevant to the touched files.
 
 ## Docs
-- No docs changes required beyond this active task record and directly related code comments.
+- [x] No docs changes required beyond this active task record and directly related code comments.
 
 ## Acceptance criteria
-- Editor UI shortest-path widget mesh branches no longer call exported shortest-path APIs with `HalfedgeMesh::Mesh`.
-- Mesh-backed shortest-path tests explicitly document graph-view usage.
-- Fix does not introduce layering violations.
+- [x] Editor UI shortest-path widget mesh branches no longer call exported shortest-path APIs with `HalfedgeMesh::Mesh`.
+- [x] Mesh-backed shortest-path tests explicitly document graph-view usage.
+- [x] Fix does not introduce layering violations.
 
 ## Verification
 ```bash

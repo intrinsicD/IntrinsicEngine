@@ -12,9 +12,9 @@
 - The inventory source is `docs/api/generated/module_inventory.md` plus `src/legacy/Graphics`, `src/legacy/RHI`, and render-adjacent `src/legacy/Runtime` module files as of 2026-05-07.
 - The final deletion/isolation slice must run only after every row below reaches `ready`; until then retained legacy modules are compatibility/reference code only and must not be imported by promoted final layers.
 ## Required changes
-- Map each retained legacy graphics-related module to a promoted owner, parity task, test gate, or explicit retirement decision.
-- Track compatibility shims and removal follow-ups.
-- Identify final blockers for deleting or isolating legacy render paths.
+- [x] Map each retained legacy graphics-related module to a promoted owner, parity task, test gate, or explicit retirement decision.
+- [x] Track compatibility shims and removal follow-ups.
+- [x] Identify final blockers for deleting or isolating legacy render paths.
 ## Retirement gate matrix
 | Legacy module family | Modules covered | Promoted owner / retirement decision | Gate evidence required | Current status | Removal follow-up |
 | --- | --- | --- | --- | --- | --- |
@@ -37,16 +37,16 @@
 - Focused contract/integration tests named by each blocker task pass in the current C++23 `ci` build tree.
 - The final deletion slice is purely mechanical or is split from semantic replacements; no mechanical delete is mixed with new behavior.
 ## Tests
-- Run task policy, docs link, module inventory, layering, and docs-sync checks when gates are updated.
-- Future deletion/isolation slices must add or run import-scan checks proving promoted code does not import deleted legacy modules.
+- [x] Run task policy, docs link, module inventory, layering, and docs-sync checks when gates are updated.
+- [x] Future deletion/isolation slices must add or run import-scan checks proving promoted code does not import deleted legacy modules.
 ## Docs
-- Update `docs/migration/nonlegacy-parity-matrix.md` with the retirement-gate overview.
-- Update generated module inventory only if module surfaces change; this planning slice should use `--check` only.
-- Update rendering backlog links after promoting/retiring this task.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` with the retirement-gate overview.
+- [x] Update generated module inventory only if module surfaces change; this planning slice should use `--check` only.
+- [x] Update rendering backlog links after promoting/retiring this task.
 ## Acceptance criteria
-- Every retained legacy rendering module has a documented owner/task/gate.
-- No legacy dependency remains untracked in promoted final layers.
-- Deletion readiness can be evaluated mechanically from documented gates.
+- [x] Every retained legacy rendering module has a documented owner/task/gate.
+- [x] No legacy dependency remains untracked in promoted final layers.
+- [x] Deletion readiness can be evaluated mechanically from documented gates.
 ## Verification
 ```bash
 python3 tools/agents/check_task_policy.py --root . --strict

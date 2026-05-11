@@ -15,19 +15,19 @@
 - Source-level import audit also found one unlisted old-name ECS source that imports only `Extrinsic.ECS.*`; it is included as a mechanical filename cleanup without changing CMake membership.
 
 ## Required changes
-- Rename qualifying source files from `Test_<Name>.cpp` to `Test.<Name>.cpp` within their existing taxonomy directories.
-- Update `tests/CMakeLists.txt` source lists for the renamed files.
-- Leave Intrinsic-linked old-name tests untouched.
-- Synchronize test naming documentation if it still describes the old convention as canonical.
+- [x] Rename qualifying source files from `Test_<Name>.cpp` to `Test.<Name>.cpp` within their existing taxonomy directories.
+- [x] Update `tests/CMakeLists.txt` source lists for the renamed files.
+- [x] Leave Intrinsic-linked old-name tests untouched.
+- [x] Synchronize test naming documentation if it still describes the old convention as canonical.
 
 ## Tests
-- Run the strict test layout checker.
-- Configure/build the relevant test targets or the repository aggregate when practical.
-- Run the default CPU-supported CTest gate when practical.
+- [x] Run the strict test layout checker.
+- [x] Configure/build the relevant test targets or the repository aggregate when practical.
+- [x] Run the default CPU-supported CTest gate when practical.
 
 ## Docs
-- Update test strategy naming policy if needed.
-- Archive this task with verification evidence when complete.
+- [x] Update test strategy naming policy if needed.
+- [x] Archive this task with verification evidence when complete.
 
 ## Acceptance criteria
 - [x] Only Extrinsic-only `Test_*.cpp` sources are renamed.

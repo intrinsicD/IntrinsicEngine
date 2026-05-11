@@ -10,16 +10,16 @@
 - 
 
 ## Required changes
-- 
+- [ ] <required change>
 
 ## Tests
-- 
+- [ ] <test or verification requirement>
 
 ## Docs
-- 
+- [ ] <documentation update>
 
 ## Acceptance criteria
-- 
+- [ ] <acceptance criterion>
 
 ## Verification
 ```bash

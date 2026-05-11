@@ -63,30 +63,30 @@ Foundational architectural shifts that are expensive to retrofit later. Must pre
 - `GRAPHICS-058` — Frame generation pass.
 
 ## Required changes
-- Land this roadmap file as the single ordered index of the modernization phases.
-- Open each leaf planning slice (`GRAPHICS-036..058`) as a separate planning-only task following the `GRAPHICS-029..034` template.
-- Update `tasks/backlog/rendering/README.md` DAG to list the new tasks in dependency order, with each entry citing its upstream gates.
-- Cross-link this roadmap from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`. Do **not** edit semantic content of those docs in this slice.
+- [ ] Land this roadmap file as the single ordered index of the modernization phases.
+- [ ] Open each leaf planning slice (`GRAPHICS-036..058`) as a separate planning-only task following the `GRAPHICS-029..034` template.
+- [ ] Update `tasks/backlog/rendering/README.md` DAG to list the new tasks in dependency order, with each entry citing its upstream gates.
+- [ ] Cross-link this roadmap from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`. Do **not** edit semantic content of those docs in this slice.
 
 ## Tests
-- Planning slice: validators only.
-- Each leaf task records its own implementation-child test split. The default verification gate stays:
+- [ ] Planning slice: validators only.
+- [ ] Each leaf task records its own implementation-child test split. The default verification gate stays:
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- `docs/architecture/graphics.md` — add a "Modernization roadmap" pointer to this task.
-- `docs/architecture/rendering-three-pass.md` — add a "Future work" pointer to this task without editing pass semantics.
-- `tasks/backlog/rendering/README.md` — DAG entry insertion (dependency order under existing `GRAPHICS-034`).
+- [ ] `docs/architecture/graphics.md` — add a "Modernization roadmap" pointer to this task.
+- [ ] `docs/architecture/rendering-three-pass.md` — add a "Future work" pointer to this task without editing pass semantics.
+- [ ] `tasks/backlog/rendering/README.md` — DAG entry insertion (dependency order under existing `GRAPHICS-034`).
 
 ## Acceptance criteria
-- All twenty-three leaf planning slices exist as task files.
-- The DAG in `tasks/backlog/rendering/README.md` lists them with explicit upstream gates.
-- This roadmap is reachable from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`.
-- No implementation child slices are opened.
-- No semantic code or shader changes land.
-- Layering invariants in `AGENTS.md` §2 and §4 hold; this roadmap introduces no new dependency edges.
+- [ ] All twenty-three leaf planning slices exist as task files.
+- [ ] The DAG in `tasks/backlog/rendering/README.md` lists them with explicit upstream gates.
+- [ ] This roadmap is reachable from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`.
+- [ ] No implementation child slices are opened.
+- [ ] No semantic code or shader changes land.
+- [ ] Layering invariants in `AGENTS.md` §2 and §4 hold; this roadmap introduces no new dependency edges.
 
 ## Verification
 ```bash

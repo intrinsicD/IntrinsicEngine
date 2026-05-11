@@ -61,21 +61,21 @@
   them.
 
 ## Required changes
-- Extend `src/geometry/Geometry.PointCloud.IO.cppm`:
-  - Add a
+- [x] Extend `src/geometry/Geometry.PointCloud.IO.cppm`:
+  - [x] Add a
     `PointCloudIOWriteStatus WritePCD(std::string_view absolute_path,
                                        const PointCloudIOResult& cloud);`
     declaration in the `Geometry::PointCloudIO` namespace
     after the existing `WriteXYZ` declaration. Reuse the
     existing `PointCloudIOWriteStatus` enum.
-- Implement `WritePCD` in
+- [x] Implement `WritePCD` in
   `src/geometry/Geometry.PointCloud.IO.cpp` after `WriteXYZ`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject empty clouds (`source.IsEmpty()`) with `EmptyCloud`.
-  - Open the output stream with
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject empty clouds (`source.IsEmpty()`) with `EmptyCloud`.
+  - [x] Open the output stream with
     `std::ios::binary | std::ios::trunc`; return `InvalidPath`
     if the stream cannot be opened.
-  - Emit the header (in order):
+  - [x] Emit the header (in order):
     `# .PCD v0.7`,
     `VERSION 0.7`,
     `FIELDS x y z` (plus `normal_x normal_y normal_z` when
@@ -90,63 +90,63 @@
     `VIEWPOINT 0 0 0 1 0 0 0`,
     `POINTS <N>`,
     `DATA ascii`.
-  - For each point, emit one whitespace-separated line with
+  - [x] For each point, emit one whitespace-separated line with
     `%.6f`-formatted values: `x y z`, then optionally
     `nx ny nz`, then optionally `r g b`, terminated by `\n`.
     Color channels are clamped to `[0, 1]` before writing so
     the round-trip stays inside `NormalizeColorChannel`'s
     no-op branch.
-  - Flush and report `FileWriteError` if `stream.good()` is
+  - [x] Flush and report `FileWriteError` if `stream.good()` is
     false after writing the body.
-- No additional public exports beyond `WritePCD`; helper logic
+- [x] No additional public exports beyond `WritePCD`; helper logic
   stays inside the existing translation-unit anonymous
   namespace or local to the function.
-- No new module imports in
+- [x] No new module imports in
   `src/geometry/Geometry.PointCloud.IO.cppm`.
 
 ## Tests
-- Add `unit;geometry` cases to
+- [x] Add `unit;geometry` cases to
   `tests/unit/geometry/Test.GeometryIO.cpp` under
   `GeometryIO_PointCloudIO` after the existing `WritesXYZ*`
   tests:
-  - `WritesPCDPositionsOnly` — three positions only; expect
+  - [x] `WritesPCDPositionsOnly` — three positions only; expect
     success, header includes `FIELDS x y z`, `WIDTH 3`,
     `POINTS 3`, `DATA ascii`; re-import via `LoadPCD` returns
     three points without normals/colors.
-  - `WritesPCDWithNormalsAndColorsRoundTrips` — two points
+  - [x] `WritesPCDWithNormalsAndColorsRoundTrips` — two points
     with normals and colors enabled; expect header includes
     `FIELDS x y z normal_x normal_y normal_z r g b`; re-import
     returns matching positions, normals, and colors.
-  - `WritesPCDIgnoresRadii` — one point with radii enabled and
+  - [x] `WritesPCDIgnoresRadii` — one point with radii enabled and
     no normals/colors; expect header has only `x y z` fields
     and re-import has no radii/normals/colors.
-  - `WritePCDRejectsEmptyCloud` — default-constructed cloud
+  - [x] `WritePCDRejectsEmptyCloud` — default-constructed cloud
     yields `EmptyCloud`.
-  - `WritePCDRejectsBadPath` — empty `absolute_path` yields
+  - [x] `WritePCDRejectsBadPath` — empty `absolute_path` yields
     `InvalidPath`; a path under a non-existent directory
     yields `InvalidPath`.
-- Use the existing `TempFile` helper and `ReadFileContents`
+- [x] Use the existing `TempFile` helper and `ReadFileContents`
   in the test file; do not introduce new test-only headers.
 
 ## Docs
-- Update the `OBJ/PLY/STL exporters` row in
+- [x] Update the `OBJ/PLY/STL exporters` row in
   `docs/migration/nonlegacy-parity-matrix.md` so it also
   records the new geometry-owned ASCII PCD writer added under
   `GEOIO-002O` (rename the row to span point-cloud exporters
   consistently with the existing additions; or add a new
   dedicated row if the existing row becomes unwieldy).
-- Regenerate `docs/api/generated/module_inventory.md` only if
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if
   the generator picks up changes to the existing
   `Geometry.PointCloud.IO` module surface. If the regenerator
   changes only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::PointCloudIO::WritePCD` compiles and is exported
+- [x] `Geometry::PointCloudIO::WritePCD` compiles and is exported
   from `Geometry.PointCloud.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into
   `src/geometry/*`.
-- Parity matrix records the new geometry-owned ASCII PCD
+- [x] Parity matrix records the new geometry-owned ASCII PCD
   writer.
 
 ## Verification

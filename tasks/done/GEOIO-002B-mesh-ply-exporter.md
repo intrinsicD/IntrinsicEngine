@@ -45,22 +45,22 @@
   container.
 
 ## Required changes
-- Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm`:
-  - Add a function declaration
+- [x] Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm`:
+  - [x] Add a function declaration
     `MeshIOWriteStatus WritePLY(std::string_view absolute_path,
                                  const MeshIOResult& mesh);`
-  - Reuse the existing `MeshIOWriteStatus` enum unchanged.
-  - Keep all existing `Load*` and `WriteOBJ` declarations bit-for-bit.
-- Implement `WritePLY` in `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
-  - Reject empty paths with `InvalidPath`.
-  - Reject empty meshes (no `v:point` property, zero vertices, no
+  - [x] Reuse the existing `MeshIOWriteStatus` enum unchanged.
+  - [x] Keep all existing `Load*` and `WriteOBJ` declarations bit-for-bit.
+- [x] Implement `WritePLY` in `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
+  - [x] Reject empty paths with `InvalidPath`.
+  - [x] Reject empty meshes (no `v:point` property, zero vertices, no
     `f:vertices` property, or zero faces) with `EmptyMesh`.
-  - Reject any face with fewer than three indices or any out-of-range
+  - [x] Reject any face with fewer than three indices or any out-of-range
     index with `InvalidFace`. No mutation of input.
-  - Open the output stream with `std::ios::binary | std::ios::trunc`; on
+  - [x] Open the output stream with `std::ios::binary | std::ios::trunc`; on
     `!stream` return `InvalidPath`; on post-write `!stream.good()` return
     `FileWriteError`.
-  - Write the canonical ASCII PLY header:
+  - [x] Write the canonical ASCII PLY header:
     ```
     ply
     format ascii 1.0
@@ -78,53 +78,53 @@
     ```
     The three `nx/ny/nz` properties are emitted only when a `v:normal`
     `glm::vec3` property of equal length to positions is present.
-  - Write each vertex on a single line: `%.6f %.6f %.6f` for `x y z`,
+  - [x] Write each vertex on a single line: `%.6f %.6f %.6f` for `x y z`,
     optionally followed by ` %.6f %.6f %.6f` for `nx ny nz` when normals
     are present. Terminate each line with `\n`.
-  - Write each face as `<count> i0 i1 ... ik\n` with zero-based indices.
-- Do not change importer behavior, do not introduce new module imports,
+  - [x] Write each face as `<count> i0 i1 ... ik\n` with zero-based indices.
+- [x] Do not change importer behavior, do not introduce new module imports,
   and do not touch any file outside `src/geometry/`,
   `tests/unit/geometry/`, `tasks/`, and the generated module inventory.
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `WritesPLYTriangle`: write a synthetic triangle `MeshIOResult`,
+  - [x] `WritesPLYTriangle`: write a synthetic triangle `MeshIOResult`,
     re-import via `LoadPLY`, verify topology and vertex equivalence.
-  - `WritesPLYTriangleWithNormals`: same as above but with vertex
+  - [x] `WritesPLYTriangleWithNormals`: same as above but with vertex
     normals populated; verify the file contains the `property float nx`
     header line and a `0.000000 0.000000 0.000000 0.000000 0.000000 1.000000`
     style vertex line, and that re-import via `LoadPLY` keeps positions
     and face indices.
-  - `WritesPLYQuadRoundTripsFaceArity`: a single quad face survives the
+  - [x] `WritesPLYQuadRoundTripsFaceArity`: a single quad face survives the
     `WritePLY` -> `LoadPLY` round-trip with `f:vertices` arity 4.
-  - `WritePLYRejectsEmptyMesh`: empty `MeshIOResult` returns `EmptyMesh`.
-  - `WritePLYRejectsOutOfRangeIndex`: a face referencing an out-of-range
+  - [x] `WritePLYRejectsEmptyMesh`: empty `MeshIOResult` returns `EmptyMesh`.
+  - [x] `WritePLYRejectsOutOfRangeIndex`: a face referencing an out-of-range
     vertex returns `InvalidFace`.
-  - `WritePLYRejectsBadPath`: a path under a non-existent directory
+  - [x] `WritePLYRejectsBadPath`: a path under a non-existent directory
     returns `InvalidPath`.
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module surfaces
+- [x] Update `docs/api/generated/module_inventory.md` only if module surfaces
   changed in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding a single new exported
   function to the existing `Geometry.HalfedgeMesh.IO` module is expected to update
   the inventory; if the regenerator only changes the date, leave it
   untouched.
-- No additional architecture/migration doc edits required for this slice;
+- [x] No additional architecture/migration doc edits required for this slice;
   parity-matrix updates remain part of the parent `GEOIO-002` task once
   STL exporter parity also lands.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::WritePLY` exists, is callable from `unit;geometry`
+- [x] `Geometry::MeshIO::WritePLY` exists, is callable from `unit;geometry`
   tests, and round-trips a triangle and a quad through `LoadPLY` without
   topology loss for the supported attributes.
-- Exporter rejects empty paths, empty meshes, out-of-range face indices,
+- [x] Exporter rejects empty paths, empty meshes, out-of-range face indices,
   and non-writable paths with the documented `MeshIOWriteStatus` values.
-- `src/geometry/*` imports remain layered (`geometry -> core` only); no
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only); no
   new asset/runtime/graphics imports introduced.
-- Existing `LoadOBJ`/`LoadOFF`/`LoadPLY`/`LoadSTL` and `PointCloudIO` /
+- [x] Existing `LoadOBJ`/`LoadOFF`/`LoadPLY`/`LoadSTL` and `PointCloudIO` /
   `GraphIO` tests continue to pass, and the `WriteOBJ*` cases added by
   `GEOIO-002A` continue to pass.
 

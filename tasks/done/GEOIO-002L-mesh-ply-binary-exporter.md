@@ -49,23 +49,23 @@
   geometry-owned writer matches that on-disk shape.
 
 ## Required changes
-- Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm` with a
+- [x] Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm` with a
   `MeshIOWriteStatus WritePLYBinary(std::string_view absolute_path,
                                     const MeshIOResult& mesh);`
   declaration in the `Geometry::MeshIO` namespace, reusing the
   existing `MeshIOWriteStatus` enum unchanged.
-- Implement `WritePLYBinary` in
+- [x] Implement `WritePLYBinary` in
   `src/geometry/Geometry.HalfedgeMesh.IO.cpp`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject empty meshes (no `v:point` `glm::vec3` property, zero
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject empty meshes (no `v:point` `glm::vec3` property, zero
     positions, no `f:vertices` `std::vector<std::uint32_t>` property,
     or zero faces) with `EmptyMesh`.
-  - Reject any face with fewer than three indices or any out-of-range
+  - [x] Reject any face with fewer than three indices or any out-of-range
     vertex index with `InvalidFace`.
-  - Open the output stream with
+  - [x] Open the output stream with
     `std::ios::binary | std::ios::trunc`; return `InvalidPath` if the
     stream cannot be opened.
-  - Emit ASCII PLY 1.0 header lines (`ply`,
+  - [x] Emit ASCII PLY 1.0 header lines (`ply`,
     `format binary_little_endian 1.0`,
     `comment Exported by IntrinsicEngine`,
     `element vertex N`, `property float x/y/z`, optional
@@ -74,65 +74,65 @@
     terminated by `\n`. Optional `nx/ny/nz` lines are emitted only
     when a `v:normal` `glm::vec3` property of length equal to the
     position count is present (parity with ASCII `WritePLY`).
-  - Write packed little-endian binary vertex records in declared
+  - [x] Write packed little-endian binary vertex records in declared
     property order. Float properties are stored as IEEE 754 32-bit
     little-endian.
-  - Write each face as `uint8_t count` followed by `count` × `int32_t`
+  - [x] Write each face as `uint8_t count` followed by `count` × `int32_t`
     little-endian vertex indices.
-  - Detect host endianness with `std::endian::native` and byte-swap
+  - [x] Detect host endianness with `std::endian::native` and byte-swap
     32-bit floats and 32-bit signed face indices on big-endian hosts
     so the on-disk encoding stays
     `binary_little_endian 1.0` regardless of platform.
-  - Flush and report `FileWriteError` if `stream.good()` is false at
+  - [x] Flush and report `FileWriteError` if `stream.good()` is false at
     end.
-- Add `#include <bit>` to the implementation translation unit so
+- [x] Add `#include <bit>` to the implementation translation unit so
   `std::endian` is available; no change to the module interface
   imports.
-- No additional public exports beyond `WritePLYBinary`; helper logic
+- [x] No additional public exports beyond `WritePLYBinary`; helper logic
   stays inside the existing translation-unit anonymous namespace or
   local to the function.
 
 ## Tests
-- Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
+- [x] Add `unit;geometry` cases to `tests/unit/geometry/Test.GeometryIO.cpp`
   under `GeometryIO_MeshIO`:
-  - `WritesPLYBinaryTriangle` — write a synthetic triangle
+  - [x] `WritesPLYBinaryTriangle` — write a synthetic triangle
     `MeshIOResult`, re-import via `LoadPLY`, verify topology and
     vertex equivalence; assert the on-disk header contains
     `format binary_little_endian 1.0\n`.
-  - `WritesPLYBinaryTriangleWithNormals` — same as above but with
+  - [x] `WritesPLYBinaryTriangleWithNormals` — same as above but with
     vertex normals populated; verify the header contains
     `property float nx\n` and re-import via `LoadPLY` keeps positions
     and face indices (normals are skipped by the reader, parity with
     the ASCII writer test).
-  - `WritesPLYBinaryQuadRoundTripsFaceArity` — a single quad face
+  - [x] `WritesPLYBinaryQuadRoundTripsFaceArity` — a single quad face
     survives `WritePLYBinary` -> `LoadPLY` round-trip with
     `f:vertices` arity 4.
-  - `WritePLYBinaryRejectsEmptyMesh` — empty `MeshIOResult` returns
+  - [x] `WritePLYBinaryRejectsEmptyMesh` — empty `MeshIOResult` returns
     `EmptyMesh`.
-  - `WritePLYBinaryRejectsOutOfRangeIndex` — a face referencing an
+  - [x] `WritePLYBinaryRejectsOutOfRangeIndex` — a face referencing an
     out-of-range vertex returns `InvalidFace`.
-  - `WritePLYBinaryRejectsBadPath` — empty `absolute_path` yields
+  - [x] `WritePLYBinaryRejectsBadPath` — empty `absolute_path` yields
     `InvalidPath`; a path under a non-existent directory yields
     `InvalidPath`.
 
 ## Docs
-- Update the `OBJ/PLY/STL exporters` row of
+- [x] Update the `OBJ/PLY/STL exporters` row of
   `docs/migration/nonlegacy-parity-matrix.md` to record that
   binary-little-endian PLY mesh export is now geometry-owned and
   added under `GEOIO-002L`.
-- Regenerate `docs/api/generated/module_inventory.md` only if the
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if the
   generator picks up the new exported function on the existing
   `Geometry.HalfedgeMesh.IO` module surface. If the regenerator
   changes only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::WritePLYBinary` compiles and is exported from
+- [x] `Geometry::MeshIO::WritePLYBinary` compiles and is exported from
   `Geometry.HalfedgeMesh.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into `src/geometry/*`.
-- Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.PLY.{cppm,cpp}`
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into `src/geometry/*`.
+- [x] Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.PLY.{cppm,cpp}`
   remains untouched (reference only).
-- Parity matrix row reflects the new exporter ownership.
+- [x] Parity matrix row reflects the new exporter ownership.
 
 ## Verification
 ```bash

@@ -70,45 +70,45 @@
   values without ambiguity.
 
 ## Required changes
-- `src/geometry/Geometry.HalfedgeMesh.IO.cpp::WriteOBJ`:
-  - After the existing `normalsView` lookup, add a parallel
+- [x] `src/geometry/Geometry.HalfedgeMesh.IO.cpp::WriteOBJ`:
+  - [x] After the existing `normalsView` lookup, add a parallel
     `texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord")`
     lookup and a `hasTexcoords` flag computed as
     `texcoordsView.IsValid() &&
      texcoordsView.Vector().size() == positions.size()`.
-  - Insert a `vt %.6f %.6f` emission loop between the
+  - [x] Insert a `vt %.6f %.6f` emission loop between the
     existing `v` emission loop and the existing `vn`
     emission loop (i.e. `v` block, then `vt` block if
     `hasTexcoords`, then `vn` block if `hasNormals`).
     Match the existing `snprintf`/`stream.write`/`written <= 0`
     failure handling pattern.
-  - Replace the existing two-way `(hasNormals ? "%llu//%llu"
+  - [x] Replace the existing two-way `(hasNormals ? "%llu//%llu"
     : "%llu")` face-token branch with the four-way table:
-    - `!hasTexcoords && !hasNormals`: `" %llu"` (unchanged).
-    - `!hasTexcoords &&  hasNormals`: `" %llu//%llu"` (unchanged).
-    - ` hasTexcoords && !hasNormals`: `" %llu/%llu"`.
-    - ` hasTexcoords &&  hasNormals`: `" %llu/%llu/%llu"`.
+    - [x] `!hasTexcoords && !hasNormals`: `" %llu"` (unchanged).
+    - [x] `!hasTexcoords &&  hasNormals`: `" %llu//%llu"` (unchanged).
+    - [x] ` hasTexcoords && !hasNormals`: `" %llu/%llu"`.
+    - [x] ` hasTexcoords &&  hasNormals`: `" %llu/%llu/%llu"`.
     The `t` and `n` indices are the same 1-based position
     index, matching the lockstep storage on disk.
-- No header file changes; the change lives entirely in the
+- [x] No header file changes; the change lives entirely in the
   existing `WriteOBJ` body.
 
 ## Tests
-- Add `unit;geometry` cases to
+- [x] Add `unit;geometry` cases to
   `tests/unit/geometry/Test.GeometryIO.cpp::GeometryIO_MeshIO`
   next to the existing `WritesOBJTriangleWithNormals` test:
-  - `WritesOBJTriangleWithTexcoords` — triangle with positions
+  - [x] `WritesOBJTriangleWithTexcoords` — triangle with positions
     and a `v:texcoord` property, no normals. Expect the on-disk
     contents to contain `vt 0.000000 0.000000\n` and
     `f 1/1 2/2 3/3\n`. Round-trip via `LoadOBJ`; expect a
     `v:texcoord` property of size 3 whose values equal the
     written ones.
-  - `WritesOBJTriangleWithTexcoordsAndNormals` — triangle with
+  - [x] `WritesOBJTriangleWithTexcoordsAndNormals` — triangle with
     positions, `v:texcoord`, and `v:normal` properties. Expect
     `vt`, `vn`, and `f 1/1/1 2/2/2 3/3/3` to appear on disk.
     Round-trip via `LoadOBJ`; expect both `v:texcoord` and
     `v:normal` properties present and equal to the inputs.
-  - `WriteOBJOmitsTexcoordsWhenAbsent` — triangle with no
+  - [x] `WriteOBJOmitsTexcoordsWhenAbsent` — triangle with no
     `v:texcoord` property at all. Expect the on-disk contents
     to contain no `vt` line, no `/` character in any token,
     and the unchanged `f 1 2 3` face format. Round-trip via
@@ -120,35 +120,35 @@
     sized to `mesh.Vertices.Size()`; the guard remains for
     forward-compatibility with future property-set shapes and
     is not exercised by a dedicated test.)
-- Extend the test helper `PopulateTriangleMesh` to accept an
+- [x] Extend the test helper `PopulateTriangleMesh` to accept an
   optional `std::span<const glm::vec2> texcoords` parameter
   (default empty), mirroring the existing optional `normals`
   parameter. The helper writes the `v:texcoord` property
   when the span is non-empty.
 
 ## Docs
-- Update the
+- [x] Update the
   `OBJ/OFF/STL mesh import and mesh PLY import` row in
   `docs/migration/nonlegacy-parity-matrix.md` to record the
   new geometry-owned OBJ vt lockstep export added under
   `GEOIO-002U`. (The matrix already cross-references
   `GEOIO-002S`/`GEOIO-002T` in the same row.)
-- Regenerate `docs/api/generated/module_inventory.md` only if
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if
   the generator picks up changes to the existing
   `Geometry.HalfedgeMesh.IO` module surface. If the regenerator
   changes only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::WriteOBJ` emits `vt u v` lines and
+- [x] `Geometry::MeshIO::WriteOBJ` emits `vt u v` lines and
   matching `p/t` or `p/t/n` face token references whenever the
   input mesh carries a `v:texcoord` property whose size equals
   the position count.
-- Mismatched `v:texcoord` arity silently falls back to the
+- [x] Mismatched `v:texcoord` arity silently falls back to the
   pre-slice writer behavior.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into
   `src/geometry/*`.
-- Parity matrix records the new OBJ vt lockstep export.
+- [x] Parity matrix records the new OBJ vt lockstep export.
 
 ## Verification
 ```bash

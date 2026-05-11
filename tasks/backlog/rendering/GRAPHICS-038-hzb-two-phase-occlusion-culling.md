@@ -32,9 +32,9 @@ Lock down the contract for extending the existing GPU-driven `CullingPass` (`Ext
 13. **Layering audit.** No live ECS access. Camera transitions are signaled through extracted snapshot fields, not direct ECS observation.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-038-Impl-A** — HZB resource + frame-graph lifetime + retained/imported policy + `contract;graphics` tests.
@@ -44,21 +44,21 @@ Lock down the contract for extending the existing GPU-driven `CullingPass` (`Ext
 - **GRAPHICS-038-Impl-E** — Opt-in `gpu;vulkan` smoke validating HZB conservatism (no over-rejection).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` with the two-phase culling shape and HZB lifetime rule.
-- Update `src/graphics/renderer/README.md` `Pass.Culling` section.
+- [ ] Update `docs/architecture/rendering-three-pass.md` with the two-phase culling shape and HZB lifetime rule.
+- [ ] Update `src/graphics/renderer/README.md` `Pass.Culling` section.
 
 ## Acceptance criteria
-- Thirteen decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- 8-bucket contract is preserved (no bucket renumbering).
-- No live ECS access. No legacy code copying.
+- [ ] Thirteen decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] 8-bucket contract is preserved (no bucket renumbering).
+- [ ] No live ECS access. No legacy code copying.
 
 ## Verification
 ```bash

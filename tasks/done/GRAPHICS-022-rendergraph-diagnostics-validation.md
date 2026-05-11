@@ -70,28 +70,28 @@ re-export from `graphics/renderer` only if needed for recipe-aware policy.
 
 Add to `Graphics.RenderGraph.Compiler.cppm`:
 
-- `enum class RenderGraphValidationSeverity : std::uint8_t { Info = 0, Warning, Error };`
-- `enum class RenderGraphValidationCode : std::uint16_t { ... }` covering at
+- [x] `enum class RenderGraphValidationSeverity : std::uint8_t { Info = 0, Warning, Error };`
+- [x] `enum class RenderGraphValidationCode : std::uint16_t { ... }` covering at
   minimum:
-  - `MissingTextureProducer`,
-  - `MissingBufferProducer`,
-  - `TransientTextureWithoutProducer`,
-  - `TransientBufferWithoutProducer`,
-  - `LoadWithoutGuaranteedWriter`,
-  - `UnauthorizedImportedTextureWrite`,
-  - `UnauthorizedImportedBufferWrite`,
-  - `BackbufferWrittenByNonFinalizer`,
-  - `ImportedTextureFinalStateMismatch`,
-  - `RenderPassColorWriteMissing` (already errors today — rewrap),
-  - `RenderPassDepthAccessMissing` (already errors today — rewrap),
-  - `CycleDetected` (already errors today — rewrap),
-  - `InvalidExplicitDependency`,
-  - `InvalidTextureAccess`,
-  - `InvalidBufferAccess`.
-- `struct RenderGraphValidationFinding { RenderGraphValidationSeverity Severity; RenderGraphValidationCode Code; std::string Message; std::uint32_t PassIndex; std::string PassName; std::uint32_t ResourceIndex; bool IsTextureResource; std::string ResourceName; };`
-- `struct RenderGraphValidationResult { std::vector<RenderGraphValidationFinding> Findings; bool HasErrors() const; bool HasWarnings() const; std::size_t CountBySeverity(RenderGraphValidationSeverity) const; };`
-- `enum class ImportedResourceWritePolicy : std::uint8_t { Disallow = 0, AllowFinalizerOnly, AllowAny };`
-- `struct ImportedResourceAuthorization { std::uint32_t ResourceIndex; bool IsTexture; ImportedResourceWritePolicy Policy; std::vector<std::string> AuthorizedWriterPassNames; };`
+  - [x] `MissingTextureProducer`,
+  - [x] `MissingBufferProducer`,
+  - [x] `TransientTextureWithoutProducer`,
+  - [x] `TransientBufferWithoutProducer`,
+  - [x] `LoadWithoutGuaranteedWriter`,
+  - [x] `UnauthorizedImportedTextureWrite`,
+  - [x] `UnauthorizedImportedBufferWrite`,
+  - [x] `BackbufferWrittenByNonFinalizer`,
+  - [x] `ImportedTextureFinalStateMismatch`,
+  - [x] `RenderPassColorWriteMissing` (already errors today — rewrap),
+  - [x] `RenderPassDepthAccessMissing` (already errors today — rewrap),
+  - [x] `CycleDetected` (already errors today — rewrap),
+  - [x] `InvalidExplicitDependency`,
+  - [x] `InvalidTextureAccess`,
+  - [x] `InvalidBufferAccess`.
+- [x] `struct RenderGraphValidationFinding { RenderGraphValidationSeverity Severity; RenderGraphValidationCode Code; std::string Message; std::uint32_t PassIndex; std::string PassName; std::uint32_t ResourceIndex; bool IsTextureResource; std::string ResourceName; };`
+- [x] `struct RenderGraphValidationResult { std::vector<RenderGraphValidationFinding> Findings; bool HasErrors() const; bool HasWarnings() const; std::size_t CountBySeverity(RenderGraphValidationSeverity) const; };`
+- [x] `enum class ImportedResourceWritePolicy : std::uint8_t { Disallow = 0, AllowFinalizerOnly, AllowAny };`
+- [x] `struct ImportedResourceAuthorization { std::uint32_t ResourceIndex; bool IsTexture; ImportedResourceWritePolicy Policy; std::vector<std::string> AuthorizedWriterPassNames; };`
 
 ### 2. New validation entry point
 
@@ -105,27 +105,27 @@ Add to the same module:
 
 Implementation lives in `Graphics.RenderGraph.Compiler.cpp`:
 
-- Build a per-resource map of (firstWritePass, lastReadPass) using the existing
+- [x] Build a per-resource map of (firstWritePass, lastReadPass) using the existing
   `TopologicalOrder` and `PassDeclarations` data, **without** changing the
   compile-time semantics. Producers are passes that write a resource; transient
   resources without any writer in `TopologicalOrder` produce an error finding.
-- LOAD-without-writer: detect attachments tagged with `LoadOp::Load` (already
+- [x] LOAD-without-writer: detect attachments tagged with `LoadOp::Load` (already
   surfaced via `RHI::RenderPassDesc` color/depth target load ops on
   `RenderPassRecord::RenderPass`) where the corresponding resource has no
   earlier writer in topological order. For imported resources whose
   `InitialState` is a "well-defined" prior-state value (e.g. `Present`), demote
   to `Info`. Otherwise emit `Warning`.
-- Imported write authorization: for each resource flagged
+- [x] Imported write authorization: for each resource flagged
   `CompiledRenderGraph::TextureImported[i]` (or `BufferImported[i]`), gather
   the set of passes that write it; if no `ImportedResourceAuthorization` is
   supplied for that resource, fall back to a default policy that only allows
   side-effect writes (`SideEffect == true`), and only writes that include
   `TextureUsage::Present`. Otherwise enforce the supplied policy.
-- Backbuffer-only-finalizer: `Backbuffer` is the imported resource whose
+- [x] Backbuffer-only-finalizer: `Backbuffer` is the imported resource whose
   recipe declaration carries `Backbuffer = true`. If the validator is given a
   `FrameRecipeIntrospection` reference (separate convenience overload, see §3),
   cross-check that only the finalizing pass writes the backbuffer.
-- Each finding records pass and resource indices/names so test assertions can
+- [x] Each finding records pass and resource indices/names so test assertions can
   match by code without comparing free-form strings.
 
 ### 3. Recipe-aware overload (in `graphics/renderer`)
@@ -149,13 +149,13 @@ recipe path a one-call ergonomic check.
 
 Adapt `RenderGraphCompiler::Compile`:
 
-- Continue returning `Core::Expected<CompiledRenderGraph>` for hard
+- [x] Continue returning `Core::Expected<CompiledRenderGraph>` for hard
   pre-execution errors that prevent producing a graph at all (cycle, invalid
   refs, missing required render-pass usages — same as today). Convert each
   existing diagnostic emission into a typed `RenderGraphValidationFinding`
   stored on a new `CompiledRenderGraph::ValidationFindings` field so callers
   can read structured failure data even when `Compile()` returned an error.
-- Preserve the old `g_LastCompileDiagnostic` thread-local for one release as a
+- [x] Preserve the old `g_LastCompileDiagnostic` thread-local for one release as a
   compatibility shim (kept truthful: it mirrors the first error finding's
   message). Schedule its removal in this task's "Forbidden changes" cleanup
   follow-up.
@@ -165,12 +165,12 @@ Adapt `RenderGraphCompiler::Compile`:
 Extend `BuildRenderGraphDebugDump(const CompiledRenderGraph&)` in
 `Graphics.RenderGraph.Compiler.cpp`:
 
-- Emit per-resource: name (if available), `imported`, `final_state`, `first_write_pass`,
+- [x] Emit per-resource: name (if available), `imported`, `final_state`, `first_write_pass`,
   `last_read_pass`, `producer_count`, `consumer_count`.
-- Emit per-pass: `queue`, `side_effect`, color targets with load/store ops,
+- [x] Emit per-pass: `queue`, `side_effect`, color targets with load/store ops,
   depth target with load/store ops, attachment formats from
   `RHI::RenderPassDesc`.
-- Format must be stable byte-for-byte across runs given identical input
+- [x] Format must be stable byte-for-byte across runs given identical input
   (sorted, no pointer addresses, no timestamps). The existing test
   `tests/integration/graphics/Test_RenderGraphPackets.cpp` will pin the new
   format with golden-string assertions; new contract tests in §6 cover the
@@ -180,90 +180,90 @@ Extend `BuildRenderGraphDebugDump(const CompiledRenderGraph&)` in
 
 Under `tests/contract/graphics/`:
 
-- `Test.RenderGraphValidation.cpp` (label `contract;graphics`):
-  - Empty graph → no findings.
-  - Pass with `LoadOp::Load` on a transient texture and no earlier writer →
+- [x] `Test.RenderGraphValidation.cpp` (label `contract;graphics`):
+  - [x] Empty graph → no findings.
+  - [x] Pass with `LoadOp::Load` on a transient texture and no earlier writer →
     one `LoadWithoutGuaranteedWriter` warning.
-  - Pass declaring only a read on a transient buffer (no writer anywhere) →
+  - [x] Pass declaring only a read on a transient buffer (no writer anywhere) →
     one `TransientBufferWithoutProducer` error.
-  - Two passes both writing imported `Backbuffer`, only one with side-effect
+  - [x] Two passes both writing imported `Backbuffer`, only one with side-effect
     finalizer → one `BackbufferWrittenByNonFinalizer` error citing the
     offending pass index.
-  - Authorized writer list: imported texture written by listed pass → no
+  - [x] Authorized writer list: imported texture written by listed pass → no
     finding; written by unlisted pass → `UnauthorizedImportedTextureWrite`.
-  - Cycle case is preserved (still `CycleDetected` error in
+  - [x] Cycle case is preserved (still `CycleDetected` error in
     `RenderGraphValidationResult` and still `Core::Err(InvalidState)` from
     `Compile`).
-  - `RenderGraphValidationFinding` ordering is stable (sorted by severity,
+  - [x] `RenderGraphValidationFinding` ordering is stable (sorted by severity,
     then code, then pass index, then resource index).
 
 Under `tests/unit/graphics/`:
 
-- `Test.RenderGraphDebugDump.cpp` (label `unit;graphics`):
-  - Golden-string test for a small recipe-driven graph (depth + scene color +
+- [x] `Test.RenderGraphDebugDump.cpp` (label `unit;graphics`):
+  - [x] Golden-string test for a small recipe-driven graph (depth + scene color +
     backbuffer present). Confirms the new attachment/load-op fields and
     sorted resource ordering.
 
 Under `tests/contract/graphics/`:
 
-- Augment `Test.FrameRecipeContract.cpp` with one test that runs
+- [x] Augment `Test.FrameRecipeContract.cpp` with one test that runs
   `ValidateRecipeCompiledGraph` against the canonical default recipe and
   asserts zero errors and zero warnings.
 
 ### 7. CMake / module surface
 
-- Add no new modules. Both new symbols live in existing `Extrinsic.Graphics.RenderGraph`
+- [x] Add no new modules. Both new symbols live in existing `Extrinsic.Graphics.RenderGraph`
   (compiler partition) and `Extrinsic.Graphics.FrameRecipe`. Update
   `src/graphics/framegraph/CMakeLists.txt` only if new `.cpp` files are
   introduced (unlikely; the new code can extend `Graphics.RenderGraph.Compiler.cpp`).
-- Update `src/graphics/renderer/CMakeLists.txt` only if a new translation
+- [x] Update `src/graphics/renderer/CMakeLists.txt` only if a new translation
   unit is added for the recipe-aware overload. Prefer keeping the helper
   inline in `Graphics.FrameRecipe.cppm` to avoid CMake churn.
-- Re-run module inventory generation (`python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`)
+- [x] Re-run module inventory generation (`python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`)
   if any new exported symbols change the surface.
 
 ## Tests
 
-- Build target: `IntrinsicTests`.
-- Default CPU gate: `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
-- New labels:
-  - `Test.RenderGraphValidation.cpp` → `contract;graphics`.
-  - `Test.RenderGraphDebugDump.cpp` → `unit;graphics`.
-- Existing `Test_RenderGraphPackets.cpp` and `Test.FrameRecipeContract.cpp`
+- [x] Build target: `IntrinsicTests`.
+- [x] Default CPU gate: `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
+- [x] New labels:
+  - [x] `Test.RenderGraphValidation.cpp` → `contract;graphics`.
+  - [x] `Test.RenderGraphDebugDump.cpp` → `unit;graphics`.
+- [x] Existing `Test_RenderGraphPackets.cpp` and `Test.FrameRecipeContract.cpp`
   must continue to pass; update their golden strings only when the new
   format requires it, and document the change in the commit message.
-- Vulkan/GPU execution remains optional and must not be required to evaluate
+- [x] Vulkan/GPU execution remains optional and must not be required to evaluate
   any new finding code path.
 
 ## Docs
 
-- Update `docs/architecture/rendering-three-pass.md` § "Validation / Audit
+- [x] Update `docs/architecture/rendering-three-pass.md` § "Validation / Audit
   Expectations" to reference the new `RenderGraphValidationResult`,
   `RenderGraphValidationCode`, and `ImportedResourceWritePolicy` types and
   the recipe-aware helper. Replace the prose mention of
   `ValidateCompiledGraph()` with the canonical signature.
-- Update `src/graphics/renderer/README.md` § "Renderer and graph" with a
+- [x] Update `src/graphics/renderer/README.md` § "Renderer and graph" with a
   paragraph describing the diagnostics surface and the recipe-aware overload.
-- Optional: cross-link this task from
+- [x] Optional: cross-link this task from
   `docs/migration/nonlegacy-parity-matrix.md` once landed (rendergraph
   diagnostics row).
 
 ## Acceptance criteria
 
-- `RenderGraphValidationResult` is the single structured surface for graph
+- [x] `RenderGraphValidationResult` is the single structured surface for graph
   diagnostics; the thread-local `g_LastCompileDiagnostic` string is either
   removed or downgraded to a documented compatibility shim with a removal
   follow-up.
-- All new validation codes are exercised by at least one CPU contract test
+- [x] All new validation codes are exercised by at least one CPU contract test
   with a deterministic finding match (severity + code + pass/resource index).
-- The default CPU CTest gate stays green; no Vulkan/GPU label is required by
+- [x] The default CPU CTest gate stays green; no Vulkan/GPU label is required by
   any new test.
-- The debug dump is byte-for-byte deterministic for fixed input and includes
+- [x] The debug dump is byte-for-byte deterministic for fixed input and includes
   attachment metadata, load/store ops, imported flags, and producer/consumer
   counts.
-- Imported-backbuffer write policy is enforced or explicitly diagnosed; the
+- [x] Imported-backbuffer write policy is enforced or explicitly diagnosed; the
   default recipe does not produce any finding.
-- Architecture and renderer-README docs reference the implemented types
+- [x] Architecture and renderer-README docs reference the implemented types
   rather than aspirational ones.
 
 ## Progress

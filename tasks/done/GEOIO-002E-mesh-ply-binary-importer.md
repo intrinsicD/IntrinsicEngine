@@ -73,86 +73,86 @@
   container.
 
 ## Required changes
-- Extend `src/geometry/Geometry.HalfedgeMesh.IO.cpp` (no `.cppm`
+- [x] Extend `src/geometry/Geometry.HalfedgeMesh.IO.cpp` (no `.cppm`
   changes):
-  - Inside the existing anonymous namespace, add small helpers:
-    - `enum class PlyFormat { Ascii, BinaryLittleEndian, BinaryBigEndian }`.
-    - `enum class PlyScalar { Int8, UInt8, Int16, UInt16, Int32, UInt32,
+  - [x] Inside the existing anonymous namespace, add small helpers:
+    - [x] `enum class PlyFormat { Ascii, BinaryLittleEndian, BinaryBigEndian }`.
+    - [x] `enum class PlyScalar { Int8, UInt8, Int16, UInt16, Int32, UInt32,
        Float32, Float64 }` plus `PlyScalarBytes(PlyScalar)` and
       `ParsePlyScalarType(std::string_view)` (token aliases match the
       legacy reference: `char/int8`, `uchar/uint8`, `short/int16`,
       `ushort/uint16`, `int/int32`, `uint/uint32`, `float/float32`,
       `double/float64`).
-    - `struct PlyProperty { std::string Name; bool IsList; PlyScalar
+    - [x] `struct PlyProperty { std::string Name; bool IsList; PlyScalar
        ScalarType; PlyScalar ListCountType; }` (for non-list properties
       `ScalarType` is the value type; for list properties `ScalarType`
       is the element type and `ListCountType` is the count type).
-    - `struct PlyElement { std::string Name; std::size_t Count;
+    - [x] `struct PlyElement { std::string Name; std::size_t Count;
        std::vector<PlyProperty> Properties; }`.
-    - `void ByteSwap(std::byte*, std::size_t)`.
-    - `template <typename T> T ReadScalarAs(const std::byte*& cursor,
+    - [x] `void ByteSwap(std::byte*, std::size_t)`.
+    - [x] `template <typename T> T ReadScalarAs(const std::byte*& cursor,
        PlyScalar, bool bigEndian)` decoding the scalar via
       `std::memcpy` + optional byte-swap, then casting through the
       declared type to `T`.
-  - Refactor `LoadPLY` to:
-    - Read the file once via `ReadTextFile`.
-    - Parse the header into a `PlyFormat` and `std::vector<PlyElement>`,
+  - [x] Refactor `LoadPLY` to:
+    - [x] Read the file once via `ReadTextFile`.
+    - [x] Parse the header into a `PlyFormat` and `std::vector<PlyElement>`,
       tracking the absolute byte offset of the first byte after the
       `end_header` line. Reject malformed `format`/`element`/`property`
       lines as `InvalidMeshFormat`.
-    - Dispatch ASCII to a `ParseAsciiPLY` helper that contains the
+    - [x] Dispatch ASCII to a `ParseAsciiPLY` helper that contains the
       existing ASCII vertex/face parsing logic byte-for-byte, keyed by
       the `vertex` and `face` element counts.
-    - Dispatch binary little/big-endian to a `ParseBinaryPLY` helper
+    - [x] Dispatch binary little/big-endian to a `ParseBinaryPLY` helper
       that walks elements in declaration order, reads x/y/z floats from
       the `vertex` element (locating their property indices and using a
       fixed per-row stride computed from all scalar properties),
       streams the `face` element row-by-row to read the
       `vertex_indices`/`vertex_index` list, and skips other elements
       whose properties are all scalars.
-  - Diagnostics: return `InvalidMeshFormat()` (i.e.
+  - [x] Diagnostics: return `InvalidMeshFormat()` (i.e.
     `Core::ErrorCode::InvalidFormat`) for missing format line, missing
     `end_header`, missing/zero-count `vertex` or `face` element,
     missing/non-`float` x/y/z, unsupported list property in a vertex
     element, missing `vertex_indices`/`vertex_index` list in the face
     element, face indices out of range, lists with a count below 3, or
     truncated/oversized binary bodies.
-- Do not change importer behavior for OBJ/OFF/STL, do not introduce new
+- [x] Do not change importer behavior for OBJ/OFF/STL, do not introduce new
   module imports, and do not touch any file outside
   `src/geometry/Geometry.HalfedgeMesh.IO.cpp`,
   `tests/unit/geometry/Test.GeometryIO.cpp`, and `tasks/`.
-- Public module surface (`Geometry.HalfedgeMesh.IO.cppm`) does not
+- [x] Public module surface (`Geometry.HalfedgeMesh.IO.cppm`) does not
   change; the inventory should remain identical apart from the
   regeneration date (matches `GEOIO-002B`/`C`/`D` precedent).
 
 ## Tests
-- Add focused `unit;geometry` coverage to
+- [x] Add focused `unit;geometry` coverage to
   `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - `LoadsBinaryLittleEndianPLYTriangle`: build a fixture with the
+  - [x] `LoadsBinaryLittleEndianPLYTriangle`: build a fixture with the
     canonical mesh-PLY binary little-endian header (`property float x`,
     `property float y`, `property float z`,
     `property list uchar int vertex_indices`) and one triangle; load
     via `LoadPLY` and assert `ExpectTriangleMeshProperties(*result)`.
-  - `LoadsBinaryBigEndianPLYTriangle`: same vertex layout but byte-swap
+  - [x] `LoadsBinaryBigEndianPLYTriangle`: same vertex layout but byte-swap
     the float positions and the four-byte indices, with
     `format binary_big_endian 1.0`.
-  - `LoadsBinaryLittleEndianPLYQuad`: list count `4` -> face arity
+  - [x] `LoadsBinaryLittleEndianPLYQuad`: list count `4` -> face arity
     preserved (4 indices); used to confirm the binary face-list reader
     does not silently truncate non-triangular faces.
-  - `LoadsBinaryLittleEndianPLYWithExtraVertexProperties`: vertex
+  - [x] `LoadsBinaryLittleEndianPLYWithExtraVertexProperties`: vertex
     layout has `float x`, `float y`, `float z`, `uchar red`,
     `uchar green`, `uchar blue` (color bytes are skipped via stride);
     confirms positions parse correctly when extra scalars are present
     after x/y/z.
-  - `LoadPLYRejectsTruncatedBinaryBody`: header advertises
+  - [x] `LoadPLYRejectsTruncatedBinaryBody`: header advertises
     `vertex 2`/`face 1` but the body only contains one vertex worth of
     bytes; expect `Core::ErrorCode::InvalidFormat`.
-  - `LoadPLYRejectsBinaryFaceListBelowThree`: face list count is `2`;
+  - [x] `LoadPLYRejectsBinaryFaceListBelowThree`: face list count is `2`;
     expect `Core::ErrorCode::InvalidFormat`.
-  - `LoadsAsciiPLYAfterBinaryDispatch`: regression — the existing ASCII
+  - [x] `LoadsAsciiPLYAfterBinaryDispatch`: regression — the existing ASCII
     fixture (`LoadsASCIIPLYTriangle`) must continue to round-trip
     through the refactored dispatch path.
-- Helper: add a `WriteBinaryPLYFixture` test fixture writer that takes
+- [x] Helper: add a `WriteBinaryPLYFixture` test fixture writer that takes
   positions, faces (as `std::vector<std::uint32_t>` lists), an optional
   vertex-color array, and an endianness flag. The writer emits the
   ASCII header up to `end_header\n`, then writes the binary body via
@@ -162,32 +162,32 @@
   the four-byte indices manually before writing.
 
 ## Docs
-- Update `docs/api/generated/module_inventory.md` only if module
+- [x] Update `docs/api/generated/module_inventory.md` only if module
   surfaces change in a way the generator picks up
   (`python3 tools/repo/generate_module_inventory.py --root src --out
   docs/api/generated/module_inventory.md`). Adding internal helpers and
   expanding a function body is not expected to change the inventory; if
   the regenerator only changes the date, leave it untouched (matches
   `GEOIO-002B`/`C`/`D` precedent).
-- No additional architecture/migration doc edits required for this
+- [x] No additional architecture/migration doc edits required for this
   slice; parity-matrix updates remain part of the parent `GEOIO-002`
   task once asset/runtime routing actually drops the legacy graphics
   importers.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::LoadPLY` returns a populated `MeshIOResult` for
+- [x] `Geometry::MeshIO::LoadPLY` returns a populated `MeshIOResult` for
   well-formed binary little-endian and binary big-endian PLY mesh
   fixtures, with positions equal to the input vertices and face indices
   matching the input list.
-- `LoadPLY` continues to accept ASCII PLY fixtures (existing
+- [x] `LoadPLY` continues to accept ASCII PLY fixtures (existing
   `LoadsASCIIPLYTriangle` and `LoadsAsciiPLYAfterBinaryDispatch`
   regression both pass).
-- A truncated or malformed binary payload produces
+- [x] A truncated or malformed binary payload produces
   `Core::ErrorCode::InvalidFormat` rather than out-of-bounds reads or
   partial parses.
-- `src/geometry/*` imports remain layered (`geometry -> core` only); no
+- [x] `src/geometry/*` imports remain layered (`geometry -> core` only); no
   new asset/runtime/graphics imports introduced.
-- Existing `LoadOBJ`/`LoadOFF`/`LoadSTL`,
+- [x] Existing `LoadOBJ`/`LoadOFF`/`LoadSTL`,
   `PointCloudIO`/`GraphIO`, and all `Write*` tests continue to pass.
 
 ## Verification

@@ -19,33 +19,33 @@
 - Common PCD producers, including PCL-style files, encode color as a single 32-bit `rgb` or `rgba` scalar whose bits are `0xAARRGGBB`/`0x00RRGGBB`; ASCII files often print the same bits through a `float` field.
 
 ## Required changes
-- `src/geometry/Geometry.PointCloud.IO.cpp`:
-  - Add helpers that recognize supported packed PCD color fields (`COUNT 1`, `SIZE 4`, `TYPE F|I|U`).
-  - Decode packed `rgb` as opaque `0x00RRGGBB` and packed `rgba` as `0xAARRGGBB` into the existing `glm::vec4` point color storage.
-  - Preserve existing separate `r g b` behavior and prefer separate channels when both channel styles are present.
-  - Preserve signed 32-bit `TYPE I` packed color fields as raw color bit patterns so high-bit alpha/channel values are not rejected.
-  - Reject malformed packed color payloads with the existing `Core::ErrorCode::InvalidFormat` path.
-- `tests/unit/geometry/Test.GeometryIO.cpp`:
-  - Add `unit;geometry` coverage for ASCII PCD `TYPE F` packed `rgb` import.
-  - Add `unit;geometry` coverage for ASCII PCD `TYPE I` packed `rgba` import with the high bit set.
-  - Add `unit;geometry` coverage for binary PCD `TYPE U` packed `rgba` import.
+- [x] `src/geometry/Geometry.PointCloud.IO.cpp`:
+  - [x] Add helpers that recognize supported packed PCD color fields (`COUNT 1`, `SIZE 4`, `TYPE F|I|U`).
+  - [x] Decode packed `rgb` as opaque `0x00RRGGBB` and packed `rgba` as `0xAARRGGBB` into the existing `glm::vec4` point color storage.
+  - [x] Preserve existing separate `r g b` behavior and prefer separate channels when both channel styles are present.
+  - [x] Preserve signed 32-bit `TYPE I` packed color fields as raw color bit patterns so high-bit alpha/channel values are not rejected.
+  - [x] Reject malformed packed color payloads with the existing `Core::ErrorCode::InvalidFormat` path.
+- [x] `tests/unit/geometry/Test.GeometryIO.cpp`:
+  - [x] Add `unit;geometry` coverage for ASCII PCD `TYPE F` packed `rgb` import.
+  - [x] Add `unit;geometry` coverage for ASCII PCD `TYPE I` packed `rgba` import with the high bit set.
+  - [x] Add `unit;geometry` coverage for binary PCD `TYPE U` packed `rgba` import.
 
 ## Tests
-- Added `GeometryIO_PointCloudIO.LoadsASCIIPCDWithPackedFloatRgb`.
-- Added `GeometryIO_PointCloudIO.LoadsASCIIPCDWithSignedPackedRgba`.
-- Added `GeometryIO_PointCloudIO.LoadsBinaryPCDPointCloudWithPackedRgba`.
-- Existing PCD tests continue to cover separate `r g b` fields, normals, extra scalar skipping, width/height point count fallback, truncated binary bodies, and unsupported `binary_compressed` rejection.
+- [x] Added `GeometryIO_PointCloudIO.LoadsASCIIPCDWithPackedFloatRgb`.
+- [x] Added `GeometryIO_PointCloudIO.LoadsASCIIPCDWithSignedPackedRgba`.
+- [x] Added `GeometryIO_PointCloudIO.LoadsBinaryPCDPointCloudWithPackedRgba`.
+- [x] Existing PCD tests continue to cover separate `r g b` fields, normals, extra scalar skipping, width/height point count fallback, truncated binary bodies, and unsupported `binary_compressed` rejection.
 
 ## Docs
-- Updated `docs/migration/nonlegacy-parity-matrix.md` to record PCD packed `rgb`/`rgba` import parity under `GEOIO-002V`.
-- No `docs/api/generated/module_inventory.md` refresh required because no public module declarations, module files, or exported names changed.
+- [x] Updated `docs/migration/nonlegacy-parity-matrix.md` to record PCD packed `rgb`/`rgba` import parity under `GEOIO-002V`.
+- [x] No `docs/api/generated/module_inventory.md` refresh required because no public module declarations, module files, or exported names changed.
 
 ## Acceptance criteria
-- ASCII PCD import decodes packed float `rgb` colors into normalized point colors.
-- Binary PCD import decodes packed integer `rgba` colors, including alpha, into normalized point colors.
-- Separate `r g b` field import remains unchanged and takes precedence if both representations are present.
-- `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
-- The migration matrix records the new parity evidence.
+- [x] ASCII PCD import decodes packed float `rgb` colors into normalized point colors.
+- [x] Binary PCD import decodes packed integer `rgba` colors, including alpha, into normalized point colors.
+- [x] Separate `r g b` field import remains unchanged and takes precedence if both representations are present.
+- [x] `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.
+- [x] The migration matrix records the new parity evidence.
 
 ## Verification
 ```bash

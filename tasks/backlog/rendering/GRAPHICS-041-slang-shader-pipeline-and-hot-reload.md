@@ -32,9 +32,9 @@ Lock down the contract for adopting Slang as the canonical shading language acro
 12. **Layering.** `graphics/` does not import the Slang compiler at runtime. `runtime/` owns the file watcher and compiler invocation. Reflection data is consumed in graphics; the compiler is not.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-041-Impl-A** — `tools/shader-compile/` Slang invocation + CMake integration + offline-deps cache update.
@@ -44,21 +44,21 @@ Lock down the contract for adopting Slang as the canonical shading language acro
 - **GRAPHICS-041-Impl-E** — `differentiable` annotation policy + paired kernel naming convention (no consumers; reserved for `GRAPHICS-051`).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/graphics.md` shader-pipeline section.
-- Update `src/graphics/renderer/README.md` material-shader section.
-- Update `cmake/Dependencies.cmake` doc only when Impl-A lands; no edits in planning slice.
+- [ ] Update `docs/architecture/graphics.md` shader-pipeline section.
+- [ ] Update `src/graphics/renderer/README.md` material-shader section.
+- [ ] Update `cmake/Dependencies.cmake` doc only when Impl-A lands; no edits in planning slice.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Default CI build buildability without Slang is preserved through cached SPIR-V in `external/cache/`.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Default CI build buildability without Slang is preserved through cached SPIR-V in `external/cache/`.
 
 ## Verification
 ```bash

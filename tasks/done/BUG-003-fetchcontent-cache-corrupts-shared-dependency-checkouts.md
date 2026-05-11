@@ -20,24 +20,24 @@
 - Impact: `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicTests`, sanitizer configure, and benchmark build retries can fail before engine code is compiled.
 
 ## Required changes
-- Audit `cmake/Dependencies.cmake` FetchContent population into `external/cache/` for lock/atomicity and completeness checks.
-- Add dependency source-tree validation for header-only/content dependencies before `FetchContent_MakeAvailable` treats cached directories as valid.
-- Ensure failed clone/populate attempts either clean their partial `<name>-src` directory or fail with a deterministic recovery message.
-- Decide whether local/manual CI retry scripts should use isolated build/cache directories and document that policy if required.
+- [x] Audit `cmake/Dependencies.cmake` FetchContent population into `external/cache/` for lock/atomicity and completeness checks.
+- [x] Add dependency source-tree validation for header-only/content dependencies before `FetchContent_MakeAvailable` treats cached directories as valid.
+- [x] Ensure failed clone/populate attempts either clean their partial `<name>-src` directory or fail with a deterministic recovery message.
+- [x] Decide whether local/manual CI retry scripts should use isolated build/cache directories and document that policy if required.
 
 ## Tests
-- Add a focused dependency-cache regression test or script-level check that simulates an incomplete dependency directory and verifies configure fails deterministically or repairs it.
-- Re-run the default configure/build/test gate after clearing the corrupted dependency directories.
+- [x] Add a focused dependency-cache regression test or script-level check that simulates an incomplete dependency directory and verifies configure fails deterministically or repairs it.
+- [x] Re-run the default configure/build/test gate after clearing the corrupted dependency directories.
 
 ## Docs
-- Update `docs/build-troubleshooting.md` with safe recovery steps for partial `external/cache/*-src` checkouts.
-- Update dependency tooling docs if `INTRINSIC_OFFLINE_DEPS` or cache-validation semantics change.
+- [x] Update `docs/build-troubleshooting.md` with safe recovery steps for partial `external/cache/*-src` checkouts.
+- [x] Update dependency tooling docs if `INTRINSIC_OFFLINE_DEPS` or cache-validation semantics change.
 
 ## Acceptance criteria
-- A missing required dependency file such as `external/cache/glm-src/glm/glm.hpp` or `external/cache/volk-src/volk.h` is detected before a long compile/generate phase.
-- Re-running configure after a failed dependency clone does not leave Git lock/ref corruption as the primary error.
-- Recovery instructions are clear for both online and `INTRINSIC_OFFLINE_DEPS=ON` workflows.
-- The fix preserves centralized dependency declarations in `cmake/Dependencies.cmake` and does not introduce layer violations.
+- [x] A missing required dependency file such as `external/cache/glm-src/glm/glm.hpp` or `external/cache/volk-src/volk.h` is detected before a long compile/generate phase.
+- [x] Re-running configure after a failed dependency clone does not leave Git lock/ref corruption as the primary error.
+- [x] Recovery instructions are clear for both online and `INTRINSIC_OFFLINE_DEPS=ON` workflows.
+- [x] The fix preserves centralized dependency declarations in `cmake/Dependencies.cmake` and does not introduce layer violations.
 
 ## Verification
 ```bash

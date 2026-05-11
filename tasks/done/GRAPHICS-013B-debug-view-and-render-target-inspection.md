@@ -19,22 +19,22 @@
 - Owner: renderer debug visualization seams and framegraph-readable resource metadata.
 - Focus is inspection and diagnostics, not effect execution.
 ## Required changes
-- Own and specify:
-  - debug-view sampled-resource selection
-  - render-target inspection hooks
-  - debug preview output
-  - diagnostics for missing sampled resources
-- Define deterministic behavior for unavailable, invalid, or incompatible debug-view resource selections.
+- [x] Own and specify:
+  - [x] debug-view sampled-resource selection
+  - [x] render-target inspection hooks
+  - [x] debug preview output
+  - [x] diagnostics for missing sampled resources
+- [x] Define deterministic behavior for unavailable, invalid, or incompatible debug-view resource selections.
 ## Tests
-- Add `contract;graphics` tests for debug-view selection semantics and preview-output pass contract behavior.
-- Add `unit;graphics` tests for deterministic diagnostic and inspection dump formatting.
-- Keep GPU/Vulkan debug visualization smoke checks optional.
+- [x] Add `contract;graphics` tests for debug-view selection semantics and preview-output pass contract behavior.
+- [x] Add `unit;graphics` tests for deterministic diagnostic and inspection dump formatting.
+- [x] Keep GPU/Vulkan debug visualization smoke checks optional.
 ## Docs
-- Update debug-view and inspection contract docs where applicable.
+- [x] Update debug-view and inspection contract docs where applicable.
 ## Acceptance criteria
-- Debug-view resource selection and fallback behavior are deterministic and testable.
-- Missing sampled-resource cases emit structured diagnostics.
-- Inspection hooks avoid coupling debug features to platform/window ownership.
+- [x] Debug-view resource selection and fallback behavior are deterministic and testable.
+- [x] Missing sampled-resource cases emit structured diagnostics.
+- [x] Inspection hooks avoid coupling debug features to platform/window ownership.
 ## Verification
 ```bash
 cmake --preset ci

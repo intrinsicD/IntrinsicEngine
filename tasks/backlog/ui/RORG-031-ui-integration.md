@@ -11,17 +11,17 @@
 - Legacy backlog includes UI-facing requirements (view settings, inspector/undo-redo integration, operator accessibility) that need explicit task tracking.
 
 ## Required changes
-- Track UI integration seams tied to runtime/renderer composition.
-- Track undo/redo wiring and panel ownership as explicit follow-on tasks.
+- [ ] Track UI integration seams tied to runtime/renderer composition.
+- [ ] Track undo/redo wiring and panel ownership as explicit follow-on tasks.
 
 ## Tests
-- Ensure task structure compliance.
+- [ ] Ensure task structure compliance.
 
 ## Docs
-- Keep UI-related architecture and migration docs synchronized when execution begins.
+- [ ] Keep UI-related architecture and migration docs synchronized when execution begins.
 
 ## Acceptance criteria
-- UI backlog exists as a structured task file under `tasks/backlog/ui/`.
+- [ ] UI backlog exists as a structured task file under `tasks/backlog/ui/`.
 
 ## Verification
 ```bash

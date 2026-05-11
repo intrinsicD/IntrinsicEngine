@@ -31,9 +31,9 @@ Lock down the contract for an optional Neural Radiance Cache (NRC) slot in the G
 12. **Performance bound.** NRC inference must complete within a recipe-defined fraction of the GI budget; exceedance is a diagnostic signal, not a correctness failure.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-049-Impl-A** — MLP weight buffer + inference kernel (frozen weights) + `unit` numerics tests.
@@ -43,21 +43,21 @@ Lock down the contract for an optional Neural Radiance Cache (NRC) slot in the G
 - **GRAPHICS-049-Impl-E** — Opt-in `gpu;vulkan` smoke on a frozen-weights checkpoint.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` GI section with the NRC slot.
-- Update `src/graphics/renderer/README.md` GI-pass section.
+- [ ] Update `docs/architecture/rendering-three-pass.md` GI section with the NRC slot.
+- [ ] Update `src/graphics/renderer/README.md` GI-pass section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- `NrcKind::Disabled` is the unconditional default.
-- No vendor SDK imports.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] `NrcKind::Disabled` is the unconditional default.
+- [ ] No vendor SDK imports.
 
 ## Verification
 ```bash

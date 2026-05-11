@@ -20,27 +20,27 @@ roots under `src/{core,assets,ecs,geometry,graphics,platform,runtime,app}`.
 
 ## Required changes
 
-- Add `docs/migration/nonlegacy-parity-matrix.md`.
-- Link the matrix from migration documentation indexes.
-- Reference legacy module names only as replacement targets.
+- [x] Add `docs/migration/nonlegacy-parity-matrix.md`.
+- [x] Link the matrix from migration documentation indexes.
+- [x] Reference legacy module names only as replacement targets.
 
 ## Tests
 
-- Run module inventory freshness check.
-- Run strict markdown link validation.
+- [x] Run module inventory freshness check.
+- [x] Run strict markdown link validation.
 
 ## Docs
 
-- Update `docs/migration/index.md`.
-- Update `docs/index.md`.
+- [x] Update `docs/migration/index.md`.
+- [x] Update `docs/index.md`.
 
 ## Acceptance criteria
 
-- The matrix lists current modules, likely legacy subsystem replaced, missing or
+- [x] The matrix lists current modules, likely legacy subsystem replaced, missing or
   unproven behavior, required tests, and retirement blocker for each promoted
   subsystem.
-- No `src/legacy/` files are modified.
-- No semantic code changes are made.
+- [x] No `src/legacy/` files are modified.
+- [x] No semantic code changes are made.
 
 ## Verification
 

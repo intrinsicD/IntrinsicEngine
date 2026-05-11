@@ -32,9 +32,9 @@ Lock down the contract for partitioning frame-graph passes across multiple GPU q
 12. **Layering audit.** `graphics/framegraph` does not import `vulkan/*`. Queue-family selection lives in `graphics/vulkan`. `QueueAffinity` is RHI-level.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-037-Impl-A** — `QueueAffinity` enum + RHI surface + null-queue mocks + `contract;graphics` partitioning tests.
@@ -43,23 +43,23 @@ Lock down the contract for partitioning frame-graph passes across multiple GPU q
 - **GRAPHICS-037-Impl-D** — Vulkan recording bodies + opt-in `gpu;vulkan` smoke (gated by `GRAPHICS-033`).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
-- Optional GPU smoke (after Impl-D): `-L 'gpu|vulkan'`.
+- [ ] Optional GPU smoke (after Impl-D): `-L 'gpu|vulkan'`.
 
 ## Docs
-- Update `docs/architecture/graphics.md` to record the multi-queue scheduling rule and the queue-family policy.
-- Update `src/graphics/framegraph/README.md` with `QueueAffinity` semantics.
-- Update `tasks/backlog/rendering/README.md` DAG.
+- [ ] Update `docs/architecture/graphics.md` to record the multi-queue scheduling rule and the queue-family policy.
+- [ ] Update `src/graphics/framegraph/README.md` with `QueueAffinity` semantics.
+- [ ] Update `tasks/backlog/rendering/README.md` DAG.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- No new dependency edges.
-- Single-queue compile path remains the unconditional default until Impl-D ships.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] No new dependency edges.
+- [ ] Single-queue compile path remains the unconditional default until Impl-D ships.
 
 ## Verification
 ```bash

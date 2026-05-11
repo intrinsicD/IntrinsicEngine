@@ -31,9 +31,9 @@ Lock down the contract for a 3D Gaussian Splatting (3DGS) rasterizer pass that c
 12. **Layering.** No live ECS. `assets/` owns `.ply` / `.splat` ingest; graphics consumes `.gsplat` only.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-048-Impl-A** — Extended point record + `.gsplat` asset format + `assets/` ingest + `unit` tests.
@@ -43,22 +43,22 @@ Lock down the contract for a 3D Gaussian Splatting (3DGS) rasterizer pass that c
 - **GRAPHICS-048-Impl-E** — Opt-in `gpu;vulkan` golden-image test on a small known scene.
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` to record 3DGS as a peer primitive.
-- Update `src/graphics/renderer/README.md` primitive section.
-- Update `docs/architecture/graphics.md` primitive ownership.
+- [ ] Update `docs/architecture/rendering-three-pass.md` to record 3DGS as a peer primitive.
+- [ ] Update `src/graphics/renderer/README.md` primitive section.
+- [ ] Update `docs/architecture/graphics.md` primitive ownership.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- 8-bucket lane contract preserved.
-- Existing `PointCloud` primitive lifecycle unchanged for non-Gaussian clouds.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] 8-bucket lane contract preserved.
+- [ ] Existing `PointCloud` primitive lifecycle unchanged for non-Gaussian clouds.
 
 ## Verification
 ```bash

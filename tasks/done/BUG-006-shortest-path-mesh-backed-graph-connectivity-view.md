@@ -20,24 +20,24 @@
 - Root cause: mesh-backed graph view construction also passed edge and halfedge property sets in the wrong order in tests/UI call sites.
 
 ## Required changes
-- Fix mesh-backed graph view construction to pass `VertexProperties`, `HalfedgeProperties`, then `EdgeProperties` in `Graph::Graph` constructor order.
-- Let `Geometry::Graph::Graph::EnsureProperties()` create graph-specific compatibility connectivity properties when it detects mesh connectivity properties with colliding names.
-- Keep the compatibility-copy fix small and defer the shared-connectivity semantic migration to `GEOM-003`.
+- [x] Fix mesh-backed graph view construction to pass `VertexProperties`, `HalfedgeProperties`, then `EdgeProperties` in `Graph::Graph` constructor order.
+- [x] Let `Geometry::Graph::Graph::EnsureProperties()` create graph-specific compatibility connectivity properties when it detects mesh connectivity properties with colliding names.
+- [x] Keep the compatibility-copy fix small and defer the shared-connectivity semantic migration to `GEOM-003`.
 
 ## Tests
-- Rebuild geometry and aggregate tests.
-- Run focused `ShortestPath` tests.
-- Run the default CPU-supported CTest gate.
+- [x] Rebuild geometry and aggregate tests.
+- [x] Run focused `ShortestPath` tests.
+- [x] Run the default CPU-supported CTest gate.
 
 ## Docs
-- Add this completion task.
-- Add the long-term connectivity split task `GEOM-003`.
+- [x] Add this completion task.
+- [x] Add the long-term connectivity split task `GEOM-003`.
 
 ## Acceptance criteria
-- Mesh-backed `ShortestPath` tests no longer abort.
-- Full default CPU-supported CTest gate passes.
-- No new cross-layer dependency is introduced.
-- Temporary compatibility behavior has a tracked follow-up (`GEOM-003`).
+- [x] Mesh-backed `ShortestPath` tests no longer abort.
+- [x] Full default CPU-supported CTest gate passes.
+- [x] No new cross-layer dependency is introduced.
+- [x] Temporary compatibility behavior has a tracked follow-up (`GEOM-003`).
 
 ## Verification
 ```bash

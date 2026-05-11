@@ -42,20 +42,20 @@ Implement and test the rendergraph diagnostics surface required by the canonical
 
 ## Tests
 
-- Add `contract;graphics` tests for validation diagnostics.
-- Add `unit;graphics` tests for deterministic debug dump formatting if appropriate.
-- Do not require Vulkan.
+- [x] Add `contract;graphics` tests for validation diagnostics.
+- [x] Add `unit;graphics` tests for deterministic debug dump formatting if appropriate.
+- [x] Do not require Vulkan.
 
 ## Docs
 
-- Update `docs/architecture/rendering-three-pass.md` validation/audit section.
-- Update `src/graphics/renderer/README.md` if public APIs change.
+- [x] Update `docs/architecture/rendering-three-pass.md` validation/audit section.
+- [x] Update `src/graphics/renderer/README.md` if public APIs change.
 
 ## Acceptance criteria
 
-- Rendergraph diagnostics are testable without Vulkan.
-- Invalid graphs fail deterministically.
-- The imported backbuffer write policy is enforced or explicitly represented in diagnostics.
+- [x] Rendergraph diagnostics are testable without Vulkan.
+- [x] Invalid graphs fail deterministically.
+- [x] The imported backbuffer write policy is enforced or explicitly represented in diagnostics.
 
 ## Verification
 

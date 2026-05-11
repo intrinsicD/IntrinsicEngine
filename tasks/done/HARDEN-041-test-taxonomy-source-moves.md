@@ -12,30 +12,30 @@ Move remaining wrapper test sources from legacy subsystem directories into the c
 HARDEN-040 completed the audit of non-taxonomic test directories and mapped concrete follow-up actions for source movement. This task performs only the mechanical source relocation and associated CMake list path rewires needed to keep builds/tests equivalent.
 
 ## Required changes
-- Move wrapper test `*.cpp` files from:
-  - `tests/Asset/`
-  - `tests/Core/`
-  - `tests/ECS/`
-  - `tests/Graphics/`
-  - `tests/Runtime/`
+- [x] Move wrapper test `*.cpp` files from:
+  - [x] `tests/Asset/`
+  - [x] `tests/Core/`
+  - [x] `tests/ECS/`
+  - [x] `tests/Graphics/`
+  - [x] `tests/Runtime/`
   into canonical taxonomy roots:
-  - `tests/unit/`
-  - `tests/contract/`
-  - `tests/integration/`
+  - [x] `tests/unit/`
+  - [x] `tests/contract/`
+  - [x] `tests/integration/`
   according to the mapping recorded in `docs/reports/test-taxonomy-audit-2026-04-29.md`.
-- Update affected `tests/CMakeLists.txt` (and subordinate CMake files if present) to point to relocated files.
-- Keep target names and labels stable unless a taxonomy-only rename is explicitly required by the audit mapping.
-- Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-041.
+- [x] Update affected `tests/CMakeLists.txt` (and subordinate CMake files if present) to point to relocated files.
+- [x] Keep target names and labels stable unless a taxonomy-only rename is explicitly required by the audit mapping.
+- [x] Update `tasks/done/0001-post-reorganization-hardening-tracker.md` status/evidence for HARDEN-041.
 
 ## Tests
-- `cmake --build --preset ci --target IntrinsicTests`
-- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
-- `python3 tools/agents/check_task_policy.py --root . --strict`
-- `python3 tools/docs/check_doc_links.py --root . --strict`
+- [x] `cmake --build --preset ci --target IntrinsicTests`
+- [x] `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict`
 
 ## Docs
-- Update hardening tracker status board and evidence log for HARDEN-041.
-- Keep links to the HARDEN-040 audit report current.
+- [x] Update hardening tracker status board and evidence log for HARDEN-041.
+- [x] Keep links to the HARDEN-040 audit report current.
 
 ## Acceptance criteria
 - [x] Wrapper source files are relocated from old subsystem directories into taxonomy directories per HARDEN-040 mapping.

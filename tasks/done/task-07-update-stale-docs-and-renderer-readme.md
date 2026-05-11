@@ -18,33 +18,33 @@ Align rendering docs and renderer README with the current agent contract and str
 
 ## Required changes
 
-1. Update `docs/architecture/rendering-three-pass.md`:
-   - Replace stale "Where Active Work Lives" reference to `tasks/backlog/legacy-todo.md` with `tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md` and `tasks/backlog/rendering/README.md`.
-   - Keep `docs/roadmap.md` for medium/long horizon only.
+- [x] Update `docs/architecture/rendering-three-pass.md`:
+   - [x] Replace stale "Where Active Work Lives" reference to `tasks/backlog/legacy-todo.md` with `tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md` and `tasks/backlog/rendering/README.md`.
+   - [x] Keep `docs/roadmap.md` for medium/long horizon only.
 
-2. Update `docs/roadmap.md`:
-   - Remove or rewrite stale references to `tasks/backlog/legacy-todo.md` anchors such as B4, C4, C9 where those anchors no longer exist.
-   - Point rendering execution work to structured GRAPHICS tasks.
-   - Keep roadmap language high-level and future-facing.
+- [x] Update `docs/roadmap.md`:
+   - [x] Remove or rewrite stale references to `tasks/backlog/legacy-todo.md` anchors such as B4, C4, C9 where those anchors no longer exist.
+   - [x] Point rendering execution work to structured GRAPHICS tasks.
+   - [x] Keep roadmap language high-level and future-facing.
 
-3. Update `src/graphics/renderer/README.md`:
-   - Remove or rewrite any claim that graphics may depend on ECS ownership/contracts.
-   - State the current intended boundary:
-     - runtime owns ECS access and extraction;
-     - graphics consumes immutable snapshots/views and owns GPU resource/state transitions;
-     - graphics/rendergraph must not import live ECS or runtime ownership.
-   - Update architecture references to include:
-     - `AGENTS.md`
-     - `docs/architecture/graphics.md`
-     - `docs/architecture/rendering-three-pass.md`
-     - `docs/migration/nonlegacy-parity-matrix.md`
-   - Keep historical docs clearly labeled as historical/advisory if referenced.
+- [x] Update `src/graphics/renderer/README.md`:
+   - [x] Remove or rewrite any claim that graphics may depend on ECS ownership/contracts.
+   - [x] State the current intended boundary:
+     - [x] runtime owns ECS access and extraction;
+     - [x] graphics consumes immutable snapshots/views and owns GPU resource/state transitions;
+     - [x] graphics/rendergraph must not import live ECS or runtime ownership.
+   - [x] Update architecture references to include:
+     - [x] `AGENTS.md`
+     - [x] `docs/architecture/graphics.md`
+     - [x] `docs/architecture/rendering-three-pass.md`
+     - [x] `docs/migration/nonlegacy-parity-matrix.md`
+   - [x] Keep historical docs clearly labeled as historical/advisory if referenced.
 
 ## Acceptance criteria
 
-- No active rendering doc sends agents to `legacy-todo.md` for near-term execution.
-- renderer README no longer contradicts `AGENTS.md`.
-- Historical docs are labeled as historical/advisory when linked.
+- [x] No active rendering doc sends agents to `legacy-todo.md` for near-term execution.
+- [x] renderer README no longer contradicts `AGENTS.md`.
+- [x] Historical docs are labeled as historical/advisory when linked.
 
 ## Verification
 

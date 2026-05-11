@@ -57,3 +57,4 @@ All new task files should be based on templates in `tasks/templates/` and includ
 - Keep each task small and scoped whenever possible.
 - Do not mix mechanical file moves with semantic refactors.
 - Keep task descriptions factual and testable.
+- Use markable checkbox todos in actionable sections (`Required changes`, `Tests`, `Docs`, and `Acceptance criteria`): `- [ ]` for open work and `- [x]` in completed task records. Keep context, non-goals, and forbidden changes as plain bullets.

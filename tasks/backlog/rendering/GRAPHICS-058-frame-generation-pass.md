@@ -31,9 +31,9 @@ Lock down the contract for an optional frame-generation pass that synthesizes in
 12. **Determinism mode.** A "no frame-gen" recipe flag for golden-image tests.
 
 ## Required changes
-- Capture the design decisions above as explicit recorded answers with trade-off rationales.
-- Cross-link upstream and downstream tasks enumerated in Context.
-- Identify follow-up implementation children below; do **not** open them in this slice.
+- [ ] Capture the design decisions above as explicit recorded answers with trade-off rationales.
+- [ ] Cross-link upstream and downstream tasks enumerated in Context.
+- [ ] Identify follow-up implementation children below; do **not** open them in this slice.
 
 ## Implementation child slices (named, not opened)
 - **GRAPHICS-058-Impl-A** — `IFrameGenerator` interface + reference motion-blend interpolator + `contract;graphics` tests.
@@ -41,21 +41,21 @@ Lock down the contract for an optional frame-generation pass that synthesizes in
 - **GRAPHICS-058-Impl-C** — Optional vendor backend hookpoints (one child per vendor; opened only when actually integrated).
 
 ## Tests
-- Planning slice: validators only.
-- Verification gate (CPU-only):
+- [ ] Planning slice: validators only.
+- [ ] Verification gate (CPU-only):
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- Update `docs/architecture/rendering-three-pass.md` post-process / present section.
-- Update `src/graphics/renderer/README.md` reconstructor / frame-gen section.
+- [ ] Update `docs/architecture/rendering-three-pass.md` post-process / present section.
+- [ ] Update `src/graphics/renderer/README.md` reconstructor / frame-gen section.
 
 ## Acceptance criteria
-- Twelve decisions are recorded with explicit answers and trade-off rationales.
-- Implementation child slices are identified but not opened.
-- Single-frame rendering remains the unconditional default.
-- No vendor SDK imports in promoted graphics layers.
+- [ ] Twelve decisions are recorded with explicit answers and trade-off rationales.
+- [ ] Implementation child slices are identified but not opened.
+- [ ] Single-frame rendering remains the unconditional default.
+- [ ] No vendor SDK imports in promoted graphics layers.
 
 ## Verification
 ```bash

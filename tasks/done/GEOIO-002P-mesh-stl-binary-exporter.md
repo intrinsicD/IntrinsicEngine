@@ -64,103 +64,103 @@
   and `triCount` triangle faces.
 
 ## Required changes
-- Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm` with a
+- [x] Extend `src/geometry/Geometry.HalfedgeMesh.IO.cppm` with a
   `MeshIOWriteStatus WriteSTLBinary(std::string_view absolute_path,
                                     const MeshIOResult& mesh);`
   declaration in the `Geometry::MeshIO` namespace, reusing the
   existing `MeshIOWriteStatus` enum unchanged.
-- Implement `WriteSTLBinary` in
+- [x] Implement `WriteSTLBinary` in
   `src/geometry/Geometry.HalfedgeMesh.IO.cpp` adjacent to the
   existing `WriteSTL`:
-  - Reject empty `absolute_path` with `InvalidPath`.
-  - Reject empty meshes (no `v:point` `glm::vec3` property, zero
+  - [x] Reject empty `absolute_path` with `InvalidPath`.
+  - [x] Reject empty meshes (no `v:point` `glm::vec3` property, zero
     positions, no `f:vertices` `std::vector<std::uint32_t>`
     property, or zero faces) with `EmptyMesh`.
-  - Reject any face whose vertex count is not exactly 3, or any
+  - [x] Reject any face whose vertex count is not exactly 3, or any
     face with an out-of-range vertex index, with `InvalidFace`.
     Binary STL has no facet arity other than triangles, so quads
     and n-gons are rejected at the writer; callers that need
     polygon output should use ASCII PLY or OBJ.
-  - Reject triangle counts that do not fit a `uint32_t` with
+  - [x] Reject triangle counts that do not fit a `uint32_t` with
     `InvalidFace` (defensive check; in practice
     `std::vector::size()` already bounds this).
-  - Open the output stream with
+  - [x] Open the output stream with
     `std::ios::binary | std::ios::trunc`; return `InvalidPath`
     if the stream cannot be opened.
-  - Emit an 80-byte header initialized to zero, with a leading
+  - [x] Emit an 80-byte header initialized to zero, with a leading
     ASCII tag (`"IntrinsicEngine binary STL"`) copied into the
     first up-to-80 bytes (no trailing newline; the tag does not
     start with the ASCII keyword `solid`, so `IsBinarySTL` will
     not misclassify the file).
-  - Emit the triangle count as a little-endian `uint32_t`
+  - [x] Emit the triangle count as a little-endian `uint32_t`
     (byte-swap on big-endian hosts).
-  - For each triangle, compute the facet normal as
+  - [x] For each triangle, compute the facet normal as
     `normalize(cross(v1 - v0, v2 - v0))`. If the cross product
     is degenerate (any component non-finite after normalization),
     emit `{0, 0, 0}` (matching the ASCII writer's fallback).
-  - Emit the per-triangle record:
+  - [x] Emit the per-triangle record:
     `float32 nx, ny, nz, v0x, v0y, v0z, v1x, v1y, v1z, v2x, v2y,
     v2z` followed by `uint16 attribute_byte_count = 0`. All
     floats are written in little-endian byte order; on
     big-endian hosts, both the 32-bit floats and the 16-bit
     attribute count are byte-swapped before write.
-  - Flush and report `FileWriteError` if `stream.good()` is
+  - [x] Flush and report `FileWriteError` if `stream.good()` is
     false at end.
-- Detect host endianness with `std::endian::native`. Reuse the
+- [x] Detect host endianness with `std::endian::native`. Reuse the
   same byte-swap helpers introduced by `GEOIO-002K`/`GEOIO-002L`
   if they are accessible within the translation unit's anonymous
   namespace; otherwise add a local 32-bit + 16-bit swap helper
   inside the translation-unit anonymous namespace. No change to
   the module interface imports.
-- No additional public exports beyond `WriteSTLBinary`; helper
+- [x] No additional public exports beyond `WriteSTLBinary`; helper
   logic stays inside the existing translation-unit anonymous
   namespace or local to the function.
 
 ## Tests
-- Add `unit;geometry` cases to
+- [x] Add `unit;geometry` cases to
   `tests/unit/geometry/Test.GeometryIO.cpp` under
   `GeometryIO_MeshIO`:
-  - `WritesSTLBinaryTriangleRoundTrip` — write a synthetic
+  - [x] `WritesSTLBinaryTriangleRoundTrip` — write a synthetic
     triangle `MeshIOResult` via `WriteSTLBinary`, re-import via
     `LoadSTL`, verify topology and vertex equivalence; assert
     the on-disk file is binary-classified by checking that the
     first five bytes are not the ASCII keyword `solid` (i.e.
     `IsBinarySTL` would route the parser to the binary path).
-  - `WritesSTLBinaryReportsTriangleCountInHeader` — write a
+  - [x] `WritesSTLBinaryReportsTriangleCountInHeader` — write a
     two-triangle quad-as-two-triangles fan, re-import via
     `LoadSTL`, verify the loaded result has 6 vertices and 2
     triangle faces (matches the per-corner vertex
     synthesization in `ParseBinarySTL`); spot-check the on-disk
     triangle count word at byte offset 80 equals `2` in
     little-endian.
-  - `WriteSTLBinaryRejectsQuadFace` — a single quad face yields
+  - [x] `WriteSTLBinaryRejectsQuadFace` — a single quad face yields
     `InvalidFace`.
-  - `WriteSTLBinaryRejectsEmptyMesh` — empty `MeshIOResult`
+  - [x] `WriteSTLBinaryRejectsEmptyMesh` — empty `MeshIOResult`
     returns `EmptyMesh`.
-  - `WriteSTLBinaryRejectsOutOfRangeIndex` — a face referencing
+  - [x] `WriteSTLBinaryRejectsOutOfRangeIndex` — a face referencing
     an out-of-range vertex returns `InvalidFace`.
-  - `WriteSTLBinaryRejectsBadPath` — empty `absolute_path`
+  - [x] `WriteSTLBinaryRejectsBadPath` — empty `absolute_path`
     yields `InvalidPath`; a path under a non-existent directory
     yields `InvalidPath`.
 
 ## Docs
-- Update the `OBJ/PLY/STL exporters` row of
+- [x] Update the `OBJ/PLY/STL exporters` row of
   `docs/migration/nonlegacy-parity-matrix.md` to record that
   binary-little-endian STL mesh export is now geometry-owned and
   added under `GEOIO-002P`.
-- Regenerate `docs/api/generated/module_inventory.md` only if
+- [x] Regenerate `docs/api/generated/module_inventory.md` only if
   the generator picks up the new exported function on the
   existing `Geometry.HalfedgeMesh.IO` module surface. If the
   regenerator changes only the date stamp, leave it untouched.
 
 ## Acceptance criteria
-- `Geometry::MeshIO::WriteSTLBinary` compiles and is exported
+- [x] `Geometry::MeshIO::WriteSTLBinary` compiles and is exported
   from `Geometry.HalfedgeMesh.IO`.
-- New tests pass under `IntrinsicTests` and the CPU gate.
-- No assets/runtime/graphics imports leak into `src/geometry/*`.
-- Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.STL.{cppm,cpp}`
+- [x] New tests pass under `IntrinsicTests` and the CPU gate.
+- [x] No assets/runtime/graphics imports leak into `src/geometry/*`.
+- [x] Legacy `src/legacy/Graphics/Exporters/Graphics.Exporters.STL.{cppm,cpp}`
   remains untouched (reference only).
-- Parity matrix row reflects the new exporter ownership.
+- [x] Parity matrix row reflects the new exporter ownership.
 
 ## Verification
 ```bash
