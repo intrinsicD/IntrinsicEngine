@@ -11,6 +11,7 @@ Backlog tasks are approved or proposed work items that have not started yet.
 - [`geometry/`](geometry/) — geometry algorithms, IO, and method readiness.
 - [`methods/`](methods/) — paper/method packages following the method workflow.
 - [`physics/`](physics/) — physics layer ownership and phenomena roadmap.
+- [`platform/`](platform/) — windowing/input port and explicit platform backends.
 - [`rendering/`](rendering/) — renderer, frame graph, and RHI work.
 - [`runtime/`](runtime/) — runtime composition root and lifecycle.
 - [`ui/`](ui/) — editor/UI integration seams.
@@ -105,6 +106,8 @@ Members:
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
+- [`platform/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md`](platform/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md).
+- [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs
 
