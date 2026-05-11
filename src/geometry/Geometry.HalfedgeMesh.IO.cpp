@@ -353,6 +353,21 @@ namespace Geometry::MeshIO
             const bool hasNormals = nxIndex && nyIndex && nzIndex;
             const bool hasColors = rIndex && gIndex && bIndex;
 
+            auto firstPropertyOf = [&](std::initializer_list<std::string_view> names) -> std::optional<std::size_t>
+            {
+                for (const auto name : names)
+                {
+                    if (const auto index = propertyIndex(name))
+                    {
+                        return index;
+                    }
+                }
+                return std::nullopt;
+            };
+            const auto texUIndex = firstPropertyOf({"s", "u", "texture_u", "texcoord_u", "u0"});
+            const auto texVIndex = firstPropertyOf({"t", "v", "texture_v", "texcoord_v", "v0"});
+            const bool hasTexcoords = texUIndex && texVIndex;
+
             std::vector<glm::vec3> vertices;
             vertices.reserve(vertexCount);
             std::vector<glm::vec3> normals;
@@ -364,6 +379,11 @@ namespace Geometry::MeshIO
             if (hasColors)
             {
                 colors.reserve(vertexCount);
+            }
+            std::vector<glm::vec2> texcoords;
+            if (hasTexcoords)
+            {
+                texcoords.reserve(vertexCount);
             }
             std::string_view line;
             for (std::size_t i = 0; i < vertexCount; ++i)
@@ -411,6 +431,16 @@ namespace Geometry::MeshIO
                                         NormalizePLYColorChannel(*b),
                                         NormalizePLYColorChannel(*a));
                 }
+                if (hasTexcoords)
+                {
+                    const auto u = ParseNumber<float>(tokens[*texUIndex]);
+                    const auto v = ParseNumber<float>(tokens[*texVIndex]);
+                    if (!u || !v)
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    texcoords.emplace_back(*u, *v);
+                }
             }
 
             std::vector<std::vector<std::uint32_t>> faces;
@@ -450,6 +480,14 @@ namespace Geometry::MeshIO
             result.SourcePath = pathInfo.SourcePath;
             result.BasePath = pathInfo.BasePath;
             PopulateResult(result, vertices, faces, normals, colors);
+            if (hasTexcoords && texcoords.size() == vertices.size())
+            {
+                auto texcoordProperty = result.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+                for (std::size_t i = 0; i < texcoords.size(); ++i)
+                {
+                    texcoordProperty[i] = texcoords[i];
+                }
+            }
             return result;
         }
 
@@ -490,6 +528,20 @@ namespace Geometry::MeshIO
             int gIndex = -1;
             int bIndex = -1;
             int aIndex = -1;
+            int texUIndex = -1;
+            int texVIndex = -1;
+            constexpr std::array<std::string_view, 5> kTexUAliases = {"s", "u", "texture_u", "texcoord_u", "u0"};
+            constexpr std::array<std::string_view, 5> kTexVAliases = {"t", "v", "texture_v", "texcoord_v", "v0"};
+            auto matchesAlias = [](std::string_view name, std::span<const std::string_view> aliases) {
+                for (const auto alias : aliases)
+                {
+                    if (name == alias)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
             std::size_t vertexStride = 0;
             for (std::size_t i = 0; i < vertexElement->Properties.size(); ++i)
             {
@@ -538,6 +590,14 @@ namespace Geometry::MeshIO
                 {
                     aIndex = static_cast<int>(i);
                 }
+                else if (texUIndex < 0 && p.ScalarType == PlyScalar::Float32 && matchesAlias(p.Name, kTexUAliases))
+                {
+                    texUIndex = static_cast<int>(i);
+                }
+                else if (texVIndex < 0 && p.ScalarType == PlyScalar::Float32 && matchesAlias(p.Name, kTexVAliases))
+                {
+                    texVIndex = static_cast<int>(i);
+                }
                 vertexStride += PlyScalarBytes(p.ScalarType);
             }
             if (xIndex < 0 || yIndex < 0 || zIndex < 0)
@@ -546,6 +606,7 @@ namespace Geometry::MeshIO
             }
             const bool hasNormals = nxIndex >= 0 && nyIndex >= 0 && nzIndex >= 0;
             const bool hasColors = rIndex >= 0 && gIndex >= 0 && bIndex >= 0;
+            const bool hasTexcoords = texUIndex >= 0 && texVIndex >= 0;
 
             int faceListIndex = -1;
             for (std::size_t i = 0; i < faceElement->Properties.size(); ++i)
@@ -586,6 +647,11 @@ namespace Geometry::MeshIO
             if (hasColors)
             {
                 colors.reserve(vertexElement->Count);
+            }
+            std::vector<glm::vec2> texcoords;
+            if (hasTexcoords)
+            {
+                texcoords.reserve(vertexElement->Count);
             }
             std::vector<std::vector<std::uint32_t>> faces;
             faces.reserve(faceElement->Count);
@@ -639,6 +705,11 @@ namespace Geometry::MeshIO
                                                 NormalizePLYColorChannel(g),
                                                 NormalizePLYColorChannel(b),
                                                 NormalizePLYColorChannel(a));
+                        }
+                        if (hasTexcoords)
+                        {
+                            texcoords.emplace_back(readFloat(base, vertexOffsets[texUIndex]),
+                                                   readFloat(base, vertexOffsets[texVIndex]));
                         }
                     }
                     cursor += total;
@@ -736,6 +807,14 @@ namespace Geometry::MeshIO
             result.SourcePath = pathInfo.SourcePath;
             result.BasePath = pathInfo.BasePath;
             PopulateResult(result, vertices, faces, normals, colors);
+            if (hasTexcoords && texcoords.size() == vertices.size())
+            {
+                auto texcoordProperty = result.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+                for (std::size_t i = 0; i < texcoords.size(); ++i)
+                {
+                    texcoordProperty[i] = texcoords[i];
+                }
+            }
             return result;
         }
 
