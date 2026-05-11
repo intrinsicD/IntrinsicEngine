@@ -68,7 +68,7 @@ python3 tools/docs/check_doc_links.py --root .
 ## Completion
 - Completed: 2026-05-11.
 - Status: done.
-- Implementation commit: pending local commit/PR reference.
+- Implementation commit: `c6ec48a`.
 - Verified in this session:
   - `cmake --preset ci` — failed before configure because this host does not have the preset-required `clang-20` / `clang++-20` on `PATH`; therefore `cmake --build --preset ci --target IntrinsicTests` and the focused `GeometryIO` CTest command could not run locally in this session.
   - Supplemental focused evidence: existing non-default `cmake-build-debug` cache uses `/usr/bin/clang++-22`; `cmake --build cmake-build-debug --target IntrinsicGeometryTests` succeeded (`ninja: no work to do`, touched objects already current).
