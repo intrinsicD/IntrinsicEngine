@@ -153,7 +153,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-11.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-7bq9k`.
-- Implementation commit: TBD.
+- Implementation commit: `75bb101`
+  (`GEOIO-002T: add OBJ ASCII vertex-texcoord import parity`).
 - Verified in this session:
   - `python3 tools/repo/check_layering.py --root src --strict` —
     no layering violations; `geometry` imports remain
