@@ -1557,6 +1557,45 @@ TEST(GeometryIO_MeshIO, WritesPLYTriangleWithVertexColors)
     EXPECT_EQ(loadedColors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }
 
+TEST(GeometryIO_MeshIO, WritesPLYTriangleWithVertexTexcoords)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.125f, 0.875f},
+        glm::vec2{0.500f, 0.250f},
+        glm::vec2{0.750f, 0.625f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, {}, texcoords);
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::MeshIO::WritePLY(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("property float s\n"), std::string::npos);
+    EXPECT_NE(contents.find("property float t\n"), std::string::npos);
+    EXPECT_NE(contents.find("0.000000 0.000000 0.000000 0.125000 0.875000\n"),
+              std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedTexcoords = loaded->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(loadedTexcoords.IsValid());
+    ASSERT_EQ(loadedTexcoords.Vector().size(), 3u);
+    for (std::size_t i = 0; i < texcoords.size(); ++i)
+    {
+        EXPECT_EQ(loadedTexcoords[i], texcoords[i]);
+    }
+}
+
 TEST(GeometryIO_MeshIO, WritesPLYQuadRoundTripsFaceArity)
 {
     Geometry::MeshIO::MeshIOResult mesh;
@@ -1734,6 +1773,44 @@ TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangleWithVertexColors)
     EXPECT_EQ(loadedColors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     EXPECT_EQ(loadedColors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
     EXPECT_EQ(loadedColors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, WritesPLYBinaryTriangleWithVertexTexcoords)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.125f, 0.875f},
+        glm::vec2{0.500f, 0.250f},
+        glm::vec2{0.750f, 0.625f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, {}, texcoords);
+
+    TempFile file(".ply", "");
+    const auto status = Geometry::MeshIO::WritePLYBinary(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("format binary_little_endian 1.0\n"), std::string::npos);
+    EXPECT_NE(contents.find("property float s\n"), std::string::npos);
+    EXPECT_NE(contents.find("property float t\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedTexcoords = loaded->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(loadedTexcoords.IsValid());
+    ASSERT_EQ(loadedTexcoords.Vector().size(), 3u);
+    for (std::size_t i = 0; i < texcoords.size(); ++i)
+    {
+        EXPECT_EQ(loadedTexcoords[i], texcoords[i]);
+    }
 }
 
 TEST(GeometryIO_MeshIO, WritesPLYBinaryQuadRoundTripsFaceArity)

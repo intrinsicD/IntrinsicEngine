@@ -1583,6 +1583,9 @@ namespace Geometry::MeshIO
         const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
         const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
 
+        const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
+        const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -1618,6 +1621,11 @@ namespace Geometry::MeshIO
             stream << "property uchar red\n";
             stream << "property uchar green\n";
             stream << "property uchar blue\n";
+        }
+        if (hasTexcoords)
+        {
+            stream << "property float s\n";
+            stream << "property float t\n";
         }
         {
             const int written = std::snprintf(buffer, sizeof(buffer),
@@ -1676,6 +1684,20 @@ namespace Geometry::MeshIO
                                         encodeColorChannel(c.r),
                                         encodeColorChannel(c.g),
                                         encodeColorChannel(c.b));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            if (hasTexcoords)
+            {
+                const auto& uv = texcoordsView.Vector()[i];
+                written = std::snprintf(buffer, sizeof(buffer),
+                                        " %.6f %.6f",
+                                        static_cast<double>(uv.x),
+                                        static_cast<double>(uv.y));
                 if (written <= 0)
                 {
                     return MeshIOWriteStatus::FileWriteError;
@@ -1761,6 +1783,9 @@ namespace Geometry::MeshIO
         const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
         const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
 
+        const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
+        const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -1796,6 +1821,11 @@ namespace Geometry::MeshIO
             stream << "property uchar red\n";
             stream << "property uchar green\n";
             stream << "property uchar blue\n";
+        }
+        if (hasTexcoords)
+        {
+            stream << "property float s\n";
+            stream << "property float t\n";
         }
         {
             const int written = std::snprintf(headerBuffer, sizeof(headerBuffer),
@@ -1869,6 +1899,14 @@ namespace Geometry::MeshIO
                 if (!writeUInt8(encodeColorChannel(c.r)) ||
                     !writeUInt8(encodeColorChannel(c.g)) ||
                     !writeUInt8(encodeColorChannel(c.b)))
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+            }
+            if (hasTexcoords)
+            {
+                const auto& uv = texcoordsView.Vector()[i];
+                if (!writeFloatLE(uv.x) || !writeFloatLE(uv.y))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }
