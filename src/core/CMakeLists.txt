@@ -24,6 +24,7 @@ target_sources(${target_name}
         Core.Telemetry.cppm
         Core.CallbackRegistry.cppm
         Core.Error.cppm
+        Core.FrameClock.cppm
         Core.Filesystem.PathResolver.cppm
         Core.Filesystem.cppm
         Core.Hash.cppm

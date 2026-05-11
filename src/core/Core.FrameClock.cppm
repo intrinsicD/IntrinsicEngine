@@ -3,7 +3,7 @@ module;
 #include <chrono>
 #include <algorithm>
 
-export module Extrinsic.Runtime.FrameClock;
+export module Extrinsic.Core.FrameClock;
 
 // ============================================================
 // FrameClock — per-frame wall-clock manager.
@@ -15,7 +15,7 @@ export module Extrinsic.Runtime.FrameClock;
 //   - Resample after deliberate sleeps (minimized window, idle
 //     throttle) so sleep time does not count as frame time.
 //
-// Usage pattern (one instance owned by Engine::Run):
+// Usage pattern (one instance owned by a frame-loop coordinator):
 //
 //   clock.BeginFrame();
 //   // ... optional deliberate sleep ...
@@ -24,7 +24,7 @@ export module Extrinsic.Runtime.FrameClock;
 //   clock.EndFrame();
 // ============================================================
 
-namespace Extrinsic::Runtime
+namespace Extrinsic::Core
 {
     export class FrameClock
     {

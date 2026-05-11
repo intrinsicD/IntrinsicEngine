@@ -14,6 +14,7 @@ engine subsystems.
 - `Extrinsic.Core.Dag.Scheduler`
 - `Extrinsic.Core.Dag.TaskGraph`
 - `Extrinsic.Core.Error`
+- `Extrinsic.Core.FrameClock`
 - `Extrinsic.Core.Filesystem.PathResolver`
 - `Extrinsic.Core.Filesystem`
 - `Extrinsic.Core.FrameGraph`
@@ -51,6 +52,8 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
     running on scheduler workers.
 - **`Extrinsic.Core.FrameGraph`**: ECS-oriented facade over `TaskGraph` with
   typed read/write access declarations plus structural and commit tokens.
+- **`Extrinsic.Core.FrameClock`**: reusable steady-clock frame delta helper with
+  clamped delta sampling and explicit resampling after deliberate sleeps.
 
 ### Graph stats and diagnostics
 

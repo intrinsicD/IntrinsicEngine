@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 1 |
 | `assets` | 7 |
-| `core` | 36 |
+| `core` | 37 |
 | `ecs` | 21 |
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
 | `platform` | 5 |
-| `runtime` | 5 |
+| `runtime` | 4 |
 
 ## Modules
 
@@ -50,6 +50,7 @@ Root scanned: `src`
 | `Extrinsic.Core.Error` | `src/core/Core.Error.cppm` | `core` |
 | `Extrinsic.Core.Filesystem.PathResolver` | `src/core/Core.Filesystem.PathResolver.cppm` | `core` |
 | `Extrinsic.Core.Filesystem` | `src/core/Core.Filesystem.cppm` | `core` |
+| `Extrinsic.Core.FrameClock` | `src/core/Core.FrameClock.cppm` | `core` |
 | `Extrinsic.Core.FrameGraph` | `src/core/Core.FrameGraph.cppm` | `core` |
 | `Extrinsic.Core.HandleLease` | `src/core/Core.HandleLease.cppm` | `core` |
 | `Extrinsic.Core.Hash` | `src/core/Core.Hash.cppm` | `core` |
@@ -443,7 +444,6 @@ Root scanned: `src`
 | `Extrinsic.Platform.Backend.GlfwVulkanSurface` | `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
-| `Extrinsic.Runtime.FrameClock` | `src/runtime/Runtime.FrameClock.cppm` | `runtime` |
 | `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |

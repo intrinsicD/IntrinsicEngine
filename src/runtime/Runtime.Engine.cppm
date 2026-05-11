@@ -8,12 +8,12 @@ export module Extrinsic.Runtime.Engine;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.TaskGraph;
+import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
-import Extrinsic.Runtime.FrameClock;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
@@ -210,7 +210,7 @@ namespace Extrinsic::Runtime
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
 
-        FrameClock m_FrameClock{};
+        Core::FrameClock m_FrameClock{};
 
         // Fixed-step simulation state
         double m_Accumulator{0.0};

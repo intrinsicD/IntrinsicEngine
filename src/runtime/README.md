@@ -9,7 +9,6 @@ startup/shutdown.
 | Module | Responsibility |
 |---|---|
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring, app-facing reference engine config helper |
-| `Extrinsic.Runtime.FrameClock` | Per-frame wall-clock management |
 | `Extrinsic.Runtime.FrameLoop` | Testable platform/render/maintenance/shutdown phase contracts |
 | `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
@@ -48,6 +47,10 @@ regress.
 10. End frame + present.
 11. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick.
 12. Frame clock finalize.
+
+`Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` for wall-clock frame
+delta sampling and post-sleep resampling; runtime owns the phase orchestration,
+not the reusable clock value type.
 
 ## Streaming integration
 

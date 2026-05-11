@@ -9,7 +9,6 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
-        Runtime.FrameClock.cppm
         Runtime.FrameLoop.cppm
         Runtime.RenderExtraction.cppm
         Runtime.StreamingExecutor.cppm
