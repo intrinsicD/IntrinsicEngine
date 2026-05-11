@@ -432,8 +432,44 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   validation-layer fail-closed policy, required-vs-optional capability split,
   queue-family ownership rules, swapchain/device-loss transition handling, test
   split, performance characteristics, extensibility, and layering. Implementation
-  child slices (`GRAPHICS-033-Impl-A/B/C/D`) are identified but not opened;
-  fail-closed behavior is preserved.
+  children `GRAPHICS-033A/B/C/D` are now opened (see below); fail-closed
+  behavior is preserved.
+- [GRAPHICS-033A — Vulkan operational status seam and reconciliation matrix](GRAPHICS-033A-vulkan-operational-status-seam.md):
+  first implementation child of GRAPHICS-033. Adds the
+  `VulkanOperationalStatusCode` / `VulkanOperationalReason` /
+  `VulkanOperationalInputs` / `VulkanOperationalStatus` types and
+  `EvaluateVulkanOperationalStatus(...)` to `Extrinsic.Backends.Vulkan` as
+  the single source of truth for operational state. CPU `contract;graphics`
+  tests cover every ordered gate item and every reconciliation-matrix row.
+  No counters, no breadcrumb, no command-recording bodies. Depends on
+  GRAPHICS-033 (done). Upstream consumer of GRAPHICS-033B/C/D.
+- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and startup breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md):
+  second implementation child. Adds `VulkanOperationalDiagnosticsSnapshot`
+  with the five process-monotonic counters
+  (`VulkanFallbackToNullCount`, `VulkanInitFailureCount`,
+  `VulkanValidationErrorCount`, `VulkanOperationalGateFailureCount`,
+  `VulkanDeviceLostOperationalDropCount`) and a reason histogram, and
+  wires the `VulkanRequestedButNotOperational` startup/transition warn
+  breadcrumb in `Runtime.Engine`. CPU `contract;graphics` and
+  `contract;runtime` tests cover row-by-row counter side-effects and
+  one-shot breadcrumb emission. Depends on GRAPHICS-033A.
+- [GRAPHICS-033C — Vulkan command recording for the minimal-debug-surface recipe](GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md):
+  third implementation child. Implements `Pass.Surface.MinimalDebug` and
+  `Pass.Present.MinimalDebug` Vulkan recording bodies through the
+  GRAPHICS-018R `RebuildOperationalResources()` seam, asserting CPU-mock
+  parity against the GRAPHICS-032 contract. Clears the
+  `MinimalRecipeRecordingMissing` gate item; full `Operational` still
+  requires the remaining gate items (barrier validation, public service
+  reconciliation). Depends on GRAPHICS-033A, GRAPHICS-032 (done),
+  GRAPHICS-031 (done), GRAPHICS-018R (done).
+- [GRAPHICS-033D — Opt-in Vulkan visible-triangle smoke fixture](GRAPHICS-033D-vulkan-visible-triangle-smoke.md):
+  fourth implementation child. Adds
+  `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp` under
+  `gpu;vulkan;graphics` labels (excluded from the default CPU gate). On
+  supported hosts the fixture drives one GRAPHICS-032 minimal-recipe
+  frame through GLFW + real Vulkan device + surface + swapchain and
+  asserts `IsOperational() == true` with no fallback counters or
+  breadcrumbs. Depends on GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.
 - [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
   planning-only design for the asset-source residency path; locks down
   AssetId-normalization placement, separate runtime cache, key + refcount,
