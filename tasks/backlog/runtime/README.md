@@ -11,6 +11,40 @@ another backlog directory.
   composition-root and lifecycle backlog work for `begin_frame`, extraction,
   prepare, execute, end, shutdown determinism, and subsystem wiring.
 
+### Sandbox / triangle path support tasks (runtime-owned)
+
+- [BUILD-001 — Wire shader compilation to the promoted Sandbox build](BUILD-001-sandbox-shader-compile-wiring.md):
+  CMake-only task adding `intrinsic_add_glsl_shaders(ExtrinsicSandbox)` so the
+  promoted Sandbox build emits SPIR-V binaries; gates GRAPHICS-031A pipeline
+  loads.
+- [RUNTIME-070 — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](RUNTIME-070-fallback-texture-bootstrap.md):
+  runtime-side graphics-bootstrap step initializing the canonical 4×4 magenta
+  fallback texture per GRAPHICS-015Q.
+
+### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
+
+These open the runtime-side producer/owner umbrellas already clarified by the
+done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
+
+- [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](RUNTIME-080-asset-bridges-texture.md):
+  texture-typed asset event subscriber producing `GpuAssetCache::RequestUpload`
+  calls (clarified by GRAPHICS-015Q).
+- [RUNTIME-081 — `Extrinsic.Runtime.CameraControllers`](RUNTIME-081-camera-controllers.md):
+  Orbit / Fly / FreeLook / TopDown camera controllers producing
+  `RenderFrameInput::Camera` (clarified by GRAPHICS-017Q).
+- [RUNTIME-082 — `Extrinsic.Runtime.SpatialDebugAdapters`](RUNTIME-082-spatial-debug-adapters.md):
+  BVH / KD-tree / Octree / ConvexHull adapters producing spatial-debug snapshot
+  records (clarified by GRAPHICS-011Q).
+- [RUNTIME-083 — `Extrinsic.Runtime.VisualizationAdapters`](RUNTIME-083-visualization-adapters.md):
+  PropertySet / KMeans / Isoline / VectorField / HtexMetadata adapters producing
+  visualization packet spans (clarified by GRAPHICS-014Q).
+- [RUNTIME-084 — `Extrinsic.Runtime.GizmoInteraction`](RUNTIME-084-gizmo-interaction.md):
+  transform-gizmo hit testing, interaction state, drag application, undo
+  emission (clarified by GRAPHICS-017Q).
+- [RUNTIME-090 — `Extrinsic.Runtime.ImGuiAdapter`](RUNTIME-090-imgui-platform-renderer-adapter.md):
+  Dear ImGui platform/renderer adapter producing `ImGuiOverlayFrame` records for
+  `ImGuiOverlaySystem::SubmitFrame` (clarified by GRAPHICS-013CQ).
+
 ## Cross-linked rendering tasks (runtime-owned)
 
 Some rendering backlog tasks are runtime-owned for extraction/wiring even

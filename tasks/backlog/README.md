@@ -30,8 +30,9 @@ how the *current* backlog maps onto that contract.
 
 Render real geometry from `Sandbox::App` through the promoted runtime/graphics
 path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
+Implementation-children gap follow-up: `tasks/backlog/rendering/GRAPHICS-029A..033D` and `runtime/BUILD-001`/`RUNTIME-070`.
 
-Members:
+Planning parents (retired):
 - [`rendering/GRAPHICS-029` (done)](../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
 - [`rendering/GRAPHICS-030` (done)](../done/GRAPHICS-030-runtime-geometry-residency-bridge.md)
 - [`rendering/GRAPHICS-031` (done)](../done/GRAPHICS-031-default-debug-surface-material.md)
@@ -44,6 +45,23 @@ Members:
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
+
+Triangle-path implementation children (newly opened — pick the next in dependency order):
+- [`active/GRAPHICS-030A`](../active/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) — procedural geometry descriptor + cache + triangle packer (in-progress).
+- [`runtime/BUILD-001`](runtime/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring.
+- [`runtime/RUNTIME-070`](runtime/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap.
+- [`rendering/GRAPHICS-029A`](rendering/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](rendering/GRAPHICS-029B-triangle-provider-and-camera.md) — reference scene + camera substitution.
+- [`rendering/GRAPHICS-030B`](rendering/GRAPHICS-030B-extraction-procedural-geometry-binding.md), [`GRAPHICS-030C`](rendering/GRAPHICS-030C-procedural-geometry-retire-ordering.md) — extraction wiring + retire ordering.
+- [`rendering/GRAPHICS-031A`](rendering/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md), [`GRAPHICS-031B`](rendering/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md) — default debug surface shaders/pipeline + substitution.
+- [`rendering/GRAPHICS-032A`](rendering/GRAPHICS-032A-minimal-debug-surface-recipe.md), [`B`](rendering/GRAPHICS-032B-minimal-debug-surface-pass-body.md), [`C`](rendering/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md), [`D`](rendering/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md) — minimal debug recipe + pass bodies + smoke.
+- [`rendering/GRAPHICS-033A`](rendering/GRAPHICS-033A-vulkan-operational-status-evaluator.md), [`B`](rendering/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md), [`C`](rendering/GRAPHICS-033C-vulkan-minimal-recipe-recording.md), [`D`](rendering/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md) — Vulkan operational gate + diagnostics + recording bodies + visible-triangle smoke.
+- [`rendering/GRAPHICS-080`](rendering/GRAPHICS-080-enable-promoted-vulkan-by-default.md) — flip reference config + add `ci-vulkan` preset.
+
+Beyond-triangle full-graphics implementation tasks (Theme B′ in the rendering DAG; gated by Theme A's triangle landing):
+- Default-recipe pass operational wiring: [`GRAPHICS-070..076`](rendering/) — forward surface, line/point, deferred GBuffer + lighting, shadows, selection/outline + picking readback, postprocess chain, debug view + canonical present.
+- Backend transient/visualization upload helpers: [`GRAPHICS-077`](rendering/GRAPHICS-077-transient-debug-primitive-upload-helper.md), [`GRAPHICS-078`](rendering/GRAPHICS-078-visualization-overlay-upload-helper.md).
+- Default-recipe ImGui pass: [`GRAPHICS-079`](rendering/GRAPHICS-079-default-recipe-imgui-pass-wiring.md).
+- Runtime adapter umbrellas (clarified by `Q` follow-ups): [`runtime/RUNTIME-080..084`, `RUNTIME-090`](runtime/) — texture asset bridge, camera controllers, spatial-debug adapters, visualization adapters, gizmo interaction, ImGui adapter.
 
 ### Theme B — Rendering modernization (P1, gated by Theme A)
 
