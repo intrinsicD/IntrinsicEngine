@@ -179,8 +179,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Completed: 2026-05-11.
 - Status: done.
 - Branch: `claude/setup-agentic-workflow-SRvKI`.
-- Implementation commit: recorded after the patch lands on the
-  branch.
+- Implementation commit: `ed519fe`
+  (`GEOIO-002U: add OBJ ASCII vertex-texcoord export parity`).
 - Verified in this session:
   - `python3 tools/repo/check_layering.py --root src --strict` —
     no layering violations; `geometry` imports remain
