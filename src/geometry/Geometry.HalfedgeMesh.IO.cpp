@@ -1203,6 +1203,9 @@ namespace Geometry::MeshIO
         const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
         const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
 
+        const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
+        const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -1224,6 +1227,21 @@ namespace Geometry::MeshIO
                 return MeshIOWriteStatus::FileWriteError;
             }
             stream.write(buffer, written);
+        }
+
+        if (hasTexcoords)
+        {
+            for (const auto& uv : texcoordsView.Vector())
+            {
+                const int written = std::snprintf(buffer, sizeof(buffer), "vt %.6f %.6f\n",
+                                                  static_cast<double>(uv.x),
+                                                  static_cast<double>(uv.y));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
         }
 
         if (hasNormals)
@@ -1249,7 +1267,17 @@ namespace Geometry::MeshIO
             {
                 const auto oneBased = static_cast<unsigned long long>(index) + 1ULL;
                 int written = 0;
-                if (hasNormals)
+                if (hasTexcoords && hasNormals)
+                {
+                    written = std::snprintf(buffer, sizeof(buffer), " %llu/%llu/%llu",
+                                            oneBased, oneBased, oneBased);
+                }
+                else if (hasTexcoords)
+                {
+                    written = std::snprintf(buffer, sizeof(buffer), " %llu/%llu",
+                                            oneBased, oneBased);
+                }
+                else if (hasNormals)
                 {
                     written = std::snprintf(buffer, sizeof(buffer), " %llu//%llu", oneBased, oneBased);
                 }

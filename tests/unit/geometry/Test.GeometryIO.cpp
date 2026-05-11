@@ -913,7 +913,8 @@ namespace
     void PopulateTriangleMesh(Geometry::MeshIO::MeshIOResult& mesh,
                               std::span<const glm::vec3> positions,
                               std::span<const std::vector<std::uint32_t>> faces,
-                              std::span<const glm::vec3> normals = {})
+                              std::span<const glm::vec3> normals = {},
+                              std::span<const glm::vec2> texcoords = {})
     {
         mesh.Vertices.Resize(positions.size());
         auto pointProperty = mesh.Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.0f));
@@ -927,6 +928,15 @@ namespace
             for (std::size_t i = 0; i < normals.size(); ++i)
             {
                 normalProperty[i] = normals[i];
+            }
+        }
+        if (!texcoords.empty())
+        {
+            auto texcoordProperty =
+                mesh.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+            for (std::size_t i = 0; i < texcoords.size(); ++i)
+            {
+                texcoordProperty[i] = texcoords[i];
             }
         }
 
@@ -1002,6 +1012,126 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithNormals)
     {
         EXPECT_EQ(loadedNormals[i], normals[i]);
     }
+}
+
+TEST(GeometryIO_MeshIO, WritesOBJTriangleWithTexcoords)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.0f, 0.0f},
+        glm::vec2{1.0f, 0.0f},
+        glm::vec2{0.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, {}, texcoords);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("vt 0.000000 0.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("vt 1.000000 0.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("vt 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("f 1/1 2/2 3/3\n"), std::string::npos);
+    EXPECT_EQ(contents.find("//"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedTexcoords = loaded->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(loadedTexcoords.IsValid());
+    ASSERT_EQ(loadedTexcoords.Vector().size(), 3u);
+    for (std::size_t i = 0; i < texcoords.size(); ++i)
+    {
+        EXPECT_EQ(loadedTexcoords[i], texcoords[i]);
+    }
+}
+
+TEST(GeometryIO_MeshIO, WritesOBJTriangleWithTexcoordsAndNormals)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.25f, 0.75f},
+        glm::vec2{0.50f, 0.50f},
+        glm::vec2{0.75f, 0.25f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, normals, texcoords);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("vt 0.250000 0.750000\n"), std::string::npos);
+    EXPECT_NE(contents.find("vn 0.000000 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("f 1/1/1 2/2/2 3/3/3\n"), std::string::npos);
+    EXPECT_EQ(contents.find("//"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedTexcoords = loaded->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(loadedTexcoords.IsValid());
+    ASSERT_EQ(loadedTexcoords.Vector().size(), 3u);
+    for (std::size_t i = 0; i < texcoords.size(); ++i)
+    {
+        EXPECT_EQ(loadedTexcoords[i], texcoords[i]);
+    }
+
+    auto loadedNormals = loaded->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(loadedNormals.IsValid());
+    ASSERT_EQ(loadedNormals.Vector().size(), 3u);
+    for (std::size_t i = 0; i < normals.size(); ++i)
+    {
+        EXPECT_EQ(loadedNormals[i], normals[i]);
+    }
+}
+
+TEST(GeometryIO_MeshIO, WriteOBJOmitsTexcoordsWhenAbsent)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_EQ(contents.find("vt "), std::string::npos);
+    EXPECT_EQ(contents.find("/"), std::string::npos);
+    EXPECT_NE(contents.find("f 1 2 3\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedTexcoords = loaded->Vertices.Get<glm::vec2>("v:texcoord");
+    EXPECT_FALSE(loadedTexcoords.IsValid());
 }
 
 TEST(GeometryIO_MeshIO, WritesOBJQuadRoundTripsFaceArity)
