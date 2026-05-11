@@ -682,6 +682,7 @@ namespace Geometry::MeshIO
 
         std::vector<glm::vec3> vertices;
         std::vector<glm::vec3> normals;
+        std::vector<glm::vec2> texcoords;
         std::vector<std::vector<std::uint32_t>> faces;
         std::size_t cursor = 0;
         std::string_view line;
@@ -732,6 +733,20 @@ namespace Geometry::MeshIO
                 }
                 normals.emplace_back(*x, *y, *z);
             }
+            else if (tokens[0] == "vt")
+            {
+                if (tokens.size() < 3)
+                {
+                    return InvalidMeshFormat();
+                }
+                const auto u = ParseNumber<float>(tokens[1]);
+                const auto v = ParseNumber<float>(tokens[2]);
+                if (!u || !v)
+                {
+                    return InvalidMeshFormat();
+                }
+                texcoords.emplace_back(*u, *v);
+            }
             else if (tokens[0] == "f")
             {
                 if (tokens.size() < 4)
@@ -765,6 +780,15 @@ namespace Geometry::MeshIO
         const std::span<const glm::vec3> normalsSpan =
             normals.size() == vertices.size() ? std::span<const glm::vec3>(normals) : std::span<const glm::vec3>{};
         PopulateResult(result, vertices, faces, normalsSpan);
+        if (texcoords.size() == vertices.size())
+        {
+            auto texcoordProperty =
+                result.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+            for (std::size_t i = 0; i < texcoords.size(); ++i)
+            {
+                texcoordProperty[i] = texcoords[i];
+            }
+        }
         return result;
     }
 
