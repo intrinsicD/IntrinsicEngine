@@ -67,7 +67,7 @@ python3 tools/docs/check_doc_links.py --root .
 ## Completion
 - Completed: 2026-05-11.
 - Status: done.
-- Implementation commit: recorded in the immediately following `GEOIO-002Z: record implementation commit` follow-up patch.
+- Implementation commit: `681f378` (`GEOIO-002Z: import mesh PLY vertex texcoords`).
 - Verified in this session:
   - `cmake --preset ci` — failed before configure because this host does not have the preset-required `clang-20` / `clang++-20` on `PATH`. Therefore `cmake --build --preset ci --target IntrinsicTests` and the `build/ci` CTest gate could not run locally in this session and remain pending CI verification on a clang-20+ host.
   - `python3 tools/repo/check_layering.py --root src --strict` — 718 files scanned; no layering violations found.
