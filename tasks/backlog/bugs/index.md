@@ -11,6 +11,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
+- Closed 2026-05-13: [`BUG-007` — GpuAssetCache uploads remain pending in default CPU gate](../../done/BUG-007-gpu-asset-cache-default-gate-failures.md). `RHI::ITransferQueue::UploadTextureFullChain(...)` now remains appended after the original upload/poll/collect virtuals, preserving the `IsComplete()` slot used by existing module consumers; the focused `GpuAssetCache`/material-system repro and default CPU CTest gate pass.
 - Closed 2026-05-09: [`BUG-002` — CI full build compiles ImGuizmo upstream target without ImGui includes](../../done/BUG-002-ci-full-build-imguizmo-upstream-target.md). ImGuizmo is populated as source-only and repository consumers use `imguizmo_lib` with the ImGui dependency wired explicitly.
 - Closed 2026-05-09: [`BUG-003` — FetchContent cache corruption breaks dependency checkouts during CI retries](../../done/BUG-003-fetchcontent-cache-corrupts-shared-dependency-checkouts.md). Dependency source trees are validated before reuse and incomplete online caches are removed before repopulation.
 - Closed 2026-05-09: [`BUG-004` — Compile-hotspot gate baseline references stale runtime source paths](../../done/BUG-004-compile-hotspot-baseline-stale-runtime-paths.md). The baseline now uses current `src/geometry/` and `src/legacy/` paths.

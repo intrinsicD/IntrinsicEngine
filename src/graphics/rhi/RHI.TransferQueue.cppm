@@ -72,16 +72,6 @@ export namespace Extrinsic::RHI
                                                           std::uint32_t  mipLevel   = 0,
                                                           std::uint32_t  arrayLayer = 0) = 0;
 
-        /// Non-blocking full texture-chain upload. `src` must be packed according
-        /// to `ComputeFullChainUploadLayout()` for the destination texture's
-        /// descriptor: layer-major, mip-minor order with each subresource offset
-        /// aligned to `RequiredBufferOffsetAlignment(format)`. Backends must
-        /// validate the destination texture metadata and byte count before
-        /// accepting the upload; unsupported formats, depth-stencil textures, or
-        /// size mismatches fail closed by returning an invalid token.
-        [[nodiscard]] virtual TransferToken UploadTextureFullChain(TextureHandle              dst,
-                                                                   std::span<const std::byte> src) = 0;
-
         // ---- Completion polling --------------------------------------
 
         /// Returns true when the GPU has finished the transfer associated
@@ -94,6 +84,20 @@ export namespace Extrinsic::RHI
         /// Must be called exactly once per frame on the render thread,
         /// after EndFrame().  Never call from a loader thread.
         virtual void CollectCompleted() = 0;
+
+        /// Non-blocking full texture-chain upload. `src` must be packed according
+        /// to `ComputeFullChainUploadLayout()` for the destination texture's
+        /// descriptor: layer-major, mip-minor order with each subresource offset
+        /// aligned to `RequiredBufferOffsetAlignment(format)`. Backends must
+        /// validate the destination texture metadata and byte count before
+        /// accepting the upload; unsupported formats, depth-stencil textures, or
+        /// size mismatches fail closed by returning an invalid token.
+        ///
+        /// Keep this appended after the original upload/poll/collect virtuals so
+        /// existing consumers continue to call the same vtable slots for
+        /// IsComplete() and CollectCompleted().
+        [[nodiscard]] virtual TransferToken UploadTextureFullChain(TextureHandle              dst,
+                                                                   std::span<const std::byte> src) = 0;
     };
 }
 
