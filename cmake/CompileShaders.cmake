@@ -3,6 +3,7 @@
 # Usage:
 #   include(cmake/CompileShaders.cmake)
 #   intrinsic_add_glsl_shaders(<target> [SOURCE_DIR <dir>] [OUTPUT_DIR <dir>])
+# Used by the legacy Sandbox target and promoted ExtrinsicSandbox target.
 
 find_program(GLSL_COMPILER glslc)
 

@@ -16,3 +16,8 @@ target_link_libraries(ExtrinsicSandbox
         PRIVATE
         ExtrinsicRuntime
 )
+
+include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
+
+# Ensure promoted Sandbox runtime shader artifacts are built next to the executable.
+intrinsic_add_glsl_shaders(ExtrinsicSandbox)

@@ -470,8 +470,8 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-030C — Procedural geometry refcount/free retire ordering](GRAPHICS-030C-procedural-geometry-retire-ordering.md):
   depends on GRAPHICS-030B.
 - [GRAPHICS-031A — Default debug surface shaders and pipeline](GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
-  depends on GRAPHICS-031 (planning) and BUILD-001 (Sandbox shader compile
-  wiring).
+  depends on GRAPHICS-031 (planning) and BUILD-001 (done; Sandbox shader
+  compile wiring).
 - [GRAPHICS-031B — Default debug surface substitution and diagnostics counters](GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
   depends on GRAPHICS-031A.
 - [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration](GRAPHICS-032A-minimal-debug-surface-recipe.md):
@@ -497,7 +497,7 @@ independently testable (CPU/null where possible), and gated as recorded.
   fail-closed fallback breadcrumb fires).
 
 Cross-layer Theme A leaves outside `rendering/`:
-- [`runtime/BUILD-001` — Wire shader compilation to the promoted Sandbox build](../runtime/BUILD-001-sandbox-shader-compile-wiring.md).
+- [`done/BUILD-001` — Wire shader compilation to the promoted Sandbox build](../../done/BUILD-001-sandbox-shader-compile-wiring.md).
 - [`runtime/RUNTIME-070` — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../runtime/RUNTIME-070-fallback-texture-bootstrap.md).
 
 ### Theme B′ — Default-recipe pass operational wiring (GRAPHICS-070..079)

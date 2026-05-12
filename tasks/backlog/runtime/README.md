@@ -13,13 +13,15 @@ another backlog directory.
 
 ### Sandbox / triangle path support tasks (runtime-owned)
 
-- [BUILD-001 — Wire shader compilation to the promoted Sandbox build](BUILD-001-sandbox-shader-compile-wiring.md):
-  CMake-only task adding `intrinsic_add_glsl_shaders(ExtrinsicSandbox)` so the
-  promoted Sandbox build emits SPIR-V binaries; gates GRAPHICS-031A pipeline
-  loads.
 - [RUNTIME-070 — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](RUNTIME-070-fallback-texture-bootstrap.md):
   runtime-side graphics-bootstrap step initializing the canonical 4×4 magenta
   fallback texture per GRAPHICS-015Q.
+
+Completed support tasks:
+- [BUILD-001 — Wire shader compilation to the promoted Sandbox build](../../done/BUILD-001-sandbox-shader-compile-wiring.md):
+  CMake-only task adding `intrinsic_add_glsl_shaders(ExtrinsicSandbox)` so the
+  promoted Sandbox build emits SPIR-V binaries; unblocks GRAPHICS-031A pipeline
+  loads.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 

@@ -30,7 +30,7 @@ how the *current* backlog maps onto that contract.
 
 Render real geometry from `Sandbox::App` through the promoted runtime/graphics
 path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
-Implementation-children gap follow-up: `tasks/backlog/rendering/GRAPHICS-029A..033D` and `runtime/BUILD-001`/`RUNTIME-070`.
+Implementation-children gap follow-up: `tasks/backlog/rendering/GRAPHICS-029A..033D` and `runtime/RUNTIME-070` (`BUILD-001` is done).
 
 Planning parents (retired):
 - [`rendering/GRAPHICS-029` (done)](../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
@@ -48,7 +48,7 @@ Planning parents (retired):
 
 Triangle-path implementation children (newly opened — pick the next in dependency order):
 - [`done/GRAPHICS-030A`](../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) — procedural geometry descriptor + cache + triangle packer (done; unblocks GRAPHICS-029B and GRAPHICS-030B).
-- [`runtime/BUILD-001`](runtime/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring.
+- [`done/BUILD-001`](../done/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring (done).
 - [`runtime/RUNTIME-070`](runtime/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap.
 - [`done/GRAPHICS-029A`](../done/GRAPHICS-029A-reference-scene-skeleton.md) (done; unblocks GRAPHICS-029B), [`done/GRAPHICS-029B`](../done/GRAPHICS-029B-triangle-provider-and-camera.md) (done) — reference scene + camera substitution.
 - [`rendering/GRAPHICS-030B`](rendering/GRAPHICS-030B-extraction-procedural-geometry-binding.md), [`GRAPHICS-030C`](rendering/GRAPHICS-030C-procedural-geometry-retire-ordering.md) — extraction wiring + retire ordering.

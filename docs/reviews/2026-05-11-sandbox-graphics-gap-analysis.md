@@ -41,7 +41,7 @@ and the swapchain finalization step is wired only as a CPU-testable contract:
 
 Standalone infrastructure / runtime tasks newly opened:
 
-- [BUILD-001](../../tasks/backlog/runtime/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring.
+- [BUILD-001](../../tasks/done/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring (done).
 - [RUNTIME-070](../../tasks/backlog/runtime/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap.
 - [GRAPHICS-080](../../tasks/backlog/rendering/GRAPHICS-080-enable-promoted-vulkan-by-default.md) — Reference config + `ci-vulkan` preset.
 
@@ -55,7 +55,7 @@ Beyond-triangle (default-recipe pass operational wiring + runtime adapter umbrel
 Recommended pickup order for the Theme A triangle path:
 
 1. `GRAPHICS-030A` (active) — finish the procedural geometry descriptor + cache + triangle packer.
-2. `BUILD-001` — wire shader compilation to `ExtrinsicSandbox` (CMake-only; can land in parallel with #1).
+2. `BUILD-001` — done; shader compilation is wired to `ExtrinsicSandbox`.
 3. `RUNTIME-070` — bootstrap `GpuAssetCache` fallback texture (can land in parallel).
 4. `GRAPHICS-029A` — reference scene skeleton.
 5. `GRAPHICS-029B` — TriangleProvider + camera substitution (depends on #1 + #4).
