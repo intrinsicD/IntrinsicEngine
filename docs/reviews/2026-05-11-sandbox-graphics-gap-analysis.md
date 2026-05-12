@@ -42,7 +42,7 @@ and the swapchain finalization step is wired only as a CPU-testable contract:
 Standalone infrastructure / runtime tasks newly opened:
 
 - [BUILD-001](../../tasks/done/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring (done).
-- [RUNTIME-070](../../tasks/backlog/runtime/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap.
+- [RUNTIME-070](../../tasks/done/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap (done).
 - [GRAPHICS-080](../../tasks/backlog/rendering/GRAPHICS-080-enable-promoted-vulkan-by-default.md) — Reference config + `ci-vulkan` preset.
 
 Beyond-triangle (default-recipe pass operational wiring + runtime adapter umbrellas) newly opened:

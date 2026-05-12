@@ -1,7 +1,12 @@
 module;
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <limits>
+#include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -14,13 +19,16 @@ import Extrinsic.Backends.Null;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Dag.TaskGraph;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.Core.Logging;
 import Extrinsic.Core.Tasks;
 import Extrinsic.Platform.Window;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
+import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
@@ -40,6 +48,54 @@ namespace Extrinsic::Runtime
     namespace
     {
         constexpr double kIdleSleepSeconds = 0.016; // ~60 Hz event wake
+
+        // RUNTIME-070: runtime-baked fallback texture bytes for GpuAssetCache.
+        // A 4×4 RGBA8_UNORM magenta-and-black checkerboard repeated from a 2×2
+        // base pattern. The cache never reads files; runtime owns the bytes.
+        // Layout: row-major, top-left origin, RGBA8 with alpha 0xFF so the
+        // sampled colour is visually unambiguous when material code observes
+        // `UsedFallback = true`.
+        constexpr std::uint8_t kFallbackMagenta[4] = {0xFF, 0x00, 0xFF, 0xFF};
+        constexpr std::uint8_t kFallbackBlack[4]   = {0x00, 0x00, 0x00, 0xFF};
+
+        consteval std::array<std::byte, 4 * 4 * 4> MakeFallbackTextureBytes() noexcept
+        {
+            std::array<std::byte, 4 * 4 * 4> bytes{};
+            for (std::size_t y = 0; y < 4; ++y)
+            {
+                for (std::size_t x = 0; x < 4; ++x)
+                {
+                    const bool magenta = (((x / 2) ^ (y / 2)) & 1u) == 0u;
+                    const std::uint8_t* src = magenta ? kFallbackMagenta : kFallbackBlack;
+                    const std::size_t base = (y * 4 + x) * 4;
+                    for (std::size_t c = 0; c < 4; ++c)
+                        bytes[base + c] = static_cast<std::byte>(src[c]);
+                }
+            }
+            return bytes;
+        }
+
+        constexpr auto kFallbackTextureBytes = MakeFallbackTextureBytes();
+
+        [[nodiscard]] Graphics::GpuTextureFallbackDesc BuildFallbackTextureDesc() noexcept
+        {
+            Graphics::GpuTextureFallbackDesc desc{};
+            desc.Bytes = std::span<const std::byte>(kFallbackTextureBytes);
+            desc.Desc.Width = 4;
+            desc.Desc.Height = 4;
+            desc.Desc.MipLevels = 1;
+            desc.Desc.Fmt = RHI::Format::RGBA8_UNORM;
+            desc.Desc.Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst;
+            desc.Desc.DebugName = "gpu-asset-fallback-texture";
+            desc.SamplerDesc.MagFilter = RHI::FilterMode::Nearest;
+            desc.SamplerDesc.MinFilter = RHI::FilterMode::Nearest;
+            desc.SamplerDesc.MipFilter = RHI::MipmapMode::Nearest;
+            desc.SamplerDesc.AddressU = RHI::AddressMode::ClampToEdge;
+            desc.SamplerDesc.AddressV = RHI::AddressMode::ClampToEdge;
+            desc.SamplerDesc.AddressW = RHI::AddressMode::ClampToEdge;
+            desc.SamplerDesc.DebugName = "gpu-asset-fallback-sampler";
+            return desc;
+        }
 
 #if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
         constexpr bool kPromotedVulkanAvailable = true;
@@ -183,11 +239,35 @@ namespace Extrinsic::Runtime
         // ── 5b. GPU asset cache ───────────────────────────────────────────
         // Bridges AssetId to refcounted Buffer/Texture leases.  Subscribes
         // to AssetEventBus for Failed / Reloaded / Destroyed transitions;
-        // type-specific bridges drive RequestUpload separately.
+        // type-specific bridges drive RequestUpload separately. The cache
+        // receives the renderer's `SamplerManager` so RUNTIME-070's fallback
+        // texture (and future texture-asset bridges) can resolve sampler
+        // descriptors through the deduplicated manager path.
         m_GpuAssetCache = std::make_unique<Graphics::GpuAssetCache>(
             m_Renderer->GetBufferManager(),
             m_Renderer->GetTextureManager(),
+            m_Renderer->GetSamplerManager(),
             m_Device->GetTransferQueue());
+
+        // RUNTIME-070: bootstrap the runtime-owned 4×4 magenta-and-black
+        // checkerboard fallback texture exactly once. Skipped when the
+        // device is non-operational (e.g. the Null backend) — material
+        // resolution then returns `GpuAssetFallbackReason::Unavailable` and
+        // shaders route to factor-only shading, matching the documented
+        // contract in `src/graphics/assets/README.md`.
+        if (m_Device->IsOperational())
+        {
+            const Graphics::GpuTextureFallbackDesc fallbackDesc =
+                BuildFallbackTextureDesc();
+            if (auto r = m_GpuAssetCache->InitializeFallbackTexture(fallbackDesc);
+                !r.has_value())
+            {
+                Core::Log::Warn(
+                    "[Runtime] GpuAssetCache fallback texture bootstrap failed: error={}; material code will use factor-only fallback.",
+                    static_cast<int>(r.error()));
+            }
+        }
+
         m_GpuAssetCacheListener = m_AssetService->SubscribeAll(
             [cache = m_GpuAssetCache.get()](Assets::AssetId id, Assets::AssetEvent ev)
             {

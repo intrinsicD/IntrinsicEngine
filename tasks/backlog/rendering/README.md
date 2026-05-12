@@ -498,7 +498,7 @@ independently testable (CPU/null where possible), and gated as recorded.
 
 Cross-layer Theme A leaves outside `rendering/`:
 - [`done/BUILD-001` — Wire shader compilation to the promoted Sandbox build](../../done/BUILD-001-sandbox-shader-compile-wiring.md).
-- [`runtime/RUNTIME-070` — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../runtime/RUNTIME-070-fallback-texture-bootstrap.md).
+- [`runtime/RUNTIME-070` — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../../done/RUNTIME-070-fallback-texture-bootstrap.md) (done).
 
 ### Theme B′ — Default-recipe pass operational wiring (GRAPHICS-070..079)
 
