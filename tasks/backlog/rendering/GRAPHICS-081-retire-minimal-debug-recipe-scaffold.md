@@ -102,7 +102,7 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 # Opt-in default-recipe Vulkan smoke (on Vulkan-capable hosts):
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicGraphicsIntegrationTests
-ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu;vulkan' --timeout 120
+ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' --timeout 120
 
 # Confirm no minimal-recipe symbols remain:
 ! grep -RE 'MinimalDebugSurface|MinimalDebug|recipe\.minimal-debug-surface|BuildMinimalDebugSurfaceRecipe|MinimalSurfacePassExecutions|MinimalPresentPassExecutions|MinimalRecipeMissingPrerequisiteCount' \

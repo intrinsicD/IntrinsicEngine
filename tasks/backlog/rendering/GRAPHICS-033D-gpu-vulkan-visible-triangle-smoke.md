@@ -16,7 +16,7 @@
 - Status: not started.
 - Owner/layer: `tests/integration/graphics` for the smoke; `graphics/vulkan` for any minor diagnostics surface adjustments needed by the assertion.
 - Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-D in the parent's Required changes.
-- Upstream gates: `GRAPHICS-033C` (recording bodies), `GRAPHICS-032D` (already lists this as the gpu;vulkan smoke for the recipe; this task is the Vulkan-side coordination).
+- Upstream gates: `GRAPHICS-033C` (recording bodies). `GRAPHICS-033D` is the canonical visible-triangle smoke and owns the pixel-readback driver harness; `GRAPHICS-032D` is a sibling fixture that reuses this harness for recipe-selector coverage, so `GRAPHICS-032D` depends on this task, not the reverse.
 - The smoke is intentionally outside the default CPU gate (`-LE 'gpu|vulkan|slow|flaky-quarantine'`); hosts without Vulkan skip the test deterministically.
 
 ## Required changes
@@ -51,7 +51,7 @@ cmake --build --preset ci --target IntrinsicGraphicsIntegrationTests
 # Default gate (skips the new fixture):
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 # Opt-in gate (selects only the new fixture and any sibling gpu;vulkan tests):
-ctest --test-dir build/ci --output-on-failure -L 'gpu;vulkan' --timeout 120
+ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
 python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
