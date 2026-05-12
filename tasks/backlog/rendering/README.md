@@ -452,10 +452,11 @@ under GRAPHICS-029..033 in dependency order so the sandbox can render its first
 visible triangle through the promoted runtime/graphics path. Each leaf is small,
 independently testable (CPU/null where possible), and gated as recorded.
 
-- [GRAPHICS-029A — Reference scene skeleton (interface, registry, config field)](../../active/GRAPHICS-029A-reference-scene-skeleton.md)
-  (active, in-progress): depends on GRAPHICS-029 (planning) and HARDEN-060 (done).
+- [GRAPHICS-029A — Reference scene skeleton (interface, registry, config field) (done)](../../done/GRAPHICS-029A-reference-scene-skeleton.md):
+  landed; depended on GRAPHICS-029 (planning) and HARDEN-060 (done). Unblocks
+  GRAPHICS-029B.
 - [GRAPHICS-029B — TriangleProvider and reference camera substitution](GRAPHICS-029B-triangle-provider-and-camera.md):
-  depends on GRAPHICS-029A and GRAPHICS-030A (done) for the
+  depends on GRAPHICS-029A (done) and GRAPHICS-030A (done) for the
   `ProceduralGeometryRef` type.
 - [GRAPHICS-030A — Procedural geometry descriptor, cache, and triangle packer (done)](../../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md):
   landed; ECS procedural component + runtime descriptor/cache/packer modules
