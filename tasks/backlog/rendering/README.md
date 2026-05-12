@@ -455,12 +455,15 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-029A — Reference scene skeleton (interface, registry, config field)](GRAPHICS-029A-reference-scene-skeleton.md):
   depends on GRAPHICS-029 (planning) and HARDEN-060 (done).
 - [GRAPHICS-029B — TriangleProvider and reference camera substitution](GRAPHICS-029B-triangle-provider-and-camera.md):
-  depends on GRAPHICS-029A and GRAPHICS-030A (active) for the
+  depends on GRAPHICS-029A and GRAPHICS-030A (done) for the
   `ProceduralGeometryRef` type.
-- [GRAPHICS-030A — Procedural geometry descriptor, cache, and triangle packer (active)](../../active/GRAPHICS-030A-procedural-geometry-descriptor-cache.md):
-  in progress; the earliest unblocked implementation child.
+- [GRAPHICS-030A — Procedural geometry descriptor, cache, and triangle packer (done)](../../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md):
+  landed; ECS procedural component + runtime descriptor/cache/packer modules
+  live in `src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm` and
+  `src/runtime/Runtime.ProceduralGeometry{,Packer}.cppm`. Unblocks
+  GRAPHICS-029B and GRAPHICS-030B.
 - [GRAPHICS-030B — Wire RenderExtraction to the procedural geometry residency bridge](GRAPHICS-030B-extraction-procedural-geometry-binding.md):
-  depends on GRAPHICS-030A and GRAPHICS-029B; first task that calls
+  depends on GRAPHICS-030A (done) and GRAPHICS-029B; first task that calls
   `GpuWorld::UploadGeometry()` and `SetInstanceGeometry()` from extraction.
 - [GRAPHICS-030C — Procedural geometry refcount/free retire ordering](GRAPHICS-030C-procedural-geometry-retire-ordering.md):
   depends on GRAPHICS-030B.

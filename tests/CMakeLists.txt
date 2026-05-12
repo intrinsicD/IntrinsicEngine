@@ -258,6 +258,26 @@ intrinsic_test_object_lib(EcsContractTestObjs
     DEPS ExtrinsicCore
 )
 
+# --- Runtime contract tests (CPU-only; GRAPHICS-030-Impl-A procedural geometry) ---
+# These tests exercise runtime-owned value types (procedural geometry descriptor,
+# cache, and packer) directly. They do not require IRenderer, GLFW, or Vulkan,
+# so they live in a dedicated CPU-only contract executable rather than the
+# headless-gated IntrinsicRuntimeTests umbrella.
+if(TARGET ExtrinsicRuntime)
+    set(_runtime_contract_test_files
+        Test.ProceduralGeometryCache.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_contract_test_sources
+        SEARCH_DIRS contract/runtime
+        FILES ${_runtime_contract_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeContractTestObjs
+        SOURCES
+            ${_runtime_contract_test_sources}
+        DEPS ExtrinsicRuntime
+    )
+endif()
+
 # --- Benchmark/SLO checks ---
 set(_benchmark_test_files
     Test_ArchitectureSLO.cpp
@@ -821,6 +841,15 @@ intrinsic_test_executable(IntrinsicEcsContractTests
     LINK_LIBS ExtrinsicCore
     LABELS contract ecs
 )
+
+# --- Runtime contract tests (CPU-only procedural geometry contracts) ---
+if(TARGET RuntimeContractTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeContractTests
+        OBJECTS RuntimeContractTestObjs
+        LINK_LIBS ExtrinsicRuntime
+        LABELS contract runtime
+    )
+endif()
 
 # --- Benchmark and SLO checks ---
 intrinsic_test_executable(IntrinsicBenchmarkTests

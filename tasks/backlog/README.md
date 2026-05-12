@@ -47,7 +47,7 @@ Planning parents (retired):
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
 
 Triangle-path implementation children (newly opened — pick the next in dependency order):
-- [`active/GRAPHICS-030A`](../active/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) — procedural geometry descriptor + cache + triangle packer (in-progress).
+- [`done/GRAPHICS-030A`](../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) — procedural geometry descriptor + cache + triangle packer (done; unblocks GRAPHICS-029B and GRAPHICS-030B).
 - [`runtime/BUILD-001`](runtime/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring.
 - [`runtime/RUNTIME-070`](runtime/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap.
 - [`rendering/GRAPHICS-029A`](rendering/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](rendering/GRAPHICS-029B-triangle-provider-and-camera.md) — reference scene + camera substitution.
