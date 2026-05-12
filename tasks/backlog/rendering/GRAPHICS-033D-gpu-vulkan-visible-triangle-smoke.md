@@ -51,7 +51,7 @@ cmake --build --preset ci --target IntrinsicGraphicsIntegrationTests
 # Default gate (skips the new fixture):
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 # Opt-in gate (selects only the new fixture and any sibling gpu;vulkan tests):
-ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
+ctest --test-dir build/ci --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120
 python3 tools/repo/check_test_layout.py --root . --strict
 ```
 
