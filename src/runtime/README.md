@@ -12,7 +12,7 @@ startup/shutdown.
 | `Extrinsic.Runtime.FrameLoop` | Testable platform/render/maintenance/shutdown phase contracts |
 | `Extrinsic.Runtime.ProceduralGeometry` | Procedural-geometry descriptor surface (`ProceduralGeometryKey`, key hash, `ProceduralGeometryCache` value type with `EnsureResident` / `Release` / `Find`). Reuses the `ProceduralGeometryKind` enum and POD `ProceduralGeometryParams` defined in `Extrinsic.ECS.Component.ProceduralGeometryRef`. `EnsureResident(key, uploadDesc, uploadFn)` either invokes the injected upload functor exactly once on a new key or hits an existing entry and increments a `std::uint32_t` refcount; `Release(key)` decrements. N entities sharing `(Kind, Hash(Params))` share one `GpuGeometryHandle`. No live ECS, no graphics imports beyond the existing `Extrinsic.Graphics.GpuWorld` value-type edge. Extraction-tick wiring and deferred-retire policy are GRAPHICS-030-Impl-B and GRAPHICS-030-Impl-C respectively. |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | Per-kind packer `Pack(kind, params, scratch) -> std::optional<GeometryUploadDesc>` consuming a runtime-owned `ProceduralGeometryPackBuffer` reused across ticks. Triangle is the only in-scope packer for Impl-A; the vertex layout is `{pos.xyz, uv}` (20 bytes/vertex) matching `Test.MinimalTriangleAcceptance`. Cube / Quad / Sphere / LineStrip extend the enum + packer table without cache or extraction lifecycle changes. |
-| `Extrinsic.Runtime.ReferenceScene` | Opt-in runtime-owned reference scene seam (GRAPHICS-029A). Exports `IReferenceSceneProvider`, `ReferenceSceneRegistry`, `ReferenceSceneEntity`/`ReferenceScenePopulation`, and `MakeDefaultReferenceSceneRegistry()`. `Engine::Initialize()` resolves `EngineConfig::ReferenceScene::Selector` against `Engine::GetReferenceSceneRegistry()` exactly once after scene-registry construction and before `IApplication::OnInitialize`, then stores the returned `ReferenceScenePopulation` so `Engine::Shutdown()` routes teardown through the same provider before the scene registry is destroyed. `m_ReferenceSceneInstalled` guards against double-install via `std::terminate` (GRAPHICS-029 Decision 7). GRAPHICS-029A registers no concrete provider — unknown selectors resolve to a no-op default so existing CPU/null tests observe zero renderable candidates; GRAPHICS-029B will register `TriangleProvider` and tighten unknown-selector handling. |
+| `Extrinsic.Runtime.ReferenceScene` | Opt-in runtime-owned reference scene seam (GRAPHICS-029A/B). Exports `IReferenceSceneProvider`, `ReferenceSceneRegistry`, `ReferenceSceneEntity`/`ReferenceScenePopulation`, `TriangleProvider`, `MakeDefaultReferenceSceneRegistry()`, `RegisterDefaultReferenceProvidersIfAbsent()`, and `BuildReferenceCameraViewInput()`. `Engine::Initialize()` invokes `RegisterDefaultReferenceProvidersIfAbsent` so any unregistered selector receives its production default (currently `TriangleProvider` for `Triangle`), then resolves `EngineConfig::ReferenceScene::Selector` against `Engine::GetReferenceSceneRegistry()` exactly once after scene-registry construction and before `IApplication::OnInitialize`. The returned `ReferenceScenePopulation` is stored so `Engine::Shutdown()` routes teardown through the same provider before the scene registry is destroyed; the optional `CameraViewInput` seed is captured on `m_ReferenceCamera` for camera substitution. `m_ReferenceSceneInstalled` guards against double-install via `std::terminate`, and `ReferenceSceneRegistry::Resolve()` itself terminates on unregistered selectors (GRAPHICS-029 Decision 7 applied to both register and resolve). `TriangleProvider::Populate` calls `ECS::Scene::CreateDefault(scene, "ReferenceTriangle")`, attaches `Graphics::Components::RenderSurface{Domain = Vertex}` and `ECS::Components::ProceduralGeometryRef{Kind = Triangle}`, and returns a CameraViewInput seed (position (0,0,3), forward (0,0,-1), up (0,1,0), near 0.1, far 100). |
 | `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
 
@@ -76,4 +76,29 @@ GPU geometry or material rebind.
 Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
 and transform application. Graphics receives only immutable `CameraViewInput`,
 `PickPixelRequest`, and transform-gizmo render packets during extraction.
+
+## Reference camera substitution (transitional)
+
+When `EngineConfig::ReferenceScene::Enabled = true` and the resolved provider
+returns a `CameraViewInput` seed, `Engine::RunFrame()` substitutes
+`RenderFrameInput::Camera` with `BuildReferenceCameraViewInput(seed, viewport)`
+before the renderer extraction phase. The helper finalises `View` via
+`glm::lookAt(seed.Position, seed.Position + seed.Forward, seed.Up)` and
+`Projection` via `glm::perspective(45° fovY, viewport.Width/viewport.Height,
+seed.NearPlane, seed.FarPlane)`, then flips `Projection[1][1]` for Vulkan
+clip-space Y inversion (matching the legacy `Graphics::CameraComponent`
+update at `src/legacy/Graphics/Graphics.Camera.cpp:34-39`). Without the flip
+the promoted Vulkan/reference-scene path would render the seeded triangle
+vertically inverted and any screen-space derivations from the resulting
+`CameraViewSnapshot` would use the wrong Y convention. The result still
+passes the GRAPHICS-002 sanitiser used by `Graphics::BuildCameraViewSnapshot`
+because the determinant check uses `std::abs`.
+
+This direct substitution is intentionally a bridge. `RUNTIME-081`
+(`Extrinsic.Runtime.CameraControllers`) and the broader `RUNTIME-002` umbrella
+will consume the `CameraViewInput` seed as the active controller's *initial
+state* and replace the direct read of `m_ReferenceCamera` with
+`controller->Update(input, dt)` / `controller->GetView(viewport)`. The
+`Engine::RunFrame()` substitution call site carries a `// TODO(RUNTIME-081)`
+comment marking the mechanical retirement anchor.
 

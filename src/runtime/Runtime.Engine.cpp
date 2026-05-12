@@ -204,20 +204,28 @@ namespace Extrinsic::Runtime
         // ── 6. ECS scene ──────────────────────────────────────────────────
         m_Scene = std::make_unique<ECS::Scene::Registry>();
 
-        // ── 6b. Reference scene bootstrap (GRAPHICS-029A) ─────────────────
+        // ── 6b. Reference scene bootstrap (GRAPHICS-029A/B) ───────────────
         // Opt-in: only fires when EngineConfig::ReferenceScene::Enabled is
         // true. The default-off path leaves m_ReferenceScenePopulation
         // empty so RenderExtraction observes zero candidates. Double-install
         // is rejected via std::terminate to match the registry's
         // GRAPHICS-029 Decision 7 invariant.
+        //
+        // GRAPHICS-029B: install the production default providers for any
+        // selector that does not yet have an explicit registration so the
+        // resolve path is always covered without colliding with the strict
+        // double-install guard.
         if (m_Config.ReferenceScene.Enabled)
         {
             if (m_ReferenceSceneInstalled)
                 std::terminate();
 
+            RegisterDefaultReferenceProvidersIfAbsent(m_ReferenceSceneRegistry);
+
             IReferenceSceneProvider& provider =
                 m_ReferenceSceneRegistry.Resolve(m_Config.ReferenceScene.Selector);
             m_ReferenceScenePopulation = provider.Populate(*m_Scene);
+            m_ReferenceCamera = m_ReferenceScenePopulation.Camera;
             m_ReferenceSceneInstalled = true;
         }
 
@@ -248,6 +256,7 @@ namespace Extrinsic::Runtime
             std::unique_ptr<ECS::Scene::Registry>& Scene;
             ReferenceSceneRegistry& ReferenceRegistry;
             ReferenceScenePopulation& ReferencePopulation;
+            std::optional<Graphics::CameraViewInput>& ReferenceCameraSeed;
             bool& ReferenceInstalled;
             Core::Config::ReferenceSceneSelector ReferenceSelector;
             bool ReferenceEnabled;
@@ -268,6 +277,7 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<ECS::Scene::Registry>& scene,
                           ReferenceSceneRegistry& referenceRegistry,
                           ReferenceScenePopulation& referencePopulation,
+                          std::optional<Graphics::CameraViewInput>& referenceCameraSeed,
                           bool& referenceInstalled,
                           Core::Config::ReferenceSceneSelector referenceSelector,
                           bool referenceEnabled)
@@ -287,6 +297,7 @@ namespace Extrinsic::Runtime
                 , Scene(scene)
                 , ReferenceRegistry(referenceRegistry)
                 , ReferencePopulation(referencePopulation)
+                , ReferenceCameraSeed(referenceCameraSeed)
                 , ReferenceInstalled(referenceInstalled)
                 , ReferenceSelector(referenceSelector)
                 , ReferenceEnabled(referenceEnabled)
@@ -311,9 +322,11 @@ namespace Extrinsic::Runtime
             }
             void DestroyScene() override
             {
-                // Reference scene teardown (GRAPHICS-029A): route entity
+                // Reference scene teardown (GRAPHICS-029A/B): route entity
                 // destruction through the same provider that authored them
-                // before the scene registry is wholesale destroyed.
+                // before the scene registry is wholesale destroyed, and
+                // clear the cached camera seed so a re-Initialize loop does
+                // not republish a stale reference camera.
                 if (ReferenceEnabled && ReferenceInstalled && Scene)
                 {
                     if (IReferenceSceneProvider* provider =
@@ -324,6 +337,7 @@ namespace Extrinsic::Runtime
                     ReferencePopulation = ReferenceScenePopulation{};
                     ReferenceInstalled = false;
                 }
+                ReferenceCameraSeed.reset();
                 Scene.reset();
             }
             void DestroyAssets() override
@@ -390,6 +404,7 @@ namespace Extrinsic::Runtime
                             m_Scene,
                             m_ReferenceSceneRegistry,
                             m_ReferenceScenePopulation,
+                            m_ReferenceCamera,
                             m_ReferenceSceneInstalled,
                             m_Config.ReferenceScene.Selector,
                             m_Config.ReferenceScene.Enabled);
@@ -503,10 +518,23 @@ namespace Extrinsic::Runtime
         m_Application->OnVariableTick(*this, alpha, frameDt);
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
-        const Graphics::RenderFrameInput renderInput{
+        const Platform::Extent2D viewport = m_Window->GetFramebufferExtent();
+        Graphics::RenderFrameInput renderInput{
             .Alpha    = alpha,
-            .Viewport = m_Window->GetFramebufferExtent(),
+            .Viewport = viewport,
         };
+
+        // GRAPHICS-029B reference camera substitution.
+        // TODO(RUNTIME-081): superseded by controller-driven update once
+        // Extrinsic.Runtime.CameraControllers consumes the reference seed
+        // as initial state; the call site below is the mechanical retirement
+        // anchor recorded in the GRAPHICS-029B Intermediate-solution notice.
+        if (m_ReferenceCamera.has_value())
+        {
+            renderInput.Camera = BuildReferenceCameraViewInput(*m_ReferenceCamera,
+                                                                viewport.Width,
+                                                                viewport.Height);
+        }
 
         // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
@@ -669,5 +697,10 @@ namespace Extrinsic::Runtime
     bool Engine::IsReferenceSceneInstalled() const noexcept
     {
         return m_ReferenceSceneInstalled;
+    }
+
+    const std::optional<Graphics::CameraViewInput>& Engine::GetReferenceCameraSeed() const noexcept
+    {
+        return m_ReferenceCamera;
     }
 }
