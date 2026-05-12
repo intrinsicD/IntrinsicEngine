@@ -104,6 +104,32 @@ with a supplied `Graphics::GpuAssetCache` view and `GpuSceneSlot` metadata to
 report pending/up-to-date/rebind-required states without performing the later
 GPU geometry or material rebind.
 
+`RenderExtractionCache` also owns the procedural-source residency bridge
+(GRAPHICS-030B). When a renderable candidate carries
+`ECS::Components::ProceduralGeometryRef`, `ExtractAndSubmit()` derives the
+`ProceduralGeometryKey` from `(Kind, Hash(Params))`, drives
+`ProceduralGeometryCache::EnsureResident(key, desc, upload)` against the
+runtime-owned `ProceduralGeometryPackBuffer` scratch and `GpuWorld::UploadGeometry`,
+and on success calls `GpuWorld::SetInstanceGeometry(instance, geometry)`,
+records the resolved key in the sidecar, and applies the procedural-source
+sentinel rule by calling `GpuSceneSlot::ClearSourceAsset()` (per GRAPHICS-030
+Decision 5). The packer is only invoked on a cache miss; cache hits do
+refcount-only work. If a renderable also carries a non-default
+`AssetInstance::Source`, the procedural path is skipped for that entity and
+`ProceduralAndAssetSourceConflict` is incremented while the existing asset
+observation continues. Retired or shutdown sidecars call
+`ProceduralGeometryCache::Release(key)`; deferred-free retire ordering against
+`GpuWorld::FreeGeometry` is reserved for `GRAPHICS-030C`. The added counter
+fields on `RuntimeRenderExtractionStats` are
+`ProceduralRenderablesEnumerated`, `ProceduralGeometryUploads`,
+`ProceduralGeometryReuseHits`, `ProceduralGeometryFailedPack`,
+`ProceduralGeometryMissingPacker`, `ProceduralGeometryInvalidParams`,
+`ProceduralAndAssetSourceConflict`, and `ProceduralAndRenderableSourceConflict`
+(reserved for future asset-backed renderable conflict detection in
+GRAPHICS-034). `FindRenderableSidecarForTest(stableId)` and
+`GetProceduralGeometryCacheForTest()` are read-only test seams used by the
+`contract;runtime` procedural-geometry tests.
+
 Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
 and transform application. Graphics receives only immutable `CameraViewInput`,
 `PickPixelRequest`, and transform-gizmo render packets during extraction.

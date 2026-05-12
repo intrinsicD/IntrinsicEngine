@@ -464,9 +464,11 @@ independently testable (CPU/null where possible), and gated as recorded.
   live in `src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm` and
   `src/runtime/Runtime.ProceduralGeometry{,Packer}.cppm`. Unblocks
   GRAPHICS-029B and GRAPHICS-030B.
-- [GRAPHICS-030B — Wire RenderExtraction to the procedural geometry residency bridge](GRAPHICS-030B-extraction-procedural-geometry-binding.md):
-  depends on GRAPHICS-030A (done) and GRAPHICS-029B; first task that calls
-  `GpuWorld::UploadGeometry()` and `SetInstanceGeometry()` from extraction.
+- [GRAPHICS-030B — Wire RenderExtraction to the procedural geometry residency bridge (done)](../../done/GRAPHICS-030B-extraction-procedural-geometry-binding.md):
+  landed; depended on GRAPHICS-030A (done) and GRAPHICS-029B (done). First
+  task that calls `GpuWorld::UploadGeometry()` and `SetInstanceGeometry()`
+  from extraction. Unblocks GRAPHICS-030C and the GRAPHICS-032B minimal-debug
+  pass body.
 - [GRAPHICS-030C — Procedural geometry refcount/free retire ordering](GRAPHICS-030C-procedural-geometry-retire-ordering.md):
   depends on GRAPHICS-030B.
 - [GRAPHICS-031A — Default debug surface shaders and pipeline](GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):

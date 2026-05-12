@@ -155,6 +155,7 @@ export namespace Extrinsic::Graphics
         void FreeGeometry(GpuGeometryHandle geometry);
 
         void SetInstanceGeometry(GpuInstanceHandle instance, GpuGeometryHandle geometry);
+        [[nodiscard]] GpuGeometryHandle GetInstanceGeometry(GpuInstanceHandle instance) const noexcept;
         void SetInstanceMaterialSlot(GpuInstanceHandle instance, std::uint32_t materialSlot);
         void SetInstanceRenderFlags(GpuInstanceHandle instance, std::uint32_t flags);
         void SetInstanceTransform(GpuInstanceHandle instance, const glm::mat4& model, const glm::mat4& prevModel);

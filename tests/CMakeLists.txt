@@ -267,6 +267,7 @@ if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.ProceduralGeometryCache.cpp
+        Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeReferenceScene.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
