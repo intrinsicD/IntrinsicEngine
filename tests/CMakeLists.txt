@@ -265,6 +265,7 @@ intrinsic_test_object_lib(EcsContractTestObjs
 # headless-gated IntrinsicRuntimeTests umbrella.
 if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
+        Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.ProceduralGeometryCache.cpp
         Test.RuntimeReferenceScene.cpp
     )

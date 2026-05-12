@@ -49,7 +49,7 @@ Planning parents (retired):
 Triangle-path implementation children (newly opened — pick the next in dependency order):
 - [`done/GRAPHICS-030A`](../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) — procedural geometry descriptor + cache + triangle packer (done; unblocks GRAPHICS-029B and GRAPHICS-030B).
 - [`done/BUILD-001`](../done/BUILD-001-sandbox-shader-compile-wiring.md) — Sandbox shader compile wiring (done).
-- [`runtime/RUNTIME-070`](runtime/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap.
+- [`runtime/RUNTIME-070` (done)](../done/RUNTIME-070-fallback-texture-bootstrap.md) — `GpuAssetCache` fallback texture bootstrap.
 - [`done/GRAPHICS-029A`](../done/GRAPHICS-029A-reference-scene-skeleton.md) (done; unblocks GRAPHICS-029B), [`done/GRAPHICS-029B`](../done/GRAPHICS-029B-triangle-provider-and-camera.md) (done) — reference scene + camera substitution.
 - [`rendering/GRAPHICS-030B`](rendering/GRAPHICS-030B-extraction-procedural-geometry-binding.md), [`GRAPHICS-030C`](rendering/GRAPHICS-030C-procedural-geometry-retire-ordering.md) — extraction wiring + retire ordering.
 - [`rendering/GRAPHICS-031A`](rendering/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md), [`GRAPHICS-031B`](rendering/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md) — default debug surface shaders/pipeline + substitution.

@@ -26,6 +26,37 @@ configuration and composition. `CreateReferenceEngineConfig()` flips
 `EngineConfig{}` keeps `Enabled = false` so existing CPU/null tests do not
 regress.
 
+## Engine initialisation ordering
+
+`Engine::Initialize()` runs the following ordered steps once per engine
+lifetime (re-`Initialize` after `Shutdown` repeats the same order against
+freshly-constructed subsystems):
+
+1. `Core::Tasks::Scheduler::Initialize` — CPU fiber scheduler must be live
+   before any task-graph or streaming dispatch runs.
+2. Platform window, RHI device, renderer construction + `Initialize`.
+3. CPU `FrameGraph` and streaming `TaskGraph` + `StreamingExecutor`.
+4. `Assets::AssetService`.
+5. `Graphics::GpuAssetCache` construction with the renderer's
+   `BufferManager`, `TextureManager`, `SamplerManager`, and the device's
+   `TransferQueue`. Immediately after construction the runtime calls
+   `GpuAssetCache::InitializeFallbackTexture(...)` with the runtime-baked
+   4×4 magenta-and-black `RGBA8_UNORM` checkerboard bytes and a
+   nearest/clamp-to-edge sampler descriptor (RUNTIME-070). The call is
+   gated on `m_Device->IsOperational()`; on the Null backend (or any
+   non-operational device) the bootstrap is skipped and
+   `GpuAssetCacheDiagnostics::FallbackTextureReady` stays `false`, leaving
+   material code on its factor-only shading branch as documented in
+   `src/graphics/assets/README.md`. A non-`Ok` result from
+   `InitializeFallbackTexture` is logged as a single `Core::Log::Warn`
+   breadcrumb and otherwise treated as a graceful "fallback unavailable"
+   transition. The `AssetEventBus` listener is registered after the
+   bootstrap attempt so a failed bootstrap does not block event
+   subscription.
+6. ECS `Scene::Registry` and the opt-in reference-scene bootstrap
+   (GRAPHICS-029A/B).
+7. `IApplication::OnInitialize`.
+
 ## Canonical frame loop phases (`Engine::RunFrame`)
 
 1. Platform events / resize handling.

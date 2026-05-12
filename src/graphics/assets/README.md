@@ -113,14 +113,18 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   under `src/graphics/vulkan` and never leak through RHI or renderer
   module surfaces.
 - **Runtime ownership.** Runtime owns both fallback initialization and
-  upload scheduling. `Runtime.Engine` (or a runtime-side graphics-
-  bootstrap step) calls `cache.InitializeFallbackTexture(fallbackDesc)`
-  exactly once after the cache is constructed and before any runtime
-  asset bridge issues `RequestUpload(GpuTextureRequest)`, sourcing the
-  fallback bytes from a baked engine resource owned by the runtime
-  layer (compiled-in byte array or runtime-loaded engine asset, **not**
-  a graphics-layer file read); the cache only consumes the
-  `std::span<const std::byte>`. Texture-typed asset bridges (planned
+  upload scheduling. `Runtime.Engine::Initialize()` calls
+  `cache.InitializeFallbackTexture(fallbackDesc)` exactly once
+  immediately after constructing the cache (RUNTIME-070), sourcing the
+  fallback bytes from a runtime-baked compiled-in `constexpr` byte
+  array (4×4 `RGBA8_UNORM` magenta-and-black checkerboard, alpha
+  `0xFF`); the cache only consumes the `std::span<const std::byte>`.
+  The call is gated on `m_Device->IsOperational()`, so the Null backend
+  leaves `FallbackTextureReady = false` deterministically. Engine
+  passes the renderer's `SamplerManager` into the cache constructor so
+  the fallback's nearest/clamp-to-edge sampler descriptor resolves
+  through the deduplicated manager path; the cache never reads files.
+  Texture-typed asset bridges (planned
   umbrella module `Extrinsic.Runtime.AssetBridges.Texture`, mirroring
   the `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
   `GRAPHICS-011Q` and the `Extrinsic.Runtime.VisualizationAdapters`
@@ -161,11 +165,15 @@ It must **not** depend on:
 ## Wiring
 
 `Runtime.Engine` constructs the cache after the renderer is initialized
-and subscribes to `AssetEventBus` via `AssetService::SubscribeAll`,
-mapping events to `NotifyFailed` / `NotifyReloaded` / `NotifyDestroyed`.
-`AssetEvent::Ready` is intentionally not handled by the cache itself —
-type-specific bridges (mesh / texture) are responsible for calling
-`RequestUpload` once their CPU payload is final.
+(passing the renderer's `BufferManager`, `TextureManager`, and
+`SamplerManager` plus the device's `TransferQueue`), invokes
+`InitializeFallbackTexture(...)` once on the operational path
+(RUNTIME-070), and subscribes to `AssetEventBus` via
+`AssetService::SubscribeAll`, mapping events to `NotifyFailed` /
+`NotifyReloaded` / `NotifyDestroyed`. `AssetEvent::Ready` is
+intentionally not handled by the cache itself — type-specific bridges
+(mesh / texture) are responsible for calling `RequestUpload` once their
+CPU payload is final.
 
 `AssetHooks::TickAssets()` calls `cache.Tick(device.GetGlobalFrameNumber(),
 device.GetFramesInFlight())` once per frame, after `AssetService::Tick()`.
