@@ -85,5 +85,17 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Closing cleanup carried over from GRAPHICS-029A's Transition notice
 
-- [ ] After `TriangleProvider` registration in `MakeDefaultReferenceSceneRegistry()`, the GRAPHICS-029A `ReferenceSceneRegistry::Resolve(...)` no-op fallback is retired: `Resolve(unregistered_selector)` now fires `std::terminate`, matching GRAPHICS-029 Decision 7's double-install guard policy applied to the resolve path. The existing "Resolve on an unknown selector returns the no-op default" test is replaced by an `EXPECT_DEATH(...)` test that constructs a fresh empty registry and resolves an unregistered selector.
-- [ ] The `#if __has_include(...)` (or CMake-flag) guard around the `ProceduralGeometryRef` assertion is omitted entirely because `GRAPHICS-030A` retired to `tasks/done/` before this slice landed; the test asserts the ref unconditionally.
+- [x] After `TriangleProvider` registration in `MakeDefaultReferenceSceneRegistry()`, the GRAPHICS-029A `ReferenceSceneRegistry::Resolve(...)` no-op fallback is retired: `Resolve(unregistered_selector)` now fires `std::terminate`, matching GRAPHICS-029 Decision 7's double-install guard policy applied to the resolve path. The existing "Resolve on an unknown selector returns the no-op default" test is replaced by an `EXPECT_DEATH(...)` test that constructs a fresh empty registry and resolves an unregistered selector.
+- [x] The `#if __has_include(...)` (or CMake-flag) guard around the `ProceduralGeometryRef` assertion is omitted entirely because `GRAPHICS-030A` retired to `tasks/done/` before this slice landed; the test asserts the ref unconditionally.
+
+## Completion
+- Completed: 2026-05-12.
+- Commit references: `3a7102c` ("GRAPHICS-029B: TriangleProvider, default registration, and reference camera substitution") and `46cb3bb` ("GRAPHICS-029B: flip Projection[1][1] for Vulkan clip-space Y in reference camera"), merged to `main` via PR #812 from branch `claude/setup-agentic-workflow-QcZwZ`.
+- Notes:
+  - All "Required changes", "Tests", "Docs", "Acceptance criteria", and the "Closing cleanup carried over from GRAPHICS-029A's Transition notice" checkboxes were completed in the implementation slices landed by `3a7102c` and `46cb3bb` / PR #812; the verification commands recorded in this task were executed in those sessions.
+  - `Runtime.ReferenceScene.cpp:115` invokes `std::terminate()` for unregistered selectors and `tests/contract/runtime/Test.RuntimeReferenceScene.cpp` covers the behavior via `EXPECT_DEATH` cases; the `ProceduralGeometryRef` assertion is unconditional (no `__has_include` guard) because `GRAPHICS-030A` retired before this slice.
+  - This commit is the mechanical retirement step missed in the implementation merge, matching the GRAPHICS-029 / GRAPHICS-029A / GRAPHICS-030 / GRAPHICS-030A pattern. No source code, shaders, tests, or generated inventories are touched here — only the task file moves from `tasks/active/` to `tasks/done/` and the inbound `active/GRAPHICS-029B` links in `tasks/backlog/README.md`, `tasks/backlog/rendering/README.md`, and `docs/reviews/2026-05-11-sandbox-graphics-gap-analysis.md` are repointed at this `tasks/done/` file.
+  - Downstream unblocked: per the Theme A triangle-path DAG, `GRAPHICS-030B` (extraction → procedural geometry binding) and `GRAPHICS-031A` (default debug surface shaders/pipeline) are the next slices; `RUNTIME-081` (CameraControllers) inherits the `Engine::RunFrame()` `// TODO(RUNTIME-081)` retirement anchor for the direct `m_ReferenceCamera` substitution.
+  - Retirement verification (run in this session):
+    - `python3 tools/agents/check_task_policy.py --root . --strict`
+    - `python3 tools/docs/check_doc_links.py --root .`
