@@ -25,6 +25,7 @@
   - concrete `TopDownCameraController` (orthographic, pan + zoom).
 - [ ] Add a `CameraControllerRegistry` mirroring `ReferenceSceneRegistry`: register a controller for a slot/role, retrieve, swap.
 - [ ] Wire `Engine::OnVariableTick` (or the `BuildRenderFrameInput` helper introduced by `GRAPHICS-029B`) to call `controller->Update(input, dt)` and substitute `controller->GetView(viewport)` into `RenderFrameInput::Camera`. The reference-scene-provided `CameraViewInput` becomes the seed for the controller's initial state.
+- [ ] **Retire the `GRAPHICS-029B` direct camera substitution.** The transitional `m_ReferenceCamera → RenderFrameInput::Camera` substitution introduced by `GRAPHICS-029B` (marked `// TODO(RUNTIME-081): superseded by controller-driven update`) must be deleted in the same commit that wires the controller-driven path. The reference-scene-provided `CameraViewInput` survives only as the controller's initial seed; no other consumer remains.
 - [ ] Configuration: `EngineConfig::Camera { ControllerKind = ControllerKind::Orbit (default) }`. `CreateReferenceEngineConfig()` keeps `Orbit`.
 
 ## Tests

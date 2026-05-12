@@ -3,6 +3,8 @@
 ## Goal
 - Land the runtime-owned reference scene seam declared by `GRAPHICS-029` Decisions 1, 2, 7, 8, and 9: a new `Extrinsic.Runtime.ReferenceScene` module exposing `IReferenceSceneProvider`, `ReferenceSceneRegistry`, and the `EngineConfig::ReferenceScene { Enabled, Selector }` plumbing, plus the `Engine::Initialize()` invocation seam. No provider implementation lands here — the registry resolves to a no-op default so existing CPU/null tests keep observing zero renderable candidates.
 
+> **Transition notice.** The no-op default provider this task registers is intentionally a placeholder for the gap between `GRAPHICS-029A` landing and `GRAPHICS-029B` registering `TriangleProvider` for `ReferenceSceneSelector::Triangle`. Once `GRAPHICS-029B` retires, the no-op default is **not** a permanent fallback — selectors with no provider registered should `std::terminate` (per `GRAPHICS-029` Decision 7's double-install guard policy applied to the resolve path), not silently no-op. The single explicit unit test that exercises "Resolve on an unknown selector returns the no-op default" must therefore be updated alongside `GRAPHICS-029B` to assert the terminate behavior instead. Track this as a closing-cleanup checkbox on `GRAPHICS-029B`.
+
 ## Non-goals
 - No `TriangleProvider` body (that is `GRAPHICS-029B`).
 - No camera substitution into `RenderFrameInput::Camera` (that is `GRAPHICS-029B`).

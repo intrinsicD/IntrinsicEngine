@@ -34,6 +34,18 @@
 
 Before this task can begin its deletions, the `gpu;vulkan` visible-triangle assertion from `GRAPHICS-033D` must be **ported to the default recipe** (or a sibling fixture authored alongside it) and reach the same pixel-readback assertions. That port is part of the upstream gate `GRAPHICS-076` (canonical `Pass.Present` operationally wired). This task verifies the port exists and is passing as its first action; it does not author the port itself.
 
+## Companion intermediate-solution audit
+
+This task is the largest scaffold retirement on the triangle-path; the smaller intermediate solutions introduced alongside the triangle-path tasks each have their own retirement arc owned by another task, but `GRAPHICS-081` verifies the audit is clean before deleting the minimal recipe:
+
+- [ ] `GRAPHICS-029A`'s **no-op default provider** is no longer the resolution path for any registered selector (replaced by `GRAPHICS-029B`'s `TriangleProvider` registration). The "unknown selector → terminate" semantic from `GRAPHICS-029B`'s closing checkbox is in place; the no-op default is unused.
+- [ ] `GRAPHICS-029B`'s **direct `m_ReferenceCamera → RenderFrameInput::Camera` substitution** has been deleted by `RUNTIME-081` (CameraControllers); the reference-scene `CameraViewInput` survives only as the controller's seed. Grep `m_ReferenceCamera` returns zero matches in `Engine::BuildRenderFrameInput` and equivalent helpers.
+- [ ] `GRAPHICS-029B`'s **`#if __has_include(...)` (or CMake-flag) test guard** for `ProceduralGeometryRef` absence has been removed by `GRAPHICS-030A`'s retirement; the corresponding contract assertion is now unconditional.
+- [ ] `GRAPHICS-080`'s **acceptance pointer to the minimal recipe** has been replaced by the canonical default-recipe pointer per its staged-acceptance section.
+- [ ] `GRAPHICS-079`'s **closing-cleanup assertion** is in place: a default-recipe frame in the operational state reports zero `SkippedNonOperational`/`SkippedUnavailable` statuses for canonical pass names.
+
+If any of these audit boxes cannot be checked, the corresponding owner task must retire first; `GRAPHICS-081` does not paper over an unfinished retirement arc.
+
 ## Required changes
 
 ### Source removal

@@ -35,7 +35,9 @@
 ## Acceptance criteria
 - [ ] `ci` preset behavior is unchanged (CPU-only verification stays fast).
 - [ ] `ci-vulkan` preset is configurable, builds, and routes the runtime through the promoted Vulkan path on Vulkan-capable hosts.
-- [ ] `ExtrinsicSandbox` started under the new preset on a Vulkan-capable host renders the GRAPHICS-029B reference triangle through the GRAPHICS-032 minimal recipe.
+- [ ] `ExtrinsicSandbox` started under the new preset on a Vulkan-capable host renders the GRAPHICS-029B reference triangle. The acceptance form is staged:
+  - **Initial form** (immediately after `GRAPHICS-033C` lands, before `GRAPHICS-070..076` retire): the triangle renders through the `FrameRecipe::MinimalDebugSurface` recipe (the bootstrap scaffold authored by `GRAPHICS-032A..D`). This validates the Vulkan operational gate and the preset/config flip in isolation.
+  - **Canonical form** (after `GRAPHICS-070..076` retire and `GRAPHICS-081` deletes the scaffold): the triangle renders through `BuildDefaultFrameRecipe`'s canonical `Pass.Forward.Surface` → `Pass.Present` lane. The `GRAPHICS-076` task is responsible for porting the visible-triangle acceptance to the default recipe, and `GRAPHICS-081` is responsible for deleting the minimal-recipe form. Once both retire, this task's acceptance criterion is read against the canonical form only.
 - [ ] On hosts without Vulkan support, runtime gracefully falls back to Null with the documented breadcrumb.
 
 ## Verification

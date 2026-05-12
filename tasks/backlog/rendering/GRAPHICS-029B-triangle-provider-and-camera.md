@@ -3,6 +3,13 @@
 ## Goal
 - Implement the `TriangleProvider` body and the runtime camera substitution declared by `GRAPHICS-029` Decisions 3 and 4: with `EngineConfig::ReferenceScene::Enabled = true` and `Selector = Triangle`, runtime creates exactly one renderable entity (`MetaData{ EntityName = "ReferenceTriangle" }`, `Transform::Component{}`, `Transform::WorldMatrix{}`, `Hierarchy::Component{}`, `Graphics::Components::RenderSurface{ Domain = Vertex }`, plus `ECS::Components::ProceduralGeometryRef{ Triangle }` once `GRAPHICS-030A` is complete) and seeds `RenderFrameInput::Camera` with the provider's `CameraViewInput`.
 
+> **Intermediate-solution notice.** Two artifacts introduced by this task are intermediate, with explicit retirement arcs:
+>
+> 1. **The direct `m_ReferenceCamera` substitution into `RenderFrameInput::Camera`** is replaced by [`RUNTIME-081`](../runtime/RUNTIME-081-camera-controllers.md) (CameraControllers umbrella). Once `RUNTIME-081` lands, the reference-scene-provided `CameraViewInput` becomes only the *seed* for the active controller's initial state; per-frame updates come from `controller->Update(input, dt)` + `controller->GetView(viewport)`. The renderer/runtime call site that substitutes `m_ReferenceCamera` directly into `RenderFrameInput::Camera` must be retired by `RUNTIME-081`. Implement the substitution today as a clearly-marked transitional code path (e.g. `// TODO(RUNTIME-081): superseded by controller-driven update`) so the retirement is mechanical.
+> 2. **The `#if __has_include(...)` (or CMake-flag) test guard around the `ProceduralGeometryRef` assertion** exists only because `GRAPHICS-030A` may still be in flight when `GRAPHICS-029B` lands. Once `GRAPHICS-030A` retires to `tasks/done/`, the guard must be removed and the test becomes unconditional. Track this as a closing-cleanup checkbox on `GRAPHICS-030A`'s retirement notice.
+>
+> Neither artifact introduces a permanent design — they are bridges over scheduling gaps.
+
 ## Non-goals
 - No GPU upload, no `GpuWorld::SetInstanceGeometry()` binding (that is `GRAPHICS-030B`).
 - No additional providers beyond `Triangle` (those are `GRAPHICS-029C`).

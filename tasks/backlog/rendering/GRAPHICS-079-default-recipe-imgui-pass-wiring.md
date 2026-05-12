@@ -38,6 +38,7 @@
 - [ ] Submitted overlay frames draw into `FrameRecipe.PresentSource` deterministically.
 - [ ] No graphics-side `imgui.h` import; no `ImDrawData` direct consumption.
 - [ ] No regression in `Pass.Present` contract.
+- [ ] **Closing-cleanup assertion for the Phase-2 wiring family.** This task is the final default-recipe pass to wire. With all of `GRAPHICS-070..079` operational, every canonical default-recipe pass name resolves to a real `Record*Pass(...)` helper in the renderer executor lambda; no canonical pass name falls through to the executor's `"everything else"` soft-skip default branch. Add a `contract;graphics` test that drives one default-recipe frame in the operational state, enumerates `RenderGraphCommandPassStats::Passes`, and asserts that none of the canonical default-recipe pass names report `SkippedNonOperational` or `SkippedUnavailable`. The soft-skip default branch is preserved (it remains a safety net for non-operational devices and for future pass names that haven't been wired yet), but no canonical default-recipe pass name should reach it.
 
 ## Verification
 ```bash

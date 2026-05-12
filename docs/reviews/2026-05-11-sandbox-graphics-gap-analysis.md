@@ -119,6 +119,26 @@ three diagnostics counters + CMake entries + tests + doc rows all removed.
 the Vulkan operational-status evaluator (GRAPHICS-033A/B) all stay — they are
 the canonical architecture, not scaffolding.
 
+### Other intermediate solutions and their retirement arcs
+
+Beyond the MinimalDebug scaffold, the triangle-path tasks introduce four
+smaller intermediate solutions. Each has an owning retirement task; the
+`GRAPHICS-081` companion audit verifies that none of them survive the
+full-pipeline completion.
+
+| Intermediate solution | Owner of retirement | Form of retirement |
+|---|---|---|
+| `GRAPHICS-029A` no-op default `IReferenceSceneProvider` for unregistered selectors | `GRAPHICS-029B` (closing checkbox) | Replaced by `std::terminate` on unknown-selector resolve, matching `GRAPHICS-029` Decision 7 double-install policy. |
+| `GRAPHICS-029B` direct `m_ReferenceCamera → RenderFrameInput::Camera` substitution in `Engine::BuildRenderFrameInput` | `RUNTIME-081` (CameraControllers) | Deleted in the same commit that wires the controller-driven update. Reference-scene `CameraViewInput` survives only as the controller's initial seed. |
+| `GRAPHICS-029B` `#if __has_include(...)` (or CMake-flag) test guard around the `ProceduralGeometryRef` assertion | `GRAPHICS-030A` retirement | Guard removed; assertion becomes unconditional. |
+| `GRAPHICS-080` acceptance pointer to "renders through GRAPHICS-032 minimal recipe" | `GRAPHICS-076` + `GRAPHICS-081` | Staged: initially the minimal recipe (validates the Vulkan operational gate in isolation); finally the default recipe (canonical). |
+| Renderer executor's `"everything else returns SkippedNonOperational/SkippedUnavailable"` default branch (pre-existing, not introduced here) | `GRAPHICS-079` (closing-cleanup assertion) | The default branch is preserved as a safety net for non-operational devices, but a `contract;graphics` test asserts no canonical default-recipe pass name falls through it once `GRAPHICS-070..079` retire. |
+
+The `GRAPHICS-081` companion audit section lists each of these as a
+prerequisite checkbox before the minimal recipe is deleted, so the team
+cannot accidentally cement an intermediate solution past the full-pipeline
+completion.
+
 ## Validation notes
 
 - This review introduces no source code changes.
