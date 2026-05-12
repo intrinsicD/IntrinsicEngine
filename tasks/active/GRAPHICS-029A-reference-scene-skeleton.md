@@ -13,7 +13,8 @@
 - No `ECS::Components::ProceduralGeometryRef` consumption (that requires `GRAPHICS-030A` first).
 
 ## Context
-- Status: not started.
+- Status: in-progress.
+- Owner/agent: Claude Code agent on branch `claude/setup-agentic-workflow-stYp3`.
 - Owner/layer: `runtime` for the new module; `core` for the new `EngineConfig::ReferenceScene` field (per `GRAPHICS-029` Decision 9).
 - Planning parent: [`tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md`](../../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md), Decisions 1, 2, 7, 8, 9, 11, plus the Impl-A row in Required changes.
 - Source tree home: `src/runtime/Runtime.ReferenceScene.cppm` (and `.cpp` if behavior beyond the registry stub is needed). Field lives in `src/core/Core.Config.Engine.cppm` (or a new `Core.Config.ReferenceScene` partition; the implementer decides).
@@ -21,33 +22,33 @@
 - Default-off rationale: `EngineConfig{}` keeps `Enabled = false`; only `CreateReferenceEngineConfig()` flips it to `true`.
 
 ## Required changes
-- [ ] Add `EngineConfig::ReferenceScene { bool Enabled = false; ReferenceSceneSelector Selector = ReferenceSceneSelector::Triangle; }` (and the `ReferenceSceneSelector` enum) to `Core.Config.Engine`.
-- [ ] Add `src/runtime/Runtime.ReferenceScene.cppm` exporting `Extrinsic.Runtime.ReferenceScene` with:
+- [x] Add `EngineConfig::ReferenceScene { bool Enabled = false; ReferenceSceneSelector Selector = ReferenceSceneSelector::Triangle; }` (and the `ReferenceSceneSelector` enum) to `Core.Config.Engine`.
+- [x] Add `src/runtime/Runtime.ReferenceScene.cppm` exporting `Extrinsic.Runtime.ReferenceScene` with:
   - `struct ReferenceSceneEntity` (placeholder owned-handle list value type),
   - `struct ReferenceScenePopulation { std::vector<ReferenceSceneEntity> Entities; std::optional<Graphics::CameraViewInput> Camera; }`,
   - `class IReferenceSceneProvider` with `Populate(scene) -> ReferenceScenePopulation`, `Teardown(scene, entities)`,
   - `class ReferenceSceneRegistry` with `Register(selector, std::unique_ptr<IReferenceSceneProvider>)`, `Resolve(selector) -> IReferenceSceneProvider*`, `ResolveOrNull(selector)`.
-- [ ] Wire `Engine::Initialize()` to invoke the resolved provider when `m_Config.ReferenceScene.Enabled`. Store the returned `ReferenceScenePopulation` so `Engine::Shutdown()` can call `Teardown(*m_Scene, population.Entities)`. Add a `bool m_ReferenceSceneInstalled` guard so double-install fires `std::terminate` (per `GRAPHICS-029` Decision 7 idempotency rule).
-- [ ] `CreateReferenceEngineConfig()` flips `EngineConfig::ReferenceScene::Enabled = true` and `Selector = ReferenceSceneSelector::Triangle`.
-- [ ] Until `GRAPHICS-029B` lands, the registry resolves to a no-op default provider (returns `ReferenceScenePopulation{}`); no entity is created.
-- [ ] Wire the new module into `src/runtime/CMakeLists.txt`.
+- [x] Wire `Engine::Initialize()` to invoke the resolved provider when `m_Config.ReferenceScene.Enabled`. Store the returned `ReferenceScenePopulation` so `Engine::Shutdown()` can call `Teardown(*m_Scene, population.Entities)`. Add a `bool m_ReferenceSceneInstalled` guard so double-install fires `std::terminate` (per `GRAPHICS-029` Decision 7 idempotency rule).
+- [x] `CreateReferenceEngineConfig()` flips `EngineConfig::ReferenceScene::Enabled = true` and `Selector = ReferenceSceneSelector::Triangle`.
+- [x] Until `GRAPHICS-029B` lands, the registry resolves to a no-op default provider (returns `ReferenceScenePopulation{}`); no entity is created.
+- [x] Wire the new module into `src/runtime/CMakeLists.txt`.
 
 ## Tests
-- [ ] `contract;runtime` test: with default-constructed `EngineConfig{}` (Enabled=false), `Engine` initializes and shuts down cleanly and `RenderExtractionCache::ExtractAndSubmit()` reports `CandidateRenderableCount == 0`.
-- [ ] `contract;runtime` test: with `CreateReferenceEngineConfig()` (Enabled=true) and the no-op default provider, `Engine` initializes/shutdowns cleanly without entity creation; `m_ReferenceSceneInstalled` flips to `true` once.
-- [ ] `contract;runtime` test: `ReferenceSceneRegistry::Register` followed by `Resolve` returns the registered provider; `Resolve` on an unknown selector returns the no-op default.
-- [ ] No `gpu`/`vulkan` tests in this slice.
+- [x] `contract;runtime` test: with default-constructed `EngineConfig{}` (Enabled=false), `Engine` initializes and shuts down cleanly and `RenderExtractionCache::ExtractAndSubmit()` reports `CandidateRenderableCount == 0`.
+- [x] `contract;runtime` test: with `CreateReferenceEngineConfig()` (Enabled=true) and the no-op default provider, `Engine` initializes/shutdowns cleanly without entity creation; `m_ReferenceSceneInstalled` flips to `true` once.
+- [x] `contract;runtime` test: `ReferenceSceneRegistry::Register` followed by `Resolve` returns the registered provider; `Resolve` on an unknown selector returns the no-op default.
+- [x] No `gpu`/`vulkan` tests in this slice.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` planned-module rows to current-state public module rows for `Extrinsic.Runtime.ReferenceScene`.
-- [ ] Update `src/core/README.md` (or relevant) with the new `EngineConfig::ReferenceScene` field.
-- [ ] Refresh `docs/api/generated/module_inventory.md` after adding the module surface.
+- [x] Update `src/runtime/README.md` planned-module rows to current-state public module rows for `Extrinsic.Runtime.ReferenceScene`.
+- [x] Update `src/core/README.md` (or relevant) with the new `EngineConfig::ReferenceScene` field.
+- [x] Refresh `docs/api/generated/module_inventory.md` after adding the module surface.
 
 ## Acceptance criteria
-- [ ] `Extrinsic.Runtime.ReferenceScene` compiles through the `ci` preset.
-- [ ] `EngineConfig::ReferenceScene` field is plumbed end-to-end with default-off behavior preserving existing CPU/null tests.
-- [ ] No frame extraction behavior change with the default provider.
-- [ ] Layering checks pass: runtime imports only `Core`, `ECS::Scene::Registry`, and `Graphics.CameraSnapshots` (already an existing edge); no new graphics/RHI/asset edges.
+- [x] `Extrinsic.Runtime.ReferenceScene` compiles through the `ci` preset.
+- [x] `EngineConfig::ReferenceScene` field is plumbed end-to-end with default-off behavior preserving existing CPU/null tests.
+- [x] No frame extraction behavior change with the default provider.
+- [x] Layering checks pass: runtime imports only `Core`, `ECS::Scene::Registry`, and `Graphics.CameraSnapshots` (already an existing edge); no new graphics/RHI/asset edges.
 
 ## Verification
 ```bash
@@ -70,3 +71,13 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 
 ## Next verification step
 - Implement the module + config field, register the no-op default provider, run the verification commands above.
+
+## Slice plan (active)
+
+1. Add `EngineConfig::ReferenceScene` and the `ReferenceSceneSelector` enum to `Extrinsic.Core.Config.Engine`.
+2. Author `src/runtime/Runtime.ReferenceScene.cppm` with the value types, interface, and registry (no provider body), plus `MakeDefaultReferenceSceneRegistry()` returning a registry that resolves all selectors to a no-op default provider.
+3. Wire `Engine::Initialize()` / `Engine::Shutdown()` to invoke the resolved provider once, gated by `m_Config.ReferenceScene.Enabled` and protected by `m_ReferenceSceneInstalled` (double-install fires `std::terminate`).
+4. Flip `CreateReferenceEngineConfig()` to set `ReferenceScene::Enabled = true`, `Selector = ReferenceSceneSelector::Triangle`.
+5. Add `contract;runtime` tests covering default-off, reference-on no-op, registry register/resolve semantics, and registry double-install guard.
+6. Update `src/runtime/README.md`, `src/core/README.md`, and regenerate `docs/api/generated/module_inventory.md`.
+7. Run the verification commands recorded in this task.

@@ -27,6 +27,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.FrameLoop;
+import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
@@ -203,6 +204,23 @@ namespace Extrinsic::Runtime
         // ── 6. ECS scene ──────────────────────────────────────────────────
         m_Scene = std::make_unique<ECS::Scene::Registry>();
 
+        // ── 6b. Reference scene bootstrap (GRAPHICS-029A) ─────────────────
+        // Opt-in: only fires when EngineConfig::ReferenceScene::Enabled is
+        // true. The default-off path leaves m_ReferenceScenePopulation
+        // empty so RenderExtraction observes zero candidates. Double-install
+        // is rejected via std::terminate to match the registry's
+        // GRAPHICS-029 Decision 7 invariant.
+        if (m_Config.ReferenceScene.Enabled)
+        {
+            if (m_ReferenceSceneInstalled)
+                std::terminate();
+
+            IReferenceSceneProvider& provider =
+                m_ReferenceSceneRegistry.Resolve(m_Config.ReferenceScene.Selector);
+            m_ReferenceScenePopulation = provider.Populate(*m_Scene);
+            m_ReferenceSceneInstalled = true;
+        }
+
         // ── 7. Application ────────────────────────────────────────────────
         m_Application->OnInitialize(*this);
 
@@ -228,6 +246,11 @@ namespace Extrinsic::Runtime
             std::unique_ptr<Graphics::GpuAssetCache>& GpuAssetCache;
             Assets::AssetEventBus::ListenerToken& GpuAssetCacheListener;
             std::unique_ptr<ECS::Scene::Registry>& Scene;
+            ReferenceSceneRegistry& ReferenceRegistry;
+            ReferenceScenePopulation& ReferencePopulation;
+            bool& ReferenceInstalled;
+            Core::Config::ReferenceSceneSelector ReferenceSelector;
+            bool ReferenceEnabled;
 
             ShutdownHooks(Engine& owner,
                           bool& running,
@@ -242,7 +265,12 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<Assets::AssetService>& assetService,
                           std::unique_ptr<Graphics::GpuAssetCache>& gpuAssetCache,
                           Assets::AssetEventBus::ListenerToken& gpuAssetCacheListener,
-                          std::unique_ptr<ECS::Scene::Registry>& scene)
+                          std::unique_ptr<ECS::Scene::Registry>& scene,
+                          ReferenceSceneRegistry& referenceRegistry,
+                          ReferenceScenePopulation& referencePopulation,
+                          bool& referenceInstalled,
+                          Core::Config::ReferenceSceneSelector referenceSelector,
+                          bool referenceEnabled)
                 : Owner(owner)
                 , Running(running)
                 , Initialized(initialized)
@@ -257,6 +285,11 @@ namespace Extrinsic::Runtime
                 , GpuAssetCache(gpuAssetCache)
                 , GpuAssetCacheListener(gpuAssetCacheListener)
                 , Scene(scene)
+                , ReferenceRegistry(referenceRegistry)
+                , ReferencePopulation(referencePopulation)
+                , ReferenceInstalled(referenceInstalled)
+                , ReferenceSelector(referenceSelector)
+                , ReferenceEnabled(referenceEnabled)
             {
             }
 
@@ -276,7 +309,23 @@ namespace Extrinsic::Runtime
                 if (StreamingExecutorPtr)
                     StreamingExecutorPtr->ShutdownAndDrain();
             }
-            void DestroyScene() override { Scene.reset(); }
+            void DestroyScene() override
+            {
+                // Reference scene teardown (GRAPHICS-029A): route entity
+                // destruction through the same provider that authored them
+                // before the scene registry is wholesale destroyed.
+                if (ReferenceEnabled && ReferenceInstalled && Scene)
+                {
+                    if (IReferenceSceneProvider* provider =
+                            ReferenceRegistry.ResolveOrNull(ReferenceSelector))
+                    {
+                        provider->Teardown(*Scene, ReferencePopulation.Entities);
+                    }
+                    ReferencePopulation = ReferenceScenePopulation{};
+                    ReferenceInstalled = false;
+                }
+                Scene.reset();
+            }
             void DestroyAssets() override
             {
                 // Unsubscribe before destroying the cache so a late event
@@ -338,7 +387,12 @@ namespace Extrinsic::Runtime
                             m_AssetService,
                             m_GpuAssetCache,
                             m_GpuAssetCacheListener,
-                            m_Scene);
+                            m_Scene,
+                            m_ReferenceSceneRegistry,
+                            m_ReferenceScenePopulation,
+                            m_ReferenceSceneInstalled,
+                            m_Config.ReferenceScene.Selector,
+                            m_Config.ReferenceScene.Enabled);
         ExecuteRuntimeShutdownContract(hooks);
     }
 
@@ -606,4 +660,14 @@ namespace Extrinsic::Runtime
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
     Core::Dag::TaskGraph& Engine::GetStreamingGraph() noexcept { return *m_StreamingGraph; }
+
+    ReferenceSceneRegistry& Engine::GetReferenceSceneRegistry() noexcept
+    {
+        return m_ReferenceSceneRegistry;
+    }
+
+    bool Engine::IsReferenceSceneInstalled() const noexcept
+    {
+        return m_ReferenceSceneInstalled;
+    }
 }

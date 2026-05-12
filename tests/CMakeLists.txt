@@ -266,6 +266,7 @@ intrinsic_test_object_lib(EcsContractTestObjs
 if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.ProceduralGeometryCache.cpp
+        Test.RuntimeReferenceScene.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
         SEARCH_DIRS contract/runtime
