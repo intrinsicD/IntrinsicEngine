@@ -445,6 +445,100 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   (`GRAPHICS-034-Impl-A/B/C/D/E`) are identified but not opened. Depends on
   GRAPHICS-028, GRAPHICS-030, and ASSETIO-001 ingest ownership.
 
+### Theme A — Triangle path implementation children (GRAPHICS-029A..033D, GRAPHICS-080)
+
+These tasks open the previously-identified-but-not-opened implementation slices
+under GRAPHICS-029..033 in dependency order so the sandbox can render its first
+visible triangle through the promoted runtime/graphics path. Each leaf is small,
+independently testable (CPU/null where possible), and gated as recorded.
+
+- [GRAPHICS-029A — Reference scene skeleton (interface, registry, config field)](GRAPHICS-029A-reference-scene-skeleton.md):
+  depends on GRAPHICS-029 (planning) and HARDEN-060 (done).
+- [GRAPHICS-029B — TriangleProvider and reference camera substitution](GRAPHICS-029B-triangle-provider-and-camera.md):
+  depends on GRAPHICS-029A and GRAPHICS-030A (active) for the
+  `ProceduralGeometryRef` type.
+- [GRAPHICS-030A — Procedural geometry descriptor, cache, and triangle packer (active)](../../active/GRAPHICS-030A-procedural-geometry-descriptor-cache.md):
+  in progress; the earliest unblocked implementation child.
+- [GRAPHICS-030B — Wire RenderExtraction to the procedural geometry residency bridge](GRAPHICS-030B-extraction-procedural-geometry-binding.md):
+  depends on GRAPHICS-030A and GRAPHICS-029B; first task that calls
+  `GpuWorld::UploadGeometry()` and `SetInstanceGeometry()` from extraction.
+- [GRAPHICS-030C — Procedural geometry refcount/free retire ordering](GRAPHICS-030C-procedural-geometry-retire-ordering.md):
+  depends on GRAPHICS-030B.
+- [GRAPHICS-031A — Default debug surface shaders and pipeline](GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
+  depends on GRAPHICS-031 (planning) and BUILD-001 (Sandbox shader compile
+  wiring).
+- [GRAPHICS-031B — Default debug surface substitution and diagnostics counters](GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
+  depends on GRAPHICS-031A.
+- [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration](GRAPHICS-032A-minimal-debug-surface-recipe.md):
+  depends on GRAPHICS-031A.
+- [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body](GRAPHICS-032B-minimal-debug-surface-pass-body.md):
+  depends on GRAPHICS-032A and GRAPHICS-030B.
+- [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test](GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
+  depends on GRAPHICS-032B.
+- [GRAPHICS-033A — Vulkan operational-status evaluator surface](GRAPHICS-033A-vulkan-operational-status-evaluator.md):
+  depends on GRAPHICS-033 (planning).
+- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
+  depends on GRAPHICS-033A.
+- [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
+  depends on GRAPHICS-032C, GRAPHICS-031B, GRAPHICS-033B, and GRAPHICS-018R
+  (done) operational-transition seam.
+- [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
+  depends on GRAPHICS-033C.
+- [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture](GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
+  depends on GRAPHICS-033C and GRAPHICS-032D.
+- [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan](GRAPHICS-080-enable-promoted-vulkan-by-default.md):
+  depends on GRAPHICS-033C; non-blocking before that landing (only the
+  fail-closed fallback breadcrumb fires).
+
+Cross-layer Theme A leaves outside `rendering/`:
+- [`runtime/BUILD-001` — Wire shader compilation to the promoted Sandbox build](../runtime/BUILD-001-sandbox-shader-compile-wiring.md).
+- [`runtime/RUNTIME-070` — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../runtime/RUNTIME-070-fallback-texture-bootstrap.md).
+
+### Theme B′ — Default-recipe pass operational wiring (GRAPHICS-070..079)
+
+These tasks wire each default-recipe pass family from soft-skip
+(`SkippedNonOperational` / `SkippedUnavailable`) to real command recording.
+They depend on the Theme A triangle path at minimum through GRAPHICS-031A
+(default-debug pipeline), and individually through their listed pass-family
+gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
+`GRAPHICS-033D`.
+
+- [GRAPHICS-070 — Default-recipe `Pass.Forward.Surface` operational wiring](GRAPHICS-070-default-recipe-forward-surface-pass-wiring.md):
+  depends on GRAPHICS-031A (slot-0 pipeline) and GRAPHICS-030B (residency).
+- [GRAPHICS-071 — Default-recipe `Pass.Forward.Line` and `Pass.Forward.Point` wiring](GRAPHICS-071-default-recipe-forward-line-point-wiring.md):
+  depends on GRAPHICS-070.
+- [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
+  depends on GRAPHICS-070, GRAPHICS-073.
+- [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation](GRAPHICS-073-default-recipe-shadow-pass-wiring.md):
+  depends on GRAPHICS-070.
+- [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
+  depends on GRAPHICS-070.
+- [GRAPHICS-075 — Default-recipe postprocess chain wiring](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
+  depends on GRAPHICS-072 (HDR scene color producer).
+- [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
+  depends on GRAPHICS-075.
+- [GRAPHICS-077 — Backend transient-debug-primitive upload helper](GRAPHICS-077-transient-debug-primitive-upload-helper.md):
+  depends on GRAPHICS-072 (uses `SceneColorHDR`/`SceneDepth` LOAD-store).
+- [GRAPHICS-078 — Backend visualization-overlay upload helper](GRAPHICS-078-visualization-overlay-upload-helper.md):
+  depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
+- [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](GRAPHICS-079-default-recipe-imgui-pass-wiring.md):
+  depends on GRAPHICS-076 (PresentSource finalization) and `runtime/RUNTIME-090`
+  (ImGui adapter producer).
+- [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
+  depends on GRAPHICS-031A/B and GRAPHICS-070..076; deletes the
+  `MinimalDebug` recipe, pass classes, executor branches, diagnostics
+  counters, CMake entries, tests, and doc rows once the default recipe
+  records all canonical pass bodies and the default-recipe equivalent of the
+  GRAPHICS-033D `gpu;vulkan` visible-triangle smoke is green.
+
+Cross-layer Theme B′ leaves outside `rendering/`:
+- [`runtime/RUNTIME-080` — Texture asset bridge](../runtime/RUNTIME-080-asset-bridges-texture.md).
+- [`runtime/RUNTIME-081` — Camera controllers](../runtime/RUNTIME-081-camera-controllers.md).
+- [`runtime/RUNTIME-082` — Spatial debug adapters](../runtime/RUNTIME-082-spatial-debug-adapters.md).
+- [`runtime/RUNTIME-083` — Visualization adapters](../runtime/RUNTIME-083-visualization-adapters.md).
+- [`runtime/RUNTIME-084` — Gizmo interaction](../runtime/RUNTIME-084-gizmo-interaction.md).
+- [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../runtime/RUNTIME-090-imgui-platform-renderer-adapter.md).
+
 ### Modernization roadmap (GRAPHICS-035..058)
 
 The tasks below form the agreed phased path from the current 2025-era
