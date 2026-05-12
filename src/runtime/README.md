@@ -85,8 +85,14 @@ returns a `CameraViewInput` seed, `Engine::RunFrame()` substitutes
 before the renderer extraction phase. The helper finalises `View` via
 `glm::lookAt(seed.Position, seed.Position + seed.Forward, seed.Up)` and
 `Projection` via `glm::perspective(45° fovY, viewport.Width/viewport.Height,
-seed.NearPlane, seed.FarPlane)`. The resulting `CameraViewInput` passes the
-GRAPHICS-002 sanitizer used by `Graphics::BuildCameraViewSnapshot`.
+seed.NearPlane, seed.FarPlane)`, then flips `Projection[1][1]` for Vulkan
+clip-space Y inversion (matching the legacy `Graphics::CameraComponent`
+update at `src/legacy/Graphics/Graphics.Camera.cpp:34-39`). Without the flip
+the promoted Vulkan/reference-scene path would render the seeded triangle
+vertically inverted and any screen-space derivations from the resulting
+`CameraViewSnapshot` would use the wrong Y convention. The result still
+passes the GRAPHICS-002 sanitiser used by `Graphics::BuildCameraViewSnapshot`
+because the determinant check uses `std::abs`.
 
 This direct substitution is intentionally a bridge. `RUNTIME-081`
 (`Extrinsic.Runtime.CameraControllers`) and the broader `RUNTIME-002` umbrella

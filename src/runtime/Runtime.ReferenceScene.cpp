@@ -159,6 +159,15 @@ namespace Extrinsic::Runtime
                                                 aspect,
                                                 seed.NearPlane,
                                                 seed.FarPlane);
+        // Vulkan clip-space Y is inverted relative to glm::perspective's
+        // OpenGL-oriented output; the promoted renderer's camera UBO consumes
+        // Projection directly, so the Y row must be flipped here for parity
+        // with the legacy CameraComponent path
+        // (src/legacy/Graphics/Graphics.Camera.cpp:34-39). Without this, the
+        // reference triangle renders vertically inverted and any screen-space
+        // derivations from the resulting CameraViewSnapshot use the wrong Y
+        // convention.
+        finalized.Projection[1][1] *= -1.0f;
         return finalized;
     }
 }

@@ -1,3 +1,4 @@
+#include <cmath>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -226,11 +227,21 @@ TEST(ReferenceCameraBuildInput, ProducesSanitizerValidSnapshotWithViewportAspect
                                                                      viewportHeight);
     EXPECT_TRUE(finalized.Valid);
 
+    // Vulkan clip-space Y inversion: glm::perspective produces a positive
+    // Projection[1][1]; BuildReferenceCameraViewInput must flip it negative
+    // for parity with the legacy CameraComponent path
+    // (src/legacy/Graphics/Graphics.Camera.cpp:34-39). Without the flip, the
+    // promoted renderer would render the reference triangle vertically
+    // inverted.
+    EXPECT_LT(finalized.Projection[1][1], 0.0f);
+
     // Aspect baked into the perspective matrix matches the viewport. Using
-    // glm::perspective(fovY, aspect, n, f): Projection[1][1] = 1 / tan(fovY/2)
-    // and Projection[0][0] = Projection[1][1] / aspect.
+    // glm::perspective(fovY, aspect, n, f) with the Vulkan Y flip:
+    // Projection[1][1] = -1 / tan(fovY/2), Projection[0][0] = (1 / tan(fovY/2)) / aspect,
+    // so |Projection[1][1] / Projection[0][0]| == aspect.
     ASSERT_NE(finalized.Projection[0][0], 0.0f);
-    const float derivedAspect = finalized.Projection[1][1] / finalized.Projection[0][0];
+    const float derivedAspect = std::abs(finalized.Projection[1][1] /
+                                         finalized.Projection[0][0]);
     const float expectedAspect = static_cast<float>(viewportWidth) /
                                   static_cast<float>(viewportHeight);
     EXPECT_NEAR(derivedAspect, expectedAspect, 1e-4f);
