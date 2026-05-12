@@ -33,7 +33,7 @@ export namespace Geometry::PointCloud
     //   - Storage via PropertySet (same pattern as HalfedgeMesh / Graph).
     //   - SoA layout for cache-friendly batch processing; each attribute is a
     //     contiguous vector inside the PropertySet registry.
-    //   - Positions are mandatory (built-in "p:position" property).
+    //   - Positions are mandatory (built-in "v:point" property shared with mesh/graph vertex positions).
     //   - Normals, colors and radii are optional built-in properties;
     //     additional per-point attributes may be added via GetOrAddVertexProperty.
     //   - Follows the Geometry operator pattern: Params/Result structs, optional

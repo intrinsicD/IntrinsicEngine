@@ -85,7 +85,7 @@ namespace Geometry::PointCloud
 
     void Cloud::EnsureProperties()
     {
-        m_PPoint = VertexProperty<glm::vec3>(m_Vertices.GetOrAdd<glm::vec3>("p:position", glm::vec3(0.f)));
+        m_PPoint = VertexProperty<glm::vec3>(m_Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.f)));
         m_VDeleted = VertexProperty<bool>(m_Vertices.GetOrAdd<bool>("p:deleted", false));
         if (m_Vertices.Exists("p:normal")) EnableNormals();
         if (m_Vertices.Exists("p:color")) EnableColors();

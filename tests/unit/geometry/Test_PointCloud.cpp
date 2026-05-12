@@ -127,9 +127,10 @@ TEST(PointCloud_Cloud, ConstPropertyAccessUsesReadOnlyViews)
     const auto cloud = MakeSphereCloud(8, 1.0f, true, false);
 
     const auto props = cloud.PointProperties();
-    EXPECT_TRUE(props.Exists("p:position"));
+    EXPECT_TRUE(props.Exists("v:point"));
+    EXPECT_FALSE(props.Exists("p:position"));
 
-    const auto positions = cloud.GetVertexProperty<glm::vec3>("p:position");
+    const auto positions = cloud.GetVertexProperty<glm::vec3>("v:point");
     ASSERT_TRUE(positions.IsValid());
     EXPECT_EQ(positions.Vector().size(), cloud.VerticesSize());
     EXPECT_EQ(positions[0], cloud.Position(Geometry::PointCloud::Cloud::Handle(0)));

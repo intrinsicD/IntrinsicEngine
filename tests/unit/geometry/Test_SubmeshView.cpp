@@ -301,3 +301,40 @@ TEST(SubmeshView_Cloud, ViewRangeAccessor)
     EXPECT_EQ(view.VertexRange().Offset, 0u);
     EXPECT_EQ(view.VertexRange().Size, 1u);
 }
+
+TEST(SubmeshView_Cloud, MeshBackedCloudUsesCanonicalVertexPointProperty)
+{
+    auto mesh = MakeSingleTriangle();
+    Geometry::PointCloud::Cloud cloud(mesh.VertexProperties(), mesh.DeletedVertexCount());
+
+    EXPECT_TRUE(cloud.PointProperties().Exists("v:point"));
+    EXPECT_FALSE(cloud.PointProperties().Exists("p:position"));
+    ASSERT_EQ(cloud.Positions().size(), mesh.Positions().size());
+
+    mesh.Position(Geometry::VertexHandle{1}) = glm::vec3(12.0f, 0.0f, 0.0f);
+    EXPECT_FLOAT_EQ(cloud.Position(Geometry::VertexHandle{1}).x, 12.0f);
+
+    cloud.Position(Geometry::VertexHandle{2}) = glm::vec3(0.0f, 34.0f, 0.0f);
+    EXPECT_FLOAT_EQ(mesh.Position(Geometry::VertexHandle{2}).y, 34.0f);
+}
+
+TEST(SubmeshView_Cloud, GraphBackedCloudUsesCanonicalVertexPointProperty)
+{
+    Geometry::Graph::Graph graph;
+    graph.AddVertex({0.0f, 0.0f, 0.0f});
+    graph.AddVertex({1.0f, 0.0f, 0.0f});
+
+    std::size_t deletedVertices = 0;
+    Geometry::PointCloud::Cloud cloud(graph.VertexProperties(), deletedVertices);
+
+    EXPECT_TRUE(cloud.PointProperties().Exists("v:point"));
+    EXPECT_FALSE(cloud.PointProperties().Exists("p:position"));
+    ASSERT_EQ(cloud.Positions().size(), graph.VerticesSize());
+
+    graph.SetVertexPosition(Geometry::VertexHandle{1}, glm::vec3(56.0f, 0.0f, 0.0f));
+    EXPECT_FLOAT_EQ(cloud.Position(Geometry::VertexHandle{1}).x, 56.0f);
+
+    cloud.Position(Geometry::VertexHandle{0}) = glm::vec3(0.0f, 78.0f, 0.0f);
+    EXPECT_FLOAT_EQ(graph.VertexPosition(Geometry::VertexHandle{0}).y, 78.0f);
+}
+

@@ -152,7 +152,7 @@ export namespace Geometry::PointCloud
         size_t &m_DeletedVertices;
 
         // Built-in properties — always present (position) or lazily allocated.
-        VertexProperty<glm::vec3> m_PPoint;   // "p:position"
+        VertexProperty<glm::vec3> m_PPoint;   // "v:point" (shared vertex-position property name)
         VertexProperty<bool> m_VDeleted;      // "p:deleted" (for GC)
         VertexProperty<glm::vec3> m_PNormal;  // "p:normal"   (optional)
         VertexProperty<glm::vec4> m_PColor;   // "p:color"    (optional)

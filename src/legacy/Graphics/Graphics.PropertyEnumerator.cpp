@@ -18,7 +18,7 @@ namespace
     [[nodiscard]] bool IsInternalProperty(std::string_view name) noexcept
     {
         // Vertex-domain internals
-        if (name == "v:position" || name == "v:normal" || name == "v:tex") return true;
+        if (name == "v:position" || name == "v:point" || name == "v:normal" || name == "v:tex") return true;
         // Point-cloud-domain internals
         if (name == "p:position" || name == "p:normal") return true;
         // Halfedge-domain internals
@@ -35,7 +35,7 @@ namespace
     // Normals are excluded here because they are valid vector field sources.
     [[nodiscard]] bool IsConnectivityProperty(std::string_view name) noexcept
     {
-        if (name == "v:position" || name == "v:tex") return true;
+        if (name == "v:position" || name == "v:point" || name == "v:tex") return true;
         if (name == "p:position") return true;
         if (name == "h:next" || name == "h:prev" || name == "h:vertex" ||
             name == "h:face" || name == "h:edge") return true;

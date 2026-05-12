@@ -25,6 +25,45 @@
   `Geometry::HalfedgeMesh::HalfedgeFaceConnectivity` under `h:face`; graph
   connectivity must not grow face ownership fields.
 
+## Mesh, graph, and point-cloud domain views
+
+`Geometry::HalfedgeMesh::Mesh`, `Geometry::Graph::Graph`, and
+`Geometry::PointCloud::Cloud` should be treated as peer geometry domains. New
+algorithms should request the least structured domain they need:
+
+- point-sample algorithms use point-cloud/domain-position views;
+- edge/topology traversal algorithms use graph views;
+- face/topological editing algorithms use mesh views.
+
+When a richer domain is passed to a less-structured algorithm, prefer an
+explicit borrowed view over a hard copy when all required semantic properties are
+already present and lifetime is clear. For example, mesh-backed graph algorithms
+can share mesh vertex, halfedge, and edge property sets because mesh traversal
+connectivity reuses the canonical graph connectivity records.
+
+Borrowed views must be explicit and documented as either read-only or mutable:
+
+- read-only algorithms should use const/borrowed views and must not mutate source
+  storage;
+- mutable algorithms may borrow source storage only when mutation is the
+  documented primary effect;
+- algorithms that change topology/cardinality, require independent lifetime, or
+  need different attribute layouts should perform an explicit hard-copy
+  conversion and report conversion diagnostics;
+- move/consume APIs are reserved for ownership transfer into result containers,
+  not for temporary adaptation.
+
+Mesh, graph, and point-cloud vertex positions use the canonical `v:point`
+`glm::vec3` property. Point-cloud adapters must not allocate a separate
+`p:position` property on shared vertex storage; any legacy `p:position` data
+must be handled by an explicit compatibility/conversion path rather than by a
+borrowed view.
+
 ## Migration note
 
 As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining `src/legacy` geometry shims (if any) must be temporary, tracked, and removed via follow-up migration tasks.
+
+## Related reviews
+
+- [`src/geometry` gap analysis](../reviews/2026-05-12-src-geometry-gap-analysis.md) records current style/API inconsistencies, missing reusable data structures, and algorithm gaps for modern geometry-processing paper work.
+

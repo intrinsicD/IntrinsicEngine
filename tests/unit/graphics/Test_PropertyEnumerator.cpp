@@ -50,6 +50,7 @@ TEST(PropertyEnumerator, FiltersInternalProperties)
 {
     Geometry::PropertySet ps;
     (void)ps.Add<glm::vec3>("v:position", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("v:point", glm::vec3(0.0f));
     (void)ps.Add<glm::vec3>("v:normal", glm::vec3(0.0f));
     (void)ps.Add<glm::vec3>("p:position", glm::vec3(0.0f));
     (void)ps.Add<glm::vec3>("p:normal", glm::vec3(0.0f));
@@ -64,6 +65,7 @@ TEST(PropertyEnumerator, VectorEnumeration_IncludesNormals)
 {
     Geometry::PropertySet ps;
     (void)ps.Add<glm::vec3>("v:position", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("v:point", glm::vec3(0.0f));
     (void)ps.Add<glm::vec3>("v:normal", glm::vec3(0.0f));
     (void)ps.Add<glm::vec3>("f:normal", glm::vec3(0.0f));
     (void)ps.Add<glm::vec3>("p:normal", glm::vec3(0.0f));
@@ -72,7 +74,7 @@ TEST(PropertyEnumerator, VectorEnumeration_IncludesNormals)
     // Normals should appear in vector enumeration (valid vector field sources)
     auto vecProps = EnumerateVectorProperties(ps);
     ASSERT_EQ(vecProps.size(), 4u); // v:normal, f:normal, p:normal, direction
-    // v:position should still be filtered out
+    // v:position and v:point should still be filtered out
 
     // But normals should NOT appear in colorable enumeration
     auto colorProps = EnumerateColorableProperties(ps);
