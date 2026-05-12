@@ -55,8 +55,8 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Completion record
 
-- Commit reference: TBD (this commit, branch `claude/setup-agentic-workflow-ghFrl`).
-- PR reference: TBD.
+- Implementation commit: `ed454a6` ("RUNTIME-070: bootstrap GpuAssetCache fallback texture in Engine::Initialize") on branch `claude/setup-agentic-workflow-ghFrl`.
+- PR reference: pending push.
 
 ## Next verification step
 - Completed on `claude/setup-agentic-workflow-ghFrl`:
