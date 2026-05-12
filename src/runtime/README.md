@@ -12,23 +12,17 @@ startup/shutdown.
 | `Extrinsic.Runtime.FrameLoop` | Testable platform/render/maintenance/shutdown phase contracts |
 | `Extrinsic.Runtime.ProceduralGeometry` | Procedural-geometry descriptor surface (`ProceduralGeometryKey`, key hash, `ProceduralGeometryCache` value type with `EnsureResident` / `Release` / `Find`). Reuses the `ProceduralGeometryKind` enum and POD `ProceduralGeometryParams` defined in `Extrinsic.ECS.Component.ProceduralGeometryRef`. `EnsureResident(key, uploadDesc, uploadFn)` either invokes the injected upload functor exactly once on a new key or hits an existing entry and increments a `std::uint32_t` refcount; `Release(key)` decrements. N entities sharing `(Kind, Hash(Params))` share one `GpuGeometryHandle`. No live ECS, no graphics imports beyond the existing `Extrinsic.Graphics.GpuWorld` value-type edge. Extraction-tick wiring and deferred-retire policy are GRAPHICS-030-Impl-B and GRAPHICS-030-Impl-C respectively. |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | Per-kind packer `Pack(kind, params, scratch) -> std::optional<GeometryUploadDesc>` consuming a runtime-owned `ProceduralGeometryPackBuffer` reused across ticks. Triangle is the only in-scope packer for Impl-A; the vertex layout is `{pos.xyz, uv}` (20 bytes/vertex) matching `Test.MinimalTriangleAcceptance`. Cube / Quad / Sphere / LineStrip extend the enum + packer table without cache or extraction lifecycle changes. |
+| `Extrinsic.Runtime.ReferenceScene` | Opt-in runtime-owned reference scene seam (GRAPHICS-029A). Exports `IReferenceSceneProvider`, `ReferenceSceneRegistry`, `ReferenceSceneEntity`/`ReferenceScenePopulation`, and `MakeDefaultReferenceSceneRegistry()`. `Engine::Initialize()` resolves `EngineConfig::ReferenceScene::Selector` against `Engine::GetReferenceSceneRegistry()` exactly once after scene-registry construction and before `IApplication::OnInitialize`, then stores the returned `ReferenceScenePopulation` so `Engine::Shutdown()` routes teardown through the same provider before the scene registry is destroyed. `m_ReferenceSceneInstalled` guards against double-install via `std::terminate` (GRAPHICS-029 Decision 7). GRAPHICS-029A registers no concrete provider — unknown selectors resolve to a no-op default so existing CPU/null tests observe zero renderable candidates; GRAPHICS-029B will register `TriangleProvider` and tighten unknown-selector handling. |
 | `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
-
-Planned modules (decisions recorded, implementation children identified but not yet opened):
-
-| Planned module | Planning task | Responsibility |
-|---|---|---|
-| `Extrinsic.Runtime.ReferenceScene` | [`GRAPHICS-029` (done)](../../tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md) | Opt-in runtime-owned reference scene bootstrap. Exposes `IReferenceSceneProvider` and `ReferenceSceneRegistry`; `Engine::Initialize()` invokes the configured `EngineConfig::ReferenceScene::Selector` provider once, after scene registry construction, before the first frame. Default provider `TriangleProvider` creates one entity through `ECS::Scene::CreateDefault("ReferenceTriangle")` carrying HARDEN-060 default components plus exactly one `Graphics::Components::RenderSurface` and `ECS::Components::ProceduralGeometryRef{ Triangle }` (now that `Extrinsic.ECS.Component.ProceduralGeometryRef` exists). No GPU-typed value type attaches to the entity; camera authorship returns a `CameraViewInput` seed substituted into `RenderFrameInput::Camera` and forward-compatible with the GRAPHICS-017Q `CameraControllers` umbrella. |
 
 `Extrinsic.Runtime.Engine` exports `CreateReferenceEngineConfig()` so reference
 applications can request the standard runtime configuration without importing
 lower-layer `core` config modules directly. Applications may pass the returned
 config to `Engine`; runtime remains responsible for interpreting subsystem
-configuration and composition. Per `GRAPHICS-029`, `CreateReferenceEngineConfig()`
-will flip `EngineConfig::ReferenceScene::Enabled = true` and
-`Selector = ReferenceSceneSelector::Triangle` once
-`Extrinsic.Runtime.ReferenceScene` lands; the default-constructed
+configuration and composition. `CreateReferenceEngineConfig()` flips
+`EngineConfig::ReferenceScene::Enabled = true` and
+`Selector = ReferenceSceneSelector::Triangle`; the default-constructed
 `EngineConfig{}` keeps `Enabled = false` so existing CPU/null tests do not
 regress.
 

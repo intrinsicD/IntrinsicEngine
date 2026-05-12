@@ -92,6 +92,23 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 - `Extrinsic.Core.Tasks.Internal`
 - `Extrinsic.Core.Tasks.LocalTask`
 
+## Engine config fields
+
+`Extrinsic.Core.Config.Engine` exports `EngineConfig`, the value type runtime
+consumes at composition time. Per-field ownership is:
+
+- `Render`, `Simulation`, `Window` — see the per-partition modules.
+- `ReferenceScene { Enabled, Selector }` — opt-in seam consumed by
+  `Runtime::Engine::Initialize()` to populate a deterministic reference
+  renderable through the runtime-owned `Extrinsic.Runtime.ReferenceScene`
+  registry. `EngineConfig{}` defaults to `Enabled = false` so existing
+  CPU/null tests observe zero renderable candidates;
+  `Runtime::CreateReferenceEngineConfig()` flips it to
+  `true`/`ReferenceSceneSelector::Triangle`. The provider implementation
+  lives in `runtime`; `core` only carries the value-type enum
+  `ReferenceSceneSelector` so this header stays free of runtime/graphics
+  imports.
+
 ## Notes
 
 - Core intentionally does **not** expose Vulkan/resource-state/barrier semantics.

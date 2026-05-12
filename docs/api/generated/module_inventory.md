@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
 | `platform` | 5 |
-| `runtime` | 6 |
+| `runtime` | 7 |
 
 ## Modules
 
@@ -448,7 +448,8 @@ Root scanned: `src`
 | `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | `src/runtime/Runtime.ProceduralGeometryPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **424**
+Total modules: **425**

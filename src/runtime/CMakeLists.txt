@@ -12,12 +12,14 @@ target_sources(${target_name}
         Runtime.FrameLoop.cppm
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
+        Runtime.ReferenceScene.cppm
         Runtime.RenderExtraction.cppm
         Runtime.StreamingExecutor.cppm
         PRIVATE
         Runtime.Engine.cpp
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
+        Runtime.ReferenceScene.cpp
         Runtime.StreamingExecutor.cpp
 )
 

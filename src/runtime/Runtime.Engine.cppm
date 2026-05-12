@@ -14,6 +14,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
@@ -59,6 +60,8 @@ namespace Extrinsic::Runtime
         config.Render.EnableValidation = true;
         config.Render.EnableVSync = true;
         config.Render.FramesInFlight = 2;
+        config.ReferenceScene.Enabled = true;
+        config.ReferenceScene.Selector = Core::Config::ReferenceSceneSelector::Triangle;
         return config;
     }
 
@@ -182,6 +185,14 @@ namespace Extrinsic::Runtime
         [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
         [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
 
+        // ── Reference scene seam (GRAPHICS-029A) ──────────────────────────
+        // Accessible before Initialize() so tests and downstream impl-B
+        // children register providers prior to subsystem wiring. After
+        // Initialize() runs, the registry is locked to its installed
+        // contents — Register() before Initialize(), Resolve() after.
+        [[nodiscard]] ReferenceSceneRegistry& GetReferenceSceneRegistry() noexcept;
+        [[nodiscard]] bool IsReferenceSceneInstalled() const noexcept;
+
     private:
         void RunFrame();      // executes one full frame — called by Run()
 
@@ -209,6 +220,15 @@ namespace Extrinsic::Runtime
             Assets::AssetEventBus::InvalidToken};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
+
+        // Reference-scene seam (GRAPHICS-029A): the registry is constructed
+        // eagerly so tests/impl-B can Register() before Initialize().
+        // Initialize() invokes the resolved provider once when
+        // m_Config.ReferenceScene.Enabled is true and stores the returned
+        // entities so Shutdown can route teardown through the same provider.
+        ReferenceSceneRegistry                 m_ReferenceSceneRegistry{};
+        ReferenceScenePopulation               m_ReferenceScenePopulation{};
+        bool                                   m_ReferenceSceneInstalled{false};
 
         Core::FrameClock m_FrameClock{};
 
