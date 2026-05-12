@@ -49,7 +49,7 @@ Lock down the contract for an optional `IRayTracingDevice` capability extension 
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
-- [ ] Optional GPU smoke: `-L 'gpu|vulkan'`.
+- [ ] Optional GPU smoke: `-L 'gpu' -L 'vulkan'`.
 
 ## Docs
 - [ ] Update `docs/architecture/graphics.md` RHI capability section.

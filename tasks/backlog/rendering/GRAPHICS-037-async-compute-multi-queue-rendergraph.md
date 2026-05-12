@@ -48,7 +48,7 @@ Lock down the contract for partitioning frame-graph passes across multiple GPU q
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
-- [ ] Optional GPU smoke (after Impl-D): `-L 'gpu|vulkan'`.
+- [ ] Optional GPU smoke (after Impl-D): `-L 'gpu' -L 'vulkan'`.
 
 ## Docs
 - [ ] Update `docs/architecture/graphics.md` to record the multi-queue scheduling rule and the queue-family policy.
