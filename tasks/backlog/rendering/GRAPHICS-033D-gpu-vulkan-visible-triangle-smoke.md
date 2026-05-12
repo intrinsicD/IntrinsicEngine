@@ -3,6 +3,8 @@
 ## Goal
 - Add the opt-in `gpu;vulkan` smoke fixture declared by `GRAPHICS-033`: on hosts with Vulkan support, drive one frame of the GRAPHICS-032 `MinimalDebugSurface` recipe with the GRAPHICS-029B reference triangle and the GRAPHICS-031A default debug pipeline, asserting (a) the device reports `Operational` only after all 9 gate prerequisites are met, (b) the swapchain image after `Present` contains a visible triangle (pixel readback assertion at 4 sample points), and (c) no fallback counters increment during the operational frame.
 
+> **Scaffold notice.** The `MinimalDebugSurface`-targeted form of this fixture is removed by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once `GRAPHICS-076` lands the canonical `Pass.Present` and the default-recipe equivalent of the visible-triangle smoke is green. The pixel-readback driver harness — and the assertion that fallback counters stay zero across an operational frame — must be authored as reusable helpers so the default-recipe fixture can call them byte-identical. Per `GRAPHICS-081`'s "no reduction of gpu;vulkan coverage" rule, the default-recipe smoke must already be green before this fixture is removed.
+
 ## Non-goals
 - No new diagnostics counters beyond those declared by `GRAPHICS-033A`/`B`.
 - No additional pass bodies (Phase-2 backlog `GRAPHICS-070..076`).

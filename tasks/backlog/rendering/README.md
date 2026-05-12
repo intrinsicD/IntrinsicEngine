@@ -524,6 +524,12 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](GRAPHICS-079-default-recipe-imgui-pass-wiring.md):
   depends on GRAPHICS-076 (PresentSource finalization) and `runtime/RUNTIME-090`
   (ImGui adapter producer).
+- [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
+  depends on GRAPHICS-031A/B and GRAPHICS-070..076; deletes the
+  `MinimalDebug` recipe, pass classes, executor branches, diagnostics
+  counters, CMake entries, tests, and doc rows once the default recipe
+  records all canonical pass bodies and the default-recipe equivalent of the
+  GRAPHICS-033D `gpu;vulkan` visible-triangle smoke is green.
 
 Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-080` — Texture asset bridge](../runtime/RUNTIME-080-asset-bridges-texture.md).

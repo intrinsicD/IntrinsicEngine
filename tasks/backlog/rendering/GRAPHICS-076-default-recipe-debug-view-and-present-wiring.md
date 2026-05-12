@@ -8,6 +8,8 @@
 - No buffer-class debug visualization (out-of-scope per `GRAPHICS-013BQ`).
 - No backend-native swapchain blit/copy fast path (rejected per `GRAPHICS-013CQ` for the contract finalization form).
 
+> **Scaffold-retirement obligation.** This task is the last upstream gate before [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) can begin deleting the `MinimalDebugSurface` recipe scaffold. As part of `GRAPHICS-076`, author the **default-recipe equivalent** of the `GRAPHICS-033D` `gpu;vulkan` visible-triangle smoke (same pixel-readback driver harness, same four-sample-point assertion, same zero-fallback-counter invariant) so that `GRAPHICS-081` can delete the minimal-recipe fixture without reducing `gpu;vulkan` coverage.
+
 ## Context
 - Status: not started.
 - Owner/layer: `graphics/renderer`.

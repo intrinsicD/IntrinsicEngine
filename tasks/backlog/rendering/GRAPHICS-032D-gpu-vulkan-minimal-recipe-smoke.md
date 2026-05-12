@@ -3,6 +3,8 @@
 ## Goal
 - Add the `gpu;vulkan` smoke fixture declared by `GRAPHICS-032`: drive one Vulkan frame of `FrameRecipe::MinimalDebugSurface` after `GRAPHICS-033C` lands the recording bodies and `GRAPHICS-033D` lands the visible-triangle-pixel assertion. This task is the recipe-side hookup; `GRAPHICS-033D` owns the assertion shape.
 
+> **Scaffold notice.** This `gpu;vulkan` fixture is removed by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once the default-recipe equivalent of the visible-triangle assertion is green on Vulkan-capable hosts. Keep the pixel-readback driver harness reusable so the default-recipe smoke (authored alongside `GRAPHICS-076`) can call it byte-identical; only the recipe-selector invocation is deleted.
+
 ## Non-goals
 - No new diagnostics counters.
 - No additional pass bodies.

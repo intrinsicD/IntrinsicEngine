@@ -3,6 +3,8 @@
 ## Goal
 - Implement the property-based CPU-mock command-recording body for `Pass.Present.MinimalDebug` (bind present pipeline, `Draw(3, 1, 0, 0)`) and add the end-to-end CPU acceptance test that runs `recipe → BeginFrame → SubmitRuntimeSnapshots → ExtractRenderWorld → PrepareFrame → ExecuteFrame → EndFrame` and asserts the command stream order, recorded barriers, and counter values for one frame of `MinimalDebugSurface` with one procedural triangle.
 
+> **Scaffold notice.** `Pass.Present.MinimalDebug` and the end-to-end CPU acceptance driver authored here are removed by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once the canonical `Pass.Present` is operationally wired (`GRAPHICS-076`) and the default-recipe CPU acceptance covers the same shape. Author the test driver so the assertion helpers it introduces are reusable by the default-recipe equivalent — the helpers stay; the minimal-recipe driver invocation is what gets deleted.
+
 ## Non-goals
 - No `gpu;vulkan` smoke (that is `GRAPHICS-032D`).
 - No new diagnostics counters beyond those declared by `GRAPHICS-032A`.

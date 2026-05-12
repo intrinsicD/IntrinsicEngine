@@ -103,6 +103,22 @@ Runtime adapter umbrellas can land in parallel:
 Asset-backed mesh residency (`GRAPHICS-034`) gates on `ASSETIO-001` and remains
 planning-only until that ingest ownership decision lands.
 
+## Bootstrap scaffold retirement
+
+The `MinimalDebugSurface` recipe and the `Pass.Surface.MinimalDebug` /
+`Pass.Present.MinimalDebug` classes introduced by `GRAPHICS-032` exist only to
+derisk the triangle path. They must not outlive the operational default
+recipe. Once `GRAPHICS-070..076` retire and the default-recipe equivalent of
+the `GRAPHICS-033D` `gpu;vulkan` visible-triangle smoke is green, the scaffold
+is deleted by
+[`GRAPHICS-081`](../../tasks/backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
+recipe + factory + two pass classes + renderer members + executor branches +
+three diagnostics counters + CMake entries + tests + doc rows all removed.
+`Material.DefaultDebugSurface` at slot 0 (GRAPHICS-031), the reference scene
+(GRAPHICS-029), the procedural geometry residency bridge (GRAPHICS-030), and
+the Vulkan operational-status evaluator (GRAPHICS-033A/B) all stay — they are
+the canonical architecture, not scaffolding.
+
 ## Validation notes
 
 - This review introduces no source code changes.
