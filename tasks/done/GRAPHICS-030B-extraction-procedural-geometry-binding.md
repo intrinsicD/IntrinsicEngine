@@ -67,7 +67,7 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Completion
 - Completed: 2026-05-12.
-- Commit reference: landed on branch `claude/setup-agentic-workflow-ngYZM`; the implementation commit's SHA is recorded in `git log` on that branch under the `GRAPHICS-030B` subject line.
+- Commit reference: `f917052` ("GRAPHICS-030B: wire RenderExtraction to procedural geometry residency bridge") on branch `claude/setup-agentic-workflow-ngYZM`.
 - Verification (all run in this session against the configured `ci` preset):
   - `cmake --preset ci`
   - `cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicGraphicsContractTests IntrinsicTests`
