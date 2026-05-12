@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 export module Extrinsic.Runtime.Engine;
 
@@ -12,6 +13,7 @@ import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.ReferenceScene;
@@ -185,13 +187,21 @@ namespace Extrinsic::Runtime
         [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
         [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
 
-        // ── Reference scene seam (GRAPHICS-029A) ──────────────────────────
-        // Accessible before Initialize() so tests and downstream impl-B
+        // ── Reference scene seam (GRAPHICS-029A/B) ────────────────────────
+        // Accessible before Initialize() so tests and downstream impl
         // children register providers prior to subsystem wiring. After
         // Initialize() runs, the registry is locked to its installed
         // contents — Register() before Initialize(), Resolve() after.
         [[nodiscard]] ReferenceSceneRegistry& GetReferenceSceneRegistry() noexcept;
         [[nodiscard]] bool IsReferenceSceneInstalled() const noexcept;
+        // GRAPHICS-029B: the optional CameraViewInput seed captured from
+        // the resolved provider's ReferenceScenePopulation. Empty when the
+        // reference scene is disabled or the provider returned no camera.
+        // RUNTIME-081 will replace direct reads of this seed with the
+        // camera-controller surface; this accessor is the test seam until
+        // then.
+        [[nodiscard]] const std::optional<Graphics::CameraViewInput>&
+            GetReferenceCameraSeed() const noexcept;
 
     private:
         void RunFrame();      // executes one full frame — called by Run()
@@ -221,14 +231,19 @@ namespace Extrinsic::Runtime
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
 
-        // Reference-scene seam (GRAPHICS-029A): the registry is constructed
-        // eagerly so tests/impl-B can Register() before Initialize().
-        // Initialize() invokes the resolved provider once when
-        // m_Config.ReferenceScene.Enabled is true and stores the returned
-        // entities so Shutdown can route teardown through the same provider.
-        ReferenceSceneRegistry                 m_ReferenceSceneRegistry{};
-        ReferenceScenePopulation               m_ReferenceScenePopulation{};
-        bool                                   m_ReferenceSceneInstalled{false};
+        // Reference-scene seam (GRAPHICS-029A/B): the registry is
+        // constructed empty so tests/impl-B can Register() before
+        // Initialize(). Initialize() then idempotently installs the
+        // production defaults for any unregistered selectors via
+        // RegisterDefaultReferenceProvidersIfAbsent before resolving the
+        // configured selector once. The returned entities/camera are stored
+        // so Shutdown can route teardown through the same provider and
+        // RunFrame can substitute RenderFrameInput::Camera until
+        // RUNTIME-081 (CameraControllers) takes over.
+        ReferenceSceneRegistry                  m_ReferenceSceneRegistry{};
+        ReferenceScenePopulation                m_ReferenceScenePopulation{};
+        std::optional<Graphics::CameraViewInput> m_ReferenceCamera{};
+        bool                                    m_ReferenceSceneInstalled{false};
 
         Core::FrameClock m_FrameClock{};
 
