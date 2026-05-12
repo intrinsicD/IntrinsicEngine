@@ -13,10 +13,10 @@
 - No `ECS::Components::ProceduralGeometryRef` consumption (that requires `GRAPHICS-030A` first).
 
 ## Context
-- Status: in-progress.
-- Owner/agent: Claude Code agent on branch `claude/setup-agentic-workflow-stYp3`.
+- Status: done.
+- Owner/agent: Claude Code agent on branch `claude/setup-agentic-workflow-stYp3` (landed via PR #810).
 - Owner/layer: `runtime` for the new module; `core` for the new `EngineConfig::ReferenceScene` field (per `GRAPHICS-029` Decision 9).
-- Planning parent: [`tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md`](../../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md), Decisions 1, 2, 7, 8, 9, 11, plus the Impl-A row in Required changes.
+- Planning parent: [`tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md`](./GRAPHICS-029-runtime-reference-scene-bootstrap.md), Decisions 1, 2, 7, 8, 9, 11, plus the Impl-A row in Required changes.
 - Source tree home: `src/runtime/Runtime.ReferenceScene.cppm` (and `.cpp` if behavior beyond the registry stub is needed). Field lives in `src/core/Core.Config.Engine.cppm` (or a new `Core.Config.ReferenceScene` partition; the implementer decides).
 - Consumed by `Engine::Initialize()` immediately after `m_Scene = std::make_unique<ECS::Scene::Registry>()` and before `m_Application->OnInitialize(*this)`.
 - Default-off rationale: `EngineConfig{}` keeps `Enabled = false`; only `CreateReferenceEngineConfig()` flips it to `true`.
@@ -81,3 +81,15 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 5. Add `contract;runtime` tests covering default-off, reference-on no-op, registry register/resolve semantics, and registry double-install guard.
 6. Update `src/runtime/README.md`, `src/core/README.md`, and regenerate `docs/api/generated/module_inventory.md`.
 7. Run the verification commands recorded in this task.
+
+## Completion
+- Completed: 2026-05-12.
+- Commit reference: `b99fed1` ("GRAPHICS-029A: reference scene skeleton + EngineConfig field"), merged to `main` via PR #810 from branch `claude/setup-agentic-workflow-stYp3`.
+- Notes:
+  - All "Required changes", "Tests", "Docs", and "Acceptance criteria" checkboxes were completed in the implementation slice landed by `b99fed1` / PR #810; the verification commands recorded in this task were executed in that session.
+  - This commit is the mechanical retirement step missed in the implementation merge, matching the GRAPHICS-029 / GRAPHICS-030 / GRAPHICS-030A pattern. No source code, shaders, tests, or generated inventories are touched here — only the task file moves from `tasks/active/` to `tasks/done/` and the inbound `active/GRAPHICS-029A` link in `tasks/backlog/README.md`, `tasks/backlog/rendering/README.md`, and `docs/reviews/2026-05-11-sandbox-graphics-gap-analysis.md` is repointed at this `tasks/done/` file.
+  - Downstream unblocked: `GRAPHICS-029B` (TriangleProvider body + camera substitution) is now the next Theme A triangle-path slice; the no-op default provider registered here remains the transition placeholder until `GRAPHICS-029B` lands the closing-cleanup checkbox documented in the Transition notice.
+  - Retirement verification (run in this session):
+    - `python3 tools/agents/check_task_policy.py --root . --strict`
+    - `python3 tools/docs/check_doc_links.py --root .`
+    - `python3 tools/repo/check_layering.py --root src --strict`
