@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 1 |
 | `assets` | 7 |
 | `core` | 37 |
-| `ecs` | 21 |
+| `ecs` | 22 |
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
 | `platform` | 5 |
-| `runtime` | 4 |
+| `runtime` | 6 |
 
 ## Modules
 
@@ -81,6 +81,7 @@ Root scanned: `src`
 | `Extrinsic.ECS.Component.Hierarchy` | `src/ecs/Components/ECS.Component.Hierarchy.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Light` | `src/ecs/Components/ECS.Component.Light.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.MetaData` | `src/ecs/Components/ECS.Component.MetaData.cppm` | `ecs` |
+| `Extrinsic.ECS.Component.ProceduralGeometryRef` | `src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm` | `ecs` |
 | `Extrinsic.ECS.Components.Selection` | `src/ecs/Components/ECS.Component.Selection.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.ShadowCaster` | `src/ecs/Components/ECS.Component.ShadowCaster.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Transform` | `src/ecs/Components/ECS.Component.Transform.Local.cppm` | `ecs` |
@@ -445,7 +446,9 @@ Root scanned: `src`
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
+| `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
+| `Extrinsic.Runtime.ProceduralGeometryPacker` | `src/runtime/Runtime.ProceduralGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **421**
+Total modules: **424**

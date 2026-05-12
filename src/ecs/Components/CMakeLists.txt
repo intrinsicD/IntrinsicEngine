@@ -11,6 +11,7 @@ target_sources(${target_name}
         ECS.Component.Hierarchy.cppm
         ECS.Component.Light.cppm
         ECS.Component.MetaData.cppm
+        ECS.Component.ProceduralGeometryRef.cppm
         ECS.Component.Selection.cppm
         ECS.Component.ShadowCaster.cppm
         ECS.Component.Transform.Local.cppm

@@ -10,10 +10,14 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
         Runtime.FrameLoop.cppm
+        Runtime.ProceduralGeometry.cppm
+        Runtime.ProceduralGeometryPacker.cppm
         Runtime.RenderExtraction.cppm
         Runtime.StreamingExecutor.cppm
         PRIVATE
         Runtime.Engine.cpp
+        Runtime.ProceduralGeometry.cpp
+        Runtime.ProceduralGeometryPacker.cpp
         Runtime.StreamingExecutor.cpp
 )
 

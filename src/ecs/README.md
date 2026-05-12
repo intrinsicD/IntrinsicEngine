@@ -32,6 +32,7 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.Component.AssetInstance`
 - `Extrinsic.ECS.Component.Collider`
 - `Extrinsic.ECS.Component.Light`
+- `Extrinsic.ECS.Component.ProceduralGeometryRef`
 - `Extrinsic.ECS.Component.Selection`
 - `Extrinsic.ECS.Component.ShadowCaster`
 - `Extrinsic.ECS.Component.DirtyTags`
@@ -62,6 +63,7 @@ Components/
   ECS.Component.AssetInstance.cppm
   ECS.Component.Collider.cppm
   ECS.Component.Light.cppm
+  ECS.Component.ProceduralGeometryRef.cppm
   ECS.Component.Selection.cppm
   ECS.Component.ShadowCaster.cppm
   ECS.Component.DirtyTags.cppm

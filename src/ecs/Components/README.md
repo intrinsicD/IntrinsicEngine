@@ -15,6 +15,7 @@ This directory contains the `Components` module/files.
 - `ECS.Component.Hierarchy.cppm`
 - `ECS.Component.Light.cppm`
 - `ECS.Component.MetaData.cppm`
+- `ECS.Component.ProceduralGeometryRef.cppm`
 - `ECS.Component.Selection.cppm`
 - `ECS.Component.ShadowCaster.cppm`
 - `ECS.Component.Transform.Local.cppm`
@@ -31,3 +32,9 @@ store `GpuInstanceHandle`, `GpuGeometryHandle`, `RHI::BufferHandle`, bindless
 indices, `GpuSceneSlot`, or renderer buffer names. Runtime owns any
 entity-keyed graphics residency sidecar/cache and translates CPU dirty semantics
 into graphics uploads.
+
+`ECS.Component.ProceduralGeometryRef` carries the CPU-only authoring data for
+runtime-owned procedural geometry sources (kind + POD parameters) per the
+GRAPHICS-030 planning contract. It imports `Extrinsic.Core.*` only; the runtime
+descriptor/cache/packer that consumes it lives in `src/runtime/` and is the only
+writer of the GPU-side residency handles.
