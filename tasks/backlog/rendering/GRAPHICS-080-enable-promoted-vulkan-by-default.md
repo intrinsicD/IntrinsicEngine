@@ -26,7 +26,7 @@
 - [ ] `contract;runtime` test: with `EnablePromotedVulkanDevice = true` and a host without Vulkan support, the runtime resolves to Null, `VulkanFallbackToNullCount` increments by 1, and the `VulkanRequestedButNotOperational` breadcrumb fires once.
 - [ ] `contract;runtime` test: with `EnablePromotedVulkanDevice = false` (legacy callers), the runtime resolves to Null without breadcrumb noise.
 - [ ] CI smoke: the existing `ci` preset run continues to skip all `gpu;vulkan` fixtures by default.
-- [ ] CI smoke: the new `ci-vulkan` preset run selects `gpu;vulkan` fixtures via `ctest -L 'gpu;vulkan'` and exits cleanly when no Vulkan device is present.
+- [ ] CI smoke: the new `ci-vulkan` preset run selects `gpu`/`vulkan` fixtures via `ctest -L 'gpu|vulkan'` (the repo-standard regex-alternation form; `gpu` and `vulkan` labels are co-applied per the `HARDEN-005` test-label audit, so the union and intersection match the same fixture set) and exits cleanly when no Vulkan device is present.
 
 ## Docs
 - [ ] Update `CMakePresets.json` documentation comments / `cmake/README.md` (if present) to enumerate the new preset.
@@ -50,7 +50,7 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 # Promoted Vulkan gate (run on hosts with Vulkan):
 cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
-ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu;vulkan' --timeout 120
+ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan' --timeout 120
 
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/docs/check_doc_links.py --root .

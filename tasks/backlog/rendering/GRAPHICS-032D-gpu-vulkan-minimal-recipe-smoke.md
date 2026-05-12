@@ -29,14 +29,14 @@
 - [ ] Update `src/graphics/framegraph/README.md` to flip the `gpu;vulkan` minimal-recipe smoke row to current state.
 
 ## Acceptance criteria
-- [ ] The fixture is selectable only via `-L 'gpu;vulkan'`; the default gate skips it.
+- [ ] The fixture is selectable only via `-L 'gpu|vulkan'`; the default gate skips it.
 - [ ] On Vulkan-capable hosts, the fixture passes; on non-Vulkan hosts, it skips deterministically.
 
 ## Verification
 ```bash
 cmake --preset ci -DINTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON
 cmake --build --preset ci --target IntrinsicGraphicsIntegrationTests
-ctest --test-dir build/ci --output-on-failure -L 'gpu;vulkan' --timeout 120
+ctest --test-dir build/ci --output-on-failure -L 'gpu|vulkan' --timeout 120
 python3 tools/repo/check_test_layout.py --root . --strict
 ```
 

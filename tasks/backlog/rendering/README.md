@@ -482,10 +482,11 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
   depends on GRAPHICS-032C, GRAPHICS-031B, GRAPHICS-033B, and GRAPHICS-018R
   (done) operational-transition seam.
-- [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
-  depends on GRAPHICS-033C.
 - [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture](GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
-  depends on GRAPHICS-033C and GRAPHICS-032D.
+  depends on GRAPHICS-033C; owns the pixel-readback driver harness.
+- [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
+  depends on GRAPHICS-033C and GRAPHICS-033D; sibling fixture reusing the
+  GRAPHICS-033D harness for recipe-selector coverage.
 - [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan](GRAPHICS-080-enable-promoted-vulkan-by-default.md):
   depends on GRAPHICS-033C; non-blocking before that landing (only the
   fail-closed fallback breadcrumb fires).
