@@ -426,6 +426,13 @@ namespace Geometry::PointCloudIO
             {
                 return InvalidPointCloudFormat();
             }
+            for (const auto& property : vertexElement->Properties)
+            {
+                if (property.IsList)
+                {
+                    return InvalidPointCloudFormat();
+                }
+            }
 
             std::vector<std::string> vertexProperties;
             vertexProperties.reserve(vertexElement->Properties.size());

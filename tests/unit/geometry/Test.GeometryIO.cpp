@@ -3119,6 +3119,24 @@ TEST(GeometryIO_PointCloudIO, LoadsAsciiPLYPointCloudAfterBinaryDispatch)
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
 }
 
+TEST(GeometryIO_PointCloudIO, LoadAsciiPLYPointCloudRejectsListPropertyInVertex)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 1\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "property list uchar int unsupported\n"
+                  "end_header\n"
+                  "1 2 3 2 4 5\n");
+
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
 namespace
 {
     struct BinaryPcdPointCloudVertex
