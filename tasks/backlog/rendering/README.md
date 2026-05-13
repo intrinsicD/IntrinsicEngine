@@ -469,8 +469,10 @@ independently testable (CPU/null where possible), and gated as recorded.
   task that calls `GpuWorld::UploadGeometry()` and `SetInstanceGeometry()`
   from extraction. Unblocks GRAPHICS-030C and the GRAPHICS-032B minimal-debug
   pass body.
-- [GRAPHICS-030C — Procedural geometry refcount/free retire ordering](GRAPHICS-030C-procedural-geometry-retire-ordering.md):
-  depends on GRAPHICS-030B.
+- [GRAPHICS-030C — Procedural geometry refcount/free retire ordering (done)](../../done/GRAPHICS-030C-procedural-geometry-retire-ordering.md):
+  landed; deferred-retire window, refcount-cancellation resurrection, and
+  `RenderExtractionCache::TickProceduralGeometry` maintenance hook are
+  wired with `contract;runtime` coverage.
 - [GRAPHICS-031A — Default debug surface shaders and pipeline](GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   depends on GRAPHICS-031 (planning) and BUILD-001 (done; Sandbox shader
   compile wiring).
