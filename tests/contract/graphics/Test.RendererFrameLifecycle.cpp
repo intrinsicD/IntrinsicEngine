@@ -504,10 +504,15 @@ TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebui
     const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetDefaultDebugSurfacePipeline();
     EXPECT_TRUE(initialPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDefaultDebugSurfacePipelineDesc();
-    EXPECT_EQ(initialDesc.VertexShaderPath,
-              std::string{"assets/shaders/forward/default_debug_surface.vert"});
-    EXPECT_EQ(initialDesc.FragmentShaderPath,
-              std::string{"assets/shaders/forward/default_debug_surface.frag"});
+    // The descriptor must reference the compiled SPIR-V artifact emitted by
+    // intrinsic_add_glsl_shaders(), not the raw GLSL source — VulkanDevice::
+    // CreatePipeline() reads the path verbatim as a SPIR-V binary.
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/forward/default_debug_surface.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/forward/default_debug_surface.frag.spv"))
+        << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
     EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Less);
     EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);

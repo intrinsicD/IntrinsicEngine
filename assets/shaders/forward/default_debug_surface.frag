@@ -5,22 +5,35 @@
 
 // GRAPHICS-031A — canonical missing-material fallback fragment shader.
 //
-// Reads the per-instance MaterialBuffer slot at set = 3, binding = 0 and
-// multiplies BaseColorFactor by the interpolated vertex colour. No textures,
-// no lighting, no normals — the unlit recorded colour is the only output.
+// BDA-only contract: the promoted Vulkan pipeline layout binds only the
+// global bindless descriptor set at set 0, so the material slot must be
+// reached through `GpuScenePushConstants::SceneTableBDA -> scene.MaterialBDA`
+// rather than a `set = 3` SSBO. Push constants are visible in both stages
+// (`stageFlags = VK_SHADER_STAGE_ALL`) so re-reading the scene table here
+// avoids passing the 64-bit BDA through a varying.
+//
+// Reads the material slot from the per-instance index forwarded by the
+// vertex shader and emits `BaseColorFactor`. Slot 0 carries the recorded
+// `Material.DefaultDebugSurface` params (`MaterialFlags::Unlit`, purple
+// `BaseColorFactor`) so any invalid material handle resolves to a visible
+// missing-material surface.
 
 #include "../common/gpu_scene.glsl"
 
-layout(std430, set = 3, binding = 0) readonly buffer MaterialBuffer {
-    GpuMaterialSlot Slots[];
-} materials;
+layout(push_constant, scalar) uniform ScenePC {
+    uint64_t SceneTableBDA;
+    uint FrameIndex;
+    uint DrawBucket;
+    uint DebugMode;
+    uint _pad0;
+} pc;
 
-layout(location = 0) in vec4 fragVertexColor;
-layout(location = 1) flat in uint fragMaterialSlot;
+layout(location = 0) flat in uint fragMaterialSlot;
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    const GpuMaterialSlot mat = materials.Slots[fragMaterialSlot];
-    outColor = vec4(mat.BaseColorFactor.rgb * fragVertexColor.rgb, mat.BaseColorFactor.a);
+    const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
+    const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[fragMaterialSlot];
+    outColor = mat.BaseColorFactor;
 }

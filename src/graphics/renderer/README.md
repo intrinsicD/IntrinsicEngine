@@ -628,17 +628,33 @@ human-readable summary should read `Findings.front().Message`.
   `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
   `MaterialFlags::Unlit`, and a deterministic non-black `BaseColorFactor`
   (`{0.55, 0.20, 0.85, 1.0}`). The shader pair lives at
-  `assets/shaders/forward/default_debug_surface.vert/frag` and reads
-  position `vec3` + optional packed RGBA8 vertex color `uint32` from the
-  existing scene-table BDA push constants and the `MaterialBuffer` SSBO at
-  `set = 3, binding = 0`; no per-material descriptor set or new cull
-  bucket is introduced (the lane reuses `SurfaceOpaque`). The pipeline
-  state is locked at `CullMode = Back`, `DepthCompareOp = Less` (or
-  `Equal` after `Pass.DepthPrepass`), `BlendEnabled = false`,
+  `assets/shaders/forward/default_debug_surface.vert/frag` and is
+  authored against the same BDA-only contract as `depth_prepass.vert`:
+  the promoted Vulkan pipeline layout binds only the global bindless
+  descriptor set at set 0 (`setLayoutCount = 1` /
+  `VK_SHADER_STAGE_ALL`-visible push constants), so all per-frame data
+  is reached via `GpuScenePushConstants::SceneTableBDA` plus the
+  `buffer_reference` chain declared in `common/gpu_scene.glsl`
+  (position read from the procedural vertex buffer at the GRAPHICS-030A
+  `{vec3 pos, vec2 uv}` 20-byte stride; material slot read via
+  `scene.MaterialBDA`). No `set = 0` camera UBO and no `set = 3`
+  material SSBO are declared — those would collide with the bindless
+  descriptor set or reference an unbound set; no per-material descriptor
+  set or new cull bucket is introduced (the lane reuses `SurfaceOpaque`).
+  Pipeline state is locked at `CullMode = Back`, `DepthCompareOp = Less`
+  (or `Equal` after `Pass.DepthPrepass`), `BlendEnabled = false`,
   `PolygonMode = Fill`, `PrimitiveTopology = TriangleList`,
   `MSAA samples = 1`, dynamic state `{Viewport, Scissor}`, with the
-  pipeline created once at renderer init and republished byte-identical by
-  `RebuildGpuResources()`. The graphics-owned snapshot-consumption
+  pipeline created once at renderer init and republished byte-identical
+  by `RebuildOperationalResources()`. `PipelineDesc::VertexShaderPath`
+  and `FragmentShaderPath` are pre-resolved via
+  `Core::Filesystem::GetShaderPath("shaders/forward/default_debug_surface.{vert,frag}.spv")`
+  so they reference the compiled SPV artifacts emitted by
+  `intrinsic_add_glsl_shaders()` rather than the raw GLSL sources
+  (`VulkanDevice::CreatePipeline()` reads the path verbatim as a SPIR-V
+  binary). Vertex transform currently lands in `dyn.Model`-space because
+  the scene table does not yet expose a camera matrix BDA; wiring view-
+  projection into the scene-table contract is a GRAPHICS-031B follow-up. The graphics-owned snapshot-consumption
   substitution at the renderer span-copy step replaces unset/out-of-range
   material slots with `kDefaultMaterialSlotIndex` and increments one of
   three additive `MaterialSystemDiagnostics` counters:
@@ -662,11 +678,16 @@ human-readable summary should read `Findings.front().Message`.
   StandardPBR/SciVis/DefaultDebugSurface and packs slot 0 with
   `kDefaultDebugSurfaceBaseColor` and `MaterialFlags::Unlit`, and the
   renderer caches a `m_DefaultDebugSurfacePipelineLease` built from a
-  byte-identical `BuildDefaultDebugSurfacePipelineDesc()` so initial
-  `Initialize()` and `RebuildOperationalResources()` republish the same
-  descriptor), Impl-B (substitution wiring + the
-  three diagnostics counters), and the optional Impl-C (one additional
-  debug variant) are identified but not opened.
+  byte-identical `BuildDefaultDebugSurfacePipelineDesc()` whose
+  `VertexShaderPath` / `FragmentShaderPath` are pre-resolved via
+  `Core::Filesystem::GetShaderPath` to the compiled
+  `shaders/forward/default_debug_surface.{vert,frag}.spv` artifacts
+  emitted by `intrinsic_add_glsl_shaders()` so the operational Vulkan
+  pipeline-creation path reads SPIR-V directly. Initial `Initialize()`
+  and `RebuildOperationalResources()` republish the same descriptor),
+  Impl-B (substitution wiring + the three diagnostics counters), and
+  the optional Impl-C (one additional debug variant) are identified
+  but not opened.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.

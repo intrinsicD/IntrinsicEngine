@@ -5,20 +5,22 @@
 
 // GRAPHICS-031A — canonical missing-material fallback vertex shader.
 //
-// Reads the scene-table BDA push constant, walks Instance/Geometry records,
-// and fetches positions from the procedural vertex buffer authored by the
-// GRAPHICS-030A Triangle packer (vec3 position + vec2 uv = 20 bytes/vertex).
-// Forwards an interpolated vertex colour and the per-instance material slot
-// so the fragment shader can sample MaterialBuffer at the canonical
-// set = 3, binding = 0 SSBO.
+// BDA-only contract: the promoted Vulkan pipeline layout binds only the
+// global bindless descriptor set at set 0 (`setLayoutCount = 1`), so no
+// per-frame camera UBO or material SSBO descriptor is available here.
+// All data is read through `GpuScenePushConstants::SceneTableBDA` and the
+// chain of `buffer_reference` pointers declared in `common/gpu_scene.glsl`.
+//
+// Reads positions from the procedural vertex buffer authored by the
+// GRAPHICS-030A Triangle packer (vec3 position + vec2 uv = 20 bytes/vertex)
+// and forwards the per-instance material slot plus the scene-table
+// MaterialBDA so the fragment shader can sample the material slot from a
+// buffer reference instead of a descriptor set. Vertex transform matches
+// the existing `depth_prepass.vert` BDA-only pattern: positions land in
+// `dyn.Model`-space until a camera contract is wired through the scene
+// table (out of scope for this slice; see GRAPHICS-031B follow-up).
 
 #include "../common/gpu_scene.glsl"
-
-layout(set = 0, binding = 0) uniform CameraBuffer {
-    mat4 View;
-    mat4 Proj;
-    mat4 ViewProj;
-} camera;
 
 struct ProceduralVertex {
     vec3 Position;
@@ -37,8 +39,7 @@ layout(push_constant, scalar) uniform ScenePC {
     uint _pad0;
 } pc;
 
-layout(location = 0) out vec4 fragVertexColor;
-layout(location = 1) flat out uint fragMaterialSlot;
+layout(location = 0) flat out uint fragMaterialSlot;
 
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
@@ -48,7 +49,6 @@ void main() {
 
     const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex];
 
-    gl_Position = camera.ViewProj * dyn.Model * vec4(v.Position, 1.0);
-    fragVertexColor = vec4(1.0);
+    gl_Position = dyn.Model * vec4(v.Position, 1.0);
     fragMaterialSlot = inst.MaterialSlot;
 }

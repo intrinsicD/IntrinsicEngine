@@ -45,6 +45,7 @@ import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Graphics
@@ -863,14 +864,26 @@ namespace Extrinsic::Graphics
 
     private:
         // GRAPHICS-031A — canonical default-debug-surface PipelineDesc.
-        // Built byte-identical at every InitializeOperationalPassResources()
-        // call so initial init and RebuildOperationalResources republish the
-        // same descriptor.
+        //
+        // VertexShaderPath / FragmentShaderPath point at the compiled SPIR-V
+        // artifacts produced by `intrinsic_add_glsl_shaders()` under the
+        // runtime shader output directory (`<bin>/shaders/<relative>.spv`).
+        // The Vulkan backend's `ReadSpirvFile()` opens these paths verbatim,
+        // so the renderer pre-resolves them via `Core::Filesystem::GetShaderPath`
+        // (the same resolver used by the legacy `RenderOrchestrator`). When
+        // the SPV files are absent (e.g. CI builds without
+        // `INTRINSIC_BUILD_SANDBOX=ON`), `GetShaderPath` returns the raw
+        // relative path so the resolved value remains deterministic. Initial
+        // `Initialize()` and `RebuildOperationalResources()` therefore
+        // republish a byte-identical descriptor against a stable filesystem
+        // state.
         [[nodiscard]] static RHI::PipelineDesc BuildDefaultDebugSurfacePipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
-            desc.VertexShaderPath = "assets/shaders/forward/default_debug_surface.vert";
-            desc.FragmentShaderPath = "assets/shaders/forward/default_debug_surface.frag";
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/forward/default_debug_surface.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/forward/default_debug_surface.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
