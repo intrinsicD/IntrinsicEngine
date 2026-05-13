@@ -678,5 +678,28 @@ namespace Extrinsic::Graphics
         return diagnostics;
     }
 
+    // -----------------------------------------------------------------
+    void MaterialSystem::RecordMissingMaterialFallback() noexcept
+    {
+        ++m_Impl->Diagnostics.MissingMaterialFallbackCount;
+    }
+
+    void MaterialSystem::RecordInvalidMaterialSlot() noexcept
+    {
+        ++m_Impl->Diagnostics.InvalidMaterialSlotCount;
+    }
+
+    void MaterialSystem::RecordDefaultDebugSurfaceUse() noexcept
+    {
+        ++m_Impl->Diagnostics.DefaultDebugSurfaceUses;
+    }
+
+    void MaterialSystem::ResetPerFrameSubstitutionCounters() noexcept
+    {
+        m_Impl->Diagnostics.MissingMaterialFallbackCount = 0;
+        m_Impl->Diagnostics.InvalidMaterialSlotCount = 0;
+        m_Impl->Diagnostics.DefaultDebugSurfaceUses = 0;
+    }
+
 } // namespace Extrinsic::Graphics
 
