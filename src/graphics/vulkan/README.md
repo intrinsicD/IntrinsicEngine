@@ -317,11 +317,19 @@ must become `true` only after one Vulkan-owned single-source evaluator reports a
 operational status; runtime, renderer, and app code must not re-derive this from
 CMake options, config flags, bootstrap snapshots, or fallback counters.
 
-Implementation child A owns the exported diagnostic seam:
+Implementation child A landed the exported diagnostic seam
+(`GRAPHICS-033A`):
 `EvaluateVulkanOperationalStatus(const VulkanOperationalInputs&) ->
-VulkanOperationalStatus`. The inputs are backend-public, non-native booleans /
-reason bits (no `Vk*` handles). `VulkanDevice::IsOperational()` and runtime
-startup reconciliation consume this result.
+VulkanOperationalStatus` is now exported from `Extrinsic.Backends.Vulkan`
+(declared in `Backends.Vulkan.cppm`, implemented in
+`Backends.Vulkan.OperationalStatus.cpp`). The inputs are backend-public,
+non-native booleans / reason bits (no `Vk*` handles). `VulkanDevice::IsOperational()`
+consumes the evaluator through `VulkanDevice::ComputeOperationalPredicate()`;
+runtime startup reconciliation (`GRAPHICS-033B`) consumes the same result.
+Until the higher-gate wiring lands, `BuildOperationalInputs()` leaves
+`MinimalRecipeRecordingPresent`, `BarrierValidationClean`, and
+`PublicServiceReconciled` as `false`, so the evaluator preserves the existing
+fail-closed contract.
 
 Ordered gate checklist:
 
@@ -388,7 +396,7 @@ backend-neutral render-graph stats.
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetVulkanPipelineDiagnosticsSnapshot()`, `VulkanPipelineCreationStatus`, `VulkanPipelineDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetVulkanPipelineDiagnosticsSnapshot()`, `VulkanPipelineCreationStatus`, `VulkanPipelineDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot`, `EvaluateVulkanOperationalStatus()`, `VulkanOperationalInputs`, `VulkanOperationalStatus`, `VulkanOperationalStatusCode`, `VulkanOperationalReason` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
@@ -415,6 +423,7 @@ backend-neutral render-graph stats.
 | `Backends.Vulkan.Bindless.cpp` | §7 `VulkanBindlessHeap` — `IBindlessHeap` with `PARTIALLY_BOUND` descriptor array |
 | `Backends.Vulkan.Transfer.cpp` | §8 `VulkanTransferQueue` — `ITransferQueue` via timeline semaphore + `StagingBelt` |
 | `Backends.Vulkan.CommandContext.cpp` | §9 `VulkanCommandContext` — `ICommandContext` (one per frame-in-flight slot), with fail-closed unbound/non-recording command skips and diagnostics. |
+| `Backends.Vulkan.OperationalStatus.cpp` | §10 `EvaluateVulkanOperationalStatus()` — pure CPU evaluator of the 9-step operational gate consumed by `VulkanDevice::IsOperational()` (GRAPHICS-033A). |
 | `Backends.Vulkan.Device.cpp` | §11 `VulkanDevice` implementations + §12 `CreateVulkanDevice()` factory |
 | `Backends.Vulkan.cpp` | *(empty placeholder — kept to avoid CMake source-list churn)* |
 | `Vma.cpp` | VMA implementation TU (`VMA_IMPLEMENTATION` guard) — compiles without modules |
