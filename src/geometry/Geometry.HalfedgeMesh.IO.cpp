@@ -196,6 +196,38 @@ namespace Geometry::MeshIO
             return std::nullopt;
         }
 
+        [[nodiscard]] bool IsPlyFloatingScalar(PlyScalar scalar)
+        {
+            return scalar == PlyScalar::Float32 || scalar == PlyScalar::Float64;
+        }
+
+        void ByteSwap(std::byte* p, std::size_t n);
+
+        [[nodiscard]] float ReadFloatingScalarAt(const std::byte* base,
+                                                 std::size_t offset,
+                                                 PlyScalar scalar,
+                                                 bool bigEndian)
+        {
+            std::array<std::byte, 8> tmp{};
+            const std::size_t byteCount = PlyScalarBytes(scalar);
+            std::memcpy(tmp.data(), base + offset, byteCount);
+            if (bigEndian)
+            {
+                ByteSwap(tmp.data(), byteCount);
+            }
+
+            if (scalar == PlyScalar::Float64)
+            {
+                double value = 0.0;
+                std::memcpy(&value, tmp.data(), 8);
+                return static_cast<float>(value);
+            }
+
+            float value = 0.0f;
+            std::memcpy(&value, tmp.data(), 4);
+            return value;
+        }
+
         struct PlyProperty
         {
             std::string Name;
@@ -550,27 +582,27 @@ namespace Geometry::MeshIO
                 {
                     return InvalidMeshFormat();
                 }
-                if (p.Name == "x" && p.ScalarType == PlyScalar::Float32)
+                if (p.Name == "x" && IsPlyFloatingScalar(p.ScalarType))
                 {
                     xIndex = static_cast<int>(i);
                 }
-                else if (p.Name == "y" && p.ScalarType == PlyScalar::Float32)
+                else if (p.Name == "y" && IsPlyFloatingScalar(p.ScalarType))
                 {
                     yIndex = static_cast<int>(i);
                 }
-                else if (p.Name == "z" && p.ScalarType == PlyScalar::Float32)
+                else if (p.Name == "z" && IsPlyFloatingScalar(p.ScalarType))
                 {
                     zIndex = static_cast<int>(i);
                 }
-                else if (p.Name == "nx" && p.ScalarType == PlyScalar::Float32)
+                else if (p.Name == "nx" && IsPlyFloatingScalar(p.ScalarType))
                 {
                     nxIndex = static_cast<int>(i);
                 }
-                else if (p.Name == "ny" && p.ScalarType == PlyScalar::Float32)
+                else if (p.Name == "ny" && IsPlyFloatingScalar(p.ScalarType))
                 {
                     nyIndex = static_cast<int>(i);
                 }
-                else if (p.Name == "nz" && p.ScalarType == PlyScalar::Float32)
+                else if (p.Name == "nz" && IsPlyFloatingScalar(p.ScalarType))
                 {
                     nzIndex = static_cast<int>(i);
                 }
@@ -590,11 +622,11 @@ namespace Geometry::MeshIO
                 {
                     aIndex = static_cast<int>(i);
                 }
-                else if (texUIndex < 0 && p.ScalarType == PlyScalar::Float32 && matchesAlias(p.Name, kTexUAliases))
+                else if (texUIndex < 0 && IsPlyFloatingScalar(p.ScalarType) && matchesAlias(p.Name, kTexUAliases))
                 {
                     texUIndex = static_cast<int>(i);
                 }
-                else if (texVIndex < 0 && p.ScalarType == PlyScalar::Float32 && matchesAlias(p.Name, kTexVAliases))
+                else if (texVIndex < 0 && IsPlyFloatingScalar(p.ScalarType) && matchesAlias(p.Name, kTexVAliases))
                 {
                     texVIndex = static_cast<int>(i);
                 }
@@ -656,18 +688,6 @@ namespace Geometry::MeshIO
             std::vector<std::vector<std::uint32_t>> faces;
             faces.reserve(faceElement->Count);
 
-            auto readFloat = [&](const std::byte* base, std::size_t offset) -> float {
-                std::array<std::byte, 4> tmp{};
-                std::memcpy(tmp.data(), base + offset, 4);
-                if (bigEndian)
-                {
-                    ByteSwap(tmp.data(), 4);
-                }
-                float v = 0.0f;
-                std::memcpy(&v, tmp.data(), 4);
-                return v;
-            };
-
             auto readUInt8 = [&](const std::byte* base, std::size_t offset) -> std::uint8_t {
                 std::uint8_t v = 0;
                 std::memcpy(&v, base + offset, 1);
@@ -686,14 +706,16 @@ namespace Geometry::MeshIO
                     for (std::size_t row = 0; row < element.Count; ++row)
                     {
                         const std::byte* base = cursor + row * vertexStride;
-                        vertices.emplace_back(readFloat(base, vertexOffsets[xIndex]),
-                                              readFloat(base, vertexOffsets[yIndex]),
-                                              readFloat(base, vertexOffsets[zIndex]));
+                        vertices.emplace_back(
+                            ReadFloatingScalarAt(base, vertexOffsets[xIndex], vertexElement->Properties[xIndex].ScalarType, bigEndian),
+                            ReadFloatingScalarAt(base, vertexOffsets[yIndex], vertexElement->Properties[yIndex].ScalarType, bigEndian),
+                            ReadFloatingScalarAt(base, vertexOffsets[zIndex], vertexElement->Properties[zIndex].ScalarType, bigEndian));
                         if (hasNormals)
                         {
-                            normals.emplace_back(readFloat(base, vertexOffsets[nxIndex]),
-                                                 readFloat(base, vertexOffsets[nyIndex]),
-                                                 readFloat(base, vertexOffsets[nzIndex]));
+                            normals.emplace_back(
+                                ReadFloatingScalarAt(base, vertexOffsets[nxIndex], vertexElement->Properties[nxIndex].ScalarType, bigEndian),
+                                ReadFloatingScalarAt(base, vertexOffsets[nyIndex], vertexElement->Properties[nyIndex].ScalarType, bigEndian),
+                                ReadFloatingScalarAt(base, vertexOffsets[nzIndex], vertexElement->Properties[nzIndex].ScalarType, bigEndian));
                         }
                         if (hasColors)
                         {
@@ -708,8 +730,9 @@ namespace Geometry::MeshIO
                         }
                         if (hasTexcoords)
                         {
-                            texcoords.emplace_back(readFloat(base, vertexOffsets[texUIndex]),
-                                                   readFloat(base, vertexOffsets[texVIndex]));
+                            texcoords.emplace_back(
+                                ReadFloatingScalarAt(base, vertexOffsets[texUIndex], vertexElement->Properties[texUIndex].ScalarType, bigEndian),
+                                ReadFloatingScalarAt(base, vertexOffsets[texVIndex], vertexElement->Properties[texVIndex].ScalarType, bigEndian));
                         }
                     }
                     cursor += total;

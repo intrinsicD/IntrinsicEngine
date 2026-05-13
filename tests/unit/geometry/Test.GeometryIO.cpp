@@ -2284,6 +2284,20 @@ namespace
         return bytes;
     }
 
+    [[nodiscard]] std::array<std::byte, 8> EncodeDouble(double value, BinaryPlyEndian endian)
+    {
+        std::array<std::byte, 8> bytes{};
+        std::memcpy(bytes.data(), &value, 8);
+        if (endian == BinaryPlyEndian::Big)
+        {
+            std::swap(bytes[0], bytes[7]);
+            std::swap(bytes[1], bytes[6]);
+            std::swap(bytes[2], bytes[5]);
+            std::swap(bytes[3], bytes[4]);
+        }
+        return bytes;
+    }
+
     [[nodiscard]] std::array<std::byte, 4> EncodeUint32(std::uint32_t value, BinaryPlyEndian endian)
     {
         std::array<std::byte, 4> bytes{};
@@ -2555,6 +2569,82 @@ TEST(GeometryIO_MeshIO, LoadsBinaryPLYTriangleWithVertexTexcoords)
     }
 }
 
+TEST(GeometryIO_MeshIO, LoadsBinaryPLYTriangleWithDoubleScalars)
+{
+    std::string contents;
+    contents += "ply\n";
+    contents += "format binary_little_endian 1.0\n";
+    contents += "element vertex 3\n";
+    contents += "property double x\n";
+    contents += "property double y\n";
+    contents += "property double z\n";
+    contents += "property double nx\n";
+    contents += "property double ny\n";
+    contents += "property double nz\n";
+    contents += "property double s\n";
+    contents += "property double t\n";
+    contents += "element face 1\n";
+    contents += "property list uchar int vertex_indices\n";
+    contents += "end_header\n";
+
+    auto appendBytes = [&](const auto& bytes)
+    {
+        contents.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    };
+
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.25f, 0.75f},
+        glm::vec2{1.0f, 0.5f},
+        glm::vec2{0.0f, 1.0f},
+    };
+
+    for (std::size_t i = 0; i < positions.size(); ++i)
+    {
+        appendBytes(EncodeDouble(positions[i].x, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(positions[i].y, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(positions[i].z, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(normals[i].x, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(normals[i].y, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(normals[i].z, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(texcoords[i].x, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(texcoords[i].y, BinaryPlyEndian::Little));
+    }
+
+    contents.push_back(static_cast<char>(3));
+    appendBytes(EncodeUint32(0u, BinaryPlyEndian::Little));
+    appendBytes(EncodeUint32(1u, BinaryPlyEndian::Little));
+    appendBytes(EncodeUint32(2u, BinaryPlyEndian::Little));
+
+    TempFile file(".ply", contents);
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto loadedNormals = result->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(loadedNormals.IsValid());
+    ASSERT_EQ(loadedNormals.Vector().size(), 3u);
+    EXPECT_EQ(loadedNormals[0], normals[0]);
+    EXPECT_EQ(loadedNormals[1], normals[1]);
+    EXPECT_EQ(loadedNormals[2], normals[2]);
+
+    auto loadedTexcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(loadedTexcoords.IsValid());
+    ASSERT_EQ(loadedTexcoords.Vector().size(), 3u);
+    EXPECT_EQ(loadedTexcoords[0], texcoords[0]);
+    EXPECT_EQ(loadedTexcoords[1], texcoords[1]);
+    EXPECT_EQ(loadedTexcoords[2], texcoords[2]);
+}
+
 TEST(GeometryIO_MeshIO, LoadPLYRejectsTruncatedBinaryBody)
 {
     const std::array<BinaryPlyVertex, 2> vertices{{
@@ -2800,6 +2890,55 @@ TEST(GeometryIO_PointCloudIO, LoadsBinaryPLYPointCloudWithNormalsAndColor)
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).x, 1.0f, 1.0e-6f);
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).z, 0.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadsBinaryPLYPointCloudWithDoubleScalars)
+{
+    std::string contents;
+    contents += "ply\n";
+    contents += "format binary_little_endian 1.0\n";
+    contents += "element vertex 2\n";
+    contents += "property double x\n";
+    contents += "property double y\n";
+    contents += "property double z\n";
+    contents += "property double nx\n";
+    contents += "property double ny\n";
+    contents += "property double nz\n";
+    contents += "end_header\n";
+
+    auto appendBytes = [&](const auto& bytes)
+    {
+        contents.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    };
+
+    const std::array<glm::vec3, 2> positions{
+        glm::vec3{1.0f, 2.0f, 3.0f},
+        glm::vec3{4.0f, 5.0f, 6.0f},
+    };
+    const std::array<glm::vec3, 2> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+
+    for (std::size_t i = 0; i < positions.size(); ++i)
+    {
+        appendBytes(EncodeDouble(positions[i].x, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(positions[i].y, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(positions[i].z, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(normals[i].x, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(normals[i].y, BinaryPlyEndian::Little));
+        appendBytes(EncodeDouble(normals[i].z, BinaryPlyEndian::Little));
+    }
+
+    TempFile file(".ply", contents);
+    const auto result = Geometry::PointCloudIO::LoadPLY(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Cloud.VerticesSize(), 2u);
+    EXPECT_TRUE(result->Cloud.HasNormals());
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), positions[0]);
+    EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{1}), positions[1]);
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{0}), normals[0]);
+    EXPECT_EQ(result->Cloud.Normal(Geometry::VertexHandle{1}), normals[1]);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsBinaryPLYPointCloudSkipsExtraScalars)
