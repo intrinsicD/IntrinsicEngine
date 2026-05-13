@@ -1,5 +1,7 @@
 module;
 
+#include <string_view>
+
 module Extrinsic.Backends.Vulkan;
 
 namespace Extrinsic::Backends::Vulkan
@@ -102,6 +104,45 @@ VulkanOperationalStatus EvaluateVulkanOperationalStatus(
                 VulkanOperationalReason::PublicServiceReconciliationFailed};
 
     return {VulkanOperationalStatusCode::Operational, VulkanOperationalReason::None};
+}
+
+std::string_view ToString(const VulkanOperationalStatusCode code) noexcept
+{
+    switch (code)
+    {
+    case VulkanOperationalStatusCode::NotCompiled:                 return "NotCompiled";
+    case VulkanOperationalStatusCode::NotRequested:                return "NotRequested";
+    case VulkanOperationalStatusCode::RequestedButUnsupported:     return "RequestedButUnsupported";
+    case VulkanOperationalStatusCode::RequestedButFailedInit:      return "RequestedButFailedInit";
+    case VulkanOperationalStatusCode::RequestedButValidationFailed:return "RequestedButValidationFailed";
+    case VulkanOperationalStatusCode::RequestedButIncompleteGate:  return "RequestedButIncompleteGate";
+    case VulkanOperationalStatusCode::Operational:                 return "Operational";
+    }
+    return "Unknown";
+}
+
+std::string_view ToString(const VulkanOperationalReason reason) noexcept
+{
+    switch (reason)
+    {
+    case VulkanOperationalReason::None:                              return "None";
+    case VulkanOperationalReason::MissingInstance:                   return "MissingInstance";
+    case VulkanOperationalReason::MissingSurface:                    return "MissingSurface";
+    case VulkanOperationalReason::NoSuitablePhysicalDevice:          return "NoSuitablePhysicalDevice";
+    case VulkanOperationalReason::MissingRequiredExtension:          return "MissingRequiredExtension";
+    case VulkanOperationalReason::MissingRequiredFeature:            return "MissingRequiredFeature";
+    case VulkanOperationalReason::LogicalDeviceFailed:               return "LogicalDeviceFailed";
+    case VulkanOperationalReason::AllocatorFailed:                   return "AllocatorFailed";
+    case VulkanOperationalReason::SwapchainFailed:                   return "SwapchainFailed";
+    case VulkanOperationalReason::CommandSyncFailed:                 return "CommandSyncFailed";
+    case VulkanOperationalReason::MinimalRecipeRecordingMissing:     return "MinimalRecipeRecordingMissing";
+    case VulkanOperationalReason::BarrierValidationFailed:           return "BarrierValidationFailed";
+    case VulkanOperationalReason::PublicServiceReconciliationFailed: return "PublicServiceReconciliationFailed";
+    case VulkanOperationalReason::ValidationLayerError:              return "ValidationLayerError";
+    case VulkanOperationalReason::DeviceLost:                        return "DeviceLost";
+    case VulkanOperationalReason::SurfaceLost:                       return "SurfaceLost";
+    }
+    return "Unknown";
 }
 
 } // namespace Extrinsic::Backends::Vulkan

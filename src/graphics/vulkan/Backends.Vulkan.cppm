@@ -1,6 +1,9 @@
 module;
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string_view>
 
 export module Extrinsic.Backends.Vulkan;
 
@@ -429,5 +432,61 @@ namespace Extrinsic::Backends::Vulkan
     // `{Operational, None}`. Append-only on both enums.
     export [[nodiscard]] VulkanOperationalStatus
     EvaluateVulkanOperationalStatus(const VulkanOperationalInputs& inputs) noexcept;
+
+    // Stable string names for diagnostics consumers (logs, breadcrumbs, tests).
+    // Append-only and matched 1:1 with the enum values; deliberately not
+    // localized.
+    export [[nodiscard]] std::string_view ToString(VulkanOperationalStatusCode code) noexcept;
+    export [[nodiscard]] std::string_view ToString(VulkanOperationalReason reason) noexcept;
+
+    // -----------------------------------------------------------------------
+    // GRAPHICS-033B: process-monotonic operational diagnostics snapshot.
+    //
+    // Counters are bumped by `RecordVulkanOperationalFallback()` at the
+    // runtime startup reconciliation point (one call per `Engine::Initialize`
+    // on a non-operational requested-Vulkan device) and by
+    // `NoteVulkanOperationalDeviceLostDrop()` when a previously operational
+    // device transitions to non-operational because of `VK_ERROR_DEVICE_LOST`.
+    // They are never reset across `Initialize`/`Shutdown` cycles, mirroring
+    // the existing `FallbackDiagnosticsSnapshot` semantics. Renderer/runtime
+    // code keeps branching only on `IDevice::IsOperational()`; this surface
+    // is diagnostics-only.
+    // -----------------------------------------------------------------------
+    export inline constexpr std::size_t kVulkanOperationalReasonCount = 16;
+
+    export struct VulkanOperationalDiagnosticsSnapshot
+    {
+        std::uint64_t VulkanFallbackToNullCount             = 0;
+        std::uint64_t VulkanInitFailureCount                = 0;
+        std::uint64_t VulkanValidationErrorCount            = 0;
+        std::uint64_t VulkanOperationalGateFailureCount     = 0;
+        std::uint64_t VulkanDeviceLostOperationalDropCount  = 0;
+        std::array<std::uint32_t, kVulkanOperationalReasonCount> ReasonHistogram{};
+    };
+
+    export [[nodiscard]] VulkanOperationalDiagnosticsSnapshot
+    GetVulkanOperationalDiagnosticsSnapshot() noexcept;
+
+    // Bumps `VulkanFallbackToNullCount`, the matching `ReasonHistogram`
+    // bucket, and the path-specific counter for `status.Code`:
+    //   - `RequestedButFailedInit`       -> `VulkanInitFailureCount`
+    //   - `RequestedButValidationFailed` -> `VulkanValidationErrorCount`
+    //   - `RequestedButIncompleteGate`   -> `VulkanOperationalGateFailureCount`
+    //   - `NotCompiled`, `RequestedButUnsupported` -> fallback + histogram only
+    // No-op when `status.Code` is `Operational` or `NotRequested` (runtime
+    // never observes a fallback in those rows of the truth table).
+    export void RecordVulkanOperationalFallback(VulkanOperationalStatus status) noexcept;
+
+    // Bumps `VulkanDeviceLostOperationalDropCount`. Called by the Vulkan
+    // backend when `VK_ERROR_DEVICE_LOST` drops a previously operational
+    // device to non-operational. Process-monotonic.
+    export void NoteVulkanOperationalDeviceLostDrop() noexcept;
+
+    // Re-evaluates the operational status of `device`, which must have been
+    // produced by `CreateVulkanDevice()`. The runtime startup breadcrumb path
+    // is the only consumer; behavior is undefined for other `IDevice`
+    // implementations. Returns `{NotCompiled, None}` for a null device.
+    export [[nodiscard]] VulkanOperationalStatus
+    EvaluateVulkanDeviceOperationalStatus(const RHI::IDevice* device) noexcept;
 }
 

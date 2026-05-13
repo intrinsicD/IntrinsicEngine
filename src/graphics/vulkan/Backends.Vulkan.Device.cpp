@@ -39,6 +39,19 @@ namespace
     std::atomic<std::uint64_t> g_FallbackResizeAttempts{0};
     std::atomic<std::uint8_t>  g_LastFallbackPipelineReason{
         static_cast<std::uint8_t>(FallbackPipelineReason::None)};
+
+    // GRAPHICS-033B operational-diagnostics counters. Process-monotonic and
+    // never reset across Initialize/Shutdown cycles; ordering across fields
+    // is not transactional. Per-reason histogram buckets are owned by the
+    // Vulkan backend because the runtime never observes the individual
+    // reasons except through this aggregate snapshot.
+    std::atomic<std::uint64_t> g_VulkanFallbackToNullCount{0};
+    std::atomic<std::uint64_t> g_VulkanInitFailureCount{0};
+    std::atomic<std::uint64_t> g_VulkanValidationErrorCount{0};
+    std::atomic<std::uint64_t> g_VulkanOperationalGateFailureCount{0};
+    std::atomic<std::uint64_t> g_VulkanDeviceLostOperationalDropCount{0};
+    std::array<std::atomic<std::uint32_t>, kVulkanOperationalReasonCount>
+        g_VulkanOperationalReasonHistogram{};
     std::mutex g_BootstrapDiagnosticsMutex;
     VulkanBootstrapDiagnosticsSnapshot g_BootstrapDiagnostics{};
     std::mutex g_FrameLifecycleDiagnosticsMutex;
@@ -636,6 +649,75 @@ FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept
     return snapshot;
 }
 
+void RecordVulkanOperationalFallback(const VulkanOperationalStatus status) noexcept
+{
+    // The truth table in `src/graphics/vulkan/README.md` records that
+    // `Operational` and `NotRequested` rows fire no fallback counters; the
+    // remaining five status codes all increment the aggregate fallback count
+    // plus the matching reason histogram bucket.
+    switch (status.Code)
+    {
+    case VulkanOperationalStatusCode::Operational:
+    case VulkanOperationalStatusCode::NotRequested:
+        return;
+    case VulkanOperationalStatusCode::NotCompiled:
+    case VulkanOperationalStatusCode::RequestedButUnsupported:
+        break;
+    case VulkanOperationalStatusCode::RequestedButFailedInit:
+        g_VulkanInitFailureCount.fetch_add(1, std::memory_order_relaxed);
+        break;
+    case VulkanOperationalStatusCode::RequestedButValidationFailed:
+        g_VulkanValidationErrorCount.fetch_add(1, std::memory_order_relaxed);
+        break;
+    case VulkanOperationalStatusCode::RequestedButIncompleteGate:
+        g_VulkanOperationalGateFailureCount.fetch_add(1, std::memory_order_relaxed);
+        break;
+    }
+
+    g_VulkanFallbackToNullCount.fetch_add(1, std::memory_order_relaxed);
+    const auto reasonIndex = static_cast<std::size_t>(status.Reason);
+    if (reasonIndex < kVulkanOperationalReasonCount)
+    {
+        g_VulkanOperationalReasonHistogram[reasonIndex].fetch_add(
+            1, std::memory_order_relaxed);
+    }
+}
+
+void NoteVulkanOperationalDeviceLostDrop() noexcept
+{
+    g_VulkanDeviceLostOperationalDropCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+VulkanOperationalDiagnosticsSnapshot GetVulkanOperationalDiagnosticsSnapshot() noexcept
+{
+    VulkanOperationalDiagnosticsSnapshot snapshot{};
+    snapshot.VulkanFallbackToNullCount =
+        g_VulkanFallbackToNullCount.load(std::memory_order_relaxed);
+    snapshot.VulkanInitFailureCount =
+        g_VulkanInitFailureCount.load(std::memory_order_relaxed);
+    snapshot.VulkanValidationErrorCount =
+        g_VulkanValidationErrorCount.load(std::memory_order_relaxed);
+    snapshot.VulkanOperationalGateFailureCount =
+        g_VulkanOperationalGateFailureCount.load(std::memory_order_relaxed);
+    snapshot.VulkanDeviceLostOperationalDropCount =
+        g_VulkanDeviceLostOperationalDropCount.load(std::memory_order_relaxed);
+    for (std::size_t i = 0; i < kVulkanOperationalReasonCount; ++i)
+    {
+        snapshot.ReasonHistogram[i] =
+            g_VulkanOperationalReasonHistogram[i].load(std::memory_order_relaxed);
+    }
+    return snapshot;
+}
+
+VulkanOperationalStatus EvaluateVulkanDeviceOperationalStatus(
+    const RHI::IDevice* device) noexcept
+{
+    if (device == nullptr)
+        return {VulkanOperationalStatusCode::NotCompiled, VulkanOperationalReason::None};
+    const auto& vulkanDevice = static_cast<const VulkanDevice&>(*device);
+    return EvaluateVulkanOperationalStatus(vulkanDevice.BuildOperationalInputs());
+}
+
 VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept
 {
     std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
@@ -818,7 +900,14 @@ void VulkanDevice::NoteDeviceLostIfNeeded(const VkResult result) noexcept
     if (result == VK_ERROR_DEVICE_LOST)
     {
         m_DeviceLost = true;
-        m_Operational = false;
+        // GRAPHICS-033B: record the operational→non-operational drop exactly
+        // once per transition; a stuck-lost device should not keep bumping
+        // the counter on every subsequent VK_ERROR_DEVICE_LOST observation.
+        if (m_Operational)
+        {
+            m_Operational = false;
+            NoteVulkanOperationalDeviceLostDrop();
+        }
     }
 }
 

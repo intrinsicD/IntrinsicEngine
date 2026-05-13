@@ -221,6 +221,34 @@ namespace Extrinsic::Runtime
         m_Window   = Platform::CreateWindow(m_Config.Window);
         m_Device   = CreateDevice(m_Config.Render);
         m_Device->Initialize(*m_Window, m_Config.Render);
+
+        // GRAPHICS-033B: emit the Vulkan-requested-but-not-operational
+        // breadcrumb and bump the operational diagnostics counters exactly
+        // once per startup when the runtime requested the promoted Vulkan
+        // device but the resolved device is not operational. Runtime never
+        // aborts on this fallback — see the truth table in
+        // `src/graphics/vulkan/README.md`.
+        if (ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(
+                m_Config.Render, m_Device->IsOperational()))
+        {
+#if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
+            const Backends::Vulkan::VulkanOperationalStatus status =
+                Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus(m_Device.get());
+            Core::Log::Warn(
+                "[Runtime] VulkanRequestedButNotOperational status={} reason={}",
+                Backends::Vulkan::ToString(status.Code),
+                Backends::Vulkan::ToString(status.Reason));
+            Backends::Vulkan::RecordVulkanOperationalFallback(status);
+#else
+            // Vulkan backend was not compiled into this build; the truth
+            // table row resolves to `NotCompiled` with no reason.
+            Core::Log::Warn(
+                "[Runtime] VulkanRequestedButNotOperational status={} reason={}",
+                "NotCompiled",
+                "None");
+#endif
+        }
+
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
         m_RendererOperational = m_Device->IsOperational();

@@ -53,6 +53,23 @@ namespace Extrinsic::Runtime
         return RuntimeDeviceSelection{};
     }
 
+    // GRAPHICS-033B: pure decision for the runtime startup breadcrumb. Returns
+    // true when the runtime requested the promoted Vulkan device but the
+    // resolved device is not operational, matching the truth-table rows in
+    // `src/graphics/vulkan/README.md`. The breadcrumb is emitted exactly once
+    // per `Engine::Initialize()` because the call site evaluates this once;
+    // no internal guard is needed here.
+    export [[nodiscard]] inline bool ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(
+        const Core::Config::RenderConfig& config,
+        const bool isDeviceOperational) noexcept
+    {
+        if (config.Backend != Core::Config::GraphicsBackend::Vulkan)
+            return false;
+        if (!config.EnablePromotedVulkanDevice)
+            return false;
+        return !isDeviceOperational;
+    }
+
     export [[nodiscard]] inline Core::Config::EngineConfig CreateReferenceEngineConfig()
     {
         Core::Config::EngineConfig config{};
