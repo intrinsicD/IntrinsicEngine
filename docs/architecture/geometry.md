@@ -13,6 +13,14 @@
 - Allowed: `core`.
 - Disallowed: runtime/app-specific ownership and rendering backend internals.
 
+## API style, diagnostics, and numeric policy
+
+New or materially changed geometry APIs must follow the
+[Geometry API Style and Numeric Policy](geometry-api-style.md). The policy covers
+module/file/namespace alignment, public state and mutability, count terminology,
+failure reporting, deterministic diagnostics, numeric tolerances, and the current
+`Geometry.LinearSolver` narrow-module decision.
+
 ## Topology connectivity ownership
 
 - `Geometry::Graph::VertexConnectivity` and `Geometry::Graph::HalfedgeConnectivity`

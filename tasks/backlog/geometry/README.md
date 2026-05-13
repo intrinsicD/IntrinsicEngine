@@ -10,7 +10,6 @@ map.
 ## Tasks
 
 - [GEOIO-002 — Geometry IO parity hardening and exporters](GEOIO-002-geometry-io-parity-hardening.md).
-- [GEOM-005 — Geometry API style and numeric policy](GEOM-005-api-style-and-numeric-policy.md).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](GEOM-006-indexed-mesh-soup-conversion-contracts.md).
 - [GEOM-007 — Robust predicates and intersection classification foundation](GEOM-007-robust-predicates-intersection-classification.md).
 - [GEOM-008 — Geometry linear algebra and solver infrastructure](GEOM-008-linear-algebra-solver-infrastructure.md).
@@ -26,10 +25,13 @@ map.
   upstream gate for [`assets/ASSETIO-001`](../assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
   and asset-backed mesh residency in **Theme A — Shortest path to sandbox
   visible geometry** (`rendering/GRAPHICS-034`).
-- GEOM-005 through GEOM-009 are the foundational tasks from the
+- [GEOM-005](../../done/GEOM-005-api-style-and-numeric-policy.md) is retired in
+  `tasks/done` and provides the canonical geometry API/numeric policy for future
+  work.
+- GEOM-006 through GEOM-009 are the remaining foundational tasks from the
   [`src/geometry` gap analysis](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md):
-  API policy, mesh/soup contracts, robust predicates, linear algebra, and
-  benchmark manifests.
+  mesh/soup contracts, robust predicates, linear algebra, and benchmark
+  manifests.
 - GEOM-010 and GEOM-011 turn point-cloud and parameterization gaps into
   method-compliant roadmap packs before algorithm implementation begins.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible

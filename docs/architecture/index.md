@@ -17,6 +17,7 @@ Status labels:
 - [Runtime](runtime.md) (`canonical`)
 - [Graphics](graphics.md) (`canonical`)
 - [Geometry](geometry.md) (`canonical`)
+- [Geometry API style and numeric policy](geometry-api-style.md) (`canonical`)
 - [Assets](assets.md) (`canonical`)
 - [ECS](ecs.md) (`canonical`)
 - [Task graphs](task-graphs.md) (`canonical`)
