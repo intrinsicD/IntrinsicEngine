@@ -484,8 +484,8 @@ independently testable (CPU/null where possible), and gated as recorded.
   depends on GRAPHICS-032A and GRAPHICS-030B.
 - [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test](GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
   depends on GRAPHICS-032B.
-- [GRAPHICS-033A — Vulkan operational-status evaluator surface](GRAPHICS-033A-vulkan-operational-status-evaluator.md):
-  depends on GRAPHICS-033 (planning).
+- [GRAPHICS-033A — Vulkan operational-status evaluator surface](../../active/GRAPHICS-033A-vulkan-operational-status-evaluator.md)
+  (in-progress): depends on GRAPHICS-033 (planning).
 - [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
   depends on GRAPHICS-033A.
 - [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
