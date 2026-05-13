@@ -31,6 +31,7 @@ target_sources(${target_name}
         Graphics.TransformSyncSystem.cppm
         PRIVATE
         Graphics.Renderer.cpp
+        Graphics.FrameRecipe.cpp
         Graphics.GpuWorld.cpp
         Graphics.MaterialSystem.cpp
         Graphics.ColormapSystem.cpp
@@ -43,6 +44,7 @@ target_sources(${target_name}
         Graphics.LightSystem.cpp
         Graphics.SelectionSystem.cpp
         Graphics.ForwardSystem.cpp
+        Graphics.SpatialDebugVisualizers.cpp
         Graphics.DeferredSystem.cpp
         Graphics.PostProcessSystem.cpp
         Graphics.ShadowSystem.cpp

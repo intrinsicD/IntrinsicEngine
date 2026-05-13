@@ -9,6 +9,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
+        Cameras/Runtime.CameraControllers.cppm
         Runtime.FrameLoop.cppm
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
@@ -20,6 +21,7 @@ target_sources(${target_name}
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
+        Runtime.RenderExtraction.cpp
         Runtime.StreamingExecutor.cpp
 )
 

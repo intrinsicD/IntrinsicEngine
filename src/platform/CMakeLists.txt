@@ -49,6 +49,8 @@ if(_intrinsic_platform_backend STREQUAL "Glfw")
                 FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
                 backends/glfw/Platform.Backend.Glfw.cppm
                 backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm
+                PRIVATE
+                backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp
         )
         target_compile_definitions(${target_name} PRIVATE INTRINSIC_PLATFORM_BACKEND_GLFW=1)
         target_link_libraries(${target_name} PUBLIC glfw imgui_lib)
