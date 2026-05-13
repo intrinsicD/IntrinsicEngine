@@ -473,9 +473,9 @@ independently testable (CPU/null where possible), and gated as recorded.
   landed; deferred-retire window, refcount-cancellation resurrection, and
   `RenderExtractionCache::TickProceduralGeometry` maintenance hook are
   wired with `contract;runtime` coverage.
-- [GRAPHICS-031A — Default debug surface shaders and pipeline](GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
+- [GRAPHICS-031A — Default debug surface shaders and pipeline (done)](../../done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   depends on GRAPHICS-031 (planning) and BUILD-001 (done; Sandbox shader
-  compile wiring).
+  compile wiring). Landed by commit `886b197`.
 - [GRAPHICS-031B — Default debug surface substitution and diagnostics counters](GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
   depends on GRAPHICS-031A.
 - [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration](GRAPHICS-032A-minimal-debug-surface-recipe.md):

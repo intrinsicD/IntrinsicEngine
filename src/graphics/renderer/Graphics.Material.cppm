@@ -69,13 +69,24 @@ export namespace Extrinsic::Graphics
     // -----------------------------------------------------------------
     // Well-known material type IDs
     // -----------------------------------------------------------------
-    // These are the registration order of built-in types; registered by
-    // MaterialSystem::Initialize() (StandardPBR) and
-    // VisualizationSyncSystem::Initialize() (SciVis).
+    // These are the registration order of built-in types; all three are
+    // registered by MaterialSystem::Initialize() so the canonical TypeIDs
+    // are reserved before any subsystem-specific registration runs.
     // Shaders branch on GpuMaterialSlot::MaterialTypeID.
     // -----------------------------------------------------------------
-    inline constexpr std::uint32_t kMaterialTypeID_StandardPBR = 0u;
-    inline constexpr std::uint32_t kMaterialTypeID_SciVis      = 1u;
+    inline constexpr std::uint32_t kMaterialTypeID_StandardPBR         = 0u;
+    inline constexpr std::uint32_t kMaterialTypeID_SciVis              = 1u;
+    inline constexpr std::uint32_t kMaterialTypeID_DefaultDebugSurface = 2u;
+
+    // Built-in type registration names — referenced by MaterialSystem::Initialize()
+    // and by subsystems that look up the registered handles (e.g. VisualizationSyncSystem).
+    inline constexpr const char* kMaterialTypeName_StandardPBR         = "StandardPBR";
+    inline constexpr const char* kMaterialTypeName_SciVis              = "SciVis";
+    inline constexpr const char* kMaterialTypeName_DefaultDebugSurface = "Material.DefaultDebugSurface";
+
+    // Slot 0 carries the canonical missing-material fallback so any
+    // invalid MaterialHandle resolves to a visible purple debug surface.
+    inline constexpr float kDefaultDebugSurfaceBaseColor[4]{0.55f, 0.20f, 0.85f, 1.0f};
 
     // -----------------------------------------------------------------
     // SciVis material — CustomData layout documentation

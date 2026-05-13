@@ -45,9 +45,10 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 //   4. TransformSyncSystem::SyncGpuBuffer()— write EffectiveSlot → GPU
 //
 // SciVis material type registration:
-//   Initialize() calls MaterialSystem::RegisterType("SciVis") to
-//   ensure the type gets TypeID = kMaterialTypeID_SciVis (1).
-//   Must be called before any other custom type is registered.
+//   MaterialSystem::Initialize() registers the SciVis type with
+//   TypeID = kMaterialTypeID_SciVis (1) alongside the other built-in
+//   types. Initialize() here just looks up the registered handle via
+//   MaterialSystem::FindType(kMaterialTypeName_SciVis).
 //
 // Thread-safety:
 //   All methods — render thread only.
@@ -76,9 +77,9 @@ export namespace Extrinsic::Graphics
         // Lifecycle
         // -----------------------------------------------------------------
 
-        /// Register the SciVis material type and connect to the device.
-        /// Must be called BEFORE any other custom material type is registered
-        /// to guarantee kMaterialTypeID_SciVis = 1.
+        /// Look up the SciVis material type (registered by
+        /// MaterialSystem::Initialize() with the well-known
+        /// kMaterialTypeID_SciVis = 1) and connect to the device.
         void Initialize(MaterialSystem& matSys, RHI::IDevice& device);
 
         void Shutdown();

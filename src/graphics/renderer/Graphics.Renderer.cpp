@@ -45,6 +45,7 @@ import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Core.Logging;
 
 namespace Extrinsic::Graphics
@@ -303,6 +304,7 @@ namespace Extrinsic::Graphics
             m_GpuWorld       .reset();
             m_MaterialSystem .reset();
             m_DepthPrepassPipelineLease.reset();
+            m_DefaultDebugSurfacePipelineLease.reset();
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -827,6 +829,21 @@ namespace Extrinsic::Graphics
 
         // ── Resource managers ─────────────────────────────────────────────
 
+        [[nodiscard]] RHI::PipelineHandle GetDefaultDebugSurfacePipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_DefaultDebugSurfacePipelineLease.has_value() ||
+                !m_DefaultDebugSurfacePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept override
+        {
+            return BuildDefaultDebugSurfacePipelineDesc();
+        }
+
         RHI::BufferManager&   GetBufferManager()   override { return *m_BufferManager;   }
         RHI::TextureManager&  GetTextureManager()  override { return *m_TextureManager;  }
         RHI::SamplerManager&  GetSamplerManager()  override { return *m_SamplerManager;  }
@@ -846,6 +863,44 @@ namespace Extrinsic::Graphics
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
 
     private:
+        // GRAPHICS-031A — canonical default-debug-surface PipelineDesc.
+        //
+        // VertexShaderPath / FragmentShaderPath point at the compiled SPIR-V
+        // artifacts produced by `intrinsic_add_glsl_shaders()` under the
+        // runtime shader output directory (`<bin>/shaders/<relative>.spv`).
+        // The Vulkan backend's `ReadSpirvFile()` opens these paths verbatim,
+        // so the renderer pre-resolves them via `Core::Filesystem::GetShaderPath`
+        // (the same resolver used by the legacy `RenderOrchestrator`). When
+        // the SPV files are absent (e.g. CI builds without
+        // `INTRINSIC_BUILD_SANDBOX=ON`), `GetShaderPath` returns the raw
+        // relative path so the resolved value remains deterministic. Initial
+        // `Initialize()` and `RebuildOperationalResources()` therefore
+        // republish a byte-identical descriptor against a stable filesystem
+        // state.
+        [[nodiscard]] static RHI::PipelineDesc BuildDefaultDebugSurfacePipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/forward/default_debug_surface.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/forward/default_debug_surface.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::Back;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = true;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Less;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA8_UNORM;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.DefaultDebugSurface";
+            return desc;
+        }
+
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
         {
             if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
@@ -879,6 +934,22 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] DepthPrepass pipeline unavailable; pass commands will be skipped: error={}",
                                 static_cast<int>(depthPipeline.error()));
+            }
+
+            // GRAPHICS-031A: canonical missing-material fallback pipeline.
+            // Republished byte-identical from BuildDefaultDebugSurfacePipelineDesc()
+            // so the descriptor matches across initial init and rebuilds.
+            m_DefaultDebugSurfacePipelineLease.reset();
+            const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc();
+            auto defaultDebugSurfacePipeline = m_PipelineManager->Create(defaultDebugSurfaceDesc);
+            if (defaultDebugSurfacePipeline.has_value())
+            {
+                m_DefaultDebugSurfacePipelineLease.emplace(std::move(*defaultDebugSurfacePipeline));
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] DefaultDebugSurface pipeline unavailable; fallback recording will be skipped: error={}",
+                                static_cast<int>(defaultDebugSurfacePipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -1031,6 +1102,7 @@ namespace Extrinsic::Graphics
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
         DepthPrepassPass                     m_DepthPrepassPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

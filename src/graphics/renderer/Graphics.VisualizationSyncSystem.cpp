@@ -235,21 +235,15 @@ namespace Extrinsic::Graphics
         assert(!m_Impl->Initialized);
         m_Impl->Device = &device;
 
-        // Register the SciVis material type.  Must happen BEFORE any
-        // other custom type so it gets kMaterialTypeID_SciVis (= 1).
-        const MaterialTypeDesc sciVisDesc{
-            .Name = "SciVis",
-            .CustomParams = {
-                {"ColormapAndDomain",  "colourmap bindless idx, domain, rangeMin, rangeMax"},
-                {"IsolinesAndBins",    "isolineCount, packedColor, isolineWidth, binCount"},
-                {"ScalarBDA",          "BDA lo/hi, elementCount, colorSourceMode"},
-                {"Reserved",           "reserved for future use"},
-            },
-        };
-
-        m_Impl->SciVisTypeHandle = matSys.RegisterType(sciVisDesc);
+        // The SciVis type is registered by MaterialSystem::Initialize() so
+        // the well-known TypeID kMaterialTypeID_SciVis (= 1) is reserved
+        // before any subsystem-specific registration runs. We only need to
+        // look up the registered handle here.
+        m_Impl->SciVisTypeHandle = matSys.FindType(kMaterialTypeName_SciVis);
         assert(m_Impl->SciVisTypeHandle.IsValid() &&
-               "SciVis type registration failed — is another type already registered?");
+               "SciVis type not registered — MaterialSystem::Initialize() must register built-in types");
+        assert(m_Impl->SciVisTypeHandle.Index == kMaterialTypeID_SciVis &&
+               "SciVis registered at unexpected TypeID");
 
         m_Impl->Initialized = true;
     }
