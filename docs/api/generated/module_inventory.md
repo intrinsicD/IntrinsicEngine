@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 51 |
+| `graphics/renderer` | 52 |
 | `graphics/rhi` | 17 |
 | `graphics/vulkan` | 12 |
 | `legacy` | 182 |
@@ -223,6 +223,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Pass.PostProcess.Histogram` | `src/graphics/renderer/Passes/Pass.PostProcess.Histogram.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.PostProcess.SMAA` | `src/graphics/renderer/Passes/Pass.PostProcess.SMAA.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.PostProcess.ToneMap` | `src/graphics/renderer/Passes/Pass.PostProcess.ToneMap.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.Pass.Present.MinimalDebug` | `src/graphics/renderer/Passes/Pass.Present.MinimalDebug.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Present` | `src/graphics/renderer/Passes/Pass.Present.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Selection.EdgeId` | `src/graphics/renderer/Passes/Pass.Selection.EdgeId.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Selection.EntityId` | `src/graphics/renderer/Passes/Pass.Selection.EntityId.cppm` | `graphics/renderer` |
@@ -455,4 +456,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **428**
+Total modules: **429**

@@ -40,6 +40,7 @@ import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
+import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -309,6 +310,7 @@ namespace Extrinsic::Graphics
             m_DepthPrepassPipelineLease.reset();
             m_DefaultDebugSurfacePipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
+            m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -819,6 +821,12 @@ namespace Extrinsic::Graphics
                             RecordMinimalDebugSurfacePass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    else if (passName == kMinimalDebugPresentPassName)
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordMinimalDebugPresentPass(graphicsContext);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                     else
                     {
                         // GRAPHICS-018 §4: surface/deferred/debug pass command bodies
@@ -1012,13 +1020,23 @@ namespace Extrinsic::Graphics
             // default-debug-surface pipeline byte-for-byte.
             m_DefaultDebugSurfacePipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
+            m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc();
             auto defaultDebugSurfacePipeline = m_PipelineManager->Create(defaultDebugSurfaceDesc);
             if (defaultDebugSurfacePipeline.has_value())
             {
                 m_DefaultDebugSurfacePipelineLease.emplace(std::move(*defaultDebugSurfacePipeline));
-                m_MinimalDebugSurfacePass.SetPipeline(
-                    m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle()));
+                const RHI::PipelineHandle slotZeroPipeline =
+                    m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
+                m_MinimalDebugSurfacePass.SetPipeline(slotZeroPipeline);
+                // GRAPHICS-032C — the minimal-debug present pass reuses the
+                // slot-0 default-debug-surface pipeline for the CPU-mock
+                // command body. The pass only records `BindPipeline` +
+                // `Draw(3,1,0,0)`; pipeline state details are irrelevant on
+                // the Null device and GRAPHICS-033C replaces the recording
+                // body with a real Vulkan fullscreen-triangle present pass.
+                // The entire MinimalDebug scaffold is deleted by GRAPHICS-081.
+                m_MinimalDebugPresentPass.SetPipeline(slotZeroPipeline);
             }
             else
             {
@@ -1197,6 +1215,35 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-032C — minimal-debug-present CPU-mock command body. The
+        // pass reuses the slot-0 default-debug-surface pipeline lease and
+        // records the fullscreen-triangle present form (BindPipeline +
+        // Draw(3, 1, 0, 0)). Missing prerequisite is the slot-0 pipeline
+        // lease only; the imported Backbuffer is validated by the
+        // recipe-build path and reported through the existing build-time
+        // diagnostic. Mirrors the SkippedNonOperational / SkippedUnavailable
+        // taxonomy used by RecordMinimalDebugSurfacePass.
+        [[nodiscard]] RenderCommandPassStatus RecordMinimalDebugPresentPass(RHI::ICommandContext& cmd)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+
+            const bool pipelineReady = m_DefaultDebugSurfacePipelineLease.has_value() &&
+                                       m_DefaultDebugSurfacePipelineLease->IsValid() &&
+                                       m_MinimalDebugPresentPass.GetPipeline().IsValid();
+            if (!pipelineReady)
+            {
+                ++m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount;
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_MinimalDebugPresentPass.Execute(cmd);
+            ++m_LastRenderGraphStats.MinimalPresentPassExecutions;
+            return RenderCommandPassStatus::Recorded;
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -1219,6 +1266,7 @@ namespace Extrinsic::Graphics
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
         DepthPrepassPass                     m_DepthPrepassPass;
         MinimalDebugSurfacePass              m_MinimalDebugSurfacePass;
+        MinimalDebugPresentPass              m_MinimalDebugPresentPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
