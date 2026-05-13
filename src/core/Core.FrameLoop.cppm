@@ -2,11 +2,11 @@ module;
 
 #include <cstdint>
 
-export module Extrinsic.Runtime.FrameLoop;
+export module Extrinsic.Core.FrameLoop;
 
-namespace Extrinsic::Runtime
+namespace Extrinsic::Core
 {
-    export enum class RuntimeRenderFramePhase : std::uint8_t
+    export enum class RenderFramePhase : std::uint8_t
     {
         BeginFrame,
         ExtractRenderWorld,
@@ -15,17 +15,17 @@ namespace Extrinsic::Runtime
         EndFrame,
     };
 
-    export struct RuntimeRenderFrameResult
+    export struct RenderFrameResult
     {
         bool BeganFrame{false};
         bool CompletedFrame{false};
         std::uint64_t CompletedGpuValue{0};
     };
 
-    export class IRuntimeRenderFrameHooks
+    export class IRenderFrameHooks
     {
     public:
-        virtual ~IRuntimeRenderFrameHooks() = default;
+        virtual ~IRenderFrameHooks() = default;
 
         [[nodiscard]] virtual bool BeginFrame() = 0;
         virtual void ExtractRenderWorld() = 0;
@@ -34,10 +34,10 @@ namespace Extrinsic::Runtime
         [[nodiscard]] virtual std::uint64_t EndFrame() = 0;
     };
 
-    export [[nodiscard]] inline RuntimeRenderFrameResult ExecuteRuntimeRenderFrameContract(
-        IRuntimeRenderFrameHooks& hooks)
+    export [[nodiscard]] inline RenderFrameResult ExecuteRenderFrameContract(
+        IRenderFrameHooks& hooks)
     {
-        RuntimeRenderFrameResult result{};
+        RenderFrameResult result{};
         result.BeganFrame = hooks.BeginFrame();
 
         if (!result.BeganFrame)
@@ -52,10 +52,10 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    export class IRuntimePlatformFrameHooks
+    export class IPlatformFrameHooks
     {
     public:
-        virtual ~IRuntimePlatformFrameHooks() = default;
+        virtual ~IPlatformFrameHooks() = default;
 
         virtual void PollEvents() = 0;
         [[nodiscard]] virtual bool ShouldClose() const = 0;
@@ -63,20 +63,20 @@ namespace Extrinsic::Runtime
         virtual void WaitForEventsTimeout(double seconds) = 0;
     };
 
-    export struct RuntimePlatformFrameResult
+    export struct PlatformFrameResult
     {
         bool ContinueFrame{false};
         bool ShouldClose{false};
         bool Minimized{false};
     };
 
-    export [[nodiscard]] inline RuntimePlatformFrameResult ExecuteRuntimePlatformBeginFrameContract(
-        IRuntimePlatformFrameHooks& hooks,
+    export [[nodiscard]] inline PlatformFrameResult ExecutePlatformBeginFrameContract(
+        IPlatformFrameHooks& hooks,
         double minimizedWaitSeconds)
     {
         hooks.PollEvents();
 
-        RuntimePlatformFrameResult result{};
+        PlatformFrameResult result{};
         result.ShouldClose = hooks.ShouldClose();
         if (result.ShouldClose)
             return result;
@@ -92,26 +92,26 @@ namespace Extrinsic::Runtime
         return result;
     }
 
-    export class IRuntimeTransferFrameHooks
+    export class ITransferFrameHooks
     {
     public:
-        virtual ~IRuntimeTransferFrameHooks() = default;
+        virtual ~ITransferFrameHooks() = default;
 
         virtual void CollectCompletedTransfers() = 0;
     };
 
-    export class IRuntimeAssetFrameHooks
+    export class IAssetFrameHooks
     {
     public:
-        virtual ~IRuntimeAssetFrameHooks() = default;
+        virtual ~IAssetFrameHooks() = default;
 
         virtual void TickAssets() = 0;
     };
 
-    export class IRuntimeStreamingFrameHooks
+    export class IStreamingFrameHooks
     {
     public:
-        virtual ~IRuntimeStreamingFrameHooks() = default;
+        virtual ~IStreamingFrameHooks() = default;
 
         virtual void DrainCompletions() = 0;
         virtual void ApplyMainThreadResults() = 0;
@@ -119,10 +119,10 @@ namespace Extrinsic::Runtime
         virtual void PumpBackground(std::uint32_t maxLaunches) = 0;
     };
 
-    export inline void ExecuteRuntimeMaintenanceContract(
-        IRuntimeTransferFrameHooks& transfer,
-        IRuntimeStreamingFrameHooks& streaming,
-        IRuntimeAssetFrameHooks& assets,
+    export inline void ExecuteMaintenanceContract(
+        ITransferFrameHooks& transfer,
+        IStreamingFrameHooks& streaming,
+        IAssetFrameHooks& assets,
         std::uint32_t maxStreamingLaunches)
     {
         transfer.CollectCompletedTransfers();
@@ -133,10 +133,10 @@ namespace Extrinsic::Runtime
         streaming.PumpBackground(maxStreamingLaunches);
     }
 
-    export class IRuntimeOperationalTransitionHooks
+    export class IOperationalTransitionHooks
     {
     public:
-        virtual ~IRuntimeOperationalTransitionHooks() = default;
+        virtual ~IOperationalTransitionHooks() = default;
 
         [[nodiscard]] virtual bool IsDeviceOperational() const = 0;
         [[nodiscard]] virtual bool IsRendererOperational() const = 0;
@@ -145,8 +145,8 @@ namespace Extrinsic::Runtime
         virtual void MarkRendererOperational() = 0;
     };
 
-    export [[nodiscard]] inline bool ExecuteRuntimeOperationalTransitionContract(
-        IRuntimeOperationalTransitionHooks& hooks)
+    export [[nodiscard]] inline bool ExecuteOperationalTransitionContract(
+        IOperationalTransitionHooks& hooks)
     {
         if (!hooks.IsDeviceOperational() || hooks.IsRendererOperational())
         {
@@ -163,10 +163,10 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    export class IRuntimeShutdownHooks
+    export class IShutdownHooks
     {
     public:
-        virtual ~IRuntimeShutdownHooks() = default;
+        virtual ~IShutdownHooks() = default;
 
         virtual void StopRunning() = 0;
         virtual void WaitDeviceIdle() = 0;
@@ -183,7 +183,7 @@ namespace Extrinsic::Runtime
         virtual void MarkUninitialized() = 0;
     };
 
-    export inline void ExecuteRuntimeShutdownContract(IRuntimeShutdownHooks& hooks)
+    export inline void ExecuteShutdownContract(IShutdownHooks& hooks)
     {
         hooks.StopRunning();
         hooks.WaitDeviceIdle();
@@ -200,4 +200,3 @@ namespace Extrinsic::Runtime
         hooks.MarkUninitialized();
     }
 }
-

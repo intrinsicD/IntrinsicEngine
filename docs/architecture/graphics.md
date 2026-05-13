@@ -78,6 +78,8 @@ and around false→true / true→false operational transitions.
   ECS storage is retained by graphics.
 - `Extrinsic.Graphics.CameraSnapshots` validates camera matrices, extracts
   frustum planes, and derives pick rays from immutable pixel pick requests.
+  Viewport dimensions are carried as the core-owned `Core::Extent2D` value type,
+  not as a dependency on the live platform window port.
   Runtime/platform own camera motion, input polling, pick-request creation,
   gizmo hit testing, and transform application; graphics only consumes the
   resulting data snapshots. Per `GRAPHICS-017Q`, the camera/gizmo runtime

@@ -4,13 +4,13 @@
 #include <string>
 #include <vector>
 
-import Extrinsic.Runtime.FrameLoop;
+import Extrinsic.Core.FrameLoop;
 
 namespace
 {
     using Trace = std::vector<std::string>;
 
-    class FakePlatformHooks final : public Extrinsic::Runtime::IRuntimePlatformFrameHooks
+    class FakePlatformHooks final : public Extrinsic::Core::IPlatformFrameHooks
     {
     public:
         explicit FakePlatformHooks(Trace& trace)
@@ -43,7 +43,7 @@ namespace
         Trace& m_Trace;
     };
 
-    class FakeRendererHooks final : public Extrinsic::Runtime::IRuntimeRenderFrameHooks
+    class FakeRendererHooks final : public Extrinsic::Core::IRenderFrameHooks
     {
     public:
         explicit FakeRendererHooks(Trace& trace)
@@ -72,7 +72,7 @@ namespace
         Trace& m_Trace;
     };
 
-    class FakeTransferHooks final : public Extrinsic::Runtime::IRuntimeTransferFrameHooks
+    class FakeTransferHooks final : public Extrinsic::Core::ITransferFrameHooks
     {
     public:
         explicit FakeTransferHooks(Trace& trace)
@@ -86,7 +86,7 @@ namespace
         Trace& m_Trace;
     };
 
-    class FakeAssetHooks final : public Extrinsic::Runtime::IRuntimeAssetFrameHooks
+    class FakeAssetHooks final : public Extrinsic::Core::IAssetFrameHooks
     {
     public:
         explicit FakeAssetHooks(Trace& trace)
@@ -100,7 +100,7 @@ namespace
         Trace& m_Trace;
     };
 
-    class FakeStreamingHooks final : public Extrinsic::Runtime::IRuntimeStreamingFrameHooks
+    class FakeStreamingHooks final : public Extrinsic::Core::IStreamingFrameHooks
     {
     public:
         explicit FakeStreamingHooks(Trace& trace)
@@ -123,7 +123,7 @@ namespace
         Trace& m_Trace;
     };
 
-    class FakeOperationalTransitionHooks final : public Extrinsic::Runtime::IRuntimeOperationalTransitionHooks
+    class FakeOperationalTransitionHooks final : public Extrinsic::Core::IOperationalTransitionHooks
     {
     public:
         explicit FakeOperationalTransitionHooks(Trace& trace)
@@ -161,7 +161,7 @@ namespace
         Trace& m_Trace;
     };
 
-    class FakeShutdownHooks final : public Extrinsic::Runtime::IRuntimeShutdownHooks
+    class FakeShutdownHooks final : public Extrinsic::Core::IShutdownHooks
     {
     public:
         explicit FakeShutdownHooks(Trace& trace)
@@ -194,8 +194,8 @@ TEST(RuntimeFrameLoopContract, PlatformBeginFramePollsBeforeMinimizedWait)
     FakePlatformHooks platform(trace);
     platform.Minimized = true;
 
-    const Extrinsic::Runtime::RuntimePlatformFrameResult result =
-        Extrinsic::Runtime::ExecuteRuntimePlatformBeginFrameContract(platform, 0.25);
+    const Extrinsic::Core::PlatformFrameResult result =
+        Extrinsic::Core::ExecutePlatformBeginFrameContract(platform, 0.25);
 
     EXPECT_FALSE(result.ContinueFrame);
     EXPECT_FALSE(result.ShouldClose);
@@ -215,8 +215,8 @@ TEST(RuntimeFrameLoopContract, RenderFrameOrdersPromotedRendererPhases)
     FakeRendererHooks renderer(trace);
     renderer.CompletedGpuValue = 99;
 
-    const Extrinsic::Runtime::RuntimeRenderFrameResult result =
-        Extrinsic::Runtime::ExecuteRuntimeRenderFrameContract(renderer);
+    const Extrinsic::Core::RenderFrameResult result =
+        Extrinsic::Core::ExecuteRenderFrameContract(renderer);
 
     EXPECT_TRUE(result.BeganFrame);
     EXPECT_TRUE(result.CompletedFrame);
@@ -236,8 +236,8 @@ TEST(RuntimeFrameLoopContract, RenderFrameSkipsExtractionWhenBeginFrameFails)
     FakeRendererHooks renderer(trace);
     renderer.BeginFrameSucceeds = false;
 
-    const Extrinsic::Runtime::RuntimeRenderFrameResult result =
-        Extrinsic::Runtime::ExecuteRuntimeRenderFrameContract(renderer);
+    const Extrinsic::Core::RenderFrameResult result =
+        Extrinsic::Core::ExecuteRenderFrameContract(renderer);
 
     EXPECT_FALSE(result.BeganFrame);
     EXPECT_FALSE(result.CompletedFrame);
@@ -252,7 +252,7 @@ TEST(RuntimeFrameLoopContract, MaintenanceOrdersTransferStreamingAssetHooks)
     FakeStreamingHooks streaming(trace);
     FakeAssetHooks assets(trace);
 
-    Extrinsic::Runtime::ExecuteRuntimeMaintenanceContract(transfer, streaming, assets, 8);
+    Extrinsic::Core::ExecuteMaintenanceContract(transfer, streaming, assets, 8);
 
     EXPECT_EQ(streaming.PumpLaunches, 8u);
     EXPECT_EQ(trace, (Trace{
@@ -271,7 +271,7 @@ TEST(RuntimeFrameLoopContract, OperationalTransitionWaitsIdleThenRebuildsRendere
     FakeOperationalTransitionHooks hooks(trace);
     hooks.DeviceOperational = true;
 
-    const bool transitioned = Extrinsic::Runtime::ExecuteRuntimeOperationalTransitionContract(hooks);
+    const bool transitioned = Extrinsic::Core::ExecuteOperationalTransitionContract(hooks);
 
     EXPECT_TRUE(transitioned);
     EXPECT_TRUE(hooks.RendererOperational);
@@ -289,7 +289,7 @@ TEST(RuntimeFrameLoopContract, OperationalTransitionNoOpsUntilDeviceBecomesOpera
     Trace trace;
     FakeOperationalTransitionHooks hooks(trace);
 
-    const bool transitioned = Extrinsic::Runtime::ExecuteRuntimeOperationalTransitionContract(hooks);
+    const bool transitioned = Extrinsic::Core::ExecuteOperationalTransitionContract(hooks);
 
     EXPECT_FALSE(transitioned);
     EXPECT_FALSE(hooks.RendererOperational);
@@ -303,7 +303,7 @@ TEST(RuntimeFrameLoopContract, OperationalTransitionDoesNotMarkRendererWhenRebui
     hooks.DeviceOperational = true;
     hooks.RebuildSucceeds = false;
 
-    const bool transitioned = Extrinsic::Runtime::ExecuteRuntimeOperationalTransitionContract(hooks);
+    const bool transitioned = Extrinsic::Core::ExecuteOperationalTransitionContract(hooks);
 
     EXPECT_FALSE(transitioned);
     EXPECT_FALSE(hooks.RendererOperational);
@@ -320,7 +320,7 @@ TEST(RuntimeFrameLoopContract, ShutdownOrdersApplicationStreamingAndSubsystemTea
     Trace trace;
     FakeShutdownHooks shutdown(trace);
 
-    Extrinsic::Runtime::ExecuteRuntimeShutdownContract(shutdown);
+    Extrinsic::Core::ExecuteShutdownContract(shutdown);
 
     EXPECT_EQ(trace, (Trace{
                          "shutdown:stop_running",

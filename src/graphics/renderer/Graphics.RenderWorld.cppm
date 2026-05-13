@@ -7,11 +7,11 @@ module;
 
 export module Extrinsic.Graphics.RenderWorld;
 
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.VisualizationPackets;
-import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Types;
 
 // ============================================================
@@ -146,7 +146,7 @@ namespace Extrinsic::Graphics
     {
         /// Forwarded from RenderFrameInput — needed by passes for
         /// viewport-dependent resource sizing and aspect ratio.
-        Platform::Extent2D Viewport{};
+        Core::Extent2D Viewport{};
 
         /// Interpolation alpha forwarded for motion-vector / TAA use.
         double Alpha{0.0};

@@ -21,6 +21,9 @@ Completed support tasks:
   CMake-only task adding `intrinsic_add_glsl_shaders(ExtrinsicSandbox)` so the
   promoted Sandbox build emits SPIR-V binaries; unblocks GRAPHICS-031A pipeline
   loads.
+- [RUNTIME-081 — `Extrinsic.Runtime.CameraControllers`](../../done/RUNTIME-081-camera-controllers.md):
+  Orbit / Fly / FreeLook / TopDown camera controllers producing
+  `RenderFrameInput::Camera` (clarified by GRAPHICS-017Q; done).
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
@@ -30,9 +33,6 @@ done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
 - [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](RUNTIME-080-asset-bridges-texture.md):
   texture-typed asset event subscriber producing `GpuAssetCache::RequestUpload`
   calls (clarified by GRAPHICS-015Q).
-- [RUNTIME-081 — `Extrinsic.Runtime.CameraControllers`](RUNTIME-081-camera-controllers.md):
-  Orbit / Fly / FreeLook / TopDown camera controllers producing
-  `RenderFrameInput::Camera` (clarified by GRAPHICS-017Q).
 - [RUNTIME-082 — `Extrinsic.Runtime.SpatialDebugAdapters`](RUNTIME-082-spatial-debug-adapters.md):
   BVH / KD-tree / Octree / ConvexHull adapters producing spatial-debug snapshot
   records (clarified by GRAPHICS-011Q).

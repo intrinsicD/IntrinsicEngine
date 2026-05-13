@@ -8,7 +8,7 @@ module;
 
 export module Extrinsic.Graphics.CameraSnapshots;
 
-import Extrinsic.Platform.Window;
+import Extrinsic.Core.Geometry2D;
 
 namespace Extrinsic::Graphics
 {
@@ -105,7 +105,7 @@ namespace Extrinsic::Graphics
 
     export [[nodiscard]] inline CameraViewSnapshot BuildCameraViewSnapshot(
         const CameraViewInput& input,
-        const Platform::Extent2D viewport,
+        const Core::Extent2D viewport,
         const PickPixelRequest pick = {}) noexcept
     {
         CameraViewSnapshot snapshot{};

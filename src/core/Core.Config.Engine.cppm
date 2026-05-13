@@ -26,12 +26,27 @@ namespace Extrinsic::Core::Config
             ReferenceSceneSelector Selector{ReferenceSceneSelector::Triangle};
         };
 
+        export enum class CameraControllerKind : std::uint32_t
+        {
+            Orbit = 0,
+            Fly = 1,
+            FreeLook = 2,
+            TopDown = 3,
+        };
+
+        export struct CameraConfig
+        {
+            bool Enabled{true};
+            CameraControllerKind Controller{CameraControllerKind::Orbit};
+        };
+
         export struct EngineConfig
         {
             RenderConfig    Render;
             SimulationConfig Simulation;
             WindowConfig    Window;
             ReferenceSceneConfig ReferenceScene;
+            CameraConfig Camera;
         };
 
 }

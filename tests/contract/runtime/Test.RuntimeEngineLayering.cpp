@@ -21,29 +21,45 @@ namespace
         buffer << in.rdbuf();
         return buffer.str();
     }
+
+    std::string SliceBetween(const std::string& content,
+                             const std::string& beginMarker,
+                             const std::string& endMarker)
+    {
+        const std::size_t begin = content.find(beginMarker);
+        EXPECT_NE(begin, std::string::npos);
+        const std::size_t end = content.find(endMarker, begin + beginMarker.size());
+        EXPECT_NE(end, std::string::npos);
+        if (begin == std::string::npos || end == std::string::npos)
+            return {};
+        return content.substr(begin, end - begin);
+    }
 }
 
 TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto frameLoop = ReadFile(RepoRoot() / "src/runtime/Runtime.FrameLoop.cppm");
+    const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
+    const auto runFrame = SliceBetween(content,
+                                       "void Engine::RunFrame()",
+                                       "bool Engine::IsRunning() const noexcept");
 
     // Runtime must orchestrate renderer phases, not GPU barriers/resources.
-    EXPECT_NE(content.find("import Extrinsic.Runtime.FrameLoop"), std::string::npos);
-    EXPECT_NE(content.find("ExecuteRuntimeRenderFrameContract(renderHooks)"), std::string::npos);
+    EXPECT_NE(content.find("import Extrinsic.Core.FrameLoop"), std::string::npos);
+    EXPECT_NE(content.find("Core::ExecuteRenderFrameContract(renderHooks)"), std::string::npos);
     EXPECT_NE(frameLoop.find("hooks.BeginFrame()"), std::string::npos);
     EXPECT_NE(frameLoop.find("hooks.ExtractRenderWorld()"), std::string::npos);
     EXPECT_NE(frameLoop.find("hooks.PrepareFrame()"), std::string::npos);
     EXPECT_NE(frameLoop.find("hooks.ExecuteFrame()"), std::string::npos);
     EXPECT_NE(frameLoop.find("hooks.EndFrame()"), std::string::npos);
 
-    EXPECT_EQ(content.find("TextureBarrier"), std::string::npos);
-    EXPECT_EQ(content.find("BufferBarrier"), std::string::npos);
-    EXPECT_EQ(content.find("TextureUsage::"), std::string::npos);
-    EXPECT_EQ(content.find("BufferUsage::"), std::string::npos);
-    EXPECT_EQ(content.find("VkImage"), std::string::npos);
-    EXPECT_EQ(content.find("VkBuffer"), std::string::npos);
-    EXPECT_EQ(content.find("vkCmd"), std::string::npos);
+    EXPECT_EQ(runFrame.find("TextureBarrier"), std::string::npos);
+    EXPECT_EQ(runFrame.find("BufferBarrier"), std::string::npos);
+    EXPECT_EQ(runFrame.find("TextureUsage::"), std::string::npos);
+    EXPECT_EQ(runFrame.find("BufferUsage::"), std::string::npos);
+    EXPECT_EQ(runFrame.find("VkImage"), std::string::npos);
+    EXPECT_EQ(runFrame.find("VkBuffer"), std::string::npos);
+    EXPECT_EQ(runFrame.find("vkCmd"), std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder)
@@ -53,9 +69,9 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     const auto pollEvents = content.find("m_Window->PollEvents();");
     const auto simTick = content.find("m_Application->OnSimTick(*this, m_FixedDt);");
     const auto variableTick = content.find("m_Application->OnVariableTick(*this, alpha, frameDt);");
-    const auto renderContract = content.find("ExecuteRuntimeRenderFrameContract(renderHooks)");
+    const auto renderContract = content.find("Core::ExecuteRenderFrameContract(renderHooks)");
     const auto present = content.find("m_Device->Present(frame);");
-    const auto maintenance = content.find("ExecuteRuntimeMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);");
+    const auto maintenance = content.find("Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);");
     const auto clockEnd = content.rfind("m_FrameClock.EndFrame();");
 
     ASSERT_NE(pollEvents, std::string::npos);
@@ -76,7 +92,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
 
 TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder)
 {
-    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.FrameLoop.cppm");
+    const auto content = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
 
     const auto beginFrame = content.find("hooks.BeginFrame()");
     const auto extract = content.find("hooks.ExtractRenderWorld()");
@@ -127,7 +143,7 @@ TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)
 
 TEST(RuntimeEngineLayering, FrameLoopContractDoesNotBecomeCompositionRoot)
 {
-    const auto frameLoop = ReadFile(RepoRoot() / "src/runtime/Runtime.FrameLoop.cppm");
+    const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
 
     EXPECT_EQ(frameLoop.find("import Extrinsic.Platform"), std::string::npos);
     EXPECT_EQ(frameLoop.find("import Extrinsic.Graphics"), std::string::npos);

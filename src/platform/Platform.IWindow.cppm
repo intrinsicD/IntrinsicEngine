@@ -9,16 +9,15 @@ module;
 
 export module Extrinsic.Platform.Window;
 
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Input;
 
 namespace Extrinsic::Platform
 {
-    export struct Extent2D
-    {
-        int Width{0};
-        int Height{0};
-    };
+    export using Extent2D = Core::Extent2D;
+    export using Offset2D = Core::Offset2D;
+    export using Rect2D = Core::Rect2D;
 
     export struct WindowCloseEvent
     {

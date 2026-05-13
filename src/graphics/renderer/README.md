@@ -156,8 +156,10 @@ human-readable summary should read `Findings.front().Message`.
   reference live ECS storage.
 - `Graphics.CameraSnapshots` is data-only: it validates view/projection
   matrices, extracts frustum planes, and derives pick rays from immutable pixel
-  requests. Camera motion, input polling, gizmo hit testing, and transform
-  mutation remain runtime/platform/editor responsibilities. Per
+  requests. Viewport dimensions use the core-owned `Core::Extent2D` value type
+  rather than the live platform window port. Camera motion, input polling, gizmo
+  hit testing, and transform mutation remain runtime/platform/editor
+  responsibilities. Per
   `GRAPHICS-017Q`, the camera/gizmo runtime follow-ups resolve as
   follows. Concrete camera controllers (orbit, fly, free-look,
   top-down) live as runtime modules under the planned umbrella

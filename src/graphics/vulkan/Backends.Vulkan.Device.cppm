@@ -13,6 +13,7 @@ module;
 export module Extrinsic.Backends.Vulkan:Device;
 
 export import Extrinsic.Core.Config.Render;
+export import Extrinsic.Core.Geometry2D;
 export import Extrinsic.Core.ResourcePool;
 export import Extrinsic.RHI.Bindless;
 export import Extrinsic.RHI.CommandContext;
@@ -63,7 +64,7 @@ namespace Extrinsic::Backends::Vulkan
         void Present(const RHI::FrameHandle& frame) override;
 
         void Resize(uint32_t width, uint32_t height) override;
-        [[nodiscard]] Platform::Extent2D GetBackbufferExtent() const override;
+        [[nodiscard]] Core::Extent2D GetBackbufferExtent() const override;
 
         void SetPresentMode(RHI::PresentMode mode) override;
         [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }

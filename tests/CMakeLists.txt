@@ -268,6 +268,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
+        Test.RuntimeCameraControllers.cpp
         Test.RuntimeReferenceScene.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources

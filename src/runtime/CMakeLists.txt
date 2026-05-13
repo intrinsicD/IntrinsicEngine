@@ -10,7 +10,6 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
         Cameras/Runtime.CameraControllers.cppm
-        Runtime.FrameLoop.cppm
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm

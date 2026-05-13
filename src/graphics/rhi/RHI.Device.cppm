@@ -6,6 +6,7 @@ module;
 
 export module Extrinsic.RHI.Device;
 
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.FrameHandle;
@@ -54,7 +55,7 @@ namespace Extrinsic::RHI
         virtual void Present(const FrameHandle& frame)    = 0;
 
         virtual void Resize(std::uint32_t width, std::uint32_t height) = 0;
-        [[nodiscard]] virtual Platform::Extent2D GetBackbufferExtent() const = 0;
+        [[nodiscard]] virtual Core::Extent2D GetBackbufferExtent() const = 0;
 
         /// Change swapchain present mode.  Takes effect on the next Resize()
         /// or the next swapchain recreation — no immediate GPU stall.

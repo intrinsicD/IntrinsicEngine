@@ -6,6 +6,7 @@ module;
 module Extrinsic.Backends.Null;
 
 import Extrinsic.Core.Config.Render;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.ResourcePool;
 import Extrinsic.Core.Telemetry;
 import Extrinsic.RHI.CommandContext;
@@ -138,7 +139,7 @@ namespace Extrinsic::Backends::Null
                                   .Height = static_cast<int>(height)};
         }
 
-        Platform::Extent2D GetBackbufferExtent() const override { return m_BackbufferExtent; }
+        Core::Extent2D GetBackbufferExtent() const override { return m_BackbufferExtent; }
 
         void SetPresentMode(RHI::PresentMode mode) override { m_PresentMode = mode; }
         [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }
@@ -223,7 +224,7 @@ namespace Extrinsic::Backends::Null
 
         std::uint32_t m_FrameIndex{0};
         RHI::PresentMode m_PresentMode{RHI::PresentMode::VSync};
-        Platform::Extent2D m_BackbufferExtent{};
+        Core::Extent2D m_BackbufferExtent{};
         NullCommandContext m_CommandContext{};
 
         std::unique_ptr<RHI::ITransferQueue> m_TransferQueue;

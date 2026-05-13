@@ -16,6 +16,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
@@ -194,12 +195,12 @@ namespace Extrinsic::Runtime
         // contents — Register() before Initialize(), Resolve() after.
         [[nodiscard]] ReferenceSceneRegistry& GetReferenceSceneRegistry() noexcept;
         [[nodiscard]] bool IsReferenceSceneInstalled() const noexcept;
-        // GRAPHICS-029B: the optional CameraViewInput seed captured from
+        // GRAPHICS-029B/RUNTIME-081A: the optional CameraViewInput seed captured from
         // the resolved provider's ReferenceScenePopulation. Empty when the
         // reference scene is disabled or the provider returned no camera.
-        // RUNTIME-081 will replace direct reads of this seed with the
-        // camera-controller surface; this accessor is the test seam until
-        // then.
+        // The promoted camera-controller surface consumes this as initial
+        // state; it is retained as a test seam and no longer directly fills
+        // RenderFrameInput::Camera.
         [[nodiscard]] const std::optional<Graphics::CameraViewInput>&
             GetReferenceCameraSeed() const noexcept;
 
@@ -243,6 +244,7 @@ namespace Extrinsic::Runtime
         ReferenceSceneRegistry                  m_ReferenceSceneRegistry{};
         ReferenceScenePopulation                m_ReferenceScenePopulation{};
         std::optional<Graphics::CameraViewInput> m_ReferenceCamera{};
+        CameraControllerRegistry                m_CameraControllers{};
         bool                                    m_ReferenceSceneInstalled{false};
 
         Core::FrameClock m_FrameClock{};

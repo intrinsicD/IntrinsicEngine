@@ -2,8 +2,8 @@ module;
 
 export module Extrinsic.Graphics.RenderFrameInput;
 
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Graphics.CameraSnapshots;
-import Extrinsic.Platform.Window;
 
 // ============================================================
 // RenderFrameInput — immutable snapshot handed to the renderer
@@ -26,7 +26,7 @@ namespace Extrinsic::Graphics
 
         /// Framebuffer extent at the moment extraction begins.
         /// May differ from window client area on HiDPI displays.
-        Platform::Extent2D Viewport{};
+        Core::Extent2D Viewport{};
 
         /// True when a pick query is pending for this frame.
         /// Renderer pass registration may include the picking pass only

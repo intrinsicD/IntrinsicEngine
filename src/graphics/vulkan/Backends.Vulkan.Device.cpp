@@ -278,7 +278,7 @@ namespace
     }
 
     [[nodiscard]] VkExtent2D ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities,
-                                                   const Platform::Extent2D framebufferExtent)
+                                                   const Core::Extent2D framebufferExtent)
     {
         if (capabilities.currentExtent.width != std::numeric_limits<std::uint32_t>::max())
             return capabilities.currentExtent;
@@ -810,8 +810,8 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
     const VkPresentModeKHR presentMode = ToVkPresentMode(m_PresentMode, presentModes);
     const VkExtent2D swapchainExtent = ChooseSwapchainExtent(
         surfaceCapabilities,
-        Platform::Extent2D{.Width = static_cast<int>(requestedWidth),
-                           .Height = static_cast<int>(requestedHeight)});
+        Core::Extent2D{.Width = static_cast<int>(requestedWidth),
+                       .Height = static_cast<int>(requestedHeight)});
     if (swapchainExtent.width == 0u || swapchainExtent.height == 0u)
         return VK_ERROR_OUT_OF_DATE_KHR;
 
@@ -2343,16 +2343,16 @@ void VulkanDevice::Resize(uint32_t width, uint32_t height)
     });
 }
 
-Platform::Extent2D VulkanDevice::GetBackbufferExtent() const
+Core::Extent2D VulkanDevice::GetBackbufferExtent() const
 {
     if (m_Swapchain == VK_NULL_HANDLE && m_HasPendingResize)
     {
-        return Platform::Extent2D{.Width = static_cast<int>(m_PendingResizeExtent.width),
-                                  .Height = static_cast<int>(m_PendingResizeExtent.height)};
+        return Core::Extent2D{.Width = static_cast<int>(m_PendingResizeExtent.width),
+                              .Height = static_cast<int>(m_PendingResizeExtent.height)};
     }
 
-    return Platform::Extent2D{.Width = static_cast<int>(m_SwapchainExtent.width),
-                              .Height = static_cast<int>(m_SwapchainExtent.height)};
+    return Core::Extent2D{.Width = static_cast<int>(m_SwapchainExtent.width),
+                          .Height = static_cast<int>(m_SwapchainExtent.height)};
 }
 
 void VulkanDevice::SetPresentMode(RHI::PresentMode mode)

@@ -25,6 +25,8 @@ target_sources(${target_name}
         Core.CallbackRegistry.cppm
         Core.Error.cppm
         Core.FrameClock.cppm
+        Core.FrameLoop.cppm
+        Core.Geometry2D.cppm
         Core.Filesystem.PathResolver.cppm
         Core.Filesystem.cppm
         Core.Hash.cppm

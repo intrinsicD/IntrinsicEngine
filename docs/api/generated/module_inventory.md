@@ -10,7 +10,7 @@ Root scanned: `src`
 |---|---:|
 | `app` | 1 |
 | `assets` | 7 |
-| `core` | 37 |
+| `core` | 39 |
 | `ecs` | 22 |
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
@@ -52,6 +52,8 @@ Root scanned: `src`
 | `Extrinsic.Core.Filesystem` | `src/core/Core.Filesystem.cppm` | `core` |
 | `Extrinsic.Core.FrameClock` | `src/core/Core.FrameClock.cppm` | `core` |
 | `Extrinsic.Core.FrameGraph` | `src/core/Core.FrameGraph.cppm` | `core` |
+| `Extrinsic.Core.FrameLoop` | `src/core/Core.FrameLoop.cppm` | `core` |
+| `Extrinsic.Core.Geometry2D` | `src/core/Core.Geometry2D.cppm` | `core` |
 | `Extrinsic.Core.HandleLease` | `src/core/Core.HandleLease.cppm` | `core` |
 | `Extrinsic.Core.Hash` | `src/core/Core.Hash.cppm` | `core` |
 | `Extrinsic.Core.IOBackend` | `src/core/Core.IOBackend.cppm` | `core` |
@@ -444,12 +446,12 @@ Root scanned: `src`
 | `Extrinsic.Platform.Backend.Glfw` | `src/platform/backends/glfw/Platform.Backend.Glfw.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.GlfwVulkanSurface` | `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
+| `Extrinsic.Runtime.CameraControllers` | `src/runtime/Cameras/Runtime.CameraControllers.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
-| `Extrinsic.Runtime.FrameLoop` | `src/runtime/Runtime.FrameLoop.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | `src/runtime/Runtime.ProceduralGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **425**
+Total modules: **427**

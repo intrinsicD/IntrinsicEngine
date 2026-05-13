@@ -25,6 +25,7 @@
 #include <vector>
 
 import Extrinsic.Core.Config.Render;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
@@ -370,7 +371,7 @@ namespace Extrinsic::Tests
             LastBackbufferFrame = frame;
             return BackbufferHandle;
         }
-        Platform::Extent2D GetBackbufferExtent() const override { return {}; }
+        Core::Extent2D GetBackbufferExtent() const override { return {}; }
 
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override { return CommandContext; }
         RHI::ITransferQueue& GetTransferQueue() override { return TransferQueue; }

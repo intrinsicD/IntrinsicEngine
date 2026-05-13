@@ -34,7 +34,8 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
-import Extrinsic.Runtime.FrameLoop;
+import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
@@ -55,9 +56,6 @@ namespace Extrinsic::Runtime
         // Layout: row-major, top-left origin, RGBA8 with alpha 0xFF so the
         // sampled colour is visually unambiguous when material code observes
         // `UsedFallback = true`.
-        constexpr std::uint8_t kFallbackMagenta[4] = {0xFF, 0x00, 0xFF, 0xFF};
-        constexpr std::uint8_t kFallbackBlack[4]   = {0x00, 0x00, 0x00, 0xFF};
-
         consteval std::array<std::byte, 4 * 4 * 4> MakeFallbackTextureBytes() noexcept
         {
             std::array<std::byte, 4 * 4 * 4> bytes{};
@@ -66,10 +64,11 @@ namespace Extrinsic::Runtime
                 for (std::size_t x = 0; x < 4; ++x)
                 {
                     const bool magenta = (((x / 2) ^ (y / 2)) & 1u) == 0u;
-                    const std::uint8_t* src = magenta ? kFallbackMagenta : kFallbackBlack;
                     const std::size_t base = (y * 4 + x) * 4;
-                    for (std::size_t c = 0; c < 4; ++c)
-                        bytes[base + c] = static_cast<std::byte>(src[c]);
+                    bytes[base + 0] = static_cast<std::byte>(magenta ? 0xFF : 0x00);
+                    bytes[base + 1] = static_cast<std::byte>(0x00);
+                    bytes[base + 2] = static_cast<std::byte>(magenta ? 0xFF : 0x00);
+                    bytes[base + 3] = static_cast<std::byte>(0xFF);
                 }
             }
             return bytes;
@@ -318,7 +317,7 @@ namespace Extrinsic::Runtime
 
     void Engine::Shutdown()
     {
-        struct ShutdownHooks final : IRuntimeShutdownHooks
+        struct ShutdownHooks final : Core::IShutdownHooks
         {
             Engine& Owner;
             bool& Running;
@@ -337,6 +336,7 @@ namespace Extrinsic::Runtime
             ReferenceSceneRegistry& ReferenceRegistry;
             ReferenceScenePopulation& ReferencePopulation;
             std::optional<Graphics::CameraViewInput>& ReferenceCameraSeed;
+            CameraControllerRegistry& CameraControllers;
             bool& ReferenceInstalled;
             Core::Config::ReferenceSceneSelector ReferenceSelector;
             bool ReferenceEnabled;
@@ -358,6 +358,7 @@ namespace Extrinsic::Runtime
                           ReferenceSceneRegistry& referenceRegistry,
                           ReferenceScenePopulation& referencePopulation,
                           std::optional<Graphics::CameraViewInput>& referenceCameraSeed,
+                          CameraControllerRegistry& cameraControllers,
                           bool& referenceInstalled,
                           Core::Config::ReferenceSceneSelector referenceSelector,
                           bool referenceEnabled)
@@ -378,6 +379,7 @@ namespace Extrinsic::Runtime
                 , ReferenceRegistry(referenceRegistry)
                 , ReferencePopulation(referencePopulation)
                 , ReferenceCameraSeed(referenceCameraSeed)
+                , CameraControllers(cameraControllers)
                 , ReferenceInstalled(referenceInstalled)
                 , ReferenceSelector(referenceSelector)
                 , ReferenceEnabled(referenceEnabled)
@@ -418,6 +420,7 @@ namespace Extrinsic::Runtime
                     ReferenceInstalled = false;
                 }
                 ReferenceCameraSeed.reset();
+                CameraControllers = CameraControllerRegistry{};
                 Scene.reset();
             }
             void DestroyAssets() override
@@ -485,10 +488,11 @@ namespace Extrinsic::Runtime
                             m_ReferenceSceneRegistry,
                             m_ReferenceScenePopulation,
                             m_ReferenceCamera,
+                            m_CameraControllers,
                             m_ReferenceSceneInstalled,
                             m_Config.ReferenceScene.Selector,
                             m_Config.ReferenceScene.Enabled);
-        ExecuteRuntimeShutdownContract(hooks);
+        Core::ExecuteShutdownContract(hooks);
     }
 
     // ── Main loop ─────────────────────────────────────────────────────────
@@ -527,7 +531,7 @@ namespace Extrinsic::Runtime
             m_Window->AcknowledgeResize();
         }
 
-        struct OperationalTransitionHooks final : IRuntimeOperationalTransitionHooks
+        struct OperationalTransitionHooks final : Core::IOperationalTransitionHooks
         {
             RHI::IDevice& Device;
             Graphics::IRenderer& Renderer;
@@ -553,7 +557,7 @@ namespace Extrinsic::Runtime
         };
 
         OperationalTransitionHooks operationalHooks(*m_Device, *m_Renderer, m_RendererOperational);
-        (void)ExecuteRuntimeOperationalTransitionContract(operationalHooks);
+        (void)Core::ExecuteOperationalTransitionContract(operationalHooks);
 
         // ── Phase 2: Fixed-step simulation + CPU task graph ───────────────
         // Each tick: app adds FrameGraph passes → Engine compiles and executes
@@ -604,23 +608,33 @@ namespace Extrinsic::Runtime
             .Viewport = viewport,
         };
 
-        // GRAPHICS-029B reference camera substitution.
-        // TODO(RUNTIME-081): superseded by controller-driven update once
-        // Extrinsic.Runtime.CameraControllers consumes the reference seed
-        // as initial state; the call site below is the mechanical retirement
-        // anchor recorded in the GRAPHICS-029B Intermediate-solution notice.
-        if (m_ReferenceCamera.has_value())
+        if (m_Config.Camera.Enabled)
         {
-            renderInput.Camera = BuildReferenceCameraViewInput(*m_ReferenceCamera,
-                                                                viewport.Width,
-                                                                viewport.Height);
+            ICameraController* controller = m_CameraControllers.ResolveOrNull(CameraControllerSlot::Main);
+            if (controller == nullptr)
+            {
+                const Graphics::CameraViewInput seed = m_ReferenceCamera.has_value()
+                    ? BuildReferenceCameraViewInput(*m_ReferenceCamera, viewport.Width, viewport.Height)
+                    : Graphics::CameraViewInput{};
+                m_CameraControllers.Register(
+                    CameraControllerSlot::Main,
+                    CreateCameraController(m_Config.Camera.Controller, seed));
+                controller = m_CameraControllers.ResolveOrNull(CameraControllerSlot::Main);
+            }
+
+            if (controller != nullptr)
+            {
+                const Platform::IWindow& window = *m_Window;
+                controller->Update(window.GetInput(), frameDt);
+                renderInput.Camera = controller->GetView(viewport);
+            }
         }
 
         // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
         Graphics::RenderWorld renderWorld{};
 
-        struct RenderFrameHooks final : IRuntimeRenderFrameHooks
+        struct RenderFrameHooks final : Core::IRenderFrameHooks
         {
             Graphics::IRenderer& Renderer;
             ECS::Scene::Registry& Scene;
@@ -667,7 +681,7 @@ namespace Extrinsic::Runtime
                                      renderInput,
                                      renderWorld);
 
-        const RuntimeRenderFrameResult renderResult = ExecuteRuntimeRenderFrameContract(renderHooks);
+        const Core::RenderFrameResult renderResult = Core::ExecuteRenderFrameContract(renderHooks);
         if (!renderResult.BeganFrame)
         {
             m_FrameClock.EndFrame();
@@ -678,7 +692,7 @@ namespace Extrinsic::Runtime
         m_Device->Present(frame);
 
         // ── Phase 10: Maintenance ─────────────────────────────────────────
-        struct TransferHooks final : IRuntimeTransferFrameHooks
+        struct TransferHooks final : Core::ITransferFrameHooks
         {
             RHI::IDevice& Device;
 
@@ -694,7 +708,7 @@ namespace Extrinsic::Runtime
             }
         };
 
-        struct StreamingHooks final : IRuntimeStreamingFrameHooks
+        struct StreamingHooks final : Core::IStreamingFrameHooks
         {
             Core::Dag::TaskGraph& Graph;
             StreamingExecutor& Executor;
@@ -711,7 +725,7 @@ namespace Extrinsic::Runtime
             void PumpBackground(std::uint32_t maxLaunches) override { Executor.PumpBackground(maxLaunches); }
         };
 
-        struct AssetHooks final : IRuntimeAssetFrameHooks
+        struct AssetHooks final : Core::IAssetFrameHooks
         {
             Assets::AssetService&     AssetService;
             Graphics::GpuAssetCache*  GpuAssetCache;
@@ -760,7 +774,7 @@ namespace Extrinsic::Runtime
                               *m_Device,
                               m_RenderExtraction,
                               *m_Renderer);
-        ExecuteRuntimeMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
+        Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
         // completedGpuValue is the renderer's per-frame timeline value.  The
         // GpuAssetCache currently retires on the CPU frame counter (which is
         // a conservative proxy for GPU completion); a follow-up may key
