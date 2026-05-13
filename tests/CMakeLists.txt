@@ -542,6 +542,7 @@ if(TARGET ExtrinsicBackendsVulkan)
     intrinsic_resolve_test_sources(_graphics_vulkan_contract_test_sources
         SEARCH_DIRS contract/graphics
         FILES Test.VulkanFailClosedContract.cpp
+              Test.VulkanOperationalStatusEvaluator.cpp
     )
     intrinsic_test_object_lib(GraphicsVulkanContractTestObjs
         SOURCES

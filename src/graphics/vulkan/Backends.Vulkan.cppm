@@ -332,5 +332,102 @@ namespace Extrinsic::Backends::Vulkan
         std::uint64_t          ResizeAttempts             = 0;
     };
     export [[nodiscard]] FallbackDiagnosticsSnapshot GetFallbackDiagnosticsSnapshot() noexcept;
+
+    // -----------------------------------------------------------------------
+    // GRAPHICS-033A: operational-status evaluator surface.
+    //
+    // Single source of truth for whether the promoted Vulkan backend is
+    // operational. Renderer/runtime code must keep branching on
+    // `IDevice::IsOperational()`; this evaluator backs that predicate and
+    // exposes a CPU-public reason taxonomy for diagnostics + the runtime
+    // reconciliation truth table documented in `src/graphics/vulkan/README.md`.
+    //
+    // `VulkanOperationalInputs` carries only backend-public booleans (no
+    // `Vk*` handles) so the evaluator is pure, total, and unit-testable
+    // without instantiating a Vulkan device. Backend code adapts live
+    // `VulkanDevice` state into this struct; future status/reason values
+    // append to the enums rather than rewriting existing entries.
+    export enum class VulkanOperationalStatusCode : std::uint8_t
+    {
+        NotCompiled                 = 0,
+        NotRequested                = 1,
+        RequestedButUnsupported     = 2,
+        RequestedButFailedInit      = 3,
+        RequestedButValidationFailed = 4,
+        RequestedButIncompleteGate  = 5,
+        Operational                 = 6,
+    };
+
+    export enum class VulkanOperationalReason : std::uint8_t
+    {
+        None                            = 0,
+        MissingInstance                 = 1,
+        MissingSurface                  = 2,
+        NoSuitablePhysicalDevice        = 3,
+        MissingRequiredExtension        = 4,
+        MissingRequiredFeature          = 5,
+        LogicalDeviceFailed             = 6,
+        AllocatorFailed                 = 7,
+        SwapchainFailed                 = 8,
+        CommandSyncFailed               = 9,
+        MinimalRecipeRecordingMissing   = 10,
+        BarrierValidationFailed         = 11,
+        PublicServiceReconciliationFailed = 12,
+        ValidationLayerError            = 13,
+        DeviceLost                      = 14,
+        SurfaceLost                     = 15,
+    };
+
+    // CPU-public, non-native boolean inputs to the operational-status gate.
+    // Each `Has*`/`*Clean`/`*Ready` field corresponds to one step of the
+    // 9-step gate documented in `src/graphics/vulkan/README.md`. Lifecycle
+    // loss states (`DeviceLost`, `SurfaceLost`) are checked first because
+    // they fail-close even after a previously successful bring-up.
+    export struct VulkanOperationalInputs
+    {
+        // Build-time gate (step 1).
+        bool CompiledIn                       = false;
+        bool Requested                        = false;
+
+        // Host support (step 2/3, pre-init capability checks).
+        bool HostSupportsRequiredInstance     = false;
+        bool HostSupportsRequiredSurface      = false;
+        bool HostSupportsPhysicalDevice       = false;
+        bool HostSupportsRequiredExtensions   = false;
+        bool HostSupportsRequiredFeatures     = false;
+
+        // Live bring-up (steps 3-5: logical device, allocator, swapchain,
+        // command pools + per-frame sync).
+        bool LogicalDeviceReady               = false;
+        bool AllocatorReady                   = false;
+        bool SwapchainReady                   = false;
+        bool CommandSyncReady                 = false;
+
+        // Higher gates (steps 6-8).
+        bool MinimalRecipeRecordingPresent    = false;
+        bool BarrierValidationClean           = false;
+        bool PublicServiceReconciled          = false;
+
+        // Validation layer (step 9, fail-closed when validation errors fire).
+        bool ValidationClean                  = true;
+
+        // Post-init lifecycle loss; these short-circuit to fail-closed
+        // regardless of how far bring-up previously progressed.
+        bool DeviceLost                       = false;
+        bool SurfaceLost                      = false;
+    };
+
+    export struct VulkanOperationalStatus
+    {
+        VulkanOperationalStatusCode Code   = VulkanOperationalStatusCode::NotCompiled;
+        VulkanOperationalReason     Reason = VulkanOperationalReason::None;
+    };
+
+    // Total, pure evaluator. The README locks the gate order; this function
+    // returns the first failing gate's reason paired with the appropriate
+    // status code. Only when every gate passes does it return
+    // `{Operational, None}`. Append-only on both enums.
+    export [[nodiscard]] VulkanOperationalStatus
+    EvaluateVulkanOperationalStatus(const VulkanOperationalInputs& inputs) noexcept;
 }
 

@@ -24,6 +24,7 @@ target_sources(${target_name}
         Backends.Vulkan.Bindless.cpp        # §7  VulkanBindlessHeap
         Backends.Vulkan.Transfer.cpp        # §8  VulkanTransferQueue
         Backends.Vulkan.CommandContext.cpp  # §9  VulkanCommandContext
+        Backends.Vulkan.OperationalStatus.cpp # §10 EvaluateVulkanOperationalStatus (GRAPHICS-033A)
         Backends.Vulkan.Device.cpp          # §11 VulkanDevice + §12 factory
         Vma.cpp              # VMA_IMPLEMENTATION TU — must compile without modules
 )

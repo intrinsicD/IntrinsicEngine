@@ -734,9 +734,78 @@ bool VulkanDevice::HasOperationalSafetyPrerequisites() const noexcept
     return false;
 }
 
+VulkanOperationalInputs VulkanDevice::BuildOperationalInputs() const noexcept
+{
+    VulkanOperationalInputs inputs{};
+
+    // The Vulkan backend is, by definition, compiled in when this code runs.
+    // Runtime-side request reconciliation lives in `GRAPHICS-033B`; from
+    // `VulkanDevice`'s own perspective the request was honored.
+    inputs.CompiledIn = true;
+    inputs.Requested  = true;
+
+    // Lifecycle loss is checked before host-support / live bring-up so a
+    // previously successful bring-up still resolves fail-closed.
+    inputs.DeviceLost  = m_DeviceLost;
+    inputs.SurfaceLost = false;
+
+    // Host-support pre-init gates. If logical device creation succeeded, the
+    // required extension/feature chain was satisfied; future GRAPHICS-033B
+    // wiring can replace the proxies with explicit per-capability bits.
+    inputs.HostSupportsRequiredInstance   = m_Instance   != VK_NULL_HANDLE;
+    inputs.HostSupportsRequiredSurface    = m_Surface    != VK_NULL_HANDLE;
+    inputs.HostSupportsPhysicalDevice     = m_PhysDevice != VK_NULL_HANDLE;
+    inputs.HostSupportsRequiredExtensions = m_Device     != VK_NULL_HANDLE;
+    inputs.HostSupportsRequiredFeatures   = m_Device     != VK_NULL_HANDLE;
+
+    // Live bring-up.
+    inputs.LogicalDeviceReady = m_Device != VK_NULL_HANDLE;
+    inputs.AllocatorReady     = m_Vma    != VK_NULL_HANDLE;
+    inputs.SwapchainReady     = m_Swapchain != VK_NULL_HANDLE &&
+                                m_SwapchainExtent.width  != 0u &&
+                                m_SwapchainExtent.height != 0u &&
+                                !m_SwapchainImages.empty() &&
+                                m_SwapchainViews.size() == m_SwapchainImages.size() &&
+                                m_SwapchainHandles.size() == m_SwapchainImages.size();
+
+    bool commandSyncReady = m_GlobalPipelineLayout != VK_NULL_HANDLE &&
+                            m_GraphicsQueue   != VK_NULL_HANDLE &&
+                            m_PresentQueue    != VK_NULL_HANDLE &&
+                            m_TransferVkQueue != VK_NULL_HANDLE &&
+                            m_BindlessHeap && m_BindlessHeap->IsValid() &&
+                            m_TransferQueue && m_TransferQueue->IsValid();
+    for (const PerFrame& frame : m_Frames)
+    {
+        if (frame.CmdPool == VK_NULL_HANDLE || frame.CmdBuffer == VK_NULL_HANDLE ||
+            frame.Fence == VK_NULL_HANDLE || frame.ImageAcquired == VK_NULL_HANDLE ||
+            frame.RenderDone == VK_NULL_HANDLE)
+        {
+            commandSyncReady = false;
+            break;
+        }
+    }
+    inputs.CommandSyncReady = commandSyncReady;
+
+    // Higher gates (GRAPHICS-033B/C). The current implementation never
+    // satisfies them so `EvaluateVulkanOperationalStatus` always returns one
+    // of the non-operational reasons; this preserves the existing
+    // fail-closed contract until the upstream wiring lands.
+    inputs.MinimalRecipeRecordingPresent = false;
+    inputs.BarrierValidationClean        = false;
+    inputs.PublicServiceReconciled       = false;
+    inputs.ValidationClean               = true;
+
+    return inputs;
+}
+
 bool VulkanDevice::ComputeOperationalPredicate() const noexcept
 {
-    return HasLiveOperationalPrerequisites() && HasOperationalSafetyPrerequisites();
+    // Single source of truth: the evaluator. `HasLiveOperationalPrerequisites`
+    // is still consumed by individual fail-closed paths (transfer queue,
+    // buffer/texture creation) that need finer-grained readiness checks than
+    // the binary operational predicate.
+    return EvaluateVulkanOperationalStatus(BuildOperationalInputs()).Code ==
+           VulkanOperationalStatusCode::Operational;
 }
 
 void VulkanDevice::RefreshOperationalState() noexcept

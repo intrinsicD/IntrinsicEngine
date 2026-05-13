@@ -174,6 +174,7 @@ namespace Extrinsic::Backends::Vulkan
 
         [[nodiscard]] bool HasLiveOperationalPrerequisites() const noexcept;
         [[nodiscard]] bool HasOperationalSafetyPrerequisites() const noexcept;
+        [[nodiscard]] VulkanOperationalInputs BuildOperationalInputs() const noexcept;
         [[nodiscard]] bool ComputeOperationalPredicate() const noexcept;
         void RefreshOperationalState() noexcept;
         void NoteDeviceLostIfNeeded(VkResult result) noexcept;
