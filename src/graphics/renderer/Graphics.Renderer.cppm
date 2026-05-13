@@ -33,6 +33,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Graphics
 {
@@ -84,6 +85,16 @@ namespace Extrinsic::Graphics
         std::string DebugDump{};
         std::string Diagnostic{};
         std::string LifecycleDiagnostic{};
+        // GRAPHICS-032A — minimal-debug-surface recipe diagnostics. The two
+        // execution counters increment in GRAPHICS-032B/C once the pass bodies
+        // land; until then they remain zero even when the recipe is selected.
+        // `MinimalRecipeMissingPrerequisiteCount` reflects per-frame counts of
+        // material/pipeline/surface-bucket residency gaps detected at recipe
+        // build time. All three reset per-frame at `BeginFrame`/`ExecuteFrame`
+        // through the existing `m_LastRenderGraphStats = {}` cadence.
+        std::uint32_t MinimalSurfacePassExecutions = 0;
+        std::uint32_t MinimalPresentPassExecutions = 0;
+        std::uint32_t MinimalRecipeMissingPrerequisiteCount = 0;
     };
 
     export struct RuntimeRenderSnapshotBatch
@@ -195,6 +206,15 @@ namespace Extrinsic::Graphics
         // republish across InitializeOperationalPassResources() invocations
         // (initial init and RebuildOperationalResources).
         [[nodiscard]] virtual RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept = 0;
+
+        // GRAPHICS-032A — opt-in selector for the minimal-debug-surface frame
+        // recipe. Default is `FrameRecipeKind::Default`, preserving the
+        // existing `BuildDefaultFrameRecipe` path. Runtime callers translate
+        // `Core::Config::RenderConfig::FrameRecipe` into this setter; scaffold
+        // retired by GRAPHICS-081.
+        virtual void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept = 0;
+
+        [[nodiscard]] virtual Core::Config::FrameRecipeKind GetFrameRecipe() const noexcept = 0;
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();
