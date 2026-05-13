@@ -133,16 +133,24 @@ human-readable summary should read `Findings.front().Message`.
   handles. Renderer diagnostics surface three counters on
   `RenderGraphFrameStats`:
   - `MinimalSurfacePassExecutions` — increments per successful surface-pass
-    record (lands in GRAPHICS-032B).
+    record in `RecordMinimalDebugSurfacePass` (GRAPHICS-032B). The pass body
+    is owned by `Extrinsic.Graphics.Pass.Surface.MinimalDebug` and reuses the
+    GRAPHICS-031A slot-0 default-debug-surface pipeline lease, drawing the
+    SurfaceOpaque cull bucket through `DrawIndexedIndirectCount`.
   - `MinimalPresentPassExecutions` — increments per successful present-pass
     record (lands in GRAPHICS-032C).
-  - `MinimalRecipeMissingPrerequisiteCount` — increments at recipe build
-    time (`Graphics.Renderer.cpp::ExecuteFrame` after
-    `BuildMinimalDebugSurfaceRecipe`) for each missing prerequisite: invalid
-    material buffer residency, invalid surface-opaque bucket residency
-    (counted jointly for the args/count pair), or invalid scene-table
-    residency. The recipe still compiles when prerequisites are missing so
-    that the skip is observable rather than silent.
+  - `MinimalRecipeMissingPrerequisiteCount` — accumulates per-frame from two
+    sites:
+    - At recipe build time in `Graphics.Renderer.cpp::ExecuteFrame` after
+      `BuildMinimalDebugSurfaceRecipe`, once per missing prerequisite:
+      invalid material buffer residency, invalid surface-opaque bucket
+      residency (counted jointly for the args/count pair), or invalid
+      scene-table residency. The recipe still compiles when prerequisites
+      are missing so the skip is observable rather than silent.
+    - At record time in `RecordMinimalDebugSurfacePass` whenever the slot-0
+      pipeline lease, the SurfaceOpaque cull bucket, or the GpuWorld
+      scene-table state is unavailable; the pass then routes to
+      `SkippedUnavailable` rather than recording an empty draw.
 
   All three counters reset per-frame through the existing
   `m_LastRenderGraphStats = {}` cadence in `ResetFrameState()` and

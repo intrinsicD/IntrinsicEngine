@@ -39,6 +39,7 @@ import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
+import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -307,6 +308,7 @@ namespace Extrinsic::Graphics
             m_MaterialSystem .reset();
             m_DepthPrepassPipelineLease.reset();
             m_DefaultDebugSurfacePipelineLease.reset();
+            m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -738,7 +740,11 @@ namespace Extrinsic::Graphics
             }
             if (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
             {
-                m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount = recipe.MissingPrerequisiteCount;
+                // GRAPHICS-032A seeds the counter from recipe-build-time
+                // prerequisite gaps; GRAPHICS-032B then accumulates record-time
+                // gaps (missing slot-0 lease, SurfaceOpaque bucket, GpuWorld) on
+                // top via RecordMinimalDebugSurfacePass.
+                m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount += recipe.MissingPrerequisiteCount;
             }
 
             const auto compileBegin = std::chrono::steady_clock::now();
@@ -805,6 +811,12 @@ namespace Extrinsic::Graphics
                     else if (passName == std::string_view{"DepthPrepass"})
                     {
                         const RenderCommandPassStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == kMinimalDebugSurfacePassName)
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordMinimalDebugSurfacePass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else
@@ -995,12 +1007,18 @@ namespace Extrinsic::Graphics
             // GRAPHICS-031A: canonical missing-material fallback pipeline.
             // Republished byte-identical from BuildDefaultDebugSurfacePipelineDesc()
             // so the descriptor matches across initial init and rebuilds.
+            // GRAPHICS-032B: the MinimalDebugSurface pass leases the same slot-0
+            // pipeline so its recorded command stream matches the
+            // default-debug-surface pipeline byte-for-byte.
             m_DefaultDebugSurfacePipelineLease.reset();
+            m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc();
             auto defaultDebugSurfacePipeline = m_PipelineManager->Create(defaultDebugSurfaceDesc);
             if (defaultDebugSurfacePipeline.has_value())
             {
                 m_DefaultDebugSurfacePipelineLease.emplace(std::move(*defaultDebugSurfacePipeline));
+                m_MinimalDebugSurfacePass.SetPipeline(
+                    m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle()));
             }
             else
             {
@@ -1140,6 +1158,45 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-032B — minimal-debug-surface CPU-mock command body. The pass
+        // shares the GRAPHICS-031A slot-0 default-debug-surface pipeline lease
+        // and draws against the SurfaceOpaque cull bucket. Missing prerequisites
+        // (slot-0 lease, SurfaceOpaque bucket residency, or GpuWorld scene table)
+        // soft-skip to SkippedUnavailable and additionally bump
+        // MinimalRecipeMissingPrerequisiteCount so the diagnostic surfaces
+        // record-site gaps in addition to the recipe-build-time count.
+        [[nodiscard]] RenderCommandPassStatus RecordMinimalDebugSurfacePass(RHI::ICommandContext& cmd,
+                                                                            const RHI::CameraUBO& camera,
+                                                                            const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+
+            const bool pipelineReady = m_DefaultDebugSurfacePipelineLease.has_value() &&
+                                       m_DefaultDebugSurfacePipelineLease->IsValid() &&
+                                       m_MinimalDebugSurfacePass.GetPipeline().IsValid();
+            const bool gpuWorldReady = m_GpuWorld.has_value();
+            bool bucketReady = false;
+            if (m_CullingSystem.has_value())
+            {
+                const auto& bucket = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
+                bucketReady = bucket.Indexed && bucket.IndexedArgsBuffer.IsValid() &&
+                              bucket.CountBuffer.IsValid() && bucket.Capacity > 0u;
+            }
+
+            if (!pipelineReady || !gpuWorldReady || !bucketReady)
+            {
+                ++m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount;
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_MinimalDebugSurfacePass.Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            ++m_LastRenderGraphStats.MinimalSurfacePassExecutions;
+            return RenderCommandPassStatus::Recorded;
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -1161,6 +1218,7 @@ namespace Extrinsic::Graphics
         RenderGraphExecutor                  m_RenderGraphExecutor;
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
         DepthPrepassPass                     m_DepthPrepassPass;
+        MinimalDebugSurfacePass              m_MinimalDebugSurfacePass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;

@@ -9,6 +9,7 @@ target_sources(${target_name}
 		Pass.Forward.Line.cppm
 		Pass.Forward.Point.cppm
 		Pass.Forward.Surface.cppm
+		Pass.Surface.MinimalDebug.cppm
 		Pass.ImGui.cppm
 		Pass.PostProcess.Bloom.cppm
 		Pass.PostProcess.FXAA.cppm
@@ -31,6 +32,7 @@ target_sources(${target_name}
 		Pass.Forward.Line.cpp
 		Pass.Forward.Point.cpp
 		Pass.Forward.Surface.cpp
+		Pass.Surface.MinimalDebug.cpp
 		Pass.ImGui.cpp
 		Pass.PostProcess.Bloom.cpp
 		Pass.PostProcess.FXAA.cpp

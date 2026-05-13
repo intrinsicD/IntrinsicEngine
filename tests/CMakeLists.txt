@@ -561,6 +561,7 @@ set(_graphics_contract_cpu_test_files
     Test.LightingShadowContracts.cpp
     Test.LinePointPassContracts.cpp
     Test.MaterialSubstitutionContract.cpp
+    Test.MinimalDebugSurfacePass.cpp
     Test.PostProcessChainContract.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp

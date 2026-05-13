@@ -480,8 +480,8 @@ independently testable (CPU/null where possible), and gated as recorded.
   (in-progress): depends on GRAPHICS-031A.
 - [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration](../../active/GRAPHICS-032A-minimal-debug-surface-recipe.md)
   (in-progress): depends on GRAPHICS-031A.
-- [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body](GRAPHICS-032B-minimal-debug-surface-pass-body.md):
-  depends on GRAPHICS-032A and GRAPHICS-030B.
+- [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body](../../active/GRAPHICS-032B-minimal-debug-surface-pass-body.md)
+  (in-progress): depends on GRAPHICS-032A and GRAPHICS-030B.
 - [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test](GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
   depends on GRAPHICS-032B.
 - [GRAPHICS-033A — Vulkan operational-status evaluator surface](../../active/GRAPHICS-033A-vulkan-operational-status-evaluator.md)
