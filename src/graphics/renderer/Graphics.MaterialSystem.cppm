@@ -85,6 +85,11 @@ export namespace Extrinsic::Graphics
         std::uint32_t TextureAssetFallbackResolveCount = 0;
         std::uint32_t TextureAssetResolveFailureCount = 0;
         std::uint32_t InvalidTextureAssetBindingCount = 0;
+        // Per-frame substitution counters (reset on BeginFrame / SubmitRuntimeSnapshots).
+        // Decision 7 path-(b) snapshot-consumption substitution to slot 0.
+        std::uint32_t MissingMaterialFallbackCount = 0;
+        std::uint32_t InvalidMaterialSlotCount = 0;
+        std::uint32_t DefaultDebugSurfaceUses = 0;
         std::uint32_t DirtySlotCount = 0;
         std::uint32_t LiveInstanceCount = 0;
         std::uint32_t RegisteredTypeCount = 0;
@@ -214,6 +219,19 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] std::uint32_t GetRegisteredTypeCount() const noexcept;
         [[nodiscard]] std::uint32_t GetCapacity()           const noexcept;
         [[nodiscard]] MaterialSystemDiagnostics GetDiagnostics() const noexcept;
+
+        // -----------------------------------------------------------------
+        // Per-frame substitution counters (GRAPHICS-031B Decision 7 path-(b))
+        // -----------------------------------------------------------------
+        // The renderer's snapshot-copy step substitutes missing/invalid
+        // material slots with `kDefaultMaterialSlotIndex` (slot 0) and
+        // records the substitution category through these helpers. The
+        // counters are reset at the per-frame cadence defined by Decision 8
+        // via `ResetPerFrameSubstitutionCounters()`.
+        void RecordMissingMaterialFallback() noexcept;
+        void RecordInvalidMaterialSlot() noexcept;
+        void RecordDefaultDebugSurfaceUse() noexcept;
+        void ResetPerFrameSubstitutionCounters() noexcept;
 
     private:
         struct Impl;

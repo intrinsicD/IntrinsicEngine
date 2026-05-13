@@ -687,8 +687,27 @@ human-readable summary should read `Findings.front().Message`.
   emitted by `intrinsic_add_glsl_shaders()` so the operational Vulkan
   pipeline-creation path reads SPIR-V directly. Initial `Initialize()`
   and `RebuildOperationalResources()` republish the same descriptor),
-  Impl-B (substitution wiring + the three diagnostics counters), and
-  the optional Impl-C (one additional debug variant) are identified
+  Impl-B (substitution wiring + the three diagnostics counters; landed
+  by
+  [`GRAPHICS-031B`](../../../tasks/active/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
+  the renderer's snapshot-copy step in
+  `Graphics.Renderer.cpp::SubmitRuntimeSnapshots()` mutates
+  `m_TransformSyncRecords` in place so that records with
+  `HasMaterialSlot == false` are reassigned to
+  `kDefaultMaterialSlotIndex` and counted via
+  `MaterialSystem::RecordMissingMaterialFallback()`, records whose
+  `MaterialSlot >= MaterialSystem::GetCapacity()` are reassigned and
+  counted via `MaterialSystem::RecordInvalidMaterialSlot()`, and every
+  record whose final slot equals `kDefaultMaterialSlotIndex` increments
+  `MaterialSystem::RecordDefaultDebugSurfaceUse()`. The three
+  per-frame counters (`MissingMaterialFallbackCount`,
+  `InvalidMaterialSlotCount`, `DefaultDebugSurfaceUses`) live on
+  `MaterialSystemDiagnostics` next to the unchanged
+  `FallbackSlotResolveCount`, and are zeroed at the start of every
+  `SubmitRuntimeSnapshots()` and inside `ResetFrameState()` —
+  mirroring the existing `InvalidSnapshotRecordCount` reset cadence —
+  via `MaterialSystem::ResetPerFrameSubstitutionCounters()`), and
+  the optional Impl-C (one additional debug variant) is identified
   but not opened.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in

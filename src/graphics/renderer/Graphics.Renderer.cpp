@@ -25,6 +25,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.VisualizationPackets;
@@ -355,6 +356,10 @@ namespace Extrinsic::Graphics
             m_VisualizationDiagnostics = ValidateVisualizationPackets(visualizationBatch);
             m_VisualizationOverlaySummary = BuildVisualizationOverlaySummary(visualizationBatch);
             m_InvalidSnapshotRecordCount = 0;
+            if (m_MaterialSystem)
+            {
+                m_MaterialSystem->ResetPerFrameSubstitutionCounters();
+            }
 
             m_DebugLinePackets.clear();
             m_DebugPointPackets.clear();
@@ -408,14 +413,47 @@ namespace Extrinsic::Graphics
                 m_TransformGizmoPackets.push_back(gizmo);
             }
 
+            // GRAPHICS-031B Decision 7 path-(b): substitute missing / invalid
+            // material slots with `kDefaultMaterialSlotIndex` (slot 0 =
+            // `Material.DefaultDebugSurface`) and record the substitution
+            // category through `MaterialSystem`. Mutate `m_TransformSyncRecords`
+            // in place so the downstream `TransformSyncSystem::SyncGpuBuffer`
+            // path observes the substituted slot, then mirror the records into
+            // the immutable `m_RenderableSnapshots` span exposed via
+            // `ExtractRenderWorld`.
             m_RenderableSnapshots.clear();
             m_RenderableSnapshots.reserve(m_TransformSyncRecords.size());
-            for (const TransformSyncRecord& record : m_TransformSyncRecords)
+            const std::uint32_t materialCapacity =
+                m_MaterialSystem ? m_MaterialSystem->GetCapacity() : 0u;
+            for (TransformSyncRecord& record : m_TransformSyncRecords)
             {
                 if (!record.Instance.IsValid())
                 {
                     ++m_InvalidSnapshotRecordCount;
                     continue;
+                }
+
+                if (!record.HasMaterialSlot)
+                {
+                    record.MaterialSlot = kDefaultMaterialSlotIndex;
+                    record.HasMaterialSlot = true;
+                    if (m_MaterialSystem)
+                    {
+                        m_MaterialSystem->RecordMissingMaterialFallback();
+                    }
+                }
+                else if (materialCapacity > 0u && record.MaterialSlot >= materialCapacity)
+                {
+                    record.MaterialSlot = kDefaultMaterialSlotIndex;
+                    if (m_MaterialSystem)
+                    {
+                        m_MaterialSystem->RecordInvalidMaterialSlot();
+                    }
+                }
+
+                if (record.MaterialSlot == kDefaultMaterialSlotIndex && m_MaterialSystem)
+                {
+                    m_MaterialSystem->RecordDefaultDebugSurfaceUse();
                 }
 
                 m_RenderableSnapshots.push_back(RenderableSnapshot{
@@ -976,6 +1014,10 @@ namespace Extrinsic::Graphics
             m_TransformGizmoPackets.clear();
             m_RenderableSnapshots.clear();
             m_InvalidSnapshotRecordCount = 0;
+            if (m_MaterialSystem)
+            {
+                m_MaterialSystem->ResetPerFrameSubstitutionCounters();
+            }
             m_HasExtractedRenderWorld = false;
             m_HasPreparedFrame = false;
             m_LastRenderGraphStats = {};

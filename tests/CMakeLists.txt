@@ -559,6 +559,7 @@ set(_graphics_contract_cpu_test_files
     Test.ImGuiPresentContract.cpp
     Test.LightingShadowContracts.cpp
     Test.LinePointPassContracts.cpp
+    Test.MaterialSubstitutionContract.cpp
     Test.PostProcessChainContract.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
