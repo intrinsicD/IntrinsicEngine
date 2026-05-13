@@ -45,6 +45,7 @@ Planning parents (retired):
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
+- [`runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md`](runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
 
 Triangle-path implementation children (newly opened — pick the next in dependency order):
 - [`done/GRAPHICS-030A`](../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) — procedural geometry descriptor + cache + triangle packer (done; unblocks GRAPHICS-029B and GRAPHICS-030B).
@@ -105,6 +106,10 @@ Members:
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
 - [`ecs/HARDEN-063-ecs-events-and-command-seams.md`](ecs/HARDEN-063-ecs-events-and-command-seams.md).
 - [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme C).
+- [`ecs/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md`](ecs/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md).
+- [`ecs/HARDEN-066-ecs-render-sync-export-policy.md`](ecs/HARDEN-066-ecs-render-sync-export-policy.md).
+- [`ecs/HARDEN-067-ecs-bounds-propagation-system.md`](ecs/HARDEN-067-ecs-bounds-propagation-system.md).
+- [`ecs/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](ecs/HARDEN-068-ecs-stable-identity-and-scene-metadata.md).
 
 ### Theme E — Geometry IO completion (P0)
 
@@ -122,6 +127,7 @@ the convergence map.
 Members:
 - [`architecture/RORG-031A-architecture-foundation.md`](architecture/RORG-031A-architecture-foundation.md).
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
+- [`runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md`](runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md) (also Theme D).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 
@@ -144,6 +150,12 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   promoted ECS scene/hierarchy/transform parity. `HARDEN-060`, `HARDEN-061`,
   and `HARDEN-062` are all retired to `tasks/done/`, so this gate is
   satisfied; the Theme A renderer leaves are unblocked on the ECS side.
+- **RUNTIME-091 ⇐ HARDEN-061.** Runtime fixed-step ECS system activation depends
+  on the promoted `TransformHierarchy` system and must keep composition in
+  `runtime` rather than adding upward imports to `src/ecs`.
+- **HARDEN-067 ⇐ RUNTIME-091 or equivalent scheduling decision.** Bounds
+  propagation can be implemented independently, but default-runtime usefulness
+  depends on a known ECS system activation path.
 - **METHOD-001 ⇐ ARCH-001.** Rigid-body reference must wait for the physics
   layer ownership decision before runtime/ECS integration.
 - **HARDEN-064 ⇐ ARCH-001.** ECS collider/rigid-body authoring contract must
