@@ -10,7 +10,7 @@
 - No change to the existing `MaterialSystemDiagnostics::FallbackSlotResolveCount` counter (it tracks the separate `GetMaterialSlot()` stale-handle path).
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: Claude on branch `claude/setup-agentic-workflow-JFf7h`.
 - Owner/layer: `graphics/renderer`.
 - Planning parent: [`tasks/done/GRAPHICS-031-default-debug-surface-material.md`](../../done/GRAPHICS-031-default-debug-surface-material.md), Decisions 7 (substitution path-(b)), 8 (reset cadence), 9 (diagnostics). Recorded as Impl-B in the parent's Required changes.
@@ -23,14 +23,14 @@
   - independent of branch, total per-frame uses of slot 0 (after substitution) increments `DefaultDebugSurfaceUses`.
 - [x] Add the three counters to `MaterialSystemDiagnostics` (alongside the existing `FallbackSlotResolveCount`).
 - [x] Reset all three counters at the cadence locked by Decision 8 (per-frame at `BeginFrame()` or in `ResetFrameState()`, mirroring existing `MaterialSystemDiagnostics` reset rhythm). Implementation resets in both `SubmitRuntimeSnapshots()` (next to `m_InvalidSnapshotRecordCount = 0`) and `ResetFrameState()` to match the existing `InvalidSnapshotRecordCount` reset rhythm.
-- [ ] Optional: add a runtime-side authoring shorthand path so a renderable submitted with no material descriptor reaches the renderer with the sentinel "unset" runtime field (Decision 7 path-(a)). *(Deferred — not exercised by current runtime extraction, which always writes `HasMaterialSlot = true`. Renderer substitution still triggers if a future extraction path leaves the field unset.)*
+- Deferred (out of scope for this task): optional runtime-side authoring shorthand path so a renderable submitted with no material descriptor reaches the renderer with the sentinel "unset" runtime field (Decision 7 path-(a)). Not exercised by current runtime extraction, which always writes `HasMaterialSlot = true`. Renderer substitution still triggers if a future extraction path leaves the field unset. See `## Completion` for follow-up disposition.
 
 ## Tests
 - [x] `contract;graphics` test: a renderable submitted with sentinel-unset material renders with slot 0 and `MissingMaterialFallbackCount` increments by 1. (`tests/contract/graphics/Test.MaterialSubstitutionContract.cpp::SentinelUnsetSubstitutesDefaultSlotAndIncrementsMissingCounter`)
 - [x] `contract;graphics` test: a renderable submitted with an out-of-range slot integer renders with slot 0 and `InvalidMaterialSlotCount` increments by 1. (`OutOfRangeSlotSubstitutesDefaultAndIncrementsInvalidCounter`)
 - [x] `contract;graphics` test: `DefaultDebugSurfaceUses == (authored-default uses + MissingMaterialFallbackCount + InvalidMaterialSlotCount)` per frame. (`DefaultDebugSurfaceUsesEqualsAuthoredDefaultPlusFallbacks`)
 - [x] `contract;graphics` test: pipeline state and `kDefaultMaterialSlotIndex` survive `RebuildGpuResources()` without identity churn. (`DefaultSlotIdentitySurvivesRebuildGpuResources`; covers slot 0 params + DefaultDebugSurface type ID and name byte-equality across the rebuild.)
-- [ ] `contract;runtime` test (Decision 7 path-(a)): an entity with geometry + no material descriptor reaches the renderer with the sentinel "unset" runtime field. *(Deferred together with the optional runtime authoring shorthand above.)*
+- Deferred (out of scope for this task): `contract;runtime` test for Decision 7 path-(a) — an entity with geometry + no material descriptor reaches the renderer with the sentinel "unset" runtime field. Tracks the optional runtime authoring shorthand in `## Required changes`.
 - [x] Additional `PerFrameCountersResetAtBeginFrame` test asserts the three counters are zeroed at `BeginFrame()` (Decision 8 reset cadence).
 
 ## Docs
@@ -56,11 +56,12 @@ python3 tools/docs/check_doc_links.py --root .
 - Mutating runtime ECS state from graphics.
 - Removing or repurposing the existing `FallbackSlotResolveCount` counter.
 
-## Next verification step
-- Local `cmake --preset ci` requires `clang-20`; the current container ships
-  only `clang-18`, so the focused
-  `IntrinsicGraphicsContractTests` / `ctest -L contract` gate from the
-  Verification block above must be re-run on a CI host that satisfies the
-  preset's compiler pin before retiring this task. Structural checks
-  (`check_layering`, `check_task_policy`, `check_doc_links`,
-  `check_test_layout`) all pass locally.
+## Completion
+- Completed: 2026-05-13.
+- Commit reference: `24ac0b7` ("GRAPHICS-031B Wire default-debug-surface substitution and diagnostics") via PR #818 from `claude/setup-agentic-workflow-JFf7h`, merged to `main` at 2026-05-13T12:26:38Z.
+- Verification:
+  - Project CI ran on PR #818 (`ci` preset, clang-20 toolchain) and passed before merge to `main`.
+  - Authoring session ran the structural checks locally; the focused `cmake --preset ci` / `ctest -L contract` gate ran in the PR's CI environment because the authoring container shipped clang-18 only.
+- Deferred follow-up (not in scope for this task; reopen as a backlog task if/when needed):
+  - Decision 7 path-(a) runtime-side authoring shorthand — current runtime extraction always writes `HasMaterialSlot = true`, so renderer-side substitution covers the contract for now.
+  - Matching `contract;runtime` test for the runtime authoring shorthand path.

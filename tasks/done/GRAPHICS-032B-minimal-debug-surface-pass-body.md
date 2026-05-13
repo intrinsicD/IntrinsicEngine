@@ -11,7 +11,7 @@
 - No new diagnostics counters beyond those declared by `GRAPHICS-032A`.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: Claude on branch `claude/setup-agentic-workflow-uLLKn`.
 - Owner/layer: `graphics/renderer`.
 - Planning parent: [`tasks/done/GRAPHICS-032-minimal-surface-present-command-path.md`](../done/GRAPHICS-032-minimal-surface-present-command-path.md), Recorded as Impl-B in the parent's Required changes.
@@ -33,7 +33,7 @@
 - [x] `contract;graphics` test: forcing the slot-0 pipeline lease to fail (`FailPipelineCreateCall = 3`) routes the pass to `SkippedUnavailable` and bumps `MinimalRecipeMissingPrerequisiteCount`. (`MissingSlotZeroPipelineLeaseSkipsUnavailableAndIncrementsCounter`)
 - [x] `contract;graphics` test: forcing the culling-shader pipeline to fail (`FailPipelineCreateCall = 1`) leaves the `SurfaceOpaque` bucket invalid, routes the pass to `SkippedUnavailable`, and bumps `MinimalRecipeMissingPrerequisiteCount`. (`MissingCullingBucketSkipsUnavailableAndIncrementsCounter`)
 - [x] `contract;graphics` test: flipping the device to non-operational between `Initialize` and `ExecuteFrame` routes the pass to `SkippedNonOperational` and leaves `MinimalSurfacePassExecutions` at zero. (`NonOperationalDeviceSkipsNonOperational`)
-- [ ] No `gpu`/`vulkan` test in this slice. *(Out-of-scope: GRAPHICS-032D.)*
+- Out of scope for this task: no `gpu`/`vulkan` test in this slice (covered by GRAPHICS-032D).
 
 ## Docs
 - [x] Update `src/graphics/renderer/README.md` to list the new `Pass.Surface.MinimalDebug` module, point at the record site, and describe the additive (build + record-time) cadence of `MinimalRecipeMissingPrerequisiteCount`.
@@ -59,5 +59,10 @@ python3 tools/docs/check_doc_links.py --root .
 - Mutating runtime ECS state.
 - Adding a `gpu;vulkan` test.
 
-## Next verification step
-- Local `cmake --preset ci` requires `clang-20`; the current container ships only `clang-18`, so the focused `IntrinsicGraphicsContractTests` / `ctest -L contract` gate from the Verification block above must be re-run on a CI host that satisfies the preset's compiler pin before retiring this task. Structural checks (`check_layering`, `check_task_policy`, `check_doc_links`, `check_test_layout`) pass locally on this branch, and `docs/api/generated/module_inventory.md` has been regenerated.
+## Completion
+- Completed: 2026-05-13.
+- Commit reference: `7fff8ca` ("GRAPHICS-032B: wire MinimalDebugSurface CPU-mock pass body") via PR #821 from `claude/setup-agentic-workflow-uLLKn`, merged to `main` at 2026-05-13T17:34:28Z.
+- Verification:
+  - Project CI ran on PR #821 (`ci` preset, clang-20 toolchain) and passed before merge to `main`.
+  - Authoring session ran the structural checks locally; the focused `cmake --preset ci` / `ctest -L contract` gate ran in the PR's CI environment because the authoring container shipped clang-18 only.
+  - `docs/api/generated/module_inventory.md` was regenerated as part of the PR (graphics/renderer module count 50 → 51; total 427 → 428).

@@ -12,7 +12,7 @@
 - No change to `BuildDefaultFrameRecipe` semantics; the minimal recipe is a separate opt-in contract.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: Claude on branch `claude/setup-agentic-workflow-JrJnr`.
 - Owner/layer: `graphics/framegraph` for the recipe declaration, `graphics/renderer` for the diagnostics counters.
 - Planning parent: [`tasks/done/GRAPHICS-032-minimal-surface-present-command-path.md`](../../done/GRAPHICS-032-minimal-surface-present-command-path.md), Recorded as Impl-A in the parent's Required changes.
@@ -33,7 +33,7 @@
 - [x] `contract;graphics` test: minimal- and default-recipe introspections are mutually isolated — neither declares the other's pass labels. (`MinimalAndDefaultRecipesAreMutuallyIsolated`)
 - [x] `contract;graphics` test: `MinimalRecipeMissingPrerequisiteCount` increments when material/pipeline residency is missing for the surface pass even though the recipe still compiles. Implemented via `FrameRecipeBuildResult::MissingPrerequisiteCount` (mirrored into the renderer counter), counting material, surface-opaque bucket (joint args/count), and scene-table residency gaps. (`MinimalDebugSurfaceRecipeCountsMissingPrerequisites`)
 - [x] `contract;graphics` test: missing backbuffer hard-fails the recipe build with a diagnostic (mirrors `DefaultFrameRecipe`). (`MinimalDebugSurfaceRecipeRequiresValidBackbuffer`)
-- [ ] No `gpu`/`vulkan` test in this slice. *(Out-of-scope: GRAPHICS-032D.)*
+- Out of scope for this task: no `gpu`/`vulkan` test in this slice (covered by GRAPHICS-032D).
 
 ## Docs
 - [x] Update `src/graphics/framegraph/README.md` to flip the planned `MinimalDebugSurface` recipe row to current state and point at the build entry point.
@@ -59,11 +59,9 @@ python3 tools/docs/check_doc_links.py --root .
 - Adding a `gpu;vulkan` test.
 - Mixing mechanical file moves with semantic refactors.
 
-## Next verification step
-- Local `cmake --preset ci` requires `clang-20`; the current container ships
-  only `clang-18`, so the focused
-  `IntrinsicGraphicsContractTests` / `ctest -L contract` gate from the
-  Verification block above must be re-run on a CI host that satisfies the
-  preset's compiler pin before retiring this task. Structural checks
-  (`check_layering`, `check_task_policy`, `check_doc_links`,
-  `check_test_layout`) all pass locally on this branch.
+## Completion
+- Completed: 2026-05-13.
+- Commit reference: `3931705` ("GRAPHICS-032A Wire minimal-debug-surface recipe and diagnostics") via PR #819 from `claude/setup-agentic-workflow-JrJnr`, merged to `main` at 2026-05-13T13:05:23Z.
+- Verification:
+  - Project CI ran on PR #819 (`ci` preset, clang-20 toolchain) and passed before merge to `main`.
+  - Authoring session ran the structural checks locally; the focused `cmake --preset ci` / `ctest -L contract` gate ran in the PR's CI environment because the authoring container shipped clang-18 only.

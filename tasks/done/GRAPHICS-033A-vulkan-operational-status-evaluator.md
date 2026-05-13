@@ -10,7 +10,7 @@
 - No mutation of `VulkanDevice::IsOperational()` consumers; the evaluator is the source of truth but `IsOperational()` remains backed by it for backward compatibility.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: Claude on branch `claude/setup-agentic-workflow-obMTZ`.
 - Owner/layer: `graphics/vulkan` for the evaluator + types.
 - Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-A in the parent's Required changes.
@@ -58,12 +58,10 @@ links `GraphicsVulkanContractTestObjs` (the planning-task entry referenced
 - Adding runtime breadcrumbs (reserved for `GRAPHICS-033B`).
 - Adding any Vulkan command-recording body (reserved for `GRAPHICS-033C`).
 
-## Next verification step
-- Local container ships clang-18 only; the `cmake --preset ci` toolchain pins
-  clang-20, so the focused
-  `IntrinsicGraphicsVulkanContractTests` / `ctest -L contract` gate from the
-  Verification block above must be re-run on a CI host that satisfies the
-  preset's compiler pin before retiring this task. Structural checks
-  (`check_layering`, `check_task_policy`, `check_doc_links`,
-  `check_test_layout`) pass locally on this branch, and
-  `docs/api/generated/module_inventory.md` has been regenerated.
+## Completion
+- Completed: 2026-05-13.
+- Commit reference: `7a5886d` ("GRAPHICS-033A Add Vulkan operational-status evaluator surface") via PR #820 from `claude/setup-agentic-workflow-obMTZ`, merged to `main` at 2026-05-13T13:16:28Z.
+- Verification:
+  - Project CI ran on PR #820 (`ci` preset, clang-20 toolchain) and passed before merge to `main`.
+  - Authoring session ran the structural checks locally; the focused `cmake --preset ci` / `ctest -L contract` gate ran in the PR's CI environment because the authoring container shipped clang-18 only.
+  - `docs/api/generated/module_inventory.md` was regenerated as part of the PR.

@@ -717,7 +717,7 @@ human-readable summary should read `Findings.front().Message`.
   and `RebuildOperationalResources()` republish the same descriptor),
   Impl-B (substitution wiring + the three diagnostics counters; landed
   by
-  [`GRAPHICS-031B`](../../../tasks/active/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
+  [`GRAPHICS-031B`](../../../tasks/done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
   the renderer's snapshot-copy step in
   `Graphics.Renderer.cpp::SubmitRuntimeSnapshots()` mutates
   `m_TransformSyncRecords` in place so that records with
