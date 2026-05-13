@@ -654,7 +654,17 @@ human-readable summary should read `Findings.front().Message`.
   constants under the naming family `Material.DefaultDebug<Variant>` /
   `kDefaultDebug<Variant>MaterialSlotIndex`; they are identified but not
   opened. Implementation children GRAPHICS-031-Impl-A (shader sources +
-  pipeline + slot-0 repopulation), Impl-B (substitution wiring + the
+  pipeline + slot-0 repopulation; landed by
+  [`GRAPHICS-031A`](../../../tasks/active/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
+  the shaders are authored at
+  `assets/shaders/forward/default_debug_surface.vert/frag`,
+  `MaterialSystem::Initialize()` registers the three built-in types
+  StandardPBR/SciVis/DefaultDebugSurface and packs slot 0 with
+  `kDefaultDebugSurfaceBaseColor` and `MaterialFlags::Unlit`, and the
+  renderer caches a `m_DefaultDebugSurfacePipelineLease` built from a
+  byte-identical `BuildDefaultDebugSurfacePipelineDesc()` so initial
+  `Initialize()` and `RebuildOperationalResources()` republish the same
+  descriptor), Impl-B (substitution wiring + the
   three diagnostics counters), and the optional Impl-C (one additional
   debug variant) are identified but not opened.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it

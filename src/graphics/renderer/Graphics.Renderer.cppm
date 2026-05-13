@@ -13,6 +13,8 @@ import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.PipelineManager;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
@@ -180,6 +182,19 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual PostProcessSystem&     GetPostProcessSystem() = 0;
         [[nodiscard]] virtual ShadowSystem&          GetShadowSystem()    = 0;
         [[nodiscard]] virtual const RenderGraphFrameStats& GetLastRenderGraphStats() const = 0;
+
+        // GRAPHICS-031A — accessor for the canonical missing-material fallback
+        // pipeline. Returns the operational device-side handle when the
+        // pipeline has been compiled (operational device path), and an
+        // invalid handle otherwise. The pipeline state itself is the
+        // canonical default-debug-surface recipe; see GetDefaultDebugSurfacePipelineDesc().
+        [[nodiscard]] virtual RHI::PipelineHandle GetDefaultDebugSurfacePipeline() const noexcept = 0;
+
+        // GRAPHICS-031A — descriptor used to compile the default-debug-surface
+        // pipeline. Returned by value so callers can assert byte-identical
+        // republish across InitializeOperationalPassResources() invocations
+        // (initial init and RebuildOperationalResources).
+        [[nodiscard]] virtual RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept = 0;
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();

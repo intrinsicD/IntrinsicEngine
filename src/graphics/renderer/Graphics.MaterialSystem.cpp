@@ -10,7 +10,10 @@ module;
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 module Extrinsic.Graphics.MaterialSystem;
 
@@ -273,24 +276,54 @@ namespace Extrinsic::Graphics
         [[maybe_unused]] bool ok = m_Impl->EnsureCapacity(kInitialCapacity);
         assert(ok && "MaterialSystem: initial SSBO allocation failed");
 
+        // Register the built-in type triplet in a fixed order so the
+        // well-known TypeIDs (StandardPBR=0, SciVis=1, DefaultDebugSurface=2)
+        // are reserved before any subsystem-specific registration runs.
+        const auto registerBuiltIn = [&](std::string_view name,
+                                         std::vector<CustomParamDesc> customParams,
+                                         std::uint32_t expectedTypeID)
+        {
+            TypeRecord rec;
+            rec.TypeID = static_cast<std::uint32_t>(m_Impl->Types.size());
+            rec.Desc   = {std::string{name}, std::move(customParams)};
+            assert(rec.TypeID == expectedTypeID && "Built-in MaterialType registration order changed");
+            m_Impl->TypeNameIndex[rec.Desc.Name] = rec.TypeID;
+            m_Impl->Types.push_back(std::move(rec));
+        };
+
+        registerBuiltIn(kMaterialTypeName_StandardPBR, {}, kMaterialTypeID_StandardPBR);
+        registerBuiltIn(kMaterialTypeName_SciVis,
+            {
+                {"ColormapAndDomain",  "colourmap bindless idx, domain, rangeMin, rangeMax"},
+                {"IsolinesAndBins",    "isolineCount, packedColor, isolineWidth, binCount"},
+                {"ScalarBDA",          "BDA lo/hi, elementCount, colorSourceMode"},
+                {"Reserved",           "reserved for future use"},
+            },
+            kMaterialTypeID_SciVis);
+        registerBuiltIn(kMaterialTypeName_DefaultDebugSurface, {}, kMaterialTypeID_DefaultDebugSurface);
+
         // Reserve slot 0 for the default material without going through
-        // the normal Create path so its index is always 0.
+        // the normal Create path so its index is always 0. Slot 0 carries
+        // the DefaultDebugSurface params (purple unlit) so any invalid
+        // MaterialHandle resolves to a visible missing-material surface.
+        MaterialParams defaultParams{};
+        defaultParams.BaseColorFactor = glm::vec4{
+            kDefaultDebugSurfaceBaseColor[0],
+            kDefaultDebugSurfaceBaseColor[1],
+            kDefaultDebugSurfaceBaseColor[2],
+            kDefaultDebugSurfaceBaseColor[3],
+        };
+        defaultParams.Flags = MaterialFlags::Unlit;
+
         m_Impl->Meta.emplace_back();
         InstanceMeta& defaultMeta    = m_Impl->Meta.back();
         defaultMeta.Generation       = 0;
         defaultMeta.Live             = true;
         defaultMeta.RefCount.store(1, std::memory_order_relaxed); // never freed
-        defaultMeta.Params           = MaterialParams{};
+        defaultMeta.Params           = defaultParams;
+        defaultMeta.Type             = MaterialTypeHandle{kMaterialTypeID_DefaultDebugSurface, 0};
 
-        // Register the built-in StandardPBR type (TypeID = 0).
-        TypeRecord pbr;
-        pbr.TypeID = 0;
-        pbr.Desc   = {"StandardPBR", {}};
-        m_Impl->Types.push_back(std::move(pbr));
-        m_Impl->TypeNameIndex["StandardPBR"] = 0;
-
-        // Pack the default slot on the CPU side and mark dirty.
-        Impl::PackSlot(m_Impl->GpuSlots[0], MaterialParams{}, 0);
+        Impl::PackSlot(m_Impl->GpuSlots[0], defaultParams, kMaterialTypeID_DefaultDebugSurface);
         m_Impl->DirtySet[0] = true;
     }
 

@@ -303,6 +303,7 @@ namespace Extrinsic::Graphics
             m_GpuWorld       .reset();
             m_MaterialSystem .reset();
             m_DepthPrepassPipelineLease.reset();
+            m_DefaultDebugSurfacePipelineLease.reset();
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -827,6 +828,21 @@ namespace Extrinsic::Graphics
 
         // ── Resource managers ─────────────────────────────────────────────
 
+        [[nodiscard]] RHI::PipelineHandle GetDefaultDebugSurfacePipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_DefaultDebugSurfacePipelineLease.has_value() ||
+                !m_DefaultDebugSurfacePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept override
+        {
+            return BuildDefaultDebugSurfacePipelineDesc();
+        }
+
         RHI::BufferManager&   GetBufferManager()   override { return *m_BufferManager;   }
         RHI::TextureManager&  GetTextureManager()  override { return *m_TextureManager;  }
         RHI::SamplerManager&  GetSamplerManager()  override { return *m_SamplerManager;  }
@@ -846,6 +862,32 @@ namespace Extrinsic::Graphics
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
 
     private:
+        // GRAPHICS-031A — canonical default-debug-surface PipelineDesc.
+        // Built byte-identical at every InitializeOperationalPassResources()
+        // call so initial init and RebuildOperationalResources republish the
+        // same descriptor.
+        [[nodiscard]] static RHI::PipelineDesc BuildDefaultDebugSurfacePipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = "assets/shaders/forward/default_debug_surface.vert";
+            desc.FragmentShaderPath = "assets/shaders/forward/default_debug_surface.frag";
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::Back;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = true;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Less;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA8_UNORM;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.DefaultDebugSurface";
+            return desc;
+        }
+
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
         {
             if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
@@ -879,6 +921,22 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] DepthPrepass pipeline unavailable; pass commands will be skipped: error={}",
                                 static_cast<int>(depthPipeline.error()));
+            }
+
+            // GRAPHICS-031A: canonical missing-material fallback pipeline.
+            // Republished byte-identical from BuildDefaultDebugSurfacePipelineDesc()
+            // so the descriptor matches across initial init and rebuilds.
+            m_DefaultDebugSurfacePipelineLease.reset();
+            const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc();
+            auto defaultDebugSurfacePipeline = m_PipelineManager->Create(defaultDebugSurfaceDesc);
+            if (defaultDebugSurfacePipeline.has_value())
+            {
+                m_DefaultDebugSurfacePipelineLease.emplace(std::move(*defaultDebugSurfacePipeline));
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] DefaultDebugSurface pipeline unavailable; fallback recording will be skipped: error={}",
+                                static_cast<int>(defaultDebugSurfacePipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -1031,6 +1089,7 @@ namespace Extrinsic::Graphics
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
         DepthPrepassPass                     m_DepthPrepassPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

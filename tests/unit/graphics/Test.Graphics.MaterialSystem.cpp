@@ -102,7 +102,8 @@ TEST(GraphicsMaterialSystem, DefaultAndStaleMaterialSlotsResolveToFallbackWithDi
     const auto diagnostics = materials.GetDiagnostics();
     EXPECT_EQ(diagnostics.FallbackSlotResolveCount, 1u);
     EXPECT_EQ(diagnostics.LiveInstanceCount, 2u); // slot 0 default + one instance
-    EXPECT_EQ(diagnostics.RegisteredTypeCount, 1u);
+    // StandardPBR + SciVis + DefaultDebugSurface — all registered by Initialize().
+    EXPECT_EQ(diagnostics.RegisteredTypeCount, 3u);
     EXPECT_GE(diagnostics.Capacity, 2u);
 
     lease.Reset();
@@ -131,7 +132,8 @@ TEST(GraphicsMaterialSystem, RejectsIncompatibleMaterialTypeLayoutsDeterministic
     EXPECT_EQ(diagnostics.IncompatibleLayoutCount, 1u);
     EXPECT_EQ(diagnostics.DuplicateTypeNameCount, 1u);
     EXPECT_EQ(diagnostics.InvalidCreateTypeCount, 1u);
-    EXPECT_EQ(diagnostics.RegisteredTypeCount, 1u);
+    // StandardPBR + SciVis + DefaultDebugSurface registered by Initialize().
+    EXPECT_EQ(diagnostics.RegisteredTypeCount, 3u);
 
     materials.Shutdown();
 }
@@ -287,4 +289,48 @@ TEST(GraphicsMaterialSystem, ReportsTextureAssetBindingFailuresWithoutFallback)
     materials.Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-031A — canonical missing-material fallback
+// ---------------------------------------------------------------------------
+
+TEST(GraphicsMaterialSystem, RegistersDefaultDebugSurfaceWithStableTypeId)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    const auto defaultDebugSurface =
+        materials.FindType(Graphics::kMaterialTypeName_DefaultDebugSurface);
+    ASSERT_TRUE(defaultDebugSurface.IsValid());
+    EXPECT_EQ(defaultDebugSurface.Index, Graphics::kMaterialTypeID_DefaultDebugSurface);
+
+    const auto standard = materials.FindType(Graphics::kMaterialTypeName_StandardPBR);
+    ASSERT_TRUE(standard.IsValid());
+    EXPECT_EQ(standard.Index, Graphics::kMaterialTypeID_StandardPBR);
+
+    const auto sciVis = materials.FindType(Graphics::kMaterialTypeName_SciVis);
+    ASSERT_TRUE(sciVis.IsValid());
+    EXPECT_EQ(sciVis.Index, Graphics::kMaterialTypeID_SciVis);
+
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, DefaultSlotCarriesDefaultDebugSurfaceParams)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    const Graphics::MaterialHandle defaultHandle{Graphics::kDefaultMaterialSlotIndex, 0u};
+    const Graphics::MaterialParams params = materials.GetParams(defaultHandle);
+    EXPECT_FLOAT_EQ(params.BaseColorFactor.x, Graphics::kDefaultDebugSurfaceBaseColor[0]);
+    EXPECT_FLOAT_EQ(params.BaseColorFactor.y, Graphics::kDefaultDebugSurfaceBaseColor[1]);
+    EXPECT_FLOAT_EQ(params.BaseColorFactor.z, Graphics::kDefaultDebugSurfaceBaseColor[2]);
+    EXPECT_FLOAT_EQ(params.BaseColorFactor.w, Graphics::kDefaultDebugSurfaceBaseColor[3]);
+    EXPECT_TRUE(Graphics::HasFlag(params.Flags, Graphics::MaterialFlags::Unlit));
+
+    materials.Shutdown();
+}
 

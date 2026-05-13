@@ -460,3 +460,65 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-031A — canonical missing-material fallback pipeline lease
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    [[nodiscard]] bool PipelineDescBytesEqual(const Extrinsic::RHI::PipelineDesc& lhs,
+                                              const Extrinsic::RHI::PipelineDesc& rhs) noexcept
+    {
+        if (lhs.VertexShaderPath != rhs.VertexShaderPath) return false;
+        if (lhs.FragmentShaderPath != rhs.FragmentShaderPath) return false;
+        if (lhs.ComputeShaderPath != rhs.ComputeShaderPath) return false;
+        if (lhs.PrimitiveTopology != rhs.PrimitiveTopology) return false;
+        if (lhs.Rasterizer.Culling != rhs.Rasterizer.Culling) return false;
+        if (lhs.Rasterizer.Winding != rhs.Rasterizer.Winding) return false;
+        if (lhs.Rasterizer.Fill != rhs.Rasterizer.Fill) return false;
+        if (lhs.DepthStencil.DepthTestEnable != rhs.DepthStencil.DepthTestEnable) return false;
+        if (lhs.DepthStencil.DepthWriteEnable != rhs.DepthStencil.DepthWriteEnable) return false;
+        if (lhs.DepthStencil.DepthFunc != rhs.DepthStencil.DepthFunc) return false;
+        if (lhs.DepthStencil.StencilEnable != rhs.DepthStencil.StencilEnable) return false;
+        if (lhs.ColorTargetCount != rhs.ColorTargetCount) return false;
+        for (std::uint32_t i = 0u; i < lhs.ColorTargetCount; ++i)
+        {
+            if (lhs.ColorBlend[i].Enable != rhs.ColorBlend[i].Enable) return false;
+            if (lhs.ColorTargetFormats[i] != rhs.ColorTargetFormats[i]) return false;
+        }
+        if (lhs.DepthTargetFormat != rhs.DepthTargetFormat) return false;
+        if (lhs.PushConstantSize != rhs.PushConstantSize) return false;
+        return true;
+    }
+}
+
+TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{173u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetDefaultDebugSurfacePipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDefaultDebugSurfacePipelineDesc();
+    EXPECT_EQ(initialDesc.VertexShaderPath,
+              std::string{"assets/shaders/forward/default_debug_surface.vert"});
+    EXPECT_EQ(initialDesc.FragmentShaderPath,
+              std::string{"assets/shaders/forward/default_debug_surface.frag"});
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Less);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetDefaultDebugSurfacePipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetDefaultDebugSurfacePipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
