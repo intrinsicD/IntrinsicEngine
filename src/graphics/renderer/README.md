@@ -113,9 +113,15 @@ human-readable summary should read `Findings.front().Message`.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
   gates, canonical resource declarations, pass-order introspection, and the
   backend-agnostic graph construction path used by the null renderer.
-- GRAPHICS-032 records `FrameRecipe::MinimalDebugSurface` as a separate opt-in
+- GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
-  implementation must declare only
+  recipe is built by
+  `BuildMinimalDebugSurfaceRecipe(graph, imports, sizing)` and declared by
+  `DescribeMinimalDebugSurfaceRecipe()` in `Extrinsic.Graphics.FrameRecipe`;
+  callers opt in via `Core::Config::RenderConfig::FrameRecipe =
+  Core::Config::FrameRecipeKind::MinimalDebug` and the
+  `IRenderer::SetFrameRecipe()` setter (default stays `FrameRecipeKind::Default`).
+  The recipe declares only
   `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug`, writes
   `SceneColorHDR`/`SceneDepth`, finalizes the imported `Backbuffer` through the
   existing fullscreen-triangle `Pass.Present` contract, and never mutates the
@@ -124,10 +130,24 @@ human-readable summary should read `Findings.front().Message`.
   binds, `DrawIndexedIndirectCount` for `SurfaceOpaque`, then fullscreen
   `Draw(3, 1, 0, 0)` for present) so tests assert pass labels, resource names,
   bucket kind, draw kind, and counts rather than transient allocator/native
-  handles. Renderer diagnostics surface `MinimalSurfacePassExecutions`,
-  `MinimalPresentPassExecutions`, and `MinimalRecipeMissingPrerequisiteCount`;
-  missing material/pipeline, residency, eligible renderable, or attachment/import
-  authorization increments the prerequisite counter instead of silently skipping.
+  handles. Renderer diagnostics surface three counters on
+  `RenderGraphFrameStats`:
+  - `MinimalSurfacePassExecutions` — increments per successful surface-pass
+    record (lands in GRAPHICS-032B).
+  - `MinimalPresentPassExecutions` — increments per successful present-pass
+    record (lands in GRAPHICS-032C).
+  - `MinimalRecipeMissingPrerequisiteCount` — increments at recipe build
+    time (`Graphics.Renderer.cpp::ExecuteFrame` after
+    `BuildMinimalDebugSurfaceRecipe`) for each missing prerequisite: invalid
+    material buffer residency, invalid surface-opaque bucket residency
+    (counted jointly for the args/count pair), or invalid scene-table
+    residency. The recipe still compiles when prerequisites are missing so
+    that the skip is observable rather than silent.
+
+  All three counters reset per-frame through the existing
+  `m_LastRenderGraphStats = {}` cadence in `ResetFrameState()` and
+  `ExecuteFrame()`. Pass-body command recording bodies and the GPU/Vulkan
+  smoke fixture land in GRAPHICS-032B, GRAPHICS-032C, and GRAPHICS-032D.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
