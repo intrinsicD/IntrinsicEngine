@@ -63,7 +63,7 @@ python3 tools/docs/check_doc_links.py --root .
 ## Completion record
 - Completed: 2026-05-13.
 - Branch: `claude/setup-agentic-workflow-B2joE`.
-- Commit: pending in this change (lands with the GRAPHICS-030C retire-ordering implementation commit on the above branch).
+- Commit: `a895d08` ("GRAPHICS-030C: defer procedural geometry frees by framesInFlight ticks").
 - PR: TBD.
 - Verification run in this session:
   - `cmake --preset ci` — configure succeeds (clang-20 toolchain pinned by preset).
