@@ -20,10 +20,15 @@ state, or asset-service traffic.
 
 ## GRAPHICS-032 minimal recipe contract
 
-GRAPHICS-032 records `FrameRecipe::MinimalDebugSurface` as an opt-in
+GRAPHICS-032A records `FrameRecipe::MinimalDebugSurface` as an opt-in
 renderer-owned recipe contract with the stable label
-`recipe.minimal-debug-surface`. The framegraph implementation must treat it like
-any other recipe: two pass declarations (`Pass.Surface.MinimalDebug` then
+`recipe.minimal-debug-surface`. The recipe is built by
+`BuildMinimalDebugSurfaceRecipe(graph, imports, sizing)` in
+`Extrinsic.Graphics.FrameRecipe`, declared by `DescribeMinimalDebugSurfaceRecipe()`,
+and reachable from the renderer through the
+`Core::Config::FrameRecipeKind::MinimalDebug` selector wired into
+`IRenderer::SetFrameRecipe()`. The framegraph treats it like any other recipe:
+two pass declarations (`Pass.Surface.MinimalDebug` then
 `Pass.Present.MinimalDebug`), transient `SceneColorHDR` and `SceneDepth`
 resources, and one imported `Backbuffer` writable only by the present declaration.
 
@@ -38,3 +43,9 @@ mutate or globally reconfigure the default recipe's pass set, feature gates,
 validation expectations, or skip/no-op statuses. Tests for the minimal recipe
 should assert compiled graph/resource properties by pass label and resource name,
 not transient allocation IDs or backend-native handles.
+
+> **Scaffold notice.** `BuildMinimalDebugSurfaceRecipe`, the
+> `MinimalDebug{Surface,Present}` pass labels, and the three minimal-recipe
+> diagnostics counters introduced alongside this recipe are bootstrap-only and
+> are removed by `GRAPHICS-081` once the canonical default recipe records every
+> pass body operationally (`GRAPHICS-070..076`).

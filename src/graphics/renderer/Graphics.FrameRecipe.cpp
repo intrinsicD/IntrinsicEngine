@@ -555,4 +555,156 @@ namespace Extrinsic::Graphics
             .DeclaredResourceCount = enabledResourceCount,
         };
     }
+
+    [[nodiscard]] FrameRecipeIntrospection DescribeMinimalDebugSurfaceRecipe()
+    {
+        FrameRecipeIntrospection out{};
+
+        AddPass(out, FrameRecipePassKind::Surface, kMinimalDebugSurfacePassName, true, false,
+                {"GpuWorld.SceneTable", "Material.Buffer",
+                 "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"},
+                {"SceneColorHDR", "SceneDepth"});
+        AddPass(out, FrameRecipePassKind::Present, kMinimalDebugPresentPassName, true, true,
+                {"SceneColorHDR", "Backbuffer"}, {});
+
+        AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
+        AddResource(out, FrameRecipeResourceKind::SceneDepth, "SceneDepth", true);
+        AddResource(out, FrameRecipeResourceKind::SceneColorHDR, "SceneColorHDR", true);
+        AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
+        AddResource(out, FrameRecipeResourceKind::MaterialBuffer, "Material.Buffer", true, true);
+        AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs, "Cull.SurfaceOpaque.IndexedArgs", true, true, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueCount, "Cull.SurfaceOpaque.Count", true, true, false, false, true);
+        return out;
+    }
+
+    [[nodiscard]] FrameRecipeBuildResult BuildMinimalDebugSurfaceRecipe(RenderGraph& graph,
+                                                                       const FrameRecipeImports& imports,
+                                                                       const FrameRecipeSizing& sizing)
+    {
+        if (!imports.Backbuffer.IsValid())
+        {
+            return FrameRecipeBuildResult{
+                .Succeeded = false,
+                .Diagnostic = "MinimalDebugSurface recipe requires a valid imported Backbuffer handle.",
+            };
+        }
+
+        const auto width = ClampExtent(sizing.Width);
+        const auto height = ClampExtent(sizing.Height);
+        const FrameRecipeIntrospection declaration = DescribeMinimalDebugSurfaceRecipe();
+
+        // GRAPHICS-032 Decision 12: missing surface-pass prerequisites
+        // (material/pipeline residency, surface-opaque bucket) increment a
+        // single counter rather than aborting the build. Pass bodies land in
+        // GRAPHICS-032B/C and consume the same counter.
+        std::uint32_t missingPrerequisites = 0u;
+        if (!imports.MaterialBuffer.IsValid())
+        {
+            ++missingPrerequisites;
+        }
+        if (!imports.SurfaceOpaqueIndexedArgs.IsValid() || !imports.SurfaceOpaqueCount.IsValid())
+        {
+            ++missingPrerequisites;
+        }
+        if (!imports.SceneTable.IsValid())
+        {
+            ++missingPrerequisites;
+        }
+
+        const auto backbuffer = graph.ImportBackbuffer("Backbuffer", imports.Backbuffer);
+        BufferRef sceneTable{};
+        BufferRef materialBuffer{};
+        BufferRef drawIndirect{};
+        BufferRef drawCount{};
+        if (imports.SceneTable.IsValid())
+        {
+            sceneTable = graph.ImportBuffer("GpuWorld.SceneTable", imports.SceneTable,
+                                            BufferState::ShaderRead, BufferState::ShaderRead);
+        }
+        if (imports.MaterialBuffer.IsValid())
+        {
+            materialBuffer = graph.ImportBuffer("Material.Buffer", imports.MaterialBuffer,
+                                                BufferState::ShaderRead, BufferState::ShaderRead);
+        }
+        if (imports.SurfaceOpaqueIndexedArgs.IsValid())
+        {
+            drawIndirect = graph.ImportBuffer("Cull.SurfaceOpaque.IndexedArgs", imports.SurfaceOpaqueIndexedArgs,
+                                              BufferState::ShaderWrite, BufferState::IndirectRead);
+        }
+        if (imports.SurfaceOpaqueCount.IsValid())
+        {
+            drawCount = graph.ImportBuffer("Cull.SurfaceOpaque.Count", imports.SurfaceOpaqueCount,
+                                           BufferState::ShaderWrite, BufferState::IndirectRead);
+        }
+
+        const auto depth = graph.CreateTexture("SceneDepth",
+                                               DepthTargetDesc(width, height, sizing.DepthFormat, "SceneDepth"));
+        const auto hdr = graph.CreateTexture("SceneColorHDR",
+                                             ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"));
+
+        PassRef previous{};
+        auto addOrderedPass = [&graph, &previous](std::string name, auto setup, const bool sideEffect = false) {
+            const PassRef dependency = previous;
+            PassRef pass = graph.AddPass(std::move(name), [dependency, setup](RenderGraphBuilder& builder) mutable {
+                if (dependency.IsValid())
+                {
+                    builder.DependsOn(dependency);
+                }
+                setup(builder);
+            }, sideEffect);
+            previous = pass;
+            return pass;
+        };
+
+        addOrderedPass(std::string{kMinimalDebugSurfacePassName}, [=](RenderGraphBuilder& builder) {
+            if (sceneTable.IsValid())
+            {
+                builder.Read(sceneTable, BufferUsage::ShaderRead);
+            }
+            if (materialBuffer.IsValid())
+            {
+                builder.Read(materialBuffer, BufferUsage::ShaderRead);
+            }
+            if (drawIndirect.IsValid())
+            {
+                builder.Read(drawIndirect, BufferUsage::IndirectRead);
+            }
+            if (drawCount.IsValid())
+            {
+                builder.Read(drawCount, BufferUsage::IndirectRead);
+            }
+            builder.Write(depth, TextureUsage::DepthWrite);
+            builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+        });
+
+        addOrderedPass(std::string{kMinimalDebugPresentPassName}, [=](RenderGraphBuilder& builder) {
+            builder.Read(hdr, TextureUsage::ShaderRead);
+            builder.Read(backbuffer, TextureUsage::Present);
+            builder.SideEffect();
+        }, true);
+
+        std::uint32_t enabledPassCount = 0u;
+        std::uint32_t enabledResourceCount = 0u;
+        for (const FrameRecipePassDeclaration& pass : declaration.Passes)
+        {
+            if (pass.Enabled)
+            {
+                ++enabledPassCount;
+            }
+        }
+        for (const FrameRecipeResourceDeclaration& resource : declaration.Resources)
+        {
+            if (resource.Enabled)
+            {
+                ++enabledResourceCount;
+            }
+        }
+
+        return FrameRecipeBuildResult{
+            .Succeeded = true,
+            .DeclaredPassCount = enabledPassCount,
+            .DeclaredResourceCount = enabledResourceCount,
+            .MissingPrerequisiteCount = missingPrerequisites,
+        };
+    }
 }

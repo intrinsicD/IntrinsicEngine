@@ -44,6 +44,7 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Filesystem.PathResolver;
@@ -700,37 +701,44 @@ namespace Extrinsic::Graphics
             const auto& surfaceOpaque = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
             const auto& lines = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Lines);
             const auto& points = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Points);
-            const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(
-                m_RenderGraph,
-                DeriveDefaultFrameRecipeFeatures(renderWorld),
-                FrameRecipeImports{
-                    .Backbuffer = m_Device->GetBackbufferHandle(frame),
-                    .SceneTable = m_GpuWorld->GetSceneTableBuffer(),
-                    .InstanceStatic = m_GpuWorld->GetInstanceStaticBuffer(),
-                    .InstanceDynamic = m_GpuWorld->GetInstanceDynamicBuffer(),
-                    .EntityConfig = m_GpuWorld->GetEntityConfigBuffer(),
-                    .GeometryRecords = m_GpuWorld->GetGeometryRecordBuffer(),
-                    .Bounds = m_GpuWorld->GetBoundsBuffer(),
-                    .Lights = m_GpuWorld->GetLightBuffer(),
-                    .MaterialBuffer = m_MaterialSystem->GetBuffer(),
-                    .SurfaceOpaqueIndexedArgs = surfaceOpaque.IndexedArgsBuffer,
-                    .SurfaceOpaqueCount = surfaceOpaque.CountBuffer,
-                    .LinesIndexedArgs = lines.IndexedArgsBuffer,
-                    .LinesCount = lines.CountBuffer,
-                    .PointsNonIndexedArgs = points.NonIndexedArgsBuffer,
-                    .PointsCount = points.CountBuffer,
-                },
-                FrameRecipeSizing{
-                    .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
-                    .Height = renderWorld.Viewport.Height > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Height) : 1u,
-                    .BackbufferFormat = RHI::Format::RGBA8_UNORM,
-                    .DepthFormat = RHI::Format::D32_FLOAT,
-                });
+            const FrameRecipeImports imports{
+                .Backbuffer = m_Device->GetBackbufferHandle(frame),
+                .SceneTable = m_GpuWorld->GetSceneTableBuffer(),
+                .InstanceStatic = m_GpuWorld->GetInstanceStaticBuffer(),
+                .InstanceDynamic = m_GpuWorld->GetInstanceDynamicBuffer(),
+                .EntityConfig = m_GpuWorld->GetEntityConfigBuffer(),
+                .GeometryRecords = m_GpuWorld->GetGeometryRecordBuffer(),
+                .Bounds = m_GpuWorld->GetBoundsBuffer(),
+                .Lights = m_GpuWorld->GetLightBuffer(),
+                .MaterialBuffer = m_MaterialSystem->GetBuffer(),
+                .SurfaceOpaqueIndexedArgs = surfaceOpaque.IndexedArgsBuffer,
+                .SurfaceOpaqueCount = surfaceOpaque.CountBuffer,
+                .LinesIndexedArgs = lines.IndexedArgsBuffer,
+                .LinesCount = lines.CountBuffer,
+                .PointsNonIndexedArgs = points.NonIndexedArgsBuffer,
+                .PointsCount = points.CountBuffer,
+            };
+            const FrameRecipeSizing sizing{
+                .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
+                .Height = renderWorld.Viewport.Height > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Height) : 1u,
+                .BackbufferFormat = RHI::Format::RGBA8_UNORM,
+                .DepthFormat = RHI::Format::D32_FLOAT,
+            };
+            const FrameRecipeBuildResult recipe = (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
+                ? BuildMinimalDebugSurfaceRecipe(m_RenderGraph, imports, sizing)
+                : BuildDefaultFrameRecipe(m_RenderGraph,
+                                          DeriveDefaultFrameRecipeFeatures(renderWorld),
+                                          imports,
+                                          sizing);
             if (!recipe.Succeeded)
             {
                 m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
                 Core::Log::Error("[Graphics] FrameRecipe build failed: diagnostic={}", recipe.Diagnostic);
                 return;
+            }
+            if (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
+            {
+                m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount = recipe.MissingPrerequisiteCount;
             }
 
             const auto compileBegin = std::chrono::steady_clock::now();
@@ -880,6 +888,16 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept override
         {
             return BuildDefaultDebugSurfacePipelineDesc();
+        }
+
+        void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept override
+        {
+            m_FrameRecipe = kind;
+        }
+
+        [[nodiscard]] Core::Config::FrameRecipeKind GetFrameRecipe() const noexcept override
+        {
+            return m_FrameRecipe;
         }
 
         RHI::BufferManager&   GetBufferManager()   override { return *m_BufferManager;   }
@@ -1167,6 +1185,7 @@ namespace Extrinsic::Graphics
         bool                                 m_CullingOutputAvailable{false};
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};
+        Core::Config::FrameRecipeKind        m_FrameRecipe{Core::Config::FrameRecipeKind::Default};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };
 
