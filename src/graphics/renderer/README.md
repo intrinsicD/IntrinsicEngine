@@ -138,9 +138,13 @@ human-readable summary should read `Findings.front().Message`.
     GRAPHICS-031A slot-0 default-debug-surface pipeline lease, drawing the
     SurfaceOpaque cull bucket through `DrawIndexedIndirectCount`.
   - `MinimalPresentPassExecutions` — increments per successful present-pass
-    record (lands in GRAPHICS-032C).
-  - `MinimalRecipeMissingPrerequisiteCount` — accumulates per-frame from two
-    sites:
+    record in `RecordMinimalDebugPresentPass` (GRAPHICS-032C). The pass body
+    is owned by `Extrinsic.Graphics.Pass.Present.MinimalDebug` and reuses the
+    GRAPHICS-031A slot-0 default-debug-surface pipeline lease, recording the
+    canonical fullscreen-triangle present form (`BindPipeline` +
+    `Draw(3, 1, 0, 0)`).
+  - `MinimalRecipeMissingPrerequisiteCount` — accumulates per-frame from
+    three sites:
     - At recipe build time in `Graphics.Renderer.cpp::ExecuteFrame` after
       `BuildMinimalDebugSurfaceRecipe`, once per missing prerequisite:
       invalid material buffer residency, invalid surface-opaque bucket
@@ -151,11 +155,18 @@ human-readable summary should read `Findings.front().Message`.
       pipeline lease, the SurfaceOpaque cull bucket, or the GpuWorld
       scene-table state is unavailable; the pass then routes to
       `SkippedUnavailable` rather than recording an empty draw.
+    - At record time in `RecordMinimalDebugPresentPass` whenever the
+      shared slot-0 pipeline lease is unavailable; the pass then routes to
+      `SkippedUnavailable`. Because the minimal-debug present and surface
+      passes share the same lease, lease-failure scenarios increment the
+      counter from both record sites.
 
   All three counters reset per-frame through the existing
   `m_LastRenderGraphStats = {}` cadence in `ResetFrameState()` and
-  `ExecuteFrame()`. Pass-body command recording bodies and the GPU/Vulkan
-  smoke fixture land in GRAPHICS-032B, GRAPHICS-032C, and GRAPHICS-032D.
+  `ExecuteFrame()`. The GPU/Vulkan smoke fixture lands in GRAPHICS-032D, and
+  the entire MinimalDebug scaffold (the recipe, the two passes, and the
+  three counters) is deleted by GRAPHICS-081 once the canonical default
+  recipe records every pass body operationally.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
@@ -717,7 +728,7 @@ human-readable summary should read `Findings.front().Message`.
   and `RebuildOperationalResources()` republish the same descriptor),
   Impl-B (substitution wiring + the three diagnostics counters; landed
   by
-  [`GRAPHICS-031B`](../../../tasks/active/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
+  [`GRAPHICS-031B`](../../../tasks/done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
   the renderer's snapshot-copy step in
   `Graphics.Renderer.cpp::SubmitRuntimeSnapshots()` mutates
   `m_TransformSyncRecords` in place so that records with

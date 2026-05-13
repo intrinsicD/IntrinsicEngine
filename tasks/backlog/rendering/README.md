@@ -476,16 +476,16 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-031A — Default debug surface shaders and pipeline (done)](../../done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   depends on GRAPHICS-031 (planning) and BUILD-001 (done; Sandbox shader
   compile wiring). Landed by commit `886b197`.
-- [GRAPHICS-031B — Default debug surface substitution and diagnostics counters](../../active/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md)
-  (in-progress): depends on GRAPHICS-031A.
-- [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration](../../active/GRAPHICS-032A-minimal-debug-surface-recipe.md)
-  (in-progress): depends on GRAPHICS-031A.
-- [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body](../../active/GRAPHICS-032B-minimal-debug-surface-pass-body.md)
-  (in-progress): depends on GRAPHICS-032A and GRAPHICS-030B.
-- [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test](GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
-  depends on GRAPHICS-032B.
-- [GRAPHICS-033A — Vulkan operational-status evaluator surface](../../active/GRAPHICS-033A-vulkan-operational-status-evaluator.md)
-  (in-progress): depends on GRAPHICS-033 (planning).
+- [GRAPHICS-031B — Default debug surface substitution and diagnostics counters (done)](../../done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
+  depends on GRAPHICS-031A. Landed by commit `24ac0b7`.
+- [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration (done)](../../done/GRAPHICS-032A-minimal-debug-surface-recipe.md):
+  depends on GRAPHICS-031A. Landed by commit `3931705`.
+- [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body (done)](../../done/GRAPHICS-032B-minimal-debug-surface-pass-body.md):
+  depends on GRAPHICS-032A and GRAPHICS-030B. Landed by commit `7fff8ca`.
+- [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test](../../active/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md)
+  (in-progress): depends on GRAPHICS-032B.
+- [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
+  depends on GRAPHICS-033 (planning). Landed by commit `7a5886d`.
 - [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
   depends on GRAPHICS-033A.
 - [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
