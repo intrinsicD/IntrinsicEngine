@@ -655,7 +655,7 @@ human-readable summary should read `Findings.front().Message`.
   `kDefaultDebug<Variant>MaterialSlotIndex`; they are identified but not
   opened. Implementation children GRAPHICS-031-Impl-A (shader sources +
   pipeline + slot-0 repopulation; landed by
-  [`GRAPHICS-031A`](../../../tasks/active/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
+  [`GRAPHICS-031A`](../../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   the shaders are authored at
   `assets/shaders/forward/default_debug_surface.vert/frag`,
   `MaterialSystem::Initialize()` registers the three built-in types

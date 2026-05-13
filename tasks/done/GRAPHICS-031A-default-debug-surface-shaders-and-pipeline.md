@@ -11,12 +11,11 @@
 - No extraction wiring or runtime change.
 
 ## Context
-- Status: in-progress.
+- Status: done.
 - Owner/agent: Claude.
 - Branch: `claude/setup-agentic-workflow-m5W12`.
-- Next verification step: run the [Verification](#verification) block after authoring the shaders, registering the material type/slot, and creating the pipeline lease.
 - Owner/layer: `graphics/renderer` for the material registration + pipeline; `assets/shaders` for the SPIR-V output.
-- Planning parent: [`tasks/done/GRAPHICS-031-default-debug-surface-material.md`](../../done/GRAPHICS-031-default-debug-surface-material.md), Decisions 4, 5, 6, 7, 9, 11. Recorded as Impl-A in the parent's Required changes.
+- Planning parent: [`tasks/done/GRAPHICS-031-default-debug-surface-material.md`](GRAPHICS-031-default-debug-surface-material.md), Decisions 4, 5, 6, 7, 9, 11. Recorded as Impl-A in the parent's Required changes.
 - Vertex format: position `vec3` (BDA-driven from `GpuWorld` position buffer) + optional packed RGBA8 `uint32` (color buffer); matches `GRAPHICS-030A` Triangle packer output.
 - Pipeline state: `CullMode = Back`, `DepthCompareOp = Less` (or `Equal` after `Pass.DepthPrepass`), `BlendEnabled = false`, `PolygonMode = Fill`, `TriangleList`, MSAA samples = 1, dynamic state `{Viewport, Scissor}`. Push-constants: existing scene-table BDA; descriptors: `MaterialBuffer` SSBO at `set = 3, binding = 0`.
 - Performance bound: ≤ 32 vertex / ≤ 16 fragment SPIR-V instructions.
@@ -62,5 +61,20 @@ python3 tools/docs/check_doc_links.py --root .
 - Adding new debug-material variants.
 - Mixing mechanical file moves with semantic refactors.
 
-## Next verification step
-- Retire to `tasks/done/` with the commit reference for the implementation commit on branch `claude/setup-agentic-workflow-m5W12`.
+## Completion
+- Completed: 2026-05-13.
+- Commit reference: `886b197` ("GRAPHICS-031A: author default debug surface shaders and pipeline") on branch `claude/setup-agentic-workflow-m5W12`.
+- Verification (all run in this session against the configured `ci` preset):
+  - `cmake --preset ci`
+  - `cmake --build --preset ci --target IntrinsicTests`
+  - `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` — 1837/1838 pass; the only failure was `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering`, which is a pre-existing flaky scheduler-ordering test (`tests/unit/core/Test.Core.TaskGraphLegacy.cpp`) unrelated to this slice. Reran with `--repeat until-pass:3 -R "CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering"` → 1/1 PASS.
+  - `python3 tools/agents/check_task_policy.py --root . --strict` — 203 task files validated, 0 findings.
+  - `python3 tools/repo/check_layering.py --root src --strict` — clean (no new allowlist entries; no new dependency edges).
+  - `python3 tools/repo/check_test_layout.py --root . --strict` — clean.
+  - `python3 tools/docs/check_doc_links.py --root .` — clean.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md` — no diff against the committed inventory.
+- Notes:
+  - SciVis material-type registration moved from `VisualizationSyncSystem::Initialize()` into `MaterialSystem::Initialize()` so all three well-known TypeIDs (StandardPBR=0, SciVis=1, DefaultDebugSurface=2) are reserved before any subsystem-specific registration runs. `VisualizationSyncSystem::Initialize()` now uses `MaterialSystem::FindType(kMaterialTypeName_SciVis)` and asserts the well-known TypeID. The change keeps the registration order invariant load-bearing for `kMaterialTypeID_SciVis = 1`.
+  - The procedural triangle packer (GRAPHICS-030A) currently emits `{vec3 pos, vec2 uv}` (20 bytes/vertex) and no separate packed RGBA8 vertex-colour buffer. The default-debug-surface vertex shader reads positions at the actual 20-byte stride via a private `ProceduralVertex` buffer reference and forwards `vec4(1.0)` as the default vertex colour until an optional packed colour buffer is added by a follow-up. Per task Non-goals, no packer changes were made.
+  - `IRenderer::GetDefaultDebugSurfacePipeline()` / `GetDefaultDebugSurfacePipelineDesc()` are added as accessors so the contract test can verify the lease and byte-identical descriptor survive `RebuildOperationalResources()`. The pipeline is not yet bound by any pass; `GRAPHICS-031B` will own substitution + the three new `MaterialSystemDiagnostics` counters.
+  - Slot 0 now carries `MaterialFlags::Unlit` and the purple `BaseColorFactor` in place of the previous opaque-white StandardPBR default. Tests that previously expected `RegisteredTypeCount == 1` were updated to expect 3 (the three built-in types). No other tests depended on slot 0's pre-031A colour or flags.
