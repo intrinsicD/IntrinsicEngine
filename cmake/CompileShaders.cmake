@@ -30,46 +30,56 @@ function(intrinsic_add_glsl_shaders target_name)
 
     file(MAKE_DIRECTORY "${ARG_OUTPUT_DIR}")
 
-    # Discover shaders. CONFIGURE_DEPENDS makes CMake re-scan on build if files are added/removed.
-    file(GLOB_RECURSE _INTRINSIC_GLSL
-        CONFIGURE_DEPENDS
-        "${ARG_SOURCE_DIR}/*.vert"
-        "${ARG_SOURCE_DIR}/*.frag"
-        "${ARG_SOURCE_DIR}/*.comp"
-    )
-    file(GLOB_RECURSE _INTRINSIC_GLSL_INCLUDES
-        CONFIGURE_DEPENDS
-        "${ARG_SOURCE_DIR}/*.glsl"
-        "${ARG_SOURCE_DIR}/*.glslinc"
-    )
+    string(SHA256 _shader_set_hash "${ARG_SOURCE_DIR}|${ARG_OUTPUT_DIR}")
+    string(SUBSTRING "${_shader_set_hash}" 0 16 _shader_set_hash)
+    set(_shader_set_target "IntrinsicShaders_${_shader_set_hash}")
 
-    if (NOT _INTRINSIC_GLSL)
-        message(WARNING "No shaders found under '${ARG_SOURCE_DIR}'.")
-        return()
-    endif()
-
-    set(_spv_outputs "")
-    foreach(_src IN LISTS _INTRINSIC_GLSL)
-        file(RELATIVE_PATH _rel "${ARG_SOURCE_DIR}" "${_src}")
-        # Preserve subfolders and add .spv suffix (e.g. foo/bar.comp -> foo/bar.comp.spv)
-        set(_out "${ARG_OUTPUT_DIR}/${_rel}.spv")
-        get_filename_component(_out_dir "${_out}" DIRECTORY)
-        file(MAKE_DIRECTORY "${_out_dir}")
-
-        add_custom_command(
-            OUTPUT "${_out}"
-            COMMAND "${GLSL_COMPILER}" "${_src}" -I "${ARG_SOURCE_DIR}" -o "${_out}" --target-env=vulkan1.3
-            DEPENDS "${_src}" ${_INTRINSIC_GLSL_INCLUDES}
-            COMMENT "Compiling GLSL -> SPV: ${_rel}"
-            VERBATIM
+    if (NOT TARGET ${_shader_set_target})
+        # Discover shaders. CONFIGURE_DEPENDS makes CMake re-scan on build if files are added/removed.
+        file(GLOB_RECURSE _INTRINSIC_GLSL
+            CONFIGURE_DEPENDS
+            "${ARG_SOURCE_DIR}/*.vert"
+            "${ARG_SOURCE_DIR}/*.frag"
+            "${ARG_SOURCE_DIR}/*.comp"
+        )
+        file(GLOB_RECURSE _INTRINSIC_GLSL_INCLUDES
+            CONFIGURE_DEPENDS
+            "${ARG_SOURCE_DIR}/*.glsl"
+            "${ARG_SOURCE_DIR}/*.glslinc"
         )
 
-        list(APPEND _spv_outputs "${_out}")
-    endforeach()
+        if (NOT _INTRINSIC_GLSL)
+            message(WARNING "No shaders found under '${ARG_SOURCE_DIR}'.")
+            return()
+        endif()
+
+        set(_spv_outputs "")
+        foreach(_src IN LISTS _INTRINSIC_GLSL)
+            file(RELATIVE_PATH _rel "${ARG_SOURCE_DIR}" "${_src}")
+            # Preserve subfolders and add .spv suffix (e.g. foo/bar.comp -> foo/bar.comp.spv)
+            set(_out "${ARG_OUTPUT_DIR}/${_rel}.spv")
+            get_filename_component(_out_dir "${_out}" DIRECTORY)
+            file(MAKE_DIRECTORY "${_out_dir}")
+
+            add_custom_command(
+                OUTPUT "${_out}"
+                COMMAND "${GLSL_COMPILER}" "${_src}" -I "${ARG_SOURCE_DIR}" -o "${_out}" --target-env=vulkan1.3
+                DEPENDS "${_src}" ${_INTRINSIC_GLSL_INCLUDES}
+                COMMENT "Compiling GLSL -> SPV: ${_rel}"
+                VERBATIM
+            )
+
+            list(APPEND _spv_outputs "${_out}")
+        endforeach()
+
+        add_custom_target(${_shader_set_target} DEPENDS ${_spv_outputs})
+        set_property(TARGET ${_shader_set_target} PROPERTY FOLDER "Shaders")
+    endif()
 
     set(_shader_target "${target_name}_Shaders")
-    add_custom_target(${_shader_target} DEPENDS ${_spv_outputs})
+    if (NOT TARGET ${_shader_target})
+        add_custom_target(${_shader_target} DEPENDS ${_shader_set_target})
+        set_property(TARGET ${_shader_target} PROPERTY FOLDER "Shaders")
+    endif()
     add_dependencies(${target_name} ${_shader_target})
-
-    set_property(TARGET ${_shader_target} PROPERTY FOLDER "Shaders")
 endfunction()
