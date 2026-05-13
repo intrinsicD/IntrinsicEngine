@@ -820,6 +820,26 @@ namespace Extrinsic::Graphics
         m_Impl->DirtyInstanceStatic[instance.Index] = true;
     }
 
+    GpuGeometryHandle GpuWorld::GetInstanceGeometry(GpuInstanceHandle instance) const noexcept
+    {
+        if (!m_Impl->InstanceSlots.Resolve(instance))
+        {
+            return {};
+        }
+        const std::uint32_t geometrySlot = m_Impl->InstanceStaticCpu[instance.Index].GeometrySlot;
+        if (geometrySlot == RHI::GpuInstanceStatic::InvalidGeometrySlot ||
+            geometrySlot >= m_Impl->GeometrySlots.Meta.size())
+        {
+            return {};
+        }
+        const auto& meta = m_Impl->GeometrySlots.Meta[geometrySlot];
+        if (!meta.Live)
+        {
+            return {};
+        }
+        return GpuGeometryHandle{geometrySlot, meta.Generation};
+    }
+
     void GpuWorld::SetInstanceMaterialSlot(GpuInstanceHandle instance, std::uint32_t materialSlot)
     {
         if (!m_Impl->InstanceSlots.ResolveForUse(instance))

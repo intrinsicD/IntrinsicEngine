@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <unordered_map>
 #include <unordered_set>
@@ -19,6 +20,7 @@ export module Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Culling.World;
@@ -37,6 +39,8 @@ import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.ProceduralGeometry;
+import Extrinsic.Runtime.ProceduralGeometryPacker;
 
 export namespace Extrinsic::Runtime
 {
@@ -84,6 +88,14 @@ export namespace Extrinsic::Runtime
         std::uint32_t SourceAssetUpToDateCount{0};
         std::uint32_t SourceAssetRebindRequiredCount{0};
         std::uint32_t SourceAssetRebindAcknowledgedCount{0};
+        std::uint32_t ProceduralRenderablesEnumerated{0};
+        std::uint32_t ProceduralGeometryUploads{0};
+        std::uint32_t ProceduralGeometryReuseHits{0};
+        std::uint32_t ProceduralGeometryFailedPack{0};
+        std::uint32_t ProceduralGeometryMissingPacker{0};
+        std::uint32_t ProceduralGeometryInvalidParams{0};
+        std::uint32_t ProceduralAndAssetSourceConflict{0};
+        std::uint32_t ProceduralAndRenderableSourceConflict{0};
     };
 
     [[nodiscard]] RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
@@ -115,6 +127,39 @@ export namespace Extrinsic::Runtime
             return static_cast<std::uint32_t>(m_Renderables.size());
         }
 
+        struct RenderableSidecarView
+        {
+            Graphics::GpuInstanceHandle Instance{};
+            Graphics::GpuGeometryHandle Geometry{};
+            std::optional<ProceduralGeometryKey> ProceduralKey{};
+            bool HasSourceAsset = false;
+            std::uint32_t GeometrySlot = 0;
+            std::uint32_t GeometryGeneration = 0;
+        };
+
+        [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
+            std::uint32_t stableEntityId) const noexcept
+        {
+            const auto it = m_Renderables.find(stableEntityId);
+            if (it == m_Renderables.end())
+            {
+                return std::nullopt;
+            }
+            return RenderableSidecarView{
+                .Instance = it->second.Instance,
+                .Geometry = it->second.Geometry,
+                .ProceduralKey = it->second.ProceduralKey,
+                .HasSourceAsset = it->second.GpuSlot.HasSourceAsset(),
+                .GeometrySlot = it->second.GpuSlot.GeometrySlot,
+                .GeometryGeneration = it->second.GpuSlot.GeometryGeneration,
+            };
+        }
+
+        [[nodiscard]] const ProceduralGeometryCache& GetProceduralGeometryCacheForTest() const noexcept
+        {
+            return m_ProceduralGeometry;
+        }
+
     private:
         struct RenderableSidecar
         {
@@ -123,6 +168,8 @@ export namespace Extrinsic::Runtime
             Graphics::Components::MaterialInstance Material{};
             Graphics::Components::VisualizationConfig Visualization{};
             bool HasVisualization{false};
+            Graphics::GpuGeometryHandle Geometry{};
+            std::optional<ProceduralGeometryKey> ProceduralKey{};
         };
 
         [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,
@@ -131,11 +178,17 @@ export namespace Extrinsic::Runtime
         void RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
                                       Graphics::IRenderer& renderer,
                                       RuntimeRenderExtractionStats& stats);
+        [[nodiscard]] bool BindProceduralGeometry(const ECS::Components::ProceduralGeometryRef& ref,
+                                                   RenderableSidecar& sidecar,
+                                                   Graphics::IRenderer& renderer,
+                                                   RuntimeRenderExtractionStats& stats);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
         std::vector<Graphics::VisualizationSyncRecord> m_Visualizations{};
         std::vector<Graphics::LightSnapshot> m_Lights{};
+        ProceduralGeometryCache m_ProceduralGeometry{};
+        ProceduralGeometryPackBuffer m_ProceduralPack{};
         RuntimeRenderExtractionStats m_LastStats{};
     };
 }
@@ -375,6 +428,67 @@ namespace Extrinsic::Runtime
         return &it->second;
     }
 
+    bool RenderExtractionCache::BindProceduralGeometry(const ECS::Components::ProceduralGeometryRef& ref,
+                                                         RenderableSidecar& sidecar,
+                                                         Graphics::IRenderer& renderer,
+                                                         RuntimeRenderExtractionStats& stats)
+    {
+        const bool packerSupportsKind = ref.Kind == ECS::Components::ProceduralGeometryKind::Triangle;
+        if (!packerSupportsKind)
+        {
+            ++stats.ProceduralGeometryMissingPacker;
+            return false;
+        }
+
+        const ProceduralGeometryKey key = MakeProceduralGeometryKey(ref.Kind, ref.Params);
+
+        Graphics::GpuWorld::GeometryUploadDesc desc{};
+        const ProceduralGeometryCacheEntry* existing = m_ProceduralGeometry.Find(key);
+        if (existing == nullptr)
+        {
+            std::optional<Graphics::GpuWorld::GeometryUploadDesc> packed =
+                Pack(ref.Kind, ref.Params, m_ProceduralPack);
+            if (!packed.has_value())
+            {
+                ++stats.ProceduralGeometryInvalidParams;
+                return false;
+            }
+            desc = *packed;
+        }
+
+        const auto preUploads = m_ProceduralGeometry.Stats().Uploads;
+        const auto preReuse = m_ProceduralGeometry.Stats().ReuseHits;
+
+        ProceduralGeometryCache::UploadFn upload = [&renderer](
+            const Graphics::GpuWorld::GeometryUploadDesc& uploadDesc) {
+            return renderer.GetGpuWorld().UploadGeometry(uploadDesc);
+        };
+
+        const Graphics::GpuGeometryHandle handle =
+            m_ProceduralGeometry.EnsureResident(key, desc, upload);
+        if (!handle.IsValid())
+        {
+            ++stats.ProceduralGeometryFailedPack;
+            return false;
+        }
+
+        if (m_ProceduralGeometry.Stats().Uploads > preUploads)
+        {
+            ++stats.ProceduralGeometryUploads;
+        }
+        if (m_ProceduralGeometry.Stats().ReuseHits > preReuse)
+        {
+            ++stats.ProceduralGeometryReuseHits;
+        }
+
+        sidecar.Geometry = handle;
+        sidecar.ProceduralKey = key;
+        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.GpuSlot.ClearSourceAsset();
+        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
+        return true;
+    }
+
     void RenderExtractionCache::RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
                                                          Graphics::IRenderer& renderer,
                                                          RuntimeRenderExtractionStats& stats)
@@ -387,6 +501,10 @@ namespace Extrinsic::Runtime
                 continue;
             }
 
+            if (it->second.ProceduralKey.has_value())
+            {
+                m_ProceduralGeometry.Release(*it->second.ProceduralKey);
+            }
             renderer.GetGpuWorld().FreeInstance(it->second.Instance);
             it = m_Renderables.erase(it);
             ++stats.FreedInstanceCount;
@@ -461,16 +579,40 @@ namespace Extrinsic::Runtime
                 sidecar->HasVisualization = false;
             }
 
-            if (const auto* source = registry.try_get<ECS::Components::AssetInstance::Source>(entity))
+            const ECS::Components::ProceduralGeometryRef* proceduralRef =
+                registry.try_get<ECS::Components::ProceduralGeometryRef>(entity);
+            const ECS::Components::AssetInstance::Source* assetSource =
+                registry.try_get<ECS::Components::AssetInstance::Source>(entity);
+            const bool assetSourcePresent = assetSource != nullptr
+                && NormalizeAssetSource(*assetSource).IsValid();
+
+            bool proceduralBound = false;
+            if (proceduralRef != nullptr)
+            {
+                ++stats.ProceduralRenderablesEnumerated;
+                if (assetSourcePresent)
+                {
+                    ++stats.ProceduralAndAssetSourceConflict;
+                }
+                else
+                {
+                    proceduralBound = BindProceduralGeometry(*proceduralRef,
+                                                              *sidecar,
+                                                              renderer,
+                                                              stats);
+                }
+            }
+
+            if (!proceduralBound && assetSource != nullptr)
             {
                 ++stats.SourceAssetObservationCount;
                 const RuntimeRenderableAssetGenerationObservation observation = ObserveRenderableAssetGeneration(
                     sidecar->GpuSlot,
-                    NormalizeAssetSource(*source),
+                    NormalizeAssetSource(*assetSource),
                     gpuAssets);
                 AccumulateAssetObservationStats(observation, stats);
             }
-            else
+            else if (!proceduralBound)
             {
                 sidecar->GpuSlot.ClearSourceAsset();
             }
@@ -514,6 +656,10 @@ namespace Extrinsic::Runtime
         RuntimeRenderExtractionStats stats{};
         for (auto& [_, sidecar] : m_Renderables)
         {
+            if (sidecar.ProceduralKey.has_value())
+            {
+                m_ProceduralGeometry.Release(*sidecar.ProceduralKey);
+            }
             renderer.GetGpuWorld().FreeInstance(sidecar.Instance);
             ++stats.FreedInstanceCount;
         }
