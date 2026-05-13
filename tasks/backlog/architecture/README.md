@@ -13,6 +13,10 @@ map.
 - [RORG-031A — Architecture foundation backlog seed](RORG-031A-architecture-foundation.md):
   tracks architecture-doc normalization, layering-checker, docs-sync-checker,
   and module-inventory governance work.
+- [RORG-036 — Layer ownership audit for misplaced concepts](RORG-036-layer-ownership-audit.md):
+  inventories promoted modules whose value types, pure data contracts, or
+  dependency-free APIs appear to live in higher layers than their true owner and
+  creates one scoped follow-up task per accepted move/split.
 
 ## Convergence
 
