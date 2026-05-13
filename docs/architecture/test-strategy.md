@@ -77,6 +77,18 @@ Operational expectations:
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
+- For local iteration before the full gate, `tools/ci/touched_scope.py` can plan
+  or run conservative affected checks from changed paths:
+
+  ```bash
+  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
+  python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+  ```
+
+  The helper maps touched paths to build targets, CTest labels, and structural
+  checks. It is not a replacement for the default full CPU-supported PR/merge
+  gate.
+
 - GPU/Vulkan tests are opt-in and should run on capable developer machines or self-hosted GPU runners:
 
   ```bash

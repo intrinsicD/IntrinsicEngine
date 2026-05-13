@@ -45,6 +45,18 @@ ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
 ```
 
+For fast local iteration on changed paths, use the touched-scope helper to plan
+or run the relevant subset before the full gate:
+
+```bash
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+```
+
+The helper is conservative and may broaden to the full CPU-supported gate for
+foundational or unknown changes; it is not a replacement for final PR/merge
+verification.
+
 `CMakePresets.json` currently defines configure/build presets but no CTest
 `testPresets`, so use the directory-based `ctest --test-dir build/ci ...`
 commands above rather than `ctest --preset ci`. Test registration sets a

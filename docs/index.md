@@ -62,6 +62,7 @@ Generated API and inventory docs:
 ## Build / troubleshooting
 
 - [Build troubleshooting](build-troubleshooting.md)
+- [Fast touched-scope verification helper](build-troubleshooting.md#fast-touched-scope-verification)
 
 ## Reviews and reports
 

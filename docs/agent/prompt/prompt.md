@@ -65,6 +65,15 @@ If you intend to land more than one slice, promote the task into `tasks/active/`
 
 Run focused targets first; broaden only when the focused gate passes and the task requires it.
 
+For local iteration on changed paths, you may use the touched-scope helper to
+plan or run conservative affected checks. Treat it as an iteration aid, not a
+replacement for the default CPU gate when PR/merge-level confidence is required.
+
+```
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir <configured-build> --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir <configured-build> --run
+```
+
 Default CPU gate (when code/tests touched):
 ```
 cmake --preset ci

@@ -23,6 +23,7 @@
   - [ ] `gpu`
   - [ ] `benchmark`
 - [ ] I ran the strongest relevant subset of checks for this change.
+- [ ] If I used `tools/ci/touched_scope.py`, I pasted the selected commands/results and noted whether full CPU CI is still required.
 - [ ] If tests were not run/updated, I explained why.
 
 ## Docs
@@ -61,6 +62,7 @@
 - Contract: `/AGENTS.md`
 - Task format: `/docs/agent/task-format.md`
 - Review checklist: `/docs/agent/review-checklist.md`
+- Touched-scope verification helper: `/docs/build-troubleshooting.md#fast-touched-scope-verification`
 - Architecture review checklist: `/docs/agent/architecture-review-checklist.md`
 - Method workflow: `/docs/agent/method-workflow.md`
 - Method review checklist: `/docs/agent/method-review-checklist.md`

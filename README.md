@@ -43,6 +43,15 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 
 This is the default CPU-supported correctness gate. GPU/Vulkan, slow, and explicitly quarantined tests are opt-in through CTest labels.
 
+For fast local iteration on small, well-scoped changes, plan or run the conservative touched-scope helper before the full gate:
+
+```bash
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+```
+
+The helper selects affected build targets, CTest labels, and structural checks, but it does not replace the full CPU-supported PR/merge gate above.
+
 ## Agent Workflow Pointer
 
 For authoritative agent operating rules, task workflow, and review checklist, use:
@@ -79,6 +88,6 @@ Benchmark structure, manifests, and result schema:
 
 ## CI Status and Expectations
 
-The repository uses split workflows under `.github/workflows/` for fast PR validation, full CPU CI, sanitizers, docs/manifests, benchmark smoke, and nightly deep checks.
+The repository uses split workflows under `.github/workflows/` for fast PR validation, full CPU CI, sanitizers, docs/manifests, benchmark smoke, and nightly deep checks. `tools/ci/touched_scope.py` is available for local/touched-scope verification planning between full CI runs.
 
 When changing code/docs/structure, keep touched-scope checks green and update related docs/tasks in the same PR.
