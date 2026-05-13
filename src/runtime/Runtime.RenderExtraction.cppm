@@ -96,6 +96,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t ProceduralGeometryInvalidParams{0};
         std::uint32_t ProceduralAndAssetSourceConflict{0};
         std::uint32_t ProceduralAndRenderableSourceConflict{0};
+        std::uint32_t ProceduralGeometryReleases{0};
+        std::uint32_t ProceduralGeometryFreeRetires{0};
+        std::uint32_t ProceduralGeometryRetireCancellations{0};
+        std::uint32_t ProceduralGeometryRefCountSaturated{0};
     };
 
     [[nodiscard]] RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
@@ -120,6 +124,15 @@ export namespace Extrinsic::Runtime
                                                                     Graphics::IRenderer& renderer,
                                                                     Graphics::GpuAssetCache* gpuAssets = nullptr);
         void Shutdown(Graphics::IRenderer& renderer);
+
+        // Maintenance-phase hook called by Engine::RunFrame after
+        // ExtractAndSubmit and Renderer::Present.  Drives the deferred-retire
+        // window of the procedural geometry cache using the same frame
+        // counter and framesInFlight that the runtime hands to
+        // `Graphics::GpuAssetCache::Tick`.
+        void TickProceduralGeometry(std::uint64_t currentFrame,
+                                    std::uint32_t framesInFlight,
+                                    Graphics::IRenderer& renderer);
 
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept { return m_LastStats; }
         [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept
@@ -189,6 +202,7 @@ export namespace Extrinsic::Runtime
         std::vector<Graphics::LightSnapshot> m_Lights{};
         ProceduralGeometryCache m_ProceduralGeometry{};
         ProceduralGeometryPackBuffer m_ProceduralPack{};
+        ProceduralGeometryCacheStats m_PrevProceduralStats{};
         RuntimeRenderExtractionStats m_LastStats{};
     };
 }
@@ -641,6 +655,22 @@ namespace Extrinsic::Runtime
         stats.SubmittedVisualizationCount = static_cast<std::uint32_t>(m_Visualizations.size());
         stats.SubmittedLightCount = static_cast<std::uint32_t>(m_Lights.size());
 
+        // Per-tick deltas vs the cache snapshot recorded at the end of the
+        // previous ExtractAndSubmit.  This captures both within-extraction
+        // changes (Release/EnsureResident) and out-of-extraction Tick
+        // increments (FreeRetires) that ran in the maintenance phase between
+        // frames.
+        const auto postCacheStats = m_ProceduralGeometry.Stats();
+        stats.ProceduralGeometryReleases =
+            postCacheStats.Releases - m_PrevProceduralStats.Releases;
+        stats.ProceduralGeometryFreeRetires =
+            postCacheStats.FreeRetires - m_PrevProceduralStats.FreeRetires;
+        stats.ProceduralGeometryRetireCancellations =
+            postCacheStats.RetireCancellations - m_PrevProceduralStats.RetireCancellations;
+        stats.ProceduralGeometryRefCountSaturated =
+            postCacheStats.RefCountSaturated - m_PrevProceduralStats.RefCountSaturated;
+        m_PrevProceduralStats = postCacheStats;
+
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
             .Transforms = m_Transforms,
             .Lights = m_Lights,
@@ -649,6 +679,17 @@ namespace Extrinsic::Runtime
 
         m_LastStats = stats;
         return m_LastStats;
+    }
+
+    void RenderExtractionCache::TickProceduralGeometry(std::uint64_t currentFrame,
+                                                       std::uint32_t framesInFlight,
+                                                       Graphics::IRenderer& renderer)
+    {
+        m_ProceduralGeometry.Tick(currentFrame,
+                                   framesInFlight,
+                                   [&renderer](Graphics::GpuGeometryHandle handle) {
+                                       renderer.GetGpuWorld().FreeGeometry(handle);
+                                   });
     }
 
     void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)

@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -54,6 +55,17 @@ namespace Extrinsic::Runtime
                 ++m_Stats.RefCountSaturated;
                 return it->second.Handle;
             }
+            if (it->second.RefCount == 0)
+            {
+                // Entry is queued for retirement but still resident.  Pull it
+                // out of the retire queue and resurrect it; the underlying
+                // GpuGeometryHandle stays bit-identical so already-extracted
+                // sidecars referencing this handle remain valid.
+                if (CancelPendingRetire(key))
+                {
+                    ++m_Stats.RetireCancellations;
+                }
+            }
             ++it->second.RefCount;
             ++m_Stats.ReuseHits;
             return it->second.Handle;
@@ -88,17 +100,89 @@ namespace Extrinsic::Runtime
         {
             return false;
         }
-        if (it->second.RefCount > 0)
+        if (it->second.RefCount == 0)
         {
-            --it->second.RefCount;
-            ++m_Stats.Releases;
+            return true;
+        }
+        --it->second.RefCount;
+        ++m_Stats.Releases;
+        if (it->second.RefCount == 0)
+        {
+            EnqueueRetire(key);
         }
         return it->second.RefCount == 0;
+    }
+
+    void ProceduralGeometryCache::Tick(std::uint64_t currentFrame,
+                                       std::uint32_t framesInFlight,
+                                       const FreeFn& freeFn)
+    {
+        const std::uint64_t deadline = currentFrame + std::uint64_t{framesInFlight};
+        for (auto& rec : m_Retire)
+        {
+            if (!rec.DeadlineSet)
+            {
+                rec.Deadline = deadline;
+                rec.DeadlineSet = true;
+            }
+        }
+
+        auto it = m_Retire.begin();
+        while (it != m_Retire.end())
+        {
+            if (it->DeadlineSet && it->Deadline <= currentFrame)
+            {
+                const auto entryIt = m_Entries.find(it->Key);
+                if (entryIt != m_Entries.end() && entryIt->second.RefCount == 0)
+                {
+                    if (freeFn)
+                    {
+                        freeFn(entryIt->second.Handle);
+                    }
+                    m_Entries.erase(entryIt);
+                    ++m_Stats.FreeRetires;
+                }
+                it = m_Retire.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
     }
 
     const ProceduralGeometryCacheEntry* ProceduralGeometryCache::Find(const ProceduralGeometryKey& key) const noexcept
     {
         const auto it = m_Entries.find(key);
         return it == m_Entries.end() ? nullptr : &it->second;
+    }
+
+    bool ProceduralGeometryCache::PrimeRefCountForTest(const ProceduralGeometryKey& key,
+                                                       std::uint32_t refCount) noexcept
+    {
+        const auto it = m_Entries.find(key);
+        if (it == m_Entries.end())
+        {
+            return false;
+        }
+        it->second.RefCount = refCount;
+        return true;
+    }
+
+    void ProceduralGeometryCache::EnqueueRetire(const ProceduralGeometryKey& key)
+    {
+        m_Retire.push_back(RetireRecord{key, 0, false});
+    }
+
+    bool ProceduralGeometryCache::CancelPendingRetire(const ProceduralGeometryKey& key)
+    {
+        const auto it = std::find_if(m_Retire.begin(), m_Retire.end(),
+                                     [&key](const RetireRecord& rec) { return rec.Key == key; });
+        if (it == m_Retire.end())
+        {
+            return false;
+        }
+        m_Retire.erase(it);
+        return true;
     }
 }

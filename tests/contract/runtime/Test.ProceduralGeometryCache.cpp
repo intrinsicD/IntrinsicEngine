@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -253,6 +254,135 @@ TEST(ProceduralGeometryPackerTest, PackBufferReusedAcrossCallsClearsBetweenInvoc
     ASSERT_TRUE(second.has_value());
     EXPECT_EQ(scratch.VertexBytes.size(), firstVertexBytes);
     EXPECT_EQ(scratch.SurfaceIndices.size(), 3u);
+}
+
+TEST(ProceduralGeometryCacheTest, ReleaseAtZeroDoesNotFreeUntilRetireWindowElapses)
+{
+    ProceduralGeometryCache cache;
+    Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
+    desc.VertexCount = 3u;
+    auto upload = [&](const Extrinsic::Graphics::GpuWorld::GeometryUploadDesc&) {
+        return MakeHandle(13u);
+    };
+
+    ProceduralGeometryParams params{};
+    const auto key = MakeProceduralGeometryKey(ProceduralGeometryKind::Triangle, params);
+
+    const auto handle = cache.EnsureResident(key, desc, upload);
+    ASSERT_TRUE(handle.IsValid());
+
+    std::vector<Extrinsic::Graphics::GpuGeometryHandle> freed;
+    auto freeFn = [&](Extrinsic::Graphics::GpuGeometryHandle h) { freed.push_back(h); };
+
+    EXPECT_TRUE(cache.Release(key));
+    EXPECT_EQ(cache.Stats().Releases, 1u);
+    EXPECT_EQ(cache.PendingRetireCount(), 1u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    constexpr std::uint64_t baseFrame = 100u;
+
+    // Tick at the release frame anchors the deadline but does not free.
+    cache.Tick(baseFrame, framesInFlight, freeFn);
+    EXPECT_EQ(cache.Stats().FreeRetires, 0u);
+    EXPECT_TRUE(freed.empty());
+    EXPECT_NE(cache.Find(key), nullptr);
+
+    // For framesInFlight - 1 subsequent ticks, the entry stays resident.
+    for (std::uint32_t i = 1; i < framesInFlight; ++i)
+    {
+        cache.Tick(baseFrame + i, framesInFlight, freeFn);
+        EXPECT_EQ(cache.Stats().FreeRetires, 0u);
+        EXPECT_TRUE(freed.empty());
+        EXPECT_NE(cache.Find(key), nullptr);
+    }
+
+    // On the framesInFlight-th tick after release, the free fires exactly once.
+    cache.Tick(baseFrame + framesInFlight, framesInFlight, freeFn);
+    EXPECT_EQ(cache.Stats().FreeRetires, 1u);
+    ASSERT_EQ(freed.size(), 1u);
+    EXPECT_EQ(freed[0].Index, 13u);
+    EXPECT_EQ(cache.Find(key), nullptr);
+    EXPECT_EQ(cache.PendingRetireCount(), 0u);
+
+    // Subsequent ticks do not double-free.
+    cache.Tick(baseFrame + framesInFlight + 1u, framesInFlight, freeFn);
+    EXPECT_EQ(cache.Stats().FreeRetires, 1u);
+    EXPECT_EQ(freed.size(), 1u);
+}
+
+TEST(ProceduralGeometryCacheTest, ResurrectInRetireWindowCancelsFreeAndReusesHandle)
+{
+    ProceduralGeometryCache cache;
+    Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
+    desc.VertexCount = 3u;
+    int uploadCalls = 0;
+    auto upload = [&](const Extrinsic::Graphics::GpuWorld::GeometryUploadDesc&) {
+        ++uploadCalls;
+        return MakeHandle(21u);
+    };
+
+    ProceduralGeometryParams params{};
+    const auto key = MakeProceduralGeometryKey(ProceduralGeometryKind::Triangle, params);
+
+    const auto first = cache.EnsureResident(key, desc, upload);
+    ASSERT_TRUE(first.IsValid());
+    EXPECT_TRUE(cache.Release(key));
+    EXPECT_EQ(cache.PendingRetireCount(), 1u);
+
+    // Anchor the deadline so we're observably inside the retire window.
+    std::vector<Extrinsic::Graphics::GpuGeometryHandle> freed;
+    auto freeFn = [&](Extrinsic::Graphics::GpuGeometryHandle h) { freed.push_back(h); };
+    cache.Tick(50u, /*framesInFlight=*/3u, freeFn);
+    EXPECT_EQ(cache.Stats().FreeRetires, 0u);
+    EXPECT_EQ(cache.PendingRetireCount(), 1u);
+
+    // Resurrect: same key, no upload should fire, RetireCancellations bumps.
+    const auto resurrected = cache.EnsureResident(key, desc, upload);
+    EXPECT_EQ(uploadCalls, 1);
+    EXPECT_EQ(resurrected, first);
+    EXPECT_EQ(cache.Stats().RetireCancellations, 1u);
+    EXPECT_EQ(cache.PendingRetireCount(), 0u);
+
+    const auto* entry = cache.Find(key);
+    ASSERT_NE(entry, nullptr);
+    EXPECT_EQ(entry->RefCount, 1u);
+    EXPECT_EQ(entry->Handle, first);
+
+    // Advance past what would have been the free deadline: no free fires.
+    cache.Tick(60u, 3u, freeFn);
+    EXPECT_EQ(cache.Stats().FreeRetires, 0u);
+    EXPECT_TRUE(freed.empty());
+    EXPECT_NE(cache.Find(key), nullptr);
+}
+
+TEST(ProceduralGeometryCacheTest, RefCountSaturationRejectsFurtherIncrements)
+{
+    ProceduralGeometryCache cache;
+    Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
+    desc.VertexCount = 3u;
+    auto upload = [&](const Extrinsic::Graphics::GpuWorld::GeometryUploadDesc&) {
+        return MakeHandle(31u);
+    };
+
+    ProceduralGeometryParams params{};
+    const auto key = MakeProceduralGeometryKey(ProceduralGeometryKind::Triangle, params);
+
+    const auto handle = cache.EnsureResident(key, desc, upload);
+    ASSERT_TRUE(handle.IsValid());
+
+    // Drive refcount to the cap without 2^32 calls.
+    ASSERT_TRUE(cache.PrimeRefCountForTest(key, std::numeric_limits<std::uint32_t>::max()));
+
+    EXPECT_EQ(cache.Stats().RefCountSaturated, 0u);
+    const auto saturated = cache.EnsureResident(key, desc, upload);
+    EXPECT_EQ(saturated, handle);
+    EXPECT_EQ(cache.Stats().RefCountSaturated, 1u);
+    EXPECT_EQ(cache.Find(key)->RefCount, std::numeric_limits<std::uint32_t>::max());
+
+    // Repeat: counter keeps growing, refcount never overflows.
+    (void)cache.EnsureResident(key, desc, upload);
+    EXPECT_EQ(cache.Stats().RefCountSaturated, 2u);
+    EXPECT_EQ(cache.Find(key)->RefCount, std::numeric_limits<std::uint32_t>::max());
 }
 
 TEST(ProceduralGeometryRefComponent, DefaultIsTriangleWithZeroPayload)

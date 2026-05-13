@@ -10,7 +10,7 @@ startup/shutdown.
 |---|---|
 | `Extrinsic.Runtime.Engine` | Composition root, frame loop, subsystem wiring, app-facing reference engine config helper |
 | `Extrinsic.Runtime.FrameLoop` | Testable platform/render/maintenance/shutdown phase contracts |
-| `Extrinsic.Runtime.ProceduralGeometry` | Procedural-geometry descriptor surface (`ProceduralGeometryKey`, key hash, `ProceduralGeometryCache` value type with `EnsureResident` / `Release` / `Find`). Reuses the `ProceduralGeometryKind` enum and POD `ProceduralGeometryParams` defined in `Extrinsic.ECS.Component.ProceduralGeometryRef`. `EnsureResident(key, uploadDesc, uploadFn)` either invokes the injected upload functor exactly once on a new key or hits an existing entry and increments a `std::uint32_t` refcount; `Release(key)` decrements. N entities sharing `(Kind, Hash(Params))` share one `GpuGeometryHandle`. No live ECS, no graphics imports beyond the existing `Extrinsic.Graphics.GpuWorld` value-type edge. Extraction-tick wiring and deferred-retire policy are GRAPHICS-030-Impl-B and GRAPHICS-030-Impl-C respectively. |
+| `Extrinsic.Runtime.ProceduralGeometry` | Procedural-geometry descriptor surface (`ProceduralGeometryKey`, key hash, `ProceduralGeometryCache` value type with `EnsureResident` / `Release` / `Tick` / `Find`). Reuses the `ProceduralGeometryKind` enum and POD `ProceduralGeometryParams` defined in `Extrinsic.ECS.Component.ProceduralGeometryRef`. `EnsureResident(key, uploadDesc, uploadFn)` either invokes the injected upload functor exactly once on a new key or hits an existing entry and increments a `std::uint32_t` refcount; `Release(key)` decrements and enqueues the entry into a deferred retire queue on the refcount-zero transition; `Tick(currentFrame, framesInFlight, freeFn)` anchors retire deadlines (`currentFrame + framesInFlight`) and calls `freeFn` on entries whose deadline has been reached, mirroring `Graphics::GpuAssetCache::Tick` semantics. Resurrecting a key inside the retire window cancels the queued free and reuses the bit-identical `GpuGeometryHandle`. N entities sharing `(Kind, Hash(Params))` share one `GpuGeometryHandle`. No live ECS, no graphics imports beyond the existing `Extrinsic.Graphics.GpuWorld` value-type edge. |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | Per-kind packer `Pack(kind, params, scratch) -> std::optional<GeometryUploadDesc>` consuming a runtime-owned `ProceduralGeometryPackBuffer` reused across ticks. Triangle is the only in-scope packer for Impl-A; the vertex layout is `{pos.xyz, uv}` (20 bytes/vertex) matching `Test.MinimalTriangleAcceptance`. Cube / Quad / Sphere / LineStrip extend the enum + packer table without cache or extraction lifecycle changes. |
 | `Extrinsic.Runtime.ReferenceScene` | Opt-in runtime-owned reference scene seam (GRAPHICS-029A/B). Exports `IReferenceSceneProvider`, `ReferenceSceneRegistry`, `ReferenceSceneEntity`/`ReferenceScenePopulation`, `TriangleProvider`, `MakeDefaultReferenceSceneRegistry()`, `RegisterDefaultReferenceProvidersIfAbsent()`, and `BuildReferenceCameraViewInput()`. `Engine::Initialize()` invokes `RegisterDefaultReferenceProvidersIfAbsent` so any unregistered selector receives its production default (currently `TriangleProvider` for `Triangle`), then resolves `EngineConfig::ReferenceScene::Selector` against `Engine::GetReferenceSceneRegistry()` exactly once after scene-registry construction and before `IApplication::OnInitialize`. The returned `ReferenceScenePopulation` is stored so `Engine::Shutdown()` routes teardown through the same provider before the scene registry is destroyed; the optional `CameraViewInput` seed is captured on `m_ReferenceCamera` for camera substitution. `m_ReferenceSceneInstalled` guards against double-install via `std::terminate`, and `ReferenceSceneRegistry::Resolve()` itself terminates on unregistered selectors (GRAPHICS-029 Decision 7 applied to both register and resolve). `TriangleProvider::Populate` calls `ECS::Scene::CreateDefault(scene, "ReferenceTriangle")`, attaches `Graphics::Components::RenderSurface{Domain = Vertex}` and `ECS::Components::ProceduralGeometryRef{Kind = Triangle}`, and returns a CameraViewInput seed (position (0,0,3), forward (0,0,-1), up (0,1,0), near 0.1, far 100). |
 | `Extrinsic.Runtime.RenderExtraction` | Runtime-owned ECS-to-graphics extraction cache and snapshot handoff |
@@ -69,7 +69,7 @@ freshly-constructed subsystems):
 8. Render prepare.
 9. Render execute.
 10. End frame + present.
-11. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick.
+11. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick, `GpuAssetCache::Tick`, and `RenderExtractionCache::TickProceduralGeometry` (procedural geometry deferred-retire window).
 12. Frame clock finalize.
 
 `Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` for wall-clock frame
@@ -118,17 +118,36 @@ refcount-only work. If a renderable also carries a non-default
 `AssetInstance::Source`, the procedural path is skipped for that entity and
 `ProceduralAndAssetSourceConflict` is incremented while the existing asset
 observation continues. Retired or shutdown sidecars call
-`ProceduralGeometryCache::Release(key)`; deferred-free retire ordering against
-`GpuWorld::FreeGeometry` is reserved for `GRAPHICS-030C`. The added counter
+`ProceduralGeometryCache::Release(key)`. When `Release` brings the refcount to
+zero the entry is appended to an in-cache retire queue but the underlying
+`GpuGeometryHandle` is **not** freed inline; it is freed by
+`ProceduralGeometryCache::Tick(currentFrame, framesInFlight, freeFn)` after
+`framesInFlight` ticks have elapsed since the release tick, mirroring the
+`Graphics::GpuAssetCache::Tick` deferred-retire window (GRAPHICS-030C
+Decision 4). `Engine::RunFrame()` drives the procedural cache from the
+maintenance phase alongside `GpuAssetCache::Tick` via
+`RenderExtractionCache::TickProceduralGeometry(currentFrame, framesInFlight,
+renderer)`, which closes over `GpuWorld::FreeGeometry`. If an entity is
+re-attached to the same `(Kind, Hash(Params))` inside the retire window,
+`EnsureResident` resurrects the queued entry (cancelling the pending free),
+returns the bit-identical `GpuGeometryHandle`, and increments
+`ProceduralGeometryRetireCancellations`. Refcount saturation
+(`UINT32_MAX`) is fail-closed: increments past the cap reject and bump
+`ProceduralGeometryRefCountSaturated` instead of overflowing. The counter
 fields on `RuntimeRenderExtractionStats` are
 `ProceduralRenderablesEnumerated`, `ProceduralGeometryUploads`,
 `ProceduralGeometryReuseHits`, `ProceduralGeometryFailedPack`,
 `ProceduralGeometryMissingPacker`, `ProceduralGeometryInvalidParams`,
-`ProceduralAndAssetSourceConflict`, and `ProceduralAndRenderableSourceConflict`
+`ProceduralAndAssetSourceConflict`, `ProceduralAndRenderableSourceConflict`
 (reserved for future asset-backed renderable conflict detection in
-GRAPHICS-034). `FindRenderableSidecarForTest(stableId)` and
-`GetProceduralGeometryCacheForTest()` are read-only test seams used by the
-`contract;runtime` procedural-geometry tests.
+GRAPHICS-034), and the per-tick deltas of the cache's retire counters:
+`ProceduralGeometryReleases`, `ProceduralGeometryFreeRetires`,
+`ProceduralGeometryRetireCancellations`, and
+`ProceduralGeometryRefCountSaturated`. `FindRenderableSidecarForTest(stableId)`
+and `GetProceduralGeometryCacheForTest()` are read-only test seams used by the
+`contract;runtime` procedural-geometry tests; `PrimeRefCountForTest` on the
+cache is a test-only refcount setter that lets saturation coverage exercise
+the rejection path without `2^32` `EnsureResident` calls.
 
 Runtime owns camera motion, input-to-pick-request translation, gizmo hit testing,
 and transform application. Graphics receives only immutable `CameraViewInput`,

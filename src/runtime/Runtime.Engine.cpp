@@ -716,13 +716,19 @@ namespace Extrinsic::Runtime
             Assets::AssetService&     AssetService;
             Graphics::GpuAssetCache*  GpuAssetCache;
             RHI::IDevice&             Device;
+            RenderExtractionCache&    Extraction;
+            Graphics::IRenderer&      Renderer;
 
             AssetHooks(Assets::AssetService& assetService,
                        Graphics::GpuAssetCache* gpuAssetCache,
-                       RHI::IDevice& device)
+                       RHI::IDevice& device,
+                       RenderExtractionCache& extraction,
+                       Graphics::IRenderer& renderer)
                 : AssetService(assetService)
                 , GpuAssetCache(gpuAssetCache)
                 , Device(device)
+                , Extraction(extraction)
+                , Renderer(renderer)
             {
             }
 
@@ -733,17 +739,27 @@ namespace Extrinsic::Runtime
                 // cache subscribed in Engine::Initialize observes those events
                 // synchronously during this Tick.
                 AssetService.Tick();
+                const std::uint64_t currentFrame = Device.GetGlobalFrameNumber();
+                const std::uint32_t framesInFlight = Device.GetFramesInFlight();
                 if (GpuAssetCache)
                 {
-                    GpuAssetCache->Tick(Device.GetGlobalFrameNumber(),
-                                        Device.GetFramesInFlight());
+                    GpuAssetCache->Tick(currentFrame, framesInFlight);
                 }
+                // GRAPHICS-030C: drive the procedural geometry cache's
+                // deferred-retire window with the same CPU frame counter and
+                // framesInFlight the asset cache uses.  Final FreeGeometry
+                // calls fall through to GpuWorld here.
+                Extraction.TickProceduralGeometry(currentFrame, framesInFlight, Renderer);
             }
         };
 
         TransferHooks transferHooks(*m_Device);
         StreamingHooks streamingHooks(*m_StreamingGraph, *m_StreamingExecutor);
-        AssetHooks assetHooks(*m_AssetService, m_GpuAssetCache.get(), *m_Device);
+        AssetHooks assetHooks(*m_AssetService,
+                              m_GpuAssetCache.get(),
+                              *m_Device,
+                              m_RenderExtraction,
+                              *m_Renderer);
         ExecuteRuntimeMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
         // completedGpuValue is the renderer's per-frame timeline value.  The
         // GpuAssetCache currently retires on the CPU frame counter (which is
