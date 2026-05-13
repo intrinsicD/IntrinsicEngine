@@ -96,3 +96,30 @@ producer targets and output directories to exist. Workflows use
 failures instead of presenting missing binaries or missing benchmark directories
 as the root cause.
 
+## Fast touched-scope verification
+
+For local iteration on small, well-scoped changes, use the touched-scope helper
+to plan or run the strongest relevant subset without waiting for the full CPU
+gate every time:
+
+```bash
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --print
+python3 tools/ci/touched_scope.py --root . --base-ref origin/main --build-dir cmake-build-debug --run
+```
+
+The helper maps changed paths to conservative CMake targets, CTest labels, and
+repository structural checks. For example, `src/geometry/` changes select
+`IntrinsicGeometryTests`, `-L geometry`, and the layering check; docs/tasks-only
+changes select docs/task validators without a C++ build. Build-system changes,
+foundational `src/core/` changes, and unknown source paths fall back to the broad
+CPU-supported gate.
+
+This helper is an iteration aid, not a replacement for the canonical PR/merge
+verification from `AGENTS.md`:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
