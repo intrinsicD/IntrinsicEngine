@@ -1,15 +1,84 @@
 #!/usr/bin/env bash
+# IntrinsicEngine session-start hook.
+#
+# Provisions the C++23 toolchain (`clang-20+` / `clang-scan-deps-20+`) and
+# windowing/Vulkan dev headers required by the `ci` CMake preset, then
+# optionally pre-builds the core library targets so the first build in the
+# session is incremental.
+#
+# Behavior:
+#   * Fast path: if `clang-20` (or any newer) and `clang-scan-deps-20` are
+#     already present, the hook returns immediately and the agent loop starts
+#     with a fully provisioned toolchain.
+#   * Slow path: otherwise the hook emits the async marker
+#     `{"async": true, "asyncTimeout": ...}` and detaches; provisioning
+#     continues in the background while the agent works in parallel.
+#     Progress is logged to `/tmp/intrinsic-session-setup.log`; completion
+#     state is signalled by `/tmp/intrinsic-session-setup.done` (success) or
+#     `/tmp/intrinsic-session-setup.failed` (failure).
+#
+# Agents that genuinely need the toolchain ready (e.g. before invoking the
+# `cmake --preset ci` gate) should call `.claude/wait-for-toolchain.sh` to
+# block until provisioning finishes.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${PROJECT_ROOT}/build"
 
-# Use sudo only when not already root
+LOG="/tmp/intrinsic-session-setup.log"
+DONE_MARKER="/tmp/intrinsic-session-setup.done"
+FAIL_MARKER="/tmp/intrinsic-session-setup.failed"
+
+# Use sudo only when not already root.
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=""
 else
     SUDO="sudo"
 fi
+
+# --------------------------------------------------------------------------
+# Fast path: nothing to install. Return immediately, no async, no log churn.
+# --------------------------------------------------------------------------
+toolchain_present() {
+    local ver
+    for ver in 22 21 20; do
+        if command -v "clang-${ver}" >/dev/null 2>&1 \
+            && command -v "clang++-${ver}" >/dev/null 2>&1 \
+            && command -v "clang-scan-deps-${ver}" >/dev/null 2>&1; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if toolchain_present; then
+    printf 'IntrinsicEngine: clang-20+ toolchain already present; skipping provisioning.\n' >"$LOG"
+    : >"$DONE_MARKER"
+    rm -f "$FAIL_MARKER"
+    exit 0
+fi
+
+# --------------------------------------------------------------------------
+# Slow path: announce async, detach IO, then provision in background.
+# --------------------------------------------------------------------------
+# IMPORTANT: the JSON line must be the *only* thing on stdout before we
+# detach, so the harness parses it cleanly and treats the rest of this
+# process as backgrounded.
+printf '{"async": true, "asyncTimeout": 1800000}\n'
+
+# Reset markers and log for this provisioning run.
+rm -f "$DONE_MARKER" "$FAIL_MARKER"
+: >"$LOG"
+
+# Detach stdio so the harness treats the hook as complete.
+exec </dev/null >>"$LOG" 2>&1
+
+trap 'echo "==> Provisioning FAILED (line $LINENO, rc=$?)."; : >"$FAIL_MARKER"; exit 1' ERR
+
+echo "========================================"
+echo " IntrinsicEngine – Session Setup (async)"
+echo " $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "========================================"
 
 # --------------------------------------------------------------------------
 # 1. Install system dependencies (idempotent – skips if already present)
@@ -43,8 +112,8 @@ install_system_deps() {
     # C++23 <format> / <expected> support (GCC 14 stdlib)
     dpkg -s libstdc++-14-dev &>/dev/null || missing+=(libstdc++-14-dev)
 
-    # Clang compiler + tools for C++23 modules
-    # Try clang-22 first (latest), fall back to clang-20.
+    # Clang 20+ for C++23 modules. Try newest available; clang-20 ships in
+    # Ubuntu 24.04 noble-updates/universe so no PPA is required.
     if ! dpkg -s clang-22 &>/dev/null && ! dpkg -s clang-20 &>/dev/null; then
         missing+=(clang-20)
     fi
@@ -55,7 +124,10 @@ install_system_deps() {
     if [ ${#missing[@]} -gt 0 ]; then
         echo "==> Installing missing packages: ${missing[*]}"
         $SUDO apt-get update -qq
-        $SUDO apt-get install -y -qq "${missing[@]}"
+        DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            "${missing[@]}"
     else
         echo "==> All system dependencies already installed."
     fi
@@ -65,7 +137,8 @@ install_system_deps() {
 # 2. Detect the best available Clang version (require 20+)
 # --------------------------------------------------------------------------
 detect_clang() {
-    for ver in 22 20; do
+    local ver
+    for ver in 22 21 20; do
         if command -v "clang++-${ver}" &>/dev/null; then
             CLANG_VER="$ver"
             CC="clang-${ver}"
@@ -74,7 +147,7 @@ detect_clang() {
             return 0
         fi
     done
-    echo "ERROR: Clang 20+ required. Install clang-20: sudo apt install clang-20 clang-tools-20" >&2
+    echo "ERROR: Clang 20+ not found after install_system_deps." >&2
     return 1
 }
 
@@ -131,7 +204,7 @@ build_project() {
         IntrinsicGraphics IntrinsicInterface IntrinsicRuntime; then
         echo "==> Library build succeeded."
     else
-        echo "==> Library build failed (exit $?). You may need to fix build errors manually."
+        echo "==> Library build failed (exit $?). Tests/agents can still iterate; rerun manually." >&2
         return 1
     fi
 }
@@ -139,14 +212,13 @@ build_project() {
 # --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
-echo "========================================"
-echo " IntrinsicEngine – Session Setup"
-echo "========================================"
-
 install_system_deps
 configure_build
 build_project || true
 
 echo "========================================"
-echo " Setup complete."
+echo " Setup complete: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "========================================"
+
+: >"$DONE_MARKER"
+exit 0
