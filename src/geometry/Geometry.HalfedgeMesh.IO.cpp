@@ -15,6 +15,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -52,25 +53,101 @@ namespace Geometry::MeshIO
             return Core::ErrorCode::Unknown;
         }
 
-        [[nodiscard]] std::optional<std::uint32_t> ParseOBJVertexIndex(std::string_view token, std::size_t vertexCount)
+        [[nodiscard]] std::optional<int> ResolveOBJIndex(std::string_view token, std::size_t valueCount)
         {
-            const std::size_t slash = token.find('/');
-            if (slash != std::string_view::npos)
-            {
-                token = token.substr(0, slash);
-            }
             const auto index = ParseNumber<int>(token);
             if (!index || *index == 0)
             {
                 return std::nullopt;
             }
 
-            const int resolved = *index > 0 ? *index - 1 : static_cast<int>(vertexCount) + *index;
-            if (resolved < 0 || static_cast<std::size_t>(resolved) >= vertexCount)
+            const int resolved = *index > 0 ? *index - 1 : static_cast<int>(valueCount) + *index;
+            if (resolved < 0 || static_cast<std::size_t>(resolved) >= valueCount)
             {
                 return std::nullopt;
             }
-            return static_cast<std::uint32_t>(resolved);
+            return resolved;
+        }
+
+        struct OBJFaceVertex
+        {
+            std::uint32_t Position = 0;
+            int Texcoord = -1;
+            int Normal = -1;
+        };
+
+        struct OBJFaceVertexKey
+        {
+            std::uint32_t Position = 0;
+            int Texcoord = -1;
+            int Normal = -1;
+
+            friend bool operator==(const OBJFaceVertexKey& lhs, const OBJFaceVertexKey& rhs)
+            {
+                return lhs.Position == rhs.Position && lhs.Texcoord == rhs.Texcoord && lhs.Normal == rhs.Normal;
+            }
+        };
+
+        struct OBJFaceVertexKeyHash
+        {
+            [[nodiscard]] std::size_t operator()(const OBJFaceVertexKey& key) const noexcept
+            {
+                std::size_t hash = static_cast<std::size_t>(key.Position) + 0x9e3779b97f4a7c15ull;
+                hash ^= static_cast<std::size_t>(key.Texcoord + 1) + 0x9e3779b97f4a7c15ull + (hash << 6u) + (hash >> 2u);
+                hash ^= static_cast<std::size_t>(key.Normal + 1) + 0x9e3779b97f4a7c15ull + (hash << 6u) + (hash >> 2u);
+                return hash;
+            }
+        };
+
+        [[nodiscard]] std::optional<OBJFaceVertex> ParseOBJFaceVertex(std::string_view token,
+                                                                      std::size_t vertexCount,
+                                                                      std::size_t texcoordCount,
+                                                                      std::size_t normalCount)
+        {
+            const std::size_t firstSlash = token.find('/');
+            const std::string_view positionToken = firstSlash == std::string_view::npos ? token : token.substr(0, firstSlash);
+            const auto position = ResolveOBJIndex(positionToken, vertexCount);
+            if (!position)
+            {
+                return std::nullopt;
+            }
+
+            OBJFaceVertex result;
+            result.Position = static_cast<std::uint32_t>(*position);
+            if (firstSlash == std::string_view::npos)
+            {
+                return result;
+            }
+
+            const std::size_t secondSlash = token.find('/', firstSlash + 1);
+            const std::string_view texcoordToken = secondSlash == std::string_view::npos
+                                                       ? token.substr(firstSlash + 1)
+                                                       : token.substr(firstSlash + 1, secondSlash - firstSlash - 1);
+            if (!texcoordToken.empty())
+            {
+                const auto texcoord = ResolveOBJIndex(texcoordToken, texcoordCount);
+                if (!texcoord)
+                {
+                    return std::nullopt;
+                }
+                result.Texcoord = *texcoord;
+            }
+
+            if (secondSlash != std::string_view::npos)
+            {
+                const std::string_view normalToken = token.substr(secondSlash + 1);
+                if (!normalToken.empty())
+                {
+                    const auto normal = ResolveOBJIndex(normalToken, normalCount);
+                    if (!normal)
+                    {
+                        return std::nullopt;
+                    }
+                    result.Normal = *normal;
+                }
+            }
+
+            return result;
         }
 
         void PopulateResult(MeshIOResult& result,
@@ -945,7 +1022,9 @@ namespace Geometry::MeshIO
         std::vector<glm::vec3> vertices;
         std::vector<glm::vec3> normals;
         std::vector<glm::vec2> texcoords;
-        std::vector<std::vector<std::uint32_t>> faces;
+        std::vector<std::vector<OBJFaceVertex>> faceVertices;
+        bool hasFaceNormals = false;
+        bool hasFaceTexcoords = false;
         std::size_t cursor = 0;
         std::string_view line;
         while (NextLine(*text, cursor, line))
@@ -1015,22 +1094,30 @@ namespace Geometry::MeshIO
                 {
                     return InvalidMeshFormat();
                 }
-                std::vector<std::uint32_t> face;
+                std::vector<OBJFaceVertex> face;
                 face.reserve(tokens.size() - 1);
                 for (std::size_t i = 1; i < tokens.size(); ++i)
                 {
-                    const auto index = ParseOBJVertexIndex(tokens[i], vertices.size());
-                    if (!index)
+                    const auto parsed = ParseOBJFaceVertex(tokens[i], vertices.size(), texcoords.size(), normals.size());
+                    if (!parsed)
                     {
                         return InvalidMeshFormat();
                     }
-                    face.push_back(*index);
+                    if (parsed->Texcoord >= 0)
+                    {
+                        hasFaceTexcoords = true;
+                    }
+                    if (parsed->Normal >= 0)
+                    {
+                        hasFaceNormals = true;
+                    }
+                    face.push_back(*parsed);
                 }
-                faces.push_back(std::move(face));
+                faceVertices.push_back(std::move(face));
             }
         }
 
-        if (vertices.empty() || faces.empty())
+        if (vertices.empty() || faceVertices.empty())
         {
             return InvalidMeshFormat();
         }
@@ -1039,6 +1126,87 @@ namespace Geometry::MeshIO
         const auto pathInfo = MakePathInfo(absolute_path);
         result.SourcePath = pathInfo.SourcePath;
         result.BasePath = pathInfo.BasePath;
+
+        if (hasFaceNormals || hasFaceTexcoords)
+        {
+            std::vector<glm::vec3> remappedVertices;
+            std::vector<glm::vec3> remappedNormals;
+            std::vector<glm::vec2> remappedTexcoords;
+            std::vector<std::vector<std::uint32_t>> remappedFaces;
+            std::unordered_map<OBJFaceVertexKey, std::uint32_t, OBJFaceVertexKeyHash> remap;
+
+            remappedFaces.reserve(faceVertices.size());
+            if (hasFaceNormals)
+            {
+                remappedNormals.reserve(vertices.size());
+            }
+            if (hasFaceTexcoords)
+            {
+                remappedTexcoords.reserve(vertices.size());
+            }
+
+            for (const auto& sourceFace : faceVertices)
+            {
+                std::vector<std::uint32_t> face;
+                face.reserve(sourceFace.size());
+                for (const OBJFaceVertex& sourceVertex : sourceFace)
+                {
+                    const OBJFaceVertexKey key{
+                        sourceVertex.Position,
+                        hasFaceTexcoords ? sourceVertex.Texcoord : -1,
+                        hasFaceNormals ? sourceVertex.Normal : -1,
+                    };
+                    auto [it, inserted] = remap.try_emplace(key, static_cast<std::uint32_t>(remappedVertices.size()));
+                    if (inserted)
+                    {
+                        remappedVertices.push_back(vertices[sourceVertex.Position]);
+                        if (hasFaceNormals)
+                        {
+                            remappedNormals.push_back(sourceVertex.Normal >= 0
+                                                          ? normals[static_cast<std::size_t>(sourceVertex.Normal)]
+                                                          : glm::vec3(0.0f, 1.0f, 0.0f));
+                        }
+                        if (hasFaceTexcoords)
+                        {
+                            remappedTexcoords.push_back(sourceVertex.Texcoord >= 0
+                                                            ? texcoords[static_cast<std::size_t>(sourceVertex.Texcoord)]
+                                                            : glm::vec2(0.0f));
+                        }
+                    }
+                    face.push_back(it->second);
+                }
+                remappedFaces.push_back(std::move(face));
+            }
+
+            PopulateResult(result,
+                           remappedVertices,
+                           remappedFaces,
+                           hasFaceNormals ? std::span<const glm::vec3>(remappedNormals) : std::span<const glm::vec3>{});
+            if (hasFaceTexcoords && remappedTexcoords.size() == remappedVertices.size())
+            {
+                auto texcoordProperty =
+                    result.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+                for (std::size_t i = 0; i < remappedTexcoords.size(); ++i)
+                {
+                    texcoordProperty[i] = remappedTexcoords[i];
+                }
+            }
+            return result;
+        }
+
+        std::vector<std::vector<std::uint32_t>> faces;
+        faces.reserve(faceVertices.size());
+        for (const auto& sourceFace : faceVertices)
+        {
+            std::vector<std::uint32_t> face;
+            face.reserve(sourceFace.size());
+            for (const OBJFaceVertex& sourceVertex : sourceFace)
+            {
+                face.push_back(sourceVertex.Position);
+            }
+            faces.push_back(std::move(face));
+        }
+
         const std::span<const glm::vec3> normalsSpan =
             normals.size() == vertices.size() ? std::span<const glm::vec3>(normals) : std::span<const glm::vec3>{};
         PopulateResult(result, vertices, faces, normalsSpan);

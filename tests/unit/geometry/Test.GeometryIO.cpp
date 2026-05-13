@@ -459,6 +459,108 @@ TEST(GeometryIO_MeshIO, LoadOBJVertexTexcoordAndNormalCoexist)
     EXPECT_EQ(texcoords[1], glm::vec2(1.0f, 0.0f));
 }
 
+TEST(GeometryIO_MeshIO, LoadsOBJFaceTexcoordIndicesDuplicateSharedPositions)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 1 1 0\n"
+                  "v 0 1 0\n"
+                  "vt 0 0\n"
+                  "vt 1 0\n"
+                  "vt 1 1\n"
+                  "vt 0 1\n"
+                  "vt 0.5 0.5\n"
+                  "f 1/1 2/2 3/3\n"
+                  "f 1/5 3/3 4/4\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Vertices.Size(), 5u);
+    EXPECT_EQ(result->Faces.Size(), 2u);
+
+    auto positions = result->Vertices.Get<glm::vec3>("v:point");
+    ASSERT_TRUE(positions.IsValid());
+    ASSERT_EQ(positions.Vector().size(), 5u);
+    EXPECT_EQ(positions[0], glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(positions[3], glm::vec3(0.0f, 0.0f, 0.0f));
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 5u);
+    EXPECT_EQ(texcoords[0], glm::vec2(0.0f, 0.0f));
+    EXPECT_EQ(texcoords[3], glm::vec2(0.5f, 0.5f));
+
+    auto faceVertices = result->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+    ASSERT_TRUE(faceVertices.IsValid());
+    ASSERT_EQ(faceVertices.Vector().size(), 2u);
+    EXPECT_EQ(faceVertices[0], (std::vector<std::uint32_t>{0u, 1u, 2u}));
+    EXPECT_EQ(faceVertices[1], (std::vector<std::uint32_t>{3u, 2u, 4u}));
+}
+
+TEST(GeometryIO_MeshIO, LoadsOBJFaceNormalIndicesWithoutLockstepNormals)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 0 1 0\n"
+                  "vn 0 0 1\n"
+                  "f 1//1 2//1 3//1\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(normals.IsValid());
+    ASSERT_EQ(normals.Vector().size(), 3u);
+    EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(normals[1], glm::vec3(0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(normals[2], glm::vec3(0.0f, 0.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsOBJFaceAttributeNegativeIndices)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 0 1 0\n"
+                  "vt 0 0\n"
+                  "vt 1 0\n"
+                  "vt 0 1\n"
+                  "vn 0 0 1\n"
+                  "f -3/-3/-1 -2/-2/-1 -1/-1/-1\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+    EXPECT_EQ(texcoords[0], glm::vec2(0.0f, 0.0f));
+    EXPECT_EQ(texcoords[1], glm::vec2(1.0f, 0.0f));
+    EXPECT_EQ(texcoords[2], glm::vec2(0.0f, 1.0f));
+
+    auto normals = result->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(normals.IsValid());
+    EXPECT_EQ(normals[0], glm::vec3(0.0f, 0.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJRejectsOutOfRangeFaceTexcoordIndex)
+{
+    TempFile file(".obj",
+                  "v 0 0 0\n"
+                  "v 1 0 0\n"
+                  "v 0 1 0\n"
+                  "vt 0 0\n"
+                  "f 1/1 2/2 3/1\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
 TEST(GeometryIO_MeshIO, LoadsASCIIPLYTriangle)
 {
     TempFile file(".ply",
