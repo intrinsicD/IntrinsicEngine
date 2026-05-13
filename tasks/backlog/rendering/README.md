@@ -482,8 +482,8 @@ independently testable (CPU/null where possible), and gated as recorded.
   depends on GRAPHICS-031A. Landed by commit `3931705`.
 - [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body (done)](../../done/GRAPHICS-032B-minimal-debug-surface-pass-body.md):
   depends on GRAPHICS-032A and GRAPHICS-030B. Landed by commit `7fff8ca`.
-- [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test](../../active/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md)
-  (in-progress): depends on GRAPHICS-032B.
+- [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test (done)](../../done/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
+  depends on GRAPHICS-032B. Landed by commit `e50c593`.
 - [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
   depends on GRAPHICS-033 (planning). Landed by commit `7a5886d`.
 - [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):

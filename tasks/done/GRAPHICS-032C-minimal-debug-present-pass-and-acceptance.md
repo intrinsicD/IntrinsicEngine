@@ -11,8 +11,8 @@
 - No mutation of the default recipe's skip/no-op statuses.
 
 ## Context
-- Status: in-progress.
-- Owner/agent: Claude on branch `claude/inspect-engine-state-4lqQS`.
+- Status: done.
+- Owner/agent: Claude on branch `claude/inspect-engine-state-4lqQS` (implementation), `claude/inspect-engine-state-ltEmM` (retirement).
 - Owner/layer: `graphics/renderer`.
 - Planning parent: [`tasks/done/GRAPHICS-032-minimal-surface-present-command-path.md`](../done/GRAPHICS-032-minimal-surface-present-command-path.md), Recorded as Impl-C in the parent's Required changes.
 - Upstream gates: `GRAPHICS-032B` (done), `GRAPHICS-031A` (done) (the present pipeline can reuse the slot-0 fullscreen-triangle path or be a dedicated minimal-present pipeline; the implementer chooses, the contract is the recorded `Draw(3,1,0,0)` form).
@@ -68,5 +68,10 @@ python3 tools/docs/check_doc_links.py --root .
 - Reusing the imported `Backbuffer` for non-present writes (validated by render-graph rejection).
 - Wiring the default recipe through the minimal pass branches.
 
-## Next verification step
-- Local `cmake --preset ci` requires `clang-20`; the current container ships only `clang-18` (the `.claude/setup.sh` toolchain provisioning failed with `403 Forbidden` on the launchpad PPAs in this session), so the focused `IntrinsicGraphicsContractTests` / `ctest -L contract` gate from the Verification block above must be re-run on a CI host that satisfies the preset's compiler pin before retiring this task. Structural checks (`check_layering`, `check_task_policy`, `check_doc_links`, `check_test_layout`) all pass locally on this branch, and `docs/api/generated/module_inventory.md` has been regenerated.
+## Completion
+- Completed: 2026-05-13.
+- Commit reference: `e50c593` ("GRAPHICS-032C: wire MinimalDebugPresent CPU-mock pass body") via PR #823 from `claude/inspect-engine-state-4lqQS`, merged to `main` at 2026-05-13T21:52:41Z.
+- Verification:
+  - Project CI ran on PR #823 (`ci` preset, clang-20 toolchain) and passed before merge to `main`.
+  - Authoring session ran the structural checks locally; the focused `cmake --preset ci` / `ctest -L contract` gate ran in the PR's CI environment because the authoring container shipped clang-18 only (`.claude/setup.sh` toolchain provisioning was network-blocked by `403 Forbidden` on the launchpad PPAs).
+  - `docs/api/generated/module_inventory.md` was regenerated as part of the PR (graphics/renderer module count 51 → 52; total 428 → 429).
