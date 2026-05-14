@@ -1,5 +1,19 @@
 # GRAPHICS-033F — Wire the `PublicServiceReconciled` operational gate
 
+## Status
+
+- Status: in-progress (slice 1 landed on this branch; awaiting CI gate confirmation for downstream `GRAPHICS-080` retirement).
+- Owner/agent: Claude on `claude/remove-blocking-validations-LWwfI`.
+- Branch: `claude/remove-blocking-validations-LWwfI`.
+- Slice 1 landed in this branch:
+  - `VulkanDevice::HasOperationalSafetyPrerequisites()` re-derived from raw, non-circular preconditions in `src/graphics/vulkan/Backends.Vulkan.Device.cpp`: `!m_DeviceLost`, `m_GlobalPipelineLayout != VK_NULL_HANDLE`, `m_BindlessHeap && m_BindlessHeap->IsValid()`, `m_TransferQueue && m_TransferQueue->IsValid()`, swapchain size-consistency, per-frame `CmdPool`/`CmdBuffer`/`Fence`/`ImageAcquired`/`RenderDone`, and every `m_CmdContexts[i].IsBound()`.
+  - `VulkanCommandContext::IsBound()` added in `src/graphics/vulkan/Backends.Vulkan.CommandPools.cppm` as a backend-local inline predicate consumed by the safety-prereq check; no `Vk*` types cross any module boundary.
+  - `VulkanDevice::BuildOperationalInputs()` now sets `inputs.PublicServiceReconciled = HasOperationalSafetyPrerequisites()` instead of the hard-coded `false`.
+  - Service-diagnostics block at the bind-loop publish point in `Backends.Vulkan.Device.cpp` now sources `PublicBindlessHeapExposed` from `HasOperationalSafetyPrerequisites() && IsOperational()` rather than from `IsOperational()` alone, removing the implicit assumption that the operational predicate implied the safety prereqs.
+  - Tests: `VulkanFailClosedContract.PublicServiceReconciledIsFalseOnFreshDevice`, `VulkanFailClosedContract.PublicServiceReconciledStaysFalseAfterNullWindowInitialize` confirm cold-start and post-`Shutdown` fail-closed semantics. The existing exhaustive 14-bit gate sweep (`Test.VulkanOperationalStatusEvaluator.cpp`) stays byte-identical.
+  - Docs: `src/graphics/vulkan/README.md` §10 enumerates the raw preconditions consulted by gate 8 and records that `HasOperationalSafetyPrerequisites()` is the single source of truth feeding `PublicServiceReconciled`.
+- Next verification step: run the default CPU gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) plus the focused `contract;graphics` and `IntrinsicRuntimeTests` targets, then the `gpu;vulkan` flipping-test on a Vulkan-capable host (reserved for `GRAPHICS-033D`).
+
 ## Goal
 - Flip the `PublicServiceReconciled` input to the `EvaluateVulkanOperationalStatus(...)` 9-step gate from its current hard-coded `false` (`src/graphics/vulkan/Backends.Vulkan.Device.cpp:883`) so it observes a non-circular `VulkanDevice::HasOperationalSafetyPrerequisites()` predicate that reports `true` once the canonical public services — bindless heap, transfer queue, pipeline manager, swapchain/backbuffer import, and command contexts — are all live and consistent with each other. This is gate step 8 of the operational checklist in `src/graphics/vulkan/README.md:363–365` and is the second of the two remaining gates blocking `IsOperational()` from ever returning `true`.
 

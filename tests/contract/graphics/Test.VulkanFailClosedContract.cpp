@@ -167,6 +167,52 @@ TEST(VulkanFailClosedContract, RecipeGraphValidationSetterFlipsBarrierValidation
         Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).BarrierValidationClean);
 }
 
+// -----------------------------------------------------------------------------
+// GRAPHICS-033F: gate 8 (`PublicServiceReconciled`) is sourced from
+// `VulkanDevice::HasOperationalSafetyPrerequisites()`, which inspects raw
+// live Vulkan handles (global pipeline layout, bindless heap, transfer
+// queue, swapchain consistency, per-frame command/sync resources, bound
+// command contexts) and `!m_DeviceLost`. A freshly-created `VulkanDevice`
+// has none of these handles live, so the input is `false` and the evaluator
+// reports `PublicServiceReconciliationFailed`. The previous hard-coded
+// `false` would also have reported the same reason, so this confirms the
+// new producer wiring preserves cold-start fail-closed semantics.
+// -----------------------------------------------------------------------------
+TEST(VulkanFailClosedContract, PublicServiceReconciledIsFalseOnFreshDevice)
+{
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+
+    EXPECT_FALSE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).PublicServiceReconciled);
+}
+
+TEST(VulkanFailClosedContract, PublicServiceReconciledStaysFalseAfterNullWindowInitialize)
+{
+    Extrinsic::Core::Config::WindowConfig windowConfig{};
+    Extrinsic::Platform::Backends::Null::NullWindow window{windowConfig};
+
+    Extrinsic::Core::Config::RenderConfig renderConfig{};
+    renderConfig.EnablePromotedVulkanDevice = true;
+    renderConfig.EnableValidation = false;
+
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+
+    device->Initialize(window, renderConfig);
+    EXPECT_FALSE(device->IsOperational());
+    EXPECT_FALSE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).PublicServiceReconciled);
+
+    // GRAPHICS-033F acceptance criterion: post-`Shutdown` the safety prereqs
+    // must be reported as not-ready even if a previous bring-up had progressed.
+    // Handles zeroed during Shutdown naturally fail every prereq.
+    device->Shutdown();
+    EXPECT_FALSE(device->IsOperational());
+    EXPECT_FALSE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).PublicServiceReconciled);
+}
+
 TEST(VulkanFailClosedContract, FallbackTransferQueueIncrementsUploadCounter)
 {
     std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
