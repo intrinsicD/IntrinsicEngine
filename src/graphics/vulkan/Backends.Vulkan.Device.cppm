@@ -1,6 +1,7 @@
 module;
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstddef>
 #include <memory>
@@ -60,6 +61,12 @@ namespace Extrinsic::Backends::Vulkan
 
         [[nodiscard]] bool IsOperational() const noexcept override;
 
+        // GRAPHICS-033E: receive the renderer's most recent recipe-aware
+        // validation outcome. Stored in `m_LatestRecipeValidationClean` and
+        // consumed by `BuildOperationalInputs()` to drive gate 7 of the
+        // operational checklist.
+        void NoteRecipeGraphValidation(bool clean) noexcept override;
+
         bool BeginFrame(RHI::FrameHandle& outFrame) override;
         void EndFrame(const RHI::FrameHandle& frame) override;
         void Present(const RHI::FrameHandle& frame) override;
@@ -112,6 +119,11 @@ namespace Extrinsic::Backends::Vulkan
         // `IDevice::IsOperational()`). The friendship keeps the read-only
         // access surface internal to the module.
         friend VulkanOperationalStatus EvaluateVulkanDeviceOperationalStatus(
+            const RHI::IDevice* device) noexcept;
+        // GRAPHICS-033E: read-only snapshot of `BuildOperationalInputs()` for
+        // contract tests that need to observe individual gate inputs without
+        // exposing them on `RHI::IDevice`.
+        friend VulkanOperationalInputs GetVulkanDeviceOperationalInputs(
             const RHI::IDevice* device) noexcept;
 
         class FallbackBindlessHeap final : public RHI::IBindlessHeap
@@ -242,6 +254,11 @@ namespace Extrinsic::Backends::Vulkan
 
         VkPipelineLayout m_GlobalPipelineLayout = VK_NULL_HANDLE;
         RHI::SamplerHandle m_DefaultSamplerHandle{};
+
+        // GRAPHICS-033E: backs gate 7 (`BarrierValidationClean`). Reset to
+        // `false` in `Initialize()` so cold startup is fail-closed until the
+        // renderer publishes the first clean recipe-aware validation outcome.
+        std::atomic<bool> m_LatestRecipeValidationClean{false};
 
         RHI::PresentMode m_PresentMode  = RHI::PresentMode::VSync;
         bool             m_Operational  = false;

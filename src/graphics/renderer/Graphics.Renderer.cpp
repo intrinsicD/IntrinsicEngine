@@ -738,6 +738,10 @@ namespace Extrinsic::Graphics
             {
                 m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
                 Core::Log::Error("[Graphics] FrameRecipe build failed: diagnostic={}", recipe.Diagnostic);
+                // GRAPHICS-033E: a failed recipe build cannot satisfy gate 7;
+                // publish fail-closed so the operational gate sees the latest
+                // outcome before the next attempt.
+                m_Device->NoteRecipeGraphValidation(false);
                 return;
             }
             if (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
@@ -761,8 +765,29 @@ namespace Extrinsic::Graphics
                 Core::Log::Error("[Graphics] RenderGraph Compile() failed: error={} diagnostic={}",
                                  static_cast<int>(compiled.error()),
                                  m_LastRenderGraphStats.Diagnostic);
+                // GRAPHICS-033E: a failed compile cannot satisfy gate 7. Publish
+                // fail-closed exactly once per compile attempt so the operational
+                // gate cannot oscillate stale-clean while the next attempt rebuilds.
+                m_Device->NoteRecipeGraphValidation(false);
                 return;
             }
+            // GRAPHICS-033E: run the recipe-aware validation against the freshly
+            // compiled graph and publish a single boolean to the device exactly
+            // once per recipe compile. Combined with the compiler-level
+            // findings already stored on the render graph, gate 7
+            // (`BarrierValidationClean`) flips to `true` only when both layers
+            // report zero `Error`-severity findings.
+            const FrameRecipeIntrospection recipeIntrospection =
+                (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
+                    ? DescribeMinimalDebugSurfaceRecipe()
+                    : DescribeDefaultFrameRecipe(DeriveDefaultFrameRecipeFeatures(renderWorld));
+            const RenderGraphValidationResult recipeValidation =
+                ValidateRecipeCompiledGraph(recipeIntrospection, *compiled);
+            const bool recipeValidationClean =
+                recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u &&
+                !m_RenderGraph.GetLastCompileValidationResult().HasErrors();
+            m_Device->NoteRecipeGraphValidation(recipeValidationClean);
+
             m_LastRenderGraphStats.Compile.Succeeded = true;
             m_LastRenderGraphStats.Compile.PassCount = compiled->PassCount;
             m_LastRenderGraphStats.Compile.CulledPassCount = compiled->CulledPassCount;

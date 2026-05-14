@@ -49,6 +49,15 @@ namespace Extrinsic::RHI
         /// when false, so no GPU-shaped call touches a stub backend.
         [[nodiscard]] virtual bool IsOperational() const noexcept { return true; }
 
+        // GRAPHICS-033E: the renderer publishes the outcome of the most recent
+        // recipe-aware render-graph validation via this setter. Backends that
+        // need the bit (Vulkan, for the `BarrierValidationClean` operational
+        // gate) override this; the default is a no-op so non-Vulkan backends
+        // remain unaffected. Renderer/runtime code keeps branching on
+        // `IsOperational()`; this surface exists only to feed the operational
+        // gate's input.
+        virtual void NoteRecipeGraphValidation(bool /*clean*/) noexcept {}
+
         // ---- Frame lifecycle -----------------------------------------
         virtual bool BeginFrame(FrameHandle& outFrame)    = 0;
         virtual void EndFrame(const FrameHandle& frame)   = 0;

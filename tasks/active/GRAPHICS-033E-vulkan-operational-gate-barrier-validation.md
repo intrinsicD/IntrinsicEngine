@@ -1,5 +1,19 @@
 # GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate
 
+## Status
+
+- Status: in-progress (slice 1 landed on this branch; awaiting CI gate confirmation and `GRAPHICS-033F` for downstream `GRAPHICS-080` retirement).
+- Owner/agent: Claude on `claude/setup-agentic-workflow-oX1eU`.
+- Branch: `claude/setup-agentic-workflow-oX1eU`.
+- Slice 1 landed in this branch:
+  - `RHI::IDevice::NoteRecipeGraphValidation(bool)` (default no-op) added in `src/graphics/rhi/RHI.Device.cppm`.
+  - `VulkanDevice` override + `std::atomic<bool> m_LatestRecipeValidationClean{false}`, reset to `false` in `Initialize()`, consumed by `BuildOperationalInputs()` for `inputs.BarrierValidationClean` in `src/graphics/vulkan/Backends.Vulkan.Device.cppm` / `.cpp`.
+  - `Graphics.Renderer.cpp::ExecuteFrame()` calls `ValidateRecipeCompiledGraph(...)` after each successful `RenderGraph::Compile()` and publishes the boolean exactly once per compile attempt; the recipe-build-failure and compile-failure paths publish `false` to preserve fail-closed semantics.
+  - Backend-public read accessor `GetVulkanDeviceOperationalInputs(const RHI::IDevice*)` (declared in `Backends.Vulkan.OperationalStatus.cppm`, implemented in `Backends.Vulkan.Device.cpp`) lets contract tests observe `BarrierValidationClean` without re-running the evaluator.
+  - Tests: `RendererFrameLifecycle.PublishesRecipeGraphValidationOnSuccessfulCompile`, `RendererFrameLifecycle.PublishesFailClosedRecipeValidationOnRecipeBuildFailure`, `VulkanFailClosedContract.RecipeGraphValidationSetterFlipsBarrierValidationClean`.
+  - Docs: `src/graphics/vulkan/README.md` §10 documents gate-7 wiring; `src/graphics/renderer/README.md` documents the `ExecuteFrame()` publish step. `MockDevice` records every `NoteRecipeGraphValidation` call.
+- Next verification step: run the default CPU gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) plus the focused contract targets, then await `GRAPHICS-033F` for gate 8 before the active `GRAPHICS-080` can retire.
+
 ## Goal
 - Flip the `BarrierValidationClean` input to the `EvaluateVulkanOperationalStatus(...)` 9-step gate from its current hard-coded `false` (`src/graphics/vulkan/Backends.Vulkan.Device.cpp:882`) so it observes the latest `RenderGraphValidationResult` for the active recipe compile and returns `true` only when the recipe-graph validation reports no `Error`-severity findings on the canonical resource set (`SceneColorHDR`, `SceneDepth`, imported backbuffer finalization, transfer-queue uploads). This is gate step 7 of the operational checklist in `src/graphics/vulkan/README.md:360–362` and is one of the two remaining gates blocking `IsOperational()` from ever returning `true`.
 
