@@ -387,16 +387,24 @@ diagnostic surface is a Vulkan-owned `VulkanOperationalDiagnosticsSnapshot` with
 process-monotonic counters (`VulkanFallbackToNullCount`,
 `VulkanInitFailureCount`, `VulkanValidationErrorCount`,
 `VulkanOperationalGateFailureCount`, `VulkanDeviceLostOperationalDropCount`) and
-a fixed-size reason histogram. Runtime reads the snapshot at startup, after
-device reset/recreate attempts, and after false→true / true→false operational
-transitions; renderer code still gates only on `IDevice::IsOperational()` and
-backend-neutral render-graph stats.
+a fixed-size reason histogram (`ReasonHistogram`, one
+`std::uint32_t` slot per `VulkanOperationalReason`). The snapshot lives in
+`Backends.Vulkan.cppm` next to `FallbackDiagnosticsSnapshot` and is queried
+through `GetVulkanOperationalDiagnosticsSnapshot()`. Counters are bumped by
+`RecordVulkanOperationalFallback(status)` from the runtime startup
+breadcrumb call site in `Runtime::Engine::Initialize()` (one call per
+non-operational truth-table row per startup), and
+`NoteVulkanOperationalDeviceLostDrop()` is invoked from
+`VulkanDevice::NoteDeviceLostIfNeeded()` on the operational→non-operational
+device-lost transition. Counters are process-monotonic across
+`Initialize`/`Shutdown` cycles. Renderer code still gates only on
+`IDevice::IsOperational()` and backend-neutral render-graph stats.
 
 ## Module surface
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetVulkanPipelineDiagnosticsSnapshot()`, `VulkanPipelineCreationStatus`, `VulkanPipelineDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot`, `EvaluateVulkanOperationalStatus()`, `VulkanOperationalInputs`, `VulkanOperationalStatus`, `VulkanOperationalStatusCode`, `VulkanOperationalReason` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetVulkanPipelineDiagnosticsSnapshot()`, `VulkanPipelineCreationStatus`, `VulkanPipelineDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot`, `EvaluateVulkanOperationalStatus()`, `VulkanOperationalInputs`, `VulkanOperationalStatus`, `VulkanOperationalStatusCode`, `VulkanOperationalReason`, `ToString(VulkanOperationalStatusCode)`, `ToString(VulkanOperationalReason)`, `kVulkanOperationalReasonCount`, `VulkanOperationalDiagnosticsSnapshot`, `GetVulkanOperationalDiagnosticsSnapshot()`, `RecordVulkanOperationalFallback()`, `NoteVulkanOperationalDeviceLostDrop()`, `EvaluateVulkanDeviceOperationalStatus()` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory

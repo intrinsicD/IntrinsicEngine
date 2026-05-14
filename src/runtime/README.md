@@ -40,6 +40,21 @@ freshly-constructed subsystems):
 1. `Core::Tasks::Scheduler::Initialize` — CPU fiber scheduler must be live
    before any task-graph or streaming dispatch runs.
 2. Platform window, RHI device, renderer construction + `Initialize`.
+   Immediately after `IDevice::Initialize`, the runtime evaluates
+   `ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(...)` against the
+   resolved `RenderConfig` and `IDevice::IsOperational()`. When the runtime
+   requested the promoted Vulkan device (`Backend == Vulkan` &&
+   `EnablePromotedVulkanDevice`) but the resolved device is non-operational,
+   `Core::Log::Warn` emits one
+   `[Runtime] VulkanRequestedButNotOperational status={...} reason={...}`
+   breadcrumb per `Engine::Initialize()` and calls
+   `Backends::Vulkan::RecordVulkanOperationalFallback(...)` to advance the
+   `VulkanOperationalDiagnosticsSnapshot` counters (GRAPHICS-033B). When the
+   Vulkan backend is not compiled in, the status/reason text is
+   `NotCompiled`/`None` and no Vulkan counters are touched (the diagnostics
+   surface does not exist in that build). Runtime never aborts solely
+   because requested Vulkan falls back to Null — see the truth table in
+   `src/graphics/vulkan/README.md`.
 3. CPU `FrameGraph` and streaming `TaskGraph` + `StreamingExecutor`.
 4. `Assets::AssetService`.
 5. `Graphics::GpuAssetCache` construction with the renderer's

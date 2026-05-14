@@ -270,6 +270,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeCameraControllers.cpp
         Test.RuntimeReferenceScene.cpp
+        Test.RuntimeVulkanBreadcrumb.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
         SEARCH_DIRS contract/runtime
@@ -543,6 +544,7 @@ if(TARGET ExtrinsicBackendsVulkan)
         SEARCH_DIRS contract/graphics
         FILES Test.VulkanFailClosedContract.cpp
               Test.VulkanOperationalStatusEvaluator.cpp
+              Test.VulkanOperationalDiagnosticsSnapshot.cpp
     )
     intrinsic_test_object_lib(GraphicsVulkanContractTestObjs
         SOURCES
