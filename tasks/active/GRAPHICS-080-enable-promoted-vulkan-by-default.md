@@ -1,5 +1,18 @@
 # GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan
 
+## Status
+
+- Status: in-progress (slice 1 landed; staged-acceptance pointer 3 still gated by upstream operational-gate inputs).
+- Owner/agent: Claude on `claude/inspect-engine-state-YRPpU`.
+- Branch: `claude/inspect-engine-state-YRPpU`.
+- Slice 1 landed in this branch:
+  - `ci-vulkan` configure + build preset (`CMakePresets.json`) inheriting from `ci` with `INTRINSIC_BUILD_SANDBOX=ON` and `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON`.
+  - `CreateReferenceEngineConfig()` now sets `Render.EnablePromotedVulkanDevice = true` (`src/runtime/Runtime.Engine.cppm`).
+  - Doc sync: `src/runtime/README.md`, `src/app/Sandbox/README.md`, `docs/architecture/graphics.md`, `tasks/backlog/rendering/README.md`, `tasks/backlog/README.md`, `docs/reviews/2026-05-11-sandbox-graphics-gap-analysis.md`.
+  - CI: new `.github/workflows/ci-vulkan.yml` row drives `cmake --preset ci-vulkan` + `ctest -L 'gpu' -L 'vulkan'`. Default CPU gate workflows (`pr-fast`, `ci-linux-clang`) continue to use the `ci` preset unchanged.
+- Acceptance criterion 3 (canonical visible triangle on a Vulkan-capable host) is staged: the initial form is gated by the remaining `BarrierValidationClean` / `PublicServiceReconciled` operational-gate inputs landing in `src/graphics/vulkan/Backends.Vulkan.Device.cpp`; the canonical form is owned by `GRAPHICS-076` + `GRAPHICS-081`. Until those upstreams land, the runtime falls back to Null with the `VulkanRequestedButNotOperational` breadcrumb (truth-table row `RequestedButIncompleteGate`), matching this task's "On hosts without Vulkan support" criterion.
+- Next verification step: rely on the new `ci-vulkan` workflow row to confirm the preset configures and the breadcrumb path remains green on hosts without a Vulkan device. Retire once acceptance criterion 3's initial form is observable (i.e., the GRAPHICS-033 operational gate fully clears).
+
 ## Goal
 - Once `GRAPHICS-033C` lands and the operational gate is satisfiable, flip the runtime reference config and a `ci-vulkan` preset so the promoted Vulkan device is the default for `ExtrinsicSandbox` runs and `gpu;vulkan` smoke tests, while keeping the existing `ci` preset Vulkan-disabled for fast CPU/null verification.
 

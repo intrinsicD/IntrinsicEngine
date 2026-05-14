@@ -47,6 +47,16 @@
         "INTRINSIC_BUILD_SANDBOX": "OFF",
         "INTRINSIC_ENABLE_CUDA": "OFF"
       }
+    },
+    {
+      "name": "ci-vulkan",
+      "displayName": "Debug tests + sandbox + promoted Vulkan (CUDA off)",
+      "inherits": "ci",
+      "description": "CI preset that opts in to the promoted Vulkan backend (INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON) and includes the Sandbox target for end-to-end visible-triangle smoke. Runtime still falls back to Null per the GRAPHICS-033 truth table when the operational gate is not satisfied; gpu;vulkan fixtures opt in via 'ctest -L gpu -L vulkan'.",
+      "cacheVariables": {
+        "INTRINSIC_BUILD_SANDBOX": "ON",
+        "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -61,6 +71,10 @@
     {
       "name": "ci",
       "configurePreset": "ci"
+    },
+    {
+      "name": "ci-vulkan",
+      "configurePreset": "ci-vulkan"
     }
   ]
 }

@@ -496,9 +496,14 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
   depends on GRAPHICS-033C and GRAPHICS-033D; sibling fixture reusing the
   GRAPHICS-033D harness for recipe-selector coverage.
-- [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan](GRAPHICS-080-enable-promoted-vulkan-by-default.md):
-  depends on GRAPHICS-033C; non-blocking before that landing (only the
-  fail-closed fallback breadcrumb fires).
+- [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan](../../active/GRAPHICS-080-enable-promoted-vulkan-by-default.md)
+  (in progress; promoted to `tasks/active/`): depends on GRAPHICS-033C (done).
+  Adds the `ci-vulkan` configure preset and flips
+  `CreateReferenceEngineConfig()` so the reference sandbox requests promoted
+  Vulkan by default; this is the flip-switch enabling the end-to-end visible
+  triangle once the GRAPHICS-033 operational gate is fully satisfied. Until
+  then runtime continues to fall back to Null per the GRAPHICS-033 truth table
+  with the `VulkanRequestedButNotOperational` breadcrumb.
 
 Cross-layer Theme A leaves outside `rendering/`:
 - [`done/BUILD-001` — Wire shader compilation to the promoted Sandbox build](../../done/BUILD-001-sandbox-shader-compile-wiring.md).

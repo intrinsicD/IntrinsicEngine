@@ -8,6 +8,20 @@ frame phases, and subsystem behavior belong in `Runtime` or lower engine layers.
 The executable obtains its default configuration through `Runtime` and should
 not import lower layers directly.
 
+## Build presets
+
+- `cmake --preset ci` configures the headless CPU/null gate (Sandbox disabled,
+  promoted Vulkan disabled). Use this for fast CPU verification.
+- `cmake --preset ci-vulkan` configures the same Debug + tests profile with
+  `INTRINSIC_BUILD_SANDBOX=ON` and `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON`
+  so `ExtrinsicSandbox` runs against the promoted Vulkan backend on
+  Vulkan-capable hosts (GRAPHICS-080). On hosts without Vulkan support the
+  runtime falls back to Null per the GRAPHICS-033 truth table and the
+  `VulkanRequestedButNotOperational` breadcrumb fires once during startup.
+  Run the opt-in `gpu;vulkan` fixtures with
+  `ctest --test-dir build/ci-vulkan -L 'gpu' -L 'vulkan'` (intersection
+  semantics, not the regex-union `'gpu|vulkan'`).
+
 ## Shader artifacts
 
 `ExtrinsicSandbox` invokes `cmake/CompileShaders.cmake` through the

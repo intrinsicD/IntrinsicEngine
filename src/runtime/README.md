@@ -24,7 +24,18 @@ configuration and composition. `CreateReferenceEngineConfig()` flips
 `EngineConfig::ReferenceScene::Enabled = true` and
 `Selector = ReferenceSceneSelector::Triangle`; the default-constructed
 `EngineConfig{}` keeps `Enabled = false` so existing CPU/null tests do not
-regress.
+regress. `CreateReferenceEngineConfig()` also sets
+`Render.EnablePromotedVulkanDevice = true` so the reference sandbox requests the
+promoted Vulkan backend by default (GRAPHICS-080). Whether the runtime actually
+binds Vulkan or falls back to Null is governed by the GRAPHICS-033 truth table
+in `src/graphics/vulkan/README.md` — when the promoted backend was not compiled
+in, the host lacks Vulkan support, or the operational gate is not yet
+satisfied, the runtime resolves to Null, emits the
+`VulkanRequestedButNotOperational` breadcrumb, and continues. The
+default-constructed `EngineConfig{}` keeps
+`Render.EnablePromotedVulkanDevice = false` so unit/contract suites that drive
+`Engine::Initialize()` against the Null device do not regress and do not emit
+the breadcrumb.
 
 Runtime consumes `Extrinsic.Core.FrameLoop` for reusable platform/render/
 maintenance/shutdown phase contracts. The contract lives in `core` because it has
