@@ -1,0 +1,50 @@
+name: ci-vulkan
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ci-vulkan:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            clang-20 \
+            clang-tools-20 \
+            python3 \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            vulkan-tools \
+            spirv-tools
+
+      - name: Configure (ci-vulkan preset)
+        run: cmake --preset ci-vulkan
+
+      - name: Build promoted Vulkan targets
+        run: cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
+
+      # GRAPHICS-080: `ctest -L 'gpu' -L 'vulkan'` is the documented intersection
+      # form. On runners without a Vulkan device the labelled fixtures self-skip
+      # via `GTEST_SKIP` and the runtime fallback breadcrumb fires — the gate
+      # passes as long as no fixture fails. `--no-tests=ignore` keeps the job
+      # green if a future host build trims the fixture set to empty.
+      - name: Run gpu;vulkan opt-in fixtures
+        run: ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" --no-tests=ignore --timeout 120 -j$(nproc)

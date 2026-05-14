@@ -548,7 +548,11 @@ scene registry is constructed but before the first frame. A
 `Engine::Shutdown()` before scene tear-down. `Sandbox::main.cpp` does not flip the
 flag — `CreateReferenceEngineConfig()` flips
 `EngineConfig::ReferenceScene::Enabled = true` so sandbox stays policy-light per
-the app/runtime boundary.
+the app/runtime boundary. The same helper also sets
+`Render.EnablePromotedVulkanDevice = true` (GRAPHICS-080) so reference
+sandbox launches request the promoted Vulkan backend; the resolved device
+remains governed by the GRAPHICS-033 truth table in
+`src/graphics/vulkan/README.md`.
 
 The first provider, `TriangleProvider`, creates exactly one entity through the
 HARDEN-060 `ECS::Scene::CreateDefault(scene, "ReferenceTriangle")` API. The

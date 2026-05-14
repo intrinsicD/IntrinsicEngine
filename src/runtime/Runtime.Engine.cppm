@@ -77,6 +77,7 @@ namespace Extrinsic::Runtime
         config.Window.Width = 1600;
         config.Window.Height = 900;
         config.Render.Backend = Core::Config::GraphicsBackend::Vulkan;
+        config.Render.EnablePromotedVulkanDevice = true;
         config.Render.EnableValidation = true;
         config.Render.EnableVSync = true;
         config.Render.FramesInFlight = 2;
