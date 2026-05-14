@@ -30,6 +30,7 @@ export import :CommandPools;
 export import :Descriptors;
 export import :Diagnostics;
 export import :Memory;
+export import :OperationalStatus;
 export import :Pipelines;
 export import :Queues;
 export import :Surface;
@@ -103,6 +104,16 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] uint64_t GetGlobalFrameNumber() const override { return m_GlobalFrameNumber; }
 
     private:
+        // GRAPHICS-033A: `EvaluateVulkanDeviceOperationalStatus` is the
+        // backend-public re-evaluator for `RHI::IDevice*` produced by
+        // `CreateVulkanDevice()`. It needs to read the private operational
+        // inputs without exposing them as a public method on `IDevice`
+        // (renderer/runtime code must keep branching on
+        // `IDevice::IsOperational()`). The friendship keeps the read-only
+        // access surface internal to the module.
+        friend VulkanOperationalStatus EvaluateVulkanDeviceOperationalStatus(
+            const RHI::IDevice* device) noexcept;
+
         class FallbackBindlessHeap final : public RHI::IBindlessHeap
         {
         public:

@@ -17,7 +17,7 @@ Root scanned: `src`
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 52 |
 | `graphics/rhi` | 17 |
-| `graphics/vulkan` | 12 |
+| `graphics/vulkan` | 13 |
 | `legacy` | 182 |
 | `platform` | 5 |
 | `runtime` | 7 |
@@ -254,6 +254,7 @@ Root scanned: `src`
 | `Extrinsic.Backends.Vulkan:Device` | `src/graphics/vulkan/Backends.Vulkan.Device.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Diagnostics` | `src/graphics/vulkan/Backends.Vulkan.Diagnostics.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Memory` | `src/graphics/vulkan/Backends.Vulkan.Memory.cppm` | `graphics/vulkan` |
+| `Extrinsic.Backends.Vulkan:OperationalStatus` | `src/graphics/vulkan/Backends.Vulkan.OperationalStatus.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Pipelines` | `src/graphics/vulkan/Backends.Vulkan.Pipelines.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Queues` | `src/graphics/vulkan/Backends.Vulkan.Queues.cppm` | `graphics/vulkan` |
 | `Extrinsic.Backends.Vulkan:Surface` | `src/graphics/vulkan/Backends.Vulkan.Surface.cppm` | `graphics/vulkan` |
@@ -456,4 +457,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **429**
+Total modules: **430**

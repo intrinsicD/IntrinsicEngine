@@ -10,6 +10,7 @@ target_sources(${target_name}
         Backends.Vulkan.Device.cppm
         Backends.Vulkan.Diagnostics.cppm
         Backends.Vulkan.Memory.cppm
+        Backends.Vulkan.OperationalStatus.cppm
         Backends.Vulkan.Pipelines.cppm
         Backends.Vulkan.Queues.cppm
         Backends.Vulkan.Surface.cppm
