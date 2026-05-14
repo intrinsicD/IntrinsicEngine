@@ -114,21 +114,6 @@ namespace
         return nullptr;
     }
 
-    [[nodiscard]] int FindBarrierIndex(const Tests::MockCommandContext& context,
-                                       const RHI::TextureHandle handle,
-                                       const RHI::TextureLayout before,
-                                       const RHI::TextureLayout after)
-    {
-        for (int i = 0; i < static_cast<int>(context.TextureBarrierCalls.size()); ++i)
-        {
-            const auto& barrier = context.TextureBarrierCalls[static_cast<std::size_t>(i)];
-            if (barrier.Texture == handle && barrier.Before == before && barrier.After == after)
-            {
-                return i;
-            }
-        }
-        return -1;
-    }
 }
 
 // -----------------------------------------------------------------------------
@@ -369,24 +354,48 @@ TEST(MinimalDebugPresentPassContract, AcceptanceFrameRecordsBothPassesAndBarrier
     EXPECT_EQ(surfacePass->Status, Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(presentPass->Status, Graphics::RenderCommandPassStatus::Recorded);
 
-    // The imported Backbuffer must reach the end-of-graph Present sentinel
-    // layout. Render-graph barrier compilation produces the exact transition.
-    const int backbufferToPresentIndex =
-        FindBarrierIndex(device.CommandContext, device.BackbufferHandle,
-                         RHI::TextureLayout::ColorAttachment, RHI::TextureLayout::Present);
+    // BUG-010: the imported Backbuffer must reach the end-of-graph Present
+    // sentinel layout. Render-graph barrier compilation emits this transition
+    // from the backbuffer's `ImportBackbuffer` final-state contract
+    // (`InitialState = Undefined`, `FinalState = Present`). The framegraph
+    // intentionally rejects `Write(backbuffer, ...)` declarations
+    // (`Graphics.RenderGraph.cpp:206`), so the canonical barrier shape is
+    // `Undefined -> Present` rather than `ColorAttachment -> Present` — the
+    // minimal present pass samples `SceneColorHDR` and the imported
+    // backbuffer is only declared via `Read(backbuffer, TextureUsage::Present)`,
+    // which marks the side-effect finalization without authorizing a
+    // graph-level color-attachment write.
+    int backbufferToPresentIndex = -1;
+    for (std::size_t bi = 0; bi < device.CommandContext.TextureBarrierCalls.size(); ++bi)
+    {
+        const auto& barrier = device.CommandContext.TextureBarrierCalls[bi];
+        if (barrier.Texture == device.BackbufferHandle &&
+            barrier.After == RHI::TextureLayout::Present)
+        {
+            backbufferToPresentIndex = static_cast<int>(bi);
+            break;
+        }
+    }
     EXPECT_GE(backbufferToPresentIndex, 0)
         << "Minimal recipe must finalize the backbuffer to Present as the "
            "end-of-graph sentinel.";
 
-    // The backbuffer should be transitioned to a writable color-attachment
-    // layout before being finalized for present.
-    const int backbufferToColorIndex =
-        FindBarrierIndex(device.CommandContext, device.BackbufferHandle,
-                         RHI::TextureLayout::Undefined, RHI::TextureLayout::ColorAttachment);
-    if (backbufferToColorIndex >= 0)
+    // The end-of-graph backbuffer transition starts from the imported
+    // `Undefined` initial state because the framegraph forbids backbuffer
+    // writes and therefore never routes the imported handle through an
+    // intermediate `ColorAttachment`/`General` layout. If the compiler
+    // ever inserts an intermediate state the assertion below documents the
+    // expected ordering invariant.
+    if (backbufferToPresentIndex >= 0)
     {
-        EXPECT_LT(backbufferToColorIndex, backbufferToPresentIndex)
-            << "Backbuffer must enter ColorAttachment before exiting to Present.";
+        const auto& finalBarrier =
+            device.CommandContext.TextureBarrierCalls[static_cast<std::size_t>(backbufferToPresentIndex)];
+        EXPECT_EQ(finalBarrier.Before, RHI::TextureLayout::Undefined)
+            << "Minimal recipe must transition the imported backbuffer directly "
+               "from Undefined to Present because the framegraph rejects "
+               "backbuffer writes; if this ever changes, update the recipe "
+               "barrier contract documentation in tasks/done/GRAPHICS-032 and "
+               "tasks/done/BUG-010 as well.";
     }
 
     renderer->Shutdown();
