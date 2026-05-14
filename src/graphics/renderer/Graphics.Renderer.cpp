@@ -1196,8 +1196,18 @@ namespace Extrinsic::Graphics
                                        m_DefaultDebugSurfacePipelineLease->IsValid() &&
                                        m_MinimalDebugSurfacePass.GetPipeline().IsValid();
             const bool gpuWorldReady = m_GpuWorld.has_value();
+            // BUG-009: the surface pass records `DrawIndexedIndirectCount`
+            // against the SurfaceOpaque bucket buffers, which are populated by
+            // `RecordCullingPass`. When the culling pipeline failed to build,
+            // `m_CullingOutputAvailable` is false and the culling dispatch is
+            // skipped, so the indirect arg/count buffers — even though their
+            // handles remain allocated by `CullingSystem::AllocateGpuBuffers`
+            // — are never written this frame. Gate the minimal-recipe surface
+            // pass on the same `m_CullingOutputAvailable` flag used by
+            // `RecordCullingPass`/`RecordDepthPrepass` so the prerequisite
+            // check matches the live culling-output contract.
             bool bucketReady = false;
-            if (m_CullingSystem.has_value())
+            if (m_CullingOutputAvailable && m_CullingSystem.has_value())
             {
                 const auto& bucket = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
                 bucketReady = bucket.Indexed && bucket.IndexedArgsBuffer.IsValid() &&

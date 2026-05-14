@@ -868,11 +868,17 @@ VulkanOperationalInputs VulkanDevice::BuildOperationalInputs() const noexcept
     }
     inputs.CommandSyncReady = commandSyncReady;
 
-    // Higher gates (GRAPHICS-033B/C). The current implementation never
-    // satisfies them so `EvaluateVulkanOperationalStatus` always returns one
-    // of the non-operational reasons; this preserves the existing
-    // fail-closed contract until the upstream wiring lands.
-    inputs.MinimalRecipeRecordingPresent = false;
+    // GRAPHICS-033C: the minimal-recipe recording bodies
+    // (`MinimalDebugSurfacePass::Execute` and
+    // `MinimalDebugPresentPass::Execute`) are present in the renderer and the
+    // executor lambda routes the live `VulkanCommandContext` to them whenever
+    // `IDevice::IsOperational()` is true and the slot-0 / culling / GpuWorld
+    // prerequisites are ready. The presence of the recording bodies is a
+    // codebase fact, so this gate flips to `true` here; runtime fail-closed
+    // behavior is still governed by the remaining higher gates
+    // (`BarrierValidationClean`, `PublicServiceReconciled`) which stay false
+    // until their owning slices land.
+    inputs.MinimalRecipeRecordingPresent = true;
     inputs.BarrierValidationClean        = false;
     inputs.PublicServiceReconciled       = false;
     inputs.ValidationClean               = true;
