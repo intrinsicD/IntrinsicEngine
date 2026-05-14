@@ -486,8 +486,8 @@ independently testable (CPU/null where possible), and gated as recorded.
   depends on GRAPHICS-032B. Landed by commit `e50c593`.
 - [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
   depends on GRAPHICS-033 (planning). Landed by commit `7a5886d`.
-- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (in-progress)](../../active/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
-  depends on GRAPHICS-033A.
+- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
+  depends on GRAPHICS-033A. Landed by commit `d736d9b`.
 - [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
   depends on GRAPHICS-032C, GRAPHICS-031B, GRAPHICS-033B, and GRAPHICS-018R
   (done) operational-transition seam.

@@ -9,10 +9,10 @@
 - No mutation of the runtime device-selection path (`Runtime.Engine.cpp:49–73` continues to consult the existing config flags); this task only adds visibility.
 
 ## Context
-- Status: in-progress.
-- Owner/agent: Claude on branch `claude/inspect-engine-state-Ava9i`.
+- Status: done.
+- Owner/agent: Claude on branch `claude/inspect-engine-state-Ava9i` (implementation), `claude/inspect-engine-state-nJhlp` (retirement).
 - Owner/layer: `graphics/vulkan` for diagnostics; `runtime` for the breadcrumb call site.
-- Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-B in the parent's Required changes.
+- Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-B in the parent's Required changes.
 - Upstream gate: `GRAPHICS-033A` (the evaluator + reason taxonomy must exist).
 - Truth table for runtime reconciliation is locked in `src/graphics/vulkan/README.md:364–376`.
 
@@ -54,8 +54,10 @@ python3 tools/docs/check_doc_links.py --root .
 - Aborting startup on fallback.
 - Mutating renderer pass routing (reserved for `GRAPHICS-033C`).
 
-## Next verification step
-- Project CI gate on the PR (`ci` preset, clang-20 toolchain) for the focused
-  contract targets and the layering/doc-link/test-layout checks; the
-  authoring container ships clang-18 only and cannot execute the build/CTest
-  gate locally, matching the GRAPHICS-033A retirement note.
+## Completion
+- Completed: 2026-05-14.
+- Commit reference: `d736d9b` ("GRAPHICS-033B Add Vulkan operational diagnostics + runtime breadcrumb") via PR #825 from `claude/inspect-engine-state-Ava9i`, merged to `main` at 2026-05-14T06:02:55Z.
+- Verification:
+  - Project CI ran on PR #825 (`ci` preset, clang-20 toolchain) and passed before merge to `main`.
+  - Authoring session ran the structural checks locally (`check_layering`, `check_doc_links`, `check_task_policy`, `check_test_layout` — all clean); the focused `cmake --preset ci` / `ctest -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'` gate ran in the PR's CI environment because the authoring container shipped clang-18 only (preset pins clang-20), matching the GRAPHICS-033A retirement note.
+  - `docs/api/generated/module_inventory.md` did not require regeneration; the new symbols (`VulkanOperationalDiagnosticsSnapshot`, `GetVulkanOperationalDiagnosticsSnapshot`, `RecordVulkanOperationalFallback`, `NoteVulkanOperationalDeviceLostDrop`, `ShouldEmitVulkanRequestedButNotOperationalBreadcrumb`) were added inside already-listed module surfaces (`Extrinsic.Backends.Vulkan`, `Intrinsic.Runtime.Engine`), and the retirement session confirmed `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md` produces no diff (429 modules, in sync).
