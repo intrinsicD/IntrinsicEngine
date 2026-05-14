@@ -326,10 +326,18 @@ VulkanOperationalStatus` is now exported from `Extrinsic.Backends.Vulkan`
 non-native booleans / reason bits (no `Vk*` handles). `VulkanDevice::IsOperational()`
 consumes the evaluator through `VulkanDevice::ComputeOperationalPredicate()`;
 runtime startup reconciliation (`GRAPHICS-033B`) consumes the same result.
-Until the higher-gate wiring lands, `BuildOperationalInputs()` leaves
-`MinimalRecipeRecordingPresent`, `BarrierValidationClean`, and
-`PublicServiceReconciled` as `false`, so the evaluator preserves the existing
-fail-closed contract.
+Implementation child C landed the minimal-recipe recording bodies
+(`GRAPHICS-033C`): `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug`
+recording bodies execute against the live command context once the device is
+operational, the slot-0 default-debug-surface pipeline lease is rebuilt
+byte-identical by `IRenderer::RebuildOperationalResources()` on the
+false→true transition, and the executor lambda routes the live graphics
+`VulkanCommandContext` to the minimal-recipe pass routes. `BuildOperationalInputs()`
+now reports `MinimalRecipeRecordingPresent = true` because the recording
+bodies are a codebase fact; the remaining higher gates
+(`BarrierValidationClean`, `PublicServiceReconciled`) stay `false` until
+their owning slices land, so the evaluator preserves the existing fail-closed
+contract.
 
 Ordered gate checklist:
 

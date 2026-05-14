@@ -323,6 +323,69 @@ TEST(MinimalDebugSurfacePassContract, MissingCullingBucketSkipsUnavailableAndInc
     renderer->Shutdown();
 }
 
+// GRAPHICS-033C — the minimal recipe must record its surface and present
+// passes after a non-operational → operational transition. The
+// `RebuildOperationalResources()` seam rebuilds the slot-0 default-debug-
+// surface pipeline lease (which both `MinimalDebugSurfacePass` and
+// `MinimalDebugPresentPass` share), the depth-prepass pipeline, the
+// `GpuWorld` buffers, and culling system byte-identical. After the
+// transition the executor lambda routes the live command context to the
+// minimal-recipe pass routes; this test pins that contract.
+TEST(MinimalDebugSurfacePassContract, RecordsCommandsAfterOperationalRebuildTransition)
+{
+    Tests::MockDevice device;
+    device.Operational = false;
+    device.BackbufferHandle = RHI::TextureHandle{777u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetFrameRecipe(Core::Config::FrameRecipeKind::MinimalDebug);
+
+    {
+        RHI::FrameHandle frame{};
+        ASSERT_TRUE(renderer->BeginFrame(frame));
+        const Graphics::RenderFrameInput input{.Viewport = {.Width = 96, .Height = 72}};
+        Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+        renderer->PrepareFrame(world);
+        renderer->ExecuteFrame(frame, world);
+
+        const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+        EXPECT_FALSE(stats.Execute.DeviceOperational);
+        const auto* surfacePass = FindCommandPass(stats, std::string{Graphics::kMinimalDebugSurfacePassName});
+        ASSERT_NE(surfacePass, nullptr);
+        EXPECT_EQ(surfacePass->Status, Graphics::RenderCommandPassStatus::SkippedNonOperational);
+        EXPECT_EQ(stats.MinimalSurfacePassExecutions, 0u);
+    }
+
+    device.Operational = true;
+    ASSERT_TRUE(renderer->RebuildOperationalResources(device));
+    EXPECT_TRUE(renderer->GetDefaultDebugSurfacePipeline().IsValid())
+        << "Slot-0 pipeline lease must be rebuilt across the transition so the "
+           "MinimalDebug recipe can record commands.";
+
+    device.CommandContext = Tests::MockCommandContext{};
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Graphics::RenderFrameInput input{.Viewport = {.Width = 96, .Height = 72}};
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+    EXPECT_EQ(stats.MinimalSurfacePassExecutions, 1u);
+    EXPECT_EQ(stats.MinimalPresentPassExecutions, 1u);
+    EXPECT_EQ(stats.MinimalRecipeMissingPrerequisiteCount, 0u);
+
+    const auto* surfacePass = FindCommandPass(stats, std::string{Graphics::kMinimalDebugSurfacePassName});
+    ASSERT_NE(surfacePass, nullptr);
+    EXPECT_EQ(surfacePass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    renderer->Shutdown();
+}
+
 TEST(MinimalDebugSurfacePassContract, NonOperationalDeviceSkipsNonOperational)
 {
     // Initialize with an operational MockDevice so the slot-0 pipeline lease

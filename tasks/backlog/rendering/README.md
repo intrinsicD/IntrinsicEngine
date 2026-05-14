@@ -488,7 +488,7 @@ independently testable (CPU/null where possible), and gated as recorded.
   depends on GRAPHICS-033 (planning). Landed by commit `7a5886d`.
 - [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
   depends on GRAPHICS-033A. Landed by commit `d736d9b`.
-- [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
+- [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface` (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
   depends on GRAPHICS-032C, GRAPHICS-031B, GRAPHICS-033B, and GRAPHICS-018R
   (done) operational-transition seam.
 - [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture](GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
