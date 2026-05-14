@@ -42,9 +42,17 @@ jobs:
         run: cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
 
       # GRAPHICS-080: `ctest -L 'gpu' -L 'vulkan'` is the documented intersection
-      # form. On runners without a Vulkan device the labelled fixtures self-skip
-      # via `GTEST_SKIP` and the runtime fallback breadcrumb fires — the gate
-      # passes as long as no fixture fails. `--no-tests=ignore` keeps the job
-      # green if a future host build trims the fixture set to empty.
+      # form across labels (each `-L` regex must match at least one label). The
+      # additional `-LE 'slow|flaky-quarantine'` exclusion narrows the gate to
+      # the actual gpu;vulkan smoke fixtures and keeps the broad
+      # `IntrinsicRuntimeTests` aggregate (plus its grouped entries) off the
+      # PR-time path: those targets are labelled `gpu vulkan slow` by
+      # `tests/CMakeLists.txt` because, per HARDEN-041, they still mix CPU-side
+      # runtime contracts with Vulkan-backed headless tests. Once HARDEN-041
+      # splits the labels we can drop the `slow` exclusion here. On runners
+      # without a Vulkan device the remaining smoke fixtures self-skip via
+      # `GTEST_SKIP` and the runtime fallback breadcrumb fires — the gate passes
+      # as long as no fixture fails. `--no-tests=ignore` keeps the job green if
+      # a future host build trims the fixture set to empty.
       - name: Run gpu;vulkan opt-in fixtures
-        run: ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" --no-tests=ignore --timeout 120 -j$(nproc)
+        run: ctest --test-dir build/ci-vulkan --output-on-failure -L "gpu" -L "vulkan" -LE "slow|flaky-quarantine" --no-tests=ignore --timeout 120 -j$(nproc)
