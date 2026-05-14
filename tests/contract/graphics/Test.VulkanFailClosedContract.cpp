@@ -125,6 +125,48 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     EXPECT_FALSE(device->IsOperational());
 }
 
+// -----------------------------------------------------------------------------
+// GRAPHICS-033E: gate 7 (`BarrierValidationClean`) is sourced from the renderer-
+// published recipe-aware validation outcome via
+// `IDevice::NoteRecipeGraphValidation(bool)`. A freshly-created `VulkanDevice`
+// reports `BarrierValidationClean == false` (cold-start fail-closed); a publish
+// of `true` flips it; a publish of `false` flips it back. The setter does not
+// affect any other gate input, and a re-`Initialize()` resets the bit to
+// fail-closed.
+// -----------------------------------------------------------------------------
+TEST(VulkanFailClosedContract, RecipeGraphValidationSetterFlipsBarrierValidationClean)
+{
+    std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
+    ASSERT_NE(device, nullptr);
+
+    EXPECT_FALSE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).BarrierValidationClean);
+
+    device->NoteRecipeGraphValidation(true);
+    EXPECT_TRUE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).BarrierValidationClean);
+
+    device->NoteRecipeGraphValidation(false);
+    EXPECT_FALSE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).BarrierValidationClean);
+
+    device->NoteRecipeGraphValidation(true);
+    EXPECT_TRUE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).BarrierValidationClean);
+
+    // Re-`Initialize()` against a null window must drop the bit back to
+    // fail-closed; the cold-start invariant survives a re-bootstrap attempt.
+    Extrinsic::Core::Config::WindowConfig windowConfig{};
+    Extrinsic::Platform::Backends::Null::NullWindow window{windowConfig};
+    Extrinsic::Core::Config::RenderConfig renderConfig{};
+    renderConfig.EnablePromotedVulkanDevice = true;
+    renderConfig.EnableValidation = false;
+    device->Initialize(window, renderConfig);
+
+    EXPECT_FALSE(
+        Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).BarrierValidationClean);
+}
+
 TEST(VulkanFailClosedContract, FallbackTransferQueueIncrementsUploadCounter)
 {
     std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();

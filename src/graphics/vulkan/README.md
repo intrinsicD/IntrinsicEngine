@@ -334,10 +334,23 @@ byte-identical by `IRenderer::RebuildOperationalResources()` on the
 false→true transition, and the executor lambda routes the live graphics
 `VulkanCommandContext` to the minimal-recipe pass routes. `BuildOperationalInputs()`
 now reports `MinimalRecipeRecordingPresent = true` because the recording
-bodies are a codebase fact; the remaining higher gates
-(`BarrierValidationClean`, `PublicServiceReconciled`) stay `false` until
-their owning slices land, so the evaluator preserves the existing fail-closed
-contract.
+bodies are a codebase fact.
+
+Implementation child E landed the gate-7 wiring (`GRAPHICS-033E`):
+`RHI::IDevice::NoteRecipeGraphValidation(bool)` is a backend-neutral CPU-public
+setter (default no-op for non-Vulkan backends). After every recipe compile
+attempt the renderer calls `ValidateRecipeCompiledGraph(...)` against the just-
+compiled graph and publishes
+`result.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u` (combined
+with the compiler-level findings already stored on the render graph) to the
+device exactly once. `VulkanDevice` stores the bit in
+`m_LatestRecipeValidationClean` (`std::atomic<bool>`, initialized to `false`
+and reset to `false` in `Initialize()`) and `BuildOperationalInputs()` reads
+it as `inputs.BarrierValidationClean`. A failed recipe build or a failed
+`RenderGraph::Compile()` publishes `false` so the gate cannot inherit a
+stale-clean state. The remaining higher gate (`PublicServiceReconciled`)
+stays `false` until its owning slice (`GRAPHICS-033F`) lands, so the evaluator
+preserves the existing fail-closed contract.
 
 Ordered gate checklist:
 

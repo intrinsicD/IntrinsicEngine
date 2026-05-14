@@ -171,4 +171,13 @@ namespace Extrinsic::Backends::Vulkan
     // implementations. Returns `{NotCompiled, None}` for a null device.
     export [[nodiscard]] VulkanOperationalStatus
     EvaluateVulkanDeviceOperationalStatus(const RHI::IDevice* device) noexcept;
+
+    // GRAPHICS-033E: backend-public snapshot of the live `VulkanOperationalInputs`
+    // for `device`, which must have been produced by `CreateVulkanDevice()`.
+    // Behavior is undefined for other `IDevice` implementations. Returns a
+    // zero-initialized struct for a null device. Used by contract tests to
+    // observe the publish-side state of individual gate inputs (notably
+    // `BarrierValidationClean`) without re-running the evaluator.
+    export [[nodiscard]] VulkanOperationalInputs
+    GetVulkanDeviceOperationalInputs(const RHI::IDevice* device) noexcept;
 }

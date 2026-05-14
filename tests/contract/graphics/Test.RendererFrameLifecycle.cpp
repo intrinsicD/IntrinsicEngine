@@ -175,6 +175,69 @@ TEST(RendererFrameLifecycle, InvalidDeviceBackbufferReportsRecipeDiagnostic)
     renderer->Shutdown();
 }
 
+// -----------------------------------------------------------------------------
+// GRAPHICS-033E: after a successful recipe build + compile, the renderer must
+// publish the recipe-aware validation outcome to the device exactly once via
+// `IDevice::NoteRecipeGraphValidation(bool)`. A clean compile of the default
+// recipe yields `true`.
+// -----------------------------------------------------------------------------
+TEST(RendererFrameLifecycle, PublishesRecipeGraphValidationOnSuccessfulCompile)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_EQ(device.RecipeGraphValidationCalls.size(), 1u);
+    EXPECT_TRUE(device.RecipeGraphValidationCalls.front());
+
+    renderer->Shutdown();
+}
+
+// -----------------------------------------------------------------------------
+// GRAPHICS-033E: when the recipe build fails (e.g. invalid backbuffer handle),
+// the renderer publishes `false` so the operational gate cannot inherit a
+// stale-clean state from a prior compile.
+// -----------------------------------------------------------------------------
+TEST(RendererFrameLifecycle, PublishesFailClosedRecipeValidationOnRecipeBuildFailure)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = {};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 64, .Height = 64},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_FALSE(stats.Compile.Succeeded);
+    ASSERT_EQ(device.RecipeGraphValidationCalls.size(), 1u);
+    EXPECT_FALSE(device.RecipeGraphValidationCalls.front());
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, NonOperationalDeviceSkipsCullingCommandsButExecutesGraph)
 {
     Extrinsic::Tests::MockDevice device;

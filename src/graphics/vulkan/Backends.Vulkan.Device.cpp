@@ -718,6 +718,15 @@ VulkanOperationalStatus EvaluateVulkanDeviceOperationalStatus(
     return EvaluateVulkanOperationalStatus(vulkanDevice.BuildOperationalInputs());
 }
 
+VulkanOperationalInputs GetVulkanDeviceOperationalInputs(
+    const RHI::IDevice* device) noexcept
+{
+    if (device == nullptr)
+        return {};
+    const auto& vulkanDevice = static_cast<const VulkanDevice&>(*device);
+    return vulkanDevice.BuildOperationalInputs();
+}
+
 VulkanBootstrapDiagnosticsSnapshot GetVulkanBootstrapDiagnosticsSnapshot() noexcept
 {
     std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
@@ -875,11 +884,15 @@ VulkanOperationalInputs VulkanDevice::BuildOperationalInputs() const noexcept
     // `IDevice::IsOperational()` is true and the slot-0 / culling / GpuWorld
     // prerequisites are ready. The presence of the recording bodies is a
     // codebase fact, so this gate flips to `true` here; runtime fail-closed
-    // behavior is still governed by the remaining higher gates
-    // (`BarrierValidationClean`, `PublicServiceReconciled`) which stay false
-    // until their owning slices land.
+    // behavior is still governed by the remaining higher gate
+    // (`PublicServiceReconciled`) which stays false until its owning slice
+    // (`GRAPHICS-033F`) lands.
     inputs.MinimalRecipeRecordingPresent = true;
-    inputs.BarrierValidationClean        = false;
+    // GRAPHICS-033E: gate 7 is sourced from the renderer-published recipe-aware
+    // validation outcome. Cold-start fail-closed (`Initialize()` resets the
+    // atomic to `false`); a single `Error`-severity finding flips it back to
+    // `false` on the next compile.
+    inputs.BarrierValidationClean        = m_LatestRecipeValidationClean.load(std::memory_order_relaxed);
     inputs.PublicServiceReconciled       = false;
     inputs.ValidationClean               = true;
 
@@ -1152,6 +1165,11 @@ bool VulkanDevice::IsOperational() const noexcept
     return m_Operational && ComputeOperationalPredicate();
 }
 
+void VulkanDevice::NoteRecipeGraphValidation(const bool clean) noexcept
+{
+    m_LatestRecipeValidationClean.store(clean, std::memory_order_relaxed);
+}
+
 RHI::ITransferQueue& VulkanDevice::GetTransferQueue()
 {
     if (HasLiveOperationalPrerequisites() && m_TransferQueue && m_TransferQueue->IsValid())
@@ -1176,6 +1194,9 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
     m_PendingResizeExtent = {};
     m_FrameSlot         = 0;
     m_GlobalFrameNumber = 0;
+    // GRAPHICS-033E: cold-start fail-closed until the renderer publishes the
+    // first clean recipe-aware validation outcome.
+    m_LatestRecipeValidationClean.store(false, std::memory_order_relaxed);
 
     if (m_Instance != VK_NULL_HANDLE || m_Surface != VK_NULL_HANDLE || m_Device != VK_NULL_HANDLE ||
         m_Swapchain != VK_NULL_HANDLE)
@@ -1187,6 +1208,7 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         m_PendingResizeExtent = {};
         m_FrameSlot         = 0;
         m_GlobalFrameNumber = 0;
+        m_LatestRecipeValidationClean.store(false, std::memory_order_relaxed);
     }
 
     VulkanBootstrapDiagnosticsSnapshot diagnostics{};

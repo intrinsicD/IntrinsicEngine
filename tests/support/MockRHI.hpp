@@ -339,12 +339,22 @@ namespace Extrinsic::Tests
         std::vector<BufferWriteRecord> BufferWrites;
         std::vector<TextureWriteRecord> TextureWrites;
 
+        // GRAPHICS-033E: records every `NoteRecipeGraphValidation(bool)` call
+        // so contract tests can verify the renderer publishes the recipe-aware
+        // validation outcome exactly once per recipe compile attempt.
+        std::vector<bool> RecipeGraphValidationCalls;
+
         MockBindlessHeap   Bindless;
         MockCommandContext CommandContext;
         MockTransferQueue  TransferQueue;
 
         // ---- IDevice -------------------------------------------------------
         [[nodiscard]] bool IsOperational() const noexcept override { return Operational; }
+
+        void NoteRecipeGraphValidation(bool clean) noexcept override
+        {
+            RecipeGraphValidationCalls.push_back(clean);
+        }
 
         void Initialize(Platform::IWindow&, const Core::Config::RenderConfig&) override {}
         void Shutdown() override {}

@@ -493,11 +493,11 @@ independently testable (CPU/null where possible), and gated as recorded.
   (done) operational-transition seam.
 - [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture](GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
   depends on GRAPHICS-033C; owns the pixel-readback driver harness.
-- [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate](GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
-  depends on GRAPHICS-033C (recording bodies landed) and GRAPHICS-022
-  (rendergraph validation surface). Producer-side wiring from the renderer's
-  post-`ValidateRecipeCompiledGraph(...)` outcome to a new CPU-public
-  `IDevice::NoteRecipeGraphValidation(bool)` setter consumed by
+- [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate](../../active/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
+  active (slice 1 landed). Depends on GRAPHICS-033C (recording bodies landed)
+  and GRAPHICS-022 (rendergraph validation surface). Producer-side wiring from
+  the renderer's post-`ValidateRecipeCompiledGraph(...)` outcome to a new
+  CPU-public `IDevice::NoteRecipeGraphValidation(bool)` setter consumed by
   `VulkanDevice::BuildOperationalInputs()`. Planning-gap fill: the parent
   GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not enumerate an
   explicit child for gates 7/8.

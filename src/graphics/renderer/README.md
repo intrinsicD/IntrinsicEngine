@@ -34,6 +34,17 @@ generated during compilation, and `GetLastCompileValidationResult()` exposes
 structured hard-error findings when `Compile()` fails. Callers needing a
 human-readable summary should read `Findings.front().Message`.
 
+Per `GRAPHICS-033E`, `Graphics.Renderer.cpp::ExecuteFrame()` publishes the
+recipe-aware validation outcome to the device via
+`RHI::IDevice::NoteRecipeGraphValidation(bool)` exactly once per recipe compile
+attempt. After a successful `RenderGraph::Compile()` the renderer calls
+`ValidateRecipeCompiledGraph(...)` on the active recipe's introspection and
+publishes
+`result.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u && !GetLastCompileValidationResult().HasErrors()`.
+A failed recipe build or a failed `Compile()` publishes `false` so the
+backend's operational gate cannot inherit a stale-clean state. Non-Vulkan
+backends inherit the default no-op implementation.
+
 ### Scene and sync systems
 
 - `Extrinsic.Graphics.RenderFrameInput`
