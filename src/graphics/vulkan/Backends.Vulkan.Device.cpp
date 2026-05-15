@@ -817,12 +817,45 @@ bool VulkanDevice::HasLiveOperationalPrerequisites() const noexcept
 
 bool VulkanDevice::HasOperationalSafetyPrerequisites() const noexcept
 {
-    // GRAPHICS-018 operational promotion is intentionally stricter than guarded
-    // bootstrap readiness. The live Vulkan objects above are necessary but not
-    // sufficient: canonical renderer resource, descriptor, and pass execution
-    // prerequisites must still be reconciled before runtime/renderer code may
-    // observe IsOperational() and therefore receive the live public services.
-    return false;
+    // GRAPHICS-033F: gate 8 (`PublicServiceReconciled`) is sourced from raw,
+    // non-circular preconditions on the live Vulkan handles and bound command
+    // contexts. The previous hard-coded `false` was a placeholder for the
+    // service-diagnostics path, and the diagnostics block used to derive
+    // `PublicBindlessHeapExposed` from `IsOperational()`, which created a
+    // definitional cycle through `BuildOperationalInputs()`. This predicate
+    // breaks that cycle by checking raw live-handle prerequisites directly.
+    if (m_DeviceLost)
+        return false;
+    if (m_GlobalPipelineLayout == VK_NULL_HANDLE)
+        return false;
+    if (!m_BindlessHeap || !m_BindlessHeap->IsValid())
+        return false;
+    if (!m_TransferQueue || !m_TransferQueue->IsValid())
+        return false;
+    if (m_Swapchain == VK_NULL_HANDLE)
+        return false;
+    const std::size_t swapchainImageCount = m_SwapchainImages.size();
+    if (swapchainImageCount == 0u ||
+        m_SwapchainViews.size()   != swapchainImageCount ||
+        m_SwapchainHandles.size() != swapchainImageCount)
+    {
+        return false;
+    }
+    for (const PerFrame& frame : m_Frames)
+    {
+        if (frame.CmdPool == VK_NULL_HANDLE || frame.CmdBuffer == VK_NULL_HANDLE ||
+            frame.Fence == VK_NULL_HANDLE || frame.ImageAcquired == VK_NULL_HANDLE ||
+            frame.RenderDone == VK_NULL_HANDLE)
+        {
+            return false;
+        }
+    }
+    for (const VulkanCommandContext& cmdContext : m_CmdContexts)
+    {
+        if (!cmdContext.IsBound())
+            return false;
+    }
+    return true;
 }
 
 VulkanOperationalInputs VulkanDevice::BuildOperationalInputs() const noexcept
@@ -883,17 +916,18 @@ VulkanOperationalInputs VulkanDevice::BuildOperationalInputs() const noexcept
     // executor lambda routes the live `VulkanCommandContext` to them whenever
     // `IDevice::IsOperational()` is true and the slot-0 / culling / GpuWorld
     // prerequisites are ready. The presence of the recording bodies is a
-    // codebase fact, so this gate flips to `true` here; runtime fail-closed
-    // behavior is still governed by the remaining higher gate
-    // (`PublicServiceReconciled`) which stays false until its owning slice
-    // (`GRAPHICS-033F`) lands.
+    // codebase fact, so this gate flips to `true` here.
     inputs.MinimalRecipeRecordingPresent = true;
     // GRAPHICS-033E: gate 7 is sourced from the renderer-published recipe-aware
     // validation outcome. Cold-start fail-closed (`Initialize()` resets the
     // atomic to `false`); a single `Error`-severity finding flips it back to
     // `false` on the next compile.
     inputs.BarrierValidationClean        = m_LatestRecipeValidationClean.load(std::memory_order_relaxed);
-    inputs.PublicServiceReconciled       = false;
+    // GRAPHICS-033F: gate 8 is sourced from the raw, non-circular safety-
+    // prereq predicate. The predicate inspects live Vulkan handles directly
+    // and never consults `IsOperational()`, so the diagnostics block can
+    // safely combine the two without re-entering this evaluator.
+    inputs.PublicServiceReconciled       = HasOperationalSafetyPrerequisites();
     inputs.ValidationClean               = true;
 
     return inputs;
@@ -1833,8 +1867,15 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
             serviceDiagnostics.CommandContextRebindCount == kMaxFramesInFlight;
         RefreshOperationalState();
         serviceDiagnostics.LiveOperationalPrerequisitesReady = HasLiveOperationalPrerequisites();
-        serviceDiagnostics.OperationalSafetyPrerequisitesReady = HasOperationalSafetyPrerequisites();
-        serviceDiagnostics.PublicBindlessHeapExposed = IsOperational() && m_BindlessHeap && m_BindlessHeap->IsValid();
+        // GRAPHICS-033F: source `PublicBindlessHeapExposed` from
+        // `HasOperationalSafetyPrerequisites() && IsOperational()` rather
+        // than from `IsOperational()` alone. This is a correctness clarification
+        // (the operational predicate already consumes the safety prereqs
+        // through gate 8), not a behavior change for fail-closed paths.
+        const bool safetyPrereqsReady = HasOperationalSafetyPrerequisites();
+        serviceDiagnostics.OperationalSafetyPrerequisitesReady = safetyPrereqsReady;
+        serviceDiagnostics.PublicBindlessHeapExposed = safetyPrereqsReady && IsOperational() &&
+                                                       m_BindlessHeap && m_BindlessHeap->IsValid();
         serviceDiagnostics.PublicTransferQueueExposed = serviceDiagnostics.LiveOperationalPrerequisitesReady &&
                                                          m_TransferQueue && m_TransferQueue->IsValid();
         serviceDiagnostics.PublicServicesExposed = serviceDiagnostics.PublicBindlessHeapExposed &&

@@ -32,6 +32,20 @@ namespace Extrinsic::Backends::Vulkan
                   uint32_t presentQueueFamily  = VK_QUEUE_FAMILY_IGNORED,
                   uint32_t transferQueueFamily = VK_QUEUE_FAMILY_IGNORED);
 
+        // GRAPHICS-033F: backend-local readiness predicate consumed by the
+        // gate-8 (`PublicServiceReconciled`) precondition check. Returns true
+        // when this context is bound to a live command buffer / global pipeline
+        // layout / bindless descriptor set. `VulkanDevice::Shutdown()`
+        // rebinds every context to `VK_NULL_HANDLE`, so this flips back to
+        // false on teardown without needing a separate reset path.
+        [[nodiscard]] bool IsBound() const noexcept
+        {
+            return m_Device       != VK_NULL_HANDLE &&
+                   m_Cmd          != VK_NULL_HANDLE &&
+                   m_GlobalLayout != VK_NULL_HANDLE &&
+                   m_BindlessSet  != VK_NULL_HANDLE;
+        }
+
         void Begin() override;
         void End()   override;
 

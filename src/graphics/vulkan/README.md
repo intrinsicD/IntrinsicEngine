@@ -348,9 +348,34 @@ device exactly once. `VulkanDevice` stores the bit in
 and reset to `false` in `Initialize()`) and `BuildOperationalInputs()` reads
 it as `inputs.BarrierValidationClean`. A failed recipe build or a failed
 `RenderGraph::Compile()` publishes `false` so the gate cannot inherit a
-stale-clean state. The remaining higher gate (`PublicServiceReconciled`)
-stays `false` until its owning slice (`GRAPHICS-033F`) lands, so the evaluator
-preserves the existing fail-closed contract.
+stale-clean state.
+
+Implementation child F landed the gate-8 wiring (`GRAPHICS-033F`):
+`VulkanDevice::HasOperationalSafetyPrerequisites()` is re-derived from raw,
+non-circular preconditions on the live Vulkan handles and bound command
+contexts; `BuildOperationalInputs()` now reads it as
+`inputs.PublicServiceReconciled` instead of the previous hard-coded `false`.
+The predicate fails closed unless every one of the following holds:
+
+- `!m_DeviceLost`.
+- `m_GlobalPipelineLayout != VK_NULL_HANDLE`.
+- `m_BindlessHeap && m_BindlessHeap->IsValid()`.
+- `m_TransferQueue && m_TransferQueue->IsValid()`.
+- `m_Swapchain != VK_NULL_HANDLE` and the swapchain image / view / handle
+  arrays are size-consistent and non-empty.
+- Every `PerFrame` slot has a non-null `CmdPool`, `CmdBuffer`, `Fence`,
+  `ImageAcquired`, and `RenderDone` semaphore.
+- Every `m_CmdContexts[i]` reports `IsBound()` (the context's device,
+  command buffer, global pipeline layout, and bindless descriptor set are
+  all non-null).
+
+The service-diagnostics block sources `serviceDiagnostics.PublicBindlessHeapExposed`
+from `HasOperationalSafetyPrerequisites() && IsOperational()`, which is a
+correctness clarification rather than a behavior change: the operational
+predicate already consumes the safety prereqs through gate 8, and the
+diagnostics block previously assumed `IsOperational()` implied safety
+prereqs. Splitting the inputs removes the implicit assumption without
+relaxing any fail-closed observable.
 
 Ordered gate checklist:
 
