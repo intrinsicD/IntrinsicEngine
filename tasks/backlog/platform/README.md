@@ -13,14 +13,17 @@ backend layout, selection policy, and dependency note.
 
 ## Tasks
 
-- [HARDEN-067 — Remove stale `src/platform/LinuxGlfwVulkan/` legacy subtree](HARDEN-067-remove-stale-platform-linuxglfwvulkan.md):
-  delete the orphaned pre-`PLATFORM-003` window/input duplicate that is not
-  added by `src/platform/CMakeLists.txt` and contains an unfinished Vulkan
-  surface stub.
 - [PLATFORM-004 — Alternative-platform backend onboarding policy (planning seed)](PLATFORM-004-alternative-platform-backend-onboarding.md):
   planning-only umbrella for Wayland / Windows / macOS backends documented as
   future plug-in slots in `src/platform/README.md`. Stays planning-only until
   there is a concrete need.
+
+Retired:
+
+- [HARDEN-067 — Remove stale `src/platform/LinuxGlfwVulkan/` legacy subtree](../../done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md)
+  (done 2026-05-15): the orphaned pre-`PLATFORM-003` window/input duplicate
+  has been deleted; the explicit-backend split now stands without dead-code
+  remnants under `src/platform/`.
 
 ## Convergence
 

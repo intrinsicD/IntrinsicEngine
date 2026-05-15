@@ -135,7 +135,7 @@ Members:
 - [`done/RUNTIME-091`](../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md) (done) (also Theme D).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
-- [`platform/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md`](platform/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md).
+- [`done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md`](../done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md) (done).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs
