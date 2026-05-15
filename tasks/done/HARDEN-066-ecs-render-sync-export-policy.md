@@ -7,7 +7,7 @@
 - Branch: `claude/setup-agentic-workflow-sI5wG`.
 - Started: 2026-05-15.
 - Completed: 2026-05-15.
-- Implementation commit: pending merge of branch `claude/setup-agentic-workflow-sI5wG`.
+- Implementation commit: `bb8f20e` on branch `claude/setup-agentic-workflow-sI5wG`.
 - Landed slice: implemented `Extrinsic.ECS.System.RenderSync` as a CPU-only tag-forwarding pass that translates `Components::Transform::WorldUpdatedTag` into `Components::DirtyTags::DirtyTransform` and clears `WorldUpdatedTag`; wired it into `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle` after `BoundsPropagation`; added unit coverage in `tests/unit/ecs/Test.ECS.RenderSync.cpp`; reconciled `tests/contract/runtime/Test.RuntimeEcsSystemBundle.cpp` to expect three registered passes and the new `DirtyTransform`/`WorldUpdatedTag` end-state; refreshed `src/ecs/README.md`, `src/ecs/Systems/README.md`, `src/runtime/Runtime.EcsSystemBundle.cppm`, and `docs/migration/nonlegacy-parity-matrix.md`.
 
 ## Decision
