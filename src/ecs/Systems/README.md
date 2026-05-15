@@ -5,6 +5,8 @@ This directory contains the `Systems` module/files.
 ## Contents
 
 - `CMakeLists.txt`
+- `ECS.System.BoundsPropagation.cpp`
+- `ECS.System.BoundsPropagation.cppm`
 - `ECS.System.RenderSync.cpp`
 - `ECS.System.RenderSync.cppm`
 - `ECS.System.TransformHierarchy.cpp`
@@ -29,6 +31,40 @@ pass named `"TransformUpdate"` declaring `Read<Transform::Component>`,
 `Signal("TransformUpdate")`. Activation from a promoted simulate-phase bundle
 is deferred to a future runtime task; `HARDEN-061` is retired with that gap
 recorded in `docs/migration/nonlegacy-parity-matrix.md`.
+
+## World bounds propagation
+
+`Extrinsic.ECS.System.BoundsPropagation::OnUpdate(entt::registry&)` recomputes
+`Components::Culling::World::Bounds` from `Components::Culling::Local::Bounds`
+and `Components::Transform::WorldMatrix` for every entity that
+`TransformHierarchy` stamped with `Components::Transform::WorldUpdatedTag`
+this frame.
+
+Selected propagation policy: **driven by `WorldUpdatedTag`**. The system does
+not introduce a separate local-bounds dirty tag and does not perform full
+scans. Producers that mutate a local AABB/sphere in isolation must therefore
+also mark the owning transform dirty (so the hierarchy traversal stamps
+`WorldUpdatedTag`) if they need the world bounds refreshed on the same
+frame; this keeps propagation O(updated subtrees) rather than O(N).
+
+The world OBB inherits the rotation embedded in the world matrix; world AABB
+extents are scaled per-column; the world sphere uses the largest column
+magnitude as a conservative scale factor. Writes use `emplace_or_replace`
+so first-frame entities and entities whose local bounds were freshly
+authored receive an initial world value. The `WorldUpdatedTag` is **not**
+cleared here — render-sync owns that hand-off.
+
+An overload `OnUpdate(registry&, Stats&)` accumulates CPU-only diagnostics
+(`Recomputed`, `SkippedMissingLocalBounds`, `SkippedMissingWorldMatrix`,
+`NonFiniteResults`). The system never logs or throws; non-finite outputs are
+counted and the entity's existing world bounds are left untouched.
+
+`RegisterSystem(FrameGraph&, registry&)` registers the pass named
+`"WorldBoundsUpdate"`, with `WaitFor("TransformUpdate")`,
+`Read<Culling::Local::Bounds>`, `Read<Transform::WorldMatrix>`,
+`Read<Transform::WorldUpdatedTag>`, `Write<Culling::World::Bounds>`, and
+`Signal("WorldBoundsUpdate")`. Activation from a promoted simulate-phase
+bundle is deferred to `RUNTIME-091`.
 
 ## Render sync boundary
 

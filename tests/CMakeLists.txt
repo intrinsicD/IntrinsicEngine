@@ -217,6 +217,7 @@ set(_ecs_test_files
     Test.ECS.SceneBootstrap.cpp
     Test.ECS.Hierarchy.cpp
     Test.ECS.TransformHierarchy.cpp
+    Test.ECS.BoundsPropagation.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
     SEARCH_DIRS unit/ecs contract/ecs integration/runtime

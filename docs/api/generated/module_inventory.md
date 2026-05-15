@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 1 |
 | `assets` | 7 |
 | `core` | 39 |
-| `ecs` | 22 |
+| `ecs` | 23 |
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -93,6 +93,7 @@ Root scanned: `src`
 | `Extrinsic.ECS.Scene.Registry` | `src/ecs/ECS.Scene.Registry.cppm` | `ecs` |
 | `Extrinsic.ECS.Hierarchy.Mutation` | `src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cppm` | `ecs` |
 | `Extrinsic.ECS.Hierarchy.Structure` | `src/ecs/Hierarchy/ECS.Hierarchy.Structure.cppm` | `ecs` |
+| `Extrinsic.ECS.System.BoundsPropagation` | `src/ecs/Systems/ECS.System.BoundsPropagation.cppm` | `ecs` |
 | `Extrinsic.ECS.System.RenderSync` | `src/ecs/Systems/ECS.System.RenderSync.cppm` | `ecs` |
 | `Extrinsic.ECS.System.TransformHierarchy` | `src/ecs/Systems/ECS.System.TransformHierarchy.cppm` | `ecs` |
 | `Geometry.AABB` | `src/geometry/Geometry.AABB.cppm` | `geometry` |
@@ -457,4 +458,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **430**
+Total modules: **431**
