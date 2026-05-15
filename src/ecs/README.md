@@ -40,6 +40,7 @@ plain data; systems are stateless functions that operate on components.
 ### Systems
 
 - `Extrinsic.ECS.System.TransformHierarchy`
+- `Extrinsic.ECS.System.BoundsPropagation`
 - `Extrinsic.ECS.System.RenderSync`
 
 ## Directory layout
@@ -69,6 +70,7 @@ Components/
   ECS.Component.DirtyTags.cppm
 Systems/
   ECS.System.TransformHierarchy.{cppm,cpp}
+  ECS.System.BoundsPropagation.{cppm,cpp}
   ECS.System.RenderSync.{cppm,cpp}
 ```
 

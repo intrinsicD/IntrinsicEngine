@@ -1,9 +1,11 @@
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        ECS.System.BoundsPropagation.cppm
         ECS.System.RenderSync.cppm
         ECS.System.TransformHierarchy.cppm
         PRIVATE
+        ECS.System.BoundsPropagation.cpp
         ECS.System.RenderSync.cpp
         ECS.System.TransformHierarchy.cpp
 )
