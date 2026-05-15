@@ -4,6 +4,7 @@
 
 - Status: done.
 - Completed: 2026-05-15 on branch `claude/setup-agentic-workflow-GtS0t`.
+- Implementation commit: `c834c2b` on branch `claude/setup-agentic-workflow-GtS0t` (merged via PR #836).
 - Verification (this session):
   - `cmake --preset ci` (Clang 20.1.2, Ninja).
   - `cmake --build --preset ci --target IntrinsicECSTests IntrinsicEcsContractTests IntrinsicRuntimeContractTests IntrinsicCoreTests IntrinsicGeometryTests`.
