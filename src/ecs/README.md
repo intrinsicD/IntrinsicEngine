@@ -81,9 +81,13 @@ The promoted ECS layer follows the contract from
 must not import `Extrinsic.Graphics.*`, `Extrinsic.RHI.*`,
 `Extrinsic.Runtime.*`, `Extrinsic.Platform.*`, `Extrinsic.App.*`, or any
 live `Extrinsic.Asset.*` modules. Render-side synchronization lives in
-`Systems/ECS.System.RenderSync` and communicates with `Graphics` through
-data contracts carried on components (`GeometrySources` + culling/light
-tags), not through direct imports of graphics internals.
+`Systems/ECS.System.RenderSync`, a CPU-only tag-forwarding pass that
+translates `Transform::WorldUpdatedTag` into `DirtyTags::DirtyTransform`
+for the runtime render-extraction lane to drain (see
+`Systems/README.md` and the `HARDEN-066` policy decision). All
+communication with `Graphics` flows through data contracts carried on
+components (`GeometrySources` + culling/light tags), not through direct
+imports of graphics internals.
 
 The contract test
 [`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`](../../tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp)

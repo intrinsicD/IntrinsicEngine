@@ -112,7 +112,7 @@ Members:
 - [`ecs/HARDEN-063-ecs-events-and-command-seams.md`](ecs/HARDEN-063-ecs-events-and-command-seams.md).
 - [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme C).
 - [`ecs/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md`](ecs/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md).
-- [`ecs/HARDEN-066-ecs-render-sync-export-policy.md`](ecs/HARDEN-066-ecs-render-sync-export-policy.md).
+- [`done/HARDEN-066`](../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [`ecs/HARDEN-067-ecs-bounds-propagation-system.md`](ecs/HARDEN-067-ecs-bounds-propagation-system.md).
 - [`ecs/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](ecs/HARDEN-068-ecs-stable-identity-and-scene-metadata.md).
 
