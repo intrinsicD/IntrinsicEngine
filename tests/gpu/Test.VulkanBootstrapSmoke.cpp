@@ -348,7 +348,7 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_EQ(serviceDiagnostics.CommandContextRebindCount, expectedFramesInFlight);
         EXPECT_GT(serviceDiagnostics.BindlessCapacity, 0u);
         EXPECT_TRUE(serviceDiagnostics.LiveOperationalPrerequisitesReady);
-        EXPECT_FALSE(serviceDiagnostics.OperationalSafetyPrerequisitesReady);
+        EXPECT_TRUE(serviceDiagnostics.OperationalSafetyPrerequisitesReady);
         EXPECT_FALSE(serviceDiagnostics.PublicServicesExposed);
         EXPECT_FALSE(serviceDiagnostics.PublicServicesRemainFailClosed);
         EXPECT_FALSE(serviceDiagnostics.PublicBindlessHeapExposed);

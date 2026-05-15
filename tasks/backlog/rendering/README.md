@@ -491,7 +491,8 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface` (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
   depends on GRAPHICS-032C, GRAPHICS-031B, GRAPHICS-033B, and GRAPHICS-018R
   (done) operational-transition seam.
-- [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture](GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
+- [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture](../../active/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md)
+  (in progress; promoted to `tasks/active/`):
   depends on GRAPHICS-033C; owns the pixel-readback driver harness.
 - [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate (done)](../../done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
   done (slice 2 dropped the over-restrictive compile-time clause from the

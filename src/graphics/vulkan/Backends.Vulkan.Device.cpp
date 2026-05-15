@@ -1202,6 +1202,7 @@ bool VulkanDevice::IsOperational() const noexcept
 void VulkanDevice::NoteRecipeGraphValidation(const bool clean) noexcept
 {
     m_LatestRecipeValidationClean.store(clean, std::memory_order_relaxed);
+    RefreshOperationalState();
 }
 
 RHI::ITransferQueue& VulkanDevice::GetTransferQueue()

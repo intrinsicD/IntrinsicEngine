@@ -1018,11 +1018,12 @@ namespace Extrinsic::Graphics
                 device,
                 *m_BufferManager,
                 *m_PipelineManager,
-                "assets/shaders/instance_cull.comp");
+                Core::Filesystem::GetShaderPath("shaders/instance_cull.comp.spv"));
 
             m_DepthPrepassPipelineLease.reset();
             RHI::PipelineDesc depthPrepassDesc{};
-            depthPrepassDesc.VertexShaderPath = "assets/shaders/depth_prepass.vert";
+            depthPrepassDesc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/depth_prepass.vert.spv");
             depthPrepassDesc.ColorTargetCount = 0u;
             depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);

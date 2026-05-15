@@ -15,9 +15,9 @@ buffers, fences, and acquire/render semaphores, then creating a guarded swapchai
   with image views and backend-local `RHI::TextureHandle` registrations for the
   swapchain images, live internal bindless/global-pipeline-layout/transfer service
   objects, rebound command contexts, and a global layout capable of the RHI
-  maximum push-constant range. It still leaves the device non-operational until
-  canonical renderer pass command recording, synchronization/barrier validation,
-  queue-family ownership handling where needed, and public service fallback reconciliation land; guarded direct `BeginFrame()` can acquire only after service-ready bootstrap and otherwise returns `false`
+  maximum push-constant range. It leaves the device fail-closed until the
+  GRAPHICS-033 operational gate observes a clean recipe validation publish and
+  all live service prerequisites are reconciled; guarded direct `BeginFrame()` can acquire only after service-ready bootstrap and otherwise returns `false`
 instead of fabricating a frame. Full execution requires a surface-capable
 physical device with timeline semaphores, descriptor indexing
 (PARTIALLY_BOUND + UPDATE_AFTER_BIND for sampled images), buffer device
@@ -57,12 +57,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   accidentally build on an unsuitable adapter.
   The snapshot avoids Vulkan-native types and is not an RHI/renderer branching seam;
   renderer/runtime code must continue to use `IDevice::IsOperational()`.
-- Runtime now has a backend-neutral operational-transition seam for future
+- Runtime has a backend-neutral operational-transition seam for
   Vulkan bring-up: when a device moves from non-operational to operational,
   runtime waits idle and calls `IRenderer::RebuildOperationalResources()` to
   rebuild renderer-owned material, `GpuWorld`, culling, and depth-prepass state
-  through RHI managers. Vulkan still remains non-operational in this directory;
-  no presentation or operational frame path is enabled by that seam.
+  through RHI managers. GRAPHICS-033D adds opt-in `gpu;vulkan` coverage for the
+  bootstrap `FrameRecipe::MinimalDebug` path; default CPU/null gates still skip
+  Vulkan execution by label.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean
@@ -301,11 +302,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   buffer/texture sharing mode handles graphics/transfer queue-family separation.
   The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies
   bootstrap state plus the guarded acquire/command-record/submit/present path
-  while asserting that `IsOperational()` remains false and public
-  bindless/transfer access still returns fail-closed fallbacks. Remaining before
-  `IsOperational()` can become true: canonical renderer pass command execution
-  beyond `CullingPass`/`DepthPrepass` routing and public service fallback
-  reconciliation.
+  on hosts where the operational gate is not satisfied. The GRAPHICS-033D
+  `MinimalDebugSurfaceGpuSmoke` fixture is also labeled `gpu;vulkan`; it drives
+  the reference triangle through the bootstrap `FrameRecipe::MinimalDebug` lane
+  after the gate flips, and reports `SKIPPED` when GLFW or Vulkan readiness is
+  unavailable on the host.
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 
@@ -376,6 +377,12 @@ predicate already consumes the safety prereqs through gate 8, and the
 diagnostics block previously assumed `IsOperational()` implied safety
 prereqs. Splitting the inputs removes the implicit assumption without
 relaxing any fail-closed observable.
+
+GRAPHICS-033D adds the opt-in `gpu;vulkan` fixture
+`MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`.
+It uses `CreateReferenceEngineConfig()`, selects `FrameRecipe::MinimalDebug`,
+drives a bounded runtime loop, verifies the operational status and minimal pass
+counters on Vulkan-capable hosts, and remains outside the default CPU gate.
 
 Ordered gate checklist:
 
@@ -450,7 +457,7 @@ device-lost transition. Counters are process-monotonic across
 
 | Module | Exported API |
 |---|---|
-| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetVulkanPipelineDiagnosticsSnapshot()`, `VulkanPipelineCreationStatus`, `VulkanPipelineDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot`, `EvaluateVulkanOperationalStatus()`, `VulkanOperationalInputs`, `VulkanOperationalStatus`, `VulkanOperationalStatusCode`, `VulkanOperationalReason`, `ToString(VulkanOperationalStatusCode)`, `ToString(VulkanOperationalReason)`, `kVulkanOperationalReasonCount`, `VulkanOperationalDiagnosticsSnapshot`, `GetVulkanOperationalDiagnosticsSnapshot()`, `RecordVulkanOperationalFallback()`, `NoteVulkanOperationalDeviceLostDrop()`, `EvaluateVulkanDeviceOperationalStatus()` |
+| `Extrinsic.Backends.Vulkan` | `CreateVulkanDevice()`, `GetVulkanBootstrapDiagnosticsSnapshot()`, `VulkanBootstrapStatus`, `VulkanBootstrapDiagnosticsSnapshot`, `GetVulkanFrameLifecycleDiagnosticsSnapshot()`, `VulkanFrameBeginStatus`, `VulkanFrameEndStatus`, `VulkanFramePresentStatus`, `VulkanFrameResizeStatus`, `VulkanFrameLifecycleDiagnosticsSnapshot`, `GetVulkanServiceDiagnosticsSnapshot()`, `VulkanServiceBootstrapStatus`, `VulkanServiceDiagnosticsSnapshot`, `GetVulkanPipelineDiagnosticsSnapshot()`, `VulkanPipelineCreationStatus`, `VulkanPipelineDiagnosticsSnapshot`, `GetFallbackBindlessAllocationAttemptCount()`, `GetFallbackTransferUploadAttemptCount()`, `GetFallbackPipelineCreationAttemptCount()`, `GetFallbackBeginFrameAttemptCount()`, `GetFallbackEndFrameAttemptCount()`, `GetFallbackPresentAttemptCount()`, `GetFallbackResizeAttemptCount()`, `GetFallbackCommandRecordingAttemptCount()`, `GetLastFallbackPipelineReason()`, `FallbackPipelineReason`, `GetFallbackDiagnosticsSnapshot()`, `FallbackDiagnosticsSnapshot`, `EvaluateVulkanOperationalStatus()`, `VulkanOperationalInputs`, `VulkanOperationalStatus`, `VulkanOperationalStatusCode`, `VulkanOperationalReason`, `ToString(VulkanOperationalStatusCode)`, `ToString(VulkanOperationalReason)`, `kVulkanOperationalReasonCount`, `VulkanOperationalDiagnosticsSnapshot`, `GetVulkanOperationalDiagnosticsSnapshot()`, `RecordVulkanOperationalFallback()`, `NoteVulkanOperationalDeviceLostDrop()`, `EvaluateVulkanDeviceOperationalStatus()`, `GetVulkanDeviceOperationalInputs()` |
 | `Extrinsic.Backends.Vulkan:{Device,Queues,Memory,CommandPools,Descriptors,Swapchain,Pipelines,Transfer,Sync,Surface,Diagnostics}` | *(internal partitions — not re-exported)* |
 
 ## File inventory
