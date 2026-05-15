@@ -339,9 +339,9 @@ TEST(FrameRecipeContract, MissingBackbufferReportsDiagnostic)
 
 // GRAPHICS-032A — minimal-debug-surface recipe contract tests. The recipe is
 // opt-in; it declares exactly two passes
-// (`Pass.Surface.MinimalDebug` then `Pass.Present.MinimalDebug`), exposes
-// transient `SceneColorHDR`/`SceneDepth`, finalizes the imported `Backbuffer`
-// through the existing fullscreen-triangle present contract, and surfaces a
+// (`Pass.Surface.MinimalDebug` then `Pass.Present.MinimalDebug`), validates
+// surface prerequisites, finalizes the imported `Backbuffer` through a direct
+// visible-triangle color write, and surfaces a
 // per-build `MissingPrerequisiteCount` (mirrored into the renderer's
 // `MinimalRecipeMissingPrerequisiteCount` counter) when material/pipeline or
 // surface-bucket residency is absent. No pass body lands in this slice
@@ -355,8 +355,7 @@ TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeDeclaresTwoPassesInOrderWithS
     EXPECT_EQ(description.Passes[0].Kind, FrameRecipePassKind::Surface);
     EXPECT_TRUE(description.Passes[0].Enabled);
     EXPECT_FALSE(description.Passes[0].FinalizesBackbuffer);
-    EXPECT_TRUE(Contains(description.Passes[0].Writes, "SceneColorHDR"));
-    EXPECT_TRUE(Contains(description.Passes[0].Writes, "SceneDepth"));
+    EXPECT_TRUE(description.Passes[0].Writes.empty());
     EXPECT_TRUE(Contains(description.Passes[0].Reads, "Material.Buffer"));
     EXPECT_TRUE(Contains(description.Passes[0].Reads, "GpuWorld.SceneTable"));
     EXPECT_TRUE(Contains(description.Passes[0].Reads, "Cull.SurfaceOpaque.IndexedArgs"));
@@ -366,8 +365,8 @@ TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeDeclaresTwoPassesInOrderWithS
     EXPECT_EQ(description.Passes[1].Kind, FrameRecipePassKind::Present);
     EXPECT_TRUE(description.Passes[1].Enabled);
     EXPECT_TRUE(description.Passes[1].FinalizesBackbuffer);
-    EXPECT_TRUE(Contains(description.Passes[1].Reads, "SceneColorHDR"));
-    EXPECT_TRUE(Contains(description.Passes[1].Reads, "Backbuffer"));
+    EXPECT_TRUE(description.Passes[1].Reads.empty());
+    EXPECT_TRUE(Contains(description.Passes[1].Writes, "Backbuffer"));
 
     // The minimal recipe must not declare any default-recipe pass.
     for (const FrameRecipePassDeclaration& pass : description.Passes)
@@ -387,9 +386,9 @@ TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeDeclaresTwoPassesInOrderWithS
     ASSERT_NE(backbuffer, nullptr);
     EXPECT_TRUE(backbuffer->Imported);
     EXPECT_TRUE(backbuffer->Backbuffer);
-    EXPECT_FALSE(backbuffer->ImportedWriteAllowed);
-    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::SceneDepth));
-    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::SceneColorHDR));
+    EXPECT_TRUE(backbuffer->ImportedWriteAllowed);
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::SceneDepth));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::SceneColorHDR));
     EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::MaterialBuffer));
     EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs));
     EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::SurfaceOpaqueCount));

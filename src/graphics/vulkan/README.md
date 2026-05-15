@@ -7,8 +7,9 @@ window, `Initialize()` now performs guarded Vulkan bootstrap by initializing
 volk, creating a `VkInstance`, creating a window surface, probing for a
 surface-capable physical device/queue-family/swapchain-support tuple that also
 supports required Vulkan 1.2/1.3 features (`timelineSemaphore`, descriptor
-indexing update-after-bind/partially-bound, `bufferDeviceAddress`, and dynamic
-rendering), creating a logical device with those features and `VK_KHR_swapchain`,
+indexing update-after-bind/partially-bound, `bufferDeviceAddress`,
+`shaderInt64`, `scalarBlockLayout`, dynamic rendering, and
+`synchronization2`), creating a logical device with those features and `VK_KHR_swapchain`,
 loading device-level volk entry points, acquiring graphics/present/transfer `VkQueue` handles,
 creating a VMA allocator, allocating per-frame command pools, primary command
 buffers, fences, and acquire/render semaphores, then creating a guarded swapchain
@@ -21,7 +22,8 @@ buffers, fences, and acquire/render semaphores, then creating a guarded swapchai
 instead of fabricating a frame. Full execution requires a surface-capable
 physical device with timeline semaphores, descriptor indexing
 (PARTIALLY_BOUND + UPDATE_AFTER_BIND for sampled images), buffer device
-addresses, and dynamic rendering
+addresses, shader Int64 support, scalar block layout, dynamic rendering, and
+synchronization2
 available through the Vulkan 1.2/1.3 feature chain.
 
 ## Frame lifecycle status
@@ -50,8 +52,9 @@ available through the Vulkan 1.2/1.3 feature chain.
   creation, per-frame command-pool/command-buffer/fence/semaphore counts, and
   swapchain creation/image enumeration/image-view/handle-registration counts and extent.
   It also reports whether required device features for later operational paths
-  were supported and enabled: descriptor indexing, timeline semaphores, and
-  dynamic rendering, plus buffer device addresses for BDA-only promoted buffer
+  were supported and enabled: descriptor indexing, timeline semaphores,
+  dynamic rendering, synchronization2, scalar block layout, shader Int64, and
+  buffer device addresses for BDA-only promoted buffer
   paths. Devices lacking those required features are skipped during
   physical-device selection so later bindless/transfer/pipeline slices do not
   accidentally build on an unsuitable adapter.
@@ -62,8 +65,9 @@ available through the Vulkan 1.2/1.3 feature chain.
   runtime waits idle and calls `IRenderer::RebuildOperationalResources()` to
   rebuild renderer-owned material, `GpuWorld`, culling, and depth-prepass state
   through RHI managers. GRAPHICS-033D adds opt-in `gpu;vulkan` coverage for the
-  bootstrap `FrameRecipe::MinimalDebug` path; default CPU/null gates still skip
-  Vulkan execution by label.
+  bootstrap `FrameRecipe::MinimalDebug` path with a backbuffer-only fixed
+  visible-triangle present finalizer; default CPU/null gates still skip Vulkan
+  execution by label.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean

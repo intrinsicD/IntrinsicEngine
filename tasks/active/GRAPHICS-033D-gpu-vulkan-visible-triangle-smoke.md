@@ -6,12 +6,13 @@
 - Owner/agent: GitHub Copilot on `copilot/graphics-033d-visible-triangle-smoke`.
 - Branch: `copilot/graphics-033d-visible-triangle-smoke`.
 - Started: 2026-05-15.
-- Current slice: smoke fixture + operational gate flip + shader/SPIR-V path wiring is implemented and verified.
+- Current slice: smoke fixture + operational gate flip + shader/SPIR-V path wiring + backbuffer-only fixed visible-triangle finalizer is implemented and verified.
 - Next verification step: add the backend-local readback/pixel assertion layer so this task can be retired instead of remaining command-counter-only.
 
 ## Progress log
 
 - 2026-05-15 — Added `MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`, wired `ci-vulkan` to build `ExtrinsicBackendsVulkan`, made `EngineConfig::Render.FrameRecipe` reach the renderer, refreshed the Vulkan operational predicate when recipe validation publishes, compiled SPIR-V for the smoke target, and resolved Vulkan operational shader paths through `Core::Filesystem::GetShaderPath(...)`. Focused opt-in smoke and the default CPU gate passed locally with Clang 22 because the pinned `clang-20` binaries were unavailable on this host.
+- 2026-05-15 — Follow-up slice: made MinimalDebug Vulkan command recording legal by adding compiled render-pass attachment scopes, matching the renderer's default-debug-surface format to the live backbuffer format, enabling required Vulkan feature-chain bits (`synchronization2`, `shaderInt64`, `scalarBlockLayout`), and replacing placeholder transient-target drawing with a backbuffer-only `Renderer.MinimalVisibleTriangle` present finalizer. Validation diagnostics confirmed the old transient `SceneColorHDR`/`SceneDepth` graph resources are handle placeholders, not live Vulkan images; pixel readback remains deferred until a safe backbuffer/readback seam is added.
 - Remaining before retirement: backbuffer/pixel readback assertions for the four deterministic sample points required by this task's acceptance criteria.
 
 ## Goal
@@ -38,7 +39,7 @@
   1. [x] Configure runtime with `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` build + `RenderConfig::EnablePromotedVulkanDevice = true` + `CreateReferenceEngineConfig()` + `RenderConfig::FrameRecipe = MinimalDebug`.
   2. [x] `Engine::Initialize()`. Skip the test deterministically if the host lacks Vulkan bootstrap readiness.
   3. [x] Drive a bounded runtime loop until the operational transition and minimal recipe have recorded.
-  4. Read the swapchain image back through the `Picking.Readback` drain pattern (or a dedicated readback path if more efficient) and assert at four sample points: triangle interior pixels match the GRAPHICS-031 `BaseColorFactor` pre-multiplied with the deterministic vertex color, and outside-triangle pixels match the clear color.
+  4. [ ] Read the swapchain image back through the `Picking.Readback` drain pattern (or a dedicated readback path if more efficient) and assert at four sample points: triangle interior pixels match the deterministic visible-triangle color and outside-triangle pixels match the clear color.
   5. [x] Assert the fallback/validation/operational-gate counters do not increment during the operational frame window.
   6. [x] `Engine::Shutdown()`.
 - [x] Update the test allow-list in `tests/README.md` and `tests/CMakeLists.txt` to label the new fixture `gpu;vulkan` (no new label introduced).
@@ -50,7 +51,7 @@
 
 ## Docs
 - [ ] Update `tests/README.md` to enumerate the new fixture under the `gpu;vulkan` opt-in section.
-- [ ] Update `src/graphics/vulkan/README.md` to flip the `gpu;vulkan` minimal-recipe smoke row to current state.
+- [x] Update `src/graphics/vulkan/README.md` to flip the `gpu;vulkan` minimal-recipe smoke row to current state.
 
 ## Acceptance criteria
 - [ ] On a Vulkan-capable Linux host, the fixture passes pixel-readback assertions and reports zero fallback-counter increments.

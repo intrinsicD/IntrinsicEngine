@@ -65,6 +65,7 @@ namespace Extrinsic::RHI
 
         virtual void Resize(std::uint32_t width, std::uint32_t height) = 0;
         [[nodiscard]] virtual Core::Extent2D GetBackbufferExtent() const = 0;
+        [[nodiscard]] virtual Format GetBackbufferFormat() const { return Format::RGBA8_UNORM; }
 
         /// Change swapchain present mode.  Takes effect on the next Resize()
         /// or the next swapchain recreation — no immediate GPU stall.

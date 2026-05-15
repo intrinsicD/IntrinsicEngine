@@ -181,7 +181,7 @@ namespace Extrinsic::Graphics
         RenderPassRecord& record = m_Impl->Passes[pass.Index];
         RenderGraphBuilder builder(
             record,
-            [this](const TextureRef ref, const TextureUsage usage, const bool write) {
+            [this, sideEffect](const TextureRef ref, const TextureUsage usage, const bool write) {
                 if (!ValidateTextureRef(ref).has_value())
                 {
                     return false;
@@ -203,7 +203,7 @@ namespace Extrinsic::Graphics
                     return false;
                 }
 
-                if (desc->IsBackbuffer && write)
+                if (desc->IsBackbuffer && write && !sideEffect)
                 {
                     return false;
                 }
