@@ -7,7 +7,7 @@
 - Branch: `claude/setup-agentic-workflow-nSRVg`.
 - Started: 2026-05-15.
 - Completed: 2026-05-15.
-- Implementation commit: TBD (branch `claude/setup-agentic-workflow-nSRVg`; commit reference will be backfilled into this file after `git commit` lands).
+- Implementation commit: `7c088f6` on branch `claude/setup-agentic-workflow-nSRVg`.
 - Landed slice: introduced `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle(FrameGraph&, ECS::Scene::Registry&)`, called from `Engine::RunFrame` between `IApplication::OnSimTick` and `Core::FrameGraph::Compile` so `TransformHierarchy` + `BoundsPropagation` run every fixed-step substep. Added contract coverage in `tests/contract/runtime/Test.RuntimeEcsSystemBundle.cpp` (bundle helper) and a layering scan in `tests/contract/runtime/Test.RuntimeEngineLayering.cpp` (engine wiring), refreshed `docs/api/generated/module_inventory.md`, and reconciled `src/ecs/Systems/README.md` + `src/runtime/README.md` + `docs/migration/nonlegacy-parity-matrix.md` with the now-active activation path.
 
 ## Goal
