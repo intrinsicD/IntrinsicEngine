@@ -502,16 +502,17 @@ independently testable (CPU/null where possible), and gated as recorded.
   consumed by `VulkanDevice::BuildOperationalInputs()`. Planning-gap fill: the
   parent GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not
   enumerate an explicit child for gates 7/8.
-- [GRAPHICS-033F — Wire the `PublicServiceReconciled` operational gate](../../active/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md):
-  active (slice 1 landed). Depends on GRAPHICS-033E (per the evaluator's
-  first-failing-gate ordering). Backend-internal: re-derive
+- [GRAPHICS-033F — Wire the `PublicServiceReconciled` operational gate (done)](../../done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md):
+  done. Depended on GRAPHICS-033E (per the evaluator's first-failing-gate
+  ordering). Backend-internal: re-derive
   `VulkanDevice::HasOperationalSafetyPrerequisites()` from raw live-handle
   preconditions and feed it into `BuildOperationalInputs()` for the gate-8
   input. With both 033E and 033F landed,
   `EvaluateVulkanOperationalStatus(...)` can finally return `{Operational, None}`
-  on a Vulkan-capable host and unblock `GRAPHICS-080` retirement. Planning-gap
-  fill: the parent GRAPHICS-033 planning slice identified Impl-A/B/C/D but did
-  not enumerate an explicit child for gates 7/8.
+  on a Vulkan-capable host. `GRAPHICS-080` retirement now waits only on
+  `GRAPHICS-033D`'s `gpu;vulkan` smoke. Planning-gap fill: the parent
+  GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not enumerate
+  an explicit child for gates 7/8.
 - [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
   depends on GRAPHICS-033C and GRAPHICS-033D; sibling fixture reusing the
   GRAPHICS-033D harness for recipe-selector coverage.
