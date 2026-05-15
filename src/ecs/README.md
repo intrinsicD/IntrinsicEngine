@@ -43,6 +43,15 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.System.BoundsPropagation`
 - `Extrinsic.ECS.System.RenderSync`
 
+### Events
+
+- `Extrinsic.ECS.Events` — CPU-only payload types for promoted scene
+  mutations (`SelectionChanged`, `HoverChanged`, `EntitySpawned`,
+  `GeometryModified`). Dispatch/queueing/subscription belong to
+  `runtime`/`editor`; see `Events/README.md` for the `HARDEN-063`
+  ownership decision and the events that are deliberately
+  runtime/graphics-owned (`GpuPickCompleted`, `GeometryUploadFailed`).
+
 ## Directory layout
 
 ```text
@@ -68,6 +77,8 @@ Components/
   ECS.Component.Selection.cppm
   ECS.Component.ShadowCaster.cppm
   ECS.Component.DirtyTags.cppm
+Events/
+  ECS.Events.cppm
 Systems/
   ECS.System.TransformHierarchy.{cppm,cpp}
   ECS.System.BoundsPropagation.{cppm,cpp}

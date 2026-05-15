@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 1 |
 | `assets` | 7 |
 | `core` | 39 |
-| `ecs` | 23 |
+| `ecs` | 24 |
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -91,6 +91,7 @@ Root scanned: `src`
 | `Extrinsic.ECS.Scene.Bootstrap` | `src/ecs/ECS.Scene.Bootstrap.cppm` | `ecs` |
 | `Extrinsic.ECS.Scene.Handle` | `src/ecs/ECS.Scene.Handle.cppm` | `ecs` |
 | `Extrinsic.ECS.Scene.Registry` | `src/ecs/ECS.Scene.Registry.cppm` | `ecs` |
+| `Extrinsic.ECS.Events` | `src/ecs/Events/ECS.Events.cppm` | `ecs` |
 | `Extrinsic.ECS.Hierarchy.Mutation` | `src/ecs/Hierarchy/ECS.Hierarchy.Mutation.cppm` | `ecs` |
 | `Extrinsic.ECS.Hierarchy.Structure` | `src/ecs/Hierarchy/ECS.Hierarchy.Structure.cppm` | `ecs` |
 | `Extrinsic.ECS.System.BoundsPropagation` | `src/ecs/Systems/ECS.System.BoundsPropagation.cppm` | `ecs` |
@@ -459,4 +460,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **432**
+Total modules: **433**
