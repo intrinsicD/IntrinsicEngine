@@ -28,9 +28,11 @@ render-sync responsibility.
 pass named `"TransformUpdate"` declaring `Read<Transform::Component>`,
 `Read<Hierarchy::Component>`, `Write<Transform::WorldMatrix>`,
 `Write<Transform::IsDirtyTag>`, `Write<Transform::WorldUpdatedTag>`, and
-`Signal("TransformUpdate")`. Activation from a promoted simulate-phase bundle
-is deferred to a future runtime task; `HARDEN-061` is retired with that gap
-recorded in `docs/migration/nonlegacy-parity-matrix.md`.
+`Signal("TransformUpdate")`. The runtime activates this pass every fixed-step
+substep through `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
+(`RUNTIME-091`), invoked after `IApplication::OnSimTick` and before
+`Core::FrameGraph::Compile` so app passes that mutate transforms run before
+the traversal and passes that `WaitFor("TransformUpdate")` run after it.
 
 ## World bounds propagation
 
@@ -63,8 +65,10 @@ counted and the entity's existing world bounds are left untouched.
 `"WorldBoundsUpdate"`, with `WaitFor("TransformUpdate")`,
 `Read<Culling::Local::Bounds>`, `Read<Transform::WorldMatrix>`,
 `Read<Transform::WorldUpdatedTag>`, `Write<Culling::World::Bounds>`, and
-`Signal("WorldBoundsUpdate")`. Activation from a promoted simulate-phase
-bundle is deferred to `RUNTIME-091`.
+`Signal("WorldBoundsUpdate")`. The runtime activates this pass alongside
+`TransformHierarchy` through `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
+(`RUNTIME-091`) so world bounds refresh on the same substep that recomputes
+the world matrix.
 
 ## Render sync boundary
 

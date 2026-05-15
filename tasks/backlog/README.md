@@ -50,7 +50,7 @@ Planning parents (retired):
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
-- [`runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md`](runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
+- [`done/RUNTIME-091`](../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md) (done)
 
 Triangle-path implementation children (newly opened — pick the next in dependency order):
 - [`done/GRAPHICS-030A`](../done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md) — procedural geometry descriptor + cache + triangle packer (done; unblocks GRAPHICS-029B and GRAPHICS-030B).
@@ -132,7 +132,7 @@ the convergence map.
 Members:
 - [`architecture/RORG-031A-architecture-foundation.md`](architecture/RORG-031A-architecture-foundation.md).
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
-- [`runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md`](runtime/RUNTIME-091-promoted-ecs-system-bundle-activation.md) (also Theme D).
+- [`done/RUNTIME-091`](../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md) (done) (also Theme D).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md`](platform/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md).

@@ -271,6 +271,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeCameraControllers.cpp
+        Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
     )

@@ -36,6 +36,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Core.FrameLoop;
+import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
@@ -600,6 +601,16 @@ namespace Extrinsic::Runtime
         {
             // App registers system passes via engine.GetFrameGraph().AddPass(...)
             m_Application->OnSimTick(*this, m_FixedDt);
+
+            // RUNTIME-091: register the promoted baseline ECS systems
+            // (TransformHierarchy, BoundsPropagation) after the app has
+            // had a chance to add its own fixed-step passes. The FrameGraph
+            // resolves the actual execution order through TypeToken reads/
+            // writes and the named TransformUpdate / WorldBoundsUpdate
+            // signals, so app passes that mutate transforms run before
+            // TransformHierarchy and app passes that WaitFor either signal
+            // run after the propagation seam.
+            (void)RegisterPromotedEcsSystemBundle(*m_FrameGraph, *m_Scene);
 
             // CPU task graph: compile dependency order, execute in topo-layer
             // sequence (currently sequential execution), then reset.

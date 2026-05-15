@@ -8,6 +8,7 @@ option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Runtime.EcsSystemBundle.cppm
         Runtime.Engine.cppm
         Cameras/Runtime.CameraControllers.cppm
         Runtime.ProceduralGeometry.cppm
@@ -16,6 +17,7 @@ target_sources(${target_name}
         Runtime.RenderExtraction.cppm
         Runtime.StreamingExecutor.cppm
         PRIVATE
+        Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
