@@ -218,6 +218,7 @@ set(_ecs_test_files
     Test.ECS.Hierarchy.cpp
     Test.ECS.TransformHierarchy.cpp
     Test.ECS.BoundsPropagation.cpp
+    Test.ECS.RenderSync.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
     SEARCH_DIRS unit/ecs contract/ecs integration/runtime

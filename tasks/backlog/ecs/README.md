@@ -17,7 +17,7 @@ map.
 - [HARDEN-063 — Define promoted ECS event and command seams](HARDEN-063-ecs-events-and-command-seams.md).
 - [HARDEN-064 — Define ECS collider and rigid-body authoring contracts](HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
 - [HARDEN-065 — Promote ECS geometry-source population and dirty-domain helpers](HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md).
-- [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](HARDEN-066-ecs-render-sync-export-policy.md).
+- [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [HARDEN-067 — Add ECS world-bounds propagation system](../../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
 - [HARDEN-068 — Define ECS stable identity and scene metadata contract](HARDEN-068-ecs-stable-identity-and-scene-metadata.md).
 
@@ -30,9 +30,11 @@ map.
 - HARDEN-064 is in **Theme C — Physics readiness** and is gated by
   [`physics/ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md);
   it must not start before that decision lands.
-- HARDEN-065 and HARDEN-066 are near-term follow-ups from the
+- HARDEN-065 is a near-term follow-up from the
   [`src/ecs` gap analysis](../../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md)
-  and should not move GPU residency or runtime extraction ownership into ECS.
+  and must not move GPU residency or runtime extraction ownership into ECS.
+  HARDEN-066 is the same family and landed as a CPU-only tag-forwarding pass
+  (see [`tasks/done/HARDEN-066`](../../done/HARDEN-066-ecs-render-sync-export-policy.md)).
 - HARDEN-067 depends on promoted transform hierarchy semantics from
   [`HARDEN-061`](../../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
   and pairs naturally with runtime fixed-step activation.

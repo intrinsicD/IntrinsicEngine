@@ -43,6 +43,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t Registered{0};
         bool TransformHierarchyRegistered{false};
         bool BoundsPropagationRegistered{false};
+        bool RenderSyncRegistered{false};
     };
 
     // Register the baseline runtime-owned ECS system passes into the
@@ -57,10 +58,15 @@ export namespace Extrinsic::Runtime
     //     matrices, stamps `WorldUpdatedTag`, clears `IsDirtyTag`.
     //   * `BoundsPropagation::PassName` — `WaitFor("TransformUpdate")`
     //     and recomputes world bounds for entities tagged this frame.
+    //   * `RenderSync::PassName` — `WaitFor("TransformUpdate")` and
+    //     `WaitFor("WorldBoundsUpdate")`, forwards `WorldUpdatedTag`
+    //     into `DirtyTags::DirtyTransform` for the runtime render
+    //     extraction lane to drain, then clears `WorldUpdatedTag`.
     //
-    // `RenderSync` is intentionally NOT registered here: per the ECS
-    // systems README, GPU-handle-touching residency belongs to the
-    // runtime render-extraction lane, not to a CPU FrameGraph pass.
+    // `RenderSync` is a CPU-only tag-forwarding pass per the
+    // `HARDEN-066` policy decision; GPU-handle-touching residency
+    // continues to live in the runtime render-extraction lane, not
+    // in any ECS system.
     [[nodiscard]] PromotedEcsSystemBundleStats RegisterPromotedEcsSystemBundle(
         Core::FrameGraph& graph,
         ECS::Scene::Registry& scene);

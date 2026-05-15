@@ -75,7 +75,33 @@ the world matrix.
 Per
 [`GRAPHICS-028`](../../../tasks/done/GRAPHICS-028-ecs-renderable-residency-bridge.md),
 GPU-handle-touching render residency does not belong in ECS systems.
-`ECS.System.RenderSync` may remain a CPU-only aggregation or forwarding seam if
-needed, but calls to `GpuWorld`, `GpuAssetCache`, RHI managers, or graphics-owned
-`GpuSceneSlot` storage are runtime responsibilities owned by
+Per [`HARDEN-066`](../../../tasks/done/HARDEN-066-ecs-render-sync-export-policy.md),
+`Extrinsic.ECS.System.RenderSync` is a CPU-only tag-forwarding pass that
+translates `Components::Transform::WorldUpdatedTag` (the producer signal
+emitted by `TransformHierarchy`) into `Components::DirtyTags::DirtyTransform`
+(the GPU-sync hand-off drained by `Runtime.RenderExtraction`). It also
+clears `WorldUpdatedTag` so the producer/consumer cycle is closed within
+the ECS layer; downstream consumers that need a "transform changed" signal
+read `DirtyTransform` instead of subscribing to `WorldUpdatedTag` directly.
+
+`Extrinsic.ECS.Systems.RenderSync::OnUpdate(registry)` iterates entities
+carrying `WorldUpdatedTag`, stamps `DirtyTransform` via
+`emplace_or_replace`, and bulk-clears `WorldUpdatedTag` afterward. The
+overload `OnUpdate(registry, Stats&)` accumulates CPU-only diagnostics
+(`WorldUpdatedObserved`, `DirtyTransformStamped`, `WorldUpdatedCleared`)
+without logging or throwing.
+
+`RegisterSystem(FrameGraph&, registry&)` registers the pass named
+`"RenderSync"` with `WaitFor("TransformUpdate")`,
+`WaitFor("WorldBoundsUpdate")`, `Write<Transform::WorldUpdatedTag>`,
+`Write<DirtyTags::DirtyTransform>`, and `Signal("RenderSync")`. The two
+`WaitFor` edges guarantee `BoundsPropagation` reads `WorldUpdatedTag`
+before this pass clears it. The runtime activates this pass alongside
+`TransformHierarchy` and `BoundsPropagation` through
+`Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`
+(`RUNTIME-091`) so the `DirtyTransform` hand-off lands every fixed-step
+substep.
+
+Calls to `GpuWorld`, `GpuAssetCache`, RHI managers, or graphics-owned
+`GpuSceneSlot` storage remain runtime responsibilities owned by
 `Runtime.RenderExtraction` or a runtime residency sibling.

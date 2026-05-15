@@ -7,6 +7,7 @@
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -37,7 +38,7 @@ namespace
     }
 }
 
-TEST(RuntimeEcsSystemBundle, RegisterAddsTransformAndBoundsPasses)
+TEST(RuntimeEcsSystemBundle, RegisterAddsTransformBoundsAndRenderSyncPasses)
 {
     Registry scene;
     FrameGraph graph;
@@ -45,10 +46,11 @@ TEST(RuntimeEcsSystemBundle, RegisterAddsTransformAndBoundsPasses)
     const PromotedEcsSystemBundleStats stats =
         RegisterPromotedEcsSystemBundle(graph, scene);
 
-    EXPECT_EQ(stats.Registered, 2u);
+    EXPECT_EQ(stats.Registered, 3u);
     EXPECT_TRUE(stats.TransformHierarchyRegistered);
     EXPECT_TRUE(stats.BoundsPropagationRegistered);
-    EXPECT_EQ(graph.PassCount(), 2u);
+    EXPECT_TRUE(stats.RenderSyncRegistered);
+    EXPECT_EQ(graph.PassCount(), 3u);
 }
 
 TEST(RuntimeEcsSystemBundle, BundleExecutionPropagatesDirtyChildWorldMatrix)
@@ -82,8 +84,13 @@ TEST(RuntimeEcsSystemBundle, BundleExecutionPropagatesDirtyChildWorldMatrix)
     EXPECT_TRUE(MatricesNear(raw.get<Components::Transform::WorldMatrix>(child).Matrix, expectedChild));
     EXPECT_FALSE(raw.all_of<Components::Transform::IsDirtyTag>(parent));
     EXPECT_FALSE(raw.all_of<Components::Transform::IsDirtyTag>(child));
-    EXPECT_TRUE(raw.all_of<Components::Transform::WorldUpdatedTag>(parent));
-    EXPECT_TRUE(raw.all_of<Components::Transform::WorldUpdatedTag>(child));
+    // RenderSync runs at the tail of the bundle, forwards WorldUpdatedTag
+    // into DirtyTransform for runtime extraction, and clears WorldUpdatedTag
+    // so the producer/consumer cycle is closed within ECS.
+    EXPECT_FALSE(raw.all_of<Components::Transform::WorldUpdatedTag>(parent));
+    EXPECT_FALSE(raw.all_of<Components::Transform::WorldUpdatedTag>(child));
+    EXPECT_TRUE(raw.all_of<Components::DirtyTags::DirtyTransform>(parent));
+    EXPECT_TRUE(raw.all_of<Components::DirtyTags::DirtyTransform>(child));
 }
 
 TEST(RuntimeEcsSystemBundle, BundleExecutionPropagatesWorldBoundsAfterTransformUpdate)
@@ -159,5 +166,6 @@ TEST(RuntimeEcsSystemBundle, AppPassMutatingTransformRunsBeforeTransformHierarch
     const glm::mat4 expected =
         glm::translate(glm::mat4(1.0f), glm::vec3(5.0f, 6.0f, 7.0f));
     EXPECT_TRUE(MatricesNear(raw.get<Components::Transform::WorldMatrix>(entity).Matrix, expected));
-    EXPECT_TRUE(raw.all_of<Components::Transform::WorldUpdatedTag>(entity));
+    EXPECT_FALSE(raw.all_of<Components::Transform::WorldUpdatedTag>(entity));
+    EXPECT_TRUE(raw.all_of<Components::DirtyTags::DirtyTransform>(entity));
 }
