@@ -78,14 +78,14 @@ Default recommendation: **B** (Knöppel et al. globally-optimal direction fields
 - [ ] Step 3: assemble Dirichlet energy in `z = e^{iNθ}` per face; alignment constraints become soft (penalty) or hard (row-elimination) pins.
 - [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via the iterative seam from `GEOM-008` (LOBPCG or shift-invert).
 - [ ] **Gauge fixing:** the eigenvector is defined up to a global complex scalar `e^{iα}`. Fix the gauge by rotating so that the representative on a chosen reference face has zero imaginary part and positive real part. Document this in the module header so test outputs are deterministic.
-- [ ] Step 5: compute singularity indices by accumulating period jumps around each vertex; verify `sum == 2χ` post-hoc and surface deviations as `Diagnostics::numerical_uncertain_count`.
+- [ ] Step 5: compute singularity indices by accumulating period jumps around each vertex; verify `sum == χ(M)` post-hoc (Poincaré–Hopf for N-RoSy fields) and surface deviations as `Diagnostics::numerical_uncertain_count`. Each individual singularity index is a multiple of `1/N` (i.e. `1/4` for cross fields).
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.CrossField.cpp`.
 - [ ] Flat disk: cross field with one boundary alignment → constant field, no interior singularities.
-- [ ] Sphere: any 4-RoSy field must have total singularity index `= 2 * χ(M) = 4`. Verify exactly.
-- [ ] Torus: total singularity index `= 0`. Verify.
-- [ ] Cube with sharp-edge alignment: singularities appear at the eight corners with index `+1/4` each.
+- [ ] Sphere: any 4-RoSy field must have total singularity index `= χ(M) = 2`. Verify exactly. (For an N-RoSy field, the Poincaré–Hopf identity gives sum-of-indices `= χ(M)`, not `Nχ(M)`. Each individual singularity is a multiple of `1/N`.)
+- [ ] Torus: total singularity index `= χ(M) = 0`. Verify.
+- [ ] Cube with sharp-edge alignment: singularities appear at the eight corners with index `+1/4` each, summing to `8 × 1/4 = 2 = χ(sphere)` (a cube is topologically a sphere).
 - [ ] Determinism with fixed seed and tie-break rule for eigenvector sign.
 
 ## Docs
@@ -96,7 +96,7 @@ Default recommendation: **B** (Knöppel et al. globally-optimal direction fields
 
 ## Acceptance criteria
 - [ ] One variant marked default.
-- [ ] Singularity index sum equals `2χ` per the Poincaré–Hopf theorem on all closed-surface tests.
+- [ ] Singularity index sum equals `χ(M)` per the Poincaré–Hopf identity (which holds for N-RoSy fields with each individual index a multiple of `1/N`) on all closed-surface tests.
 - [ ] Alignment constraint test (cube corners) passes.
 - [ ] No Eigen types leak through the public API.
 
