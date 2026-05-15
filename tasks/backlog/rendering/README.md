@@ -493,24 +493,26 @@ independently testable (CPU/null where possible), and gated as recorded.
   (done) operational-transition seam.
 - [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture](GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
   depends on GRAPHICS-033C; owns the pixel-readback driver harness.
-- [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate](../../active/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
-  active (slice 1 landed). Depends on GRAPHICS-033C (recording bodies landed)
-  and GRAPHICS-022 (rendergraph validation surface). Producer-side wiring from
-  the renderer's post-`ValidateRecipeCompiledGraph(...)` outcome to a new
-  CPU-public `IDevice::NoteRecipeGraphValidation(bool)` setter consumed by
-  `VulkanDevice::BuildOperationalInputs()`. Planning-gap fill: the parent
-  GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not enumerate an
-  explicit child for gates 7/8.
-- [GRAPHICS-033F — Wire the `PublicServiceReconciled` operational gate](../../active/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md):
-  active (slice 1 landed). Depends on GRAPHICS-033E (per the evaluator's
-  first-failing-gate ordering). Backend-internal: re-derive
+- [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate (done)](../../done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
+  done (slice 2 dropped the over-restrictive compile-time clause from the
+  producer publish; CPU gate green). Depends on GRAPHICS-033C (recording
+  bodies landed) and GRAPHICS-022 (rendergraph validation surface).
+  Producer-side wiring from the renderer's post-`ValidateRecipeCompiledGraph(...)`
+  outcome to a new CPU-public `IDevice::NoteRecipeGraphValidation(bool)` setter
+  consumed by `VulkanDevice::BuildOperationalInputs()`. Planning-gap fill: the
+  parent GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not
+  enumerate an explicit child for gates 7/8.
+- [GRAPHICS-033F — Wire the `PublicServiceReconciled` operational gate (done)](../../done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md):
+  done. Depended on GRAPHICS-033E (per the evaluator's first-failing-gate
+  ordering). Backend-internal: re-derive
   `VulkanDevice::HasOperationalSafetyPrerequisites()` from raw live-handle
   preconditions and feed it into `BuildOperationalInputs()` for the gate-8
   input. With both 033E and 033F landed,
   `EvaluateVulkanOperationalStatus(...)` can finally return `{Operational, None}`
-  on a Vulkan-capable host and unblock `GRAPHICS-080` retirement. Planning-gap
-  fill: the parent GRAPHICS-033 planning slice identified Impl-A/B/C/D but did
-  not enumerate an explicit child for gates 7/8.
+  on a Vulkan-capable host. `GRAPHICS-080` retirement now waits only on
+  `GRAPHICS-033D`'s `gpu;vulkan` smoke. Planning-gap fill: the parent
+  GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not enumerate
+  an explicit child for gates 7/8.
 - [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
   depends on GRAPHICS-033C and GRAPHICS-033D; sibling fixture reusing the
   GRAPHICS-033D harness for recipe-selector coverage.

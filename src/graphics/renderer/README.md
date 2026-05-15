@@ -39,11 +39,16 @@ recipe-aware validation outcome to the device via
 `RHI::IDevice::NoteRecipeGraphValidation(bool)` exactly once per recipe compile
 attempt. After a successful `RenderGraph::Compile()` the renderer calls
 `ValidateRecipeCompiledGraph(...)` on the active recipe's introspection and
-publishes
-`result.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u && !GetLastCompileValidationResult().HasErrors()`.
-A failed recipe build or a failed `Compile()` publishes `false` so the
-backend's operational gate cannot inherit a stale-clean state. Non-Vulkan
-backends inherit the default no-op implementation.
+publishes `result.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u`.
+The recipe-aware result is the sole source of truth because it carries the
+`ImportedResourceAuthorization` entries derived from the recipe; the bare
+compile-time `GetLastCompileValidationResult()` lacks that context and will
+report `UnauthorizedImportedBufferWrite` errors for any imported write from
+a non-side-effect pass (e.g. `CullingPass` writing `Cull.*` buffers), so it
+is not consulted by the published bool. A failed recipe build or a failed
+`Compile()` publishes `false` so the backend's operational gate cannot
+inherit a stale-clean state. Non-Vulkan backends inherit the default no-op
+implementation.
 
 ### Scene and sync systems
 
