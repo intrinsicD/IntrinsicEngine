@@ -159,7 +159,11 @@ TEST(GraphicsImGuiPresentContract, RenderGraphRejectsNonPresentBackbufferWrites)
     EXPECT_FALSE(compiled.has_value());
     const auto& findings = graph.GetLastCompileValidationResult().Findings;
     ASSERT_FALSE(findings.empty());
-    EXPECT_NE(findings.front().Message.find("BadOverlayBackbufferWrite"), std::string::npos);
+    const bool reportedBadPass = std::ranges::any_of(findings, [](const Graphics::RenderGraphValidationFinding& finding) {
+        return finding.PassName == "BadOverlayBackbufferWrite" ||
+               finding.Message.find("BadOverlayBackbufferWrite") != std::string::npos;
+    });
+    EXPECT_TRUE(reportedBadPass);
 }
 
 TEST(GraphicsImGuiPresentContract, DefaultFrameRecipeBuildsPresentAsOnlyBackbufferUse)

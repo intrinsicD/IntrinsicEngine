@@ -11,6 +11,7 @@ module Extrinsic.Graphics.FrameRecipe;
 
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 
@@ -94,6 +95,24 @@ namespace Extrinsic::Graphics
                 .DebugName = name,
             };
         }
+
+        [[nodiscard]] constexpr RHI::TextureHandle RenderPassAttachmentToken() noexcept
+        {
+            return RHI::TextureHandle{0u, 1u};
+        }
+
+        constexpr RHI::ColorAttachment kMinimalRenderPassColorAttachments[] = {
+            RHI::ColorAttachment{
+                .Target = RenderPassAttachmentToken(),
+                .Load = RHI::LoadOp::Clear,
+                .Store = RHI::StoreOp::Store,
+                .ClearR = 0.0f,
+                .ClearG = 0.0f,
+                .ClearB = 0.0f,
+                .ClearA = 1.0f,
+            },
+        };
+
     }
 
     [[nodiscard]] FrameRecipeFeatures DeriveDefaultFrameRecipeFeatures(const RenderWorld& world)
@@ -563,13 +582,11 @@ namespace Extrinsic::Graphics
         AddPass(out, FrameRecipePassKind::Surface, kMinimalDebugSurfacePassName, true, false,
                 {"GpuWorld.SceneTable", "Material.Buffer",
                  "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"},
-                {"SceneColorHDR", "SceneDepth"});
+                {});
         AddPass(out, FrameRecipePassKind::Present, kMinimalDebugPresentPassName, true, true,
-                {"SceneColorHDR", "Backbuffer"}, {});
+                {}, {"Backbuffer"});
 
-        AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
-        AddResource(out, FrameRecipeResourceKind::SceneDepth, "SceneDepth", true);
-        AddResource(out, FrameRecipeResourceKind::SceneColorHDR, "SceneColorHDR", true);
+        AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
         AddResource(out, FrameRecipeResourceKind::MaterialBuffer, "Material.Buffer", true, true);
         AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs, "Cull.SurfaceOpaque.IndexedArgs", true, true, false, false, true);
@@ -589,8 +606,7 @@ namespace Extrinsic::Graphics
             };
         }
 
-        const auto width = ClampExtent(sizing.Width);
-        const auto height = ClampExtent(sizing.Height);
+        (void)sizing;
         const FrameRecipeIntrospection declaration = DescribeMinimalDebugSurfaceRecipe();
 
         // GRAPHICS-032 Decision 12: missing surface-pass prerequisites
@@ -637,11 +653,6 @@ namespace Extrinsic::Graphics
                                            BufferState::ShaderWrite, BufferState::IndirectRead);
         }
 
-        const auto depth = graph.CreateTexture("SceneDepth",
-                                               DepthTargetDesc(width, height, sizing.DepthFormat, "SceneDepth"));
-        const auto hdr = graph.CreateTexture("SceneColorHDR",
-                                             ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"));
-
         PassRef previous{};
         auto addOrderedPass = [&graph, &previous](std::string name, auto setup, const bool sideEffect = false) {
             const PassRef dependency = previous;
@@ -673,13 +684,13 @@ namespace Extrinsic::Graphics
             {
                 builder.Read(drawCount, BufferUsage::IndirectRead);
             }
-            builder.Write(depth, TextureUsage::DepthWrite);
-            builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
         });
 
         addOrderedPass(std::string{kMinimalDebugPresentPassName}, [=](RenderGraphBuilder& builder) {
-            builder.Read(hdr, TextureUsage::ShaderRead);
-            builder.Read(backbuffer, TextureUsage::Present);
+            builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+            builder.SetRenderPass(RHI::RenderPassDesc{
+                .ColorTargets = kMinimalRenderPassColorAttachments,
+            });
             builder.SideEffect();
         }, true);
 

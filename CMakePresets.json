@@ -54,6 +54,7 @@
       "inherits": "ci",
       "description": "CI preset that opts in to the promoted Vulkan backend (INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON) and includes the Sandbox target for end-to-end visible-triangle smoke. Runtime still falls back to Null per the GRAPHICS-033 truth table when the operational gate is not satisfied; gpu;vulkan fixtures opt in via 'ctest -L gpu -L vulkan'.",
       "cacheVariables": {
+        "EXTRINSIC_BACKEND": "Vulkan",
         "INTRINSIC_BUILD_SANDBOX": "ON",
         "INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN": "ON"
       }

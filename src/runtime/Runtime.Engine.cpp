@@ -251,6 +251,7 @@ namespace Extrinsic::Runtime
 
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
+        m_Renderer->SetFrameRecipe(m_Config.Render.FrameRecipe);
         m_RendererOperational = m_Device->IsOperational();
 
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────

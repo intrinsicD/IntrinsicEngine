@@ -5,6 +5,7 @@ endif()
 
 # Helper to run tests via CTest
 include(GoogleTest)
+include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
 
 # Try to locate a symbolizer so sanitizer reports have function/file/line.
 find_program(INTRINSIC_LLVM_SYMBOLIZER
@@ -437,16 +438,17 @@ endif()
 
 if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     set(_graphics_vulkan_smoke_test_files
+        Test.MinimalDebugSurfaceGpuSmoke.cpp
         Test.VulkanBootstrapSmoke.cpp
     )
     intrinsic_resolve_test_sources(_graphics_vulkan_smoke_test_sources
-        SEARCH_DIRS gpu
+        SEARCH_DIRS gpu integration/graphics
         FILES ${_graphics_vulkan_smoke_test_files}
     )
     intrinsic_test_object_lib(GraphicsVulkanSmokeTestObjs
         SOURCES
             ${_graphics_vulkan_smoke_test_sources}
-        DEPS ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+        DEPS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
     )
 endif()
 
@@ -905,9 +907,10 @@ endif()
 if(TARGET GraphicsVulkanSmokeTestObjs)
     intrinsic_test_executable(IntrinsicGraphicsVulkanSmokeTests
         OBJECTS GraphicsVulkanSmokeTestObjs
-        LINK_LIBS ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+        LINK_LIBS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
         LABELS gpu vulkan graphics
     )
+    intrinsic_add_glsl_shaders(IntrinsicGraphicsVulkanSmokeTests)
 endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests

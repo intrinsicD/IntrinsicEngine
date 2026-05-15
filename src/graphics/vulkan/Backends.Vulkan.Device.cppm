@@ -73,6 +73,7 @@ namespace Extrinsic::Backends::Vulkan
 
         void Resize(uint32_t width, uint32_t height) override;
         [[nodiscard]] Core::Extent2D GetBackbufferExtent() const override;
+        [[nodiscard]] RHI::Format GetBackbufferFormat() const override;
 
         void SetPresentMode(RHI::PresentMode mode) override;
         [[nodiscard]] RHI::PresentMode GetPresentMode() const override { return m_PresentMode; }

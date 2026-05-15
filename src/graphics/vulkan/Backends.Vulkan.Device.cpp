@@ -81,11 +81,15 @@ namespace
         bool TimelineSemaphoreSupported = false;
         bool DynamicRenderingSupported = false;
         bool BufferDeviceAddressSupported = false;
+        bool Synchronization2Supported = false;
+        bool ScalarBlockLayoutSupported = false;
+        bool ShaderInt64Supported = false;
 
         [[nodiscard]] bool AllRequiredSupported() const noexcept
         {
             return DescriptorIndexingSupported && TimelineSemaphoreSupported && DynamicRenderingSupported &&
-                   BufferDeviceAddressSupported;
+                   BufferDeviceAddressSupported && Synchronization2Supported && ScalarBlockLayoutSupported &&
+                   ShaderInt64Supported;
         }
     };
 
@@ -271,6 +275,9 @@ namespace
         probe.TimelineSemaphoreSupported = features12.timelineSemaphore == VK_TRUE;
         probe.DynamicRenderingSupported = features13.dynamicRendering == VK_TRUE;
         probe.BufferDeviceAddressSupported = features12.bufferDeviceAddress == VK_TRUE;
+        probe.Synchronization2Supported = features13.synchronization2 == VK_TRUE;
+        probe.ScalarBlockLayoutSupported = features12.scalarBlockLayout == VK_TRUE;
+        probe.ShaderInt64Supported = features2.features.shaderInt64 == VK_TRUE;
         return probe;
     }
 
@@ -288,6 +295,18 @@ namespace
             ? VkSurfaceFormatKHR{.format = VK_FORMAT_B8G8R8A8_UNORM,
                                  .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}
             : formats.front();
+    }
+
+    [[nodiscard]] RHI::Format ToRhiBackbufferFormat(const VkFormat format) noexcept
+    {
+        switch (format)
+        {
+        case VK_FORMAT_R8G8B8A8_UNORM: return RHI::Format::RGBA8_UNORM;
+        case VK_FORMAT_R8G8B8A8_SRGB: return RHI::Format::RGBA8_SRGB;
+        case VK_FORMAT_B8G8R8A8_UNORM: return RHI::Format::BGRA8_UNORM;
+        case VK_FORMAT_B8G8R8A8_SRGB: return RHI::Format::BGRA8_SRGB;
+        default: return RHI::Format::RGBA8_UNORM;
+        }
     }
 
     [[nodiscard]] VkExtent2D ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities,
@@ -375,6 +394,7 @@ namespace
         VkPhysicalDeviceVulkan13Features enabled13{};
         enabled13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
         enabled13.dynamicRendering = VK_TRUE;
+        enabled13.synchronization2 = VK_TRUE;
 
         VkPhysicalDeviceVulkan12Features enabled12{};
         enabled12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
@@ -383,6 +403,7 @@ namespace
         enabled12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
         enabled12.timelineSemaphore = VK_TRUE;
         enabled12.bufferDeviceAddress = VK_TRUE;
+        enabled12.scalarBlockLayout = VK_TRUE;
 
         VkPhysicalDeviceFeatures2 enabledFeatures{};
         enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -393,6 +414,7 @@ namespace
             if (outSamplerAnisotropySupported != nullptr)
                 *outSamplerAnisotropySupported = true;
         }
+        enabledFeatures.features.shaderInt64 = VK_TRUE;
 
         const char* deviceExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
@@ -1202,6 +1224,7 @@ bool VulkanDevice::IsOperational() const noexcept
 void VulkanDevice::NoteRecipeGraphValidation(const bool clean) noexcept
 {
     m_LatestRecipeValidationClean.store(clean, std::memory_order_relaxed);
+    RefreshOperationalState();
 }
 
 RHI::ITransferQueue& VulkanDevice::GetTransferQueue()
@@ -2580,6 +2603,11 @@ Core::Extent2D VulkanDevice::GetBackbufferExtent() const
 
     return Core::Extent2D{.Width = static_cast<int>(m_SwapchainExtent.width),
                           .Height = static_cast<int>(m_SwapchainExtent.height)};
+}
+
+RHI::Format VulkanDevice::GetBackbufferFormat() const
+{
+    return ToRhiBackbufferFormat(m_SwapchainFormat);
 }
 
 void VulkanDevice::SetPresentMode(RHI::PresentMode mode)

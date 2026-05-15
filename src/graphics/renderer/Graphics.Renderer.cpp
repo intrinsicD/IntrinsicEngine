@@ -49,6 +49,7 @@ import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Core.Logging;
 
@@ -201,6 +202,7 @@ namespace Extrinsic::Graphics
             m_SamplerManager .emplace(device);
             m_TextureManager .emplace(device, device.GetBindlessHeap());
             m_PipelineManager.emplace(device);
+            m_BackbufferFormat = device.GetBackbufferFormat();
             m_GpuWorld.emplace();
             m_GpuWorld->Initialize(device, *m_BufferManager);
             m_MaterialSystem .emplace();
@@ -245,6 +247,7 @@ namespace Extrinsic::Graphics
                     "Renderer operational-resource rebuild requires an operational device.";
                 return false;
             }
+            m_BackbufferFormat = device.GetBackbufferFormat();
             if (!m_BufferManager || !m_PipelineManager || !m_MaterialSystem ||
                 !m_GpuWorld || !m_CullingSystem)
             {
@@ -309,6 +312,7 @@ namespace Extrinsic::Graphics
             m_MaterialSystem .reset();
             m_DepthPrepassPipelineLease.reset();
             m_DefaultDebugSurfacePipelineLease.reset();
+            m_MinimalDebugPresentPipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -725,7 +729,7 @@ namespace Extrinsic::Graphics
             const FrameRecipeSizing sizing{
                 .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
                 .Height = renderWorld.Viewport.Height > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Height) : 1u,
-                .BackbufferFormat = RHI::Format::RGBA8_UNORM,
+                .BackbufferFormat = m_BackbufferFormat,
                 .DepthFormat = RHI::Format::D32_FLOAT,
             };
             const FrameRecipeBuildResult recipe = (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
@@ -817,7 +821,7 @@ namespace Extrinsic::Graphics
             const auto executeResult = m_RenderGraphExecutor.Execute(
                 *compiled,
                 {},
-                [this, &graphicsContext, &passNameByIndex, &camera, &frame](const std::uint32_t passIndex)
+                [this, &graphicsContext, &passNameByIndex, &camera, &frame, &compiled](const std::uint32_t passIndex)
                 {
                     if (passIndex >= passNameByIndex.size())
                     {
@@ -833,6 +837,29 @@ namespace Extrinsic::Graphics
                                         passIndex);
                         return;
                     }
+                    const ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
+                    if (activeRenderPass.HasAttachments)
+                    {
+                        graphicsContext.BeginRenderPass(RHI::RenderPassDesc{
+                            .ColorTargets = activeRenderPass.ColorAttachments,
+                            .Depth = activeRenderPass.DepthAttachment,
+                        });
+                        const Core::Extent2D extent = m_Device != nullptr
+                            ? m_Device->GetBackbufferExtent()
+                            : Core::Extent2D{.Width = 1, .Height = 1};
+                        const std::uint32_t width = extent.Width > 0 ? static_cast<std::uint32_t>(extent.Width) : 1u;
+                        const std::uint32_t height = extent.Height > 0 ? static_cast<std::uint32_t>(extent.Height) : 1u;
+                        graphicsContext.SetViewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
+                        graphicsContext.SetScissor(0, 0, width, height);
+                    }
+
+                    const auto endActiveRenderPass = [&graphicsContext, &activeRenderPass]
+                    {
+                        if (activeRenderPass.HasAttachments)
+                        {
+                            graphicsContext.EndRenderPass();
+                        }
+                    };
                     if (passName == std::string_view{"CullingPass"})
                     {
                         const RenderCommandPassStatus status = RecordCullingPass(graphicsContext, camera);
@@ -852,7 +879,7 @@ namespace Extrinsic::Graphics
                     else if (passName == kMinimalDebugPresentPassName)
                     {
                         const RenderCommandPassStatus status =
-                            RecordMinimalDebugPresentPass(graphicsContext);
+                            RecordMinimalDebugPresentPass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else
@@ -874,6 +901,7 @@ namespace Extrinsic::Graphics
                                 : RenderCommandPassStatus::SkippedUnavailable;
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    endActiveRenderPass();
                 },
                 [&graphicsContext, &compiled](const BarrierPacket& packet)
                 {
@@ -935,7 +963,7 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept override
         {
-            return BuildDefaultDebugSurfacePipelineDesc();
+            return BuildDefaultDebugSurfacePipelineDesc(m_BackbufferFormat);
         }
 
         void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept override
@@ -981,7 +1009,8 @@ namespace Extrinsic::Graphics
         // `Initialize()` and `RebuildOperationalResources()` therefore
         // republish a byte-identical descriptor against a stable filesystem
         // state.
-        [[nodiscard]] static RHI::PipelineDesc BuildDefaultDebugSurfacePipelineDesc() noexcept
+        [[nodiscard]] static RHI::PipelineDesc BuildDefaultDebugSurfacePipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
@@ -998,10 +1027,34 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorTargetCount = 1u;
-            desc.ColorTargetFormats[0] = RHI::Format::RGBA8_UNORM;
+            desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
             desc.DebugName = "Renderer.DefaultDebugSurface";
+            return desc;
+        }
+
+        [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/minimal_debug_visible_triangle.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/minimal_debug_visible_triangle.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = colorFormat;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = 0u;
+            desc.DebugName = "Renderer.MinimalVisibleTriangle";
             return desc;
         }
 
@@ -1018,11 +1071,12 @@ namespace Extrinsic::Graphics
                 device,
                 *m_BufferManager,
                 *m_PipelineManager,
-                "assets/shaders/instance_cull.comp");
+                Core::Filesystem::GetShaderPath("shaders/instance_cull.comp.spv"));
 
             m_DepthPrepassPipelineLease.reset();
             RHI::PipelineDesc depthPrepassDesc{};
-            depthPrepassDesc.VertexShaderPath = "assets/shaders/depth_prepass.vert";
+            depthPrepassDesc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/depth_prepass.vert.spv");
             depthPrepassDesc.ColorTargetCount = 0u;
             depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
@@ -1047,9 +1101,10 @@ namespace Extrinsic::Graphics
             // pipeline so its recorded command stream matches the
             // default-debug-surface pipeline byte-for-byte.
             m_DefaultDebugSurfacePipelineLease.reset();
+            m_MinimalDebugPresentPipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
-            const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc();
+            const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc(m_BackbufferFormat);
             auto defaultDebugSurfacePipeline = m_PipelineManager->Create(defaultDebugSurfaceDesc);
             if (defaultDebugSurfacePipeline.has_value())
             {
@@ -1057,14 +1112,6 @@ namespace Extrinsic::Graphics
                 const RHI::PipelineHandle slotZeroPipeline =
                     m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
                 m_MinimalDebugSurfacePass.SetPipeline(slotZeroPipeline);
-                // GRAPHICS-032C — the minimal-debug present pass reuses the
-                // slot-0 default-debug-surface pipeline for the CPU-mock
-                // command body. The pass only records `BindPipeline` +
-                // `Draw(3,1,0,0)`; pipeline state details are irrelevant on
-                // the Null device and GRAPHICS-033C replaces the recording
-                // body with a real Vulkan fullscreen-triangle present pass.
-                // The entire MinimalDebug scaffold is deleted by GRAPHICS-081.
-                m_MinimalDebugPresentPass.SetPipeline(slotZeroPipeline);
             }
             else
             {
@@ -1072,8 +1119,78 @@ namespace Extrinsic::Graphics
                                 static_cast<int>(defaultDebugSurfacePipeline.error()));
             }
 
+            const RHI::PipelineDesc minimalVisibleTriangleDesc =
+                BuildMinimalVisibleTrianglePipelineDesc(m_BackbufferFormat);
+            auto minimalVisibleTrianglePipeline = m_PipelineManager->Create(minimalVisibleTriangleDesc);
+            if (minimalVisibleTrianglePipeline.has_value())
+            {
+                m_MinimalDebugPresentPipelineLease.emplace(std::move(*minimalVisibleTrianglePipeline));
+                m_MinimalDebugPresentPass.SetPipeline(
+                    m_PipelineManager->GetDeviceHandle(m_MinimalDebugPresentPipelineLease->GetHandle()));
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] MinimalVisibleTriangle pipeline unavailable; present recording will be skipped: error={}",
+                                static_cast<int>(minimalVisibleTrianglePipeline.error()));
+            }
+
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
                 m_DepthPrepassPipelineLease->IsValid();
+        }
+
+        struct ActiveRenderPassDesc
+        {
+            std::vector<RHI::ColorAttachment> ColorAttachments{};
+            RHI::DepthAttachment DepthAttachment{};
+            bool HasAttachments = false;
+        };
+
+        [[nodiscard]] static ActiveRenderPassDesc BuildActiveRenderPassDesc(
+            const CompiledRenderGraph& compiled,
+            const std::uint32_t passIndex)
+        {
+            ActiveRenderPassDesc out{};
+            for (const CompiledRenderPassAttachment& attachment : compiled.RenderPassAttachments)
+            {
+                if (attachment.PassIndex != passIndex || attachment.ResourceIndex >= compiled.TextureHandles.size())
+                {
+                    continue;
+                }
+
+                const RHI::TextureHandle texture = compiled.TextureHandles[attachment.ResourceIndex];
+                if (!texture.IsValid())
+                {
+                    continue;
+                }
+
+                if (attachment.IsDepthAttachment)
+                {
+                    out.DepthAttachment = RHI::DepthAttachment{
+                        .Target = texture,
+                        .Load = attachment.Load,
+                        .Store = attachment.Store,
+                        .ClearDepth = 1.0f,
+                    };
+                    out.HasAttachments = true;
+                    continue;
+                }
+
+                if (out.ColorAttachments.size() <= attachment.AttachmentIndex)
+                {
+                    out.ColorAttachments.resize(attachment.AttachmentIndex + 1u);
+                }
+                out.ColorAttachments[attachment.AttachmentIndex] = RHI::ColorAttachment{
+                    .Target = texture,
+                    .Load = attachment.Load,
+                    .Store = attachment.Store,
+                    .ClearR = 0.0f,
+                    .ClearG = 0.0f,
+                    .ClearB = 0.0f,
+                    .ClearA = 1.0f,
+                };
+                out.HasAttachments = true;
+            }
+            return out;
         }
 
         void ResetFrameState()
@@ -1215,6 +1332,9 @@ namespace Extrinsic::Graphics
                                                                             const RHI::CameraUBO& camera,
                                                                             const std::uint32_t frameIndex)
         {
+            (void)cmd;
+            (void)camera;
+            (void)frameIndex;
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
@@ -1248,28 +1368,31 @@ namespace Extrinsic::Graphics
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_MinimalDebugSurfacePass.Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
             ++m_LastRenderGraphStats.MinimalSurfacePassExecutions;
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-032C — minimal-debug-present CPU-mock command body. The
-        // pass reuses the slot-0 default-debug-surface pipeline lease and
-        // records the fullscreen-triangle present form (BindPipeline +
-        // Draw(3, 1, 0, 0)). Missing prerequisite is the slot-0 pipeline
-        // lease only; the imported Backbuffer is validated by the
-        // recipe-build path and reported through the existing build-time
-        // diagnostic. Mirrors the SkippedNonOperational / SkippedUnavailable
-        // taxonomy used by RecordMinimalDebugSurfacePass.
-        [[nodiscard]] RenderCommandPassStatus RecordMinimalDebugPresentPass(RHI::ICommandContext& cmd)
+        // GRAPHICS-033D prerequisite: once MinimalDebug records against real
+        // Vulkan dynamic rendering, the finalizer must not issue the older
+        // CPU-mock `Draw(3)` with the BDA default-debug-surface pipeline. That
+        // pipeline requires the same scene-table push constants and indexed
+        // reference-triangle inputs as `Pass.Surface.MinimalDebug`; replay that
+        // parameterized draw body into the backbuffer render pass so the smoke
+        // has a legal visible-triangle producer until GRAPHICS-081 removes the
+        // scaffold.
+        [[nodiscard]] RenderCommandPassStatus RecordMinimalDebugPresentPass(RHI::ICommandContext& cmd,
+                                                                            const RHI::CameraUBO& camera,
+                                                                            const std::uint32_t frameIndex)
         {
+            (void)camera;
+            (void)frameIndex;
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
 
-            const bool pipelineReady = m_DefaultDebugSurfacePipelineLease.has_value() &&
-                                       m_DefaultDebugSurfacePipelineLease->IsValid() &&
+            const bool pipelineReady = m_MinimalDebugPresentPipelineLease.has_value() &&
+                                       m_MinimalDebugPresentPipelineLease->IsValid() &&
                                        m_MinimalDebugPresentPass.GetPipeline().IsValid();
             if (!pipelineReady)
             {
@@ -1286,6 +1409,7 @@ namespace Extrinsic::Graphics
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
         std::optional<RHI::PipelineManager> m_PipelineManager;
+        RHI::Format                          m_BackbufferFormat{RHI::Format::RGBA8_UNORM};
         std::optional<GpuWorld>              m_GpuWorld;
         std::optional<MaterialSystem>        m_MaterialSystem;
         std::optional<ColormapSystem>        m_ColormapSystem;
@@ -1307,6 +1431,7 @@ namespace Extrinsic::Graphics
         MinimalDebugPresentPass              m_MinimalDebugPresentPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

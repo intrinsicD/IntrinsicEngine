@@ -45,6 +45,18 @@ ctest --test-dir build/ci --output-on-failure -L 'unit|contract' -LE 'gpu|vulkan
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j$(nproc)
 ```
 
+Opt-in promoted Vulkan smoke coverage is selected with the label intersection
+form below. `IntrinsicGraphicsVulkanSmokeTests` includes
+`MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`,
+the `GRAPHICS-033D` fixture that drives the reference triangle through the
+bootstrap `FrameRecipe::MinimalDebug` path. It reports `SKIPPED` when GLFW or a
+Vulkan-capable swapchain/device is unavailable and is intentionally excluded
+from the default CPU gate by its `gpu;vulkan` labels.
+
+```bash
+ctest --test-dir build/ci --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120
+```
+
 For fast local iteration on changed paths, use the touched-scope helper to plan
 or run the relevant subset before the full gate:
 

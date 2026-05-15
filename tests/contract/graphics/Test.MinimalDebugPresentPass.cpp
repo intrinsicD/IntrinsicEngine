@@ -192,15 +192,15 @@ TEST(MinimalDebugPresentPassContract, RendererRoutesAndIncrementsPresentExecutio
     renderer->Shutdown();
 }
 
-TEST(MinimalDebugPresentPassContract, MissingSlotZeroPipelineLeaseSkipsUnavailableAndIncrementsCounter)
+TEST(MinimalDebugPresentPassContract, MissingVisibleTrianglePipelineLeaseSkipsUnavailableAndIncrementsCounter)
 {
     Tests::MockDevice device;
-    // GRAPHICS-031A creates the slot-0 default-debug-surface pipeline as the
-    // third PipelineManager::Create() call (culling, depth-prepass, then
-    // default-debug-surface). GRAPHICS-032C reuses that same lease for the
-    // minimal-debug present pass; failing the third Create() therefore
-    // exercises the SkippedUnavailable path for both minimal passes.
-    device.FailPipelineCreateCall = 3;
+    // The MinimalDebug visible-triangle present pipeline is the fourth
+    // PipelineManager::Create() call (culling, depth-prepass,
+    // default-debug-surface, then Renderer.MinimalVisibleTriangle). Failing
+    // that create exercises the present-only SkippedUnavailable path while the
+    // surface prerequisite-validation scaffold can still record.
+    device.FailPipelineCreateCall = 4;
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
     renderer->Initialize(device);
@@ -354,17 +354,11 @@ TEST(MinimalDebugPresentPassContract, AcceptanceFrameRecordsBothPassesAndBarrier
     EXPECT_EQ(surfacePass->Status, Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(presentPass->Status, Graphics::RenderCommandPassStatus::Recorded);
 
-    // BUG-010: the imported Backbuffer must reach the end-of-graph Present
-    // sentinel layout. Render-graph barrier compilation emits this transition
-    // from the backbuffer's `ImportBackbuffer` final-state contract
-    // (`InitialState = Undefined`, `FinalState = Present`). The framegraph
-    // intentionally rejects `Write(backbuffer, ...)` declarations
-    // (`Graphics.RenderGraph.cpp:206`), so the canonical barrier shape is
-    // `Undefined -> Present` rather than `ColorAttachment -> Present` — the
-    // minimal present pass samples `SceneColorHDR` and the imported
-    // backbuffer is only declared via `Read(backbuffer, TextureUsage::Present)`,
-    // which marks the side-effect finalization without authorizing a
-    // graph-level color-attachment write.
+    // GRAPHICS-033D: the MinimalDebug Vulkan smoke writes the imported
+    // backbuffer directly from the present finalizer so Vulkan records a legal
+    // dynamic-rendering color attachment. The imported Backbuffer still must
+    // reach Present at the end-of-graph sentinel, but the transition now starts
+    // from ColorAttachment instead of Undefined.
     int backbufferToPresentIndex = -1;
     for (std::size_t bi = 0; bi < device.CommandContext.TextureBarrierCalls.size(); ++bi)
     {
@@ -380,22 +374,15 @@ TEST(MinimalDebugPresentPassContract, AcceptanceFrameRecordsBothPassesAndBarrier
         << "Minimal recipe must finalize the backbuffer to Present as the "
            "end-of-graph sentinel.";
 
-    // The end-of-graph backbuffer transition starts from the imported
-    // `Undefined` initial state because the framegraph forbids backbuffer
-    // writes and therefore never routes the imported handle through an
-    // intermediate `ColorAttachment`/`General` layout. If the compiler
-    // ever inserts an intermediate state the assertion below documents the
-    // expected ordering invariant.
+    // The end-of-graph backbuffer transition starts from the present
+    // finalizer's ColorAttachment write.
     if (backbufferToPresentIndex >= 0)
     {
         const auto& finalBarrier =
             device.CommandContext.TextureBarrierCalls[static_cast<std::size_t>(backbufferToPresentIndex)];
-        EXPECT_EQ(finalBarrier.Before, RHI::TextureLayout::Undefined)
-            << "Minimal recipe must transition the imported backbuffer directly "
-               "from Undefined to Present because the framegraph rejects "
-               "backbuffer writes; if this ever changes, update the recipe "
-               "barrier contract documentation in tasks/done/GRAPHICS-032 and "
-               "tasks/done/BUG-010 as well.";
+        EXPECT_EQ(finalBarrier.Before, RHI::TextureLayout::ColorAttachment)
+            << "Minimal recipe present finalizer must color-write the imported "
+               "backbuffer before the end-of-graph Present transition.";
     }
 
     renderer->Shutdown();
