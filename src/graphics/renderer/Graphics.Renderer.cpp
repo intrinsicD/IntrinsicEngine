@@ -773,10 +773,14 @@ namespace Extrinsic::Graphics
             }
             // GRAPHICS-033E: run the recipe-aware validation against the freshly
             // compiled graph and publish a single boolean to the device exactly
-            // once per recipe compile. Combined with the compiler-level
-            // findings already stored on the render graph, gate 7
-            // (`BarrierValidationClean`) flips to `true` only when both layers
-            // report zero `Error`-severity findings.
+            // once per recipe compile. The recipe-aware validator supplies the
+            // `ImportedResourceAuthorization` entries that the bare
+            // compile-time validator lacks (the compile-time pass has no
+            // recipe context, so imported writes from non-side-effect passes
+            // such as `CullingPass` always trip
+            // `UnauthorizedImportedBufferWrite`). Gate 7
+            // (`BarrierValidationClean`) therefore flips to `true` when the
+            // recipe-aware validation reports zero `Error`-severity findings.
             const FrameRecipeIntrospection recipeIntrospection =
                 (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
                     ? DescribeMinimalDebugSurfaceRecipe()
@@ -784,8 +788,7 @@ namespace Extrinsic::Graphics
             const RenderGraphValidationResult recipeValidation =
                 ValidateRecipeCompiledGraph(recipeIntrospection, *compiled);
             const bool recipeValidationClean =
-                recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u &&
-                !m_RenderGraph.GetLastCompileValidationResult().HasErrors();
+                recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u;
             m_Device->NoteRecipeGraphValidation(recipeValidationClean);
 
             m_LastRenderGraphStats.Compile.Succeeded = true;

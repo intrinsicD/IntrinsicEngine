@@ -2,17 +2,22 @@
 
 ## Status
 
-- Status: in-progress (slice 1 landed on this branch; awaiting CI gate confirmation and `GRAPHICS-033F` for downstream `GRAPHICS-080` retirement).
-- Owner/agent: Claude on `claude/setup-agentic-workflow-oX1eU`.
-- Branch: `claude/setup-agentic-workflow-oX1eU`.
-- Slice 1 landed in this branch:
+- Status: in-progress (slice 2 landed; awaiting retirement once the default CPU gate is confirmed green for the producer-side fix).
+- Owner/agent: Claude on `claude/setup-agentic-workflow-2glkN`.
+- Branch: `claude/setup-agentic-workflow-2glkN`.
+- Slice 1 landed previously on `claude/setup-agentic-workflow-oX1eU` (merged via PR #831):
   - `RHI::IDevice::NoteRecipeGraphValidation(bool)` (default no-op) added in `src/graphics/rhi/RHI.Device.cppm`.
   - `VulkanDevice` override + `std::atomic<bool> m_LatestRecipeValidationClean{false}`, reset to `false` in `Initialize()`, consumed by `BuildOperationalInputs()` for `inputs.BarrierValidationClean` in `src/graphics/vulkan/Backends.Vulkan.Device.cppm` / `.cpp`.
   - `Graphics.Renderer.cpp::ExecuteFrame()` calls `ValidateRecipeCompiledGraph(...)` after each successful `RenderGraph::Compile()` and publishes the boolean exactly once per compile attempt; the recipe-build-failure and compile-failure paths publish `false` to preserve fail-closed semantics.
   - Backend-public read accessor `GetVulkanDeviceOperationalInputs(const RHI::IDevice*)` (declared in `Backends.Vulkan.OperationalStatus.cppm`, implemented in `Backends.Vulkan.Device.cpp`) lets contract tests observe `BarrierValidationClean` without re-running the evaluator.
   - Tests: `RendererFrameLifecycle.PublishesRecipeGraphValidationOnSuccessfulCompile`, `RendererFrameLifecycle.PublishesFailClosedRecipeValidationOnRecipeBuildFailure`, `VulkanFailClosedContract.RecipeGraphValidationSetterFlipsBarrierValidationClean`.
   - Docs: `src/graphics/vulkan/README.md` §10 documents gate-7 wiring; `src/graphics/renderer/README.md` documents the `ExecuteFrame()` publish step. `MockDevice` records every `NoteRecipeGraphValidation` call.
-- Next verification step: run the default CPU gate (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`) plus the focused contract targets, then await `GRAPHICS-033F` for gate 8 before the active `GRAPHICS-080` can retire.
+- Slice 2 landed on this branch (producer-side bug fix):
+  - The slice-1 producer wiring computed `recipeValidationClean` as `recipeValidation.CountBySeverity(Error) == 0u && !GetLastCompileValidationResult().HasErrors()`. The second clause re-consulted the bare compile-time validator, which has no recipe context and therefore reports `UnauthorizedImportedBufferWrite` for every imported write from a non-side-effect pass (e.g. `CullingPass` writing `Cull.SurfaceOpaque.IndexedArgs`). The default recipe always tripped this false positive, so gate 7 could never flip to `true` and `RendererFrameLifecycle.PublishesRecipeGraphValidationOnSuccessfulCompile` regressed under the default CPU gate.
+  - Fix in `src/graphics/renderer/Graphics.Renderer.cpp::ExecuteFrame()`: publish solely on `recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u`. The recipe-aware validator already provides the `ImportedResourceAuthorization` entries; consulting the bare compile-time result is strictly redundant and over-restrictive.
+  - Doc sync in `src/graphics/renderer/README.md` to match the simplified formula.
+  - No test changes: the existing `RendererFrameLifecycle.PublishesRecipeGraphValidationOnSuccessfulCompile` test (which expected `true`) now passes.
+- Next verification step: default CPU gate now green on this branch (1884/1885 pass; the single failure `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` is a documented pre-existing flake that passes on retry, tracked in `tasks/done/GRAPHICS-031A`). Ready to retire to `tasks/done/`.
 
 ## Goal
 - Flip the `BarrierValidationClean` input to the `EvaluateVulkanOperationalStatus(...)` 9-step gate from its current hard-coded `false` (`src/graphics/vulkan/Backends.Vulkan.Device.cpp:882`) so it observes the latest `RenderGraphValidationResult` for the active recipe compile and returns `true` only when the recipe-graph validation reports no `Error`-severity findings on the canonical resource set (`SceneColorHDR`, `SceneDepth`, imported backbuffer finalization, transfer-queue uploads). This is gate step 7 of the operational checklist in `src/graphics/vulkan/README.md:360–362` and is one of the two remaining gates blocking `IsOperational()` from ever returning `true`.
