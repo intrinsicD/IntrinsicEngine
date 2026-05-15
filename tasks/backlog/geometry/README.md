@@ -17,6 +17,8 @@ map.
 - [GEOM-010 — Point-cloud algorithm pack roadmap](GEOM-010-point-cloud-algorithm-pack-roadmap.md).
 - [GEOM-011 — Parameterization and mapping roadmap](GEOM-011-parameterization-mapping-roadmap.md).
 - [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](GEOM-012-symmetric-domain-views-property-sharing.md).
+- [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
+- [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -36,6 +38,12 @@ map.
   method-compliant roadmap packs before algorithm implementation begins.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible
   property storage through explicit borrowed views instead of accidental copies.
+- GEOM-013 and GEOM-014 are seeded by the geometry paper survey
+  [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md).
+  Each lists explicit algorithm variants and requires the maintainer to mark one
+  as the default before implementation begins. GEOM-013 (dual contouring) is a
+  peer of the existing `Geometry.MarchingCubes`; GEOM-014 (FA-QEM) is an in-place
+  extension of `Geometry.HalfedgeMesh.Simplification`.
 - RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.
 - Future geometry algorithm packages should follow
   [`docs/agent/method-workflow.md`](../../../docs/agent/method-workflow.md):
