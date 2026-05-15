@@ -19,6 +19,7 @@ map.
 - [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](GEOM-012-symmetric-domain-views-property-sharing.md).
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
 - [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
+- [GEOM-015 — Common method-package infrastructure](GEOM-015-common-method-package-infrastructure.md).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -44,6 +45,11 @@ map.
   as the default before implementation begins. GEOM-013 (dual contouring) is a
   peer of the existing `Geometry.MarchingCubes`; GEOM-014 (FA-QEM) is an in-place
   extension of `Geometry.HalfedgeMesh.Simplification`.
+- GEOM-015 is the cross-cutting infrastructure task that hosts the shared types
+  (`Diagnostics`, `Random`, `ClosestPointOracle`, `HalfedgeMesh::Connection`,
+  `PDE::BoundaryConditions`, `Provenance`, `QEFSolver`, `AttributeTransfer`)
+  consumed by every method-package task in this branch. METHOD-002 through
+  METHOD-007, GEOM-013, and GEOM-014 all hard-depend on it.
 - RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.
 - Future geometry algorithm packages should follow
   [`docs/agent/method-workflow.md`](../../../docs/agent/method-workflow.md):

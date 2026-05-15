@@ -16,7 +16,20 @@
 - Paper: see Variants below.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #2.
 - Reuses `Geometry.Grid`, `Geometry.SDF`, `Geometry.KDTree` / `Geometry.BVH` (closest-point oracle), and the sparse-solver seam from [`GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md).
+- **Hard dependency:** [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md) for `Geometry::ClosestPointOracle`, `Geometry::PDE::BoundaryConditions`, `Geometry::Diagnostics`.
 - Symmetric-domain-views work in [`GEOM-012`](../geometry/GEOM-012-symmetric-domain-views-property-sharing.md) is a soft prerequisite: this method must accept a `ClosestPoint` interface backed by any of: halfedge mesh, point cloud, or implicit SDF.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on) from [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md):
+
+- `Geometry::ClosestPointOracle` — the canonical input abstraction; this task does **not** redefine its own oracle interface.
+- `Geometry::PDE::BoundaryConditions::ScalarBC` (variant A) — for interior Dirichlet curves.
+- `Geometry::Diagnostics` — used as `Result::diagnostics`.
+
+This task **may extract** (if not already in `GEOM-015`):
+
+- `Geometry::Grid::NarrowBand` — narrow-band grid view (a band-of-cells subset of a `Geometry::Grid`). If a clean abstraction emerges during implementation, promote it into `Geometry.Grid` as a public type rather than keeping it private to this method package.
 
 ## Variants and default selection
 
@@ -37,30 +50,34 @@ Default recommendation: **A**.
 
 ### Public API in `src/geometry`
 - [ ] Add module `Geometry.ClosestPointPDE` in `src/geometry/Geometry.ClosestPointPDE.cppm` + `.cpp`.
-- [ ] Public surface (sketch):
+- [ ] Public surface (sketch) — note that the oracle type is **imported** from `Geometry::ClosestPointOracle` (GEOM-015), not redefined:
   ```cpp
   namespace Geometry::ClosestPointPDE {
-    struct ClosestPointOracle {
-      // Returns nearest surface point + outward normal for any sample x in R^3.
-      virtual glm::dvec3 ClosestPoint(glm::dvec3 x) const = 0;
-      virtual glm::dvec3 Normal(glm::dvec3 surface_point) const = 0;
-    };
     struct Input {
-      const ClosestPointOracle& oracle;
-      AABB band_bounds;              // bounding box of the surface
-      double grid_spacing;           // h
-      std::span<const BoundaryCurve> interior_dirichlet;   // variant A only
+      const Geometry::ClosestPointOracle& oracle;     // from GEOM-015
+      AABB band_bounds;                                // bounding box of the surface
+      double grid_spacing;                             // h
+      // Interior Dirichlet curves projected onto the surface via oracle.Query().
+      std::span<const std::vector<glm::dvec3>> interior_dirichlet_curves;  // variant A only
     };
     enum class Equation { Laplace, Poisson, Heat, ReactionDiffusion };
-    struct Params { Equation equation; double t_final = 0.0; /* ... */ };
+    struct Params {
+      Equation equation;
+      double t_final = 0.0;
+      uint32_t fd_order = 2;          // finite-difference spatial order; band radius depends on this
+      std::function<double(glm::dvec3)> source_term;   // optional Poisson RHS
+    };
     struct Result {
-      Geometry::Grid<double> band_field;   // narrow-band values
-      Diagnostics diagnostics;
+      Geometry::Grid<double> band_field;   // narrow-band values; see narrow-band note below
+      Geometry::Diagnostics diagnostics;
     };
     Core::Expected<Result> Solve(const Input&, const Params&);
   }
   ```
 - [ ] Register module in `src/geometry/CMakeLists.txt`; do **not** add to `Geometry.cppm` umbrella initially (advanced numerical surface).
+- [ ] **Narrow-band radius contract:** the band must include at least `ceil((p+1)/2) * h` cells around the surface for finite-difference order `p`, plus the closest-point interpolation stencil radius (typically 2 cells for tri-cubic). Document this in the module header as the precondition on `Input::band_bounds` vs the surface extent.
+- [ ] **Interior BC projection:** the polyline samples in `interior_dirichlet_curves` may live anywhere in R^3; the implementation must project each sample to the surface via `oracle.Query()` and rasterise into the narrow band. Document this in the module header.
+- [ ] **SDF normal note:** when using `OracleFromSDF`, `ClosestPointResult::normal` is the normalised gradient and is finite only away from the medial axis. The implementation must guard against NaN normals at sampled points coincident with the medial axis and surface them via `Diagnostics::degenerate_input_count`.
 
 ### Implementation steps
 - [ ] Step 1: build a narrow band around the surface using `Geometry.Grid` + the closest-point oracle (bandwidth ≥ `(p+1)/2 * h` for finite-difference order `p`, plus interpolation support).
@@ -70,9 +87,14 @@ Default recommendation: **A**.
 - [ ] Step 5: solve `L_band X = b` via the LDLT / iterative path from `GEOM-008`.
 
 ### Closest-point oracle adapters
-- [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromHalfedgeMesh` using existing `Geometry.BVH`.
-- [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromPointCloud` using `Geometry.KDTree` + `Geometry.NormalEstimation`.
-- [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromSDF` using `Geometry.SDF` gradient.
+
+The oracle adapters live in `GEOM-015`, **not** in this method package. This task only consumes them:
+
+- `Geometry::OracleFromHalfedgeMesh`
+- `Geometry::OracleFromPointCloud`
+- `Geometry::OracleFromSDF`
+
+If any of these adapters needs an extension specific to PDE solving (e.g. cached gradient evaluation), promote the extension into `GEOM-015` rather than adding it here.
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.ClosestPointPDE.cpp`.

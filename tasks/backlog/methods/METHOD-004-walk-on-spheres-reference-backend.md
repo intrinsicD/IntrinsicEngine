@@ -14,7 +14,15 @@
 - Method package: `methods/geometry/walk_on_spheres/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #3.
 - Uses existing `Geometry.SDF` (signed distance), `Geometry.BVH` / `Geometry.KDTree` (closest point), `Geometry.Raycast` (for WoSt star steps).
-- The gap analysis flags "stochastic reproducibility state" (P2) — this task is where the deterministic seeded-RNG contract gets defined.
+- **Hard dependency:** [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md) for `Geometry::Random` (deterministic RNG with seed-stream contract), `Geometry::ClosestPointOracle`, `Geometry::Diagnostics`.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on) from [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md):
+
+- `Geometry::Random::SplitMix64` + `PCG32` and the seed-stream contract `(seed, point_index, walk_index, step_index)` — this task does **not** define its own RNG.
+- `Geometry::ClosestPointOracle` (used as the surface-PDE oracle in variant C and as the closest-boundary-point query for vanilla WoS / WoSt).
+- `Geometry::Diagnostics` for the `Estimate` aggregation summary.
 
 ## Variants and default selection
 
@@ -41,43 +49,40 @@ Default recommendation: **A** (WoSt) since it subsumes B and is the current stat
 
 ### Public API in `src/geometry`
 - [ ] Add module `Geometry.WalkOnSpheres` in `src/geometry/Geometry.WalkOnSpheres.cppm` + `.cpp`.
+- [ ] The domain queries are provided by `Geometry::ClosestPointOracle` (from GEOM-015), augmented with the explicit `SignedDistance` / `Bounds` methods that oracle already exposes. Do **not** define a new oracle interface here.
 - [ ] Public surface (sketch):
   ```cpp
   namespace Geometry::WalkOnSpheres {
-    struct DomainQueries {
-      virtual double SignedDistance(glm::dvec3 x) const = 0;
-      virtual glm::dvec3 ClosestBoundaryPoint(glm::dvec3 x) const = 0;
-      virtual glm::dvec3 BoundaryNormal(glm::dvec3 p) const = 0;  // WoSt only
-    };
-    struct BoundaryConditions {
+    struct BoundaryFunctions {
       std::function<double(glm::dvec3)> dirichlet;   // value at boundary points
       std::function<double(glm::dvec3)> neumann;     // flux; WoSt only
-      std::function<double(glm::dvec3)> source;      // Poisson RHS, optional
+      std::function<double(glm::dvec3)> source;      // Poisson RHS f(x); optional
     };
+    enum class Variant { WalkOnSpheres, WalkOnStars, ProjectedWoS };
     struct Params {
+      Variant variant = Variant::WalkOnStars;
       uint32_t samples_per_point = 128;
       uint32_t max_steps = 256;
       double epsilon_shell = 1e-4;
-      uint64_t seed = 0;          // deterministic
+      uint64_t seed = 0;
+      // For Poisson source-term integration: number of strata for the Green's-function ball sample.
+      uint32_t source_strata_per_step = 1;
     };
-    struct Estimate { double mean; double stderr_; uint32_t actual_steps_mean; };
-    Estimate SolveAtPoint(const DomainQueries&, const BoundaryConditions&,
+    struct Estimate { double mean; double stderr_; uint32_t actual_steps_mean; Geometry::Diagnostics diagnostics; };
+    Estimate SolveAtPoint(const Geometry::ClosestPointOracle&, const BoundaryFunctions&,
                           glm::dvec3 x, const Params&);
-    std::vector<Estimate> SolveAtPoints(const DomainQueries&, const BoundaryConditions&,
+    std::vector<Estimate> SolveAtPoints(const Geometry::ClosestPointOracle&, const BoundaryFunctions&,
                                         std::span<const glm::dvec3>, const Params&);
   }
   ```
 - [ ] Register module in `src/geometry/CMakeLists.txt`; do not umbrella-export.
+- [ ] **Poisson source-term sampling:** for non-zero `source`, each walk step must take `source_strata_per_step` uniform samples inside the current ball and accumulate `f(y) * G(x, y, R)` where `G` is the Green's function for the ball of radius `R`. This is the standard WoS / WoSt extension for the Poisson term and must be in the implementation steps below, not omitted.
+- [ ] **WoSt star-step:** for Neumann boundaries, the walk uses `Geometry::Raycast` to intersect the ball's bounding sphere with the Neumann boundary and reflect; document this explicitly in the implementation comments.
 
 ### Deterministic RNG contract
-- [ ] Add `Geometry::Random::SplitMix64` / `PCG32` in `src/geometry/Geometry.Random.cppm` (if not already present from `GEOM-009` benchmark fixtures).
-- [ ] Document: identical `(seed, point_index)` → identical walk sequence on any platform / thread count.
-- [ ] Parallel sampling must seed per-point, not per-walk, to preserve determinism across threading.
-
-### Query adapters
-- [ ] `DomainQueriesFromSDF` — wraps `Geometry.SDF`.
-- [ ] `DomainQueriesFromMesh` — wraps `Geometry.BVH` (closest-point) + face normals.
-- [ ] Surface-PDE variant C, if selected: `DomainQueriesProjected` using `Geometry.ClosestPointPDE` oracle.
+- [ ] Use `Geometry::Random` from `GEOM-015`. Do **not** introduce a local RNG type.
+- [ ] Per-point per-walk per-step seeding contract: `state = SplitMix64(seed, point_index, walk_index, step_index)`. This guarantees deterministic output regardless of thread count.
+- [ ] Add a regression test that varies `OMP_NUM_THREADS` between 1 and 8 and asserts bitwise output equality.
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.WalkOnSpheres.cpp`.

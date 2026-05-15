@@ -15,17 +15,39 @@
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #8.
 - Targets the existing module `Geometry.HalfedgeMesh.Simplification` (`src/geometry/Geometry.HalfedgeMesh.Simplification.cppm` + `.cpp`).
 - Test target: `tests/unit/geometry/Test_Simplification.cpp` (existing; extend, do not replace).
+- **Hard dependency:** [`GEOM-015`](GEOM-015-common-method-package-infrastructure.md) for `Geometry::QEFSolver` (vertex-placement quadratic), `Geometry::Diagnostics`.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on):
+
+- `Geometry::QEFSolver::QEF3` + `SolveQEF` — the per-collapse optimal-position computation uses the shared QEF solver, the same one used by `GEOM-013`. The classical QEM, FA-QEM, and intrinsic QEM variants all reduce to building different `QEF3` accumulators and feeding them to the same solver.
+- `Geometry::Diagnostics` — collapse rejection counters, fallback-to-midpoint events.
+
+This task **does not** introduce new shared types. The boundary-curvature term is computed as the discrete turning angle (`π - α` where `α` is the angle between adjacent boundary edges), accumulated per boundary loop; document this convention explicitly in the module header.
 
 ## Variants and default selection
 
-Mark `[x]` next to the variant that should become the **default error metric**. Other metrics remain selectable via the `Params::metric` enum.
+Mark `[x]` next to the variant that should become the **default error metric** for new callers. Other metrics remain selectable via the `Params::metric` enum.
 
 - [ ] **A — Classical QEM (Garland & Heckbert, SIGGRAPH 1997).** Plane-distance quadric only. Fastest, smallest code. Current behaviour.
 - [ ] **B — FA-QEM: Feature-Aware QEM (Cao et al., arXiv:2605.14029, 2025).** Joint encoding of geometric deviation, boundary curvature, and surface normal consistency. Recommended new default for asset / LOD pipelines.
 - [ ] **C — Surface Simplification Using Intrinsic Error Metrics (arXiv:2305.06410).** Intrinsic-Delaunay-aware error metric; pairs well with future intrinsic-triangulation work. Pick if intrinsic geometry is a year-1 priority.
 - [ ] **D — Line-quadric variant (Hsueh-Ti Derek Liu et al., controlling QEM with line constraints).** Adds line-feature pinning. Useful for CAD / architectural assets.
 
-Default recommendation: **B** (FA-QEM) — the survey's strongest "easy win," directly relevant to LOD / asset pipelines, no new dependencies beyond what the existing simplification module already uses.
+Default recommendation: **B** (FA-QEM) — the survey's strongest "easy win," directly relevant to LOD / asset pipelines.
+
+### Default-flip migration policy (resolves the existing-caller compatibility question)
+
+This task ships the new metrics as **opt-in**. The default value of `Params::metric` does **not** change in this task — existing callers of `Simplify(mesh, Params{})` continue to receive classical-QEM behaviour. This satisfies the "no public API break" constraint.
+
+A separate, narrower follow-up task (created during the next [`METHOD-008`](../methods/METHOD-008-recurring-method-sota-review.md) cycle after this one lands and benchmarks confirm parity) will:
+
+1. Audit every consumer of `Simplify(...)` in the codebase.
+2. Either set the metric explicitly per consumer, or accept the new default behaviour after explicit per-consumer review.
+3. Flip the default value of `Params::metric` to the chosen variant in one mechanical commit.
+
+Following the migration policy in [`docs/agent/method-sota-review.md`](../../../docs/agent/method-sota-review.md), at least one full review cycle (one quarter) must elapse between this task landing and the default flip.
 
 ## Required changes
 

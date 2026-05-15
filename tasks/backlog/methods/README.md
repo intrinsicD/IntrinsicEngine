@@ -21,6 +21,8 @@ map.
 - [METHOD-006 — Cross-field / frame-field design reference backend](METHOD-006-cross-field-design-reference-backend.md).
 - [METHOD-007 — Constrained Delaunay tetrahedralization reference backend](METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
   (hard-gated by [`geometry/GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md)).
+- [METHOD-008 — Recurring method SOTA review (standing task)](METHOD-008-recurring-method-sota-review.md)
+  (process: [`docs/agent/method-sota-review.md`](../../../docs/agent/method-sota-review.md)).
 
 ## Convergence
 
@@ -34,10 +36,21 @@ map.
   [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
   Each task lists explicit algorithm variants and requires the maintainer to mark
   one as the public-facing default backend before implementation begins.
-- Ordering: METHOD-002, METHOD-003, METHOD-004 can proceed in parallel once
-  [`geometry/GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md)
-  exposes the sparse-solver seam. METHOD-005 and METHOD-007 both wait on
+- Ordering: every implementation method task (METHOD-002..007, plus
+  [`geometry/GEOM-013`](../geometry/GEOM-013-feature-preserving-dual-contouring.md)
+  and [`geometry/GEOM-014`](../geometry/GEOM-014-feature-aware-quadric-error-simplification.md))
+  hard-depends on
+  [`geometry/GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md)
+  for shared `Diagnostics`, `Random`, `ClosestPointOracle`, `Connection`,
+  `BoundaryConditions`, `Provenance`, and `QEFSolver` types. Land GEOM-015 first.
+  After that: METHOD-002, METHOD-003, METHOD-004, METHOD-006 can proceed in
+  parallel once [`geometry/GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md)
+  exposes the sparse-solver seam. METHOD-005 and METHOD-007 also need
   [`geometry/GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md).
-  METHOD-006 has no hard gate beyond `GEOM-008`.
+- METHOD-008 is the **standing recurring task** for quarterly SOTA review of
+  every method package; it never moves to `tasks/done/`. Its process doc is
+  [`docs/agent/method-sota-review.md`](../../../docs/agent/method-sota-review.md).
+  Each cycle produces a dated review note under `docs/reviews/` and any required
+  follow-up implementation tasks.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.

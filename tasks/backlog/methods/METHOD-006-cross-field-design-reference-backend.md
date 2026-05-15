@@ -15,7 +15,17 @@
 - Method package: `methods/geometry/cross_field/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #6.
 - Gap analysis explicitly lists "vector-field design, cross fields, frame fields, and singularity indexing" as a P1 missing capability.
-- Reuses `Geometry.HalfedgeMesh.Curvature` (principal curvature alignment), `Geometry.HalfedgeMesh.DEC` (Laplacian), `Geometry.HalfedgeMesh.VectorHeatMethod` (parallel transport on the surface), and the sparse-solver seam from [`GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md).
+- Reuses `Geometry.HalfedgeMesh.Curvature` (principal curvature alignment), `Geometry.HalfedgeMesh.DEC` (Laplacian), and the sparse-solver seam from [`GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md).
+- **Hard dependency:** [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md) for `Geometry::HalfedgeMesh::Connection` (parallel transport, vertex angle defects), `Geometry::Diagnostics`. The `Connection` module is the extraction of the parallel-transport machinery currently buried inside `Geometry.HalfedgeMesh.VectorHeatMethod`.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on) from [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md):
+
+- `Geometry::HalfedgeMesh::Connection::BuildFaceFrames` — defines the per-face tangent frame against which the cross field's complex representative is expressed. The choice of frame matters: the same complex representative produces different tangent vectors under different frames. The module-level doc must specify exactly which frame convention is used, and `ExtractTangentPair` must take the frame array as an input parameter.
+- `Geometry::HalfedgeMesh::Connection::EdgeTransportAngles` — period-jump / rotation between adjacent face frames; this is the input to the smoothness energy.
+- `Geometry::HalfedgeMesh::Connection::VertexAngleDefects` — needed to verify the Poincaré–Hopf identity in tests.
+- `Geometry::Diagnostics` for the result.
 
 ## Variants and default selection
 
@@ -63,11 +73,12 @@ Default recommendation: **B** (Knöppel et al. globally-optimal direction fields
 - [ ] Register in `src/geometry/CMakeLists.txt`; do not umbrella-export initially.
 
 ### Implementation (variant B reference path)
-- [ ] Step 1: build per-face local frames using `Geometry.HalfedgeMesh.Curvature` tangent basis.
-- [ ] Step 2: compute edge-based parallel-transport rotations between adjacent face frames (reuse `Geometry.HalfedgeMesh.VectorHeatMethod` connection internals).
-- [ ] Step 3: assemble Dirichlet energy in `z = e^{iNθ}` per face; alignment constraints become soft / hard pins.
+- [ ] Step 1: build per-face local frames via `Geometry::HalfedgeMesh::Connection::BuildFaceFrames` (GEOM-015). Frame convention: `e1` = first halfedge of the face projected to the face plane, `e2 = normal × e1`. Document this in the module header.
+- [ ] Step 2: compute edge transport angles via `Geometry::HalfedgeMesh::Connection::EdgeTransportAngles`.
+- [ ] Step 3: assemble Dirichlet energy in `z = e^{iNθ}` per face; alignment constraints become soft (penalty) or hard (row-elimination) pins.
 - [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via the iterative seam from `GEOM-008` (LOBPCG or shift-invert).
-- [ ] Step 5: compute singularity indices by accumulating period jumps around each vertex.
+- [ ] **Gauge fixing:** the eigenvector is defined up to a global complex scalar `e^{iα}`. Fix the gauge by rotating so that the representative on a chosen reference face has zero imaginary part and positive real part. Document this in the module header so test outputs are deterministic.
+- [ ] Step 5: compute singularity indices by accumulating period jumps around each vertex; verify `sum == 2χ` post-hoc and surface deviations as `Diagnostics::numerical_uncertain_count`.
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.CrossField.cpp`.

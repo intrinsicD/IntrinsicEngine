@@ -16,7 +16,19 @@
 - Paper(s): see Variants below.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #1, against gaps in [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) (geodesics + intrinsic geometry pack; tolerant input for noisy / broken boundary data).
 - Reuses the cotan Laplacian / mass matrix already assembled by `Geometry.HalfedgeMesh.DEC` and the upcoming general sparse-solver seam from [`GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md).
+- **Hard dependency:** [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md) for `Geometry::Diagnostics`, `Geometry::HalfedgeMesh::Connection`, and `Geometry::ClosestPointOracle` (used by the polyline source variant).
 - Reference C++ implementation exists in geometry-central's `signed_heat_method` module and may be used as the parity oracle, not as a dependency.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on) from [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md):
+
+- `Geometry::Diagnostics` — used as `Result::diagnostics`.
+- `Geometry::HalfedgeMesh::Connection` — needed for the parallel-transport step on multi-component sources.
+- `Geometry::ClosestPointOracle` (`OracleFromHalfedgeMesh` adapter) — for the polyline source variant.
+- `Geometry::PDE::BoundaryConditions::ScalarBC` — for the Poisson pin specification.
+
+This task **does not** introduce any new shared types; if any algorithm-internal helper looks generic, it should be promoted into `GEOM-015` rather than added here.
 
 ## Variants and default selection
 
@@ -39,24 +51,35 @@ Default recommendation: **A** (smallest reuse of existing engine code; B/C as fo
 ### Public API in `src/geometry`
 - [ ] Add module `Geometry.HalfedgeMesh.SignedHeatMethod` in `src/geometry/Geometry.HalfedgeMesh.SignedHeatMethod.cppm` + `.cpp`.
 - [ ] Mirror the namespace pattern used by `Geometry.HalfedgeMesh.VectorHeatMethod` (per `docs/reviews/2026-05-12-src-geometry-gap-analysis.md` §1 naming policy follow-up).
+- [ ] Accept three input forms (the paper allows all three; the implementation should normalise them through a common `SourceCurve` type):
+  - halfedge subset (curves embedded in the mesh edges),
+  - vertex / region subset (closed-region boundary),
+  - generic broken polyline projected to the mesh via `Geometry::ClosestPointOracle` (from `GEOM-015`).
 - [ ] Public surface (sketch):
   ```cpp
   namespace Geometry::SignedHeatMethod {
-    struct Input {
-      const HalfedgeMesh::Mesh& mesh;
-      std::span<const HalfedgeMesh::HalfedgeHandle> boundary;  // broken curve as halfedges
-      // or: std::span<const glm::vec3> polyline; // R^3 polyline projected to surface
+    struct SourceCurve {
+      std::vector<HalfedgeMesh::HalfedgeHandle> halfedges;     // option A
+      std::vector<HalfedgeMesh::VertexHandle>   vertices;      // option B
+      std::vector<glm::dvec3>                   polyline;      // option C (closest-point projected)
     };
-    struct Params { double t_smooth = -1.0; /* auto = mean edge length squared */
-                    bool preserve_source_normals = true; };
+    struct Input { const HalfedgeMesh::Mesh& mesh; SourceCurve source; };
+    struct Params {
+      double t_smooth = -1.0;            // auto = h^2 with h = mean edge length
+      bool preserve_source_normals = true;
+      // Pin choice for the Poisson solve null space. -1 = pick first source-adjacent vertex.
+      int32_t poisson_pin_vertex = -1;
+      double poisson_pin_value = 0.0;
+    };
     struct Result {
       std::vector<double> signed_distance;       // per-vertex
-      Diagnostics diagnostics;                   // residuals, degeneracy counts
+      Geometry::Diagnostics diagnostics;         // shared record from GEOM-015
     };
     Core::Expected<Result> Solve(const Input&, const Params&);
   }
   ```
 - [ ] Register the new module in `src/geometry/CMakeLists.txt` and re-export from `Geometry.cppm` only if it is part of the umbrella surface.
+- [ ] Document multi-component-boundary handling: each connected component contributes its own diffused normal field; the sign at vertices closer to component A vs B is determined by the dominant unit-vector direction after diffusion. Add a smoke test for a pair of disjoint source loops on a torus.
 
 ### Implementation
 - [ ] Step 1: assemble cotan-Laplace `L`, lumped mass `M` via existing `Geometry.HalfedgeMesh.DEC` exports.

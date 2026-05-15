@@ -14,8 +14,23 @@
 - Owning subsystem/layer: `geometry` and `methods/geometry`.
 - Method package: `methods/geometry/robust_boolean/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #5.
-- **Hard prerequisite:** [`GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md) (robust predicates + intersection classification) must land first. This task assumes orientation / incircle / segment-triangle classification predicates are available.
+- **Hard prerequisites:**
+  - [`GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md) — robust predicates + intersection classification (especially indirect predicates per Attene 2020 / Cherchi et al. 2022).
+  - [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md) — `Geometry::Provenance`, `Geometry::Diagnostics`, `Geometry::Random` (for snap-rounding tie-breaks).
 - The existing `Geometry.HalfedgeMesh.Boolean` produces wrong results on near-coincident and degenerate inputs from Thingi10k; this is the canonical robustness motivator.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on):
+
+- `Geometry::Provenance::OutputProvenance` (GEOM-015) — used as `Result::provenance`. The `ArrangementProvenance` placeholder in earlier sketches is replaced by this shared type; per-output triangle records its source mesh id + source triangle id + barycentric weights for attribute transfer.
+- `Geometry::AttributeTransfer` helpers (GEOM-015) — handle vertex/face property interpolation onto the output.
+- `Geometry::Diagnostics` — degenerate input counts, snap events, arrangement statistics.
+- `Geometry::Random` — for deterministic tie-breaks during snap-rounding.
+
+This task **may extract** (if not already in `GEOM-007`):
+
+- BVH-vs-BVH overlap traversal — if the implementation produces a clean reusable routine, promote it as `Geometry::BVH::Overlap(const BVH&, const BVH&, OverlapVisitor&)` in `Geometry.BVH` rather than keeping it private to this method.
 
 ## Variants and default selection
 
@@ -36,7 +51,7 @@ Default recommendation: **A** (Cherchi et al.) — best balance of robustness, p
 
 ### Public API in `src/geometry`
 - [ ] Add module `Geometry.HalfedgeMesh.RobustBoolean` in `src/geometry/Geometry.HalfedgeMesh.RobustBoolean.cppm` + `.cpp`.
-- [ ] Public surface (sketch):
+- [ ] Public surface (sketch) — uses shared `Geometry::Provenance::OutputProvenance` and `Geometry::Diagnostics` from GEOM-015:
   ```cpp
   namespace Geometry::RobustBoolean {
     enum class Op { Union, Intersection, Difference, SymmetricDifference };
@@ -49,11 +64,12 @@ Default recommendation: **A** (Cherchi et al.) — best balance of robustness, p
       bool snap_round_inputs = true;
       double snap_epsilon = 1e-9;  // scale-relative
       bool transfer_attributes = true;
+      uint64_t snap_seed = 0;      // tie-breaks (Geometry::Random)
     };
     struct Result {
       HalfedgeMesh::Mesh out;
-      ArrangementProvenance provenance;  // see GEOM-007
-      Diagnostics diagnostics;           // degeneracies, snap events, etc.
+      Geometry::Provenance::OutputProvenance provenance;  // shared type
+      Geometry::Diagnostics diagnostics;                  // shared type
     };
     Core::Expected<Result> Compute(const Input&, const Params&);
   }

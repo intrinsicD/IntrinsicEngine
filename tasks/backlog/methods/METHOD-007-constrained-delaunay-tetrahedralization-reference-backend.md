@@ -14,8 +14,23 @@
 - Owning subsystem/layer: `geometry` and `methods/geometry`.
 - Method package: `methods/geometry/constrained_delaunay_tet/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #4.
-- **Hard prerequisite:** [`GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md) (robust 3D orientation + insphere predicates).
+- **Hard prerequisites:**
+  - [`GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md) — robust 3D orientation + insphere predicates.
+  - [`GEOM-015`](../geometry/GEOM-015-common-method-package-infrastructure.md) — `Geometry::Provenance`, `Geometry::Diagnostics`, `Geometry::Random` (for incremental insertion order tie-breaks).
 - Closes the P1 "volumetric and cell-complex containers" gap from `docs/reviews/2026-05-12-src-geometry-gap-analysis.md`.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on):
+
+- `Geometry::Diagnostics` — boundary repair counts, steiner-point insertions, recovery iteration counts.
+- `Geometry::Provenance::OutputProvenance` — per-output tet records its source boundary triangles for material-region attribute transfer.
+- `Geometry::Random` — for deterministic tie-breaks in the incremental Delaunay insertion order.
+
+This task **extracts** (introduces as shared infrastructure):
+
+- `Geometry::TetMesh` — the volumetric container itself is shared infrastructure, not a method-package-private type. Other future methods (FEM assembly, soft-body simulation, volumetric remeshing) consume it. The container is **not** scoped to this method package; it lives in `src/geometry/`.
+- `Geometry::TetMesh.IO` — VTK / MEDIT writer is shared infrastructure for any future tet-mesh-producing method.
 
 ## Variants and default selection
 
@@ -55,12 +70,21 @@ Default recommendation: **A** (Diazzi et al.) — most recent, clean robustness 
 - [ ] Add `Geometry.ConstrainedDelaunayTet` builder module in `src/geometry/Geometry.ConstrainedDelaunayTet.cppm` + `.cpp`:
   ```cpp
   namespace Geometry::ConstrainedDelaunayTet {
-    struct Input { const HalfedgeMesh::Mesh& boundary; /* must be closed, watertight */ };
-    struct Params { double target_edge_length = 0.0; /* 0 = no refinement */ };
-    struct Result { TetMesh::Mesh mesh; Diagnostics diagnostics; };
+    struct Input { const HalfedgeMesh::Mesh& boundary; };
+    struct Params {
+      double target_edge_length = 0.0;        // 0 = pure CDT, no refinement (this task's scope)
+      uint64_t insertion_seed = 0;            // Geometry::Random tie-breaks
+    };
+    struct Result { TetMesh::Mesh mesh; Geometry::Diagnostics diagnostics; Geometry::Provenance::OutputProvenance provenance; };
     Core::Expected<Result> Build(const Input&, const Params&);
   }
   ```
+- [ ] **Precondition checks (explicit, surfaced as diagnostics, never asserts):**
+  - boundary mesh is **closed** (every halfedge has a twin) — verified via `Geometry::HalfedgeMesh::Analysis`,
+  - boundary is **manifold** (no edge incident to > 2 faces),
+  - boundary is **self-intersection-free** — verified via BVH-vs-BVH overlap from `Geometry::BVH`.
+  Any failure populates `Diagnostics` with a typed note and returns an error via `Core::Expected`. The implementation must never crash or assert on bad input.
+- [ ] **Scope clarity:** this task ships **CDT only** (boundary-conforming Delaunay tetrahedralisation). It does **not** ship quality-driven refinement or sliver removal. The output may contain low-quality tets; quality refinement is a separate follow-up task. Document this explicitly in the module header and the `paper.md`.
 - [ ] Add quality metrics module `Geometry.TetMesh.Quality` with dihedral-angle, aspect-ratio, inradius / circumradius ratio.
 - [ ] Register modules in `src/geometry/CMakeLists.txt`; export `Geometry.TetMesh` from `Geometry.cppm` (container is a public type), keep the builder module out of the umbrella.
 

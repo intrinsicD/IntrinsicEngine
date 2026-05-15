@@ -14,7 +14,18 @@
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #7.
 - Closes the P1 "marching tetrahedra / dual contouring" gap from `docs/reviews/2026-05-12-src-geometry-gap-analysis.md`.
-- Reuses `Geometry.Grid` (sampling), `Geometry.SDF` (oracle), and the dense small-matrix utilities from [`GEOM-008`](GEOM-008-linear-algebra-solver-infrastructure.md) for the per-cell QEF solve.
+- Reuses `Geometry.Grid` (sampling), `Geometry.SDF` (oracle), and the dense small-matrix utilities from [`GEOM-008`](GEOM-008-linear-algebra-solver-infrastructure.md).
+- **Hard dependency:** [`GEOM-015`](GEOM-015-common-method-package-infrastructure.md) for `Geometry::QEFSolver` (per-cell vertex placement), `Geometry::ClosestPointOracle` (`OracleFromSDF` adapter), `Geometry::Diagnostics`.
+
+## Shared infrastructure consumed / extracted
+
+This task **consumes** (depends on):
+
+- `Geometry::QEFSolver::QEF3` + `SolveQEF` — the per-cell vertex placement is delegated to the shared QEF solver. Do **not** redefine `QEF3` here.
+- `Geometry::ClosestPointOracle::OracleFromSDF` — used as the gradient sampler (`gradient = normal at closest-point projection`).
+- `Geometry::Diagnostics` — sharp-feature-cell count, manifold-split-cell count, QEF rank-deficient cell count.
+
+This task **does not** introduce new shared types. Output may include polygons with > 3 sides; these get triangulated before populating the `HalfedgeMesh::Mesh` output. Document the polygon-fan triangulation rule in the module header.
 
 ## Variants and default selection
 
@@ -58,11 +69,12 @@ Default recommendation: **B** (Manifold DC) — the engine's halfedge mesh requi
 - [ ] Add a free function `Geometry::DualContouring::SamplerFromSdfModule(const SDF&)` adapter.
 
 ### Implementation steps (variant B reference path)
-- [ ] Step 1: sample the grid; classify edges as sign-changing.
-- [ ] Step 2: per cell, accumulate the QEF from sign-changing edges using gradient samples.
-- [ ] Step 3: solve the per-cell QEF via SVD-with-singular-value-clamping (from `GEOM-008` dense utilities).
-- [ ] Step 4: connect dual vertices across cells sharing sign-changing edges.
-- [ ] Step 5: manifold pass — detect cells where dual vertices would create non-manifold edges and split them per Schaefer-Ju-Warren 2007.
+- [ ] Step 1: sample the grid corner SDF values; classify each grid edge as sign-changing if the two endpoint signs differ.
+- [ ] Step 2: for each sign-changing edge, locate the iso-crossing point by linear interpolation of the SDF along the edge, and sample the gradient (oracle-normal) **at that crossing point**, not at the cell centre or grid corners. Each sign-changing edge contributes one `(point, normal)` pair to the per-cell `QEF3`.
+- [ ] Step 3: per cell, solve the QEF via `Geometry::QEFSolver::SolveQEF` with `singular_value_threshold = Params::qef_singular_value_threshold` and `fallback_point = mean of edge crossings` (clamp to cell bounds).
+- [ ] Step 4: connect dual vertices across cells sharing sign-changing edges. Each sign-changing edge is shared by exactly four cells; emit a quad (or triangulated quad fan) with those four dual vertices.
+- [ ] Step 5: **manifold pass** (Schaefer-Ju-Warren 2007) — for each cell whose dual vertex would create a non-manifold edge (detected by analysing the local sign-pattern topology), split the cell into multiple dual vertices, one per disconnected component of the sign-pattern's interior. Implement the four-case split table from §3 of the 2007 paper. Without this pass, the output mesh cannot be loaded into `HalfedgeMesh::Mesh` (which is manifold-only).
+- [ ] Step 6: triangulate any non-triangular faces (polygon fan from the centroid) before populating the `HalfedgeMesh::Mesh` output.
 
 ## Tests
 - [ ] `tests/unit/geometry/Test.DualContouring.cpp` (CTest labels `unit;geometry`).
