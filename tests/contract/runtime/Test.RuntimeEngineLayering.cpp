@@ -132,6 +132,28 @@ TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMainten
     EXPECT_LT(submit, pump);
 }
 
+TEST(RuntimeEngineLayering, RunFrameRegistersPromotedEcsSystemBundleBetweenSimTickAndCompile)
+{
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+
+    const auto simTick = content.find("m_Application->OnSimTick(*this, m_FixedDt);");
+    const auto bundleRegistration = content.find(
+        "RegisterPromotedEcsSystemBundle(*m_FrameGraph, *m_Scene)");
+    const auto compile = content.find("m_FrameGraph->Compile()");
+    const auto bundleImport = content.find("import Extrinsic.Runtime.EcsSystemBundle");
+
+    ASSERT_NE(simTick, std::string::npos);
+    ASSERT_NE(bundleRegistration, std::string::npos);
+    ASSERT_NE(compile, std::string::npos);
+    ASSERT_NE(bundleImport, std::string::npos);
+
+    // Bundle activation must run after the app has had its OnSimTick callback
+    // (so app-added passes are in the graph) and before FrameGraph::Compile
+    // resolves dependencies. RUNTIME-091.
+    EXPECT_LT(simTick, bundleRegistration);
+    EXPECT_LT(bundleRegistration, compile);
+}
+
 TEST(RuntimeEngineLayering, StreamingExecutorApiStaysCpuOnly)
 {
     const auto publicApi = ReadFile(RepoRoot() / "src/runtime/Runtime.StreamingExecutor.cppm");

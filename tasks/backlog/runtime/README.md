@@ -10,9 +10,12 @@ another backlog directory.
 - [RORG-031C — Runtime composition backlog seed](RORG-031-runtime-composition.md):
   composition-root and lifecycle backlog work for `begin_frame`, extraction,
   prepare, execute, end, shutdown determinism, and subsystem wiring.
-- [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](RUNTIME-091-promoted-ecs-system-bundle-activation.md):
-  runtime-owned activation of promoted ECS systems, starting with
-  `Extrinsic.ECS.System.TransformHierarchy`, before render extraction.
+- [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
+  (done): runtime-owned activation of promoted ECS systems via
+  `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called
+  every fixed-step substep before `Core::FrameGraph::Compile` so
+  `TransformHierarchy` + `BoundsPropagation` run deterministically before
+  render extraction.
 
 ### Sandbox / triangle path support tasks (runtime-owned)
 
