@@ -5,7 +5,7 @@ export module Extrinsic.ECS.Component.Culling.Local;
 import Geometry.AABB;
 import Geometry.Sphere;
 
-export namespace Extrinsic::ECS::Components::Culling
+export namespace Extrinsic::ECS::Components::Culling::Local
 {
     struct Bounds
     {

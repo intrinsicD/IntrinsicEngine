@@ -127,7 +127,7 @@ namespace Extrinsic::Runtime
                                                    const glm::mat4& model)
         {
             RHI::GpuBounds bounds = DefaultBoundsFor(model);
-            if (const auto* worldBounds = registry.try_get<ECS::Components::Culling::Bounds>(entity))
+            if (const auto* worldBounds = registry.try_get<ECS::Components::Culling::World::Bounds>(entity))
             {
                 bounds.WorldSphere = {worldBounds->WorldBoundingSphere.Center,
                                       worldBounds->WorldBoundingSphere.Radius};
