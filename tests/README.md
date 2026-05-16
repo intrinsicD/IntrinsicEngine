@@ -51,7 +51,15 @@ form below. `IntrinsicGraphicsVulkanSmokeTests` includes
 the `GRAPHICS-033D` fixture that drives the reference triangle through the
 bootstrap `FrameRecipe::MinimalDebug` path. It reports `SKIPPED` when GLFW or a
 Vulkan-capable swapchain/device is unavailable and is intentionally excluded
-from the default CPU gate by its `gpu;vulkan` labels.
+from the default CPU gate by its `gpu;vulkan` labels. The fixture consumes the
+reusable `tests/support/MinimalTriangleReadback.hpp` and
+`tests/support/OperationalCounterStability.hpp` helpers so the sibling
+`GRAPHICS-032D` recipe-selector fixture and the canonical `GRAPHICS-076`/
+`GRAPHICS-081` default-recipe smoke can reuse the sample-point table,
+expected-color quantization, and fallback-counter stability contract
+byte-identical. CPU-only invariants of those helpers run inside the default
+gate via `IntrinsicGraphicsContractCpuTests`
+(`MinimalTriangleReadbackHarness`, `OperationalCounterStability`).
 
 ```bash
 ctest --test-dir build/ci --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120

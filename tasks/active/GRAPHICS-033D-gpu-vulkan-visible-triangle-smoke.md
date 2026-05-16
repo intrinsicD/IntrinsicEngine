@@ -3,17 +3,18 @@
 ## Status
 
 - Status: in-progress.
-- Owner/agent: GitHub Copilot on `copilot/graphics-033d-visible-triangle-smoke`.
-- Branch: `copilot/graphics-033d-visible-triangle-smoke`.
+- Owner/agent: Claude on `claude/complete-agentic-task-JjT4B` (current slice); previously GitHub Copilot on `copilot/graphics-033d-visible-triangle-smoke`.
+- Branch: `claude/complete-agentic-task-JjT4B`.
 - Started: 2026-05-15.
-- Current slice: smoke fixture + operational gate flip + shader/SPIR-V path wiring + backbuffer-only fixed visible-triangle finalizer is implemented and verified.
-- Next verification step: add the backend-local readback/pixel assertion layer so this task can be retired instead of remaining command-counter-only.
+- Current slice: reusable pixel-readback driver harness + operational-counter stability helper authored as header-only seams and wired through the smoke; CPU-only contract coverage of those helpers added to the default gate.
+- Next verification step: add the backend-local backbuffer-to-host readback seam (RHI `CopyTextureToBuffer` or equivalent) so the four-sample assertion the harness already encodes can run as a live `EXPECT_` on a Vulkan-capable host; this is the last remaining bullet before retirement.
 
 ## Progress log
 
 - 2026-05-15 — Added `MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`, wired `ci-vulkan` to build `ExtrinsicBackendsVulkan`, made `EngineConfig::Render.FrameRecipe` reach the renderer, refreshed the Vulkan operational predicate when recipe validation publishes, compiled SPIR-V for the smoke target, and resolved Vulkan operational shader paths through `Core::Filesystem::GetShaderPath(...)`. Focused opt-in smoke and the default CPU gate passed locally with Clang 22 because the pinned `clang-20` binaries were unavailable on this host.
 - 2026-05-15 — Follow-up slice: made MinimalDebug Vulkan command recording legal by adding compiled render-pass attachment scopes, matching the renderer's default-debug-surface format to the live backbuffer format, enabling required Vulkan feature-chain bits (`synchronization2`, `shaderInt64`, `scalarBlockLayout`), and replacing placeholder transient-target drawing with a backbuffer-only `Renderer.MinimalVisibleTriangle` present finalizer. Validation diagnostics confirmed the old transient `SceneColorHDR`/`SceneDepth` graph resources are handle placeholders, not live Vulkan images; pixel readback remains deferred until a safe backbuffer/readback seam is added.
-- Remaining before retirement: backbuffer/pixel readback assertions for the four deterministic sample points required by this task's acceptance criteria.
+- 2026-05-16 — Authored the scaffold-notice reusable helpers as engine-free headers under `tests/support/`: `MinimalTriangleReadback.hpp` encodes the triangle/clear constants, the 128x128 framebuffer extent, the four deterministic sample points (one interior + three exterior corners chosen so Vulkan Y-flip cannot change membership), `Quantize8`/`ExpectedAt` constexpr expectations, and `ChannelsWithinTolerance` for sRGB/format-conversion noise. `OperationalCounterStability.hpp` encodes the fallback-counter snapshot and `IsStable(before, after)` predicate. Refactored the smoke to consume both helpers and use `Counters::IsStable` as the single counter assertion. Added CPU-only contract coverage `tests/contract/graphics/Test.MinimalTriangleReadbackHarness.cpp` so the harness invariants run inside the default gate via `IntrinsicGraphicsContractCpuTests`. Updated `tests/README.md`, `tests/support/README.md`, and `src/graphics/vulkan/README.md` to record the seam. Build/preset verification deferred: the pinned `clang-20`/`clang-scan-deps-20` toolchain is unavailable on this host (Clang 18.1.3 only), so the smoke's compile-side static asserts on the harness still gate the contract for any host that builds the Vulkan-backed smoke target. Repository structural checks pass with the default policy baseline.
+- Remaining before retirement: the backbuffer-to-host pixel-bytes seam itself (RHI-level copy + readback buffer) and the live four-sample `EXPECT_` call site that turns the harness's compile-time expectations into a runtime assertion.
 
 ## Goal
 - Add the opt-in `gpu;vulkan` smoke fixture declared by `GRAPHICS-033`: on hosts with Vulkan support, drive one frame of the GRAPHICS-032 `MinimalDebugSurface` recipe with the GRAPHICS-029B reference triangle and the GRAPHICS-031A default debug pipeline, asserting (a) the device reports `Operational` only after all 9 gate prerequisites are met, (b) the swapchain image after `Present` contains a visible triangle (pixel readback assertion at 4 sample points), and (c) no fallback counters increment during the operational frame.
@@ -39,19 +40,22 @@
   1. [x] Configure runtime with `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` build + `RenderConfig::EnablePromotedVulkanDevice = true` + `CreateReferenceEngineConfig()` + `RenderConfig::FrameRecipe = MinimalDebug`.
   2. [x] `Engine::Initialize()`. Skip the test deterministically if the host lacks Vulkan bootstrap readiness.
   3. [x] Drive a bounded runtime loop until the operational transition and minimal recipe have recorded.
-  4. [ ] Read the swapchain image back through the `Picking.Readback` drain pattern (or a dedicated readback path if more efficient) and assert at four sample points: triangle interior pixels match the deterministic visible-triangle color and outside-triangle pixels match the clear color.
-  5. [x] Assert the fallback/validation/operational-gate counters do not increment during the operational frame window.
+  4. [ ] Read the swapchain image back through the `Picking.Readback` drain pattern (or a dedicated readback path if more efficient) and assert at four sample points: triangle interior pixels match the deterministic visible-triangle color and outside-triangle pixels match the clear color. Harness now authored (`tests/support/MinimalTriangleReadback.hpp`); only the backbuffer-to-host bytes seam remains.
+  5. [x] Assert the fallback/validation/operational-gate counters do not increment during the operational frame window (now via the reusable `OperationalCounterStability::IsStable` helper).
   6. [x] `Engine::Shutdown()`.
 - [x] Update the test allow-list in `tests/README.md` and `tests/CMakeLists.txt` to label the new fixture `gpu;vulkan` (no new label introduced).
+- [x] Author reusable pixel-readback driver harness and fallback-counter stability helper so the sibling `GRAPHICS-032D` and canonical `GRAPHICS-076`/`GRAPHICS-081` fixtures can call them byte-identical (scaffold notice).
 
 ## Tests
 - [x] The new `gpu;vulkan` fixture itself is the test.
 - [x] Confirm the default CPU gate (`-LE 'gpu|vulkan|slow|flaky-quarantine'`) does **not** select the new fixture.
 - [ ] On hosts without Vulkan support: the fixture is selected by the `gpu;vulkan` opt-in invocation and reports a deterministic `SKIPPED` with a `VulkanRequestedButNotOperational` warn breadcrumb logged once.
+- [x] CPU-only contract coverage `tests/contract/graphics/Test.MinimalTriangleReadbackHarness.cpp` exercises the harness's sample-point membership, expected-color quantization, tolerance comparator, and counter-stability predicate inside the default gate via `IntrinsicGraphicsContractCpuTests`.
 
 ## Docs
-- [ ] Update `tests/README.md` to enumerate the new fixture under the `gpu;vulkan` opt-in section.
-- [x] Update `src/graphics/vulkan/README.md` to flip the `gpu;vulkan` minimal-recipe smoke row to current state.
+- [x] Update `tests/README.md` to enumerate the new fixture under the `gpu;vulkan` opt-in section and to record the reusable readback / counter-stability helper seam plus its CPU-only contract coverage.
+- [x] Update `tests/support/README.md` to enumerate the reusable readback harness and counter-stability helper.
+- [x] Update `src/graphics/vulkan/README.md` to flip the `gpu;vulkan` minimal-recipe smoke row to current state and reference the harness.
 
 ## Acceptance criteria
 - [ ] On a Vulkan-capable Linux host, the fixture passes pixel-readback assertions and reports zero fallback-counter increments.
@@ -76,4 +80,4 @@ python3 tools/repo/check_test_layout.py --root . --strict
 - Mixing mechanical file moves with semantic refactors.
 
 ## Next verification step
-- Add the fixture, label it `gpu;vulkan`, run the opt-in invocation on a Vulkan-capable host, confirm pixel and counter assertions.
+- Land the backbuffer-to-host readback seam (RHI-level `CopyTextureToBuffer` or a dedicated `MinimalDebug.Readback` buffer wired through the present finalizer), call the harness's `kSamplePoints` table from a live `EXPECT_TRUE(Readback::ChannelsWithinTolerance(...))` site in the smoke, and run the opt-in `-L 'gpu' -L 'vulkan'` invocation on a Vulkan-capable host to confirm pixel assertions alongside the already-passing counter assertions.

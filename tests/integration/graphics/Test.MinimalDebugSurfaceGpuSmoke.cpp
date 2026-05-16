@@ -3,6 +3,9 @@
 
 #include <gtest/gtest.h>
 
+#include "MinimalTriangleReadback.hpp"
+#include "OperationalCounterStability.hpp"
+
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Render;
@@ -12,6 +15,9 @@ import Extrinsic.Runtime.Engine;
 
 namespace
 {
+namespace Readback = Extrinsic::Tests::Support::MinimalTriangleReadback;
+namespace Counters = Extrinsic::Tests::Support::OperationalCounterStability;
+
 using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
 using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
 using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
@@ -19,6 +25,17 @@ using Extrinsic::Backends::Vulkan::ToString;
 using Extrinsic::Core::Config::FrameRecipeKind;
 using Extrinsic::Runtime::Engine;
 using Extrinsic::Runtime::IApplication;
+
+Counters::Snapshot ToCounterSnapshot(
+    const Extrinsic::Backends::Vulkan::VulkanOperationalDiagnosticsSnapshot& vk) noexcept
+{
+    return Counters::Snapshot{
+        vk.VulkanFallbackToNullCount,
+        vk.VulkanInitFailureCount,
+        vk.VulkanValidationErrorCount,
+        vk.VulkanOperationalGateFailureCount,
+    };
+}
 
 class ExitAfterFramesApp final : public IApplication
 {
@@ -57,8 +74,8 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
 
     auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
     config.Window.Title = "Intrinsic MinimalDebug gpu;vulkan smoke";
-    config.Window.Width = 128;
-    config.Window.Height = 128;
+    config.Window.Width = Readback::kFramebufferWidth;
+    config.Window.Height = Readback::kFramebufferHeight;
     config.Window.Resizable = false;
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
@@ -75,6 +92,7 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
     }
 
     const auto beforeFrameDiagnostics = GetVulkanOperationalDiagnosticsSnapshot();
+    const auto beforeCounters = ToCounterSnapshot(beforeFrameDiagnostics);
 
     engine.Run();
 
@@ -99,14 +117,27 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
     EXPECT_EQ(stats.MinimalRecipeMissingPrerequisiteCount, 0u);
 
     const auto afterFrameDiagnostics = GetVulkanOperationalDiagnosticsSnapshot();
-    EXPECT_EQ(afterFrameDiagnostics.VulkanFallbackToNullCount,
-              beforeFrameDiagnostics.VulkanFallbackToNullCount);
-    EXPECT_EQ(afterFrameDiagnostics.VulkanInitFailureCount,
-              beforeFrameDiagnostics.VulkanInitFailureCount);
-    EXPECT_EQ(afterFrameDiagnostics.VulkanValidationErrorCount,
-              beforeFrameDiagnostics.VulkanValidationErrorCount);
-    EXPECT_EQ(afterFrameDiagnostics.VulkanOperationalGateFailureCount,
-              beforeFrameDiagnostics.VulkanOperationalGateFailureCount);
+    const auto afterCounters = ToCounterSnapshot(afterFrameDiagnostics);
+    EXPECT_TRUE(Counters::IsStable(beforeCounters, afterCounters))
+        << "Vulkan fallback counters incremented across an operational frame: "
+        << "fallbackToNull " << beforeCounters.FallbackToNull << " -> " << afterCounters.FallbackToNull
+        << ", initFailure " << beforeCounters.InitFailure << " -> " << afterCounters.InitFailure
+        << ", validationError " << beforeCounters.ValidationError << " -> " << afterCounters.ValidationError
+        << ", gateFailure " << beforeCounters.OperationalGateFailure << " -> " << afterCounters.OperationalGateFailure;
+
+    // GRAPHICS-033D pixel readback: the four-sample assertion runs against the
+    // reusable harness sample-point table once the backbuffer-to-host readback
+    // seam lands (tracked as the remaining bullet in
+    // tasks/active/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md). The
+    // harness is exercised at compile time below so the byte-identical contract
+    // shared with the sibling GRAPHICS-032D recipe-selector fixture and the
+    // canonical GRAPHICS-076/081 default-recipe smoke is locked in here.
+    static_assert(Readback::kSamplePoints.size() == 4u,
+                  "GRAPHICS-033D pixel readback requires exactly four deterministic sample points");
+    static_assert(Readback::ExpectedAt(Readback::kSamplePoints[0]).R == Readback::Quantize8(Readback::kTriangleR),
+                  "Interior sample point must expect the reference-triangle color");
+    static_assert(Readback::ExpectedAt(Readback::kSamplePoints[1]).R == Readback::Quantize8(Readback::kClearR),
+                  "Exterior sample point must expect the clear color");
 
     engine.Shutdown();
 }
