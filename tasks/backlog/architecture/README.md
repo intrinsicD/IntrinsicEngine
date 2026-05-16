@@ -21,6 +21,11 @@ map.
   shrink the 793-line `graphics.md` to ≤ 250 lines by extracting embedded
   decision records into ADRs and migration inventories, leaving only the
   canonical contract behind. Sliced for incremental landing.
+- [REVIEW-001 — Establish weekly human-led review of agent-authored slices](REVIEW-001-human-led-agent-week-review-cadence.md):
+  adds a low-overhead weekly audit checklist (`docs/agent/agent-output-review-checklist.md`)
+  covering nine agent-specific failure modes (scope creep, decorative comments,
+  premature abstraction, documented-but-not-tested, etc.) plus a first
+  calibration audit of the GRAPHICS-033E/F + HARDEN-066 + RUNTIME-091 window.
 
 ## Convergence
 
