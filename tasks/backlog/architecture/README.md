@@ -17,6 +17,14 @@ map.
   inventories promoted modules whose value types, pure data contracts, or
   dependency-free APIs appear to live in higher layers than their true owner and
   creates one scoped follow-up task per accepted move/split.
+- [ARCH-004 — Pin first legacy-deletion target and sequencing](ARCH-004-legacy-retirement-first-deletion-target.md):
+  picks the first `src/legacy/<area>/` subtree to actually delete (recommendation:
+  `src/legacy/Interface/`), records second and third targets in dependency order,
+  and adds a Sequencing section to `docs/migration/legacy-retirement.md` so
+  retirement becomes a tracked program rather than an indefinite "blocked" row.
+- [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
+  first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
+  prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
 
 ## Convergence
 

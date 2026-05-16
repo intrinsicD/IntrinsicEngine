@@ -65,6 +65,16 @@ rendering module from `docs/api/generated/module_inventory.md` into a promoted
 owner, required parity evidence, current readiness state, and final removal
 follow-up. No source deletion is authorized by this matrix alone.
 
+The retirement *program* (which subtree gets deleted first, second, third, and
+under what prerequisite checklist) is driven by
+[`ARCH-004`](../../tasks/backlog/architecture/ARCH-004-legacy-retirement-first-deletion-target.md);
+that task pins concrete deletion targets, while individual deletions are
+executed by `LEGACY-NNN` tasks (first one:
+[`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)).
+Targets in this `GRAPHICS-020` table that are blocked on the GRAPHICS-033 +
+GRAPHICS-070..076 + GRAPHICS-081 chain are deliberately not on `ARCH-004`'s
+initial sequencing list; they are added when their upstream gates retire.
+
 | Legacy family | Promoted owner / gate summary | Readiness |
 | --- | --- | --- |
 | Graphics component/data-authority modules and lifecycle/GPU-scene sync systems | Split across CPU-only ECS/geometry data, runtime extraction sidecars, and graphics renderer packets/resources; gated by `GRAPHICS-016`, `GRAPHICS-028`, `ASSETIO-001`, `GEOIO-002`, and lifecycle/dirty-domain tests. | blocked |
