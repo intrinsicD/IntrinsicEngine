@@ -63,73 +63,73 @@ bodies, and no behavior change for default CPU-supported builds.
     task only enforces the device-selection column.
 
 ## Required changes
-- Add the new types and free function to `src/graphics/vulkan/`. Export
+- [ ] Add the new types and free function to `src/graphics/vulkan/`. Export
   them from `Extrinsic.Backends.Vulkan` as the single public seam.
-- Wire `VulkanDevice::IsOperational()` to consult
+- [ ] Wire `VulkanDevice::IsOperational()` to consult
   `EvaluateVulkanOperationalStatus(...)` exactly once per evaluation
   (init, swapchain/device recreate, and explicit transition checks per
   GRAPHICS-033 Decision 12).
-- Wire runtime's `SelectRuntimeDeviceBackend()` in
+- [ ] Wire runtime's `SelectRuntimeDeviceBackend()` in
   `src/runtime/Runtime.Engine.cppm`/`.cpp` to consult the status code
   for device selection. Runtime must not branch on `VkResult`, native
   handles, or any non-public Vulkan symbol.
-- Define and document the "first failing reason" rule (the reason
+- [ ] Define and document the "first failing reason" rule (the reason
   returned must correspond to the earliest unsatisfied gate item).
-- Make sure all current call sites that previously consulted booleans,
+- [ ] Make sure all current call sites that previously consulted booleans,
   CMake flags, or fallback counters to decide operational state now go
   through the new seam. Remove any duplicate gate checks in renderer,
   runtime, app, or asset-service code.
 
 ## Tests
-- New `tests/contract/graphics/Test.VulkanOperationalGate.cpp`
+- [ ] New `tests/contract/graphics/Test.VulkanOperationalGate.cpp`
   (CTest labels `contract;graphics`): table-driven property tests over
   every reconciliation-matrix row in Decision 4 and over the ordered
   gate items in Decision 1. Inputs are synthesized `VulkanOperationalInputs`
   values (no real Vulkan device, no GLFW).
-- New `tests/contract/graphics/Test.VulkanOperationalReason.cpp`
+- [ ] New `tests/contract/graphics/Test.VulkanOperationalReason.cpp`
   (labels `contract;graphics`): asserts the first-failing-reason
   selection for each ordering permutation in the gate checklist, and
   asserts enum values are stable / append-only by comparing to a
   baseline list copied from this task.
-- Update the existing `tests/contract/graphics/Test.VulkanFailClosedContract.cpp`
+- [ ] Update the existing `tests/contract/graphics/Test.VulkanFailClosedContract.cpp`
   to consume the new status code rather than a bare bool, without
   changing its observable assertions.
-- Default CPU gate
+- [ ] Default CPU gate
   (`ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`)
   must include the new tests and pass.
 
 ## Docs
-- Update `src/graphics/vulkan/README.md` to document the
+- [ ] Update `src/graphics/vulkan/README.md` to document the
   `VulkanOperationalStatusCode` / `VulkanOperationalReason` enums and the
   single-source-of-truth rule (no other code may re-derive operational
   state).
-- Update `docs/architecture/graphics.md` and
+- [ ] Update `docs/architecture/graphics.md` and
   `docs/architecture/rendering-three-pass.md` operational-readiness
   sections to point at the new seam.
-- Refresh `docs/api/generated/module_inventory.md` with
+- [ ] Refresh `docs/api/generated/module_inventory.md` with
   `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
-- No changes to `docs/migration/nonlegacy-parity-matrix.md` rows in this
+- [ ] No changes to `docs/migration/nonlegacy-parity-matrix.md` rows in this
   slice (Vulkan operational row stays "pending"; GRAPHICS-033B flips
   diagnostics columns; GRAPHICS-033C flips the recording column).
 
 ## Acceptance criteria
-- `Extrinsic.Backends.Vulkan` exports the five new symbols
+- [ ] `Extrinsic.Backends.Vulkan` exports the five new symbols
   (`VulkanOperationalStatusCode`, `VulkanOperationalReason`,
   `VulkanOperationalInputs`, `VulkanOperationalStatus`,
   `EvaluateVulkanOperationalStatus`) and the existing operational call
   sites consume the seam unchanged in behavior.
-- `VulkanDevice::IsOperational()` does not duplicate any gate check that
+- [ ] `VulkanDevice::IsOperational()` does not duplicate any gate check that
   the seam already evaluates.
-- Runtime device selection consults only the status code; no `Vk*`
+- [ ] Runtime device selection consults only the status code; no `Vk*`
   symbols are visible to `src/runtime/`.
-- The Vulkan backend remains fail-closed: `IsOperational()` returns
+- [ ] The Vulkan backend remains fail-closed: `IsOperational()` returns
   `false` for every state where the gate is unsatisfied, including all
   rows of the reconciliation matrix except `Operational`.
-- New `contract;graphics` tests cover every row of the reconciliation
+- [ ] New `contract;graphics` tests cover every row of the reconciliation
   matrix and every first-failing-reason ordering.
-- Layering, test-layout, task-validator, and module-inventory checks
+- [ ] Layering, test-layout, task-validator, and module-inventory checks
   pass.
-- The default CPU gate remains green.
+- [ ] The default CPU gate remains green.
 
 ## Verification
 ```bash

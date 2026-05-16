@@ -54,7 +54,7 @@ that expose Vulkan and the required X11/Wayland headers.
   This smoke registers `gpu;vulkan` labels so it is excluded.
 
 ## Required changes
-- New `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp`
+- [ ] New `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp`
   (CTest labels `gpu;vulkan;graphics`). The fixture:
   1. Skips with an explicit reason when GLFW cannot initialize or when
      `EvaluateVulkanOperationalStatus()` returns a code other than
@@ -74,45 +74,45 @@ that expose Vulkan and the required X11/Wayland headers.
   4. Asserts `GraphicsBackendDiagnostics` / `RenderGraphFrameStats`
      report exactly the expected pass executions for the minimal
      recipe (one surface, one present).
-- Register the smoke in `tests/CMakeLists.txt` with labels
+- [ ] Register the smoke in `tests/CMakeLists.txt` with labels
   `gpu;vulkan;graphics`. Keep timeouts under the 120s opt-in budget
   documented in `tests/README.md`.
-- Add a documented opt-in invocation block in `tests/README.md` and in
+- [ ] Add a documented opt-in invocation block in `tests/README.md` and in
   `src/graphics/vulkan/README.md` so contributors know how to run the
   fixture locally.
 
 ## Tests
-- The smoke itself is the deliverable. It is excluded from the default
+- [ ] The smoke itself is the deliverable. It is excluded from the default
   CPU gate. CPU-only tests must continue to pass unchanged.
-- Verification commands:
+- [ ] Verification commands:
   - Default CPU gate (must still pass):
     `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
   - Opt-in GPU gate (host-dependent):
     `ctest --test-dir build/ci -L 'gpu|vulkan' --timeout 120`.
 
 ## Docs
-- Update `tests/README.md` opt-in section: add the visible-triangle
+- [ ] Update `tests/README.md` opt-in section: add the visible-triangle
   smoke entry and the host-requirements list (Vulkan 1.3-capable
   device, GLFW-compatible windowing, X11 or Wayland dev headers).
-- Update `src/graphics/vulkan/README.md` to record that the GRAPHICS-032
+- [ ] Update `src/graphics/vulkan/README.md` to record that the GRAPHICS-032
   recipe is now exercised by a real-device smoke on supported hosts.
-- Update `docs/migration/nonlegacy-parity-matrix.md` Vulkan smoke row.
-- No regeneration of `docs/api/generated/module_inventory.md` is
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` Vulkan smoke row.
+- [ ] No regeneration of `docs/api/generated/module_inventory.md` is
   required if no new module surface is exported.
 
 ## Acceptance criteria
-- `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp`
+- [ ] `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp`
   exists, builds, registers under `gpu;vulkan;graphics`, and is
   excluded from the default CPU correctness gate.
-- On a host that satisfies the full GRAPHICS-033 gate, the smoke
+- [ ] On a host that satisfies the full GRAPHICS-033 gate, the smoke
   passes: `IsOperational() == true`, one minimal-recipe frame is
   recorded and presented, no startup breadcrumb fires, and no
   Vulkan operational counters increment.
-- On a host without Vulkan or without the required X11/Wayland
+- [ ] On a host without Vulkan or without the required X11/Wayland
   headers, the smoke either is not built (CMake-gated) or skips with
   a clear reason; the CPU gate is unaffected.
-- Default CPU gate remains green.
-- Layering, test-layout, task-validator, and module-inventory checks
+- [ ] Default CPU gate remains green.
+- [ ] Layering, test-layout, task-validator, and module-inventory checks
   pass.
 
 ## Verification

@@ -55,68 +55,68 @@ stay outside this slice.
   CPU/null path is the only place the GRAPHICS-032 recipe executes.
 
 ## Required changes
-- Implement `RecordPass.Surface.MinimalDebug` and
+- [ ] Implement `RecordPass.Surface.MinimalDebug` and
   `RecordPass.Present.MinimalDebug` command-recording bodies inside
   `src/graphics/vulkan/` against the existing command context. Bodies
   consume the GRAPHICS-032 framegraph and the GRAPHICS-031 default
   debug surface material slot.
-- Ensure recording bodies do not allocate per frame and do not access
+- [ ] Ensure recording bodies do not allocate per frame and do not access
   any non-public Vulkan symbol from outside the backend.
-- Set the `MinimalRecipeRecordingMissing` gate input to `false` only
+- [ ] Set the `MinimalRecipeRecordingMissing` gate input to `false` only
   when both recording bodies are present and the recipe's
   prerequisites (default debug material slot populated, framegraph
   validation result clean) are satisfied. The other unsatisfied gate
   items remain unchanged.
-- Wire recording into `RebuildOperationalResources()` so that the
+- [ ] Wire recording into `RebuildOperationalResources()` so that the
   GRAPHICS-018R transition seam is the single re-entry point on
   swapchain/device recreate. No recording occurs outside of an
   operational gate-eligible window.
-- Backbuffer-import declaration, fullscreen-triangle present body, and
+- [ ] Backbuffer-import declaration, fullscreen-triangle present body, and
   framegraph barrier inference all stay graphics-owned; renderer/runtime
   do not learn about Vulkan-native barriers.
 
 ## Tests
-- New `tests/contract/graphics/Test.VulkanMinimalRecipeRecording.cpp`
+- [ ] New `tests/contract/graphics/Test.VulkanMinimalRecipeRecording.cpp`
   (labels `contract;graphics`): drives the recording bodies against a
   null/mock command context that captures the recorded command stream
   and asserts the pass/resource/command sequence matches the
   GRAPHICS-032 CPU-mock parity contract exactly. No real Vulkan device.
-- New `tests/contract/graphics/Test.VulkanMinimalRecipeGateFlip.cpp`
+- [ ] New `tests/contract/graphics/Test.VulkanMinimalRecipeGateFlip.cpp`
   (labels `contract;graphics`): asserts that with `Pass.Surface.MinimalDebug`
   and `Pass.Present.MinimalDebug` bodies in place, the
   `MinimalRecipeRecordingMissing` input goes `true → false`, but with
   any other gate item unsatisfied the overall status remains
   `RequestedButIncompleteGate` (not `Operational`).
-- Update the existing GRAPHICS-022 / GRAPHICS-032 CPU contract tests
+- [ ] Update the existing GRAPHICS-022 / GRAPHICS-032 CPU contract tests
   to consume the new recording bodies through the null command-context
   shim; no behavior change in those existing assertions.
-- Real-device smoke is intentionally deferred to GRAPHICS-033D.
+- [ ] Real-device smoke is intentionally deferred to GRAPHICS-033D.
 
 ## Docs
-- Update `src/graphics/vulkan/README.md` minimal-recipe section to
+- [ ] Update `src/graphics/vulkan/README.md` minimal-recipe section to
   reflect that recording bodies are now implemented and the gate item
   6 is consequently satisfiable.
-- Update `docs/architecture/rendering-three-pass.md` to mark
+- [ ] Update `docs/architecture/rendering-three-pass.md` to mark
   `Pass.Surface.MinimalDebug` / `Pass.Present.MinimalDebug` recording
   as Vulkan-backed and to record the still-outstanding gate items
   (barrier validation, public service reconciliation).
-- Update `docs/migration/nonlegacy-parity-matrix.md` Vulkan operational
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` Vulkan operational
   rows accordingly.
-- Refresh `docs/api/generated/module_inventory.md`.
+- [ ] Refresh `docs/api/generated/module_inventory.md`.
 
 ## Acceptance criteria
-- `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug` recording
+- [ ] `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug` recording
   bodies exist in `src/graphics/vulkan/` and are reachable through
   `RebuildOperationalResources()` only.
-- CPU-mock parity tests show identical pass/resource/command sequences
+- [ ] CPU-mock parity tests show identical pass/resource/command sequences
   to the GRAPHICS-032 contract.
-- The `MinimalRecipeRecordingMissing` gate input becomes flippable;
+- [ ] The `MinimalRecipeRecordingMissing` gate input becomes flippable;
   full `Operational` status still requires the remaining gate items.
-- Default CPU gate passes; no `gpu|vulkan|slow|flaky-quarantine` label
+- [ ] Default CPU gate passes; no `gpu|vulkan|slow|flaky-quarantine` label
   is added to the new tests.
-- Layering remains `graphics/vulkan -> core, graphics/rhi, backend-local
+- [ ] Layering remains `graphics/vulkan -> core, graphics/rhi, backend-local
   Vulkan deps`; no new edges.
-- No per-frame allocations or string formatting on the recording path.
+- [ ] No per-frame allocations or string formatting on the recording path.
 
 ## Verification
 ```bash
