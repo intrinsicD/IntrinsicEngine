@@ -50,69 +50,69 @@ new operational gate logic; consumes GRAPHICS-033A.
   atomics or fixed-size arrays; no per-frame allocations or string work.
 
 ## Required changes
-- Add `VulkanOperationalDiagnosticsSnapshot` to
+- [ ] Add `VulkanOperationalDiagnosticsSnapshot` to
   `src/graphics/vulkan/` and export it via `Extrinsic.Backends.Vulkan`.
   Snapshot is read-only; the backend exposes a `Get*()` accessor that
   returns a copy of the current counter values.
-- Add storage for the five counters and the per-reason histogram inside
+- [ ] Add storage for the five counters and the per-reason histogram inside
   the Vulkan backend (atomics for counter increments; the histogram is
   also append-only / fixed-size keyed by `VulkanOperationalReason`).
-- Increment counters at each reconciliation-matrix transition exactly as
+- [ ] Increment counters at each reconciliation-matrix transition exactly as
   Decision 4 prescribes. Counter increment is the only side-effect of
   status evaluation; status code derivation remains in GRAPHICS-033A.
-- Wire `Runtime.Engine.cpp` to emit one `VulkanRequestedButNotOperational`
+- [ ] Wire `Runtime.Engine.cpp` to emit one `VulkanRequestedButNotOperational`
   warn breadcrumb at initialization when `Requested == true` and the
   effective device is Null, carrying the status code and first failing
   reason. Repeat-emission guard: at most once per engine initialization
   attempt. After a successful device recreate that flips operational to
   `true → false`, runtime emits exactly one additional breadcrumb of the
   same kind (this is the "transient drop" case from Decision 10).
-- Runtime breadcrumb formatting reads enum values only; no `vk*` call,
+- [ ] Runtime breadcrumb formatting reads enum values only; no `vk*` call,
   no native handle inspection.
 
 ## Tests
-- New `tests/contract/graphics/Test.VulkanOperationalDiagnostics.cpp`
+- [ ] New `tests/contract/graphics/Test.VulkanOperationalDiagnostics.cpp`
   (labels `contract;graphics`): drives each reconciliation-matrix row
   via synthesized `VulkanOperationalInputs`, asserts the exact counter
   delta set and the histogram bin incremented matches Decision 4 +
   Decision 5.
-- New `tests/contract/runtime/Test.VulkanStartupBreadcrumb.cpp`
+- [ ] New `tests/contract/runtime/Test.VulkanStartupBreadcrumb.cpp`
   (labels `contract;runtime`): drives runtime initialization against a
   mock Vulkan backend that reports each non-operational status, asserts
   exactly one `VulkanRequestedButNotOperational` breadcrumb is emitted
   per init attempt with the expected status/reason payload, and asserts
   no breadcrumb is emitted when `Requested == false` or when the
   effective device is Vulkan.
-- New `tests/contract/runtime/Test.VulkanTransitionBreadcrumb.cpp`
+- [ ] New `tests/contract/runtime/Test.VulkanTransitionBreadcrumb.cpp`
   (labels `contract;runtime`): simulates an `Operational → DeviceLost`
   transition and asserts one breadcrumb emission with the correct reason
   and `VulkanDeviceLostOperationalDropCount` increment.
-- All new tests run under the default CPU gate; no GPU labels.
+- [ ] All new tests run under the default CPU gate; no GPU labels.
 
 ## Docs
-- Update `src/graphics/vulkan/README.md` to enumerate the snapshot
+- [ ] Update `src/graphics/vulkan/README.md` to enumerate the snapshot
   counters and to document that they are read-only public diagnostics.
-- Update `docs/architecture/graphics.md` (Vulkan operational diagnostics
+- [ ] Update `docs/architecture/graphics.md` (Vulkan operational diagnostics
   section): list the five counters and the breadcrumb name.
-- Update `docs/migration/nonlegacy-parity-matrix.md` rows for "Vulkan
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` rows for "Vulkan
   operational diagnostics" to mark this slice complete.
-- Refresh `docs/api/generated/module_inventory.md` after the new module
+- [ ] Refresh `docs/api/generated/module_inventory.md` after the new module
   surface lands.
 
 ## Acceptance criteria
-- `Extrinsic.Backends.Vulkan` exports
+- [ ] `Extrinsic.Backends.Vulkan` exports
   `VulkanOperationalDiagnosticsSnapshot` and a public accessor.
-- Each reconciliation-matrix row produces the exact counter and
+- [ ] Each reconciliation-matrix row produces the exact counter and
   histogram side-effects required by GRAPHICS-033 Decisions 4 and 5.
-- `Runtime.Engine` emits the startup breadcrumb at most once per
+- [ ] `Runtime.Engine` emits the startup breadcrumb at most once per
   initialization attempt and exactly once on every
   `Operational → non-operational` transition.
-- Backend remains fail-closed; `IsOperational()` is unchanged by this
+- [ ] Backend remains fail-closed; `IsOperational()` is unchanged by this
   slice except for the inclusion of the snapshot reset on init/recreate.
-- New `contract;graphics` and `contract;runtime` tests pass in the
+- [ ] New `contract;graphics` and `contract;runtime` tests pass in the
   default CPU gate; existing tests continue to pass.
-- No `Vk*` symbol crosses `src/runtime/`.
-- Layering, test-layout, task-validator, and module-inventory checks
+- [ ] No `Vk*` symbol crosses `src/runtime/`.
+- [ ] Layering, test-layout, task-validator, and module-inventory checks
   pass.
 
 ## Verification
