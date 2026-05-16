@@ -17,12 +17,13 @@
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #1, against gaps in [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) (geodesics + intrinsic geometry pack; tolerant input for noisy / broken boundary data).
 - Reuses the cotan Laplacian / mass matrix already assembled by `Geometry.HalfedgeMesh.DEC` and the upcoming general sparse-solver seam from [`GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md).
 - Reference C++ implementation exists in geometry-central's `signed_heat_method` module and may be used as the parity oracle, not as a dependency.
+- Pathfinder method per [`METHODS-001`](METHODS-001-signed-heat-pathfinder.md): the first method to be driven end-to-end through the `methods/` pipeline. When `GEOM-008` retires, promote this task to `tasks/active/` and start with the method-package scaffolding slice + Variant A reference implementation against the analytic disk test.
 
 ## Variants and default selection
 
 Mark `[x]` next to the variant that should be the **public-facing default backend** once CPU reference parity is demonstrated. Unmarked variants become optional comparison backends behind capability flags or remain out of scope.
 
-- [ ] **A — Signed Heat Method on surfaces (Feng & Crane, SIGGRAPH 2024).** Solves signed geodesic distance to a curve / region boundary on a surface mesh. Best fit for the existing halfedge mesh pipeline; reuses cotan-Laplace + mass assembly already present.
+- [x] **A — Signed Heat Method on surfaces (Feng & Crane, SIGGRAPH 2024).** Solves signed geodesic distance to a curve / region boundary on a surface mesh. Best fit for the existing halfedge mesh pipeline; reuses cotan-Laplace + mass assembly already present. **Selected as the default variant per `METHODS-001`.**
 - [ ] **B — Signed Heat Method on point clouds (Feng & Crane, SIGGRAPH 2024).** Same algorithm with point-cloud Laplacian; only viable if point-cloud Laplacian assembly is added under [`GEOM-010`](../geometry/GEOM-010-point-cloud-algorithm-pack-roadmap.md).
 - [ ] **C — Generalized signed distance in R^n (Feng & Crane).** Volumetric grid variant; only viable if `Geometry.Grid` gains a Laplacian assembly path.
 
