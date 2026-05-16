@@ -386,7 +386,17 @@ GRAPHICS-033D adds the opt-in `gpu;vulkan` fixture
 `MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`.
 It uses `CreateReferenceEngineConfig()`, selects `FrameRecipe::MinimalDebug`,
 drives a bounded runtime loop, verifies the operational status and minimal pass
-counters on Vulkan-capable hosts, and remains outside the default CPU gate.
+counters on Vulkan-capable hosts, and remains outside the default CPU gate. It
+consumes the reusable `tests/support/MinimalTriangleReadback.hpp` and
+`tests/support/OperationalCounterStability.hpp` helpers so the sibling
+`GRAPHICS-032D` recipe-selector fixture and the canonical `GRAPHICS-076` /
+`GRAPHICS-081` default-recipe smoke can reuse the four-sample-point table and
+fallback-counter stability contract byte-identical. The pixel readback bytes
+that turn the four-sample expectation into a live assertion are tracked as the
+remaining bullet on
+[`tasks/active/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md`](../../../tasks/active/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md);
+CPU-only invariants of the helpers already run in the default gate via
+`IntrinsicGraphicsContractCpuTests`.
 
 Ordered gate checklist:
 
