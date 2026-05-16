@@ -19,7 +19,7 @@
   - Its acceptance test (analytic disk + sphere convergence) is closed-form, so correctness verification does not depend on a third-party parity oracle in the default build.
   - It produces a demoable output (signed geodesic distance scalar field) that the existing geometry library can visualize without depending on the promoted Vulkan path becoming operational. This decouples methods progress from the GRAPHICS-033 critical path.
 - Prerequisite chain (hard, in order):
-  1. [`GEOM-005 — Geometry API style and numeric policy`](../geometry/GEOM-005-api-style-and-numeric-policy.md) — already `done`. (Sanity check: it was retired.)
+  1. [`GEOM-005 — Geometry API style and numeric policy`](../../done/GEOM-005-api-style-and-numeric-policy.md) — already retired to `tasks/done/`. (Sanity check: link targets the `done/` location, not `backlog/geometry/`, which does not contain a GEOM-005 file.)
   2. [`GEOM-008 — Geometry linear algebra and solver infrastructure`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md) — Eigen3 dependency, sparse builders, solver diagnostics. METHOD-002 cites this as a required dependency.
   3. [`METHOD-002 — Signed Heat Method reference backend`](METHOD-002-signed-heat-method-reference-backend.md) — paper intake, scaffolding, CPU reference, correctness tests, benchmark stub, docs.
 - Soft dependency (not blocking): `GEOM-009 — Benchmark manifests / fixtures / smoke`. METHOD-002 can ship its benchmark harness using the `benchmarks/_template` even if `GEOM-009` lands after.
