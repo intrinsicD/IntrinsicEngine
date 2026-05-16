@@ -8,12 +8,17 @@ optimized CPU → GPU only after reference parity.
 See [`tasks/backlog/README.md`](../README.md) for the cross-domain convergence
 map.
 
+## Program tasks
+
+- [METHODS-001 — Pin signed heat as methods-pipeline pathfinder](METHODS-001-signed-heat-pathfinder.md).
+
 ## Tasks
 
 - [METHOD-001 — Rigid-body dynamics reference backend](METHOD-001-rigid-body-dynamics-reference-backend.md)
   (gated by [`physics/ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md);
   ECS authoring side handled by [`ecs/HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
-- [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md).
+- [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
+  **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md).
 - [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md).
 - [METHOD-005 — Robust mesh boolean reference backend](METHOD-005-robust-mesh-boolean-reference-backend.md)
