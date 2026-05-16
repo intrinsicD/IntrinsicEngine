@@ -17,6 +17,11 @@ map.
   inventories promoted modules whose value types, pure data contracts, or
   dependency-free APIs appear to live in higher layers than their true owner and
   creates one scoped follow-up task per accepted move/split.
+- [REVIEW-001 — Establish weekly human-led review of agent-authored slices](REVIEW-001-human-led-agent-week-review-cadence.md):
+  adds a low-overhead weekly audit checklist (`docs/agent/agent-output-review-checklist.md`)
+  covering nine agent-specific failure modes (scope creep, decorative comments,
+  premature abstraction, documented-but-not-tested, etc.) plus a first
+  calibration audit of the GRAPHICS-033E/F + HARDEN-066 + RUNTIME-091 window.
 
 ## Convergence
 
