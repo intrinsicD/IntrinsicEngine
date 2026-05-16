@@ -50,16 +50,16 @@
     excluded from the default CPU gate.
 
 ## Required changes
-- This task remains planning-only. No source or build changes.
-- When promoting this task, the promoting agent must:
+- [ ] This task remains planning-only. No source or build changes.
+- [ ] When promoting this task, the promoting agent must:
   - Pick a single concrete backend (not a bundle).
   - Create `PLATFORM-005-<backend>-backend.md` (or next free `PLATFORM-` ID)
     under `tasks/backlog/platform/` using `tasks/templates/task.md`.
   - Cite this task in the new task's Context section.
 
 ## Tests
-- None required by this planning task.
-- The eventual implementation task per backend must add:
+- [ ] None required by this planning task.
+- [ ] The eventual implementation task per backend must add:
   - A headless contract test confirming the backend factory honors the
     backend selection (or is correctly compiled out when not selected).
   - An opt-in smoke test under a backend-specific label (analogous to
@@ -69,17 +69,17 @@
     surface introduced.
 
 ## Docs
-- No doc changes by this planning task.
-- The implementing task must update `src/platform/README.md` to list the
+- [ ] No doc changes by this planning task.
+- [ ] The implementing task must update `src/platform/README.md` to list the
   new backend, refresh `docs/api/generated/module_inventory.md`, and add
   any backend-specific build prerequisites to the relevant
   `docs/architecture/` page.
 
 ## Acceptance criteria
-- This file exists in `tasks/backlog/platform/` and is referenced from
+- [ ] This file exists in `tasks/backlog/platform/` and is referenced from
   `tasks/backlog/platform/README.md`.
-- `python3 tools/agents/validate_tasks.py --root tasks --strict` passes.
-- The task is left in `tasks/backlog/`. Promoting it to `tasks/active/`
+- [ ] `python3 tools/agents/validate_tasks.py --root tasks --strict` passes.
+- [ ] The task is left in `tasks/backlog/`. Promoting it to `tasks/active/`
   requires producing at least one concrete backend implementation task as
   described in "Required changes".
 
