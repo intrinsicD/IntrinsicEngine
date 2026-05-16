@@ -22,7 +22,7 @@
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries grandfathered entries for legacy modules. Drop only rows whose key path begins with `src/legacy/Interface/`.
 
 ## Required changes
-- [ ] (Prerequisite, verified before this task is moved to `tasks/active/`) Confirm no `import` or `#include` from `src/runtime/`, `src/graphics/`, `src/platform/`, `src/app/`, `src/legacy/Apps/`, `src/legacy/Runtime/`, `src/legacy/Graphics/`, `src/legacy/EditorUI/`, or `tests/` references `Interface` or `Interface::GUI`. Record the grep evidence in the commit message.
+- [ ] (Prerequisite, verified before this task is moved to `tasks/active/`) Run the consumer-grep gate in the Verification section and confirm it exits 0 with `OK: no external consumers ...`. The gate must fail loudly when any match outside `src/legacy/Interface/**` is found; `git grep` exits 0 on match, so the verification block inverts that. Today (2026-05-16) the gate fails by design — ~248 matches across files including `src/legacy/Apps/Sandbox/main.cpp`, `src/legacy/Graphics/Graphics.RenderDriver.cpp`, `src/legacy/EditorUI/*`, `src/legacy/Runtime/*`, and `tests/contract/ui/Test_PanelRegistration.cpp`. Promotion is blocked until those consumers migrate to the promoted platform/app entry points. Record the empty grep output in the commit message as evidence the prerequisite passed.
 - [ ] Delete the four files under `src/legacy/Interface/`.
 - [ ] Remove the corresponding `add_subdirectory(${INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT})` line and the `INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT` variable assignment from `CMakeLists.txt`.
 - [ ] Drop the allowlist rows in `tools/repo/layering_allowlist.yaml` whose key begins with `src/legacy/Interface/`.
@@ -52,9 +52,23 @@
 
 ## Verification
 ```bash
-# Confirm there are no remaining consumers (record output in the commit message):
-git grep -nE 'import\s+Interface\b|Interface::GUI|#include\s*"Interface' \
-    -- 'src/**' 'tests/**' || echo "no consumers remain"
+# Gate: fail loudly if any consumer of `src/legacy/Interface/` remains
+# outside the doomed subtree itself. `git grep` exits 0 on match, so the
+# check must invert that to block promotion. Record the (empty) output
+# in the commit message as evidence the prerequisite passed.
+#
+# Today (2026-05-16) this gate fails: ~248 matches across files including
+# src/legacy/Apps/Sandbox/main.cpp, src/legacy/Graphics/Graphics.RenderDriver.cpp,
+# src/legacy/EditorUI/*, src/legacy/Runtime/*, and
+# tests/contract/ui/Test_PanelRegistration.cpp. The gate stays failing
+# until consumers migrate to the promoted platform/app entry points.
+if git grep -nE 'import\s+Interface\b|Interface::GUI|#include\s*"Interface' \
+       -- 'src/**' 'tests/**' ':!src/legacy/Interface/**'; then
+    echo "ERROR: src/legacy/Interface/ consumers remain outside the doomed subtree." >&2
+    echo "       LEGACY-001 prerequisite NOT satisfied; do not promote to tasks/active/." >&2
+    exit 1
+fi
+echo "OK: no external consumers of src/legacy/Interface/ remain."
 
 # Standard structural gates:
 python3 tools/repo/check_layering.py --root src --strict
