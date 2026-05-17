@@ -31,7 +31,12 @@
     the existing `HasGraphTopology` marker so `BuildConstView` /
     `BuildMutableView` resolve `Domain::Graph` without requiring a
     Halfedges PropertySet (graph halfedges remain internal to
-    `Geometry::Graph`).
+    `Geometry::Graph`). Each populate call drops the entity's prior
+    `GeometrySources` components and topology markers before emplacing
+    the new domain, so re-population across domains (mesh→cloud,
+    graph→cloud, mesh→graph, …) cannot leak stale topology into
+    `BuildConstView`/`BuildMutableView` — `entt::registry::remove<T>`
+    is a silent no-op on first-population entities.
   - `tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp` (twelve
     `unit;ecs` cases covering emplaced-components shape, canonical key
     presence/positions/connectivity, alive-count tracking, user-defined

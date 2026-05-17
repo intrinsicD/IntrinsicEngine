@@ -101,3 +101,11 @@ Canonical key constants live in
 (`kPosition`, `kNormal`, `kEdgeV0`, `kEdgeV1`, `kHalfedgeToVertex`,
 `kHalfedgeNext`, `kHalfedgeFace`, `kFaceHalfedge`); read sites must
 prefer these constants over inline string literals.
+
+Each populate helper drops the entity's prior `GeometrySources`
+components (`Vertices`/`Edges`/`Halfedges`/`Faces`/`Nodes`) and
+topology markers (`HasMeshTopology`/`HasGraphTopology`) before
+emplacing the new domain, so a re-population from a different
+domain (mesh→cloud, graph→cloud, mesh→graph, etc.) cannot leak stale
+topology into `BuildConstView`/`BuildMutableView`. The reset is a
+silent no-op on first-population entities.

@@ -355,3 +355,138 @@ TEST(ECSGeometrySourcesPopulate, ECSComponentSurvivesSourceMeshDestruction)
     EXPECT_EQ(posProp.Vector().size(), static_cast<std::size_t>(4));
     EXPECT_EQ(posProp.Vector()[2], glm::vec3(1.0f, 1.0f, 0.0f));
 }
+
+// =============================================================================
+// Re-population across domains drops stale GeometrySources components
+// =============================================================================
+TEST(ECSGeometrySourcesPopulate, MeshToCloudRePopulationDropsMeshTopology)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    {
+        auto mesh = MakeQuadMesh();
+        GeometrySources::PopulateFromMesh(raw, entity, mesh);
+    }
+    ASSERT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::Faces>(entity));
+
+    Geometry::PointCloud::Cloud cloud;
+    (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+    (void)cloud.AddPoint({1.0f, 0.0f, 0.0f});
+    GeometrySources::PopulateFromCloud(raw, entity, cloud);
+
+    EXPECT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Edges>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Halfedges>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Faces>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::HasMeshTopology>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::PointCloud);
+    EXPECT_EQ(view.VerticesAlive(), static_cast<std::size_t>(2));
+}
+
+TEST(ECSGeometrySourcesPopulate, GraphToCloudRePopulationDropsGraphState)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    {
+        Geometry::Graph::Graph graph;
+        const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+        const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+        (void)graph.AddEdge(v0, v1);
+        GeometrySources::PopulateFromGraph(raw, entity, graph);
+    }
+    ASSERT_TRUE(raw.all_of<GeometrySources::Nodes>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
+
+    Geometry::PointCloud::Cloud cloud;
+    (void)cloud.AddPoint({2.0f, 2.0f, 2.0f});
+    GeometrySources::PopulateFromCloud(raw, entity, cloud);
+
+    EXPECT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Edges>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::PointCloud);
+    EXPECT_EQ(view.VerticesAlive(), static_cast<std::size_t>(1));
+}
+
+TEST(ECSGeometrySourcesPopulate, MeshToGraphRePopulationDropsMeshFacesAndHalfedges)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    {
+        auto mesh = MakeQuadMesh();
+        GeometrySources::PopulateFromMesh(raw, entity, mesh);
+    }
+    ASSERT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
+    ASSERT_TRUE(raw.all_of<GeometrySources::Faces>(entity));
+
+    Geometry::Graph::Graph graph;
+    const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = graph.AddVertex({2.0f, 0.0f, 0.0f});
+    (void)graph.AddEdge(v0, v1);
+    (void)graph.AddEdge(v1, v2);
+    GeometrySources::PopulateFromGraph(raw, entity, graph);
+
+    EXPECT_TRUE(raw.all_of<GeometrySources::Nodes>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Vertices>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Halfedges>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Faces>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::HasMeshTopology>(entity));
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::Graph);
+    EXPECT_EQ(view.NodesAlive(), static_cast<std::size_t>(3));
+    EXPECT_EQ(view.EdgesAlive(), static_cast<std::size_t>(2));
+}
+
+TEST(ECSGeometrySourcesPopulate, CloudToMeshRePopulationProducesMeshDomain)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    {
+        Geometry::PointCloud::Cloud cloud;
+        (void)cloud.AddPoint({5.0f, 5.0f, 5.0f});
+        GeometrySources::PopulateFromCloud(raw, entity, cloud);
+    }
+    ASSERT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+
+    auto mesh = MakeQuadMesh();
+    GeometrySources::PopulateFromMesh(raw, entity, mesh);
+
+    EXPECT_TRUE(raw.all_of<GeometrySources::Vertices>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Edges>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Halfedges>(entity));
+    EXPECT_TRUE(raw.all_of<GeometrySources::Faces>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::Nodes>(entity));
+    EXPECT_FALSE(raw.all_of<GeometrySources::HasGraphTopology>(entity));
+
+    // Vertex data must be the mesh's, not the prior point cloud's.
+    auto& vComp = raw.get<GeometrySources::Vertices>(entity);
+    auto posProp = vComp.Properties.Get<glm::vec3>(PropertyNames::kPosition);
+    ASSERT_EQ(posProp.Vector().size(), static_cast<std::size_t>(4));
+    EXPECT_EQ(posProp.Vector()[0], glm::vec3(0.0f, 0.0f, 0.0f));
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::Mesh);
+}

@@ -16,6 +16,13 @@
 //                        Calls graph.GarbageCollection() if HasGarbage().
 //   PopulateFromCloud  → emplaces Vertices
 //
+// Every populate call first drops the entity's existing GeometrySources
+// components (Vertices/Edges/Halfedges/Faces/Nodes) and topology markers
+// (HasMeshTopology/HasGraphTopology) so a re-population from a different
+// domain (e.g. mesh→cloud, graph→cloud, mesh→graph) does not leak stale
+// topology into BuildConstView/BuildMutableView. The reset is silent on
+// first-population entities.
+//
 // Canonical properties written by every populate call (see
 // `Extrinsic.ECS.Components.GeometrySources::PropertyNames`):
 //   Vertices / Nodes : "v:position"  (glm::vec3)

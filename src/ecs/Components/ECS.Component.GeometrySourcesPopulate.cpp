@@ -22,12 +22,35 @@ namespace Extrinsic::ECS::Components::GeometrySources
     namespace
     {
         constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
+
+        // Drop every GeometrySources component + topology marker on `entity`
+        // before a populate call writes the new domain. Without this reset,
+        // emplace_or_replace would only overwrite the components shared
+        // between the old and new domains, leaving stale Edges/Halfedges/
+        // Faces/Nodes/marker entries behind — and `BuildConstView` /
+        // `BuildMutableView` would then resolve `Domain::Unknown` (or expose
+        // stale topology) on a domain switch such as mesh→cloud, graph→cloud,
+        // or mesh→graph. `entt::registry::remove<T>` is a silent no-op when
+        // the component is absent, so the reset is cheap on first-population
+        // entities.
+        void ResetGeometrySourceComponents(entt::registry& registry, entt::entity entity)
+        {
+            registry.remove<Vertices>(entity);
+            registry.remove<Edges>(entity);
+            registry.remove<Halfedges>(entity);
+            registry.remove<Faces>(entity);
+            registry.remove<Nodes>(entity);
+            registry.remove<HasMeshTopology>(entity);
+            registry.remove<HasGraphTopology>(entity);
+        }
     }
 
     void PopulateFromMesh(entt::registry& registry,
                           entt::entity entity,
                           Geometry::HalfedgeMesh::Mesh& mesh)
     {
+        ResetGeometrySourceComponents(registry, entity);
+
         const std::size_t vSize = mesh.VerticesSize();
         const std::size_t eSize = mesh.EdgesSize();
         const std::size_t hSize = mesh.HalfedgesSize();
@@ -124,6 +147,8 @@ namespace Extrinsic::ECS::Components::GeometrySources
                            entt::entity entity,
                            Geometry::Graph::Graph& graph)
     {
+        ResetGeometrySourceComponents(registry, entity);
+
         // Compact so the resulting GeometrySources have no deleted-index gaps.
         if (graph.HasGarbage())
             graph.GarbageCollection();
@@ -179,6 +204,8 @@ namespace Extrinsic::ECS::Components::GeometrySources
                            entt::entity entity,
                            Geometry::PointCloud::Cloud& cloud)
     {
+        ResetGeometrySourceComponents(registry, entity);
+
         const std::size_t pSize = cloud.VerticesSize();
 
         auto& vComp = registry.emplace_or_replace<Vertices>(entity);
