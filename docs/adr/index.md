@@ -18,6 +18,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 12. [0012 — ImGui overlay submission and `Pass.Present` finalization](0012-imgui-overlay-and-present-finalization.md)
 13. [0013 — ECS renderable residency bridge](0013-ecs-renderable-residency-bridge.md)
 14. [0014 — Procedural-source residency bridge](0014-procedural-source-residency-bridge.md)
+15. [0015 — Runtime reference scene bootstrap](0015-reference-scene-bootstrap.md)
 
 ## Conventions
 
