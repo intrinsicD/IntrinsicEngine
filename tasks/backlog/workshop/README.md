@@ -20,8 +20,9 @@ and absence of a standing architecture-review gate.
    renderer responsibilities before the renderer becomes the new god object.
 5. [`WORKSHOP-007`](WORKSHOP-007-dependency-driven-default-recipe.md) — move
    the default recipe toward true graph semantics.
-6. [`WORKSHOP-008`](WORKSHOP-008-task-maturity-taxonomy.md) — prevent "scaffold
-   done" from looking like "capability done."
+6. [`WORKSHOP-008` (done)](../../done/WORKSHOP-008-task-maturity-taxonomy.md) —
+   prevent "scaffold done" from looking like "capability done." Retired
+   2026-05-17; taxonomy lives at [`docs/agent/task-maturity.md`](../../../docs/agent/task-maturity.md).
 7. [`WORKSHOP-009`](WORKSHOP-009-clean-workshop-review-gate.md) — add a
    standing architecture-review gate to keep the workshop clean.
 
@@ -35,8 +36,10 @@ and absence of a standing architecture-review gate.
   subsystem ownership has been moved into the registry.
 - **WORKSHOP-007 ⇐ WORKSHOP-003.** Dependency-driven recipes benefit from
   typed resource identity for ordering decisions.
-- **WORKSHOP-009 ⇐ WORKSHOP-001, WORKSHOP-008.** The review gate references
-  the strict layer checker and the maturity taxonomy.
+- **WORKSHOP-009 ⇐ WORKSHOP-001, WORKSHOP-008 (done).** The review gate
+  references the strict layer checker (WORKSHOP-001) and the maturity
+  taxonomy at [`docs/agent/task-maturity.md`](../../../docs/agent/task-maturity.md)
+  (WORKSHOP-008 retired 2026-05-17).
 
 ## Related
 

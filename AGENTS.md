@@ -197,3 +197,4 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 | `docs/agent/benchmark-review-checklist.md` | Reviewing benchmark changes or performance claims before commit or PR. |
 | `docs/agent/docs-sync-policy.md` | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed. |
 | `docs/agent/roles.md` | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions. |
+| `docs/agent/task-maturity.md` | Closing a task whose stop-state is ambiguous, especially rendering, Vulkan, asset ingest, hot reload, pass command bodies, runtime composition, or legacy retirement; reviewers checking the `Scaffolded` closure rule. |

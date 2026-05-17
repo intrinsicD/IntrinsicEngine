@@ -36,3 +36,16 @@
 ## Forbidden changes
 - Adding optimized CPU or GPU backend before reference parity.
 - Claiming performance wins without baseline comparison.
+
+<!--
+Method workflow maps directly onto the maturity taxonomy in
+docs/agent/task-maturity.md:
+  1. Intake + contract           → Scaffolded
+  2. CPU reference + correctness → CPUContracted
+  3. Benchmark harness/manifests → CPUContracted (with baseline)
+  4. Optimized CPU backend       → Operational (CPU)
+  5. GPU backend after parity    → Operational (GPU) + ParityProven
+Record the intended endpoint in an optional `## Maturity` section when the
+method task stops earlier than reference parity.
+-->
+

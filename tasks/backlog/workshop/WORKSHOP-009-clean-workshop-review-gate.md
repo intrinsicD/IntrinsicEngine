@@ -22,7 +22,9 @@
   - renderer member/subsystem growth is justified by an owning seam;
   - new passes use typed IDs, not string routing;
   - new frame recipe dependencies are resource-driven or explicitly justified;
-  - scaffold tasks have follow-up maturity gates;
+  - scaffold tasks have follow-up maturity gates (see the
+    [`task-maturity.md`](../../../docs/agent/task-maturity.md) taxonomy and
+    its `Scaffolded` closure rule, landed by WORKSHOP-008 on 2026-05-17);
   - legacy exceptions have task IDs and expiry.
 - [ ] Add a small script or documented command bundle under `tools/ci/` that runs the relevant existing checks and prints the review checklist location.
 - [ ] Link the review doc from `docs/index.md` and `/AGENTS.md` related docs table if appropriate.
