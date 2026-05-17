@@ -15,6 +15,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 9. [0009 — Visualization packets, validation, and overlay upload](0009-visualization-packets-and-overlay-upload.md)
 10. [0010 — Postprocess chain backend policy](0010-postprocess-chain-backend-policy.md)
 11. [0011 — Debug-view inspection table and visualization mode mapping](0011-debug-view-inspection-table.md)
+12. [0012 — ImGui overlay submission and `Pass.Present` finalization](0012-imgui-overlay-and-present-finalization.md)
 
 ## Conventions
 
