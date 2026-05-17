@@ -8,6 +8,22 @@ Use this checklist before commit and PR creation.
 - [ ] Owning subsystem/layer is identified.
 - [ ] Mechanical moves and semantic edits are not mixed.
 
+## Maturity and closure
+
+- [ ] For tasks closing to `tasks/done/`: the reached maturity level is
+      named (see [`task-maturity.md`](task-maturity.md): `Scaffolded`,
+      `CPUContracted`, `Operational`, `ParityProven`, `Retired`). State it
+      in the task `Status` block, retirement commit message, or completion
+      summary — pick one and use it consistently.
+- [ ] If the closing task body uses "scaffold", "stub", "fail-closed", or
+      "minimal" language, it either names a follow-up task ID for the next
+      maturity level or records an explicit `Non-goals` line that pins the
+      scaffold as the intended endpoint.
+- [ ] For rendering, Vulkan, asset ingest, hot reload, pass command bodies,
+      runtime composition, and legacy retirement tasks: an `Operational`
+      claim cites the backend-labeled or integration-labeled run that
+      actually executed (not just CPU contract coverage).
+
 ## Architecture and layering
 
 - [ ] Dependency flow follows `AGENTS.md` invariants.

@@ -44,6 +44,29 @@ sections so task status is visible at a glance. Completed task files under
 `tasks/done/` should not contain unchecked actionable todos; unresolved work
 belongs in a follow-up task.
 
+## Optional `## Maturity` field
+
+For tasks where the stop-state is ambiguous — typically rendering, Vulkan,
+asset ingest, hot reload, pass command bodies, runtime composition, and
+legacy retirement — an optional `## Maturity` section makes the intended
+endpoint explicit. The section is not required and the validator does not
+enforce it, but reviewers should ask for it when a task could plausibly stop
+at multiple levels.
+
+Suggested shape:
+
+```md
+## Maturity
+
+- Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere
+  else.
+- Slice 1 closes `Scaffolded → CPUContracted`; `Operational` is owned by
+  the follow-up <TASK-ID>.
+```
+
+See [`task-maturity.md`](task-maturity.md) for the taxonomy and the
+`Scaffolded` closure rule that applies even when the field is absent.
+
 ## Example
 
 ```md

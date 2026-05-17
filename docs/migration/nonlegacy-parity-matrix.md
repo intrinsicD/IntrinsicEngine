@@ -18,6 +18,11 @@ claim that legacy retirement is complete.
 - “Missing behavior” means missing or not yet proven by non-legacy contracts,
   tests, and runtime wiring. Some behavior may exist but still lacks a retirement
   gate strong enough to remove the legacy module.
+- Maturity vocabulary used by the readiness cells below
+  (`Scaffolded`, `CPUContracted`, `Operational`, `ParityProven`, `Retired`)
+  is defined in [`docs/agent/task-maturity.md`](../agent/task-maturity.md).
+  Older `blocked` / `partial` / `done` wording is preserved where the row
+  state mixes maturity with a gating decision.
 
 ## Matrix
 
@@ -75,15 +80,23 @@ Targets in this `GRAPHICS-020` table that are blocked on the GRAPHICS-033 +
 GRAPHICS-070..076 + GRAPHICS-081 chain are deliberately not on `ARCH-004`'s
 initial sequencing list; they are added when their upstream gates retire.
 
+The `Readiness` column uses the maturity taxonomy defined in
+[`docs/agent/task-maturity.md`](../agent/task-maturity.md):
+`Scaffolded`, `CPUContracted`, `Operational`, `ParityProven`, `Retired`.
+The older `blocked` / `partial` / `done` triplet is preserved where the
+readiness state mixes maturity with a gating decision (for example, a row
+that is `CPUContracted` for the promoted seam but `blocked` overall because
+parity evidence is not yet available).
+
 | Legacy family | Promoted owner / gate summary | Readiness |
 | --- | --- | --- |
-| Graphics component/data-authority modules and lifecycle/GPU-scene sync systems | Split across CPU-only ECS/geometry data, runtime extraction sidecars, and graphics renderer packets/resources; gated by `GRAPHICS-016`, `GRAPHICS-028`, `ASSETIO-001`, `GEOIO-002`, and lifecycle/dirty-domain tests. | blocked |
-| GPU scene/world/global resources and retained draw state | Promoted `GpuWorld`, culling, material/light/selection, and asset residency gates exist; `GRAPHICS-028` records the runtime-owned residency bridge contract, while full asset/geometry renderable implementation parity remains downstream. | partial |
-| Framegraph/render-driver/pipeline/path and pass modules | Promoted renderer/framegraph/pass contracts are covered by `GRAPHICS-002` through `GRAPHICS-014`, `GRAPHICS-022`, and clarification tasks; final deletion still requires import scans and backend parity evidence. | partial |
-| Materials, shader/pipeline registries, and hot reload | Base material/pipeline contracts are done; retirement waits on `GRAPHICS-023` hot-reload ownership and tests. | blocked |
-| Import/export/model/texture IO | Owner split recorded by `GRAPHICS-019`; implementation gates are `ASSETIO-001`, `GEOIO-002`, and `GRAPHICS-028`. | blocked |
-| Visualization/debug/camera/gizmo/overlay/presentation adjacency | Packet/producer ownership is recorded by `GRAPHICS-010Q`, `GRAPHICS-011Q`, `GRAPHICS-013CQ`, `GRAPHICS-014Q`, `GRAPHICS-017Q`, and `GRAPHICS-024`; runtime/editor/app parity and final import scans remain. | partial |
-| Legacy RHI/Vulkan/CUDA/runtime render orchestration | RHI/Vulkan CPU/null and opt-in GPU gates are split through `GRAPHICS-006`, `GRAPHICS-015`, `GRAPHICS-018*`, and `GRAPHICS-026`; runtime orchestration gates include `GRAPHICS-016`, `GRAPHICS-018R`, and `RORG-031-runtime-composition`. CUDA remains an explicit keep/remove decision for the final deletion slice. | partial/open |
+| Graphics component/data-authority modules and lifecycle/GPU-scene sync systems | Split across CPU-only ECS/geometry data, runtime extraction sidecars, and graphics renderer packets/resources; gated by `GRAPHICS-016`, `GRAPHICS-028`, `ASSETIO-001`, `GEOIO-002`, and lifecycle/dirty-domain tests. | `Scaffolded` (promoted seams exist; `CPUContracted` blocked on dirty-domain and residency tests). |
+| GPU scene/world/global resources and retained draw state | Promoted `GpuWorld`, culling, material/light/selection, and asset residency gates exist; `GRAPHICS-028` records the runtime-owned residency bridge contract, while full asset/geometry renderable implementation parity remains downstream. | `CPUContracted` (promoted seams covered by null-backend tests; `Operational` blocked on `ASSETIO-001`/`GEOIO-002` residency implementation). |
+| Framegraph/render-driver/pipeline/path and pass modules | Promoted renderer/framegraph/pass contracts are covered by `GRAPHICS-002` through `GRAPHICS-014`, `GRAPHICS-022`, and clarification tasks; final deletion still requires import scans and backend parity evidence. | `CPUContracted` (contract tests cover graph/pass/barrier behavior; `Operational` blocked on `GRAPHICS-070..076` default-recipe pass bodies; `ParityProven` blocked on import scans). |
+| Materials, shader/pipeline registries, and hot reload | Base material/pipeline contracts are done; retirement waits on `GRAPHICS-023` hot-reload ownership and tests. | `Scaffolded` (base contracts covered; hot-reload `CPUContracted` blocked on `GRAPHICS-023`). |
+| Import/export/model/texture IO | Owner split recorded by `GRAPHICS-019`; implementation gates are `ASSETIO-001`, `GEOIO-002`, and `GRAPHICS-028`. | `Scaffolded` (ownership split decided; implementation `CPUContracted` blocked on `GEOIO-002` parity slices and `ASSETIO-001`). |
+| Visualization/debug/camera/gizmo/overlay/presentation adjacency | Packet/producer ownership is recorded by `GRAPHICS-010Q`, `GRAPHICS-011Q`, `GRAPHICS-013CQ`, `GRAPHICS-014Q`, `GRAPHICS-017Q`, and `GRAPHICS-024`; runtime/editor/app parity and final import scans remain. | `CPUContracted` for packet contracts; `Operational` and `ParityProven` blocked on runtime/editor/app producer implementation and import scans. |
+| Legacy RHI/Vulkan/CUDA/runtime render orchestration | RHI/Vulkan CPU/null and opt-in GPU gates are split through `GRAPHICS-006`, `GRAPHICS-015`, `GRAPHICS-018*`, and `GRAPHICS-026`; runtime orchestration gates include `GRAPHICS-016`, `GRAPHICS-018R`, and `RORG-031-runtime-composition`. CUDA remains an explicit keep/remove decision for the final deletion slice. | `CPUContracted` (null-backend coverage); Vulkan `Operational` gated on `GRAPHICS-033D`'s `gpu;vulkan` smoke flipping `IsOperational()` to `true`; CUDA keep/remove decision is an open `Non-goal`-or-follow-up question. |
 
 ## Overlay/presentation/editor handoff inventory (`GRAPHICS-024` Slice A)
 
