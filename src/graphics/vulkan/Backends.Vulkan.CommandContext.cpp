@@ -650,4 +650,33 @@ void VulkanCommandContext::CopyBufferToTexture(RHI::BufferHandle src, uint64_t s
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
+void VulkanCommandContext::CopyTextureToBuffer(RHI::TextureHandle src,
+                                                RHI::TextureLayout srcLayout,
+                                                uint32_t mipLevel, uint32_t arrayLayer,
+                                                RHI::BufferHandle dst,
+                                                uint64_t dstOffset)
+{
+    if (!CanRecord("[VulkanCommandContext] CopyTextureToBuffer skipped; command context is not recording"))
+        return;
+    if (!m_Buffers || !m_Images)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Warn("[VulkanCommandContext] CopyTextureToBuffer skipped; buffer or image pool is unavailable");
+        return;
+    }
+
+    const auto* s = m_Images->GetIfValid(src);
+    const auto* d = m_Buffers->GetIfValid(dst);
+    if (!s || !d || s->Image == VK_NULL_HANDLE || d->Buffer == VK_NULL_HANDLE) return;
+    if (mipLevel >= s->MipLevels || arrayLayer >= s->ArrayLayers) return;
+
+    VkBufferImageCopy region{};
+    region.bufferOffset     = dstOffset;
+    region.imageSubresource = {AspectFromFormat(s->Format), mipLevel, arrayLayer, 1};
+    region.imageExtent      = {std::max(1u, s->Width >> mipLevel),
+                                std::max(1u, s->Height >> mipLevel), 1};
+    vkCmdCopyImageToBuffer(m_Cmd, s->Image, ToVkImageLayout(srcLayout),
+                           d->Buffer, 1, &region);
+}
+
 } // namespace Extrinsic::Backends::Vulkan

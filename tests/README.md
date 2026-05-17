@@ -57,9 +57,16 @@ reusable `tests/support/MinimalTriangleReadback.hpp` and
 `GRAPHICS-032D` recipe-selector fixture and the canonical `GRAPHICS-076`/
 `GRAPHICS-081` default-recipe smoke can reuse the sample-point table,
 expected-color quantization, and fallback-counter stability contract
-byte-identical. CPU-only invariants of those helpers run inside the default
-gate via `IntrinsicGraphicsContractCpuTests`
-(`MinimalTriangleReadbackHarness`, `OperationalCounterStability`).
+byte-identical. The four-sample pixel assertion runs as a live
+`EXPECT_TRUE(Readback::ChannelsWithinTolerance(...))` site on a Vulkan-capable
+host: the renderer's opt-in `SetMinimalDebugBackbufferReadbackBuffer(handle)`
+hook + the RHI `CopyTextureToBuffer`/`ReadBuffer` seam drain the backbuffer
+into a host-visible buffer the smoke owns through `BufferManager::Create`. CPU
+invariants of those helpers and the renderer wiring (default-disabled state,
+configured-handle triplet against MockDevice, default-recipe ignore path,
+non-operational skip path) run inside the default gate via
+`IntrinsicGraphicsContractCpuTests` (`MinimalTriangleReadbackHarness`,
+`OperationalCounterStability`, `MinimalDebugBackbufferReadbackContract`).
 
 ```bash
 ctest --test-dir build/ci --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120

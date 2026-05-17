@@ -2997,6 +2997,54 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
     vmaDestroyBuffer(m_Vma, stagingBuf, stagingAlloc);
 }
 
+// GRAPHICS-033D — host-visible buffer drain used by the opt-in
+// `gpu;vulkan` MinimalDebug visible-triangle smoke. Mirrors the host-visible
+// fast path of WriteBuffer in reverse: WaitIdle so any prior
+// `vkCmdCopyImageToBuffer` recorded into the in-flight command buffer has
+// finished, then memcpy out of the persistently-mapped pointer. Device-local
+// buffers are not supported by this slice (would need a staging round-trip via
+// a temporary host-visible buffer + EndOneShot); we log once and return so
+// callers see the fallback behaviour rather than silent garbage. The smoke
+// drives the only known caller and supplies a HostVisible buffer.
+void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
+                               uint64_t size, uint64_t offset)
+{
+    if (!HasLiveOperationalPrerequisites())
+        return;
+
+    if (!data || size == 0) return;
+    VulkanBuffer* buf = m_Buffers.GetIfValid(handle);
+    if (!buf) return;
+    if (offset > buf->SizeBytes || size > buf->SizeBytes - offset) return;
+
+    if (!buf->HostVisible)
+    {
+        Core::Log::Warn("[VulkanDevice::ReadBuffer] device-local buffer readback is not supported in this slice; skipping");
+        return;
+    }
+
+    assert(buf->MappedPtr && "HostVisible buffer has null MappedPtr");
+
+    // WaitIdle bounds the readback to GPU-completed bytes. The in-flight
+    // command buffer that wrote into this buffer is submitted by EndFrame and
+    // signals through the present semaphore chain; vkDeviceWaitIdle is the
+    // most defensive synchronisation primitive available without exposing
+    // per-frame fences here. The smoke calls ReadBuffer once after Run() so
+    // the throughput cost is irrelevant.
+    if (m_Device != VK_NULL_HANDLE)
+    {
+        std::scoped_lock lock{m_QueueMutex};
+        (void)vkDeviceWaitIdle(m_Device);
+    }
+
+    // Note: same VMA caveat as WriteBuffer's host-visible fast path — on
+    // discrete GPUs that lack HOST_COHERENT we would need
+    // `vmaInvalidateAllocation(m_Vma, buf->Allocation, offset, size)` to
+    // guarantee the host sees GPU writes. The smoke runs on the CI host
+    // matrix which selects HOST_COHERENT through VMA_MEMORY_USAGE_CPU_TO_GPU.
+    std::memcpy(data, static_cast<const char*>(buf->MappedPtr) + offset, size);
+}
+
 uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const
 {
     if (!HasLiveOperationalPrerequisites())

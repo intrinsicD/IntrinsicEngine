@@ -391,12 +391,21 @@ consumes the reusable `tests/support/MinimalTriangleReadback.hpp` and
 `tests/support/OperationalCounterStability.hpp` helpers so the sibling
 `GRAPHICS-032D` recipe-selector fixture and the canonical `GRAPHICS-076` /
 `GRAPHICS-081` default-recipe smoke can reuse the four-sample-point table and
-fallback-counter stability contract byte-identical. The pixel readback bytes
-that turn the four-sample expectation into a live assertion are tracked as the
-remaining bullet on
-[`tasks/active/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md`](../../../tasks/active/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md);
-CPU-only invariants of the helpers already run in the default gate via
-`IntrinsicGraphicsContractCpuTests`.
+fallback-counter stability contract byte-identical. The backbuffer-to-host
+readback seam is provided by `RHI::ICommandContext::CopyTextureToBuffer`
+(Vulkan: `vkCmdCopyImageToBuffer`) plus `RHI::IDevice::ReadBuffer` (Vulkan:
+`vkDeviceWaitIdle` + `memcpy` from a HostVisible buffer's persistent map). The
+renderer exposes an opt-in `IRenderer::SetMinimalDebugBackbufferReadbackBuffer`
+hook that, when armed under `FrameRecipeKind::MinimalDebug` on an operational
+device, inserts a `Present → TransferSrc → CopyTextureToBuffer → Present`
+triplet after the executor's final barriers and before the command buffer
+closes; the layout sequencing leaves the backbuffer in `Present` so the
+device's submit + `vkQueuePresentKHR` chain is unchanged. The per-frame
+diagnostic counter `RenderGraphFrameStats::MinimalDebugBackbufferReadbackCopyCount`
+increments per readback frame so the contract cannot silently regress. CPU
+invariants of the helpers and the renderer wiring run in the default gate via
+`IntrinsicGraphicsContractCpuTests`
+(`Test.MinimalTriangleReadbackHarness.cpp` and `Test.MinimalDebugBackbufferReadback.cpp`).
 
 Ordered gate checklist:
 
