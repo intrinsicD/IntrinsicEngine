@@ -66,10 +66,10 @@ owner, required parity evidence, current readiness state, and final removal
 follow-up. No source deletion is authorized by this matrix alone.
 
 The retirement *program* (which subtree gets deleted first, second, third, and
-under what prerequisite checklist) is driven by
-[`ARCH-004`](../../tasks/backlog/architecture/ARCH-004-legacy-retirement-first-deletion-target.md);
-that task pins concrete deletion targets, while individual deletions are
-executed by `LEGACY-NNN` tasks (first one:
+under what prerequisite checklist) was pinned by
+[`ARCH-004`](../../tasks/done/ARCH-004-legacy-retirement-first-deletion-target.md)
+(done 2026-05-17); that task fixed the first three concrete deletion targets,
+while individual deletions are executed by `LEGACY-NNN` tasks (first one:
 [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)).
 Targets in this `GRAPHICS-020` table that are blocked on the GRAPHICS-033 +
 GRAPHICS-070..076 + GRAPHICS-081 chain are deliberately not on `ARCH-004`'s

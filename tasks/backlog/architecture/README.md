@@ -24,11 +24,13 @@ map.
   ADR-0004 through ADR-0018), slice 3 (no-op; the only migration-inventory
   row cross-linked to the existing parity matrix via ADR-0006), and slice 4
   (final tightening + Pointers) all landed.
-- [ARCH-004 — Pin first legacy-deletion target and sequencing](ARCH-004-legacy-retirement-first-deletion-target.md):
-  picks the first `src/legacy/<area>/` subtree to actually delete (recommendation:
-  `src/legacy/Interface/`), records second and third targets in dependency order,
-  and adds a Sequencing section to `docs/migration/legacy-retirement.md` so
-  retirement becomes a tracked program rather than an indefinite "blocked" row.
+- [ARCH-004 — Pin first legacy-deletion target and sequencing](../../done/ARCH-004-legacy-retirement-first-deletion-target.md)
+  (done 2026-05-17): pinned `src/legacy/Interface/` as the first deletion
+  target, recorded `src/legacy/Asset/` and `src/legacy/EditorUI/` as the
+  second and third, and added the Sequencing table to
+  [`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md)
+  so retirement is a tracked program rather than an indefinite "blocked"
+  row. The executing task is `LEGACY-001` below.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
