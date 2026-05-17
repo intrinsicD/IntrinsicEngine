@@ -1514,6 +1514,237 @@ TEST(GeometryIO_MeshIO, WritesOBJTriangleWithTexcoordsAndNormals)
     }
 }
 
+TEST(GeometryIO_MeshIO, WritesOBJTriangleWithVertexColors)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec4, 3> colors{
+        glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        colorProperty[i] = colors[i];
+    }
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("v 1.000000 0.000000 0.000000 0.000000 1.000000 0.000000\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("v 0.000000 1.000000 0.000000 0.000000 0.000000 1.000000\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("f 1 2 3\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedColors = loaded->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(loadedColors.IsValid());
+    ASSERT_EQ(loadedColors.Vector().size(), 3u);
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        EXPECT_EQ(loadedColors[i], colors[i]);
+    }
+}
+
+TEST(GeometryIO_MeshIO, WritesOBJTriangleWithColorsAndNormals)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    const std::array<glm::vec4, 3> colors{
+        glm::vec4{0.25f, 0.50f, 0.75f, 1.0f},
+        glm::vec4{0.10f, 0.20f, 0.30f, 1.0f},
+        glm::vec4{0.90f, 0.80f, 0.70f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, normals);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        colorProperty[i] = colors[i];
+    }
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000 0.250000 0.500000 0.750000\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("vn 0.000000 0.000000 1.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("f 1//1 2//2 3//3\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedColors = loaded->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(loadedColors.IsValid());
+    ASSERT_EQ(loadedColors.Vector().size(), 3u);
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        EXPECT_EQ(loadedColors[i], colors[i]);
+    }
+
+    auto loadedNormals = loaded->Vertices.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(loadedNormals.IsValid());
+    ASSERT_EQ(loadedNormals.Vector().size(), 3u);
+    for (std::size_t i = 0; i < normals.size(); ++i)
+    {
+        EXPECT_EQ(loadedNormals[i], normals[i]);
+    }
+}
+
+TEST(GeometryIO_MeshIO, WritesOBJTriangleWithColorsAndTexcoords)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.0f, 0.0f},
+        glm::vec2{1.0f, 0.0f},
+        glm::vec2{0.0f, 1.0f},
+    };
+    const std::array<glm::vec4, 3> colors{
+        glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+        glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, {}, texcoords);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        colorProperty[i] = colors[i];
+    }
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000 1.000000 0.000000 0.000000\n"),
+              std::string::npos);
+    EXPECT_NE(contents.find("vt 0.000000 0.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("f 1/1 2/2 3/3\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+
+    auto loadedColors = loaded->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(loadedColors.IsValid());
+    ASSERT_EQ(loadedColors.Vector().size(), 3u);
+    for (std::size_t i = 0; i < colors.size(); ++i)
+    {
+        EXPECT_EQ(loadedColors[i], colors[i]);
+    }
+
+    auto loadedTexcoords = loaded->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(loadedTexcoords.IsValid());
+    ASSERT_EQ(loadedTexcoords.Vector().size(), 3u);
+    for (std::size_t i = 0; i < texcoords.size(); ++i)
+    {
+        EXPECT_EQ(loadedTexcoords[i], texcoords[i]);
+    }
+}
+
+TEST(GeometryIO_MeshIO, WriteOBJOmitsColorsWhenAbsent)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 1.000000 0.000000 0.000000\n"), std::string::npos);
+    EXPECT_NE(contents.find("v 0.000000 1.000000 0.000000\n"), std::string::npos);
+
+    const auto loaded = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(loaded.has_value());
+    ExpectTriangleMeshProperties(*loaded);
+    EXPECT_FALSE(loaded->Vertices.Get<glm::vec4>("v:color").IsValid());
+}
+
+TEST(GeometryIO_MeshIO, WriteOBJOmitsColorsWhenMismatchedCount)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    colorProperty[0] = glm::vec4(0.25f, 0.50f, 0.75f, 1.0f);
+    colorProperty.Vector().push_back(glm::vec4(0.0f));
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::Success);
+
+    const std::string contents = ReadFileContents(file.Path);
+    EXPECT_NE(contents.find("v 0.000000 0.000000 0.000000\n"), std::string::npos);
+    EXPECT_EQ(contents.find("v 0.000000 0.000000 0.000000 "), std::string::npos);
+}
+
+TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexColor)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    const float huge = std::numeric_limits<float>::max();
+    colorProperty[0] = glm::vec4(huge, huge, huge, 1.0f);
+    colorProperty[1] = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+    colorProperty[2] = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+}
+
 TEST(GeometryIO_MeshIO, WriteOBJOmitsTexcoordsWhenAbsent)
 {
     Geometry::MeshIO::MeshIOResult mesh;
