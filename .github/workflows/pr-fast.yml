@@ -37,5 +37,16 @@ jobs:
       - name: Validate docs links (warning mode)
         run: python3 tools/docs/check_doc_links.py --root .
 
-      - name: Validate layering (strict mode)
-        run: python3 tools/repo/check_layering.py --root src --strict
+      - name: Validate layering (strict mode, expected-failure during WORKSHOP-002 window)
+        # WORKSHOP-001 made the layering checker module- and CMake-aware,
+        # which exposes the pre-existing graphics_rhi -> Extrinsic.Platform.Window
+        # edge (plus three sibling graphics-layer imports and the matching
+        # CMake link edge). WORKSHOP-002 removes that set; until it lands,
+        # the strict run is expected to fail with exactly those violations.
+        # The gate fails if the checker reports anything beyond the expected
+        # WORKSHOP-002 set, so a regression that adds a new violation alongside
+        # the known ones cannot ride along. Revert this step to a direct
+        # `python3 tools/repo/check_layering.py --root src --strict` invocation
+        # and delete `tools/ci/check_layering_workshop_002_gate.py` once
+        # WORKSHOP-002 lands.
+        run: python3 tools/ci/check_layering_workshop_002_gate.py

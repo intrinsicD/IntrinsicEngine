@@ -8,6 +8,11 @@ Use this checklist for architecture-impacting changes (code, build, docs, CI, an
 - [ ] New dependency edges are justified and align with `AGENTS.md` invariants.
 - [ ] No lower layer imports higher layers.
 - [ ] `runtime` remains composition root; lower layers remain reusable.
+- [ ] `tools/repo/check_layering.py --root src --strict` covers both C++23
+      module imports (`import Extrinsic.<Layer>.*;`) and CMake
+      `target_link_libraries(...)` edges; new dependencies are visible to
+      the strict run and either pass or carry a tracked allowlist entry
+      with `task`/`expires` metadata.
 
 ## Lifetime and resource ownership
 

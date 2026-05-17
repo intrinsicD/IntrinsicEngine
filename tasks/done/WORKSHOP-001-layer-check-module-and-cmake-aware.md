@@ -1,5 +1,34 @@
 # WORKSHOP-001 — Make layer enforcement module- and CMake-aware
 
+## Status
+
+- Status: done.
+- Completion date: 2026-05-17.
+- Branch: `claude/backlog-task-agent-prompt-VqqlY`.
+- Commit reference: see the retirement commit on `claude/backlog-task-agent-prompt-VqqlY`.
+- Maturity: `Operational` — the strict run now reports C++23 module
+  imports and CMake link edges in addition to ``#include`` directives.
+- Follow-up: WORKSHOP-002 removes the surfaced
+  `graphics_rhi -> Extrinsic.Platform.Window` edge (plus the parallel
+  `graphics/renderer/Backends/Null/Backends.Null.cpp` and
+  `graphics/vulkan/Backends.Vulkan.Device.cppm` imports that this task
+  exposed) and the matching `target_link_libraries(... ExtrinsicPlatform)`
+  edge in `src/graphics/rhi/CMakeLists.txt`. Until then, the CI
+  workflows route the strict layer check through
+  `tools/ci/check_layering_workshop_002_gate.py`, which exits 0 only
+  when the observed violation set is a subset of the four expected
+  WORKSHOP-002 entries — a regression that adds any new violation
+  alongside the known ones fails CI. Once WORKSHOP-002 lands, the gate
+  script and its unit tests
+  (`tests/regression/tooling/Test.CheckLayeringWorkshop002Gate.py`) are
+  deleted and the workflow steps revert to the unguarded
+  `python3 tools/repo/check_layering.py --root src --strict` invocation.
+- Verification step run: see "Verification" below; fixture-only run +
+  regression test suite both pass; the strict `src/` run fails with the
+  expected `Extrinsic.Platform.Window` violation (plus the three
+  newly-surfaced sibling imports and the CMake link edge), satisfying the
+  task's expected-failure acceptance criterion.
+
 ## Goal
 - Make `tools/repo/check_layering.py --strict` catch promoted-layer dependency violations in both C++23 module imports and CMake target links, so the written architecture contract cannot silently drift away from the actual build graph.
 
@@ -16,7 +45,7 @@
 - This task should intentionally make that violation visible before WORKSHOP-002 fixes it.
 
 ## Required changes
-- [ ] Extend `tools/repo/check_layering.py` target-layer detection to recognize C++23 module imports using promoted module prefixes:
+- [x] Extend `tools/repo/check_layering.py` target-layer detection to recognize C++23 module imports using promoted module prefixes:
   - `Extrinsic.Core.*` -> `core`
   - `Extrinsic.Geometry.*` and `Geometry.*` promoted modules -> `geometry`
   - `Extrinsic.Asset.*` -> `assets`
@@ -26,8 +55,8 @@
   - `Extrinsic.Backends.Vulkan*` -> `graphics`
   - `Extrinsic.Platform.*` -> `platform`
   - `Extrinsic.Runtime.*` -> `runtime`
-- [ ] Add CMake target dependency scanning for promoted targets in `target_link_libraries(...)` calls.
-- [ ] Map promoted CMake targets to layers, at minimum:
+- [x] Add CMake target dependency scanning for promoted targets in `target_link_libraries(...)` calls.
+- [x] Map promoted CMake targets to layers, at minimum:
   - `ExtrinsicCore`, `IntrinsicCore` -> `core`
   - `IntrinsicGeometry` -> `geometry`
   - `ExtrinsicAssets` -> `assets`
@@ -36,37 +65,37 @@
   - `ExtrinsicGraphics`, `ExtrinsicGraphicsAssets`, `ExtrinsicGraphicsRenderGraph`, `ExtrinsicBackendsVulkan` -> `graphics`
   - `ExtrinsicPlatform` -> `platform`
   - `ExtrinsicRuntime`, `IntrinsicRuntime` -> `runtime`
-- [ ] Make the checker report source file path, line number, source layer, target layer, reference, and whether the violation came from a C++ import/include or a CMake link edge.
-- [ ] Add a small fixture directory under `tests/contract/repo/layering_fixtures/` or another repo-appropriate test fixture location.
-- [ ] Add regression fixtures proving these fail:
+- [x] Make the checker report source file path, line number, source layer, target layer, reference, and whether the violation came from a C++ import/include or a CMake link edge.
+- [x] Add a small fixture directory under `tests/contract/repo/layering_fixtures/` or another repo-appropriate test fixture location.
+- [x] Add regression fixtures proving these fail:
   - `graphics/rhi` importing `Extrinsic.Platform.Window`
   - `graphics/rhi` linking `ExtrinsicPlatform`
   - `graphics` importing `Extrinsic.ECS.*`
   - `platform` importing `Extrinsic.Graphics.*`
   - `core` importing anything promoted above core
-- [ ] Add regression fixtures proving these pass:
+- [x] Add regression fixtures proving these pass:
   - `runtime` importing `Extrinsic.ECS.*`, `Extrinsic.Graphics.*`, `Extrinsic.RHI.*`, `Extrinsic.Platform.*`, and `Extrinsic.Asset.*`
   - `graphics` importing `Extrinsic.RHI.*`, `Extrinsic.Asset.Registry`, `Extrinsic.Core.*`, and allowed geometry GPU-view/value modules
-- [ ] Ensure allowlist handling still works and still requires task/expiry/reason metadata.
-- [ ] Update failure text so agents know whether to fix by moving the dependency downward, introducing a seam, or adding a temporary tracked allowlist entry.
+- [x] Ensure allowlist handling still works and still requires task/expiry/reason metadata.
+- [x] Update failure text so agents know whether to fix by moving the dependency downward, introducing a seam, or adding a temporary tracked allowlist entry.
 
 ## Tests
-- [ ] Add or update a repo-tooling test for `check_layering.py` fixture cases.
-- [ ] Run the updated checker against fixtures and assert expected pass/fail behavior.
-- [ ] Run the updated checker against the real `src/` tree and confirm it reports the known `graphics/rhi -> platform` violation before WORKSHOP-002 lands.
-- [ ] Keep existing task-policy and docs-link checks passing.
+- [x] Add or update a repo-tooling test for `check_layering.py` fixture cases.
+- [x] Run the updated checker against fixtures and assert expected pass/fail behavior.
+- [x] Run the updated checker against the real `src/` tree and confirm it reports the known `graphics/rhi -> platform` violation before WORKSHOP-002 lands.
+- [x] Keep existing task-policy and docs-link checks passing.
 
 ## Docs
-- [ ] Update `docs/agent/architecture-review-checklist.md` to state that layer checks cover both C++23 imports and CMake target links.
-- [ ] Update `docs/agent/review-checklist.md` if needed so agents treat CMake link edges as architecture edges.
-- [ ] Update any `tools/repo/check_layering.py` usage docs or comments to mention module-prefix and CMake-edge coverage.
+- [x] Update `docs/agent/architecture-review-checklist.md` to state that layer checks cover both C++23 imports and CMake target links.
+- [x] Update `docs/agent/review-checklist.md` if needed so agents treat CMake link edges as architecture edges.
+- [x] Update any `tools/repo/check_layering.py` usage docs or comments to mention module-prefix and CMake-edge coverage.
 
 ## Acceptance criteria
-- [ ] `tools/repo/check_layering.py --root src --strict` fails on the current RHI/platform dependency until WORKSHOP-002 fixes it; the task's verification block wraps this call as an expected-failure check that asserts both non-zero exit and the specific `Extrinsic.Platform.Window` violation message.
-- [ ] The checker catches C++ module import violations involving `Extrinsic.*` module names.
-- [ ] The checker catches CMake `target_link_libraries(...)` violations between promoted targets.
-- [ ] Fixture tests prove both positive and negative cases.
-- [ ] No architecture rule in `/AGENTS.md` is weakened.
+- [x] `tools/repo/check_layering.py --root src --strict` fails on the current RHI/platform dependency until WORKSHOP-002 fixes it; the task's verification block wraps this call as an expected-failure check that asserts both non-zero exit and the specific `Extrinsic.Platform.Window` violation message.
+- [x] The checker catches C++ module import violations involving `Extrinsic.*` module names.
+- [x] The checker catches CMake `target_link_libraries(...)` violations between promoted targets.
+- [x] Fixture tests prove both positive and negative cases.
+- [x] No architecture rule in `/AGENTS.md` is weakened.
 
 ## Verification
 
@@ -90,9 +119,11 @@ out=$(python3 tools/repo/check_layering.py --root src --strict 2>&1); status=$?;
   }
 
 # Fixture-only strict run must pass: positive fixtures clean, negative
-# fixtures excluded or otherwise scoped so the checker exits zero on the
-# fixture root alone.
-python3 tools/repo/check_layering.py --root tests/contract/repo/layering_fixtures --strict
+# fixtures excluded so the checker exits zero on the fixture root alone.
+# Per-case negative fixtures are exercised by Test.CheckLayering.py.
+python3 tools/repo/check_layering.py \
+  --root tests/contract/repo/layering_fixtures --strict --exclude 'negative_*'
+python3 tests/regression/tooling/Test.CheckLayering.py
 
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
