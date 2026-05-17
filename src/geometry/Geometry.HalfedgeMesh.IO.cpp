@@ -1683,7 +1683,7 @@ namespace Geometry::MeshIO
                                         static_cast<double>(p.x),
                                         static_cast<double>(p.y),
                                         static_cast<double>(p.z));
-            if (written <= 0)
+            if (written <= 0 || static_cast<std::size_t>(written) >= sizeof(buffer))
             {
                 return MeshIOWriteStatus::FileWriteError;
             }
@@ -1696,7 +1696,7 @@ namespace Geometry::MeshIO
                                         static_cast<double>(c.r),
                                         static_cast<double>(c.g),
                                         static_cast<double>(c.b));
-                if (written <= 0)
+                if (written <= 0 || static_cast<std::size_t>(written) >= sizeof(buffer))
                 {
                     return MeshIOWriteStatus::FileWriteError;
                 }

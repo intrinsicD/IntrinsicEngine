@@ -1724,6 +1724,27 @@ TEST(GeometryIO_MeshIO, WriteOBJOmitsColorsWhenMismatchedCount)
     EXPECT_EQ(contents.find("v 0.000000 0.000000 0.000000 "), std::string::npos);
 }
 
+TEST(GeometryIO_MeshIO, WriteOBJReportsFailureOnUnformattableVertexColor)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(0.0f));
+    const float huge = std::numeric_limits<float>::max();
+    colorProperty[0] = glm::vec4(huge, huge, huge, 1.0f);
+    colorProperty[1] = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+    colorProperty[2] = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+
+    TempFile file(".obj", "");
+    const auto status = Geometry::MeshIO::WriteOBJ(file.Path, mesh);
+    EXPECT_EQ(status, Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+}
+
 TEST(GeometryIO_MeshIO, WriteOBJOmitsTexcoordsWhenAbsent)
 {
     Geometry::MeshIO::MeshIOResult mesh;
