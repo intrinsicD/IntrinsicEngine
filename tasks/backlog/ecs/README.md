@@ -16,7 +16,7 @@ map.
 - [HARDEN-062 — Harden ECS layering and component boundaries](../../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md) (done).
 - [HARDEN-063 — Define promoted ECS event and command seams](../../active/HARDEN-063-ecs-events-and-command-seams.md) (active; slice 1 in flight on `claude/setup-agentic-workflow-IdWgV`).
 - [HARDEN-064 — Define ECS collider and rigid-body authoring contracts](HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
-- [HARDEN-065 — Promote ECS geometry-source population and dirty-domain helpers](HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md).
+- [HARDEN-065 — Promote ECS geometry-source population and dirty-domain helpers](../../active/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md) (active; slice 1 in flight on `claude/setup-agentic-workflow-IY9XW`).
 - [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [HARDEN-067 — Add ECS world-bounds propagation system](../../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
 - [HARDEN-068 — Define ECS stable identity and scene metadata contract](HARDEN-068-ecs-stable-identity-and-scene-metadata.md).
