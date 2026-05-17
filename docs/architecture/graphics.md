@@ -140,24 +140,7 @@ See [ADR-0016 — Texture residency, fallback, and asset cache policy](../adr/00
   (`kDefaultMaterialSlotIndex`). Stale or invalid material handles resolve to
   that fallback and increment deterministic CPU-visible diagnostics.
 - Slot 0 is the `"Material.DefaultDebugSurface"` unlit material with deterministic non-black `BaseColorFactor = {0.55, 0.20, 0.85, 1.0}`, pre-populated by `MaterialSystem::Initialize()` and republished byte-identical by `RebuildGpuResources()`. See [ADR-0017 — Default debug surface material (slot 0)](../adr/0017-default-debug-surface-material.md) for the `MaterialTypeID` / shader pair (`assets/shaders/forward/default_debug_surface.vert/frag`) / vertex format / forward graphics pipeline state / `SurfaceOpaque` cull-bucket reuse details.
-- Per
-  [`GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
-  the missing-material fallback policy is graphics-owned at snapshot
-  consumption time: when the renderer copies a runtime-submitted snapshot
-  record whose resolved material slot is unset or out-of-range, it
-  substitutes `kDefaultMaterialSlotIndex` and increments one of three
-  additive `MaterialSystemDiagnostics` counters —
-  `MissingMaterialFallbackCount` (sentinel-unset authoring),
-  `InvalidMaterialSlotCount` (out-of-range/stale slot integers), and
-  `DefaultDebugSurfaceUses` (total per-frame uses of slot 0 after
-  substitution). The substitution lives at the same renderer span-copy step
-  that already drains `InvalidSnapshotRecordCount`, so runtime stays
-  agnostic of graphics-side slot identity. Runtime authoring may also
-  request the default explicitly through a sentinel "unset material"
-  description; the renderer-side substitution and counter increments are
-  identical. There are no silent-skip fallback paths, and
-  `MaterialSystemDiagnostics::FallbackSlotResolveCount` continues to track
-  the separate stale-handle resolution path inside `GetMaterialSlot()`.
+- See [ADR-0018 — Missing-material fallback substitution and diagnostics](../adr/0018-missing-material-fallback-substitution.md) for the graphics-owned snapshot-span-copy substitution policy that replaces unset / out-of-range material slots with `kDefaultMaterialSlotIndex`, the three additive `MaterialSystemDiagnostics` counters (`MissingMaterialFallbackCount`, `InvalidMaterialSlotCount`, `DefaultDebugSurfaceUses`), the no-silent-skip rule, and the separation from the handle-keyed `FallbackSlotResolveCount` path inside `GetMaterialSlot()`.
 - Follow-up debug-material variants (`Wireframe`, `Line`, `Point`, `Normals`,
   `UVs`, `Depth`, `InstanceId`) attach as additional `MaterialTypeDesc`
   registrations and additional well-known slot constants under the naming
