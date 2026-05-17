@@ -62,21 +62,48 @@
 - [ ] Update any `tools/repo/check_layering.py` usage docs or comments to mention module-prefix and CMake-edge coverage.
 
 ## Acceptance criteria
-- [ ] `tools/repo/check_layering.py --root src --strict` fails on the current RHI/platform dependency until WORKSHOP-002 fixes it.
+- [ ] `tools/repo/check_layering.py --root src --strict` fails on the current RHI/platform dependency until WORKSHOP-002 fixes it; the task's verification block wraps this call as an expected-failure check that asserts both non-zero exit and the specific `Extrinsic.Platform.Window` violation message.
 - [ ] The checker catches C++ module import violations involving `Extrinsic.*` module names.
 - [ ] The checker catches CMake `target_link_libraries(...)` violations between promoted targets.
 - [ ] Fixture tests prove both positive and negative cases.
 - [ ] No architecture rule in `/AGENTS.md` is weakened.
 
 ## Verification
+
+The strict layer check against the real `src/` tree is an **expected-failure**
+invocation for this task: WORKSHOP-001 must surface the known
+`graphics/rhi -> platform` violation, which only WORKSHOP-002 is allowed to
+fix. Wrap the strict run so the verification step succeeds when the checker
+exits non-zero and the expected violation is reported, and fails otherwise.
+
 ```bash
-python3 tools/repo/check_layering.py --root src --strict
+# Expected-failure check: succeeds iff the checker exits non-zero AND
+# reports the known graphics/rhi -> Extrinsic.Platform.Window violation.
+# The fixture-only run below must pass normally.
+out=$(python3 tools/repo/check_layering.py --root src --strict 2>&1); status=$?; \
+  printf '%s\n' "$out"; \
+  if [ $status -eq 0 ]; then \
+    echo "WORKSHOP-001: expected strict layer check to fail before WORKSHOP-002 lands" >&2; exit 1; \
+  fi; \
+  printf '%s\n' "$out" | grep -q 'Extrinsic\.Platform\.Window' || { \
+    echo "WORKSHOP-001: expected graphics/rhi -> Extrinsic.Platform.Window violation not reported" >&2; exit 1; \
+  }
+
+# Fixture-only strict run must pass: positive fixtures clean, negative
+# fixtures excluded or otherwise scoped so the checker exits zero on the
+# fixture root alone.
+python3 tools/repo/check_layering.py --root tests/contract/repo/layering_fixtures --strict
+
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -L "unit|contract" -LE "gpu|vulkan|slow|flaky-quarantine" --timeout 60 -j$(nproc)
 ```
+
+The unguarded strict run against `src/` is intentionally not part of this
+task's verification; it returns to the standard "must pass" form in
+WORKSHOP-002's verification block, where the fix lands.
 
 ## Forbidden changes
 - Do not edit `/AGENTS.md` to legalize current violations.
