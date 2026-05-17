@@ -14,6 +14,7 @@ Graphics is organized into explicit sublayers:
 - Graphics-owned GPU handles, slots, leases, and backend resource IDs must not be stored in canonical `src/ecs` components.
 - Runtime owns ECS-to-graphics extraction and any sidecar/cache mappings from ECS entities, asset IDs, or geometry source handles to graphics GPU handles.
 - Runtime extraction is implemented by `Extrinsic.Runtime.RenderExtraction`, which queries live ECS, maintains entity-to-graphics sidecars outside canonical ECS components, and submits `RuntimeRenderSnapshotBatch` records through `IRenderer::SubmitRuntimeSnapshots()`.
+- `graphics/rhi` is platform-neutral and depends on `core` only. `RHI::IDevice::Initialize` takes a `RHI::DeviceCreateDesc` (render config + framebuffer extent + opaque native window handle); runtime composition fills it from its live `Platform::IWindow` so neither RHI nor concrete backends (Vulkan, Null) import `Extrinsic.Platform.*`. Backends that need a native surface (Vulkan/GLFW) cast `NativeWindowHandle` to their platform-native type; backends that don't (Null) consume only `InitialFramebufferExtent`. See `ARCH-005` / `WORKSHOP-002` (2026-05-17) for the boundary fix that retired the previous `graphics/rhi -> platform` edge.
 - Backend code depends on RHI + allowed platform abstractions only.
 - Vulkan backend implementation files emit diagnostics through `Core::Log::*`; they must not bypass the project logger with direct `stderr` writes.
 

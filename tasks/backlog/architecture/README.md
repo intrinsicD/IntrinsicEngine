@@ -10,9 +10,14 @@ map.
 
 ## Tasks
 
-- [ARCH-005 — Resolve graphics/RHI platform layering violations](../../active/ARCH-005-resolve-graphics-platform-layering-violations.md)
-  (active): removes the current strict-layering failures where promoted
-  graphics/RHI targets import or link `platform` for window/surface inputs.
+- [ARCH-005 — Resolve graphics/RHI platform layering violations](../../done/ARCH-005-resolve-graphics-platform-layering-violations.md)
+  (done 2026-05-17): removed the four strict-layering failures where
+  promoted graphics/RHI targets imported or linked `platform` for
+  window/surface inputs. Landed jointly with [`WORKSHOP-002`](../../done/WORKSHOP-002-remove-platform-window-from-rhi.md);
+  `RHI::IDevice::Initialize` now takes a platform-neutral
+  `RHI::DeviceCreateDesc`, `ExtrinsicRHI` no longer links
+  `ExtrinsicPlatform`, and the strict layer check runs unguarded in
+  `pr-fast` / `ci-linux-clang`.
 - [RORG-031A — Architecture foundation backlog seed](RORG-031A-architecture-foundation.md):
   tracks architecture-doc normalization, layering-checker, docs-sync-checker,
   and module-inventory governance work.

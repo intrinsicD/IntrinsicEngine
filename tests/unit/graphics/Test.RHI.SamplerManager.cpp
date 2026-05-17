@@ -11,7 +11,6 @@ import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.Core.Config.Render;
-import Extrinsic.Platform.Window;
 
 #include "MockRHI.hpp"
 

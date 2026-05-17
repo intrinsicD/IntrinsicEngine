@@ -219,9 +219,18 @@ namespace Extrinsic::Runtime
         Core::Tasks::Scheduler::Initialize(m_Config.Simulation.WorkerThreadCount);
 
         // ── 2. Subsystems ─────────────────────────────────────────────────
+        // ARCH-005 / WORKSHOP-002: runtime owns the cross-layer composition
+        // between platform window and graphics backend. RHI is platform-
+        // neutral, so we fill a backend-agnostic `RHI::DeviceCreateDesc`
+        // from the live `IWindow` here.
         m_Window   = Platform::CreateWindow(m_Config.Window);
         m_Device   = CreateDevice(m_Config.Render);
-        m_Device->Initialize(*m_Window, m_Config.Render);
+        const Platform::Extent2D initialExtent = m_Window->GetFramebufferExtent();
+        m_Device->Initialize(RHI::DeviceCreateDesc{
+            .RenderConfig             = m_Config.Render,
+            .InitialFramebufferExtent = initialExtent,
+            .NativeWindowHandle       = m_Window->GetNativeHandle(),
+        });
 
         // GRAPHICS-033B: emit the Vulkan-requested-but-not-operational
         // breadcrumb and bump the operational diagnostics counters exactly

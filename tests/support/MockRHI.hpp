@@ -26,7 +26,6 @@
 
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.Platform.Window;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
@@ -356,7 +355,7 @@ namespace Extrinsic::Tests
             RecipeGraphValidationCalls.push_back(clean);
         }
 
-        void Initialize(Platform::IWindow&, const Core::Config::RenderConfig&) override {}
+        void Initialize(const RHI::DeviceCreateDesc&) override {}
         void Shutdown() override {}
         void WaitIdle() override {}
 

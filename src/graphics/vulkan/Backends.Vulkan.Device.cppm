@@ -26,7 +26,6 @@ export import Extrinsic.RHI.Profiler;
 export import Extrinsic.RHI.Transfer;
 export import Extrinsic.RHI.TransferQueue;
 export import Extrinsic.RHI.Types;
-export import Extrinsic.Platform.Window;
 export import :CommandPools;
 export import :Descriptors;
 export import :Diagnostics;
@@ -54,8 +53,7 @@ namespace Extrinsic::Backends::Vulkan
         VulkanDevice()  = default;
         ~VulkanDevice() override;
 
-        void Initialize(Platform::IWindow& window,
-                        const Core::Config::RenderConfig& config) override;
+        void Initialize(const RHI::DeviceCreateDesc& desc) override;
         void Shutdown()  override;
         void WaitIdle()  override;
 
