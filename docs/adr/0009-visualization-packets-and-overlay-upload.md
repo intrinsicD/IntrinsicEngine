@@ -5,7 +5,7 @@
 - **Owners:** Runtime extraction (visualization adapters, packet authorship), Graphics (frozen `Extrinsic.Graphics.VisualizationPackets` validation seam, backend-local overlay upload helper)
 - **Related tasks:** [`tasks/done/GRAPHICS-014`](../../tasks/done/GRAPHICS-014-visualization-attributes-overlays.md), [`GRAPHICS-014Q`](../../tasks/done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md), [`GRAPHICS-010Q`](../../tasks/done/GRAPHICS-010Q-transient-debug-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.VisualizationPackets` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.VisualizationPackets` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0008](0008-spatial-debug-visualizer-adapters.md) records the analogous `Extrinsic.Runtime.SpatialDebugAdapters` umbrella for spatial debug visualizers; the `Extrinsic.Runtime.VisualizationAdapters` umbrella in this ADR mirrors that pattern. [ADR-0012](0012-imgui-overlay-and-present-finalization.md) and the transient-debug expansion in `GRAPHICS-010Q` are the sibling backend-local upload helpers whose pattern the visualization overlay upload mirrors.
 
 ## Context

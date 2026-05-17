@@ -5,7 +5,7 @@
 - **Owners:** Runtime composition, Graphics (CameraSnapshots boundary)
 - **Related tasks:** [`tasks/done/GRAPHICS-017`](../../tasks/done/GRAPHICS-017-camera-interaction-and-gizmo-boundaries.md), [`GRAPHICS-017Q`](../../tasks/done/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md), [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.CameraSnapshots` "Per `GRAPHICS-017Q`" follow-up paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.CameraSnapshots` "Per `GRAPHICS-017Q`" follow-up paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0007](0007-picking-selection-and-outline.md) owns the `Extrinsic.Graphics.SelectionSystem` reporting seam this handoff produces selection inputs for.
 
 ## Context

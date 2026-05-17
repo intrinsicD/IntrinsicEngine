@@ -5,7 +5,7 @@
 - **Owners:** Runtime composition (`Extrinsic.Runtime.ReferenceScene`, `Engine::Initialize` integration), App (`Sandbox` config selection)
 - **Related tasks:** [`tasks/done/GRAPHICS-029`](../../tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md), [`GRAPHICS-029A`](../../tasks/done/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](../../tasks/done/GRAPHICS-029B-triangle-provider-and-camera.md), [`tasks/active/GRAPHICS-080`](../../tasks/active/GRAPHICS-080-enable-promoted-vulkan-by-default.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/runtime/README.md`](../../src/runtime/README.md), [`src/app/Sandbox/README.md`](../../src/app/Sandbox/README.md)
-- **Supersedes:** none. Extracted from the `## Reference scene bootstrap` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Reference scene bootstrap` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0013](0013-ecs-renderable-residency-bridge.md) records the ECS-renderable residency bridge that the reference scene's entities feed into. [ADR-0014](0014-procedural-source-residency-bridge.md) records the procedural-source residency bridge that the `TriangleProvider` exercises. [ADR-0005](0005-vulkan-operational-readiness-gate.md) records the Vulkan operational truth table that governs which backend actually runs when the reference sandbox launches with `Render.EnablePromotedVulkanDevice = true`.
 
 ## Context

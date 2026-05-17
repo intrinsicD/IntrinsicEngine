@@ -15,7 +15,7 @@ Status labels:
 - [Overview](overview.md) (`canonical`)
 - [Layering rules](layering.md) (`canonical`)
 - [Runtime](runtime.md) (`canonical`)
-- [Graphics](graphics.md) (`canonical`) — reduced to the contract layer per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md); embedded decision records relocated to ADRs `0004..0018` (see Pointers section).
+- [Graphics](graphics.md) (`canonical`) — reduced to the contract layer per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md); embedded decision records relocated to ADRs `0004..0018` (see Pointers section).
 - [Geometry](geometry.md) (`canonical`)
 - [Geometry API style and numeric policy](geometry-api-style.md) (`canonical`)
 - [Assets](assets.md) (`canonical`)

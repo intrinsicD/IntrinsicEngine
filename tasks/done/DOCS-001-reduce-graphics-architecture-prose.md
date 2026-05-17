@@ -2,7 +2,15 @@
 
 ## Status
 
-- Status: complete (slice 1 landed; slice 2 landed 15 ADRs `0004..0018`; slice 3 is a no-op; slice 4 final tightening + Pointers section landed). Ready to retire to `tasks/done/`.
+- Status: done.
+- Completed: 2026-05-17.
+- Retirement: this commit (moves the file from `tasks/active/` to `tasks/done/` and rewrites the `tasks/active/DOCS-001-...` references in all 15 new ADR files + `docs/architecture/index.md` to point at the `tasks/done/` path).
+- Final `docs/architecture/graphics.md` line count: 118 (target was ≤ 250; reduced from 793 over slice 1 (table only) + slice 2 (15 ADR extractions) + slice 4 (final tightening + Pointers)).
+- All slices landed:
+  - Slice 1: Classification table commit `70e4612` on `claude/setup-agentic-workflow-6h6w4`.
+  - Slice 2 (15 commits, one per ADR): ADR-0004 commit `42b966f` (prior branch); ADR-0005 commit `2415e13`; ADR-0006 commit `bfe0652`; ADR-0007 commit `d38cc45`; ADR-0008 commit `feeecae`; ADR-0009 commit `95edfd3`; ADR-0010 commit `d60adbc`; ADR-0011 commit `bdf82c9`; ADR-0012 commit `d674b08`; ADR-0013 commit `a569767`; ADR-0014 commit `0dc15cd`; ADR-0015 commit `f843152`; ADR-0016 commit `d17c2ab`; ADR-0017 commit `20c67f4`; ADR-0018 commit `23cd5b7`.
+  - Slice 3: no-op (the only migration-inventory row in the Classification table was cross-linked to the existing `docs/migration/nonlegacy-parity-matrix.md` by ADR-0006 with no new migration doc).
+  - Slice 4: final tightening + Pointers section commit `c88da85`.
 - Owner/agent: Claude on `claude/finish-active-tasks-Tx4Br` (handed off from `claude/setup-agentic-workflow-6h6w4`).
 - Branch: `claude/finish-active-tasks-Tx4Br`.
 - Started: 2026-05-17.
@@ -118,10 +126,10 @@ Slice-budget sanity check: extracting 14 pure decision-record rows + 1 mixed row
 - [x] Slice-1 commit is doc-only and changes only this task file. (Landed in commit `70e4612`.)
 
 ### Slice 2 — extract decision records to ADRs
-- [ ] For each row classified `decision-record`, author an ADR under `docs/adr/` (`0004-*`, `0005-*`, ...). Use the existing ADR pattern. The ADR captures the decision and its rationale; the original prose becomes the ADR's body.
-- [ ] Update `docs/adr/index.md` to list the new records.
-- [ ] Update `docs/architecture/graphics.md` to replace each extracted block with a one-line pointer (`See [ADR-NNNN](../adr/NNNN-*.md).`).
-- [ ] Slice-2 commit per ADR (each ADR + its `graphics.md` pointer update is a single commit).
+- [x] For each row classified `decision-record`, author an ADR under `docs/adr/` (`0004-*`, `0005-*`, ...). Use the existing ADR pattern. The ADR captures the decision and its rationale; the original prose becomes the ADR's body.
+- [x] Update `docs/adr/index.md` to list the new records.
+- [x] Update `docs/architecture/graphics.md` to replace each extracted block with a one-line pointer (`See [ADR-NNNN](../adr/NNNN-*.md).`).
+- [x] Slice-2 commit per ADR (each ADR + its `graphics.md` pointer update is a single commit).
 
 Slice-2 progress (per Classification-table row, top-to-bottom):
 
@@ -148,6 +156,11 @@ Slice-2 progress (per Classification-table row, top-to-bottom):
 - [x] After slices 1–3, `docs/architecture/graphics.md` should fit on roughly two screens of reading. Tighten any remaining prose to one-sentence-per-bullet form. Keep the canonical sublayer split, the dependency rules, the frame lifecycle outline, the renderer/RHI seam, and the GPU scene ownership contract.
 - [x] Add a "Pointers" section at the bottom listing every ADR and migration doc extracted in slices 2 and 3.
 - [x] Slice-4 commit is the final `graphics.md` tightening.
+
+## Completion metadata
+- Completion date: 2026-05-17.
+- Commit reference: pending current workspace/PR (retirement commit on branch `claude/finish-active-tasks-Tx4Br`; see Status section for the per-slice commit SHAs).
+- Follow-up: none.
 
 ## Tests
 - [x] No code is produced by this task. No automated tests.

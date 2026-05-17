@@ -5,7 +5,7 @@
 - **Owners:** Graphics (`Extrinsic.Graphics.DebugViewSystem`), Runtime/editor (UI-name dictionary, persistence)
 - **Related tasks:** [`tasks/done/GRAPHICS-013B`](../../tasks/done/GRAPHICS-013B-debug-view-and-render-target-inspection.md), [`GRAPHICS-013BQ`](../../tasks/done/GRAPHICS-013BQ-debug-view-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.DebugViewSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.DebugViewSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0007](0007-picking-selection-and-outline.md) records the `EncodedSelectionId` packing that §1 reuses for the `PrimitiveId` integer-hash visualization. [ADR-0010](0010-postprocess-chain-backend-policy.md) records the one-push-constant-block / one-pass-local-descriptor-set pattern that §2 mirrors.
 
 ## Context

@@ -5,7 +5,7 @@
 - **Owners:** Graphics (SelectionSystem reporting seam), Runtime composition (StableEntityId resolution, outline-mask producer)
 - **Related tasks:** [`tasks/done/GRAPHICS-012`](../../tasks/done/GRAPHICS-012-picking-selection-outline.md), [`GRAPHICS-012Q`](../../tasks/done/GRAPHICS-012Q-picking-backend-runtime-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SelectionSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SelectionSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0006](0006-camera-picking-and-gizmo-runtime-handoff.md) records the producer side (camera controllers, single-shot `PickPixelRequest` scheduling, gizmo handoff); this ADR records the consumer / reporting side (selection ID encoding, drain pattern, runtime ownership of `StableEntityId` resolution and outline-mask production).
 
 ## Context

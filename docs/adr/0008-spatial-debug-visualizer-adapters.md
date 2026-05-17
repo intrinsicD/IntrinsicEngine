@@ -5,7 +5,7 @@
 - **Owners:** Runtime extraction (adapter ownership), Graphics (frozen `Extrinsic.Graphics.SpatialDebugVisualizers` packet contract)
 - **Related tasks:** [`tasks/done/GRAPHICS-011`](../../tasks/done/GRAPHICS-011-spatial-debug-visualizers.md), [`GRAPHICS-011Q`](../../tasks/done/GRAPHICS-011Q-spatial-debug-adapter-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SpatialDebugVisualizers` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.SpatialDebugVisualizers` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 
 ## Context
 

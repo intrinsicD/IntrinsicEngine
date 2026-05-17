@@ -5,7 +5,7 @@
 - **Owners:** Graphics (`Extrinsic.Graphics.MaterialSystem` slot 0 registration, default debug surface shader pair, forward graphics pipeline)
 - **Related tasks:** [`tasks/done/GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md) (parent planning), [`GRAPHICS-031A`](../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) (shader pair + pipeline implementation)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `## Material registry and slot contract` GRAPHICS-031 paragraph (lines 727–746) in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Material registry and slot contract` GRAPHICS-031 paragraph (lines 727–746) in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0018](0018-missing-material-fallback-substitution.md) records the substitution policy that uses this material as the fallback. [ADR-0014](0014-procedural-source-residency-bridge.md) records the `Triangle` packer whose vertex format this material consumes. [ADR-0015](0015-reference-scene-bootstrap.md) records the `TriangleProvider` reference entity that depends on this material to compose a frame.
 
 ## Context

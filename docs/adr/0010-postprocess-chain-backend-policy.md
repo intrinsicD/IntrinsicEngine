@@ -5,7 +5,7 @@
 - **Owners:** Graphics (`Extrinsic.Graphics.PostProcessSystem`)
 - **Related tasks:** [`tasks/done/GRAPHICS-013A`](../../tasks/done/GRAPHICS-013A-postprocess-chain.md), [`GRAPHICS-013AQ`](../../tasks/done/GRAPHICS-013AQ-postprocess-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.PostProcessSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.PostProcessSystem` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0007](0007-picking-selection-and-outline.md) records the `Picking.Readback` drain pattern that the histogram readback in §2 reuses byte-identically.
 
 ## Context

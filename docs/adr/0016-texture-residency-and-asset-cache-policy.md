@@ -5,7 +5,7 @@
 - **Owners:** Graphics (`Graphics.GpuAssetCache`, fallback texture, bindless write batching), Runtime composition (fallback initialization, upload scheduling, `Extrinsic.Runtime.AssetBridges.Texture`)
 - **Related tasks:** [`tasks/done/GRAPHICS-015`](../../tasks/done/GRAPHICS-015-gpu-assets-textures-residency.md), [`GRAPHICS-015Q`](../../tasks/done/GRAPHICS-015Q-texture-residency-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md), [`src/graphics/assets/README.md`](../../src/graphics/assets/README.md)
-- **Supersedes:** none. Extracted from the `## Graphics asset residency` GRAPHICS-015Q clarification paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Graphics asset residency` GRAPHICS-015Q clarification paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0007](0007-picking-selection-and-outline.md) records the `Picking.Readback` drain pattern reused for bindless descriptor write coalescing in §6. [ADR-0010](0010-postprocess-chain-backend-policy.md) records the histogram readback drain that uses the same pattern. [ADR-0009](0009-visualization-packets-and-overlay-upload.md) records the visualization-atlas residency-deferral policy referenced in §5.
 
 ## Context

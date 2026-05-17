@@ -5,7 +5,7 @@
 - **Owners:** Runtime extraction (bridge owner, sidecar / cache), Graphics (data-only `GpuSceneSlot` value type, `GpuWorld` upload seam)
 - **Related tasks:** [`tasks/done/GRAPHICS-028`](../../tasks/done/GRAPHICS-028-ecs-renderable-residency-bridge.md), [`GRAPHICS-023A`](../../tasks/done/GRAPHICS-023A-gpu-scene-slot-asset-generation-tracking.md), [`GRAPHICS-023B`](../../tasks/done/GRAPHICS-023B-gpu-scene-slot-asset-rebind-decision.md), [`GRAPHICS-023C`](../../tasks/done/GRAPHICS-023C-runtime-asset-generation-observation.md), [`GRAPHICS-023D`](../../tasks/done/GRAPHICS-023D-runtime-asset-generation-rebind-acknowledgment.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `## ECS renderable residency bridge` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## ECS renderable residency bridge` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0014](0014-procedural-source-residency-bridge.md) records the procedural-geometry first slice of this bridge captured by `GRAPHICS-030`; this ADR records the parent contract.
 
 ## Context

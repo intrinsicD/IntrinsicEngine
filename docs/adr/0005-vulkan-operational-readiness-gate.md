@@ -5,7 +5,7 @@
 - **Owners:** Graphics / Vulkan backend, Runtime composition
 - **Related tasks:** [`tasks/done/GRAPHICS-033`](../../tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), [`GRAPHICS-033A`](../../tasks/done/GRAPHICS-033A-vulkan-operational-status-evaluator.md), [`GRAPHICS-033B`](../../tasks/done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md), [`GRAPHICS-033C`](../../tasks/done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md), [`GRAPHICS-033E`](../../tasks/done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md), [`GRAPHICS-033F`](../../tasks/done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/vulkan/README.md`](../../src/graphics/vulkan/README.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md)
-- **Supersedes:** none. Extracted from the `## Vulkan operational readiness and runtime fallback` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Vulkan operational readiness and runtime fallback` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0004](0004-vulkan-backend-bringup-and-fallback.md) records the bring-up sequence, `IsOperational()` predicate, diagnostics snapshots, and fail-closed breadcrumb policy that this gate sits on top of.
 
 ## Context

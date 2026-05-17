@@ -5,7 +5,7 @@
 - **Owners:** Graphics (`Extrinsic.Graphics.ImGuiOverlaySystem`, `Extrinsic.Graphics.Pass.Present`), Runtime composition (event pump, frame bracketing), Platform (`src/platform/`), Backend (`src/graphics/vulkan/`)
 - **Related tasks:** [`tasks/done/GRAPHICS-013C`](../../tasks/done/GRAPHICS-013C-imgui-overlay-and-present.md), [`GRAPHICS-013CQ`](../../tasks/done/GRAPHICS-013CQ-imgui-present-backend-clarifications.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`docs/architecture/rendering-three-pass.md`](../architecture/rendering-three-pass.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
-- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.ImGuiOverlaySystem` / `Pass.Present` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `Extrinsic.Graphics.ImGuiOverlaySystem` / `Pass.Present` bullet in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 - **Related ADRs:** [ADR-0009](0009-visualization-packets-and-overlay-upload.md) and the transient-debug expansion in `GRAPHICS-007Q` / `GRAPHICS-008Q` record the sibling backend-local upload helpers whose per-frame transient buffer pattern the ImGui overlay upload reuses. [ADR-0010](0010-postprocess-chain-backend-policy.md) records the retained `AreaTex` / `SearchTex` lookup-texture ownership pattern that the retained font-atlas texture mirrors.
 
 ## Context
