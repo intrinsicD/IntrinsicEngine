@@ -2,7 +2,7 @@
 
 ## Status
 
-- Status: in-progress (slice 1 landed; slice 2 in flight, ADR-0004 landed, ADR-0005..0017 remaining).
+- Status: in-progress (slice 1 landed; slice 2 in flight, ADR-0004 landed, ADR-0005..0018 remaining).
 - Owner/agent: Claude on `claude/setup-agentic-workflow-6h6w4`.
 - Branch: `claude/setup-agentic-workflow-6h6w4`.
 - Started: 2026-05-17.
@@ -82,17 +82,17 @@ Conventions used in the table:
 | 619–701 | `## Graphics asset residency` — GRAPHICS-015Q clarification paragraph (cache capacity / future eviction policy, streaming mip reupload via `RHI::TextureManager::Reupload()`, single magenta-checker fallback + per-channel neutrality, bindless descriptor flush cadence + `BindlessDescriptorRewrites`, sampler manager dedup, runtime upload scheduling + `Extrinsic.Runtime.AssetBridges.Texture` umbrella) | decision-record | `docs/adr/0016-texture-residency-and-asset-cache-policy.md`; cross-links `tasks/done/GRAPHICS-015-gpu-assets-textures-residency.md`, `tasks/done/GRAPHICS-015Q-texture-residency-backend-clarifications.md`. Replace paragraph with a 1-sentence pointer in `graphics.md`. |
 | 703–716 | `## Pipeline and shader registry contract` (3 bullets: `Extrinsic.RHI.PipelineRegistry`, shader reload invalidation, missing-shader diagnostics) | canonical-contract | `graphics.md` (keep) |
 | 718–726 | `## Material registry and slot contract` — canonical opening (MaterialSystem ownership + slot 0 fallback immutability + stale-handle resolution) | canonical-contract | `graphics.md` (keep) |
-| 727–746 | `## Material registry and slot contract` — GRAPHICS-031 default-debug-surface material details (slot 0 registration as `"Material.DefaultDebugSurface"`, shader pair location, vertex format, descriptor/push-constant reuse, pipeline state, dynamic state, cull bucket reuse) | decision-record | `docs/adr/0017-default-debug-surface-material.md`; cross-links `tasks/done/GRAPHICS-031-default-debug-surface-material.md`, `tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md`, `tasks/done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md`. Replace paragraph with a 1-sentence pointer in `graphics.md`. |
-| 747–764 | `## Material registry and slot contract` — GRAPHICS-031 missing-material fallback substitution policy (three additive `MaterialSystemDiagnostics` counters at renderer span-copy step, no silent-skip, runtime-agnostic) | decision-record | merge into ADR-0017 above (one ADR per topical seam). Replace paragraph with a 1-sentence pointer in `graphics.md`. |
+| 727–746 | `## Material registry and slot contract` — GRAPHICS-031 default-debug-surface material details (slot 0 registration as `"Material.DefaultDebugSurface"`, shader pair location, vertex format, descriptor/push-constant reuse, pipeline state, dynamic state, cull bucket reuse) | decision-record | `docs/adr/0017-default-debug-surface-material.md`; cross-links `tasks/done/GRAPHICS-031-default-debug-surface-material.md` (parent planning) and `tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md` (shader pair + pipeline implementation). Replace paragraph with a 1-sentence pointer in `graphics.md`. ADR-0018 owns the substitution/diagnostics half of GRAPHICS-031 (lines 747–764) and is where `GRAPHICS-031B` is cross-linked. |
+| 747–764 | `## Material registry and slot contract` — GRAPHICS-031 missing-material fallback substitution policy (three additive `MaterialSystemDiagnostics` counters at renderer span-copy step, no silent-skip, runtime-agnostic) | decision-record | `docs/adr/0018-missing-material-fallback-substitution.md`; cross-link `tasks/done/GRAPHICS-031-default-debug-surface-material.md`, `tasks/done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md`. Replace paragraph with a 1-sentence pointer in `graphics.md`. Kept distinct from ADR-0017 because the substitution policy (when/where slot 0 replaces a snapshot record's resolved slot, which counters increment, and that there are no silent-skip paths) is a separately traceable decision from the material definition itself (slot 0 registration, shader pair, pipeline state); per the task's `## Forbidden changes` rule, multiple decisions must not be folded into a single ADR. |
 | 765–770 | `## Material registry and slot contract` — debug-variant family extensibility (`Material.DefaultDebug<Variant>` naming) | canonical-contract | `graphics.md` (keep one-sentence pointer to the naming family) |
 | 771–775 | `## Material registry and slot contract` — canonical material SSBO layout (`kMaterialLayoutVersion == 1`, `GetCanonicalMaterialLayoutContract()`, 128-byte slot, 4 custom `vec4`, 4 texture refs) | canonical-contract | `graphics.md` (keep) |
 | 776–783 | `## Material registry and slot contract` — texture references + `MaterialTextureAssetBindings` + `ResolveTextureAssetBindings` (canonical seam) | canonical-contract | `graphics.md` (keep) |
 | 784–788 | `## Material registry and slot contract` — material type registration rejection + dirty material coalescing + CPU-testable diagnostics | canonical-contract | `graphics.md` (keep) |
 | 790–793 | `## Related references` (frame-graph pointer + historical migration docs) | canonical-contract | `graphics.md` (keep) |
 
-Row totals: 32 rows. By classification: `canonical-contract` = 18, `decision-record` = 13, `decision-record + migration-inventory` = 1, `migration-inventory` (standalone) = 0, `obsolete` = 0. ADR roster proposed by slice 1: `0004..0017` (14 ADRs; one row consolidates into ADR-0017 to satisfy the "one bullet → one ADR" default).
+Row totals: 33 rows. By classification: `canonical-contract` = 18, `decision-record` = 14, `decision-record + migration-inventory` = 1, `migration-inventory` (standalone) = 0, `obsolete` = 0. ADR roster proposed by slice 1: `0004..0018` (15 ADRs, one per decision-record-classified row including the mixed row; no consolidation, per the task's `## Forbidden changes` rule that one decision-record row maps to one ADR).
 
-Slice-budget sanity check: collapsing 13 decision-record rows + 1 mixed row into ADRs leaves ~18 canonical-contract rows in `graphics.md`. Each row contributes between 1 and 9 lines of canonical prose (the largest are 20–30 `## Renderer/RHI frame lifecycle` and 595–617 `## Graphics asset residency`; both can compress to ≤ 10 lines under slice 4's one-sentence-per-bullet rule). Final shape is therefore inside the ≤ 250-line acceptance criterion with margin for the section headings, the new "Pointers" section at the bottom, and the front-matter intro.
+Slice-budget sanity check: extracting 14 pure decision-record rows + 1 mixed row leaves 18 canonical-contract rows in `graphics.md`. Each row contributes between 1 and 9 lines of canonical prose (the largest are 20–30 `## Renderer/RHI frame lifecycle` and 596–617 `## Graphics asset residency`; both can compress to ≤ 10 lines under slice 4's one-sentence-per-bullet rule). Final shape is therefore inside the ≤ 250-line acceptance criterion with margin for the section headings, the new "Pointers" section at the bottom, and the front-matter intro.
 
 ## Required changes
 
@@ -123,7 +123,8 @@ Slice-2 progress (per Classification-table row, top-to-bottom):
 - [ ] ADR-0014 — Procedural-source residency bridge (Classification row 467–534).
 - [ ] ADR-0015 — Reference scene bootstrap (Classification row 536–594).
 - [ ] ADR-0016 — Texture residency and asset cache policy (Classification row 619–701).
-- [ ] ADR-0017 — Default debug surface material (Classification rows 727–746 + 747–764).
+- [ ] ADR-0017 — Default debug surface material definition (Classification row 727–746).
+- [ ] ADR-0018 — Missing-material fallback substitution policy (Classification row 747–764).
 
 ### Slice 3 — extract migration inventories
 - [ ] For each row classified `migration-inventory`, either fold the content into an existing `docs/migration/*` file (preferred) or author a new `docs/migration/<topic>-handoff-inventory.md` file. Cross-link from `docs/migration/index.md`.
