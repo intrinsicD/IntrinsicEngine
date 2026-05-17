@@ -2,13 +2,36 @@
 
 ## Status
 
-- Status: in-progress (slice 1 landed; slice 2 in flight, ADR-0004 landed, ADR-0005..0018 remaining).
-- Owner/agent: Claude on `claude/setup-agentic-workflow-6h6w4`.
-- Branch: `claude/setup-agentic-workflow-6h6w4`.
+- Status: done.
+- Completed: 2026-05-17.
+- Retirement: this commit (moves the file from `tasks/active/` to `tasks/done/` and rewrites the `tasks/active/DOCS-001-...` references in all 15 new ADR files + `docs/architecture/index.md` to point at the `tasks/done/` path).
+- Final `docs/architecture/graphics.md` line count: 118 (target was ≤ 250; reduced from 793 over slice 1 (table only) + slice 2 (15 ADR extractions) + slice 4 (final tightening + Pointers)).
+- All slices landed:
+  - Slice 1: Classification table commit `70e4612` on `claude/setup-agentic-workflow-6h6w4`.
+  - Slice 2 (15 commits, one per ADR): ADR-0004 commit `42b966f` (prior branch); ADR-0005 commit `2415e13`; ADR-0006 commit `bfe0652`; ADR-0007 commit `d38cc45`; ADR-0008 commit `feeecae`; ADR-0009 commit `95edfd3`; ADR-0010 commit `d60adbc`; ADR-0011 commit `bdf82c9`; ADR-0012 commit `d674b08`; ADR-0013 commit `a569767`; ADR-0014 commit `0dc15cd`; ADR-0015 commit `f843152`; ADR-0016 commit `d17c2ab`; ADR-0017 commit `20c67f4`; ADR-0018 commit `23cd5b7`.
+  - Slice 3: no-op (the only migration-inventory row in the Classification table was cross-linked to the existing `docs/migration/nonlegacy-parity-matrix.md` by ADR-0006 with no new migration doc).
+  - Slice 4: final tightening + Pointers section commit `c88da85`.
+- Owner/agent: Claude on `claude/finish-active-tasks-Tx4Br` (handed off from `claude/setup-agentic-workflow-6h6w4`).
+- Branch: `claude/finish-active-tasks-Tx4Br`.
 - Started: 2026-05-17.
 - Slice 1 landed in commit `70e4612` (Classification subsection appended to Context).
-- Slice 2 landed so far: ADR-0004 (Vulkan backend bring-up + fail-closed fallback) — replaces the line-31 mega-paragraph of `docs/architecture/graphics.md` with a one-line pointer. Cross-links retired `GRAPHICS-018`/`018Q`/`018R`/`018T`/`026`.
-- Next verification step: continue slice 2 in dependency order from the Classification table. The next per-ADR commit is ADR-0005 (Vulkan operational readiness gate; extracts lines 33–65 of `docs/architecture/graphics.md`); after that, the remaining 12 ADRs follow the Classification table top-to-bottom. Each commit runs the three static verification gates (`tools/agents/check_task_policy.py --strict`, `tools/docs/check_doc_links.py`, `tools/agents/validate_tasks.py --strict`). Build/CTest verification deferred to CI because the pinned `clang-20` toolchain is unavailable on this host.
+- Slice 2 landed so far:
+  - ADR-0004 (Vulkan backend bring-up + fail-closed fallback) — replaces the line-31 mega-paragraph of `docs/architecture/graphics.md` with a one-line pointer. Cross-links retired `GRAPHICS-018`/`018Q`/`018R`/`018T`/`026`.
+  - ADR-0005 (Vulkan operational readiness gate and runtime reconciliation) — replaces the lines 33–65 `## Vulkan operational readiness and runtime fallback` section with a one-line pointer. Cross-links retired `GRAPHICS-033`/`033A`/`033B`/`033C`/`033E`/`033F` and the active `GRAPHICS-033D` smoke as the canonical end-to-end validator.
+  - ADR-0006 (Camera, picking-request, and gizmo runtime handoff) — replaces the lines 85–149 GRAPHICS-017Q clarification paragraph embedded in the `Extrinsic.Graphics.CameraSnapshots` bullet with a one-line pointer. Cross-links retired `GRAPHICS-017`/`017Q` and the migration parity matrix (no new migration doc; the handoff inventory already lives there).
+  - ADR-0007 (Picking, selection, and outline reporting seam) — replaces the lines 150–175 `Extrinsic.Graphics.SelectionSystem` bullet with a 2-sentence canonical summary plus a one-line pointer. Cross-links retired `GRAPHICS-012`/`012Q`. ADR-0006's forward note to ADR-0007 is upgraded to a real cross-link in this commit.
+  - ADR-0008 (Spatial debug visualizer runtime adapters) — replaces the lines 176–200 `Extrinsic.Graphics.SpatialDebugVisualizers` bullet with a 2-sentence canonical summary plus a one-line pointer. Cross-links retired `GRAPHICS-011`/`011Q`.
+  - ADR-0009 (Visualization packets, validation, and overlay upload) — replaces the lines 201–257 `Extrinsic.Graphics.VisualizationPackets` bullet with a 2-sentence canonical summary plus a one-line pointer. Cross-links retired `GRAPHICS-014`/`014Q`/`010Q`.
+  - ADR-0010 (Postprocess chain backend policy) — replaces the lines 265–298 `Extrinsic.Graphics.PostProcessSystem` bullet with a 2-sentence canonical summary plus a one-line pointer. Cross-links retired `GRAPHICS-013A`/`013AQ`.
+  - ADR-0011 (Debug-view inspection table and visualization mode mapping) — replaces the lines 299–336 `Extrinsic.Graphics.DebugViewSystem` bullet with a 2-sentence canonical summary plus a one-line pointer. Cross-links retired `GRAPHICS-013B`/`013BQ`.
+  - ADR-0012 (ImGui overlay submission and `Pass.Present` finalization) — replaces the lines 337–393 `ImGuiOverlaySystem`/`Pass.Present` bullet with a 2-sentence canonical summary plus a one-line pointer. Cross-links retired `GRAPHICS-013C`/`013CQ`. ADR-0009's forward note to ADR-0012 is upgraded to a real cross-link in this commit.
+  - ADR-0013 (ECS renderable residency bridge) — replaces the lines 406–465 `## ECS renderable residency bridge` section with a 2-sentence canonical summary plus a one-line pointer. Cross-links retired `GRAPHICS-028`/`023A`/`023B`/`023C`/`023D`.
+  - ADR-0014 (Procedural-source residency bridge) — replaces the lines 467–534 `## Procedural-source residency bridge` section with a one-line pointer. Cross-links retired `GRAPHICS-030`/`030A`/`030B`/`030C`. ADR-0013's forward note to ADR-0014 is upgraded to a real cross-link in this commit.
+  - ADR-0015 (Runtime reference scene bootstrap) — replaces the lines 536–594 `## Reference scene bootstrap` section with a one-line pointer. Cross-links retired `GRAPHICS-029`/`029A`/`029B` and the active `GRAPHICS-080` for the `Render.EnablePromotedVulkanDevice` flip.
+  - ADR-0016 (Texture residency, fallback, and asset cache policy) — replaces the lines 619–701 GRAPHICS-015Q clarification paragraph inside the `## Graphics asset residency` section with a one-line pointer. Cross-links retired `GRAPHICS-015`/`015Q`.
+  - ADR-0017 (Default debug surface material, slot 0) — replaces the lines 727–746 GRAPHICS-031 paragraph in the `## Material registry and slot contract` section with a one-line pointer + a short canonical summary of the slot-0 material identity. Cross-links retired `GRAPHICS-031`/`031A`.
+  - ADR-0018 (Missing-material fallback substitution and diagnostics) — replaces the lines 747–764 GRAPHICS-031 substitution paragraph with a one-line pointer. Cross-links retired `GRAPHICS-031`/`031B`. Kept distinct from ADR-0017 per this task's `## Forbidden changes` rule (one decision per ADR).
+- Slice 2 per-ADR extraction is complete (15 ADRs: 0004 through 0018, one per decision-record-classified Classification-table row). Slice 3 (migration-inventory extraction) is a no-op because the only migration-inventory row in the Classification table is row 85–149 which was already cross-linked to the existing `docs/migration/nonlegacy-parity-matrix.md` by ADR-0006 with no new migration doc required. Next verification step: prepare slice 4 final tightening — graphics.md is already well under the ≤250-line acceptance target; slice 4 adds the "Pointers" section at the bottom enumerating every extracted ADR + any migration docs and tightens any remaining bullets to one-sentence-per-bullet form. Each remaining commit runs the three static verification gates (`tools/agents/check_task_policy.py --strict`, `tools/docs/check_doc_links.py`, `tools/agents/validate_tasks.py --strict`). Build/CTest verification deferred to CI because the pinned `clang-20` toolchain is unavailable on this host.
 
 ## Goal
 - [ ] Reshape [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) (currently ~793 lines, much of it multi-paragraph prose embedded in single bullet items) into a short canonical contract that a contributor can read in five minutes, plus a short pointer list to the deeper material it currently inlines.
@@ -103,58 +126,61 @@ Slice-budget sanity check: extracting 14 pure decision-record rows + 1 mixed row
 - [x] Slice-1 commit is doc-only and changes only this task file. (Landed in commit `70e4612`.)
 
 ### Slice 2 — extract decision records to ADRs
-- [ ] For each row classified `decision-record`, author an ADR under `docs/adr/` (`0004-*`, `0005-*`, ...). Use the existing ADR pattern. The ADR captures the decision and its rationale; the original prose becomes the ADR's body.
-- [ ] Update `docs/adr/index.md` to list the new records.
-- [ ] Update `docs/architecture/graphics.md` to replace each extracted block with a one-line pointer (`See [ADR-NNNN](../adr/NNNN-*.md).`).
-- [ ] Slice-2 commit per ADR (each ADR + its `graphics.md` pointer update is a single commit).
+- [x] For each row classified `decision-record`, author an ADR under `docs/adr/` (`0004-*`, `0005-*`, ...). Use the existing ADR pattern. The ADR captures the decision and its rationale; the original prose becomes the ADR's body.
+- [x] Update `docs/adr/index.md` to list the new records.
+- [x] Update `docs/architecture/graphics.md` to replace each extracted block with a one-line pointer (`See [ADR-NNNN](../adr/NNNN-*.md).`).
+- [x] Slice-2 commit per ADR (each ADR + its `graphics.md` pointer update is a single commit).
 
 Slice-2 progress (per Classification-table row, top-to-bottom):
 
 - [x] ADR-0004 — Vulkan backend bring-up and fail-closed fallback (Classification row 31). Replaces graphics.md line 31 with a one-line pointer; index updated.
-- [ ] ADR-0005 — Vulkan operational readiness gate (Classification row 33–65).
-- [ ] ADR-0006 — Camera, picking, and gizmo runtime handoff (Classification row 85–149).
-- [ ] ADR-0007 — Picking, selection, and outline (Classification row 150–175).
-- [ ] ADR-0008 — Spatial debug visualizer adapters (Classification row 176–200).
-- [ ] ADR-0009 — Visualization packets and overlay upload (Classification row 201–257).
-- [ ] ADR-0010 — Postprocess chain backend policy (Classification row 265–298).
-- [ ] ADR-0011 — Debug-view inspection table (Classification row 299–336).
-- [ ] ADR-0012 — ImGui overlay and Present finalization (Classification row 337–393).
-- [ ] ADR-0013 — ECS renderable residency bridge (Classification row 406–465).
-- [ ] ADR-0014 — Procedural-source residency bridge (Classification row 467–534).
-- [ ] ADR-0015 — Reference scene bootstrap (Classification row 536–594).
-- [ ] ADR-0016 — Texture residency and asset cache policy (Classification row 619–701).
-- [ ] ADR-0017 — Default debug surface material definition (Classification row 727–746).
-- [ ] ADR-0018 — Missing-material fallback substitution policy (Classification row 747–764).
+- [x] ADR-0005 — Vulkan operational readiness gate (Classification row 33–65). Replaces the `## Vulkan operational readiness and runtime fallback` section with a one-line pointer; index updated.
+- [x] ADR-0006 — Camera, picking, and gizmo runtime handoff (Classification row 85–149). Replaces the GRAPHICS-017Q clarification paragraph embedded in the `Extrinsic.Graphics.CameraSnapshots` bullet with a one-line pointer; index updated. Migration-inventory portion stays cross-linked to `docs/migration/nonlegacy-parity-matrix.md` (no new migration doc).
+- [x] ADR-0007 — Picking, selection, and outline (Classification row 150–175). Replaces the `Extrinsic.Graphics.SelectionSystem` bullet with a 2-sentence canonical summary plus a one-line pointer; index updated. ADR-0006 cross-link upgraded from text-only to real link.
+- [x] ADR-0008 — Spatial debug visualizer adapters (Classification row 176–200). Replaces the `Extrinsic.Graphics.SpatialDebugVisualizers` bullet with a 2-sentence canonical summary plus a one-line pointer; index updated.
+- [x] ADR-0009 — Visualization packets and overlay upload (Classification row 201–257). Replaces the `Extrinsic.Graphics.VisualizationPackets` bullet with a 2-sentence canonical summary plus a one-line pointer; index updated.
+- [x] ADR-0010 — Postprocess chain backend policy (Classification row 265–298). Replaces the `Extrinsic.Graphics.PostProcessSystem` bullet with a 2-sentence canonical summary plus a one-line pointer; index updated.
+- [x] ADR-0011 — Debug-view inspection table (Classification row 299–336). Replaces the `Extrinsic.Graphics.DebugViewSystem` bullet with a 2-sentence canonical summary plus a one-line pointer; index updated.
+- [x] ADR-0012 — ImGui overlay and Present finalization (Classification row 337–393). Replaces the `ImGuiOverlaySystem`/`Pass.Present` bullet with a 2-sentence canonical summary plus a one-line pointer; index updated. ADR-0009 cross-link upgraded from text-only to real link.
+- [x] ADR-0013 — ECS renderable residency bridge (Classification row 406–465). Replaces the `## ECS renderable residency bridge` section with a 2-sentence canonical summary plus a one-line pointer; index updated.
+- [x] ADR-0014 — Procedural-source residency bridge (Classification row 467–534). Replaces the `## Procedural-source residency bridge` section with a one-line pointer; index updated. ADR-0013 cross-link upgraded from text-only to real link.
+- [x] ADR-0015 — Reference scene bootstrap (Classification row 536–594). Replaces the `## Reference scene bootstrap` section with a one-line pointer; index updated.
+- [x] ADR-0016 — Texture residency and asset cache policy (Classification row 619–701). Replaces the GRAPHICS-015Q clarification paragraph in the `## Graphics asset residency` section with a one-line pointer; index updated.
+- [x] ADR-0017 — Default debug surface material definition (Classification row 727–746). Replaces the GRAPHICS-031 slot-0 paragraph with a one-line pointer + short canonical summary; index updated.
+- [x] ADR-0018 — Missing-material fallback substitution policy (Classification row 747–764). Replaces the GRAPHICS-031 substitution paragraph with a one-line pointer; index updated. Kept distinct from ADR-0017 per `## Forbidden changes` rule.
 
 ### Slice 3 — extract migration inventories
-- [ ] For each row classified `migration-inventory`, either fold the content into an existing `docs/migration/*` file (preferred) or author a new `docs/migration/<topic>-handoff-inventory.md` file. Cross-link from `docs/migration/index.md`.
-- [ ] Update `docs/architecture/graphics.md` to replace each extracted block with a one-line pointer to the migration doc.
-- [ ] Slice-3 commit per migration file extracted.
+- [x] No migration-inventory rows in the Classification table require a new migration doc. The only `migration-inventory`-classified row (85–149, the GRAPHICS-017Q camera/gizmo handoff inventory) was authored in row 85–149 of the slice-1 Classification table to live in `docs/migration/nonlegacy-parity-matrix.md` via cross-link rather than a new file. ADR-0006 carries that cross-link; no new migration doc is added and `docs/migration/index.md` is unchanged.
 
 ### Slice 4 — final tightening
-- [ ] After slices 1–3, `docs/architecture/graphics.md` should fit on roughly two screens of reading. Tighten any remaining prose to one-sentence-per-bullet form. Keep the canonical sublayer split, the dependency rules, the frame lifecycle outline, the renderer/RHI seam, and the GPU scene ownership contract.
-- [ ] Add a "Pointers" section at the bottom listing every ADR and migration doc extracted in slices 2 and 3.
-- [ ] Slice-4 commit is the final `graphics.md` tightening.
+- [x] After slices 1–3, `docs/architecture/graphics.md` should fit on roughly two screens of reading. Tighten any remaining prose to one-sentence-per-bullet form. Keep the canonical sublayer split, the dependency rules, the frame lifecycle outline, the renderer/RHI seam, and the GPU scene ownership contract.
+- [x] Add a "Pointers" section at the bottom listing every ADR and migration doc extracted in slices 2 and 3.
+- [x] Slice-4 commit is the final `graphics.md` tightening.
+
+## Completion metadata
+- Completion date: 2026-05-17.
+- Commit reference: pending current workspace/PR (retirement commit on branch `claude/finish-active-tasks-Tx4Br`; see Status section for the per-slice commit SHAs).
+- Follow-up: none.
 
 ## Tests
-- [ ] No code is produced by this task. No automated tests.
-- [ ] Each slice must pass `python3 tools/docs/check_doc_links.py --root .` (no broken relative links).
-- [ ] Each slice must pass `python3 tools/agents/check_task_policy.py --root . --strict`.
-- [ ] Final `graphics.md` line count target: ≤ 250 lines. (Current: 793.)
+- [x] No code is produced by this task. No automated tests.
+- [x] Each slice must pass `python3 tools/docs/check_doc_links.py --root .` (no broken relative links).
+- [x] Each slice must pass `python3 tools/agents/check_task_policy.py --root . --strict`.
+- [x] Final `graphics.md` line count target: ≤ 250 lines. (Current: see Status; well under the target after slice 4 tightening.)
 
 ## Docs
-- [ ] [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) reduced to canonical contract + pointers.
-- [ ] [`docs/adr/index.md`](../../docs/adr/index.md) lists each new ADR.
-- [ ] [`docs/migration/index.md`](../../docs/migration/index.md) lists any new migration docs.
-- [ ] [`docs/architecture/index.md`](../../docs/architecture/index.md) status note for `graphics.md` reflects the reduction.
+- [x] [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) reduced to canonical contract + pointers.
+- [x] [`docs/adr/index.md`](../../docs/adr/index.md) lists each new ADR (`0004..0018`).
+- [x] [`docs/migration/index.md`](../../docs/migration/index.md) lists any new migration docs. (No new migration docs; the only migration-inventory row was cross-linked to the existing `nonlegacy-parity-matrix.md` by ADR-0006.)
+- [x] [`docs/architecture/index.md`](../../docs/architecture/index.md) status note for `graphics.md` reflects the reduction (slice-4 commit).
 
 ## Acceptance criteria
-- [ ] Final `docs/architecture/graphics.md` is ≤ 250 lines.
-- [ ] No prose paragraph in the final `graphics.md` exceeds 5 lines (single-paragraph clarifications relocate to ADRs/migration docs).
-- [ ] Every relocated decision is captured in either an ADR (decision records), a migration doc (handoff inventories), or a `tasks/done/` cross-link (slice-specific clarifications). No content is lost.
-- [ ] `python3 tools/docs/check_doc_links.py --root .` passes with no broken relative links.
-- [ ] Per `AGENTS.md` §5 ("keep patches small and scoped to one task when possible") each slice (1, 2-per-ADR, 3-per-migration-doc, 4) lands as its own commit/PR.
-- [ ] No `src/graphics/*` source or behavior changes in any slice.
+- [x] Final `docs/architecture/graphics.md` is ≤ 250 lines.
+- [x] No prose paragraph in the final `graphics.md` exceeds 5 lines (single-paragraph clarifications relocate to ADRs/migration docs).
+- [x] Every relocated decision is captured in either an ADR (decision records), a migration doc (handoff inventories), or a `tasks/done/` cross-link (slice-specific clarifications). No content is lost.
+- [x] `python3 tools/docs/check_doc_links.py --root .` passes with no broken relative links.
+- [x] Per `AGENTS.md` §5 ("keep patches small and scoped to one task when possible") each slice (1, 2-per-ADR, 3-per-migration-doc, 4) lands as its own commit/PR.
+- [x] No `src/graphics/*` source or behavior changes in any slice.
 
 ## Verification
 ```bash
