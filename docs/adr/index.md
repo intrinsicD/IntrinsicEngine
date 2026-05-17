@@ -17,6 +17,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 11. [0011 — Debug-view inspection table and visualization mode mapping](0011-debug-view-inspection-table.md)
 12. [0012 — ImGui overlay submission and `Pass.Present` finalization](0012-imgui-overlay-and-present-finalization.md)
 13. [0013 — ECS renderable residency bridge](0013-ecs-renderable-residency-bridge.md)
+14. [0014 — Procedural-source residency bridge](0014-procedural-source-residency-bridge.md)
 
 ## Conventions
 

@@ -84,72 +84,7 @@ The bridge owner is `runtime`: `Extrinsic.Runtime.RenderExtraction` queries live
 
 ## Procedural-source residency bridge
 
-`GRAPHICS-030` records the planning contract for the procedural-geometry first
-slice of the GRAPHICS-028 residency bridge. The descriptor surface is closed:
-`ProceduralGeometryKind` (initial enumerator `Triangle`) plus a small POD
-`ProceduralGeometryParams` (vertex/index counts plus a fixed-size float
-payload), exported from a planned module `Extrinsic.Runtime.ProceduralGeometry`
-at `src/runtime/Runtime.ProceduralGeometry.cppm`. Two sources are the same
-allocation iff `ProceduralGeometryKey = (Kind, Hash(Params))` is equal; debug
-name, source entity ID, owning provider identity, frame index, and
-`MetaData::EntityName` are explicitly excluded from the key so N entities
-sharing the same key share one `Graphics::GpuGeometryHandle`.
-
-The cache `Runtime::ProceduralGeometryCache` is a value type owned as a
-member of `Runtime::RenderExtractionCache`, lifetime tied to the existing
-extraction tick. `EnsureResident(key, params)` either inserts an entry and
-runs the per-kind packer + `GpuWorld::UploadGeometry()` once, or hits an
-existing entry and increments its `std::uint32_t` refcount. `Release(key)`
-decrements; on transition to zero the entry is moved to a deferred-retire
-list and `GpuWorld::FreeGeometry()` is issued only after `framesInFlight`
-ticks have elapsed, mirroring the deferred-free contract that
-`Graphics::GpuAssetCache::Tick(currentFrame, framesInFlight)` enforces for
-asset leases. Per-kind packers live in a sibling module
-`Extrinsic.Runtime.ProceduralGeometryPacker` whose `Pack(kind, params,
-scratch) → std::optional<GeometryUploadDesc>` consumes a runtime-owned
-scratch buffer (packed vertex bytes + surface/line index vectors) reused
-across ticks. `GpuWorld` stays domain-agnostic and never imports
-`Extrinsic.Runtime.ProceduralGeometry*`.
-
-Procedural sources do **not** participate in `Graphics::GpuAssetCache`
-generation tracking. `GpuSceneSlot::SourceAsset` is left at the default
-`Assets::AssetId{}` (`HasSourceAsset()` returns `false`); the GRAPHICS-023C
-`Runtime::ObserveRenderableAssetGeneration` helper already short-circuits in
-that case and reports `SourceAssetCacheUnavailableCount` /
-`SourceAssetViewUnavailableCount` instead of `RebindRequired`. No new
-sentinel value or `IsProcedural` flag is added to `GpuSceneSlot`. The
-procedural-source link on the entity is a CPU-only ECS component
-`ECS::Components::ProceduralGeometryRef { Kind, Params }` at
-`src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm`, importing
-`Extrinsic.Core.*` only — no graphics, RHI, asset, or runtime imports — so
-the GRAPHICS-028 prohibition on GPU-typed ECS components and the AGENTS.md
-§2 `ecs → core` invariant both hold.
-
-Lifecycle ordering inside `RenderExtractionCache::ExtractAndSubmit()` is
-locked: detect candidates carrying `ProceduralGeometryRef`, `EnsureResident`
-the key, `AllocateInstance` if no sidecar exists, refresh `GpuSceneSlot`,
-`GpuWorld::SetInstanceGeometry()` once per `(instance, geometry)` pair, then
-consume `DirtyTransform` → `SetInstanceTransform()` and clear the tag.
-Failures are fail-closed and never throw: missing packer, upload failure,
-allocate-instance failure, bind rejection, refcount saturation, invalid
-params, and procedural+asset conflict each increment a dedicated counter on
-`RuntimeRenderExtractionStats` (`ProceduralGeometryUploads`,
-`ProceduralGeometryReuseHits`, `ProceduralGeometryReleases`,
-`ProceduralGeometryFreeRetires`, `ProceduralGeometryFailedUploads`,
-`ProceduralGeometryFailedInstanceAlloc`, `ProceduralGeometryFailedBinds`,
-`ProceduralGeometryMissingPacker`, `ProceduralGeometryInvalidParams`,
-`ProceduralGeometryRefCountSaturated`, `ProceduralAndAssetSourceConflict`)
-and skip the entity for the tick. Steady-state cost is O(1) per renderable;
-already-resident geometry incurs one `unordered_map` lookup and a refcount
-increment with no scratch-buffer touch and no packer invocation. Adding a
-new primitive (`Cube`, `Quad`, `Sphere`, `LineStrip`) requires only enum
-extension + per-kind packer + a contract test, with no cache or extraction
-lifecycle changes. Asset-backed mesh residency (the `AssetInstance::Source`
-→ `GpuAssetCache` → `GpuWorld` path) and mixed-source entities remain
-deferred to GRAPHICS-034. Implementation children GRAPHICS-030-Impl-A
-(component + cache + Triangle packer), Impl-B (extraction wiring + bind
-test), Impl-C (refcount/free + retire-queue test), and the optional Impl-D
-(second packer) are identified but not opened.
+See [ADR-0014 — Procedural-source residency bridge](../adr/0014-procedural-source-residency-bridge.md) for the closed `Extrinsic.Runtime.ProceduralGeometry` descriptor surface, the `Runtime::ProceduralGeometryCache` shape (content-addressed `(Kind, Hash(Params))` key, `EnsureResident`/`Release` refcount, deferred-retire queue mirroring `GpuAssetCache::Tick`), the CPU-only `ECS::Components::ProceduralGeometryRef` link with `ecs → core` enforcement, the locked `RenderExtractionCache::ExtractAndSubmit()` ordering, the exhaustive fail-closed `RuntimeRenderExtractionStats` counter set, and the GRAPHICS-034 deferral for asset-backed mesh residency.
 
 ## Reference scene bootstrap
 
