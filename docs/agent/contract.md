@@ -95,7 +95,7 @@ Exceptions are allowed only if:
 
 The per-PR `docs/agent/review-checklist.md` catches single-slice
 defects. A weekly human-led sweep — driven by
-[`REVIEW-001`](../../tasks/backlog/architecture/REVIEW-001-human-led-agent-week-review-cadence.md)
+[`REVIEW-001`](../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md)
 and run from [`docs/agent/agent-output-review-checklist.md`](agent-output-review-checklist.md)
 — audits roughly one week of agent-authored commits for patterns the
 per-PR view misses (multi-PR scope drift, decorative comments,

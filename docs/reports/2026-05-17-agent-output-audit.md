@@ -4,7 +4,7 @@ This is the first calibration audit run against
 [`docs/agent/agent-output-review-checklist.md`](../agent/agent-output-review-checklist.md).
 It validates that the checklist is actionable on a real recent slice of
 agent-authored work, as required by
-[`REVIEW-001`](../../tasks/backlog/architecture/REVIEW-001-human-led-agent-week-review-cadence.md).
+[`REVIEW-001`](../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md).
 
 ## Window
 
