@@ -80,64 +80,7 @@ See [ADR-0005 — Vulkan operational readiness gate and runtime reconciliation](
 
 ## ECS renderable residency bridge
 
-`GRAPHICS-028` records the planning contract for turning live ECS renderable
-entities into `GpuWorld` instance and geometry records. The bridge owner is
-`runtime`: `Extrinsic.Runtime.RenderExtraction` is allowed to query live ECS,
-read CPU-only `AssetInstance::Source`, `GeometrySources::*`, hierarchy, transform,
-and dirty-tag components, and maintain an entity-keyed residency sidecar/cache.
-That cache may store graphics-owned value types such as
-`Graphics::Components::GpuSceneSlot`, `GpuInstanceHandle`, material instances, and
-asset-binding metadata (`GpuSceneSlot::SourceAsset` and
-`GpuSceneSlot::LastSeenAssetGeneration`), but those values remain outside
-canonical ECS components and outside the live `entt::registry` as GPU-typed ECS
-state. `GpuSceneSlot::EvaluateSourceAssetRebind()` compares the sidecar's stored
-asset binding against an observed `(Assets::AssetId, generation)` supplied by
-runtime; it does not import `Graphics.GpuAssetCache` or query live asset state.
-`GRAPHICS-023C` adds the runtime-owned observation bridge: render extraction may
-read `AssetInstance::Source`, query a supplied `Graphics.GpuAssetCache`, and
-report whether a future rebind is required, but it does not mark newer
-generations as last-seen until a later upload/rebind slice actually performs the
-binding work. `GRAPHICS-023D` closes that loop on the runtime side only by
-adding `Runtime::AcknowledgeRenderableAssetRebind(slot, observation)`, an
-explicit caller-driven helper that advances `GpuSceneSlot::LastSeenAssetGeneration`
-to the observed generation when the asset identity matches; it does not
-auto-acknowledge inside `RenderExtractionCache::ExtractAndSubmit`, perform
-uploads, watch files, recompile shaders, or reload texture residency. Graphics
-render passes receive only renderer-submitted snapshots/views and must not
-query ECS or runtime sidecar storage directly.
-
-Static-vs-dynamic geometry residency is decided per stream. Immutable, shared
-asset geometry flows from the CPU asset identifier on `AssetInstance::Source`
-through runtime normalization to `Assets::AssetId`, then through
-`Graphics.GpuAssetCache` and `GpuWorld::UploadGeometry()`. Dynamic per-entity
-streams are owned by runtime residency policy and may use `GpuSceneSlot` named
-buffers or a future `GpuWorld` successor for per-entity updates. Per-instance
-state such as transforms, render flags, bounds, and material slots continues to
-flow through runtime-submitted transform/material records and `GpuWorld` instance
-SSBO updates.
-
-Dirty tags in ECS remain CPU-only semantic markers. Editing systems may mark
-`DirtyTransform`, `DirtyVertexPositions`, `DirtyVertexAttributes`, topology tags,
-or the `GpuDirty` escape hatch, but they must not encode renderer buffer names,
-`RHI::BufferHandle` values, bindless indices, or `GpuSceneSlot` references. The
-runtime bridge consumes tags in dependency order, maps CPU property/channel
-changes to packed upload streams or named dynamic buffers, and clears only the
-tags it has consumed. Mesh, graph, point-cloud, and primitive domains share a
-uniform `GpuWorld::GeometryUploadDesc` target so `GpuWorld` remains
-domain-agnostic.
-
-Hierarchy and primitive policy are also runtime-owned. Only renderable leaves
-with geometry sources or asset sources materialize `GpuInstanceHandle` entries;
-root/interior hierarchy nodes propagate transforms, visibility, and editor policy
-to leaves before extraction. Authored primitive entities default to regular
-`GpuWorld` instances that reference shared unit geometry so they participate in
-culling, sorting, and picking. High-volume transient debug primitives may instead
-be collected into per-frame instanced debug batches following the existing
-transient debug packet pattern, without consuming retained `GpuWorld` instance
-slots. Implementation of the full bridge remains a follow-up to the completed
-planning task; the current promoted runtime extraction cache already owns the
-partial sidecar for render hints, instance allocation/free, transform/light/
-visualization submission, and consumed `DirtyTransform` clearing.
+The bridge owner is `runtime`: `Extrinsic.Runtime.RenderExtraction` queries live ECS, maintains an entity-keyed residency sidecar that stores graphics-owned value types (`GpuSceneSlot`, `GpuInstanceHandle`, material instances, asset-binding metadata) outside canonical ECS, and submits per-frame transform/material/visualization records through `IRenderer::SubmitRuntimeSnapshots()`. Graphics render passes receive only renderer-submitted snapshots/views and must not query ECS or runtime sidecar storage directly. See [ADR-0013 — ECS renderable residency bridge](../adr/0013-ecs-renderable-residency-bridge.md) for the four-step asset-rebind observation/acknowledgment loop (GRAPHICS-023A/B/C/D), the static-vs-dynamic stream split, the dirty-tag CPU-only invariant, the hierarchy/primitive policy (only renderable leaves materialize `GpuInstanceHandle`s), and the remaining-implementation status.
 
 ## Procedural-source residency bridge
 
