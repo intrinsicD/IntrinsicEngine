@@ -13,6 +13,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 7. [0007 — Picking, selection, and outline reporting seam](0007-picking-selection-and-outline.md)
 8. [0008 — Spatial debug visualizer runtime adapters](0008-spatial-debug-visualizer-adapters.md)
 9. [0009 — Visualization packets, validation, and overlay upload](0009-visualization-packets-and-overlay-upload.md)
+10. [0010 — Postprocess chain backend policy](0010-postprocess-chain-backend-policy.md)
 
 ## Conventions
 
