@@ -21,7 +21,8 @@
   - ADR-0014 (Procedural-source residency bridge) — replaces the lines 467–534 `## Procedural-source residency bridge` section with a one-line pointer. Cross-links retired `GRAPHICS-030`/`030A`/`030B`/`030C`. ADR-0013's forward note to ADR-0014 is upgraded to a real cross-link in this commit.
   - ADR-0015 (Runtime reference scene bootstrap) — replaces the lines 536–594 `## Reference scene bootstrap` section with a one-line pointer. Cross-links retired `GRAPHICS-029`/`029A`/`029B` and the active `GRAPHICS-080` for the `Render.EnablePromotedVulkanDevice` flip.
   - ADR-0016 (Texture residency, fallback, and asset cache policy) — replaces the lines 619–701 GRAPHICS-015Q clarification paragraph inside the `## Graphics asset residency` section with a one-line pointer. Cross-links retired `GRAPHICS-015`/`015Q`.
-- Next verification step: continue slice 2 in dependency order from the Classification table. The next per-ADR commit is ADR-0017 (Default debug surface material definition; GRAPHICS-031 row 727–746). After that, ADR-0018 (missing-material fallback substitution policy; GRAPHICS-031B row 747–764) closes out slice 2 per-ADR work, and slice 4 final tightening can follow. Each commit runs the three static verification gates (`tools/agents/check_task_policy.py --strict`, `tools/docs/check_doc_links.py`, `tools/agents/validate_tasks.py --strict`). Build/CTest verification deferred to CI because the pinned `clang-20` toolchain is unavailable on this host.
+  - ADR-0017 (Default debug surface material, slot 0) — replaces the lines 727–746 GRAPHICS-031 paragraph in the `## Material registry and slot contract` section with a one-line pointer + a short canonical summary of the slot-0 material identity. Cross-links retired `GRAPHICS-031`/`031A`.
+- Next verification step: the last per-ADR commit is ADR-0018 (missing-material fallback substitution policy; GRAPHICS-031B row 747–764). After that closes out slice 2, slice 4 final tightening can follow. Each remaining commit runs the three static verification gates (`tools/agents/check_task_policy.py --strict`, `tools/docs/check_doc_links.py`, `tools/agents/validate_tasks.py --strict`). Build/CTest verification deferred to CI because the pinned `clang-20` toolchain is unavailable on this host.
 
 ## Goal
 - [ ] Reshape [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) (currently ~793 lines, much of it multi-paragraph prose embedded in single bullet items) into a short canonical contract that a contributor can read in five minutes, plus a short pointer list to the deeper material it currently inlines.
@@ -136,7 +137,7 @@ Slice-2 progress (per Classification-table row, top-to-bottom):
 - [x] ADR-0014 — Procedural-source residency bridge (Classification row 467–534). Replaces the `## Procedural-source residency bridge` section with a one-line pointer; index updated. ADR-0013 cross-link upgraded from text-only to real link.
 - [x] ADR-0015 — Reference scene bootstrap (Classification row 536–594). Replaces the `## Reference scene bootstrap` section with a one-line pointer; index updated.
 - [x] ADR-0016 — Texture residency and asset cache policy (Classification row 619–701). Replaces the GRAPHICS-015Q clarification paragraph in the `## Graphics asset residency` section with a one-line pointer; index updated.
-- [ ] ADR-0017 — Default debug surface material definition (Classification row 727–746).
+- [x] ADR-0017 — Default debug surface material definition (Classification row 727–746). Replaces the GRAPHICS-031 slot-0 paragraph with a one-line pointer + short canonical summary; index updated.
 - [ ] ADR-0018 — Missing-material fallback substitution policy (Classification row 747–764).
 
 ### Slice 3 — extract migration inventories

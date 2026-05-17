@@ -139,26 +139,7 @@ See [ADR-0016 — Texture residency, fallback, and asset cache policy](../adr/00
 - Slot `0` is the immutable fallback/default material slot
   (`kDefaultMaterialSlotIndex`). Stale or invalid material handles resolve to
   that fallback and increment deterministic CPU-visible diagnostics.
-- Per
-  [`GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
-  slot 0 is registered as `"Material.DefaultDebugSurface"` with
-  `MaterialTypeID = kMaterialTypeID_DefaultDebugSurface = 2u`,
-  `MaterialFlags::Unlit`, and a deterministic non-black `BaseColorFactor`
-  (`{0.55, 0.20, 0.85, 1.0}`); the slot is pre-populated by
-  `MaterialSystem::Initialize()` and republished byte-identical by
-  `MaterialSystem::RebuildGpuResources()`. The shader pair lives at
-  `assets/shaders/forward/default_debug_surface.vert/frag` and consumes the
-  canonical `GpuScenePushConstants` scene-table BDA + the existing
-  `MaterialBuffer` SSBO at `set = 3, binding = 0`; no per-material descriptor
-  set is added. The vertex format is position `vec3` + optional packed RGBA8
-  vertex color `uint32`, matching the `Triangle` packer planned in
-  GRAPHICS-030-Impl-A. The forward graphics pipeline is created once at
-  renderer init with `CullMode = Back`, `DepthCompareOp = Less` (or `Equal`
-  when running after `Pass.DepthPrepass`), `BlendEnabled = false`,
-  `PolygonMode = Fill`, `PrimitiveTopology = TriangleList`,
-  `MSAA samples = 1`, and dynamic state `{Viewport, Scissor}`. The default
-  debug surface lane consumes the existing `SurfaceOpaque` cull bucket; no
-  new bucket, no new pass, no new descriptor set is introduced.
+- Slot 0 is the `"Material.DefaultDebugSurface"` unlit material with deterministic non-black `BaseColorFactor = {0.55, 0.20, 0.85, 1.0}`, pre-populated by `MaterialSystem::Initialize()` and republished byte-identical by `RebuildGpuResources()`. See [ADR-0017 — Default debug surface material (slot 0)](../adr/0017-default-debug-surface-material.md) for the `MaterialTypeID` / shader pair (`assets/shaders/forward/default_debug_surface.vert/frag`) / vertex format / forward graphics pipeline state / `SurfaceOpaque` cull-bucket reuse details.
 - Per
   [`GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
   the missing-material fallback policy is graphics-owned at snapshot

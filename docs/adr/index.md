@@ -20,6 +20,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 14. [0014 — Procedural-source residency bridge](0014-procedural-source-residency-bridge.md)
 15. [0015 — Runtime reference scene bootstrap](0015-reference-scene-bootstrap.md)
 16. [0016 — Texture residency, fallback, and asset cache policy](0016-texture-residency-and-asset-cache-policy.md)
+17. [0017 — Default debug surface material (slot 0)](0017-default-debug-surface-material.md)
 
 ## Conventions
 
