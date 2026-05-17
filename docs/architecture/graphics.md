@@ -64,44 +64,7 @@ See [ADR-0005 — Vulkan operational readiness gate and runtime reconciliation](
   the async transfer seam instead of the blocking `IDevice::WriteTexture()`
   helper.
 - `Extrinsic.Graphics.PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain. `SceneColorHDR`, `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, and `PostProcess.AATemp` are frame-recipe transient resources owned by the framegraph; `PostProcessSystem` retains only the SMAA `AreaTex`/`SearchTex` lookup textures and the exposure-adaptation history buffer. See [ADR-0010 — Postprocess chain backend policy](../adr/0010-postprocess-chain-backend-policy.md) for the bloom mip-chain pyramid + filter taps, the 256-bin histogram + drain pattern, the FXAA/SMAA mutual-exclusion + named-subresource `AATemp` policy, the retained-vs-frame-transient ownership split, and the one-push-constant-block / one-pass-local-descriptor-set binding rule.
-- `Extrinsic.Graphics.DebugViewSystem` owns the backend-agnostic
-  render-target inspection and resource-selection seam. It builds a
-  deterministic inspection table from `FrameRecipeIntrospection`,
-  classifies resources (texture, depth texture, buffer, backbuffer,
-  alias, unknown), and resolves the requested `DebugViewSettings::RequestedResourceName`
-  with structured fallback diagnostics. Per `GRAPHICS-013BQ`, no
-  retained graphics-owned debug-view textures or buffers exist;
-  `DebugViewRGBA` is a frame-recipe transient owned by the framegraph,
-  and the resolved sampled selection is bound through one pass-local
-  `Pass.DebugView` descriptor set with exactly two bindings (sampled
-  image view + linear-clamp sampler). Visualization mode is derived
-  deterministically from `FrameRecipeResourceKind` plus
-  `DebugViewResourceClass`, so `DebugViewSettings` does not gain a
-  user-selectable visualization-mode field and
-  `DebugViewPushConstants` keeps its existing four-`uint32` packing.
-  Concrete `VkDescriptorSetLayout` definitions and per-aspect view
-  creation (color view for `RGBA8_UNORM`/`RGBA16_FLOAT` resources,
-  depth-aspect-only view for depth-class resources, integer-typed view
-  for the `R32_UINT` selection-ID resources `EntityId`/`PrimitiveId`)
-  remain backend-local under `src/graphics/vulkan` and never leak
-  through RHI or renderer module surfaces. `Material0` is
-  `RGBA16_FLOAT` carrying scalar PBR channels (roughness in R,
-  metallic in G, reserved in B/A) and is visualized as a scalar
-  channel false-color preview rather than as an integer slot-ID
-  hash; `DebugViewRGBA` is the pass color attachment and is
-  deliberately non-selectable as a preview input by
-  `DebugViewSystem::BuildInspectionTable()` to prevent self-sampling. Runtime/editor code owns the dictionary
-  that maps human-readable UI strings to canonical
-  `FrameRecipeIntrospection::Resources[i].Name` keys using the rows
-  exposed by `DebugViewSystem::BuildInspectionTable()`, then calls
-  `DebugViewSystem::SetSettings(...)`; graphics never receives display
-  strings and never imports ImGui or platform/window state. Buffer-class
-  resources remain listed in the inspection table but stay
-  non-previewable in `Pass.DebugView`; textual/statistical buffer
-  inspection is deferred to a future runtime/editor visualization
-  surface tracked under `GRAPHICS-014Q` that consumes existing
-  per-owner diagnostics rather than adding a parallel buffer-readback
-  API on `DebugViewSystem`.
+- `Extrinsic.Graphics.DebugViewSystem` owns the backend-agnostic render-target inspection and resource-selection seam. It builds a deterministic inspection table from `FrameRecipeIntrospection`, classifies resources (texture, depth texture, buffer, backbuffer, alias, unknown), and resolves the requested `DebugViewSettings::RequestedResourceName` with structured fallback diagnostics. See [ADR-0011 — Debug-view inspection table and visualization mode mapping](../adr/0011-debug-view-inspection-table.md) for the deterministic `(FrameRecipeResourceKind, DebugViewResourceClass)` → shader visualization-mode table, the one-pass-local-descriptor-set + per-aspect view rules, the runtime/editor-owned UI-name dictionary, and the buffer-class non-previewability + deferred textual/statistical inspection policy.
 - `Extrinsic.Graphics.ImGuiOverlaySystem` and
   `Extrinsic.Graphics.Pass.Present` own the backend-agnostic ImGui
   overlay summary contract and the imported backbuffer finalization
