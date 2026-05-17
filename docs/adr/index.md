@@ -9,6 +9,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 3. [0003 — Ideal runtime architecture](0003-ideal-runtime-architecture.md)
 4. [0004 — Vulkan backend bring-up and fail-closed fallback](0004-vulkan-backend-bringup-and-fallback.md)
 5. [0005 — Vulkan operational readiness gate and runtime reconciliation](0005-vulkan-operational-readiness-gate.md)
+6. [0006 — Camera, picking-request, and gizmo runtime handoff](0006-camera-picking-and-gizmo-runtime-handoff.md)
 
 ## Conventions
 

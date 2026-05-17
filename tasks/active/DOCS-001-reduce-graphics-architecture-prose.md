@@ -10,7 +10,8 @@
 - Slice 2 landed so far:
   - ADR-0004 (Vulkan backend bring-up + fail-closed fallback) — replaces the line-31 mega-paragraph of `docs/architecture/graphics.md` with a one-line pointer. Cross-links retired `GRAPHICS-018`/`018Q`/`018R`/`018T`/`026`.
   - ADR-0005 (Vulkan operational readiness gate and runtime reconciliation) — replaces the lines 33–65 `## Vulkan operational readiness and runtime fallback` section with a one-line pointer. Cross-links retired `GRAPHICS-033`/`033A`/`033B`/`033C`/`033E`/`033F` and the active `GRAPHICS-033D` smoke as the canonical end-to-end validator.
-- Next verification step: continue slice 2 in dependency order from the Classification table. The next per-ADR commit is ADR-0006 (Camera, picking, and gizmo runtime handoff; extracts lines 85–149 of `docs/architecture/graphics.md`); after that, the remaining 11 ADRs follow the Classification table top-to-bottom. Each commit runs the three static verification gates (`tools/agents/check_task_policy.py --strict`, `tools/docs/check_doc_links.py`, `tools/agents/validate_tasks.py --strict`). Build/CTest verification deferred to CI because the pinned `clang-20` toolchain is unavailable on this host.
+  - ADR-0006 (Camera, picking-request, and gizmo runtime handoff) — replaces the lines 85–149 GRAPHICS-017Q clarification paragraph embedded in the `Extrinsic.Graphics.CameraSnapshots` bullet with a one-line pointer. Cross-links retired `GRAPHICS-017`/`017Q` and the migration parity matrix (no new migration doc; the handoff inventory already lives there).
+- Next verification step: continue slice 2 in dependency order from the Classification table. The next per-ADR commit is ADR-0007 (Picking, selection, and outline; extracts lines 150–175 of `docs/architecture/graphics.md`); after that, the remaining 10 ADRs follow the Classification table top-to-bottom. Each commit runs the three static verification gates (`tools/agents/check_task_policy.py --strict`, `tools/docs/check_doc_links.py`, `tools/agents/validate_tasks.py --strict`). Build/CTest verification deferred to CI because the pinned `clang-20` toolchain is unavailable on this host.
 
 ## Goal
 - [ ] Reshape [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) (currently ~793 lines, much of it multi-paragraph prose embedded in single bullet items) into a short canonical contract that a contributor can read in five minutes, plus a short pointer list to the deeper material it currently inlines.
@@ -114,7 +115,7 @@ Slice-2 progress (per Classification-table row, top-to-bottom):
 
 - [x] ADR-0004 — Vulkan backend bring-up and fail-closed fallback (Classification row 31). Replaces graphics.md line 31 with a one-line pointer; index updated.
 - [x] ADR-0005 — Vulkan operational readiness gate (Classification row 33–65). Replaces the `## Vulkan operational readiness and runtime fallback` section with a one-line pointer; index updated.
-- [ ] ADR-0006 — Camera, picking, and gizmo runtime handoff (Classification row 85–149).
+- [x] ADR-0006 — Camera, picking, and gizmo runtime handoff (Classification row 85–149). Replaces the GRAPHICS-017Q clarification paragraph embedded in the `Extrinsic.Graphics.CameraSnapshots` bullet with a one-line pointer; index updated. Migration-inventory portion stays cross-linked to `docs/migration/nonlegacy-parity-matrix.md` (no new migration doc).
 - [ ] ADR-0007 — Picking, selection, and outline (Classification row 150–175).
 - [ ] ADR-0008 — Spatial debug visualizer adapters (Classification row 176–200).
 - [ ] ADR-0009 — Visualization packets and overlay upload (Classification row 201–257).
