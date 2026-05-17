@@ -19,6 +19,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 13. [0013 — ECS renderable residency bridge](0013-ecs-renderable-residency-bridge.md)
 14. [0014 — Procedural-source residency bridge](0014-procedural-source-residency-bridge.md)
 15. [0015 — Runtime reference scene bootstrap](0015-reference-scene-bootstrap.md)
+16. [0016 — Texture residency, fallback, and asset cache policy](0016-texture-residency-and-asset-cache-policy.md)
 
 ## Conventions
 
