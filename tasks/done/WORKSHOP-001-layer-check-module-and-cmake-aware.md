@@ -13,10 +13,16 @@
   `graphics/renderer/Backends/Null/Backends.Null.cpp` and
   `graphics/vulkan/Backends.Vulkan.Device.cppm` imports that this task
   exposed) and the matching `target_link_libraries(... ExtrinsicPlatform)`
-  edge in `src/graphics/rhi/CMakeLists.txt`; once it lands, the CI
-  workflows can revert the expected-failure wrapper added by this task
-  back to an unguarded `python3 tools/repo/check_layering.py --root src
-  --strict` invocation.
+  edge in `src/graphics/rhi/CMakeLists.txt`. Until then, the CI
+  workflows route the strict layer check through
+  `tools/ci/check_layering_workshop_002_gate.py`, which exits 0 only
+  when the observed violation set is a subset of the four expected
+  WORKSHOP-002 entries — a regression that adds any new violation
+  alongside the known ones fails CI. Once WORKSHOP-002 lands, the gate
+  script and its unit tests
+  (`tests/regression/tooling/Test.CheckLayeringWorkshop002Gate.py`) are
+  deleted and the workflow steps revert to the unguarded
+  `python3 tools/repo/check_layering.py --root src --strict` invocation.
 - Verification step run: see "Verification" below; fixture-only run +
   regression test suite both pass; the strict `src/` run fails with the
   expected `Extrinsic.Platform.Window` violation (plus the three

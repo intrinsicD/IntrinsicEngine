@@ -51,7 +51,10 @@
       `.github/workflows/ci-linux-clang.yml` from the WORKSHOP-001
       expected-failure wrapper to an unguarded
       `python3 tools/repo/check_layering.py --root src --strict`
-      invocation.
+      invocation, and delete
+      `tools/ci/check_layering_workshop_002_gate.py` and
+      `tests/regression/tooling/Test.CheckLayeringWorkshop002Gate.py`
+      (the gate's purpose is the transient WORKSHOP-002 window only).
 
 ## Tests
 - [ ] Update existing RHI manager tests to compile without `ExtrinsicPlatform` as an RHI dependency.
