@@ -15,7 +15,7 @@ Status labels:
 - [Overview](overview.md) (`canonical`)
 - [Layering rules](layering.md) (`canonical`)
 - [Runtime](runtime.md) (`canonical`)
-- [Graphics](graphics.md) (`canonical`)
+- [Graphics](graphics.md) (`canonical`) — reduced to the contract layer per [`DOCS-001`](../../tasks/active/DOCS-001-reduce-graphics-architecture-prose.md); embedded decision records relocated to ADRs `0004..0018` (see Pointers section).
 - [Geometry](geometry.md) (`canonical`)
 - [Geometry API style and numeric policy](geometry-api-style.md) (`canonical`)
 - [Assets](assets.md) (`canonical`)
@@ -32,6 +32,21 @@ Status labels:
 - [`0001-minimal-runtime-refactor.md`](../adr/0001-minimal-runtime-refactor.md) (`legacy-background`)
 - [`0002-pragmatic-medium-runtime-refactor.md`](../adr/0002-pragmatic-medium-runtime-refactor.md) (`legacy-background`)
 - [`0003-ideal-runtime-architecture.md`](../adr/0003-ideal-runtime-architecture.md) (`legacy-background`)
+- [`0004-vulkan-backend-bringup-and-fallback.md`](../adr/0004-vulkan-backend-bringup-and-fallback.md) (`canonical`)
+- [`0005-vulkan-operational-readiness-gate.md`](../adr/0005-vulkan-operational-readiness-gate.md) (`canonical`)
+- [`0006-camera-picking-and-gizmo-runtime-handoff.md`](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md) (`canonical`)
+- [`0007-picking-selection-and-outline.md`](../adr/0007-picking-selection-and-outline.md) (`canonical`)
+- [`0008-spatial-debug-visualizer-adapters.md`](../adr/0008-spatial-debug-visualizer-adapters.md) (`canonical`)
+- [`0009-visualization-packets-and-overlay-upload.md`](../adr/0009-visualization-packets-and-overlay-upload.md) (`canonical`)
+- [`0010-postprocess-chain-backend-policy.md`](../adr/0010-postprocess-chain-backend-policy.md) (`canonical`)
+- [`0011-debug-view-inspection-table.md`](../adr/0011-debug-view-inspection-table.md) (`canonical`)
+- [`0012-imgui-overlay-and-present-finalization.md`](../adr/0012-imgui-overlay-and-present-finalization.md) (`canonical`)
+- [`0013-ecs-renderable-residency-bridge.md`](../adr/0013-ecs-renderable-residency-bridge.md) (`canonical`)
+- [`0014-procedural-source-residency-bridge.md`](../adr/0014-procedural-source-residency-bridge.md) (`canonical`)
+- [`0015-reference-scene-bootstrap.md`](../adr/0015-reference-scene-bootstrap.md) (`canonical`)
+- [`0016-texture-residency-and-asset-cache-policy.md`](../adr/0016-texture-residency-and-asset-cache-policy.md) (`canonical`)
+- [`0017-default-debug-surface-material.md`](../adr/0017-default-debug-surface-material.md) (`canonical`)
+- [`0018-missing-material-fallback-substitution.md`](../adr/0018-missing-material-fallback-substitution.md) (`canonical`)
 
 ## Existing architecture references by status
 

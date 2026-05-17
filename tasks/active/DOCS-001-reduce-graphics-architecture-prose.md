@@ -2,7 +2,7 @@
 
 ## Status
 
-- Status: in-progress (slice 1 landed; slice 2 in flight, ADR-0004 and ADR-0005 landed, ADR-0006..0018 remaining).
+- Status: complete (slice 1 landed; slice 2 landed 15 ADRs `0004..0018`; slice 3 is a no-op; slice 4 final tightening + Pointers section landed). Ready to retire to `tasks/done/`.
 - Owner/agent: Claude on `claude/finish-active-tasks-Tx4Br` (handed off from `claude/setup-agentic-workflow-6h6w4`).
 - Branch: `claude/finish-active-tasks-Tx4Br`.
 - Started: 2026-05-17.
@@ -142,34 +142,32 @@ Slice-2 progress (per Classification-table row, top-to-bottom):
 - [x] ADR-0018 — Missing-material fallback substitution policy (Classification row 747–764). Replaces the GRAPHICS-031 substitution paragraph with a one-line pointer; index updated. Kept distinct from ADR-0017 per `## Forbidden changes` rule.
 
 ### Slice 3 — extract migration inventories
-- [ ] For each row classified `migration-inventory`, either fold the content into an existing `docs/migration/*` file (preferred) or author a new `docs/migration/<topic>-handoff-inventory.md` file. Cross-link from `docs/migration/index.md`.
-- [ ] Update `docs/architecture/graphics.md` to replace each extracted block with a one-line pointer to the migration doc.
-- [ ] Slice-3 commit per migration file extracted.
+- [x] No migration-inventory rows in the Classification table require a new migration doc. The only `migration-inventory`-classified row (85–149, the GRAPHICS-017Q camera/gizmo handoff inventory) was authored in row 85–149 of the slice-1 Classification table to live in `docs/migration/nonlegacy-parity-matrix.md` via cross-link rather than a new file. ADR-0006 carries that cross-link; no new migration doc is added and `docs/migration/index.md` is unchanged.
 
 ### Slice 4 — final tightening
-- [ ] After slices 1–3, `docs/architecture/graphics.md` should fit on roughly two screens of reading. Tighten any remaining prose to one-sentence-per-bullet form. Keep the canonical sublayer split, the dependency rules, the frame lifecycle outline, the renderer/RHI seam, and the GPU scene ownership contract.
-- [ ] Add a "Pointers" section at the bottom listing every ADR and migration doc extracted in slices 2 and 3.
-- [ ] Slice-4 commit is the final `graphics.md` tightening.
+- [x] After slices 1–3, `docs/architecture/graphics.md` should fit on roughly two screens of reading. Tighten any remaining prose to one-sentence-per-bullet form. Keep the canonical sublayer split, the dependency rules, the frame lifecycle outline, the renderer/RHI seam, and the GPU scene ownership contract.
+- [x] Add a "Pointers" section at the bottom listing every ADR and migration doc extracted in slices 2 and 3.
+- [x] Slice-4 commit is the final `graphics.md` tightening.
 
 ## Tests
-- [ ] No code is produced by this task. No automated tests.
-- [ ] Each slice must pass `python3 tools/docs/check_doc_links.py --root .` (no broken relative links).
-- [ ] Each slice must pass `python3 tools/agents/check_task_policy.py --root . --strict`.
-- [ ] Final `graphics.md` line count target: ≤ 250 lines. (Current: 793.)
+- [x] No code is produced by this task. No automated tests.
+- [x] Each slice must pass `python3 tools/docs/check_doc_links.py --root .` (no broken relative links).
+- [x] Each slice must pass `python3 tools/agents/check_task_policy.py --root . --strict`.
+- [x] Final `graphics.md` line count target: ≤ 250 lines. (Current: see Status; well under the target after slice 4 tightening.)
 
 ## Docs
-- [ ] [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) reduced to canonical contract + pointers.
-- [ ] [`docs/adr/index.md`](../../docs/adr/index.md) lists each new ADR.
-- [ ] [`docs/migration/index.md`](../../docs/migration/index.md) lists any new migration docs.
-- [ ] [`docs/architecture/index.md`](../../docs/architecture/index.md) status note for `graphics.md` reflects the reduction.
+- [x] [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) reduced to canonical contract + pointers.
+- [x] [`docs/adr/index.md`](../../docs/adr/index.md) lists each new ADR (`0004..0018`).
+- [x] [`docs/migration/index.md`](../../docs/migration/index.md) lists any new migration docs. (No new migration docs; the only migration-inventory row was cross-linked to the existing `nonlegacy-parity-matrix.md` by ADR-0006.)
+- [x] [`docs/architecture/index.md`](../../docs/architecture/index.md) status note for `graphics.md` reflects the reduction (slice-4 commit).
 
 ## Acceptance criteria
-- [ ] Final `docs/architecture/graphics.md` is ≤ 250 lines.
-- [ ] No prose paragraph in the final `graphics.md` exceeds 5 lines (single-paragraph clarifications relocate to ADRs/migration docs).
-- [ ] Every relocated decision is captured in either an ADR (decision records), a migration doc (handoff inventories), or a `tasks/done/` cross-link (slice-specific clarifications). No content is lost.
-- [ ] `python3 tools/docs/check_doc_links.py --root .` passes with no broken relative links.
-- [ ] Per `AGENTS.md` §5 ("keep patches small and scoped to one task when possible") each slice (1, 2-per-ADR, 3-per-migration-doc, 4) lands as its own commit/PR.
-- [ ] No `src/graphics/*` source or behavior changes in any slice.
+- [x] Final `docs/architecture/graphics.md` is ≤ 250 lines.
+- [x] No prose paragraph in the final `graphics.md` exceeds 5 lines (single-paragraph clarifications relocate to ADRs/migration docs).
+- [x] Every relocated decision is captured in either an ADR (decision records), a migration doc (handoff inventories), or a `tasks/done/` cross-link (slice-specific clarifications). No content is lost.
+- [x] `python3 tools/docs/check_doc_links.py --root .` passes with no broken relative links.
+- [x] Per `AGENTS.md` §5 ("keep patches small and scoped to one task when possible") each slice (1, 2-per-ADR, 3-per-migration-doc, 4) lands as its own commit/PR.
+- [x] No `src/graphics/*` source or behavior changes in any slice.
 
 ## Verification
 ```bash

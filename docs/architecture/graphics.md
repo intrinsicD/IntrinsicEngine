@@ -38,44 +38,17 @@ See [ADR-0005 — Vulkan operational readiness gate and runtime reconciliation](
 
 - Runtime composes the CPU render scene from ECS, assets, geometry, transforms, materials, lights, selection, camera, and debug inputs.
 - Graphics receives immutable `RenderWorld` / `RenderFrameInput` snapshots plus runtime-submitted transform/light/visualization record batches and uploads them into graphics-owned GPU scene buffers.
-- `RenderWorld` currently exposes renderer-owned spans of `RenderableSnapshot`
-  and `LightSnapshot` values, sanitized transient debug line/point/triangle
-  packet spans, data-only transform-gizmo render packet spans, data-only
-  visualization packet spans/diagnostics, camera/view/frustum snapshots,
-  defaulted optional packets for picking, selection, shadows,
-  postprocess/readback, and invalid-record diagnostics. Runtime-submitted
-  batches are copied by the renderer before these spans are exposed, so no live
-  ECS storage is retained by graphics.
-- `Extrinsic.Graphics.CameraSnapshots` validates camera matrices, extracts
-  frustum planes, and derives pick rays from immutable pixel pick requests.
-  Viewport dimensions are carried as the core-owned `Core::Extent2D` value type,
-  not as a dependency on the live platform window port.
-  Runtime/platform own camera motion, input polling, pick-request creation,
-  gizmo hit testing, and transform application; graphics only consumes the
-  resulting data snapshots. See [ADR-0006 — Camera, picking-request, and gizmo runtime handoff](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md) for the runtime camera-controller umbrella, single-shot `PickPixelRequest` scheduling and coalescing, transform-gizmo hit-test ownership, interaction-state storage and lifetime, and transform-application/undo policy; legacy `Graphics.TransformGizmo` / `Graphics.Interaction` feature handoff stays tracked in [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md).
+- `RenderWorld` exposes renderer-owned spans (renderable / light snapshots, sanitized transient debug packets, transform-gizmo and visualization packets, camera / view / frustum snapshots, optional picking / selection / shadows / postprocess / readback packets, invalid-record diagnostics). Runtime-submitted batches are copied by the renderer before exposure so no live ECS storage is retained by graphics.
+- `Extrinsic.Graphics.CameraSnapshots` validates camera matrices, extracts frustum planes, and derives pick rays from immutable pixel pick requests; viewport dimensions ride on the core-owned `Core::Extent2D` value type rather than a live platform window port. Runtime/platform own camera motion, input polling, pick-request creation, gizmo hit testing, and transform application; graphics only consumes the resulting data snapshots. See [ADR-0006](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md) for the camera-controller / pick-scheduling / gizmo-handoff / undo policy; legacy `Graphics.TransformGizmo` / `Graphics.Interaction` handoff stays tracked in [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md).
 - `Extrinsic.Graphics.SelectionSystem` is a CPU-visible reporting-only seam for picking. The renderer copies the requested pixel(s) into the graphics-owned host-visible `Picking.Readback` buffer at frame-record time and drains it on the next `BeginFrame()` through `SelectionSystem::PublishPickResult(...)` / `PublishNoHit()`; runtime owns `StableEntityId` → live ECS resolution and the selection-outline input mask consumed by `SelectionOutlinePass`. See [ADR-0007 — Picking, selection, and outline reporting seam](../adr/0007-picking-selection-and-outline.md) for the `EntityId` / `PrimitiveId` `EncodedSelectionId` packing, the per-pass payload sources, the drain timing and diagnostic-counter invariants, and the transparent / special-material picking eligibility gate that holds until `GRAPHICS-025` lands.
 - `Extrinsic.Graphics.SpatialDebugVisualizers` converts data-only spatial debug snapshots (bounds, hierarchy nodes, split planes, convex-hull wire edges, point markers) into transient debug packets with deterministic limits and diagnostics. Graphics never imports geometry tree implementations or editor state; concrete adapters live in runtime extraction. See [ADR-0008 — Spatial debug visualizer runtime adapters](../adr/0008-spatial-debug-visualizer-adapters.md) for the `Extrinsic.Runtime.SpatialDebugAdapters` umbrella, the `Build*SpatialDebugInputs(...)` naming convention, the frozen packet/diagnostics contract, the pre-filter vs graphics-side truncation budget split, and the `integration;runtime;graphics` adapter test placement.
 - `Extrinsic.Graphics.VisualizationPackets` is the promoted data-only seam for scalar/color/vector attribute buffers, vector-field overlays, isoline overlays, UV-backed fragment-bake atlas descriptors, and Htex patch-preview/bake atlas descriptors. The packet layer validates domains, ranges, colormap IDs, buffer-address seams, missing texcoords/resources, and Htex recreation requests through `ValidateVisualizationPackets(...)` at snapshot extraction time; rejected records are dropped and counted in `VisualizationDiagnostics`. See [ADR-0009 — Visualization packets, validation, and overlay upload](../adr/0009-visualization-packets-and-overlay-upload.md) for the `Extrinsic.Runtime.VisualizationAdapters` runtime ownership, the "no runtime filtering" rule, the backend-local vector-field/isoline overlay upload helper that mirrors `GRAPHICS-007Q`/`GRAPHICS-010Q`/`GRAPHICS-013CQ`, the `ExistingTexcoords`/`ExistingHtex`/`RecreateHtex` fragment-bake mapping policy with `Extrinsic.Runtime.StreamingExecutor` async baking, and the two-pipeline-variant depth-test policy reused from `GRAPHICS-010Q`.
-- `Extrinsic.Graphics.ColormapSystem` owns built-in colormap LUT residency. It
-  allocates retained 256-sample RGBA8 LUT textures through RHI managers, submits
-  the initial bytes through `RHI::ITransferQueue`, and exposes `IsReady()` as the
-  first-frame readiness guard. Bindless colormap indices stay invalid until all
-  LUT transfer tokens are valid and complete, keeping renderer/runtime callers on
-  the async transfer seam instead of the blocking `IDevice::WriteTexture()`
-  helper.
+- `Extrinsic.Graphics.ColormapSystem` owns built-in colormap LUT residency: retained 256-sample RGBA8 LUT textures allocated through RHI managers and uploaded via `RHI::ITransferQueue`, with `IsReady()` as the first-frame readiness guard. Bindless colormap indices stay invalid until all LUT transfer tokens are valid and complete, keeping callers on the async transfer seam instead of the blocking `IDevice::WriteTexture()` helper.
 - `Extrinsic.Graphics.PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain. `SceneColorHDR`, `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, and `PostProcess.AATemp` are frame-recipe transient resources owned by the framegraph; `PostProcessSystem` retains only the SMAA `AreaTex`/`SearchTex` lookup textures and the exposure-adaptation history buffer. See [ADR-0010 — Postprocess chain backend policy](../adr/0010-postprocess-chain-backend-policy.md) for the bloom mip-chain pyramid + filter taps, the 256-bin histogram + drain pattern, the FXAA/SMAA mutual-exclusion + named-subresource `AATemp` policy, the retained-vs-frame-transient ownership split, and the one-push-constant-block / one-pass-local-descriptor-set binding rule.
 - `Extrinsic.Graphics.DebugViewSystem` owns the backend-agnostic render-target inspection and resource-selection seam. It builds a deterministic inspection table from `FrameRecipeIntrospection`, classifies resources (texture, depth texture, buffer, backbuffer, alias, unknown), and resolves the requested `DebugViewSettings::RequestedResourceName` with structured fallback diagnostics. See [ADR-0011 — Debug-view inspection table and visualization mode mapping](../adr/0011-debug-view-inspection-table.md) for the deterministic `(FrameRecipeResourceKind, DebugViewResourceClass)` → shader visualization-mode table, the one-pass-local-descriptor-set + per-aspect view rules, the runtime/editor-owned UI-name dictionary, and the buffer-class non-previewability + deferred textual/statistical inspection policy.
 - `Extrinsic.Graphics.ImGuiOverlaySystem` and `Extrinsic.Graphics.Pass.Present` own the backend-agnostic ImGui overlay summary contract and the imported backbuffer finalization shim. Graphics never imports `imgui.h` or platform/swapchain types; runtime/editor translates `ImDrawData` into `ImGuiOverlayFrame` and runtime composition owns frame bracketing + `IDevice::Present(frame)`. See [ADR-0012 — ImGui overlay submission and `Pass.Present` finalization](../adr/0012-imgui-overlay-and-present-finalization.md) for the `SubmitFrame`/`ClearFrame` timing, the transient overlay buffer ring + retained font atlas + bindless user textures + single-pipeline binding rule, the rejection of swapchain copy/blit as the contract finalization form (fullscreen-triangle stays the CPU-testable shape), and the platform/backend/runtime/graphics boundary table.
 - The promoted GPU-driven path should use a canonical instance-slot space shared by renderable records, transform records, bounds/culling records, material references, picking IDs, and draw buckets.
-- `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry.
-  Managed-buffer compaction is explicit and opt-in: callers first request a
-  `PlanManagedBufferCompaction()` result, then may pass that exact generation-
-  checked plan to `ApplyManagedBufferCompaction()`. The relocation table reports
-  old/new geometry byte offsets and shader-visible vertex/index units so runtime
-  sidecars can refresh extracted caches without graphics importing runtime or
-  live ECS ownership. Compaction is skipped when disabled or below threshold and
-  is blocked by default while deferred frees are still pending for frames in
-  flight.
+- `GpuWorld` owns retained managed vertex/index buffer ranges for uploaded geometry. Managed-buffer compaction is explicit and opt-in: callers `PlanManagedBufferCompaction()`, then pass that generation-checked plan to `ApplyManagedBufferCompaction()`; the relocation table reports old/new geometry byte offsets and shader-visible vertex/index units so runtime sidecars can refresh extracted caches without graphics importing runtime or live ECS ownership. Compaction is skipped when disabled or below threshold and is blocked by default while deferred frees are still pending for frames in flight.
 - Heavy CPU scene data lives in the owning subsystem or runtime extraction pools; canonical ECS components keep source data/IDs, not graphics backend resources.
 
 ## ECS renderable residency bridge
@@ -92,79 +65,52 @@ See [ADR-0015 — Runtime reference scene bootstrap](../adr/0015-reference-scene
 
 ## Graphics asset residency
 
-- `src/graphics/assets/Graphics.GpuAssetCache.cppm` maps promoted
-  `Assets::AssetId` values to graphics-owned GPU buffer/texture leases. It uses
-  only Asset Registry identity types plus RHI managers; runtime remains
-  responsible for translating asset events into `Reserve`, `RequestUpload`,
-  `NotifyFailed`, `NotifyReloaded`, and `NotifyDestroyed` calls.
-- Texture uploads use `GpuTextureRequest` (`AssetId`, CPU bytes, `TextureDesc`,
-  and either an externally owned sampler handle or a sampler descriptor owned
-  through `RHI::SamplerManager`). Ready texture views expose texture handle,
-  bindless index, sampler handle, generation, and kind.
-- Missing, pending, or failed texture assets resolve deterministically through
-  `InitializeFallbackTexture()` plus `GetViewOrFallback()`. The resolved view
-  records whether fallback was used and why (`Missing`, `Pending`, or `Failed`),
-  keeping material/pass code CPU-testable without Vulkan.
-- The current cache is explicitly non-evicting. Hot reloads keep old leases alive
-  through a frame-anchored retire queue so immutable renderer snapshots can keep
-  using old views for at least `framesInFlight` frames. Future capacity/eviction
-  policy must be a separate semantic task.
-- `GpuAssetCacheDiagnostics` reports upload requests, texture upload requests,
-  texture/sampler allocation failures, fallback hits/misses, tracked assets,
-  pending retire records, fallback readiness, and the non-eviction policy.
+- `src/graphics/assets/Graphics.GpuAssetCache.cppm` maps promoted `Assets::AssetId` values to graphics-owned GPU buffer/texture leases using only Asset Registry identity types plus RHI managers; runtime translates asset events into `Reserve` / `RequestUpload` / `NotifyFailed` / `NotifyReloaded` / `NotifyDestroyed` calls.
+- Texture uploads use `GpuTextureRequest` (`AssetId`, CPU bytes, `TextureDesc`, externally-owned sampler handle or `RHI::SamplerManager` descriptor); ready texture views expose texture handle, bindless index, sampler handle, generation, and kind.
+- Missing, pending, or failed texture assets resolve deterministically through `InitializeFallbackTexture()` + `GetViewOrFallback()`, with the resolved view recording whether fallback was used and why (`Missing` / `Pending` / `Failed`) so material/pass code stays CPU-testable without Vulkan.
+- The current cache is explicitly non-evicting; hot reloads keep old leases alive through a frame-anchored retire queue so immutable renderer snapshots can keep using old views for at least `framesInFlight` frames. Future capacity/eviction policy must be a separate semantic task.
+- `GpuAssetCacheDiagnostics` reports upload requests, texture upload requests, texture/sampler allocation failures, fallback hits/misses, tracked assets, pending retire records, fallback readiness, and the non-eviction policy.
 
 See [ADR-0016 — Texture residency, fallback, and asset cache policy](../adr/0016-texture-residency-and-asset-cache-policy.md) for the GRAPHICS-015Q follow-ups: the explicitly non-evicting cache + future bounded-eviction constraints, the `RHI::TextureManager::Reupload()` streaming-mip preservation seam vs full-lease-replacement `RequestUpload`, the single 4x4 magenta-and-black fallback texture + per-channel shader-side neutrality contract, the `InitializeFallbackTexture()` failure behavior, the per-frame coalesced bindless descriptor write batch (mirroring `Picking.Readback` / histogram drain) + `RHI::SamplerManager` dedup + `BindlessDescriptorRewrites` counter, and the runtime ownership of fallback initialization, `Extrinsic.Runtime.AssetBridges.Texture` event subscription, and synchronous `RequestUpload`/`NotifyDestroyed` calls.
 
 ## Pipeline and shader registry contract
 
-- `Extrinsic.RHI.PipelineRegistry` is the promoted CPU-testable cache layer for
-  deterministic shader/pipeline identities. It builds `PipelineKey` values from
-  shader paths, shader generations, and the RHI `PipelineDesc` render state;
-  matching keys return the same graphics-owned pipeline handle without requiring
-  Vulkan shader compilation in the default CPU gate.
-- Shader reload is represented as explicit invalidation by shader path. The
-  registry drops affected cached leases and reports reload invalidation counts;
-  callers request a new key with an updated shader generation to recreate the
-  pipeline through `RHI::PipelineManager`.
-- Missing shader IDs, key/descriptor mismatches, and backend pipeline creation
-  failures are deterministic diagnostics. Backend-specific shader compilation
-  remains behind RHI/backend integration and stays opt-in for GPU/Vulkan tests.
+- `Extrinsic.RHI.PipelineRegistry` is the promoted CPU-testable cache layer for deterministic shader/pipeline identities: `PipelineKey` values from shader paths + generations + `PipelineDesc` render state return the same graphics-owned pipeline handle without requiring Vulkan shader compilation in the default CPU gate.
+- Shader reload is explicit invalidation by shader path: the registry drops affected cached leases and reports reload invalidation counts; callers request a new key with an updated shader generation to recreate the pipeline through `RHI::PipelineManager`.
+- Missing shader IDs, key/descriptor mismatches, and backend pipeline creation failures are deterministic diagnostics; backend-specific shader compilation remains behind RHI/backend integration and stays opt-in for GPU/Vulkan tests.
 
 ## Material registry and slot contract
 
-- `Extrinsic.Graphics.MaterialSystem` owns promoted material-slot allocation in
-  the renderer layer. Runtime extraction may maintain sidecar mappings from ECS
-  entities or material asset IDs to `MaterialSystem` leases/slots, but canonical
-  ECS components must not store graphics-owned material-slot indices.
-- Slot `0` is the immutable fallback/default material slot
-  (`kDefaultMaterialSlotIndex`). Stale or invalid material handles resolve to
-  that fallback and increment deterministic CPU-visible diagnostics.
+- `Extrinsic.Graphics.MaterialSystem` owns promoted material-slot allocation in the renderer layer. Runtime extraction may maintain sidecar mappings from ECS entities or material asset IDs to `MaterialSystem` leases/slots, but canonical ECS components must not store graphics-owned material-slot indices.
+- Slot `0` is the immutable fallback/default material slot (`kDefaultMaterialSlotIndex`); stale or invalid material handles resolve to that fallback and increment deterministic CPU-visible diagnostics.
 - Slot 0 is the `"Material.DefaultDebugSurface"` unlit material with deterministic non-black `BaseColorFactor = {0.55, 0.20, 0.85, 1.0}`, pre-populated by `MaterialSystem::Initialize()` and republished byte-identical by `RebuildGpuResources()`. See [ADR-0017 — Default debug surface material (slot 0)](../adr/0017-default-debug-surface-material.md) for the `MaterialTypeID` / shader pair (`assets/shaders/forward/default_debug_surface.vert/frag`) / vertex format / forward graphics pipeline state / `SurfaceOpaque` cull-bucket reuse details.
 - See [ADR-0018 — Missing-material fallback substitution and diagnostics](../adr/0018-missing-material-fallback-substitution.md) for the graphics-owned snapshot-span-copy substitution policy that replaces unset / out-of-range material slots with `kDefaultMaterialSlotIndex`, the three additive `MaterialSystemDiagnostics` counters (`MissingMaterialFallbackCount`, `InvalidMaterialSlotCount`, `DefaultDebugSurfaceUses`), the no-silent-skip rule, and the separation from the handle-keyed `FallbackSlotResolveCount` path inside `GetMaterialSlot()`.
-- Follow-up debug-material variants (`Wireframe`, `Line`, `Point`, `Normals`,
-  `UVs`, `Depth`, `InstanceId`) attach as additional `MaterialTypeDesc`
-  registrations and additional well-known slot constants under the naming
-  family `Material.DefaultDebug<Variant>` /
-  `kDefaultDebug<Variant>MaterialSlotIndex`, sharing the same descriptor
-  layout family; they are identified but not opened by GRAPHICS-031.
-- The canonical material SSBO layout is versioned by
-  `kMaterialLayoutVersion == 1` and described by
-  `GetCanonicalMaterialLayoutContract()`: one 128-byte `RHI::GpuMaterialSlot`
-  per material, four custom `vec4` slots, and four texture/bindless references
-  (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`).
-- Texture references remain `RHI::BindlessIndex` values in `MaterialParams` for
-  this contract. `MaterialTextureAssetBindings` carries data-only `AssetId`
-  texture slots (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`), and
-  `MaterialSystem::ResolveTextureAssetBindings()` resolves them through
-  `GpuAssetCache` into bindless material params. Missing, pending, or failed
-  texture assets can resolve to the cache fallback texture; unavailable
-  fallbacks are deterministic diagnostics. Runtime owns the asset-event and
-  material-authoring sidecars, not renderer passes or live asset-service traffic.
-- Material type registration rejects duplicate names and incompatible layouts
-  (for example more custom parameters than the four shader-visible custom data
-  slots). Dirty material updates are coalesced before upload and reported through
-  `MaterialSystemDiagnostics` so CPU-only tests can cover fallback, layout,
-  texture asset binding, and update behavior without Vulkan.
+- Follow-up debug-material variants (`Wireframe`, `Line`, `Point`, `Normals`, `UVs`, `Depth`, `InstanceId`) attach as additional `MaterialTypeDesc` registrations and well-known slot constants under the `Material.DefaultDebug<Variant>` / `kDefaultDebug<Variant>MaterialSlotIndex` naming family, sharing the same descriptor layout; identified but not opened by GRAPHICS-031.
+- Canonical material SSBO layout is versioned by `kMaterialLayoutVersion == 1` and described by `GetCanonicalMaterialLayoutContract()`: one 128-byte `RHI::GpuMaterialSlot` per material, four custom `vec4` slots, four texture/bindless references (`Albedo`, `Normal`, `MetallicRoughness`, `Emissive`).
+- Texture references remain `RHI::BindlessIndex` values in `MaterialParams`; `MaterialTextureAssetBindings` carries data-only `AssetId` slots (`Albedo` / `Normal` / `MetallicRoughness` / `Emissive`) and `MaterialSystem::ResolveTextureAssetBindings()` resolves them through `GpuAssetCache` into bindless material params, with missing/pending/failed assets resolving to the cache fallback texture and unavailable fallbacks surfacing as deterministic diagnostics. Runtime owns the asset-event and material-authoring sidecars, not renderer passes or live asset-service traffic.
+- Material type registration rejects duplicate names and incompatible layouts (for example more custom parameters than the four shader-visible custom data slots); dirty material updates are coalesced before upload and reported through `MaterialSystemDiagnostics` so CPU-only tests can cover fallback, layout, texture asset binding, and update behavior without Vulkan.
+
+## Pointers
+
+The decision-record content this document previously inlined has been extracted to the following ADRs (in order of original appearance, per the DOCS-001 slice-1 Classification table):
+
+- [ADR-0004 — Vulkan backend bring-up and fail-closed fallback](../adr/0004-vulkan-backend-bringup-and-fallback.md)
+- [ADR-0005 — Vulkan operational readiness gate and runtime reconciliation](../adr/0005-vulkan-operational-readiness-gate.md)
+- [ADR-0006 — Camera, picking-request, and gizmo runtime handoff](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md)
+- [ADR-0007 — Picking, selection, and outline reporting seam](../adr/0007-picking-selection-and-outline.md)
+- [ADR-0008 — Spatial debug visualizer runtime adapters](../adr/0008-spatial-debug-visualizer-adapters.md)
+- [ADR-0009 — Visualization packets, validation, and overlay upload](../adr/0009-visualization-packets-and-overlay-upload.md)
+- [ADR-0010 — Postprocess chain backend policy](../adr/0010-postprocess-chain-backend-policy.md)
+- [ADR-0011 — Debug-view inspection table and visualization mode mapping](../adr/0011-debug-view-inspection-table.md)
+- [ADR-0012 — ImGui overlay submission and `Pass.Present` finalization](../adr/0012-imgui-overlay-and-present-finalization.md)
+- [ADR-0013 — ECS renderable residency bridge](../adr/0013-ecs-renderable-residency-bridge.md)
+- [ADR-0014 — Procedural-source residency bridge](../adr/0014-procedural-source-residency-bridge.md)
+- [ADR-0015 — Runtime reference scene bootstrap](../adr/0015-reference-scene-bootstrap.md)
+- [ADR-0016 — Texture residency, fallback, and asset cache policy](../adr/0016-texture-residency-and-asset-cache-policy.md)
+- [ADR-0017 — Default debug surface material (slot 0)](../adr/0017-default-debug-surface-material.md)
+- [ADR-0018 — Missing-material fallback substitution and diagnostics](../adr/0018-missing-material-fallback-substitution.md)
+
+The handoff inventory that the GRAPHICS-017Q clarification paragraph previously embedded (legacy `Graphics.TransformGizmo` / `Graphics.Interaction` features awaiting promoted-implementation tasks) lives in [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md); ADR-0006 cross-links it rather than duplicating it (no new migration doc was authored).
 
 ## Related references
 
