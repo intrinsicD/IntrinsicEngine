@@ -17,10 +17,12 @@ map.
   inventories promoted modules whose value types, pure data contracts, or
   dependency-free APIs appear to live in higher layers than their true owner and
   creates one scoped follow-up task per accepted move/split.
-- [DOCS-001 — Reduce `docs/architecture/graphics.md` to contract + status](DOCS-001-reduce-graphics-architecture-prose.md):
-  shrink the 793-line `graphics.md` to ≤ 250 lines by extracting embedded
-  decision records into ADRs and migration inventories, leaving only the
-  canonical contract behind. Sliced for incremental landing.
+- [DOCS-001 — Reduce `docs/architecture/graphics.md` to contract + status](../../active/DOCS-001-reduce-graphics-architecture-prose.md)
+  (promoted to `tasks/active/`): shrink the 793-line `graphics.md` to ≤ 250
+  lines by extracting embedded decision records into ADRs and migration
+  inventories, leaving only the canonical contract behind. Sliced for
+  incremental landing; slice 1 (classification) and slice 2's first ADR
+  (`docs/adr/0004-vulkan-backend-bringup-and-fallback.md`) have landed.
 - [ARCH-004 — Pin first legacy-deletion target and sequencing](ARCH-004-legacy-retirement-first-deletion-target.md):
   picks the first `src/legacy/<area>/` subtree to actually delete (recommendation:
   `src/legacy/Interface/`), records second and third targets in dependency order,
