@@ -14,7 +14,20 @@
 - `src/graphics/rhi/CMakeLists.txt` currently links `ExtrinsicPlatform`.
 - This violates the intended promoted contract where `graphics/rhi` depends on `core` only.
 - Runtime should own composition between platform window and concrete backend. Abstract RHI should stay backend-neutral and platform-neutral.
-- WORKSHOP-001 makes this violation detectable in `check_layering.py --strict`; this task fixes it.
+- WORKSHOP-001 (retired 2026-05-17) made this violation detectable in
+  `check_layering.py --strict`; this task fixes it. WORKSHOP-001 also
+  surfaced three sibling graphics-layer imports of
+  `Extrinsic.Platform.Window` —
+  `src/graphics/renderer/Backends/Null/Backends.Null.cpp`,
+  `src/graphics/vulkan/Backends.Vulkan.Device.cppm` — which this task
+  must also remove, because they exist only to satisfy the current
+  `IDevice::Initialize(Platform::IWindow&, ...)` contract.
+- Until this task lands, `.github/workflows/pr-fast.yml` and
+  `.github/workflows/ci-linux-clang.yml` wrap the strict layering check
+  as an expected-failure invocation that succeeds while
+  `Extrinsic.Platform.Window` is reported. Reverting those steps to the
+  unguarded `python3 tools/repo/check_layering.py --root src --strict`
+  invocation is part of this task's Required changes.
 
 ## Required changes
 - [ ] Replace `RHI::IDevice::Initialize(Platform::IWindow&, const Core::Config::RenderConfig&)` with a platform-neutral initialization API.
@@ -24,10 +37,21 @@
   - Runtime constructs a backend-specific presentation attachment and passes only backend-neutral state through RHI.
 - [ ] Ensure `ExtrinsicRHI` no longer imports any `Extrinsic.Platform.*` module.
 - [ ] Ensure `src/graphics/rhi/CMakeLists.txt` no longer links `ExtrinsicPlatform`.
+- [ ] Ensure `src/graphics/renderer/Backends/Null/Backends.Null.cpp` and
+      `src/graphics/vulkan/Backends.Vulkan.Device.cppm` no longer import
+      `Extrinsic.Platform.Window` (they only do so today to consume the
+      `IDevice::Initialize(Platform::IWindow&, ...)` argument; once that
+      argument is gone the imports must follow).
 - [ ] Keep Null/headless behavior intact.
 - [ ] Update all concrete device implementations and mocks to match the new initialization contract.
 - [ ] Update runtime device selection/wiring so platform-aware code lives in `runtime` and/or concrete backend factory code, not in abstract RHI.
 - [ ] If a temporary bridge is unavoidable, isolate it outside `graphics/rhi` and document it with a removal task ID.
+- [ ] Revert the `Validate layering` step in
+      `.github/workflows/pr-fast.yml` and
+      `.github/workflows/ci-linux-clang.yml` from the WORKSHOP-001
+      expected-failure wrapper to an unguarded
+      `python3 tools/repo/check_layering.py --root src --strict`
+      invocation.
 
 ## Tests
 - [ ] Update existing RHI manager tests to compile without `ExtrinsicPlatform` as an RHI dependency.

@@ -29,6 +29,10 @@ Use this checklist before commit and PR creation.
 - [ ] Dependency flow follows `AGENTS.md` invariants.
 - [ ] No cross-layer convenience imports introduced.
 - [ ] Runtime wiring remains in `runtime`.
+- [ ] CMake `target_link_libraries(...)` edges between promoted targets
+      treat the link as an architecture dependency, not a build-system
+      convenience. `tools/repo/check_layering.py --root src --strict`
+      covers both C++23 module imports and CMake link edges.
 
 ## Testing
 

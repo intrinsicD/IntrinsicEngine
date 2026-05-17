@@ -153,6 +153,10 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
             plan.structural_checks.add("docs")
             plan.reasons.append(f"{path}: docs tooling changed; selected doc link check")
             matched = True
+        elif path == "tools/repo/check_layering.py":
+            plan.structural_checks.update({"layering", "layering_regression_tests", "test_layout"})
+            plan.reasons.append(f"{path}: layering checker changed; selected layering contract + regression tests")
+            matched = True
         elif path.startswith("tools/repo/"):
             plan.structural_checks.update({"layering", "test_layout"})
             plan.reasons.append(f"{path}: repo checker changed; selected structural checks")
@@ -193,12 +197,20 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
                     plan.reasons.append(f"{path}: matched {prefix}; selected {', '.join(labels)} test scope")
                     matched = True
                     break
-            if not matched and path.endswith((".cpp", ".cppm", ".hpp", ".h")):
+            if not matched and path.startswith("tests/contract/repo/layering_fixtures/"):
+                plan.structural_checks.add("layering_regression_tests")
+                plan.reasons.append(f"{path}: layering fixture changed; selected layering regression tests")
+                matched = True
+            elif not matched and path.endswith((".cpp", ".cppm", ".hpp", ".h")):
                 plan.broad_cpu_gate = True
                 plan.reasons.append(f"{path}: test source has no narrow mapping; selected broad CPU gate")
             elif path.startswith("tests/regression/tooling/") and path.endswith(".py"):
-                plan.structural_checks.add("touched_scope_tests")
-                plan.reasons.append(f"{path}: tooling regression changed; selected tooling regression tests")
+                if path == "tests/regression/tooling/Test.CheckLayering.py":
+                    plan.structural_checks.add("layering_regression_tests")
+                    plan.reasons.append(f"{path}: layering checker regression test changed; selected layering regression tests")
+                else:
+                    plan.structural_checks.add("touched_scope_tests")
+                    plan.reasons.append(f"{path}: tooling regression changed; selected tooling regression tests")
                 matched = True
 
         if path.startswith("assets/shaders/"):
@@ -218,6 +230,8 @@ def structural_commands(root_arg: str, checks: set[str]) -> list[Command]:
     commands: list[Command] = []
     if "touched_scope_tests" in checks:
         commands.append(Command(("python3", "tests/regression/tooling/Test.TouchedScope.py"), "tooling regression tests"))
+    if "layering_regression_tests" in checks:
+        commands.append(Command(("python3", "tests/regression/tooling/Test.CheckLayering.py"), "layering checker regression tests"))
     if "tool_smoke" in checks:
         commands.append(Command(("python3", "tools/repo/check_pr_contract.py", "--root", root_arg, "--mode", "local"), "generic tool smoke"))
     if "layering" in checks:

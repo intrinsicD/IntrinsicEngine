@@ -97,6 +97,14 @@ Shared support fixtures live under `support/`. Runtime/Vulkan integration tests
 that borrow `RuntimeRhiTestEnvironment` must keep per-test mutable state local
 to each fixture and follow the reset contract in `support/README.md`.
 
+Repo-tooling fixtures live alongside their consumers. The layering checker
+fixtures live under
+[`contract/repo/layering_fixtures/`](contract/repo/layering_fixtures/README.md)
+and are exercised by `regression/tooling/Test.CheckLayering.py`. Positive
+cases live at the top level; negative cases live in sibling `negative_*`
+directories and are scanned per-case so the bulk fixture root can stay
+clean under `--exclude 'negative_*'`.
+
 Some slow runtime suites also have grouped CTest entries, such as
 `IntrinsicRuntimeTests.RuntimeRHIGrouped`,
 `IntrinsicRuntimeTests.RenderOrchestratorHeadlessGrouped`,
