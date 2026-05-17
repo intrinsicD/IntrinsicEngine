@@ -459,6 +459,80 @@ TEST(GeometryIO_MeshIO, LoadOBJVertexTexcoordAndNormalCoexist)
     EXPECT_EQ(texcoords[1], glm::vec2(1.0f, 0.0f));
 }
 
+TEST(GeometryIO_MeshIO, LoadsOBJTriangleWithVertexColors)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 1 0 0\n"
+                  "v 1 0 0 0 1 0\n"
+                  "v 0 1 0 0 0 1\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJIgnoresMismatchedVertexColorCount)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 1 0 0\n"
+                  "v 1 0 0\n"
+                  "v 0 1 0 0 0 1\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+    EXPECT_FALSE(result->Vertices.Get<glm::vec4>("v:color").IsValid());
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJRejectsMalformedVertexColor)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 0.5 not-a-number 0.5\n"
+                  "v 1 0 0 0 1 0\n"
+                  "v 0 1 0 0 0 1\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJVertexColorAndTexcoordCoexist)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 1 0 0\n"
+                  "v 1 0 0 0 1 0\n"
+                  "v 0 1 0 0 0 1\n"
+                  "vt 0 0\n"
+                  "vt 1 0\n"
+                  "vt 0 1\n"
+                  "f 1/1 2/2 3/3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+    EXPECT_EQ(texcoords[2], glm::vec2(0.0f, 1.0f));
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
 TEST(GeometryIO_MeshIO, LoadsOBJFaceTexcoordIndicesDuplicateSharedPositions)
 {
     TempFile file(".obj",
