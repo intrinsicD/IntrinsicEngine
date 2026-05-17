@@ -91,3 +91,5 @@ Benchmark structure, manifests, and result schema:
 The repository uses split workflows under `.github/workflows/` for fast PR validation, full CPU CI, sanitizers, docs/manifests, benchmark smoke, and nightly deep checks. `tools/ci/touched_scope.py` is available for local/touched-scope verification planning between full CI runs.
 
 When changing code/docs/structure, keep touched-scope checks green and update related docs/tasks in the same PR.
+
+A weekly human-led sweep over agent-authored slices is documented in `docs/agent/agent-output-review-checklist.md`; the cadence is additive to per-PR review and is not enforced by CI.
