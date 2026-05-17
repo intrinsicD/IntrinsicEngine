@@ -43,6 +43,17 @@ CPU-only contract coverage of the harness lives in
 `tests/contract/graphics/Test.MinimalTriangleReadbackHarness.cpp`
 (`MinimalTriangleReadbackHarness` suite) and runs in the default gate.
 
+The renderer-side wiring contract that drives the live readback through
+`RHI::ICommandContext::CopyTextureToBuffer` + `RHI::IDevice::ReadBuffer` and
+the opt-in `IRenderer::SetMinimalDebugBackbufferReadbackBuffer(handle)` hook
+is covered by `tests/contract/graphics/Test.MinimalDebugBackbufferReadback.cpp`
+(`MinimalDebugBackbufferReadbackContract` suite), also in the default gate. The
+`gpu;vulkan` smoke is the only call site that turns the harness's compile-time
+expectations into a runtime `EXPECT_TRUE(Readback::ChannelsWithinTolerance(...))`
+assertion on a Vulkan-capable host; format conversion (BGRA-to-RGBA, sRGB-to-
+linear) is applied based on `IDevice::GetBackbufferFormat()` so the comparison
+runs against the harness's canonical linear RGBA expectations.
+
 ## Operational fallback-counter stability helper
 
 `OperationalCounterStability.hpp` is the reusable fallback-counter snapshot

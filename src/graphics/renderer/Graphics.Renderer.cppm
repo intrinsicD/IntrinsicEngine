@@ -95,6 +95,15 @@ namespace Extrinsic::Graphics
         std::uint32_t MinimalSurfacePassExecutions = 0;
         std::uint32_t MinimalPresentPassExecutions = 0;
         std::uint32_t MinimalRecipeMissingPrerequisiteCount = 0;
+        // GRAPHICS-033D — count of frames in which the opt-in MinimalDebug
+        // backbuffer-to-host readback seam recorded the
+        // `Present → TransferSrc → CopyImageToBuffer → Present` triplet. Stays
+        // at zero unless `SetMinimalDebugBackbufferReadbackBuffer()` was
+        // configured with a valid HostVisible+TransferDst buffer and the
+        // recipe + device are operational during the frame. The smoke fixture
+        // asserts this is 1 after a single operational frame so the readback
+        // wiring cannot silently regress to a no-op.
+        std::uint32_t MinimalDebugBackbufferReadbackCopyCount = 0;
     };
 
     export struct RuntimeRenderSnapshotBatch
@@ -215,6 +224,20 @@ namespace Extrinsic::Graphics
         virtual void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept = 0;
 
         [[nodiscard]] virtual Core::Config::FrameRecipeKind GetFrameRecipe() const noexcept = 0;
+
+        // GRAPHICS-033D — opt-in backbuffer-to-host readback wiring for the
+        // MinimalDebug visible-triangle smoke (and the canonical
+        // GRAPHICS-076/081 default-recipe equivalent once those land). The
+        // caller owns the buffer's lifetime via `BufferManager::BufferLease`
+        // and passes the raw handle; the renderer issues
+        // `vkCmdCopyImageToBuffer` after the present pass and before the
+        // backbuffer transitions to PRESENT_SRC on hosts where the device is
+        // operational and the MinimalDebug recipe is selected. Calling with
+        // `RHI::BufferHandle{}` disables the readback path (the default
+        // post-Initialize state). Scaffold retired by GRAPHICS-081.
+        virtual void SetMinimalDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
+
+        [[nodiscard]] virtual RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept = 0;
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();

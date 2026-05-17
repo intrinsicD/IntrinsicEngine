@@ -272,5 +272,30 @@ namespace Extrinsic::RHI
                                          TextureHandle dst,
                                          std::uint32_t mipLevel,
                                          std::uint32_t arrayLayer) = 0;
+
+        // GRAPHICS-033D — texture-to-buffer readback used by the opt-in
+        // `gpu;vulkan` MinimalDebug visible-triangle smoke (and the canonical
+        // GRAPHICS-076/081 default-recipe equivalent once those land). The
+        // caller is responsible for transitioning `src` into TransferSrc layout
+        // before this call and back to its prior layout afterwards. The whole
+        // mip-0 / layer-0 image extent is copied into `dst` starting at
+        // `dstOffset`; `dst` must have been created with
+        // `BufferUsage::TransferDst`. The default body is a no-op so existing
+        // CPU contract mocks remain unaffected; the Vulkan backend overrides
+        // it to issue `vkCmdCopyImageToBuffer`.
+        virtual void CopyTextureToBuffer(TextureHandle src,
+                                         TextureLayout srcLayout,
+                                         std::uint32_t mipLevel,
+                                         std::uint32_t arrayLayer,
+                                         BufferHandle  dst,
+                                         std::uint64_t dstOffset)
+        {
+            (void)src;
+            (void)srcLayout;
+            (void)mipLevel;
+            (void)arrayLayer;
+            (void)dst;
+            (void)dstOffset;
+        }
     };
 }

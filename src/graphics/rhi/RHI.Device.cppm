@@ -89,6 +89,32 @@ namespace Extrinsic::RHI
         virtual void WriteBuffer(BufferHandle handle, const void* data,
                                  std::uint64_t size, std::uint64_t offset = 0)    = 0;
 
+        /// GRAPHICS-033D — read back CPU-visible bytes from a buffer. Used by
+        /// the opt-in `gpu;vulkan` visible-triangle smoke (and the canonical
+        /// GRAPHICS-076/081 default-recipe equivalent once those land) to drain
+        /// the destination of a prior `ICommandContext::CopyTextureToBuffer`
+        /// into the test's reusable readback harness.
+        ///
+        /// Contract:
+        ///   - Backends MUST `WaitIdle()` (or equivalent fine-grained wait) on
+        ///     entry so the copy that produced the bytes has finished.
+        ///   - `handle` must reference a buffer created with `HostVisible=true`
+        ///     and `BufferUsage::TransferDst`. Backends without host-visible
+        ///     support silently no-op (the default body below).
+        ///   - `offset + size` must fit within the buffer's SizeBytes; out-of-
+        ///     range requests are dropped without writing to `data`.
+        ///
+        /// The default body is a no-op so the Null backend and CPU contract
+        /// mocks remain unchanged; the Vulkan backend overrides it.
+        virtual void ReadBuffer(BufferHandle handle, void* data,
+                                std::uint64_t size, std::uint64_t offset = 0)
+        {
+            (void)handle;
+            (void)data;
+            (void)size;
+            (void)offset;
+        }
+
         /// Return the GPU virtual address of a device-local buffer for BDA use.
         /// The buffer must have been created with BufferUsage::Storage.
         /// Returns 0 when BDA is unsupported or the handle is invalid.

@@ -90,6 +90,11 @@ namespace Extrinsic::Backends::Vulkan
         void CopyBufferToTexture(RHI::BufferHandle src, uint64_t srcOff,
                                  RHI::TextureHandle dst,
                                  uint32_t mipLevel, uint32_t arrayLayer) override;
+        void CopyTextureToBuffer(RHI::TextureHandle src,
+                                 RHI::TextureLayout srcLayout,
+                                 uint32_t mipLevel, uint32_t arrayLayer,
+                                 RHI::BufferHandle dst,
+                                 uint64_t dstOffset) override;
 
     private:
         [[nodiscard]] bool CanBegin() const;

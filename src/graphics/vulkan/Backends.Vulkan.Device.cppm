@@ -91,6 +91,8 @@ namespace Extrinsic::Backends::Vulkan
         void DestroyBuffer(RHI::BufferHandle handle) override;
         void WriteBuffer(RHI::BufferHandle handle, const void* data,
                          uint64_t size, uint64_t offset) override;
+        void ReadBuffer(RHI::BufferHandle handle, void* data,
+                        uint64_t size, uint64_t offset) override;
         [[nodiscard]] uint64_t GetBufferDeviceAddress(RHI::BufferHandle handle) const override;
 
         [[nodiscard]] RHI::TextureHandle CreateTexture(const RHI::TextureDesc& desc) override;

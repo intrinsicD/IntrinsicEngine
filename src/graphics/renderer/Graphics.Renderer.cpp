@@ -320,6 +320,10 @@ namespace Extrinsic::Graphics
             m_SamplerManager .reset();
             m_BufferManager  .reset();
             m_CullingOutputAvailable = false;
+            // GRAPHICS-033D — drop the smoke's readback handle so a later
+            // Initialize starts with the wiring disabled (the smoke fixture
+            // re-arms it after Initialize before Run).
+            m_MinimalDebugReadbackBuffer = RHI::BufferHandle{};
         }
 
         void Resize(std::uint32_t, std::uint32_t) override
@@ -907,6 +911,40 @@ namespace Extrinsic::Graphics
                 {
                     SubmitBarrierPacket(graphicsContext, *compiled, packet);
                 });
+            // GRAPHICS-033D — opt-in MinimalDebug backbuffer-to-host readback.
+            // Inserted after the executor finalises the
+            // `ColorAttachment → Present` transition and before End() closes
+            // the command buffer so the copy executes on the same submit that
+            // produced the visible-triangle pixels. The triplet leaves the
+            // backbuffer back in Present layout so EndFrame's submit + the
+            // device's Present() call still produce a well-formed
+            // vkQueuePresentKHR. The path is gated on (a) operational device,
+            // (b) MinimalDebug recipe, (c) the smoke wired a valid readback
+            // buffer through SetMinimalDebugBackbufferReadbackBuffer(), and
+            // (d) the executor reports a clean Execute so we never copy from
+            // an undefined backbuffer.
+            if (executeResult.has_value() &&
+                m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug &&
+                m_MinimalDebugReadbackBuffer.IsValid() &&
+                m_Device != nullptr && m_Device->IsOperational())
+            {
+                const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
+                if (backbuffer.IsValid())
+                {
+                    graphicsContext.TextureBarrier(backbuffer,
+                                                    RHI::TextureLayout::Present,
+                                                    RHI::TextureLayout::TransferSrc);
+                    graphicsContext.CopyTextureToBuffer(backbuffer,
+                                                        RHI::TextureLayout::TransferSrc,
+                                                        0u, 0u,
+                                                        m_MinimalDebugReadbackBuffer,
+                                                        0u);
+                    graphicsContext.TextureBarrier(backbuffer,
+                                                    RHI::TextureLayout::TransferSrc,
+                                                    RHI::TextureLayout::Present);
+                    ++m_LastRenderGraphStats.MinimalDebugBackbufferReadbackCopyCount;
+                }
+            }
             graphicsContext.End();
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
@@ -974,6 +1012,16 @@ namespace Extrinsic::Graphics
         [[nodiscard]] Core::Config::FrameRecipeKind GetFrameRecipe() const noexcept override
         {
             return m_FrameRecipe;
+        }
+
+        void SetMinimalDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept override
+        {
+            m_MinimalDebugReadbackBuffer = handle;
+        }
+
+        [[nodiscard]] RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept override
+        {
+            return m_MinimalDebugReadbackBuffer;
         }
 
         RHI::BufferManager&   GetBufferManager()   override { return *m_BufferManager;   }
@@ -1455,6 +1503,13 @@ namespace Extrinsic::Graphics
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};
         Core::Config::FrameRecipeKind        m_FrameRecipe{Core::Config::FrameRecipeKind::Default};
+        // GRAPHICS-033D — opt-in readback target wired by the smoke fixture
+        // through SetMinimalDebugBackbufferReadbackBuffer(). Invalid handle =
+        // readback disabled (default), so the executor's standard
+        // ColorAttachment → Present transition is unchanged for every other
+        // caller. Retired together with the MinimalDebug recipe by
+        // GRAPHICS-081.
+        RHI::BufferHandle                    m_MinimalDebugReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };
 
