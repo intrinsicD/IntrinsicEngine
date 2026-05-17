@@ -1663,6 +1663,9 @@ namespace Geometry::MeshIO
         const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
         const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
 
+        const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
+        const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
+
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
@@ -1673,17 +1676,34 @@ namespace Geometry::MeshIO
 
         stream << "# Exported by IntrinsicEngine\n";
 
-        for (const auto& p : positions)
+        for (std::size_t i = 0; i < positions.size(); ++i)
         {
-            const int written = std::snprintf(buffer, sizeof(buffer), "v %.6f %.6f %.6f\n",
-                                              static_cast<double>(p.x),
-                                              static_cast<double>(p.y),
-                                              static_cast<double>(p.z));
+            const auto& p = positions[i];
+            int written = std::snprintf(buffer, sizeof(buffer), "v %.6f %.6f %.6f",
+                                        static_cast<double>(p.x),
+                                        static_cast<double>(p.y),
+                                        static_cast<double>(p.z));
             if (written <= 0)
             {
                 return MeshIOWriteStatus::FileWriteError;
             }
             stream.write(buffer, written);
+
+            if (hasColors)
+            {
+                const auto& c = colorsView.Vector()[i];
+                written = std::snprintf(buffer, sizeof(buffer), " %.6f %.6f %.6f",
+                                        static_cast<double>(c.r),
+                                        static_cast<double>(c.g),
+                                        static_cast<double>(c.b));
+                if (written <= 0)
+                {
+                    return MeshIOWriteStatus::FileWriteError;
+                }
+                stream.write(buffer, written);
+            }
+
+            stream.put('\n');
         }
 
         if (hasTexcoords)
