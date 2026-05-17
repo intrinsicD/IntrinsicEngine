@@ -533,6 +533,87 @@ TEST(GeometryIO_MeshIO, LoadOBJVertexColorAndTexcoordCoexist)
     EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }
 
+TEST(GeometryIO_MeshIO, LoadsOBJTriangleWithVertexColorsAndAlpha)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 1 0 0 0.25\n"
+                  "v 1 0 0 0 1 0 0.5\n"
+                  "v 0 1 0 0 0 1 0.75\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 0.25f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 0.5f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 0.75f));
+}
+
+TEST(GeometryIO_MeshIO, LoadsOBJMixedSevenAndEightTokenVertexColors)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 1 0 0 0.25\n"
+                  "v 1 0 0 0 1 0\n"
+                  "v 0 1 0 0 0 1 0.75\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 0.25f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 0.75f));
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJRejectsMalformedVertexColorAlpha)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 0.5 0.5 0.5 not-a-number\n"
+                  "v 1 0 0 0 1 0 1\n"
+                  "v 0 1 0 0 0 1 1\n"
+                  "f 1 2 3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadOBJVertexColorAlphaSurvivesFaceAttributeRemap)
+{
+    TempFile file(".obj",
+                  "v 0 0 0 1 0 0 0.25\n"
+                  "v 1 0 0 0 1 0 0.5\n"
+                  "v 0 1 0 0 0 1 0.75\n"
+                  "vt 0 0\n"
+                  "vt 1 0\n"
+                  "vt 0 1\n"
+                  "f 1/1 2/2 3/3\n");
+
+    const auto result = Geometry::MeshIO::LoadOBJ(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
+
+    auto texcoords = result->Vertices.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+    EXPECT_EQ(texcoords[2], glm::vec2(0.0f, 1.0f));
+
+    auto colors = result->Vertices.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 0.25f));
+    EXPECT_EQ(colors[1], glm::vec4(0.0f, 1.0f, 0.0f, 0.5f));
+    EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 0.75f));
+}
+
 TEST(GeometryIO_MeshIO, LoadsOBJFaceTexcoordIndicesDuplicateSharedPositions)
 {
     TempFile file(".obj",

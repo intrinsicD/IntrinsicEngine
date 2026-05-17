@@ -1070,6 +1070,18 @@ namespace Geometry::MeshIO
                     }
                     colors.emplace_back(*r, *g, *b, 1.0f);
                 }
+                else if (tokens.size() == 8)
+                {
+                    const auto r = ParseNumber<float>(tokens[4]);
+                    const auto g = ParseNumber<float>(tokens[5]);
+                    const auto b = ParseNumber<float>(tokens[6]);
+                    const auto a = ParseNumber<float>(tokens[7]);
+                    if (!r || !g || !b || !a)
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    colors.emplace_back(*r, *g, *b, *a);
+                }
             }
             else if (tokens[0] == "vn")
             {
