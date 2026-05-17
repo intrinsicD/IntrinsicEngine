@@ -32,11 +32,14 @@ map.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
-- [REVIEW-001 — Establish weekly human-led review of agent-authored slices](REVIEW-001-human-led-agent-week-review-cadence.md):
-  adds a low-overhead weekly audit checklist (`docs/agent/agent-output-review-checklist.md`)
-  covering nine agent-specific failure modes (scope creep, decorative comments,
-  premature abstraction, documented-but-not-tested, etc.) plus a first
-  calibration audit of the GRAPHICS-033E/F + HARDEN-066 + RUNTIME-091 window.
+- [REVIEW-001 — Establish weekly human-led review of agent-authored slices](../../done/REVIEW-001-human-led-agent-week-review-cadence.md)
+  (done 2026-05-17): landed `docs/agent/agent-output-review-checklist.md` with
+  the nine-row failure-mode checklist, added the cadence pointer to
+  `docs/agent/contract.md` and the reviewer rotation note to
+  `docs/agent/roles.md`, and ran the first calibration audit on the
+  GRAPHICS-033E/F + HARDEN-066 + RUNTIME-091 window
+  (`docs/reports/2026-05-17-agent-output-audit.md`, ≈ 15 minutes, eight rows
+  pass, one self-corrected historical finding, no new follow-up filed).
 
 ## Convergence
 

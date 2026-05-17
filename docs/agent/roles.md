@@ -21,6 +21,11 @@ These roles describe responsibilities; one change may involve multiple roles.
 
 - Applies the review checklist before merge.
 - Verifies docs sync, CI impact, and shim tracking.
+- Owns the weekly agent-output audit cadence in
+  [`docs/agent/agent-output-review-checklist.md`](agent-output-review-checklist.md)
+  when picked up that week. The role rotates rather than belonging to a
+  permanent reviewer; the per-PR `docs/agent/review-checklist.md` stays
+  the per-commit gate and is not replaced by the weekly sweep.
 
 ## Paper Agent
 

@@ -90,3 +90,17 @@ Exceptions are allowed only if:
 - linked to a removal task ID,
 - time-bounded,
 - and isolated so they do not create new promoted-layer violations.
+
+## Weekly agent-output review cadence
+
+The per-PR `docs/agent/review-checklist.md` catches single-slice
+defects. A weekly human-led sweep — driven by
+[`REVIEW-001`](../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md)
+and run from [`docs/agent/agent-output-review-checklist.md`](agent-output-review-checklist.md)
+— audits roughly one week of agent-authored commits for patterns the
+per-PR view misses (multi-PR scope drift, decorative comments,
+documented-but-not-tested claims, ceremony-without-shipped-value). The
+cadence is *additive*: it does not gate PR merges, does not impose
+per-commit reviewer load, and either silently passes or files specific
+follow-up tasks. Reviewer ownership rotates; see
+[`docs/agent/roles.md`](roles.md).
