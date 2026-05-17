@@ -1053,6 +1053,19 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
         desiredImageCount = surfaceCapabilities.maxImageCount;
 
     const std::uint32_t queueFamilyIndices[] = {m_GraphicsFamily, m_PresentFamily};
+    // GRAPHICS-033D: opt into TRANSFER_SRC for the swapchain images when the
+    // surface advertises it. The MinimalDebug backbuffer-to-host readback path
+    // records vkCmdCopyImageToBuffer with the backbuffer as the source, which
+    // requires `VK_IMAGE_USAGE_TRANSFER_SRC_BIT` on the image. The flag is
+    // commonly supported but not guaranteed by the Vulkan spec; when the
+    // surface omits it we keep the prior usage set and the renderer's readback
+    // hook degrades to a no-op (the gpu;vulkan smoke would then trip its own
+    // operational-counter assertion instead of producing undefined results).
+    VkImageUsageFlags swapchainImageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    if ((surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0u)
+    {
+        swapchainImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
     VkSwapchainCreateInfoKHR swapchainInfo{};
     swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchainInfo.surface = m_Surface;
@@ -1061,7 +1074,7 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
     swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
     swapchainInfo.imageExtent = swapchainExtent;
     swapchainInfo.imageArrayLayers = 1u;
-    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    swapchainInfo.imageUsage = swapchainImageUsage;
     if (m_GraphicsFamily != m_PresentFamily)
     {
         swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -1149,7 +1162,12 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
         importedImage.Format = outState.Format;
         importedImage.RhiFormat = RHI::Format::Undefined;
         importedImage.Dimension = RHI::TextureDimension::Tex2D;
-        importedImage.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        // GRAPHICS-033D: mirror the swapchain's negotiated usage so the
+        // backend-internal `HasImageUsage(image->Usage, VK_IMAGE_USAGE_*)`
+        // checks (e.g. the GRAPHICS-033D backbuffer-to-host readback path)
+        // honour the live TRANSFER_SRC opt-in from
+        // CreateSwapchainResources().
+        importedImage.Usage = swapchainImageUsage;
         importedImage.Width = outState.Extent.width;
         importedImage.Height = outState.Extent.height;
         importedImage.Depth = 1u;
@@ -1670,6 +1688,15 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
             desiredImageCount = surfaceCapabilities.maxImageCount;
 
         const std::uint32_t queueFamilyIndices[] = {m_GraphicsFamily, m_PresentFamily};
+        // GRAPHICS-033D: mirror the CreateSwapchainResources() opt-in so the
+        // backbuffer-to-host readback path keeps working across the bootstrap
+        // swapchain creation site too (kept in sync with the recreation path
+        // for symmetry).
+        VkImageUsageFlags swapchainImageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        if ((surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0u)
+        {
+            swapchainImageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        }
         VkSwapchainCreateInfoKHR swapchainInfo{};
         swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         swapchainInfo.surface = m_Surface;
@@ -1678,7 +1705,7 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
         swapchainInfo.imageExtent = swapchainExtent;
         swapchainInfo.imageArrayLayers = 1u;
-        swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        swapchainInfo.imageUsage = swapchainImageUsage;
         if (m_GraphicsFamily != m_PresentFamily)
         {
             swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -1772,7 +1799,10 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
             importedImage.Format = m_SwapchainFormat;
             importedImage.RhiFormat = RHI::Format::Undefined;
             importedImage.Dimension = RHI::TextureDimension::Tex2D;
-            importedImage.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            // GRAPHICS-033D: record the live swapchain usage (kept in sync with
+            // the chosen `swapchainImageUsage` above, including the
+            // TRANSFER_SRC opt-in when the surface advertises it).
+            importedImage.Usage = swapchainImageUsage;
             importedImage.Width = m_SwapchainExtent.width;
             importedImage.Height = m_SwapchainExtent.height;
             importedImage.Depth = 1u;
@@ -3037,11 +3067,26 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
         (void)vkDeviceWaitIdle(m_Device);
     }
 
-    // Note: same VMA caveat as WriteBuffer's host-visible fast path — on
-    // discrete GPUs that lack HOST_COHERENT we would need
-    // `vmaInvalidateAllocation(m_Vma, buf->Allocation, offset, size)` to
-    // guarantee the host sees GPU writes. The smoke runs on the CI host
-    // matrix which selects HOST_COHERENT through VMA_MEMORY_USAGE_CPU_TO_GPU.
+    // Invalidate the non-coherent CPU cache before memcpy so the host sees
+    // the GPU writes the prior copy produced. vkDeviceWaitIdle proves the
+    // copy completed device-side; on memory types that lack HOST_COHERENT
+    // (typical on discrete GPUs once the allocator can no longer satisfy
+    // CPU_TO_GPU with a HOST_COHERENT type) the mapped pointer can still
+    // reflect stale cache lines without this call. vmaInvalidateAllocation
+    // is a documented no-op when the underlying memory type is
+    // HOST_COHERENT, so this stays correct on the integrated/desktop hosts
+    // where VMA selects HOST_COHERENT today.
+    if (m_Vma != VK_NULL_HANDLE && buf->Allocation != VK_NULL_HANDLE)
+    {
+        const VkResult invalidateResult =
+            vmaInvalidateAllocation(m_Vma, buf->Allocation, offset, size);
+        if (invalidateResult != VK_SUCCESS)
+        {
+            Core::Log::Warn("[VulkanDevice::ReadBuffer] vmaInvalidateAllocation reported VkResult={}; readback bytes may reflect stale CPU cache on non-coherent memory.",
+                            static_cast<int>(invalidateResult));
+        }
+    }
+
     std::memcpy(data, static_cast<const char*>(buf->MappedPtr) + offset, size);
 }
 
