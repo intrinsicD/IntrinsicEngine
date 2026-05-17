@@ -83,6 +83,7 @@ IntrinsicEngine/
       ci-sanitizers.yml
       ci-docs.yml
       ci-bench-smoke.yml
+      ci-vulkan.yml
       nightly-deep.yml
     pull_request_template.md
     ISSUE_TEMPLATE/

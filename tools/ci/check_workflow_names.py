@@ -14,6 +14,7 @@ ALLOWED_WORKFLOW_FILES = {
     "ci-sanitizers.yml",
     "ci-docs.yml",
     "ci-bench-smoke.yml",
+    "ci-vulkan.yml",
     "nightly-deep.yml",
 }
 
