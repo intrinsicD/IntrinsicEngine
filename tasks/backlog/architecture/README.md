@@ -10,6 +10,9 @@ map.
 
 ## Tasks
 
+- [ARCH-005 — Resolve graphics/RHI platform layering violations](../../active/ARCH-005-resolve-graphics-platform-layering-violations.md)
+  (active): removes the current strict-layering failures where promoted
+  graphics/RHI targets import or link `platform` for window/surface inputs.
 - [RORG-031A — Architecture foundation backlog seed](RORG-031A-architecture-foundation.md):
   tracks architecture-doc normalization, layering-checker, docs-sync-checker,
   and module-inventory governance work.

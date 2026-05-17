@@ -390,7 +390,7 @@ TEST(GraphicsRenderGraph, PresentChainKeepsProducerPasses)
     const auto tonemapPass = graph.AddPass("Tonemap", [lighting, backbuffer](RenderGraphBuilder& builder) {
         (void)builder.Read(lighting, TextureUsage::ShaderRead);
         (void)builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
-    });
+    }, true);
     const auto presentPass = graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
         (void)builder.Read(backbuffer, TextureUsage::Present);
     });
@@ -549,7 +549,7 @@ TEST(GraphicsRenderGraph, BarriersTransitionFromUndefinedToColorWriteThenShaderR
     (void)graph.AddPass("Post", [lighting, backbuffer](RenderGraphBuilder& builder) {
         (void)builder.Read(lighting, TextureUsage::ShaderRead);
         (void)builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
-    });
+    }, true);
     (void)graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
         (void)builder.Read(backbuffer, TextureUsage::Present);
     });
@@ -798,7 +798,7 @@ TEST(GraphicsRenderGraph, ExecutePresentChainRecordsPassOrderAndBarriers)
     const auto postPass = graph.AddPass("Post", [lighting, backbuffer](RenderGraphBuilder& builder) {
         (void)builder.Read(lighting, TextureUsage::ShaderRead);
         (void)builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
-    });
+    }, true);
     const auto presentPass = graph.AddPass("Present", [backbuffer](RenderGraphBuilder& builder) {
         (void)builder.Read(backbuffer, TextureUsage::Present);
     });
@@ -834,7 +834,7 @@ TEST(GraphicsRenderGraph, ExecuteInterleavesBarriersWithPassesAndEmitsFinalBarri
     const auto compositePass = graph.AddPass("Composite", [lighting, backbuffer](RenderGraphBuilder& builder) {
         (void)builder.Read(lighting, TextureUsage::ShaderRead);
         (void)builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
-    });
+    }, true);
 
     auto compiled = graph.Compile();
     ASSERT_TRUE(compiled.has_value());

@@ -14,8 +14,12 @@ namespace Intrinsic::Tests
 
         static RuntimeRhiTestEnvironment& Get()
         {
-            static RuntimeRhiTestEnvironment environment{};
-            return environment;
+            // GPU tests run as short-lived CTest subprocesses. Keep the shared
+            // Vulkan context/device alive until process termination rather than
+            // relying on static destruction order after validation/loader state
+            // may already be tearing down.
+            static auto* environment = new RuntimeRhiTestEnvironment{};
+            return *environment;
         }
 
         [[nodiscard]] ::testing::AssertionResult CheckAvailable()
@@ -46,10 +50,6 @@ namespace Intrinsic::Tests
 
         ~RuntimeRhiTestEnvironment()
         {
-            if (m_Device && m_Device->IsValid() && m_Device->GetLogicalDevice() != VK_NULL_HANDLE)
-            {
-                vkDeviceWaitIdle(m_Device->GetLogicalDevice());
-            }
             m_Device.reset();
             m_Context.reset();
         }

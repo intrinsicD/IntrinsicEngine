@@ -6,6 +6,7 @@ module;
 export module Extrinsic.Graphics.RenderGraph:Executor;
 
 import Extrinsic.Core.Error;
+import :Barriers;
 import :Compiler;
 
 namespace Extrinsic::Graphics

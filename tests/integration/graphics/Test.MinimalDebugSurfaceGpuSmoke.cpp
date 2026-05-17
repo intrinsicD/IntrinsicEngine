@@ -15,7 +15,6 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
-import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
@@ -156,15 +155,15 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
         GTEST_SKIP() << "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.";
     }
 
-    // GRAPHICS-033D readback wiring: allocate a host-visible buffer sized for a
-    // full mip-0 copy of the backbuffer image and arm the renderer's opt-in
-    // readback hook. The buffer lifetime is bound to the BufferLease declared
-    // inside this scope so it outlives the engine.Run() / readback drain
-    // sequence and is released back to the BufferManager before
-    // engine.Shutdown() tears the manager down. The readback path is a no-op
-    // on every other test/engine config (the smoke is the only caller of
-    // SetMinimalDebugBackbufferReadbackBuffer), so wiring it here cannot
-    // affect the default CPU gate.
+    // GRAPHICS-033D readback wiring: allocate a host-visible backend buffer
+    // sized for a full mip-0 copy of the backbuffer image and arm the
+    // renderer's opt-in readback hook. This smoke allocates directly through
+    // IDevice instead of BufferManager because BufferManager is intentionally
+    // fail-closed while IDevice::IsOperational() is false; the readback buffer
+    // must already exist for the frame that proves the Vulkan operational gate
+    // flips. The readback path is a no-op on every other test/engine config
+    // (the smoke is the only caller of SetMinimalDebugBackbufferReadbackBuffer),
+    // so wiring it here cannot affect the default CPU gate.
     auto& renderer = engine.GetRenderer();
     auto& device   = engine.GetDevice();
     const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
@@ -178,19 +177,18 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
         static_cast<std::uint64_t>(bytesPerPixel) *
         static_cast<std::uint64_t>(Readback::kFramebufferWidth) *
         static_cast<std::uint64_t>(Readback::kFramebufferHeight);
-    auto readbackLeaseExpected = renderer.GetBufferManager().Create(Extrinsic::RHI::BufferDesc{
+    Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
         .SizeBytes = readbackSize,
         .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
         .HostVisible = true,
         .DebugName = "MinimalDebug.Readback",
     });
-    if (!readbackLeaseExpected.has_value())
+    if (!readbackBuffer.IsValid())
     {
         engine.Shutdown();
         GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
     }
-    auto readbackLease = std::move(*readbackLeaseExpected);
-    renderer.SetMinimalDebugBackbufferReadbackBuffer(readbackLease.GetHandle());
+    renderer.SetMinimalDebugBackbufferReadbackBuffer(readbackBuffer);
 
     const auto beforeFrameDiagnostics = GetVulkanOperationalDiagnosticsSnapshot();
     const auto beforeCounters = ToCounterSnapshot(beforeFrameDiagnostics);
@@ -200,6 +198,8 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
     const auto status = EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
     if (!engine.GetDevice().IsOperational())
     {
+        renderer.SetMinimalDebugBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
         GTEST_SKIP() << "Promoted Vulkan operational gate did not flip on this host: status="
                      << ToString(status.Code) << " reason=" << ToString(status.Reason);
@@ -246,7 +246,7 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
         << "MinimalDebug readback triplet did not record on any operational frame.";
 
     std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
-    device.ReadBuffer(readbackLease.GetHandle(), readbackBytes.data(), readbackSize, 0u);
+    device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
 
     const std::uint64_t rowStride =
         static_cast<std::uint64_t>(bytesPerPixel) *
@@ -290,12 +290,12 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
             << " backbuffer format=" << static_cast<int>(backbufferFormat);
     }
 
-    // Drop the readback wiring before the lease is released so the renderer
-    // cannot hold a stale handle into the BufferManager's slot pool. Without
-    // this the GRAPHICS-033F-style backend-readiness predicate would observe
-    // a dangling readback handle across Shutdown().
+    // Drop the readback wiring before destroying the backend buffer so the
+    // renderer cannot hold a stale handle across Shutdown(). Without this the
+    // GRAPHICS-033F-style backend-readiness predicate would observe a dangling
+    // readback handle across Shutdown().
     renderer.SetMinimalDebugBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
-    readbackLease = {};
+    device.DestroyBuffer(readbackBuffer);
 
     engine.Shutdown();
 }

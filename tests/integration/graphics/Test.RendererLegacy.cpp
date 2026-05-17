@@ -43,9 +43,10 @@ TEST(GraphicsRenderer, NullRendererExecutesRenderGraphPath)
     EXPECT_FALSE(stats.DebugDump.empty());
 
     renderer->Resize(1920u, 1080u);
+    renderer->PrepareFrame(world);
     renderer->ExecuteFrame(frame, world);
 
-    EXPECT_EQ(renderer->EndFrame(frame), 0u);
+    EXPECT_EQ(renderer->EndFrame(frame), 1u);
     renderer->Shutdown();
 }
 
@@ -74,42 +75,41 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     EXPECT_EQ(stats.Compile.CulledPassCount, 0u);
 
     const auto& dump = stats.DebugDump;
-    EXPECT_NE(dump.find("name=\"Null.Compute.Prologue\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.Culling\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.GBuffer\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.DeferredLighting\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.Bloom\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.ToneMap\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.FXAA\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.SelectionOutline\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"Null.Present\""), std::string::npos);
-    EXPECT_EQ(dump.find("name=\"Null.OverlaySurface\""), std::string::npos);
-    EXPECT_EQ(dump.find("name=\"Null.DebugView\""), std::string::npos);
-    EXPECT_EQ(dump.find("name=\"Null.Picking\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"CullingPass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"DepthPrepass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"SurfacePass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"CompositionPass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"LinePass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"PointPass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"PostProcessPass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"ImGuiPass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"Present\""), std::string::npos);
+    EXPECT_EQ(dump.find("name=\"DebugViewPass\""), std::string::npos);
+    EXPECT_EQ(dump.find("name=\"PickingPass\""), std::string::npos);
 
-    const std::size_t gbufferPos = dump.find("name=\"Null.GBuffer\"");
-    const std::size_t deferredPos = dump.find("name=\"Null.DeferredLighting\"");
-    const std::size_t bloomPos = dump.find("name=\"Null.Bloom\"");
-    const std::size_t toneMapPos = dump.find("name=\"Null.ToneMap\"");
-    const std::size_t fxaaPos = dump.find("name=\"Null.FXAA\"");
-    const std::size_t selectionPos = dump.find("name=\"Null.SelectionOutline\"");
-    const std::size_t presentPos = dump.find("name=\"Null.Present\"");
-    ASSERT_NE(gbufferPos, std::string::npos);
-    ASSERT_NE(deferredPos, std::string::npos);
-    ASSERT_NE(bloomPos, std::string::npos);
-    ASSERT_NE(toneMapPos, std::string::npos);
-    ASSERT_NE(fxaaPos, std::string::npos);
-    ASSERT_NE(selectionPos, std::string::npos);
+    const std::size_t surfacePos = dump.find("name=\"SurfacePass\"");
+    const std::size_t compositionPos = dump.find("name=\"CompositionPass\"");
+    const std::size_t linePos = dump.find("name=\"LinePass\"");
+    const std::size_t pointPos = dump.find("name=\"PointPass\"");
+    const std::size_t postPos = dump.find("name=\"PostProcessPass\"");
+    const std::size_t imguiPos = dump.find("name=\"ImGuiPass\"");
+    const std::size_t presentPos = dump.find("name=\"Present\"");
+    ASSERT_NE(surfacePos, std::string::npos);
+    ASSERT_NE(compositionPos, std::string::npos);
+    ASSERT_NE(linePos, std::string::npos);
+    ASSERT_NE(pointPos, std::string::npos);
+    ASSERT_NE(postPos, std::string::npos);
+    ASSERT_NE(imguiPos, std::string::npos);
     ASSERT_NE(presentPos, std::string::npos);
 
-    EXPECT_LT(gbufferPos, deferredPos);
-    EXPECT_LT(deferredPos, bloomPos);
-    EXPECT_LT(bloomPos, toneMapPos);
-    EXPECT_LT(toneMapPos, fxaaPos);
-    EXPECT_LT(fxaaPos, selectionPos);
-    EXPECT_LT(selectionPos, presentPos);
+    EXPECT_LT(surfacePos, compositionPos);
+    EXPECT_LT(compositionPos, linePos);
+    EXPECT_LT(linePos, pointPos);
+    EXPECT_LT(pointPos, postPos);
+    EXPECT_LT(postPos, imguiPos);
+    EXPECT_LT(imguiPos, presentPos);
 
-    EXPECT_EQ(renderer->EndFrame(frame), 0u);
+    EXPECT_EQ(renderer->EndFrame(frame), 1u);
     renderer->Shutdown();
 }
 
@@ -135,20 +135,17 @@ TEST(GraphicsRenderer, NullRendererEnablesDebugChainWhenRequested)
 
     const auto& dump = renderer->GetLastRenderGraphStats().DebugDump;
     ASSERT_FALSE(dump.empty());
-    const std::size_t selectionPos = dump.find("name=\"Null.SelectionOutline\"");
-    const std::size_t overlayPos = dump.find("name=\"Null.OverlaySurface\"");
-    const std::size_t debugPos = dump.find("name=\"Null.DebugView\"");
-    const std::size_t presentPos = dump.find("name=\"Null.Present\"");
+    const std::size_t debugPos = dump.find("name=\"DebugViewPass\"");
+    const std::size_t imguiPos = dump.find("name=\"ImGuiPass\"");
+    const std::size_t presentPos = dump.find("name=\"Present\"");
 
-    ASSERT_NE(selectionPos, std::string::npos);
-    ASSERT_NE(overlayPos, std::string::npos);
     ASSERT_NE(debugPos, std::string::npos);
+    ASSERT_NE(imguiPos, std::string::npos);
     ASSERT_NE(presentPos, std::string::npos);
-    EXPECT_LT(selectionPos, overlayPos);
-    EXPECT_LT(overlayPos, debugPos);
-    EXPECT_LT(debugPos, presentPos);
+    EXPECT_LT(debugPos, imguiPos);
+    EXPECT_LT(imguiPos, presentPos);
 
-    EXPECT_EQ(renderer->EndFrame(frame), 0u);
+    EXPECT_EQ(renderer->EndFrame(frame), 1u);
     renderer->Shutdown();
 }
 
@@ -175,9 +172,9 @@ TEST(GraphicsRenderer, NullRendererAddsPickingPassWhenPickIsPending)
     const auto& stats = renderer->GetLastRenderGraphStats();
     ASSERT_TRUE(stats.Compile.Succeeded);
     ASSERT_FALSE(stats.DebugDump.empty());
-    EXPECT_NE(stats.DebugDump.find("name=\"Null.Picking\""), std::string::npos);
+    EXPECT_NE(stats.DebugDump.find("name=\"PickingPass\""), std::string::npos);
 
-    EXPECT_EQ(renderer->EndFrame(frame), 0u);
+    EXPECT_EQ(renderer->EndFrame(frame), 1u);
     renderer->Shutdown();
 }
 

@@ -4,6 +4,7 @@ module;
 #define GLFW_INCLUDE_NONE
 #endif
 #include <GLFW/glfw3.h>
+#include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <memory>
 #include <string>
@@ -28,6 +29,12 @@ namespace Extrinsic::Platform::Backends::Glfw
         void GLFWErrorCallback(int error, const char* description)
         {
             Core::Log::Error("GLFW Error ({0}): {1}", error, description ? description : "<null>");
+        }
+
+        [[nodiscard]] bool HasImGuiGlfwBackend() noexcept
+        {
+            return ImGui::GetCurrentContext() != nullptr &&
+                   ImGui::GetIO().BackendPlatformUserData != nullptr;
         }
 
         class GLFWLifetime
@@ -310,7 +317,8 @@ namespace Extrinsic::Platform::Backends::Glfw
 
             glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
             {
-                ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+                if (HasImGuiGlfwBackend())
+                    ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
                 if (action != GLFW_PRESS && action != GLFW_RELEASE) return;
 
                 auto& self = *static_cast<Window*>(glfwGetWindowUserPointer(window));
@@ -319,7 +327,8 @@ namespace Extrinsic::Platform::Backends::Glfw
 
             glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
             {
-                ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+                if (HasImGuiGlfwBackend())
+                    ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
                 if (action != GLFW_PRESS && action != GLFW_RELEASE) return;
 
                 auto& self = *static_cast<Window*>(glfwGetWindowUserPointer(window));
@@ -328,21 +337,24 @@ namespace Extrinsic::Platform::Backends::Glfw
 
             glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xoffset, double yoffset)
             {
-                ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+                if (HasImGuiGlfwBackend())
+                    ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
                 auto& self = *static_cast<Window*>(glfwGetWindowUserPointer(window));
                 self.Emit(Platform::ScrollEvent{.XOffset = xoffset, .YOffset = yoffset});
             });
 
             glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xpos, double ypos)
             {
-                ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
+                if (HasImGuiGlfwBackend())
+                    ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
                 auto& self = *static_cast<Window*>(glfwGetWindowUserPointer(window));
                 self.Emit(Platform::CursorEvent{.XPos = xpos, .YPos = ypos});
             });
 
             glfwSetCharCallback(m_Window, [](GLFWwindow* window, unsigned int c)
             {
-                ImGui_ImplGlfw_CharCallback(window, c);
+                if (HasImGuiGlfwBackend())
+                    ImGui_ImplGlfw_CharCallback(window, c);
                 auto& self = *static_cast<Window*>(glfwGetWindowUserPointer(window));
                 self.Emit(Platform::CharEvent{.Character = c});
             });

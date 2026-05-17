@@ -7,7 +7,7 @@
 - No change to the workflow itself (`name: ci-vulkan`, `on: pull_request|workflow_dispatch`, build/test steps).
 - No change to the `ci` preset CPU gate behaviour.
 - No promotion of `ci-vulkan.yml` to `REQUIRED_WORKFLOW_FILES`; mirroring the `nightly-deep.yml` precedent it stays opt-in (allowed but not required), so the workflow naming check tolerates removal on branches that predate the GRAPHICS-080 slice.
-- No GRAPHICS-080 retirement-state edit; that task remains active until `GRAPHICS-033D`'s `gpu;vulkan` flipping smoke confirms the acceptance criterion 3 initial form.
+- No GRAPHICS-080 retirement-state edit was made in this bug task; GRAPHICS-080 retirement remained owned by its task record and later closed after the `gpu;vulkan` visible-triangle and full gate evidence landed.
 
 ## Context
 - Status: done.

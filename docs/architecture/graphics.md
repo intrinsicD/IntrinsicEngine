@@ -61,7 +61,7 @@ See [ADR-0014 — Procedural-source residency bridge](../adr/0014-procedural-sou
 
 ## Reference scene bootstrap
 
-See [ADR-0015 — Runtime reference scene bootstrap](../adr/0015-reference-scene-bootstrap.md) for the runtime-owned, opt-in `Extrinsic.Runtime.ReferenceScene` module + `IReferenceSceneProvider` / `ReferenceSceneRegistry` shape, the `Engine::Initialize()` resolution of `EngineConfig::ReferenceScene::Selector` with the double-install guard, the `TriangleProvider` single-entity contract (no GPU-typed ECS state, no light, CPU-only `ProceduralGeometryRef`), the forward-compatible `CameraViewInput` seed for the future `CameraControllers` umbrella, the strict import allow-list, and the cross-link to [GRAPHICS-080](../../tasks/active/GRAPHICS-080-enable-promoted-vulkan-by-default.md) for the `Render.EnablePromotedVulkanDevice` flip.
+See [ADR-0015 — Runtime reference scene bootstrap](../adr/0015-reference-scene-bootstrap.md) for the runtime-owned, opt-in `Extrinsic.Runtime.ReferenceScene` module + `IReferenceSceneProvider` / `ReferenceSceneRegistry` shape, the `Engine::Initialize()` resolution of `EngineConfig::ReferenceScene::Selector` with the double-install guard, the `TriangleProvider` single-entity contract (no GPU-typed ECS state, no light, CPU-only `ProceduralGeometryRef`), the forward-compatible `CameraViewInput` seed for the future `CameraControllers` umbrella, the strict import allow-list, and the cross-link to [GRAPHICS-080](../../tasks/done/GRAPHICS-080-enable-promoted-vulkan-by-default.md) for the `Render.EnablePromotedVulkanDevice` flip.
 
 ## Graphics asset residency
 

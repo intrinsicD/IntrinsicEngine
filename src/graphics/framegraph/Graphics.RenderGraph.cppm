@@ -13,8 +13,8 @@ import Extrinsic.RHI.Descriptors;
 
 export import :Resources;
 export import :Pass;
-export import :Compiler;
 export import :Barriers;
+export import :Compiler;
 export import :TransientAllocator;
 export import :Executor;
 

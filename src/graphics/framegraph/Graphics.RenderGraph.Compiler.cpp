@@ -15,6 +15,7 @@ module;
 
 module Extrinsic.Graphics.RenderGraph;
 
+import :Barriers;
 import :Compiler;
 
 import Extrinsic.RHI.Handles;

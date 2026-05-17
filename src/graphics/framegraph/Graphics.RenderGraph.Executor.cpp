@@ -6,6 +6,7 @@ module;
 
 module Extrinsic.Graphics.RenderGraph;
 
+import :Barriers;
 import :Executor;
 
 import Extrinsic.Core.Error;

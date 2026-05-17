@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -20,6 +21,17 @@ import Geometry.Properties;
 
 namespace ECS::Components::GeometrySources
 {
+    namespace
+    {
+        void RemovePropertyIfPresent(Geometry::PropertySet& properties, const std::string_view name)
+        {
+            if (const auto id = properties.Registry().Find(name))
+            {
+                (void)properties.Registry().Remove(*id);
+            }
+        }
+    }
+
     // =========================================================================
     // PopulateFromMesh
     // =========================================================================
@@ -40,6 +52,7 @@ namespace ECS::Components::GeometrySources
         vComp.NumDeleted   = vSize - mesh.VertexCount();
 
         {
+            RemovePropertyIfPresent(vComp.Properties, PropertyNames::kPosition);
             auto posProp = vComp.Properties.GetOrAdd<glm::vec3>(
                 std::string{PropertyNames::kPosition}, glm::vec3(0.0f));
             posProp.Vector().resize(vSize);
@@ -57,6 +70,8 @@ namespace ECS::Components::GeometrySources
         eComp.NumDeleted = eSize - mesh.EdgeCount();
 
         {
+            RemovePropertyIfPresent(eComp.Properties, PropertyNames::kEdgeV0);
+            RemovePropertyIfPresent(eComp.Properties, PropertyNames::kEdgeV1);
             auto v0Prop = eComp.Properties.GetOrAdd<uint32_t>(
                 std::string{PropertyNames::kEdgeV0}, 0u);
             auto v1Prop = eComp.Properties.GetOrAdd<uint32_t>(
@@ -80,6 +95,9 @@ namespace ECS::Components::GeometrySources
         {
             constexpr uint32_t kInvalid = std::numeric_limits<uint32_t>::max();
 
+            RemovePropertyIfPresent(hComp.Properties, PropertyNames::kHalfedgeToVertex);
+            RemovePropertyIfPresent(hComp.Properties, PropertyNames::kHalfedgeNext);
+            RemovePropertyIfPresent(hComp.Properties, PropertyNames::kHalfedgeFace);
             auto toVtxProp = hComp.Properties.GetOrAdd<uint32_t>(
                 std::string{PropertyNames::kHalfedgeToVertex}, kInvalid);
             auto nextProp  = hComp.Properties.GetOrAdd<uint32_t>(
@@ -110,6 +128,7 @@ namespace ECS::Components::GeometrySources
 
         {
             constexpr uint32_t kInvalid = std::numeric_limits<uint32_t>::max();
+            RemovePropertyIfPresent(fComp.Properties, PropertyNames::kFaceHalfedge);
             auto heProp = fComp.Properties.GetOrAdd<uint32_t>(
                 std::string{PropertyNames::kFaceHalfedge}, kInvalid);
             heProp.Vector().resize(fSize);
