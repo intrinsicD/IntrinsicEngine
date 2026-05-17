@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 1 |
 | `assets` | 7 |
 | `core` | 39 |
-| `ecs` | 24 |
+| `ecs` | 25 |
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -80,6 +80,7 @@ Root scanned: `src`
 | `Extrinsic.ECS.Component.Culling.World` | `src/ecs/Components/ECS.Component.Culling.World.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.DirtyTags` | `src/ecs/Components/ECS.Component.DirtyTags.cppm` | `ecs` |
 | `Extrinsic.ECS.Components.GeometrySources` | `src/ecs/Components/ECS.Component.GeometrySources.cppm` | `ecs` |
+| `Extrinsic.ECS.Components.GeometrySourcesPopulate` | `src/ecs/Components/ECS.Component.GeometrySourcesPopulate.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Hierarchy` | `src/ecs/Components/ECS.Component.Hierarchy.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Light` | `src/ecs/Components/ECS.Component.Light.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.MetaData` | `src/ecs/Components/ECS.Component.MetaData.cppm` | `ecs` |
@@ -460,4 +461,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **433**
+Total modules: **434**

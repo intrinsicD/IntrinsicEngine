@@ -25,7 +25,16 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.Component.Transform.WorldMatrix`
 - `Extrinsic.ECS.Component.Hierarchy`
 - `Extrinsic.ECS.Component.MetaData`
-- `Extrinsic.ECS.Components.GeometrySources`
+- `Extrinsic.ECS.Components.GeometrySources` — per-domain owned
+  `PropertySet` components (`Vertices`, `Edges`, `Halfedges`, `Faces`,
+  `Nodes`) plus canonical `PropertyNames` keys, domain markers
+  (`HasMeshTopology`, `HasGraphTopology`), and `BuildConstView`/
+  `BuildMutableView` domain detection.
+- `Extrinsic.ECS.Components.GeometrySourcesPopulate` — promoted
+  `PopulateFromMesh` / `PopulateFromGraph` / `PopulateFromCloud` helpers
+  that copy a `Geometry::HalfedgeMesh::Mesh`, `Geometry::Graph::Graph`,
+  or `Geometry::PointCloud::Cloud` into the ECS-owned PropertySets
+  (HARDEN-065 slice 2).
 - `Extrinsic.ECS.Component.Culling.Local`
 - `Extrinsic.ECS.Component.Culling.World`
 - `Extrinsic.ECS.Component.Culling.Proxy`
@@ -67,6 +76,7 @@ Components/
   ECS.Component.Hierarchy.cppm
   ECS.Component.MetaData.cppm
   ECS.Component.GeometrySources.cppm
+  ECS.Component.GeometrySourcesPopulate.{cppm,cpp}
   ECS.Component.Culling.Local.cppm
   ECS.Component.Culling.World.cppm
   ECS.Component.Culling.Proxy.cppm

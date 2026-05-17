@@ -221,6 +221,7 @@ set(_ecs_test_files
     Test.ECS.RenderSync.cpp
     Test.ECS.Events.cpp
     Test.ECS.GeometryDirtyDomains.cpp
+    Test.ECS.GeometrySourcesPopulate.cpp
 )
 intrinsic_resolve_test_sources(_ecs_test_sources
     SEARCH_DIRS unit/ecs contract/ecs integration/runtime

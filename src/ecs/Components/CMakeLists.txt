@@ -8,6 +8,7 @@ target_sources(${target_name}
         ECS.Component.Culling.Proxy.cppm
         ECS.Component.DirtyTags.cppm
         ECS.Component.GeometrySources.cppm
+        ECS.Component.GeometrySourcesPopulate.cppm
         ECS.Component.Hierarchy.cppm
         ECS.Component.Light.cppm
         ECS.Component.MetaData.cppm
@@ -18,6 +19,7 @@ target_sources(${target_name}
         ECS.Component.Transform.World.cppm
         PRIVATE
         ECS.Component.Transform.Local.cpp
+        ECS.Component.GeometrySourcesPopulate.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
@@ -26,7 +28,8 @@ target_include_directories(${target_name} PUBLIC .)
 # component module surface are linked here. The promoted ECS dependency
 # contract is `ecs -> {core, geometry}` (see /AGENTS.md §2). Components import
 # `Geometry.*` types directly (Sphere, AABB, OBB, Octree, ConvexHull,
-# Properties) and use `glm` for transform math; they do not import any
+# Properties, plus HalfedgeMesh/Graph/PointCloud for the `GeometrySources`
+# populate helpers) and use `glm` for transform math; they do not import any
 # `Extrinsic.Asset.*`, `Extrinsic.RHI.*`, `Extrinsic.Graphics.*`,
 # `Extrinsic.Runtime.*`, or `Extrinsic.Platform.*` modules. ExtrinsicCore is
 # linked transitively via `Systems/CMakeLists.txt` for the

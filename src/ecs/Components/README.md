@@ -12,6 +12,7 @@ This directory contains the `Components` module/files.
 - `ECS.Component.Culling.World.cppm`
 - `ECS.Component.DirtyTags.cppm`
 - `ECS.Component.GeometrySources.cppm`
+- `ECS.Component.GeometrySourcesPopulate.cppm` + `.cpp`
 - `ECS.Component.Hierarchy.cppm`
 - `ECS.Component.Light.cppm`
 - `ECS.Component.MetaData.cppm`
@@ -64,9 +65,47 @@ corresponding upload, mirroring the existing `DirtyTags::DirtyTransform`
 drain that `RenderSync::OnUpdate` produces and `RenderExtraction` consumes
 (`HARDEN-066`).
 
-The promoted ownership decision for `GeometrySources` (borrowed views,
-owned copies, or a split) and the population helpers (`PopulateFromMesh`,
-`PopulateFromGraph`, `PopulateFromCloud`) remain deferred to
-[`HARDEN-065`](../../../tasks/active/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md)
-slice 2; the current promoted `GeometrySources` retains the non-owning
-`ObserverPtr<Geometry::PropertySet>` shape.
+## Geometry source ownership
+
+`HARDEN-065` slice 2 closed the borrowed-vs-owned decision for promoted
+`GeometrySources`: the per-domain components (`Vertices`, `Edges`,
+`Halfedges`, `Faces`, `Nodes`) now own a `Geometry::PropertySet` directly,
+matching the legacy `ECS::Components::GeometrySources` shape. The entity is
+the authoritative CPU geometry source after a `PopulateFrom*` call, so the
+originating mesh/graph/cloud object can be discarded without invalidating
+the ECS view.
+
+`Extrinsic.ECS.Components.GeometrySourcesPopulate` provides the promoted
+population helpers (declared in `ECS.Component.GeometrySourcesPopulate.cppm`,
+implemented in the matching `.cpp`):
+
+- `PopulateFromMesh(registry, entity, mesh)` — emplaces `Vertices`,
+  `Edges`, `Halfedges`, and `Faces`. Each per-domain `PropertySet` is
+  copied from the source `Geometry::HalfedgeMesh::Mesh` so user-defined
+  properties (colors, labels, vector fields, …) survive the promotion.
+  Canonical keys: `v:position`, `e:v0`/`e:v1`, `h:to_vertex`/`h:next`/
+  `h:face`, `f:halfedge`.
+- `PopulateFromGraph(registry, entity, graph)` — emplaces `Nodes` and
+  `Edges` plus the `HasGraphTopology` marker (graph halfedges remain
+  internal to `Geometry::Graph` and are not promoted to GeometrySources;
+  the marker lets `BuildConstView`/`BuildMutableView` resolve
+  `Domain::Graph` without a `Halfedges` PropertySet). Calls
+  `graph.GarbageCollection()` if `HasGarbage()` so the resulting
+  PropertySets are contiguous.
+- `PopulateFromCloud(registry, entity, cloud)` — emplaces `Vertices` with
+  canonical `v:position` (and `v:normal` when `HasNormals()`), preserving
+  the full `PointProperties()` PropertySet.
+
+Canonical key constants live in
+`Extrinsic.ECS.Components.GeometrySources::PropertyNames`
+(`kPosition`, `kNormal`, `kEdgeV0`, `kEdgeV1`, `kHalfedgeToVertex`,
+`kHalfedgeNext`, `kHalfedgeFace`, `kFaceHalfedge`); read sites must
+prefer these constants over inline string literals.
+
+Each populate helper drops the entity's prior `GeometrySources`
+components (`Vertices`/`Edges`/`Halfedges`/`Faces`/`Nodes`) and
+topology markers (`HasMeshTopology`/`HasGraphTopology`) before
+emplacing the new domain, so a re-population from a different
+domain (mesh→cloud, graph→cloud, mesh→graph, etc.) cannot leak stale
+topology into `BuildConstView`/`BuildMutableView`. The reset is a
+silent no-op on first-population entities.
