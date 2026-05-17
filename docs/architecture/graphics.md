@@ -54,31 +54,7 @@ See [ADR-0005 — Vulkan operational readiness gate and runtime reconciliation](
   gizmo hit testing, and transform application; graphics only consumes the
   resulting data snapshots. See [ADR-0006 — Camera, picking-request, and gizmo runtime handoff](../adr/0006-camera-picking-and-gizmo-runtime-handoff.md) for the runtime camera-controller umbrella, single-shot `PickPixelRequest` scheduling and coalescing, transform-gizmo hit-test ownership, interaction-state storage and lifetime, and transform-application/undo policy; legacy `Graphics.TransformGizmo` / `Graphics.Interaction` feature handoff stays tracked in [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md).
 - `Extrinsic.Graphics.SelectionSystem` is a CPU-visible reporting-only seam for picking. The renderer copies the requested pixel(s) into the graphics-owned host-visible `Picking.Readback` buffer at frame-record time and drains it on the next `BeginFrame()` through `SelectionSystem::PublishPickResult(...)` / `PublishNoHit()`; runtime owns `StableEntityId` → live ECS resolution and the selection-outline input mask consumed by `SelectionOutlinePass`. See [ADR-0007 — Picking, selection, and outline reporting seam](../adr/0007-picking-selection-and-outline.md) for the `EntityId` / `PrimitiveId` `EncodedSelectionId` packing, the per-pass payload sources, the drain timing and diagnostic-counter invariants, and the transparent / special-material picking eligibility gate that holds until `GRAPHICS-025` lands.
-- `Extrinsic.Graphics.SpatialDebugVisualizers` converts data-only spatial debug
-  snapshots (bounds, hierarchy nodes, split planes, convex-hull wire edges, and
-  point markers) into transient debug packets with deterministic limits and
-  diagnostics. Geometry/runtime/editor adapters remain outside graphics and feed
-  snapshot records instead of giving graphics live ownership of geometry trees or
-  editor state. Concrete adapters that translate `Geometry::BVH`,
-  `Geometry::KDTree`, `Geometry::Octree`, and convex-hull outputs into these
-  data-only records live in **runtime extraction** (planned umbrella module
-  name `Extrinsic.Runtime.SpatialDebugAdapters`), not in `src/geometry` and not
-  in `src/graphics`: geometry stays at the `geometry -> core` layer rule and
-  graphics never imports geometry tree implementations or editor state. Editor
-  and app code may own user-facing toggles (enable/disable, color, leaf/internal
-  filters, per-depth filters) but must funnel them into the runtime adapter as
-  pre-filter inputs rather than calling
-  `Extrinsic.Graphics.SpatialDebugVisualizers` with live geometry references.
-  The `SpatialDebugVisualizerOptions::MaxLinePackets`/`MaxPointPackets`/
-  `MaxDepth` budget remains the single place that enforces graphics-side
-  truncation, and `SpatialDebugVisualizerDiagnostics` remains the only
-  graphics-visible diagnostic surface; adapters apply CPU-side pre-filters
-  (e.g. leaf-only, occupancy-only, capped depth) and report adapter-side
-  invocation/filter statistics through runtime extraction stats rather than
-  introducing a parallel graphics diagnostics struct. Adapter tests are
-  runtime integration tests under `tests/integration/runtime/` (matching
-  `Test.RuntimeRenderExtraction.cpp`); the data-only packet contract keeps
-  its unit coverage under `tests/unit/graphics/`.
+- `Extrinsic.Graphics.SpatialDebugVisualizers` converts data-only spatial debug snapshots (bounds, hierarchy nodes, split planes, convex-hull wire edges, point markers) into transient debug packets with deterministic limits and diagnostics. Graphics never imports geometry tree implementations or editor state; concrete adapters live in runtime extraction. See [ADR-0008 — Spatial debug visualizer runtime adapters](../adr/0008-spatial-debug-visualizer-adapters.md) for the `Extrinsic.Runtime.SpatialDebugAdapters` umbrella, the `Build*SpatialDebugInputs(...)` naming convention, the frozen packet/diagnostics contract, the pre-filter vs graphics-side truncation budget split, and the `integration;runtime;graphics` adapter test placement.
 - `Extrinsic.Graphics.VisualizationPackets` is the promoted data-only seam for
   scalar/color/vector attribute buffers, vector-field overlays, isoline overlays,
   UV-backed fragment-bake atlas descriptors, and Htex patch-preview/bake atlas

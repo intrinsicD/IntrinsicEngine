@@ -11,6 +11,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 5. [0005 — Vulkan operational readiness gate and runtime reconciliation](0005-vulkan-operational-readiness-gate.md)
 6. [0006 — Camera, picking-request, and gizmo runtime handoff](0006-camera-picking-and-gizmo-runtime-handoff.md)
 7. [0007 — Picking, selection, and outline reporting seam](0007-picking-selection-and-outline.md)
+8. [0008 — Spatial debug visualizer runtime adapters](0008-spatial-debug-visualizer-adapters.md)
 
 ## Conventions
 
