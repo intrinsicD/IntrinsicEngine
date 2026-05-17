@@ -32,37 +32,7 @@ Graphics is organized into explicit sublayers:
 
 ## Vulkan operational readiness and runtime fallback
 
-`GRAPHICS-033` records the operational-readiness contract that must be satisfied
-before the promoted Vulkan backend can leave fail-closed mode. The ordered gate is
-backend-owned and append-only: (1) build/runtime request reconciled, (2) instance,
-surface, physical device, and queue families live, (3) logical device, required
-features/extensions, allocator, and heap diagnostics live, (4) swapchain acquire /
-present / resize policy satisfies the GRAPHICS-013CQ present contract, (5)
-per-frame command/sync objects are live for the GRAPHICS-032 minimal recipe, (6)
-minimal surface and present recording bodies match the CPU/null command contract,
-(7) framegraph barrier/layout validation reports no GRAPHICS-022 hard errors, (8)
-public bindless/transfer/pipeline/backbuffer/command-context services agree on the
-same operational answer, and (9) validation-layer policy reports no gate-blocking
-error.
-
-The single source of truth is a planned Vulkan-public, non-native evaluator:
-`EvaluateVulkanOperationalStatus(const VulkanOperationalInputs&) ->
-VulkanOperationalStatus`. Status is reasoned rather than bool-only:
-`VulkanOperationalStatusCode { NotCompiled, NotRequested,
-RequestedButUnsupported, RequestedButFailedInit, RequestedButValidationFailed,
-RequestedButIncompleteGate, Operational }`, with an append-only
-`VulkanOperationalReason` for the first failing gate. `VulkanDevice::IsOperational()`
-and runtime startup reconciliation consume that result; renderer code still gates
-only on `RHI::IDevice::IsOperational()` and backend-neutral framegraph stats.
-
-Runtime reconciliation is fail-soft: if Vulkan is requested but not compiled,
-unsupported, failed initialization, validation-failed, or gate-incomplete, runtime
-returns the Null device, increments the Vulkan operational fallback diagnostics,
-emits one `VulkanRequestedButNotOperational` startup breadcrumb, and continues.
-Runtime never aborts solely because requested Vulkan falls back to Null. Runtime
-does not call `vk*` symbols or inspect native handles; it reads a future
-`VulkanOperationalDiagnosticsSnapshot` at startup, after device reset/recreate,
-and around false→true / true→false operational transitions.
+See [ADR-0005 — Vulkan operational readiness gate and runtime reconciliation](../adr/0005-vulkan-operational-readiness-gate.md) for the 9-step ordered gate, the `EvaluateVulkanOperationalStatus(...)` single-source-of-truth evaluator, the `VulkanOperationalStatusCode`/`VulkanOperationalReason` taxonomy, the runtime reconciliation truth table, the `VulkanOperationalDiagnosticsSnapshot` surface, the validation-layer policy, the required-vs-optional capability split, and the rules for transient operational drops.
 
 ## GPU scene ownership
 
