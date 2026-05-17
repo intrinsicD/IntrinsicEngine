@@ -1,10 +1,20 @@
 # DOCS-001 — Reduce `docs/architecture/graphics.md` to contract + status
 
+## Status
+
+- Status: in-progress (slice 1 landed; slice 2 in flight, ADR-0004 landed, ADR-0005..0017 remaining).
+- Owner/agent: Claude on `claude/setup-agentic-workflow-6h6w4`.
+- Branch: `claude/setup-agentic-workflow-6h6w4`.
+- Started: 2026-05-17.
+- Slice 1 landed in commit `70e4612` (Classification subsection appended to Context).
+- Slice 2 landed so far: ADR-0004 (Vulkan backend bring-up + fail-closed fallback) — replaces the line-31 mega-paragraph of `docs/architecture/graphics.md` with a one-line pointer. Cross-links retired `GRAPHICS-018`/`018Q`/`018R`/`018T`/`026`.
+- Next verification step: continue slice 2 in dependency order from the Classification table. The next per-ADR commit is ADR-0005 (Vulkan operational readiness gate; extracts lines 33–65 of `docs/architecture/graphics.md`); after that, the remaining 12 ADRs follow the Classification table top-to-bottom. Each commit runs the three static verification gates (`tools/agents/check_task_policy.py --strict`, `tools/docs/check_doc_links.py`, `tools/agents/validate_tasks.py --strict`). Build/CTest verification deferred to CI because the pinned `clang-20` toolchain is unavailable on this host.
+
 ## Goal
-- [ ] Reshape [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md) (currently ~793 lines, much of it multi-paragraph prose embedded in single bullet items) into a short canonical contract that a contributor can read in five minutes, plus a short pointer list to the deeper material it currently inlines.
+- [ ] Reshape [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) (currently ~793 lines, much of it multi-paragraph prose embedded in single bullet items) into a short canonical contract that a contributor can read in five minutes, plus a short pointer list to the deeper material it currently inlines.
 - [ ] Move the inlined narrative (Vulkan operational gate decisions, GRAPHICS-017Q/018Q/032/033/etc. clarification prose, runtime/editor handoff inventories) out of the canonical architecture doc and into:
-  - ADRs under [`docs/adr/`](../../../docs/adr/) for irreversible architecture decisions; or
-  - migration notes under [`docs/migration/`](../../../docs/migration/) for time-bounded transition state; or
+  - ADRs under [`docs/adr/`](../../docs/adr/) for irreversible architecture decisions; or
+  - migration notes under [`docs/migration/`](../../docs/migration/) for time-bounded transition state; or
   - the originating tasks under `tasks/done/` (where the prose was authored as part of the slice).
 - [ ] Leave `docs/architecture/graphics.md` factual about *current* state of canonical graphics layers, per `AGENTS.md` §9 doc sync policy.
 
@@ -28,13 +38,13 @@
   - The document is hard to read end-to-end and almost impossible to keep current.
   - Architectural contracts and ephemeral decisions are not visually distinguishable.
   - Cross-references from canonical sources point at run-on paragraphs that are likely to rot.
-- Reference for target shape: [`docs/architecture/overview.md`](../../../docs/architecture/overview.md) (22 lines) and [`docs/architecture/layering.md`](../../../docs/architecture/layering.md) (~41 lines) demonstrate the intended concision for canonical architecture docs.
-- ADR template: [`docs/adr/`](../../../docs/adr/) already has 3 records (0001..0003). Each new extracted decision becomes an ADR (`0004`, `0005`, ...).
-- Migration target: [`docs/migration/`](../../../docs/migration/) already hosts the legacy retirement and parity matrix documents; extracted handoff inventories live alongside them.
+- Reference for target shape: [`docs/architecture/overview.md`](../../docs/architecture/overview.md) (22 lines) and [`docs/architecture/layering.md`](../../docs/architecture/layering.md) (~41 lines) demonstrate the intended concision for canonical architecture docs.
+- ADR template: [`docs/adr/`](../../docs/adr/) already has 3 records (0001..0003). Each new extracted decision becomes an ADR (`0004`, `0005`, ...).
+- Migration target: [`docs/migration/`](../../docs/migration/) already hosts the legacy retirement and parity matrix documents; extracted handoff inventories live alongside them.
 
 ### Classification
 
-This subsection is the slice-1 deliverable. It records the end-to-end pass over [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md) at the section/bullet granularity established by the document's top-level `##` headings and `^- ` bullet boundaries (see `grep -nE "^##|^- " docs/architecture/graphics.md` for the raw list). The intent is that slices 2–4 can mechanically consume this table without re-reading the source document: each `decision-record` row becomes one ADR commit (slice 2), each `migration-inventory` row becomes one migration-doc commit (slice 3), and the remaining `canonical-contract` rows are tightened in place (slice 4).
+This subsection is the slice-1 deliverable. It records the end-to-end pass over [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) at the section/bullet granularity established by the document's top-level `##` headings and `^- ` bullet boundaries (see `grep -nE "^##|^- " docs/architecture/graphics.md` for the raw list). The intent is that slices 2–4 can mechanically consume this table without re-reading the source document: each `decision-record` row becomes one ADR commit (slice 2), each `migration-inventory` row becomes one migration-doc commit (slice 3), and the remaining `canonical-contract` rows are tightened in place (slice 4).
 
 Conventions used in the table:
 
@@ -87,16 +97,33 @@ Slice-budget sanity check: collapsing 13 decision-record rows + 1 mixed row into
 ## Required changes
 
 ### Slice 1 — inventory and classify (no edits to `graphics.md` yet)
-- [ ] Read `docs/architecture/graphics.md` end-to-end and classify each section/bullet as one of:
+- [x] Read `docs/architecture/graphics.md` end-to-end and classify each section/bullet as one of:
       `canonical-contract` | `decision-record` | `migration-inventory` | `obsolete`.
-- [ ] Record the classification as a table in this task file under a new "Classification" subsection appended to the Context section above. The table columns are: line-range, current heading, classification, target destination (`graphics.md (keep)` | `docs/adr/NNNN-*.md` | `docs/migration/<name>.md` | `tasks/done/<id>.md` cross-link).
-- [ ] Slice-1 commit is doc-only and changes only this task file.
+- [x] Record the classification as a table in this task file under a new "Classification" subsection appended to the Context section above. The table columns are: line-range, current heading, classification, target destination (`graphics.md (keep)` | `docs/adr/NNNN-*.md` | `docs/migration/<name>.md` | `tasks/done/<id>.md` cross-link).
+- [x] Slice-1 commit is doc-only and changes only this task file. (Landed in commit `70e4612`.)
 
 ### Slice 2 — extract decision records to ADRs
 - [ ] For each row classified `decision-record`, author an ADR under `docs/adr/` (`0004-*`, `0005-*`, ...). Use the existing ADR pattern. The ADR captures the decision and its rationale; the original prose becomes the ADR's body.
 - [ ] Update `docs/adr/index.md` to list the new records.
 - [ ] Update `docs/architecture/graphics.md` to replace each extracted block with a one-line pointer (`See [ADR-NNNN](../adr/NNNN-*.md).`).
 - [ ] Slice-2 commit per ADR (each ADR + its `graphics.md` pointer update is a single commit).
+
+Slice-2 progress (per Classification-table row, top-to-bottom):
+
+- [x] ADR-0004 — Vulkan backend bring-up and fail-closed fallback (Classification row 31). Replaces graphics.md line 31 with a one-line pointer; index updated.
+- [ ] ADR-0005 — Vulkan operational readiness gate (Classification row 33–65).
+- [ ] ADR-0006 — Camera, picking, and gizmo runtime handoff (Classification row 85–149).
+- [ ] ADR-0007 — Picking, selection, and outline (Classification row 150–175).
+- [ ] ADR-0008 — Spatial debug visualizer adapters (Classification row 176–200).
+- [ ] ADR-0009 — Visualization packets and overlay upload (Classification row 201–257).
+- [ ] ADR-0010 — Postprocess chain backend policy (Classification row 265–298).
+- [ ] ADR-0011 — Debug-view inspection table (Classification row 299–336).
+- [ ] ADR-0012 — ImGui overlay and Present finalization (Classification row 337–393).
+- [ ] ADR-0013 — ECS renderable residency bridge (Classification row 406–465).
+- [ ] ADR-0014 — Procedural-source residency bridge (Classification row 467–534).
+- [ ] ADR-0015 — Reference scene bootstrap (Classification row 536–594).
+- [ ] ADR-0016 — Texture residency and asset cache policy (Classification row 619–701).
+- [ ] ADR-0017 — Default debug surface material (Classification rows 727–746 + 747–764).
 
 ### Slice 3 — extract migration inventories
 - [ ] For each row classified `migration-inventory`, either fold the content into an existing `docs/migration/*` file (preferred) or author a new `docs/migration/<topic>-handoff-inventory.md` file. Cross-link from `docs/migration/index.md`.
@@ -115,10 +142,10 @@ Slice-budget sanity check: collapsing 13 decision-record rows + 1 mixed row into
 - [ ] Final `graphics.md` line count target: ≤ 250 lines. (Current: 793.)
 
 ## Docs
-- [ ] [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md) reduced to canonical contract + pointers.
-- [ ] [`docs/adr/index.md`](../../../docs/adr/index.md) lists each new ADR.
-- [ ] [`docs/migration/index.md`](../../../docs/migration/index.md) lists any new migration docs.
-- [ ] [`docs/architecture/index.md`](../../../docs/architecture/index.md) status note for `graphics.md` reflects the reduction.
+- [ ] [`docs/architecture/graphics.md`](../../docs/architecture/graphics.md) reduced to canonical contract + pointers.
+- [ ] [`docs/adr/index.md`](../../docs/adr/index.md) lists each new ADR.
+- [ ] [`docs/migration/index.md`](../../docs/migration/index.md) lists any new migration docs.
+- [ ] [`docs/architecture/index.md`](../../docs/architecture/index.md) status note for `graphics.md` reflects the reduction.
 
 ## Acceptance criteria
 - [ ] Final `docs/architecture/graphics.md` is ≤ 250 lines.

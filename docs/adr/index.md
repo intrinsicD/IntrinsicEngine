@@ -7,6 +7,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 1. [0001 — Minimal runtime refactor](0001-minimal-runtime-refactor.md)
 2. [0002 — Pragmatic medium runtime refactor](0002-pragmatic-medium-runtime-refactor.md)
 3. [0003 — Ideal runtime architecture](0003-ideal-runtime-architecture.md)
+4. [0004 — Vulkan backend bring-up and fail-closed fallback](0004-vulkan-backend-bringup-and-fallback.md)
 
 ## Conventions
 
