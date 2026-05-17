@@ -15,6 +15,9 @@ Backlog tasks are approved or proposed work items that have not started yet.
 - [`rendering/`](rendering/) — renderer, frame graph, and RHI work.
 - [`runtime/`](runtime/) — runtime composition root and lifecycle.
 - [`ui/`](ui/) — editor/UI integration seams.
+- [`workshop/`](workshop/) — clean-workshop task pack: guardrails, boundary
+  fixes, typed routing, renderer decomposition, maturity taxonomy, and
+  architecture review gate.
 
 ## Convergence themes
 

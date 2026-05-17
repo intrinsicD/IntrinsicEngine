@@ -24,6 +24,8 @@ Use stable task prefixes to reflect ownership and review routing:
 - `BENCH-` — benchmark manifests, runners, and baselines.
 - `CI-` — workflow and automation changes.
 - `HARDEN-` — post-reorganization hardening, verification, and cleanup.
+- `WORKSHOP-` — clean-workshop pack: architecture guardrails, boundary fixes,
+  typed routing, renderer decomposition, maturity taxonomy, and review gate.
 
 ## Active trackers
 
