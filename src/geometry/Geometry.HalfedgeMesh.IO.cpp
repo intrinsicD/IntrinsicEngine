@@ -1022,6 +1022,7 @@ namespace Geometry::MeshIO
         std::vector<glm::vec3> vertices;
         std::vector<glm::vec3> normals;
         std::vector<glm::vec2> texcoords;
+        std::vector<glm::vec4> colors;
         std::vector<std::vector<OBJFaceVertex>> faceVertices;
         bool hasFaceNormals = false;
         bool hasFaceTexcoords = false;
@@ -1058,6 +1059,17 @@ namespace Geometry::MeshIO
                     return InvalidMeshFormat();
                 }
                 vertices.emplace_back(*x, *y, *z);
+                if (tokens.size() == 7)
+                {
+                    const auto r = ParseNumber<float>(tokens[4]);
+                    const auto g = ParseNumber<float>(tokens[5]);
+                    const auto b = ParseNumber<float>(tokens[6]);
+                    if (!r || !g || !b)
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    colors.emplace_back(*r, *g, *b, 1.0f);
+                }
             }
             else if (tokens[0] == "vn")
             {
@@ -1129,9 +1141,11 @@ namespace Geometry::MeshIO
 
         if (hasFaceNormals || hasFaceTexcoords)
         {
+            const bool hasLockstepColors = colors.size() == vertices.size();
             std::vector<glm::vec3> remappedVertices;
             std::vector<glm::vec3> remappedNormals;
             std::vector<glm::vec2> remappedTexcoords;
+            std::vector<glm::vec4> remappedColors;
             std::vector<std::vector<std::uint32_t>> remappedFaces;
             std::unordered_map<OBJFaceVertexKey, std::uint32_t, OBJFaceVertexKeyHash> remap;
 
@@ -1143,6 +1157,10 @@ namespace Geometry::MeshIO
             if (hasFaceTexcoords)
             {
                 remappedTexcoords.reserve(vertices.size());
+            }
+            if (hasLockstepColors)
+            {
+                remappedColors.reserve(vertices.size());
             }
 
             for (const auto& sourceFace : faceVertices)
@@ -1172,6 +1190,10 @@ namespace Geometry::MeshIO
                                                             ? texcoords[static_cast<std::size_t>(sourceVertex.Texcoord)]
                                                             : glm::vec2(0.0f));
                         }
+                        if (hasLockstepColors)
+                        {
+                            remappedColors.push_back(colors[static_cast<std::size_t>(sourceVertex.Position)]);
+                        }
                     }
                     face.push_back(it->second);
                 }
@@ -1181,7 +1203,10 @@ namespace Geometry::MeshIO
             PopulateResult(result,
                            remappedVertices,
                            remappedFaces,
-                           hasFaceNormals ? std::span<const glm::vec3>(remappedNormals) : std::span<const glm::vec3>{});
+                           hasFaceNormals ? std::span<const glm::vec3>(remappedNormals) : std::span<const glm::vec3>{},
+                           hasLockstepColors && remappedColors.size() == remappedVertices.size()
+                               ? std::span<const glm::vec4>(remappedColors)
+                               : std::span<const glm::vec4>{});
             if (hasFaceTexcoords && remappedTexcoords.size() == remappedVertices.size())
             {
                 auto texcoordProperty =
@@ -1209,7 +1234,9 @@ namespace Geometry::MeshIO
 
         const std::span<const glm::vec3> normalsSpan =
             normals.size() == vertices.size() ? std::span<const glm::vec3>(normals) : std::span<const glm::vec3>{};
-        PopulateResult(result, vertices, faces, normalsSpan);
+        const std::span<const glm::vec4> colorsSpan =
+            colors.size() == vertices.size() ? std::span<const glm::vec4>(colors) : std::span<const glm::vec4>{};
+        PopulateResult(result, vertices, faces, normalsSpan, colorsSpan);
         if (texcoords.size() == vertices.size())
         {
             auto texcoordProperty =
