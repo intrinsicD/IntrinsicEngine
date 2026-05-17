@@ -2,7 +2,7 @@
 
 ## Goal
 - [ ] Remove the three-file `src/legacy/Interface/` subtree (`Gui.cpp`, `Gui.cppm`, `Interface.cppm`, `CMakeLists.txt`) from the repository as a single mechanical commit, retire its `add_subdirectory` entry from the top-level CMake graph, and drop any layering-allowlist rows that were granted only for this subtree.
-- [ ] Land the first concrete deletion that retires part of `src/legacy/` from the engine, proving the legacy-retirement program documented in [`ARCH-004`](ARCH-004-legacy-retirement-first-deletion-target.md) is operational.
+- [ ] Land the first concrete deletion that retires part of `src/legacy/` from the engine, proving the legacy-retirement program documented in [`ARCH-004`](../../done/ARCH-004-legacy-retirement-first-deletion-target.md) is operational.
 
 ## Non-goals
 - [ ] Do not delete any other `src/legacy/` subtree under cover of this task.
@@ -12,7 +12,7 @@
 
 ## Context
 - Owning subsystem/layer: `src/legacy/Interface/` removal; downstream owners `src/platform/` (window/input ports) and `src/app/` (UI shell entry).
-- Driver: [`ARCH-004 — Pin first legacy-deletion target and sequencing`](ARCH-004-legacy-retirement-first-deletion-target.md).
+- Driver: [`ARCH-004 — Pin first legacy-deletion target and sequencing`](../../done/ARCH-004-legacy-retirement-first-deletion-target.md).
 - Files in scope:
   - `src/legacy/Interface/CMakeLists.txt`
   - `src/legacy/Interface/Gui.cpp`

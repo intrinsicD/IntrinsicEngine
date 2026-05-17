@@ -29,7 +29,7 @@ When a legacy area is retired:
 
 ## Sequencing
 
-Retirement runs as a tracked program. Targets are deleted in the order below, each as a single mechanical commit, gated by an explicit prerequisite checklist. New targets are added by [`ARCH-004 — Pin first legacy-deletion target and sequencing`](../../tasks/backlog/architecture/ARCH-004-legacy-retirement-first-deletion-target.md); the executing tasks live alongside it under `tasks/backlog/architecture/LEGACY-NNN-*.md`.
+Retirement runs as a tracked program. Targets are deleted in the order below, each as a single mechanical commit, gated by an explicit prerequisite checklist. The first/second/third deletion targets were pinned by [`ARCH-004 — Pin first legacy-deletion target and sequencing`](../../tasks/done/ARCH-004-legacy-retirement-first-deletion-target.md) (done 2026-05-17); new targets are added by a follow-up `ARCH-NNN` task once the upstream gates for the next subtree retire. The executing tasks live under `tasks/backlog/architecture/LEGACY-NNN-*.md`.
 
 | # | Subtree | Size | Promoted owner | Prerequisite checklist | Executing task |
 |---|---|---|---|---|---|
