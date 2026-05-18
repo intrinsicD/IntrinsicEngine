@@ -657,7 +657,7 @@ testable; each phase derisks the next.
   locks the contract for sim-N / render-N-1 pipelining against an immutable
   double-buffered render world. Owner layers: `runtime` (pool + swap),
   `graphics/renderer` (consumer). Depends on GRAPHICS-002, GRAPHICS-016.
-- [GRAPHICS-037 — Async compute and multi-queue scheduling in the frame graph (planning)](GRAPHICS-037-async-compute-multi-queue-rendergraph.md):
+- [GRAPHICS-037 — Async compute and multi-queue scheduling in the frame graph (planning, done)](../../done/GRAPHICS-037-async-compute-multi-queue-rendergraph.md):
   locks `QueueAffinity` enum, partitioning, cross-queue timeline-semaphore
   edges, ownership transfer, and CPU-testable null-RHI mocks. Depends on
   GRAPHICS-022, GRAPHICS-018T.
