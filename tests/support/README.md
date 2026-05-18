@@ -34,8 +34,12 @@ so viewport Y-flip cannot change membership, and `ExpectedAt(point)` plus
 locked in at compile time across:
 
 - the GRAPHICS-033D MinimalDebug fixture
-  (`tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp`);
-- the sibling GRAPHICS-032D recipe-selector fixture;
+  (`MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`
+  in `tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp`);
+- the sibling GRAPHICS-032D recipe-selector fixture
+  (`MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
+  in the same file; reuses the harness only for the framebuffer extent and
+  fallback-counter contract — pixel readback stays exclusive to the 033D sibling);
 - the canonical GRAPHICS-076 / GRAPHICS-081 default-recipe smoke once the
   scaffold recipe is retired.
 

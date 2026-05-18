@@ -389,9 +389,15 @@ drives a bounded runtime loop, verifies the operational status and minimal pass
 counters on Vulkan-capable hosts, and remains outside the default CPU gate. It
 consumes the reusable `tests/support/MinimalTriangleReadback.hpp` and
 `tests/support/OperationalCounterStability.hpp` helpers so the sibling
-`GRAPHICS-032D` recipe-selector fixture and the canonical `GRAPHICS-076` /
+`GRAPHICS-032D` recipe-selector fixture
+(`MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`,
+landed alongside this one in the same file) and the canonical `GRAPHICS-076` /
 `GRAPHICS-081` default-recipe smoke can reuse the four-sample-point table and
-fallback-counter stability contract byte-identical. The backbuffer-to-host
+fallback-counter stability contract byte-identical. The two `MinimalDebugSurfaceGpuSmoke`
+fixtures share one bounded `engine.Run()` driver helper
+(`BootstrapEngineForMinimalDebug` + `DriveOneFrameAndCapture`) so the driver loop
+is not duplicated; the 032D sibling deliberately leaves the readback hook unarmed
+and asserts the recipe-selector counters only. The backbuffer-to-host
 readback seam is provided by `RHI::ICommandContext::CopyTextureToBuffer`
 (Vulkan: `vkCmdCopyImageToBuffer`) plus `RHI::IDevice::ReadBuffer` (Vulkan:
 `vkDeviceWaitIdle` + `memcpy` from a HostVisible buffer's persistent map). The

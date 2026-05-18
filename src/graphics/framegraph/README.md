@@ -49,3 +49,19 @@ not transient allocation IDs or backend-native handles.
 > diagnostics counters introduced alongside this recipe are bootstrap-only and
 > are removed by `GRAPHICS-081` once the canonical default recipe records every
 > pass body operationally (`GRAPHICS-070..076`).
+
+## GRAPHICS-032D minimal-recipe `gpu;vulkan` smoke
+
+The opt-in recipe-selector smoke landed via `GRAPHICS-032D` as
+`MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
+in `tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp`. It drives
+one operational frame of `FrameRecipe::MinimalDebugSurface` and asserts only the
+per-frame recipe-selector counters
+(`MinimalSurfacePassExecutions == 1`, `MinimalPresentPassExecutions == 1`,
+`MinimalRecipeMissingPrerequisiteCount == 0`, and the default-disabled
+`MinimalDebugBackbufferReadbackCopyCount == 0`); pixel readback remains exclusive
+to the sibling `GRAPHICS-033D` fixture in the same file. Both share the bounded
+`engine.Run()` bootstrap so the driver loop is not duplicated. The fixture is
+labelled `gpu;vulkan;graphics` and is selected only via
+`ctest -L 'gpu' -L 'vulkan' …`; the default CPU gate excludes it. Scaffold
+retirement remains owned by `GRAPHICS-081`.
