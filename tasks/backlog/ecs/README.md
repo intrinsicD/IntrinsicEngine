@@ -19,7 +19,7 @@ map.
 - [HARDEN-065 — Promote ECS geometry-source population and dirty-domain helpers](../../active/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md) (active; slice 1 in flight on `claude/setup-agentic-workflow-IY9XW`).
 - [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [HARDEN-067 — Add ECS world-bounds propagation system](../../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
-- [HARDEN-068 — Define ECS stable identity and scene metadata contract](HARDEN-068-ecs-stable-identity-and-scene-metadata.md).
+- [HARDEN-068 — Define ECS stable identity and scene metadata contract](../../active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (active; slice 1 in flight on `claude/setup-agentic-workflow-9l6ef`).
 
 ## Convergence
 
