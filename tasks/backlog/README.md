@@ -112,7 +112,7 @@ Members:
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md).
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md).
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
-- [`ecs/HARDEN-063-ecs-events-and-command-seams.md`](ecs/HARDEN-063-ecs-events-and-command-seams.md).
+- [`done/HARDEN-063`](../done/HARDEN-063-ecs-events-and-command-seams.md) (done).
 - [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme C).
 - [`done/HARDEN-065`](../done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md) (done).
 - [`done/HARDEN-066`](../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).

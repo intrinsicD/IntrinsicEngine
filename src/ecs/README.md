@@ -65,6 +65,40 @@ plain data; systems are stateless functions that operate on components.
   ownership decision and the events that are deliberately
   runtime/graphics-owned (`GpuPickCompleted`, `GeometryUploadFailed`).
 
+## Event and command seams
+
+`HARDEN-063` defines ECS-owned mutation seams without promoting a generic
+command-buffer, undo/redo, or editor command abstraction into `src/ecs`.
+ECS remains the CPU scene-data authority; runtime/editor/app code owns when
+commands are queued, replayed, undone, coalesced, or translated from input.
+
+- **Entity lifecycle.** ECS owns the typed lifecycle primitives on
+  `Extrinsic.ECS.Scene.Registry` (`Create`, `Destroy`, `Clear`, `IsValid`,
+  and explicit `Raw()` access) plus the default bootstrap helpers
+  `Scene::EmplaceDefaults` and `Scene::CreateDefault`. `Destroy` is a
+  single-entity primitive: recursive delete, orphan/reparent policy,
+  serialization snapshots, and undo/redo state are runtime/editor command
+  concerns. Callers that need hierarchy-safe deletion must detach or reparent
+  children before destroying entities.
+- **Hierarchy mutation.** ECS owns the deterministic `Hierarchy::Attach` and
+  `Hierarchy::Detach` operations and their invariants (invalid/self/cycle
+  rejection, idempotency, parent/child link maintenance, and world-position
+  preservation when transform state is ready). Higher layers decide which user
+  action invokes those primitives and how that action participates in history
+  or serialization.
+- **Transform mutation.** ECS owns transform data and dirty markers. Mutation
+  sites update `Components::Transform::Component` through the registry and
+  stamp `Components::Transform::IsDirtyTag`; `System.TransformHierarchy`
+  consumes that CPU recompute marker and `System.RenderSync` forwards the GPU
+  dirty signal. No transform command object is promoted by HARDEN-063.
+- **Selection and hover mutation.** ECS owns the selection/hover data carriers
+  (`SelectableTag`, `SelectedTag`, `HoveredTag`, `PickID`, and cached selected
+  primitive-index components). Runtime/editor owns replace/add/toggle/clear
+  semantics, primitive-cache invalidation policy, input interpretation, GPU
+  pick readback translation, and event dispatch. After mutating the ECS data,
+  those higher layers may publish the CPU-only `SelectionChanged` or
+  `HoverChanged` payloads through their own dispatcher.
+
 ## Directory layout
 
 ```text

@@ -47,10 +47,18 @@ The promoted ECS layer should not own:
 
 ### Important current limitations
 
-- `Extrinsic.ECS.System.RenderSync` is a placeholder. The ECS-to-runtime/graphics handoff relies on runtime extraction today, not an ECS-owned CPU aggregation seam.
-- `TransformHierarchy::RegisterSystem` exists, but runtime activation from a promoted simulate-phase system bundle remains a deferred runtime task.
-- Promoted ECS has no event seam, command buffer, transaction API, or scheduling-safe mutation queue.
-- `GeometrySources` has promoted view/count helpers, but the legacy population helpers that copy mesh/graph/point-cloud data into entity components are not promoted.
+- `Extrinsic.ECS.System.RenderSync` now owns CPU-only transform GPU-dirty tag
+  forwarding (`HARDEN-066`); runtime extraction still owns graphics sidecars
+  and drains the GPU-sync signal.
+- Runtime activation from a promoted simulate-phase system bundle is covered by
+  `RUNTIME-091` for `TransformHierarchy`, `BoundsPropagation`, and
+  `RenderSync`.
+- Promoted ECS has CPU-only event payloads and a documented command ownership
+  seam from `HARDEN-063`; a generic command buffer / undo-redo / scheduling
+  queue remains deliberately outside ECS and belongs to runtime/editor if a
+  consumer needs it.
+- `GeometrySources` now owns per-domain `Geometry::PropertySet` components and
+  promoted population helpers for mesh/graph/point-cloud data (`HARDEN-065`).
 - `Collider` is sphere-only and no `RigidBody` authoring component exists. This is intentionally gated by `ARCH-001` and `HARDEN-064`.
 - Several current ECS tests still exercise the legacy `ECS` module rather than only `Extrinsic.ECS.*`, so they are not retirement evidence for promoted ECS.
 
@@ -58,8 +66,8 @@ The promoted ECS layer should not own:
 
 | Area | Current state | Missing system/component | Impact | Priority / owner |
 | --- | --- | --- | --- | --- |
-| Deterministic mutation | `Registry::Raw()` exposes EnTT directly; `CreateDefault`, `Attach`, `Detach` provide a few typed operations. | Command buffer / transaction seam for create, destroy, add/remove/replace component, hierarchy mutation, transform mutation, and deferred main-thread application. | Async producers and runtime/editor code must mutate through raw EnTT or ad hoc lambdas. This weakens deterministic scheduling, undo/redo, and validation. | P0 — `ecs`; covered conceptually by [`HARDEN-063`](../../tasks/backlog/ecs/HARDEN-063-ecs-events-and-command-seams.md). |
-| Events | Legacy `ECS:Components.Events` has selection, hover, GPU-pick, spawned, geometry-modified, upload-failed events. Promoted ECS has none. | CPU-only event payload modules and/or a decision that specific events belong to runtime/editor/graphics extraction. | Runtime/editor workflows lack promoted event ownership; legacy cannot retire cleanly. | P0 — `ecs`/`runtime`; [`HARDEN-063`](../../tasks/backlog/ecs/HARDEN-063-ecs-events-and-command-seams.md). |
+| Deterministic mutation | `HARDEN-063` documents the command seam: ECS owns `Registry::{Create,Destroy,Clear}`, `Scene::{EmplaceDefaults,CreateDefault}`, `Hierarchy::{Attach,Detach}`, transform data + dirty markers, and selection/hover data carriers; runtime/editor/app own queueing, undo/redo, recursive delete/orphan policy, input interpretation, and event dispatch. | Generic command buffer / transaction queue remains a runtime/editor concern if needed. | ECS has deterministic low-level mutation primitives without importing higher-layer command history or editor behavior. | Done — [`HARDEN-063`](../../tasks/done/HARDEN-063-ecs-events-and-command-seams.md). |
+| Events | `Extrinsic.ECS.Events` promotes CPU-only payloads for selection, hover, entity-spawned, and geometry-modified events; GPU-pick and upload-failed events remain runtime/graphics-owned. | Runtime/editor dispatchers, subscription, and queueing remain outside ECS. | Runtime/editor workflows have promoted payload shapes without coupling ECS to dispatch policy. | Done — [`HARDEN-063`](../../tasks/done/HARDEN-063-ecs-events-and-command-seams.md). |
 | System scheduling | `TransformHierarchy::RegisterSystem` can add a FrameGraph pass. Runtime `Engine` lets applications add passes during `OnSimTick`. | Promoted simulate-phase system bundle or runtime-owned registration path that consistently schedules transform propagation before extraction. | Transform update parity exists in isolation but not as default runtime behavior. | P0 — `runtime`; follow-up from [`HARDEN-061`](../../tasks/done/HARDEN-061-ecs-hierarchy-transform-system-parity.md). |
 | Render sync / export seam | `DirtyTags::DirtyTransform` exists; runtime extraction consumes renderable state and graphics components. `RenderSync` is empty. | CPU-only ECS render-sync/export seam or explicit retirement of `RenderSync`; policy for stamping/clearing GPU-sync dirty tags from `WorldUpdatedTag`. | Dirty-domain ownership is split and easy to regress; render extraction remains runtime-specific without an ECS-side snapshot contract. | P0/P1 — `ecs` + `runtime`; must preserve no graphics imports in ECS. |
 | Geometry source authoring | Promoted `GeometrySources` stores non-owning `ObserverPtr<PropertySet>` and view/count helpers. Legacy had `PopulateFromMesh`, `PopulateFromGraph`, `PopulateFromCloud`. | Promoted population/copy/move helpers or a runtime-owned ingest contract that creates stable ECS geometry-source components from geometry containers. | Asset/runtime ingest cannot rely on promoted ECS as authoritative geometry scene data; legacy population helpers remain a retirement blocker. | P0 — likely `ecs` + `geometry` + `runtime`; listed in migration parity matrix. |
@@ -172,7 +180,7 @@ Recommended focused test additions as gaps are closed:
 
 ## Recommended next task order
 
-1. **Finish [`HARDEN-063`](../../tasks/backlog/ecs/HARDEN-063-ecs-events-and-command-seams.md)** — define event and command ownership. This unlocks deterministic mutation, selection decisions, and lifecycle policy.
+1. **Finish [`HARDEN-063`](../../tasks/done/HARDEN-063-ecs-events-and-command-seams.md)** (done) — define event and command ownership. This unlocks deterministic mutation, selection decisions, and lifecycle policy.
 2. **Implement [`RUNTIME-091`](../../tasks/done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)** (done) — register/invoke `TransformHierarchy` by default in fixed-step runtime composition before extraction.
 3. **Implement [`HARDEN-065`](../../tasks/done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md)** (done) — decide owning vs borrowed `GeometrySources` and port/rewrite population helpers with dirty-domain tests.
 4. **Implement [`HARDEN-066`](../../tasks/done/HARDEN-066-ecs-render-sync-export-policy.md)** (done) — either implement a CPU-only tag/export pass or retire the placeholder and document runtime extraction as the sole owner.

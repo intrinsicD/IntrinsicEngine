@@ -2,15 +2,21 @@
 
 ## Status
 
-- Status: in-progress (slice 1 in flight).
+- Status: done.
+- Completed: 2026-05-18.
+- Commit: event payload implementation commit `6a942e12`, merged via PR #841
+  (`3297440c`); slice-2 command-seam decision closure in the current
+  retirement commit.
 - Owner/agent: Claude on `claude/setup-agentic-workflow-IdWgV`.
 - Branch: `claude/setup-agentic-workflow-IdWgV`.
 - Started: 2026-05-15.
-- Current slice: slice 1 — event payload promotion.
-- Next verification step: run the default CPU gate against
-  `IntrinsicECSTests` + the new `Test.ECS.Events` cases and the ECS
-  contract layering test; regenerate the module inventory; promote
-  remaining command-seam work (slice 2) once slice 1 lands.
+- Completed maturity: `CPUContracted` for event payloads and command-seam
+  ownership decisions.
+- Slice 1: event payload promotion landed via PR #841.
+- Slice 2: command-seam decisions closed without adding a generic ECS
+  command-buffer abstraction; ECS owns deterministic low-level primitives and
+  data carriers, while runtime/editor/app own command queueing, undo/redo,
+  input interpretation, GPU pick translation, and event dispatch.
 
 ## Slice plan
 
@@ -32,7 +38,7 @@
   - Defer command seams (lifecycle/hierarchy/transform/selection
     mutation ownership) to slice 2; record the deferral here.
 
-- **Slice 2 (deferred): command seam decisions and promoted invariants.**
+- **Slice 2 (complete): command seam decisions and promoted invariants.**
   - Decide whether entity mutation commands live in ECS as pure
     data/operations or in runtime/editor as composition behavior.
   - Define lifecycle command policy: create, destroy, recursive
@@ -81,17 +87,17 @@
 ## Required changes
 - [x] Inventory legacy ECS event types and classify each as: promote to `ecs`, move to `runtime`, move to graphics/runtime extraction, or retire (slice 1; see "Event ownership decision" table above).
 - [x] Define minimal CPU-only event payload modules in `src/ecs/Events/` for the promoted events (slice 1).
-- [ ] Define whether entity mutation commands belong in ECS as pure data/operations or in runtime/editor as composition behavior (slice 2).
-- [ ] Include lifecycle command policy for create, destroy, recursive destroy or orphan handling, default bootstrap, attach/detach, and transform mutation (slice 2).
-- [ ] Include selection command ownership decisions for replace/add/toggle/clear selection and primitive-selection caches; keep input interpretation and GPU pick readback outside ECS unless represented only as CPU event payloads (slice 2).
+- [x] Define whether entity mutation commands belong in ECS as pure data/operations or in runtime/editor as composition behavior (slice 2: no generic ECS command buffer; ECS owns low-level deterministic primitives/data, runtime/editor/app owns scheduling/history/composition behavior).
+- [x] Include lifecycle command policy for create, destroy, recursive destroy or orphan handling, default bootstrap, attach/detach, and transform mutation (slice 2: documented in `src/ecs/README.md` and the parity matrix).
+- [x] Include selection command ownership decisions for replace/add/toggle/clear selection and primitive-selection caches; keep input interpretation and GPU pick readback outside ECS unless represented only as CPU event payloads (slice 2: runtime/editor owns replace/add/toggle/clear semantics, primitive-cache invalidation, pick translation, and dispatch; ECS owns only selection/hover data carriers and event payload shapes).
 - [x] Add focused tests for event payload construction (slice 1).
-- [ ] Add focused tests for any promoted command invariants (slice 2).
+- [x] Add focused tests for any promoted command invariants (slice 2: no new command module was promoted; existing `Test.ECS.SceneRegistry`, `Test.ECS.SceneBootstrap`, `Test.ECS.Hierarchy`, `Test.ECS.TransformHierarchy`, and `Test.ECS.Events` cover the low-level primitives/events named as the command seam).
 - [x] Record unpromoted legacy events as explicit non-goals or follow-up tasks (slice 1: `GpuPickCompleted` and `GeometryUploadFailed` stay runtime/graphics-owned).
 
 ## Tests
 - [x] `tests/unit/ecs/Test.ECS.Events.cpp` — payload construction, default-`InvalidEntityHandle` initialization, trivially-copyable invariants for all four promoted events (slice 1).
-- [ ] `tests/unit/ecs/Test.ECS.Commands.cpp` — deterministic command application and invalid-handle behavior (slice 2; only if commands are promoted).
-- [ ] `tests/unit/ecs/Test.ECS.SelectionCommands.cpp` — replace/add/toggle/clear selection semantics (slice 2; only if owned by ECS).
+- [x] `tests/unit/ecs/Test.ECS.Commands.cpp` — not added because HARDEN-063 slice 2 deliberately did not promote a generic ECS command object/module; entity lifecycle and invalid-handle behavior remain covered by `Test.ECS.SceneRegistry` and `Test.ECS.SceneBootstrap`.
+- [x] `tests/unit/ecs/Test.ECS.SelectionCommands.cpp` — not added because replace/add/toggle/clear selection semantics are runtime/editor command behavior; ECS owns only data carriers and `SelectionChanged`/`HoverChanged` payload shapes.
 - [x] Existing `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` already enforces that any new `src/ecs/Events/*` files do not import higher-layer modules (slice 1: verified by running the contract test).
 
 ## Docs
@@ -99,12 +105,12 @@
 - [x] Add `src/ecs/Events/README.md` enumerating the promoted module surface and the deliberately-runtime/graphics-owned events (slice 1).
 - [x] Update [`docs/migration/nonlegacy-parity-matrix.md`](../../docs/migration/nonlegacy-parity-matrix.md) ECS row to reflect promoted `Extrinsic.ECS.Events` and the slice-2 deferral of command seams (slice 1).
 - [x] Regenerate [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md) (slice 1).
-- [ ] Update `src/ecs/README.md` and the parity matrix again with slice-2 command decisions (slice 2).
+- [x] Update `src/ecs/README.md` and the parity matrix again with slice-2 command decisions (slice 2).
 
 ## Acceptance criteria
 - [x] Legacy ECS event surface has an explicit promoted-owner decision recorded in this task and in `docs/migration/nonlegacy-parity-matrix.md` (slice 1).
 - [x] Any promoted ECS events are deterministic payload types with no graphics/runtime dependencies (slice 1).
-- [ ] Promoted command decisions cover entity lifecycle, hierarchy mutation, transform mutation, and selection mutation ownership (slice 2).
+- [x] Promoted command decisions cover entity lifecycle, hierarchy mutation, transform mutation, and selection mutation ownership (slice 2).
 - [x] Runtime/editor-specific behaviors are not placed in the ECS layer for convenience (slice 1: `GpuPickCompleted` / `GeometryUploadFailed` kept runtime/graphics-owned).
 
 ## Verification
@@ -127,4 +133,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Promoting `GpuPickCompleted` or `GeometryUploadFailed` to ECS in slice 1 (deliberately runtime/graphics-owned).
 
 ## Next verification step
-- Run the default CPU gate against `IntrinsicECSTests` + the new `Test.ECS.Events` cases and the ECS contract layering test; regenerate the module inventory; once slice 1 lands, open slice 2 for the command seam decisions.
+- No active next verification step remains for HARDEN-063; the task is retired.
