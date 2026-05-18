@@ -2,11 +2,14 @@
 
 ## Status
 
-- State: in-progress (Slice A landed via `claude/setup-agent-workflow-Si8we`/PR #881; Slice B in progress on `claude/setup-agentic-workflow-rlgPZ`).
+- State: done. Slice A + Slice B landed; Slice C scope transferred into GRAPHICS-072 (the deferred-lighting `set 0, binding 1` shadow-sampler binding and the cross-pass `DepthAttachment → ShaderRead` barrier-transition test can only be exercised once `DeferredLightingPass` is recording in the operational executor, which is GRAPHICS-072's deliverable).
 - Owner/agent: local agent workflow.
-- Branch: `claude/setup-agentic-workflow-rlgPZ` (Slice B); Slice A landed via `claude/setup-agent-workflow-Si8we`.
+- Branch: Slice A — `claude/setup-agent-workflow-Si8we`; Slice B — `claude/setup-agentic-workflow-rlgPZ`.
+- PR: Slice A — PR #881; Slice B — PR #882.
+- Commit: Slice A — `79fee87`; Slice B — `b746db5`, `2d9508c`.
 - Activated: 2026-05-18 after GRAPHICS-071 retirement made it the next unblocked Theme A leaf.
-- Next verification step: land Slice B (`ShadowSystem`-owned atlas + sampler allocation, `FrameRecipeShadowSizing` import seam, atlas-survives-rebuild + missing-caster-diagnostic tests). The deferred-lighting `set 0, binding 1` descriptor wiring + the cross-pass barrier-transition test stay gated on GRAPHICS-072 and are recorded as a Slice C follow-up.
+- Completed: 2026-05-18. Retirement landed via `claude/setup-agentic-workflow-XknwW`.
+- Completion verification: see "Completion note" below.
 
 ## Goal
 - Wire `Pass.Shadows` (`src/graphics/renderer/Passes/Pass.Shadows.cpp/.cppm`) into the renderer executor under the default recipe: shadow-atlas texture/sampler allocated by `ShadowSystem` at renderer init, the depth-only shadow pipeline created, instance owned by `NullRenderer`, and the executor route consumes the `ShadowOpaque` cull bucket per `GRAPHICS-009Q`.
@@ -46,10 +49,7 @@ Slice B (this slice):
 - [x] Add `FrameRecipeShadowSizing` + an optional `FrameRecipeImports::ShadowAtlas`; teach `BuildDefaultFrameRecipe` to import the `ShadowSystem`-owned atlas (replacing the transient `graph.CreateTexture("ShadowAtlas", ...)` when the import is valid; the typed sizing seam covers the headless transient fallback).
 - [x] Surface a `ShadowDiagnostics::MissingCasterCount` counter from `Pass.Shadows::Execute` when shadows are enabled but the `ShadowOpaque` cull bucket is empty, so operators can distinguish "no casters this frame" from "atlas wiring broken".
 
-Slice C (follow-up; gated by GRAPHICS-072):
-
-- [ ] Confirm the deferred lighting pass (per `GRAPHICS-072`) reads the shadow atlas via `set 0, binding 1`.
-- [ ] Add the `contract;graphics` test that compiled barriers transition the shadow atlas `DepthAttachment` → `ShaderRead` before deferred lighting once `DeferredLightingPass` is recording in the operational executor.
+Slice C (transferred to GRAPHICS-072): see "Completion note" below.
 
 ## Tests
 
@@ -69,15 +69,12 @@ Slice B (this slice):
 - [x] `contract;graphics` test (`Test.FrameRecipeContract.cpp::ShadowAtlasTransientPathAcceptsTypedShadowSizing`): the transient path accepts the new `FrameRecipeShadowSizing` parameter without build failure.
 - [x] `contract;graphics` test (`Test.RendererFrameLifecycle.cpp::ShadowAtlasSurvivesOperationalRebuild`): with shadows enabled via the renderer's exposed `GetShadowSystem()`, the atlas + sampler handles stay byte-identical across `RebuildOperationalResources()`.
 
-Slice C (follow-up; gated by GRAPHICS-072):
-
-- [ ] `contract;graphics` test: with one shadow-casting renderable + one light wired end-to-end through extraction, the executor reports `Recorded` for `ShadowPass` (requires extraction integration).
-- [ ] `contract;graphics` test: barrier packets transition the shadow atlas `DepthAttachment` → `ShaderRead` before deferred lighting.
+Slice C (transferred to GRAPHICS-072): see "Completion note" below.
 
 ## Docs
 - [x] Update `src/graphics/renderer/README.md` to record `Pass.Shadows` pipeline + executor branch as operationally wired (Slice A).
 - [x] Update `src/graphics/renderer/README.md` to record `ShadowSystem`-owned atlas + sampler + recipe import seam + `MissingCasterCount` diagnostic (Slice B).
-- [ ] Update `docs/architecture/rendering-three-pass.md` if shadow ordering shifts (Slice C — gated on GRAPHICS-072 wiring).
+- Slice C-owned doc updates (rendering-three-pass shadow ordering, if any) transferred to GRAPHICS-072 — see "Completion note" below.
 
 ## Acceptance criteria
 
@@ -91,8 +88,7 @@ Slice B:
 - [x] Atlas + sampler survive `RebuildOperationalResources()` byte-identically.
 - [x] `ShadowDiagnostics::MissingCasterCount` increments only when shadows are enabled and the cull bucket is empty.
 
-Slice C (gated on GRAPHICS-072):
-- [ ] Deferred lighting samples the atlas correctly (test asserts the descriptor binding at `set 0, binding 1`).
+Slice C (transferred to GRAPHICS-072): see "Completion note" below.
 
 ## Verification
 ```bash
@@ -109,6 +105,8 @@ python3 tools/docs/check_doc_links.py --root .
 - Owning cascade matrices in graphics (runtime extraction owns those).
 - Smuggling the typed `FrameRecipeShadowSizing` transition into Slice A (it is the Slice B deliverable per `GRAPHICS-009Q`).
 
-## Next verification step
-- Slice B landed: `ShadowSystem`-owned atlas + sampler allocated lazily on `SetParams(...)` enable; `FrameRecipeImports::ShadowAtlas` + `FrameRecipeShadowSizing` typed seam wired into `BuildDefaultFrameRecipe`; `ShadowDiagnostics::MissingCasterCount` surfaces empty-cull-bucket frames; 6 new `contract;graphics` tests pass alongside the Slice A regression test. Full default CPU gate green (1987/1987 tests).
-- Slice C pickup is gated on GRAPHICS-072 (deferred GBuffer + lighting wiring) — once `DeferredLightingPass` records in the operational executor, wire its `set 0, binding 1` shadow-sampler binding from `ShadowSystem::GetAtlasBindlessIndex()` / `GetAtlasSampler()` and land the deferred-lighting-bound barrier-transition + `Recorded` integration tests.
+## Completion note
+
+- Slice A (PR #881, commit `79fee87`): `m_ShadowPass` + `m_ShadowPipelineLease` owned by `NullRenderer`; depth-only shadow pipeline built from `BuildShadowPipelineDesc()` and republished byte-identically across `RebuildOperationalResources()`; `"ShadowPass"` executor branch routes through `RecordShadowPass(...)` with the `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy; `IRenderer::GetShadowPipeline()` / `GetShadowPipelineDesc()` exposed for byte-identical-rebuild assertions.
+- Slice B (PR #882, commits `b746db5`, `2d9508c`): `ShadowSystem::Initialize(device, textureMgr, samplerMgr)` lazily allocates the `D32_FLOAT` atlas (`AtlasResolution * CascadeCount × AtlasResolution`) and a `sampler2DShadow`-bindable sampler on the first shadows-enabled `SetParams(...)`; `FrameRecipeShadowSizing` + optional `FrameRecipeImports::ShadowAtlas` let `BuildDefaultFrameRecipe` import the `ShadowSystem`-owned atlas with `InitialState = Undefined` cross-frame; `ShadowDiagnostics::MissingCasterCount` surfaces empty-cull-bucket frames; six new `contract;graphics` tests cover atlas/sampler lazy allocation, no-allocation while disabled, shutdown release, missing-caster diagnostic, imported vs transient ShadowAtlas paths, typed shadow-sizing acceptance, and atlas survival across `RebuildOperationalResources()`. Full default CPU gate green (1987/1987 tests).
+- Slice C (transferred to GRAPHICS-072): the deferred-lighting `set 0, binding 1` shadow-sampler binding and the cross-pass `DepthAttachment → ShaderRead` barrier-transition + `Recorded` integration tests can only be exercised once `DeferredLightingPass` is recording in the operational executor. Those requirements now live in GRAPHICS-072 (Required changes, Tests, Acceptance criteria, Docs) so they are picked up alongside the deferred GBuffer + lighting wiring rather than re-promoted as a stranded sliver.

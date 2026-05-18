@@ -219,8 +219,9 @@ implementation.
   but the `ShadowOpaque` cull bucket is empty, so operators can distinguish
   "no casters this frame" from "atlas wiring broken" without inspecting the
   executor's `SkippedUnavailable` taxonomy. The deferred-lighting
-  `set 0, binding 1` shadow-sampler binding stays gated on GRAPHICS-072 and is
-  tracked as a Slice C follow-up.
+  `set 0, binding 1` shadow-sampler binding is owned by GRAPHICS-072
+  (absorbed from the original GRAPHICS-073 Slice C scope) and lands alongside
+  the deferred GBuffer + lighting passes.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by
