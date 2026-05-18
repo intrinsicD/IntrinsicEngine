@@ -218,10 +218,6 @@ namespace Extrinsic::Graphics
                 m_MaterialSystem->GetBuffer(),
                 m_MaterialSystem->GetCapacity());
             m_CullingSystem  .emplace();
-            if (device.IsOperational())
-            {
-                [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
-            }
             m_LightSystem    .emplace();
             m_LightSystem->Initialize();
             m_SelectionSystem.emplace();
@@ -231,11 +227,22 @@ namespace Extrinsic::Graphics
             // GRAPHICS-070 — default-recipe forward surface pass owns its
             // ForwardSystem-bound instance plus the slot-0-shaped pipeline
             // lease created from `InitializeOperationalPassResources()`. The
-            // pipeline lease + `SetPipeline()` call are routed through the
-            // same code path on `RebuildOperationalResources()` so the
+            // pass must be emplaced before that publisher runs so the
+            // initial operational `Initialize()` path can call
+            // `SetPipeline(...)` on the pass — otherwise the first frame
+            // would see a `has_value()` lease but a default-constructed
+            // pipeline handle on the pass itself, and `Execute()` would
+            // early-return on `!m_Pipeline.IsValid()` while the executor
+            // still reported `Recorded`. Pipeline lease + `SetPipeline()`
+            // are routed through the same code path on
+            // `RebuildOperationalResources()` so the
             // post-operational-transition reset (GRAPHICS-018R) republishes
             // both byte-identical.
             m_ForwardSurfacePass.emplace(*m_ForwardSystem);
+            if (device.IsOperational())
+            {
+                [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
+            }
             m_DeferredSystem.emplace();
             m_DeferredSystem->Initialize();
             m_PostProcessSystem.emplace();
@@ -1146,13 +1153,27 @@ namespace Extrinsic::Graphics
         // touching depth. Held byte-identical between the initial
         // `Initialize()` and any subsequent `RebuildOperationalResources()`
         // so the pipeline registry/dedupe can return a stable device handle.
+        //
+        // Shader pairing: `ForwardSurfacePass::Execute()` pushes
+        // `RHI::GpuScenePushConstants` (SceneTableBDA / FrameIndex /
+        // DrawBucket) and the pipeline layout's `PushConstantSize` matches
+        // `sizeof(GpuScenePushConstants)`. The shaders must therefore observe
+        // the GpuScene-aware push-constant block and the BDA-only descriptor
+        // contract — pairing with the canonical GpuScene shader pair
+        // (`forward/default_debug_surface.{vert,frag}`) satisfies both
+        // contracts. The legacy `surface.vert/frag` pair predates the
+        // GpuScene seam — it declares `mat4 Model` + `PtrPositions`-style
+        // push constants plus `set = 0/2/3` descriptor sets — and would
+        // either fail Vulkan pipeline-layout validation or read unrelated
+        // push-constant bytes. A dedicated lit forward-surface shader is a
+        // GRAPHICS-072 follow-up.
         [[nodiscard]] static RHI::PipelineDesc BuildForwardSurfacePipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/surface.vert.spv");
+                "shaders/forward/default_debug_surface.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/surface.frag.spv");
+                "shaders/forward/default_debug_surface.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;

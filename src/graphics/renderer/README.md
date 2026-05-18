@@ -134,16 +134,31 @@ implementation.
   `m_ForwardSurfacePass` instance (constructed against the renderer's
   `m_ForwardSystem`) and the `m_ForwardSurfacePipelineLease`. The pipeline is
   created in `InitializeOperationalPassResources()` from
-  `BuildForwardSurfacePipelineDesc()` (vertex `shaders/surface.vert.spv`,
-  fragment `shaders/surface.frag.spv`, `DepthCompareOp = Equal` with
-  `DepthWriteEnable = false` matching the depth-prepass-on contract, single
-  RGBA16F color target for `SceneColorHDR`, and `D32_FLOAT` depth), and
-  republished byte-identical through `RebuildOperationalResources()`. The
-  executor's `"SurfacePass"` branch routes to `RecordForwardSurfacePass(...)`
-  only when the active default-recipe features select the forward lighting
-  path; deferred mode falls through to the catch-all soft-skip until
-  GRAPHICS-072 lands its `Pass.Deferred.GBuffers` body. While GRAPHICS-072 is
-  still open, `DeriveDefaultFrameRecipeFeatures()` selects
+  `BuildForwardSurfacePipelineDesc()` (vertex
+  `shaders/forward/default_debug_surface.vert.spv`, fragment
+  `shaders/forward/default_debug_surface.frag.spv` — the canonical
+  GpuScene-aware shader pair whose push-constant block and BDA-only
+  descriptor contract match `sizeof(GpuScenePushConstants)`;
+  `DepthCompareOp = Equal` with `DepthWriteEnable = false` matching the
+  depth-prepass-on contract, single RGBA16F color target for
+  `SceneColorHDR`, and `D32_FLOAT` depth), and republished byte-identical
+  through `RebuildOperationalResources()`. `Initialize()` emplaces
+  `m_ForwardSystem` + `m_ForwardSurfacePass` *before* calling
+  `InitializeOperationalPassResources()` so the publisher's
+  `SetPipeline(...)` actually lands on the pass on the initial operational
+  path (otherwise the first frame would observe a `has_value()` pipeline
+  lease but a default-constructed handle on the pass and `Execute()` would
+  early-return on `!m_Pipeline.IsValid()` while the executor still
+  reported `Recorded`). The legacy `assets/shaders/surface.vert/frag` pair
+  predates the GpuScene seam (it declares `mat4 Model` + `PtrPositions`
+  push constants plus `set = 0/2/3` descriptor sets) and is deliberately
+  *not* referenced by the new pipeline; a dedicated lit forward-surface
+  shader is a GRAPHICS-072 follow-up. The executor's `"SurfacePass"` branch
+  routes to `RecordForwardSurfacePass(...)` only when the active
+  default-recipe features select the forward lighting path; deferred mode
+  falls through to the catch-all soft-skip until GRAPHICS-072 lands its
+  `Pass.Deferred.GBuffers` body. While GRAPHICS-072 is still open,
+  `DeriveDefaultFrameRecipeFeatures()` selects
   `FrameRecipeLightingPath::Forward` so the default recipe can actually
   record draws; the deferred-mode branches in
   `Graphics.FrameRecipe.cpp`/`Test.FrameRecipeContract.cpp` remain
