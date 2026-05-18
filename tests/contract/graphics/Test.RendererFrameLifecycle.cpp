@@ -8,6 +8,7 @@
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -772,6 +773,54 @@ TEST(RendererFrameLifecycle, ShadowPipelineSurvivesOperationalRebuild)
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
     EXPECT_TRUE(renderer->GetShadowPipeline().IsValid());
     EXPECT_TRUE(PipelineDescBytesEqual(initialShadowDesc, renderer->GetShadowPipelineDesc()));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-073 Slice B — `ShadowSystem`-owned atlas + sampler. Once shadows
+// are enabled the atlas handle must stay byte-identical across an operational
+// rebuild, because `RebuildOperationalResources()` only recreates pipeline +
+// culling resources; the texture manager + ShadowSystem hold the atlas across
+// the boundary. The runtime extraction publisher will eventually call
+// `SetParams(...)` once shadow-casters arrive; in this test we mutate the
+// ShadowSystem directly via `GetShadowSystem()` to avoid spinning up a full
+// extraction harness.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, ShadowAtlasSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{186u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::Graphics::ShadowSystem& shadows = renderer->GetShadowSystem();
+    shadows.SetParams(Extrinsic::Graphics::ShadowParams{
+        .Enabled = true,
+        .CascadeCount = 2u,
+        .AtlasResolution = 512u,
+    });
+
+    const Extrinsic::RHI::TextureHandle atlasHandle = shadows.GetAtlasTexture();
+    EXPECT_TRUE(atlasHandle.IsValid());
+    const Extrinsic::RHI::SamplerHandle samplerHandle = shadows.GetAtlasSampler();
+    EXPECT_TRUE(samplerHandle.IsValid());
+    const Extrinsic::Graphics::ShadowAtlasDesc initialAtlas = shadows.GetAllocatedAtlasDesc();
+    EXPECT_TRUE(initialAtlas.Enabled);
+    EXPECT_EQ(initialAtlas.Width, 512u * 2u);
+    EXPECT_EQ(initialAtlas.Height, 512u);
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+
+    EXPECT_EQ(shadows.GetAtlasTexture(), atlasHandle);
+    EXPECT_EQ(shadows.GetAtlasSampler(), samplerHandle);
+    const Extrinsic::Graphics::ShadowAtlasDesc afterRebuild = shadows.GetAllocatedAtlasDesc();
+    EXPECT_EQ(afterRebuild.Width, initialAtlas.Width);
+    EXPECT_EQ(afterRebuild.Height, initialAtlas.Height);
+    EXPECT_EQ(afterRebuild.CascadeCount, initialAtlas.CascadeCount);
 
     renderer->Shutdown();
 }

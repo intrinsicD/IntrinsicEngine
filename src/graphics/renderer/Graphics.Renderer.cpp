@@ -246,8 +246,15 @@ namespace Extrinsic::Graphics
             // GRAPHICS-073 Slice A — ShadowSystem must be live before the
             // operational publisher creates the depth-only shadow pipeline
             // and calls `SetPipeline(...)` on `m_ShadowPass`.
+            // GRAPHICS-073 Slice B — ShadowSystem now owns the depth atlas +
+            // `sampler2DShadow`-bindable sampler. The managers are emplaced
+            // earlier in this function (line 207), so the system can hold
+            // long-lived references and lazily allocate the atlas when
+            // `SetParams(...)` enables shadows. The atlas is *not* reallocated
+            // by `RebuildOperationalResources()` so the imported handle stays
+            // byte-identical across rebuilds.
             m_ShadowSystem.emplace();
-            m_ShadowSystem->Initialize();
+            m_ShadowSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
             m_ShadowPass.emplace(*m_ShadowSystem);
             if (device.IsOperational())
             {
@@ -764,6 +771,14 @@ namespace Extrinsic::Graphics
                 .LinesCount = lines.CountBuffer,
                 .PointsNonIndexedArgs = points.NonIndexedArgsBuffer,
                 .PointsCount = points.CountBuffer,
+                // GRAPHICS-073 Slice B — when `ShadowSystem` has lazily
+                // allocated its atlas (after `SetParams` enabled shadows),
+                // hand the handle to the recipe so the imported atlas
+                // replaces the Slice A transient `graph.CreateTexture(...)`
+                // path. Stays invalid until the runtime publishes shadows
+                // enabled, which keeps default-CPU/null fixtures on the
+                // transient fallback.
+                .ShadowAtlas = m_ShadowSystem ? m_ShadowSystem->GetAtlasTexture() : RHI::TextureHandle{},
             };
             const FrameRecipeSizing sizing{
                 .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
@@ -771,6 +786,19 @@ namespace Extrinsic::Graphics
                 .BackbufferFormat = m_BackbufferFormat,
                 .DepthFormat = RHI::Format::D32_FLOAT,
             };
+            // GRAPHICS-073 Slice B — derive the typed shadow sizing from the
+            // current `ShadowSystem` params so transient fallbacks (no atlas
+            // imported) still size the recipe-owned atlas per
+            // `ShadowParams::AtlasResolution * CascadeCount`. When the atlas
+            // is imported, `BuildDefaultFrameRecipe` ignores this sizing and
+            // honors the imported handle's dimensions.
+            FrameRecipeShadowSizing shadowSizing{};
+            if (m_ShadowSystem)
+            {
+                const ShadowParams shadowParams = m_ShadowSystem->GetParams();
+                shadowSizing.AtlasResolution = shadowParams.AtlasResolution;
+                shadowSizing.CascadeCount = shadowParams.CascadeCount;
+            }
             // GRAPHICS-070 — derive default-recipe features once per frame so
             // the executor lambda below can route `"SurfacePass"` through the
             // forward or deferred surface body without re-deriving features
@@ -782,7 +810,8 @@ namespace Extrinsic::Graphics
                 : BuildDefaultFrameRecipe(m_RenderGraph,
                                           defaultRecipeFeatures,
                                           imports,
-                                          sizing);
+                                          sizing,
+                                          shadowSizing);
             if (!recipe.Succeeded)
             {
                 m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;

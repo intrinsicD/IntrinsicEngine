@@ -483,6 +483,148 @@ TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeRequiresValidBackbuffer)
     EXPECT_EQ(graph.GetPassCount(), 0u);
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-073 Slice B — `FrameRecipeImports::ShadowAtlas` + the typed
+// `FrameRecipeShadowSizing` seam. The recipe prefers the imported handle
+// when valid, and falls back to a transient depth target sized by the
+// typed seam (or the viewport when neither is plumbed).
+// ---------------------------------------------------------------------------
+
+TEST(FrameRecipeContract, ShadowAtlasUsesImportedHandleWhenProvided)
+{
+    FrameRecipeFeatures features{};
+    features.EnableShadows = true;
+
+    FrameRecipeImports imports = MakeImports();
+    const Extrinsic::RHI::TextureHandle shadowAtlasHandle{77u, 1u};
+    imports.ShadowAtlas = shadowAtlasHandle;
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 1280u, .Height = 720u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    // The compiled graph should mark ShadowAtlas as imported and resolve its
+    // device handle to the one supplied by the caller.
+    bool foundShadow = false;
+    for (std::size_t idx = 0; idx < compiled->TextureNames.size(); ++idx)
+    {
+        if (compiled->TextureNames[idx] != "ShadowAtlas")
+        {
+            continue;
+        }
+        foundShadow = true;
+        ASSERT_LT(idx, compiled->TextureImported.size());
+        EXPECT_TRUE(compiled->TextureImported[idx]);
+        ASSERT_LT(idx, compiled->TextureHandles.size());
+        EXPECT_EQ(compiled->TextureHandles[idx], shadowAtlasHandle);
+    }
+    EXPECT_TRUE(foundShadow);
+
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(features);
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors());
+    EXPECT_FALSE(validation.HasWarnings());
+}
+
+TEST(FrameRecipeContract, ShadowAtlasFallsBackToTransientWhenImportInvalid)
+{
+    FrameRecipeFeatures features{};
+    features.EnableShadows = true;
+
+    FrameRecipeImports imports = MakeImports();
+    // imports.ShadowAtlas left default (invalid).
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 800u, .Height = 600u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    bool foundShadow = false;
+    for (std::size_t idx = 0; idx < compiled->TextureNames.size(); ++idx)
+    {
+        if (compiled->TextureNames[idx] != "ShadowAtlas")
+        {
+            continue;
+        }
+        foundShadow = true;
+        ASSERT_LT(idx, compiled->TextureImported.size());
+        EXPECT_FALSE(compiled->TextureImported[idx]);
+    }
+    EXPECT_TRUE(foundShadow);
+}
+
+TEST(FrameRecipeContract, ShadowAtlasTransientPathAcceptsTypedShadowSizing)
+{
+    FrameRecipeFeatures features{};
+    features.EnableShadows = true;
+
+    FrameRecipeImports imports = MakeImports();
+    // No imports.ShadowAtlas — exercise the transient fallback path that
+    // consumes `FrameRecipeShadowSizing` instead of the viewport.
+
+    const FrameRecipeShadowSizing shadowSizing{
+        .AtlasResolution = 512u,
+        .CascadeCount = 3u,
+    };
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 1280u, .Height = 720u},
+        shadowSizing);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    // The transient ShadowAtlas is allocated and the compiled graph treats it
+    // as non-imported — the typed sizing seam only affects the recipe-level
+    // texture description, which `CompiledRenderGraph` does not surface for
+    // contract assertion. Exercising the new code path without a build
+    // failure is the observable contract here; end-to-end atlas sizing is
+    // covered by the `ShadowSystem` allocation test in
+    // `Test.LightingShadowContracts.cpp`.
+    bool foundShadow = false;
+    for (std::size_t idx = 0; idx < compiled->TextureNames.size(); ++idx)
+    {
+        if (compiled->TextureNames[idx] != "ShadowAtlas")
+        {
+            continue;
+        }
+        foundShadow = true;
+        ASSERT_LT(idx, compiled->TextureImported.size());
+        EXPECT_FALSE(compiled->TextureImported[idx]);
+    }
+    EXPECT_TRUE(foundShadow);
+}
+
 
 
 

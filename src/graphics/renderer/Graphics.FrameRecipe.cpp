@@ -188,7 +188,13 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::Albedo, "Albedo", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneColorHDR, "SceneColorHDR", true);
-        AddResource(out, FrameRecipeResourceKind::ShadowAtlas, "ShadowAtlas", features.EnableShadows, false, false, true);
+        // GRAPHICS-073 Slice B — declare ShadowAtlas as imported-write-allowed.
+        // `BuildDefaultFrameRecipe` chooses between an imported handle (when
+        // `imports.ShadowAtlas.IsValid()`) and a transient depth target at
+        // build time; the validator only attaches an authorized writer set
+        // when the *compiled* graph marks the resource imported, so the
+        // declaration stays valid for both paths.
+        AddResource(out, FrameRecipeResourceKind::ShadowAtlas, "ShadowAtlas", features.EnableShadows, true, false, true, true);
         AddResource(out, FrameRecipeResourceKind::SceneColorLDR, "SceneColorLDR", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessBloomScratch, "PostProcess.BloomScratch", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessHistogram, "PostProcess.Histogram", features.EnablePostProcess, false, false, true);
@@ -293,7 +299,8 @@ namespace Extrinsic::Graphics
     [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
                                                                         const FrameRecipeFeatures& features,
                                                                         const FrameRecipeImports& imports,
-                                                                        const FrameRecipeSizing& sizing)
+                                                                        const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeShadowSizing& shadowSizing)
     {
         if (!imports.Backbuffer.IsValid())
         {
@@ -361,7 +368,41 @@ namespace Extrinsic::Graphics
         }
         if (features.EnableShadows)
         {
-            shadowAtlas = graph.CreateTexture("ShadowAtlas", DepthTargetDesc(width, height, RHI::Format::D32_FLOAT, "ShadowAtlas"));
+            // GRAPHICS-073 Slice B — prefer the `ShadowSystem`-owned atlas
+            // when the caller plumbs a valid handle into
+            // `imports.ShadowAtlas`. The imported initial state is `DepthWrite`
+            // (matching the ShadowPass's first use of the resource) and the
+            // final state is `ShaderRead` (the atlas is sampled by the
+            // surface/composition passes and survives across frames in that
+            // layout). The `Imported && Write` builder gate requires either
+            // the initial or final state to allow writes — `DepthWrite` is
+            // that contract assertion; without it `builder.Write(shadowAtlas,
+            // DepthWrite)` would be rejected even though the atlas is the
+            // canonical writer.
+            //
+            // When the import is absent (headless contract tests, or
+            // ShadowSystem allocation deferred), fall back to the Slice A
+            // viewport-sized transient atlas. Slice A's transient sizing is
+            // *not* viewport-correct for production shadow mapping, but it
+            // keeps the recipe build deterministic without a ShadowSystem.
+            if (imports.ShadowAtlas.IsValid())
+            {
+                shadowAtlas = graph.ImportTexture("ShadowAtlas",
+                                                  imports.ShadowAtlas,
+                                                  TextureState::DepthWrite,
+                                                  TextureState::ShaderRead);
+            }
+            else
+            {
+                const std::uint32_t atlasWidth = (shadowSizing.AtlasResolution > 0u && shadowSizing.CascadeCount > 0u)
+                                                     ? shadowSizing.AtlasResolution * shadowSizing.CascadeCount
+                                                     : width;
+                const std::uint32_t atlasHeight = (shadowSizing.AtlasResolution > 0u)
+                                                      ? shadowSizing.AtlasResolution
+                                                      : height;
+                shadowAtlas = graph.CreateTexture("ShadowAtlas",
+                                                  DepthTargetDesc(atlasWidth, atlasHeight, RHI::Format::D32_FLOAT, "ShadowAtlas"));
+            }
         }
         if (features.EnablePostProcess)
         {

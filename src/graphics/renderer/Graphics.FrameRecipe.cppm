@@ -111,6 +111,24 @@ namespace Extrinsic::Graphics
         RHI::BufferHandle LinesCount{};
         RHI::BufferHandle PointsNonIndexedArgs{};
         RHI::BufferHandle PointsCount{};
+        // GRAPHICS-073 Slice B — optional `ShadowSystem`-owned atlas. When
+        // valid, `BuildDefaultFrameRecipe` imports this texture as the
+        // ShadowAtlas resource instead of allocating a transient depth target.
+        // When invalid, the recipe falls back to the GRAPHICS-073 Slice A
+        // transient path (`graph.CreateTexture("ShadowAtlas", ...)`).
+        RHI::TextureHandle ShadowAtlas{};
+    };
+
+    // GRAPHICS-073 Slice B — typed sizing seam for the shadow atlas. When
+    // populated, `BuildDefaultFrameRecipe` derives the atlas dimensions from
+    // `(AtlasResolution * CascadeCount, AtlasResolution)` rather than the
+    // viewport-sized `FrameRecipeSizing` fallback inherited from Slice A.
+    // Leaving `AtlasResolution = 0` keeps the viewport-sized transient
+    // fallback so headless contract tests need not plumb a `ShadowSystem`.
+    export struct FrameRecipeShadowSizing
+    {
+        std::uint32_t AtlasResolution{0u};
+        std::uint32_t CascadeCount{0u};
     };
 
     export struct FrameRecipePassDeclaration
@@ -171,7 +189,8 @@ namespace Extrinsic::Graphics
     export [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
                                                                         const FrameRecipeFeatures& features,
                                                                         const FrameRecipeImports& imports,
-                                                                        const FrameRecipeSizing& sizing);
+                                                                        const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeShadowSizing& shadowSizing = {});
 
     export [[nodiscard]] FrameRecipeBuildResult BuildMinimalDebugSurfaceRecipe(RenderGraph& graph,
                                                                                const FrameRecipeImports& imports,
