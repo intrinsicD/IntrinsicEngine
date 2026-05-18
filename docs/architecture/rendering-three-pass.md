@@ -449,3 +449,21 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 - Rendering backlog dependency DAG and agent selection rules: [tasks/backlog/rendering/README.md](../../tasks/backlog/rendering/README.md).
 - Medium/long-horizon planning: [docs/roadmap.md](../roadmap.md).
 - Historical migration narrative: [docs/migration/archive/plan.md](../migration/archive/plan.md) (archival index).
+
+## Future Work
+
+This document describes the canonical three-pass architecture as it exists
+today; pass semantics, attachment ownership, bucket lanes, and the snapshot
+extraction boundary do not change without an ADR. The phased plan that
+extends this foundation toward 2026+ features (pipelined sim/render,
+async-compute multi-queue scheduling, HZB two-phase occlusion culling,
+clustered light binning, TAA + reconstructor seam, Slang shader pipeline,
+visibility buffer + meshlets, hardware ray tracing + hybrid GI, virtual
+shadow maps, gaussian splatting, neural radiance cache, neural texture
+compression, differentiable rendering, deltaful scene, mesh shaders, work
+graphs, streaming virtual textures, virtualized meshes, GPU decompression,
+frame generation) is recorded in the planning-only umbrella
+[`tasks/done/GRAPHICS-035-modernization-roadmap.md`](../../tasks/done/GRAPHICS-035-modernization-roadmap.md)
+with leaf planning slices `GRAPHICS-036..058`. The roadmap does not relax
+fail-closed Vulkan behavior, does not collapse the 8-bucket draw-lane
+contract, and does not remove the snapshot-extraction boundary.

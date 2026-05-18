@@ -643,10 +643,12 @@ leaf task is a planning-only slice following the GRAPHICS-029..034 pattern
 (implementation children identified but not opened). Phases are independently
 testable; each phase derisks the next.
 
-- [GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index)](GRAPHICS-035-modernization-roadmap.md):
+- [GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index, done)](../../done/GRAPHICS-035-modernization-roadmap.md):
   records the agreed phased roadmap (Phase 1 frame structure, Phase 2 shader
   & material modernization, Phase 3 RT & GI, Phase 4 research differentiators,
-  Phase 5 frontier). Parent of GRAPHICS-036..058. No implementation, no
+  Phase 5 frontier). Parent of GRAPHICS-036..058. Cross-linked from
+  `docs/architecture/graphics.md` and
+  `docs/architecture/rendering-three-pass.md`. No implementation, no
   shader/pipeline changes, no CMake option growth.
 
 #### Phase 1 — Modern frame structure

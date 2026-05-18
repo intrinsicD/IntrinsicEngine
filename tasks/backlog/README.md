@@ -76,7 +76,7 @@ breaking the foundation. All leaves stay planning-only until Theme A is
 unblocked.
 
 Members:
-- [`rendering/GRAPHICS-035-modernization-roadmap.md`](rendering/GRAPHICS-035-modernization-roadmap.md) (umbrella).
+- [`done/GRAPHICS-035-modernization-roadmap.md`](../done/GRAPHICS-035-modernization-roadmap.md) (umbrella; done — leaf planning slices live in `rendering/`).
 - `rendering/GRAPHICS-036..058` planning-only leaves: pipelined frames,
   async compute and multi-queue scheduling, HZB occlusion culling, clustered
   light binning, TAA and reconstructor seam, Slang shader pipeline, PBR

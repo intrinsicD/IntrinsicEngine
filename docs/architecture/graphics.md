@@ -113,6 +113,21 @@ The decision-record content this document previously inlined has been extracted 
 
 The handoff inventory that the GRAPHICS-017Q clarification paragraph previously embedded (legacy `Graphics.TransformGizmo` / `Graphics.Interaction` features awaiting promoted-implementation tasks) lives in [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md); ADR-0006 cross-links it rather than duplicating it (no new migration doc was authored).
 
+## Modernization roadmap
+
+The phased plan that takes the promoted rendering stack from its current
+2025-era foundation toward a 2026+ feature set (modern frame structure, Slang
+shader pipeline, visibility buffer + meshlets, hardware ray tracing + hybrid
+GI, virtual shadow maps, reconstruction/upscaler seam, research-grade
+differentiators) is recorded in the planning-only umbrella
+[`tasks/done/GRAPHICS-035-modernization-roadmap.md`](../../tasks/done/GRAPHICS-035-modernization-roadmap.md).
+The leaf planning slices (`GRAPHICS-036..058`) sit under
+[`tasks/backlog/rendering/`](../../tasks/backlog/rendering/) and follow the
+`GRAPHICS-029..034` pattern — implementation children are identified but not
+opened until their phase prerequisites land. The roadmap introduces no new
+dependency edges and no semantic code in this slice; consult the umbrella
+for phase ordering and per-leaf scope.
+
 ## Related references
 
 - Frame graph details: [frame-graph.md](frame-graph.md).
