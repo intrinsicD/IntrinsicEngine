@@ -19,6 +19,7 @@ This directory contains the `Components` module/files.
 - `ECS.Component.ProceduralGeometryRef.cppm`
 - `ECS.Component.Selection.cppm`
 - `ECS.Component.ShadowCaster.cppm`
+- `ECS.Component.StableId.cppm`
 - `ECS.Component.Transform.Local.cppm`
 - `ECS.Component.Transform.World.cppm`
 
@@ -33,15 +34,20 @@ records the contract for entity-stable identity:
   entity carries `MetaData::EntityName`. `MetaData` is not extended
   with stable-identity, prefab, or serialization fields under
   HARDEN-068 (Decision 4).
-- A future `Extrinsic.ECS.Component.StableId` module
-  (HARDEN-068-Impl-A; not yet landed) carries a 128-bit UUID-shaped
-  `StableId` value type. It is an **optional sparse component**
-  (Decision 2) — authoring/runtime code opts in only when a
+- `Extrinsic.ECS.Component.StableId`
+  (`ECS.Component.StableId.cppm`, landed by HARDEN-068-Impl-A) carries a
+  128-bit UUID-shaped `StableId` value type. It is an **optional sparse
+  component** (Decision 2) — authoring/runtime code opts in only when a
   serializer / undo / prefab / external-reference consumer needs
   durability across `entt::entity` recycling, save/load, or hot
   reload.
 - ECS owns only the value type + `kInvalidStableId` + `IsValid` +
-  equality + `operator<=>` + `StableIdHash` (Decision 3). Any
+  defaulted equality / `operator<=>` + the exported `StableIdHash`
+  hasher (Decision 3). The payload header imports neither `entt` nor
+  any higher-layer module so it remains usable from serializer / editor /
+  runtime helpers; the contract test
+  [`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`](../../../tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp)
+  (`StableIdPayloadStaysCpuOnly`) enforces that rule. Any
   `StableId → entt::entity` lookup sidecar lives in `src/runtime/`,
   not in `src/ecs/`.
 - Future authoring metadata (`SerializationHints`, `SceneSource`,
