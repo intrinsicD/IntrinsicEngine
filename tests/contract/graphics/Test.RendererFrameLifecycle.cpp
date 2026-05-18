@@ -625,10 +625,18 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetForwardSurfacePipelineDesc();
     // The descriptor must reference the SPIR-V emitted by intrinsic_add_glsl_shaders()
     // and the depth-prepass-on path documented in
-    // docs/architecture/rendering-three-pass.md.
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with("shaders/surface.vert.spv"))
+    // docs/architecture/rendering-three-pass.md. The shader pair must also
+    // observe the GpuScene push-constant contract that
+    // `ForwardSurfacePass::Execute()` pushes — the canonical GpuScene-aware
+    // forward shader pair (`forward/default_debug_surface.{vert,frag}`)
+    // matches `sizeof(GpuScenePushConstants)` and the BDA-only descriptor
+    // layout. The legacy `surface.vert/frag` pair is incompatible
+    // (mat4 Model + PtrPositions push block + set=2/3 SSBOs).
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/forward/default_debug_surface.vert.spv"))
         << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with("shaders/surface.frag.spv"))
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/forward/default_debug_surface.frag.spv"))
         << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
