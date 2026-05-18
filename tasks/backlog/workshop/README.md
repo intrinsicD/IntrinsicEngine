@@ -10,8 +10,13 @@ and absence of a standing architecture-review gate.
 1. [`WORKSHOP-001` (done)](../../done/WORKSHOP-001-layer-check-module-and-cmake-aware.md) —
    the architecture guardrail now catches real dependencies (C++23 module
    imports and CMake link edges). Retired 2026-05-17.
-2. [`WORKSHOP-002`](WORKSHOP-002-remove-platform-window-from-rhi.md) — fix the
-   known `graphics/rhi -> platform` leak.
+2. [`WORKSHOP-002` (done)](../../done/WORKSHOP-002-remove-platform-window-from-rhi.md) —
+   fixed the `graphics/rhi -> platform` leak. Retired 2026-05-17 jointly
+   with [`ARCH-005`](../../done/ARCH-005-resolve-graphics-platform-layering-violations.md);
+   `RHI::IDevice::Initialize` now takes a platform-neutral
+   `RHI::DeviceCreateDesc`, `ExtrinsicRHI` no longer links
+   `ExtrinsicPlatform`, and the strict layering check runs unguarded in
+   `pr-fast` / `ci-linux-clang`.
 3. [`WORKSHOP-003`](WORKSHOP-003-typed-frame-pass-and-resource-identity.md) and
    [`WORKSHOP-004`](WORKSHOP-004-typed-command-router.md) — make frame-pass
    identity typed and remove stringly command routing.
@@ -28,15 +33,13 @@ and absence of a standing architecture-review gate.
 
 ## Cross-domain dependency anchors
 
-- **WORKSHOP-002 ⇐ WORKSHOP-001 (done).** WORKSHOP-001 retired
-  2026-05-17 and the guardrail now catches the
+- **WORKSHOP-002 (done) ⇐ WORKSHOP-001 (done).** WORKSHOP-001 retired
+  2026-05-17 and the guardrail caught the
   `graphics_rhi -> Extrinsic.Platform.Window` import and the matching
   `target_link_libraries(... ExtrinsicPlatform)` link edge that
-  WORKSHOP-002 will remove. Until WORKSHOP-002 lands, the strict
-  `check_layering.py --root src --strict` run is expected to fail with
-  that violation reported; the `pr-fast` and `ci-linux-clang` workflows
-  wrap the invocation as an expected-failure check (revert to the
-  unguarded form once WORKSHOP-002 lands).
+  WORKSHOP-002 removed; the strict `check_layering.py --root src --strict`
+  run is now clean and `pr-fast` / `ci-linux-clang` invoke it directly
+  (expected-failure wrapper deleted with WORKSHOP-002's retirement).
 - **WORKSHOP-004 ⇐ WORKSHOP-003.** Typed command routing consumes the typed
   pass identity introduced by WORKSHOP-003.
 - **WORKSHOP-006 ⇐ WORKSHOP-005.** Render-prep extraction is easier once

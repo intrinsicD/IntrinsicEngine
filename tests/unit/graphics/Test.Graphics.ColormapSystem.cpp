@@ -18,7 +18,6 @@ import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Extrinsic.Core.Config.Render;
-import Extrinsic.Platform.Window;
 
 #include "MockRHI.hpp"
 

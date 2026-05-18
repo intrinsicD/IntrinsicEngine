@@ -19,7 +19,6 @@ import Extrinsic.RHI.Profiler;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Types;
-import Extrinsic.Platform.Window;
 
 namespace Extrinsic::Backends::Null
 {
@@ -99,12 +98,10 @@ namespace Extrinsic::Backends::Null
 
         [[nodiscard]] bool IsOperational() const noexcept override { return false; }
 
-        void Initialize(Platform::IWindow& window,
-                        const Core::Config::RenderConfig& config) override
+        void Initialize(const RHI::DeviceCreateDesc& desc) override
         {
             [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"NullDevice::Initialize", Extrinsic::Core::Telemetry::HashString("NullDevice::Initialize")};
-            (void)config;
-            m_BackbufferExtent = window.GetFramebufferExtent();
+            m_BackbufferExtent = desc.InitialFramebufferExtent;
         }
 
         void Shutdown() override {}

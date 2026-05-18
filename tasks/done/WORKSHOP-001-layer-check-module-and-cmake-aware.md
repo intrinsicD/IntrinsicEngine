@@ -8,21 +8,17 @@
 - Commit reference: see the retirement commit on `claude/backlog-task-agent-prompt-VqqlY`.
 - Maturity: `Operational` — the strict run now reports C++23 module
   imports and CMake link edges in addition to ``#include`` directives.
-- Follow-up: WORKSHOP-002 removes the surfaced
-  `graphics_rhi -> Extrinsic.Platform.Window` edge (plus the parallel
-  `graphics/renderer/Backends/Null/Backends.Null.cpp` and
-  `graphics/vulkan/Backends.Vulkan.Device.cppm` imports that this task
-  exposed) and the matching `target_link_libraries(... ExtrinsicPlatform)`
-  edge in `src/graphics/rhi/CMakeLists.txt`. Until then, the CI
-  workflows route the strict layer check through
-  `tools/ci/check_layering_workshop_002_gate.py`, which exits 0 only
-  when the observed violation set is a subset of the four expected
-  WORKSHOP-002 entries — a regression that adds any new violation
-  alongside the known ones fails CI. Once WORKSHOP-002 lands, the gate
-  script and its unit tests
-  (`tests/regression/tooling/Test.CheckLayeringWorkshop002Gate.py`) are
-  deleted and the workflow steps revert to the unguarded
-  `python3 tools/repo/check_layering.py --root src --strict` invocation.
+- Follow-up: WORKSHOP-002 (retired 2026-05-17 jointly with `ARCH-005`)
+  removed the surfaced `graphics_rhi -> Extrinsic.Platform.Window` edge
+  (plus the parallel `graphics/renderer/Backends/Null/Backends.Null.cpp`
+  and `graphics/vulkan/Backends.Vulkan.Device.cppm` imports that this
+  task exposed) and the matching
+  `target_link_libraries(... ExtrinsicPlatform)` edge in
+  `src/graphics/rhi/CMakeLists.txt`. With WORKSHOP-002 landed, the CI
+  workflows now run the unguarded
+  `python3 tools/repo/check_layering.py --root src --strict` directly;
+  the transient `tools/ci/check_layering_workshop_002_gate.py` wrapper
+  and its unit tests were deleted as part of WORKSHOP-002's retirement.
 - Verification step run: see "Verification" below; fixture-only run +
   regression test suite both pass; the strict `src/` run fails with the
   expected `Extrinsic.Platform.Window` violation (plus the three

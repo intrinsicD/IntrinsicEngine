@@ -7,7 +7,6 @@ module;
 export module Extrinsic.RHI.Device;
 
 import Extrinsic.Core.Geometry2D;
-import Extrinsic.Platform.Window;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Descriptors;
@@ -27,13 +26,30 @@ import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::RHI
 {
+    // ============================================================
+    // DeviceCreateDesc — backend-neutral seam between runtime and
+    // RHI. Runtime fills the native window handle + framebuffer
+    // extent from its platform window (see ARCH-005 / WORKSHOP-002);
+    // RHI never imports `Extrinsic.Platform.*` to keep
+    // `graphics/rhi -> core` clean. Backends that need a window
+    // surface cast `NativeWindowHandle` to their platform-native
+    // type; backends that don't (e.g. the Null device) use only
+    // `InitialFramebufferExtent`.
+    // ============================================================
+    export struct DeviceCreateDesc
+    {
+        Core::Config::RenderConfig RenderConfig{};
+        Core::Extent2D             InitialFramebufferExtent{};
+        void*                      NativeWindowHandle{nullptr};
+    };
+
     export class IDevice
     {
     public:
         virtual ~IDevice() = default;
 
         // ---- Device lifecycle ----------------------------------------
-        virtual void Initialize(Platform::IWindow& window, const Core::Config::RenderConfig& config) = 0;
+        virtual void Initialize(const DeviceCreateDesc& desc) = 0;
         virtual void Shutdown()   = 0;
         virtual void WaitIdle()   = 0;
 

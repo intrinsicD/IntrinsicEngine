@@ -156,7 +156,11 @@ TEST(VulkanOperationalDiagnosticsSnapshot, CountersSurviveDeviceInitializeShutdo
             Extrinsic::Backends::Vulkan::CreateVulkanDevice();
         ASSERT_NE(device, nullptr);
 
-        device->Initialize(window, renderConfig);
+        device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
+            .RenderConfig             = renderConfig,
+            .InitialFramebufferExtent = window.GetFramebufferExtent(),
+            .NativeWindowHandle       = window.GetNativeHandle(),
+        });
         ASSERT_FALSE(device->IsOperational());
 
         // The runtime breadcrumb call site would emit one fallback record per

@@ -1259,9 +1259,9 @@ RHI::IBindlessHeap& VulkanDevice::GetBindlessHeap()
     return m_FallbackBindlessHeap;
 }
 
-void VulkanDevice::Initialize(Platform::IWindow& window,
-                              const Core::Config::RenderConfig& config)
+void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
 {
+    const Core::Config::RenderConfig& config = desc.RenderConfig;
     m_ValidationEnabled = config.EnableValidation;
     m_Operational       = false;
     m_DeviceLost        = false;
@@ -1304,7 +1304,7 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         Shutdown();
     };
 
-    auto* glfwWindow = static_cast<GLFWwindow*>(window.GetNativeHandle());
+    auto* glfwWindow = static_cast<GLFWwindow*>(desc.NativeWindowHandle);
     diagnostics.NativeWindowAvailable = glfwWindow != nullptr;
     if (!glfwWindow)
     {
@@ -1681,7 +1681,7 @@ void VulkanDevice::Initialize(Platform::IWindow& window,
         const VkSurfaceFormatKHR surfaceFormat = ChooseSwapchainSurfaceFormat(surfaceFormats);
         const VkPresentModeKHR presentMode = ToVkPresentMode(m_PresentMode, presentModes);
         const VkExtent2D swapchainExtent = ChooseSwapchainExtent(surfaceCapabilities,
-                                                                 window.GetFramebufferExtent());
+                                                                 desc.InitialFramebufferExtent);
 
         std::uint32_t desiredImageCount = surfaceCapabilities.minImageCount + 1u;
         if (surfaceCapabilities.maxImageCount > 0u && desiredImageCount > surfaceCapabilities.maxImageCount)

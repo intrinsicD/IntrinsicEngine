@@ -161,10 +161,6 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
             plan.structural_checks.update({"layering", "test_layout"})
             plan.reasons.append(f"{path}: repo checker changed; selected structural checks")
             matched = True
-        elif path == "tools/ci/check_layering_workshop_002_gate.py":
-            plan.structural_checks.update({"layering_regression_tests", "layering_gate_tests"})
-            plan.reasons.append(f"{path}: WORKSHOP-002 layering gate changed; selected gate unit tests")
-            matched = True
         elif path.startswith("tools/ci/"):
             plan.structural_checks.add("touched_scope_tests")
             plan.reasons.append(f"{path}: CI helper changed; selected tooling regression tests")
@@ -212,9 +208,6 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
                 if path == "tests/regression/tooling/Test.CheckLayering.py":
                     plan.structural_checks.add("layering_regression_tests")
                     plan.reasons.append(f"{path}: layering checker regression test changed; selected layering regression tests")
-                elif path == "tests/regression/tooling/Test.CheckLayeringWorkshop002Gate.py":
-                    plan.structural_checks.add("layering_gate_tests")
-                    plan.reasons.append(f"{path}: WORKSHOP-002 gate test changed; selected gate unit tests")
                 else:
                     plan.structural_checks.add("touched_scope_tests")
                     plan.reasons.append(f"{path}: tooling regression changed; selected tooling regression tests")
@@ -239,8 +232,6 @@ def structural_commands(root_arg: str, checks: set[str]) -> list[Command]:
         commands.append(Command(("python3", "tests/regression/tooling/Test.TouchedScope.py"), "tooling regression tests"))
     if "layering_regression_tests" in checks:
         commands.append(Command(("python3", "tests/regression/tooling/Test.CheckLayering.py"), "layering checker regression tests"))
-    if "layering_gate_tests" in checks:
-        commands.append(Command(("python3", "tests/regression/tooling/Test.CheckLayeringWorkshop002Gate.py"), "WORKSHOP-002 layering gate unit tests"))
     if "tool_smoke" in checks:
         commands.append(Command(("python3", "tools/repo/check_pr_contract.py", "--root", root_arg, "--mode", "local"), "generic tool smoke"))
     if "layering" in checks:
