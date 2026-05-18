@@ -178,7 +178,7 @@ Recommended focused test additions as gaps are closed:
 4. **Implement [`HARDEN-066`](../../tasks/done/HARDEN-066-ecs-render-sync-export-policy.md)** (done) — either implement a CPU-only tag/export pass or retire the placeholder and document runtime extraction as the sole owner.
 5. **Implement [`HARDEN-067`](../../tasks/done/HARDEN-067-ecs-bounds-propagation-system.md)** (done) — keep world culling bounds synchronized after promoted transform updates.
 6. **After [`ARCH-001`](../../tasks/backlog/physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md), implement [`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)** — expand collider and add rigid-body authoring components without solver handles.
-7. **Implement [`HARDEN-068`](../../tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md)** — define ECS-owned stable identity/metadata before runtime scene serialization depends on entity references. (Slice 1 active on `claude/setup-agentic-workflow-9l6ef`; the five contract decisions are recorded in the task file. Implementation children `HARDEN-068-Impl-A/B/C` open as follow-up slices.)
+7. **Implement [`HARDEN-068`](../../tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md)** (done) — define ECS-owned stable identity/metadata before runtime scene serialization depends on entity references. `HARDEN-068-Impl-A` landed the `StableId` payload module; `HARDEN-068-Impl-B/C` remain identified-only follow-ups that open only when a concrete consumer demands them.
 
 ## Bottom line
 

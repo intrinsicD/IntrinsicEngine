@@ -155,8 +155,8 @@ mechanical change; until that decision is recorded, ECS keeps the raw
 stable ID and the runtime assembles the typed handle at the
 `ecs -> runtime -> graphics` seam.
 
-`HARDEN-068` slice 1 (Decision 5, see
-[`tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
+`HARDEN-068` (Decision 5, see
+[`tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
 explicitly does **not** widen this contract under HARDEN-068. If a
 future consumer wants the typed handle, that becomes a separate
 `ARCH-*` task that owns the layering allowlist change and the
@@ -167,8 +167,8 @@ inside `ecs -> {core, geometry}`.
 
 Entity-stable identity used for scene save/load, undo/redo, prefab
 references, hot reload, and external references is **separate** from
-the volatile `entt::entity` value. `HARDEN-068` slice 1 (see
-[`tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
+the volatile `entt::entity` value. `HARDEN-068` (see
+[`tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
 records the five contract decisions:
 
 1. **Shape (Decision 1).** `StableId` is a 128-bit UUID-shaped

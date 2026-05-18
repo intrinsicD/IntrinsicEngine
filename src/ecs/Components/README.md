@@ -25,8 +25,8 @@ This directory contains the `Components` module/files.
 
 ## Stable identity vs `MetaData`
 
-`HARDEN-068` slice 1 (see
-[`tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../../tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
+`HARDEN-068` (see
+[`tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../../tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
 records the contract for entity-stable identity:
 
 - `Extrinsic.ECS.Component.MetaData` (`ECS.Component.MetaData.cppm`)

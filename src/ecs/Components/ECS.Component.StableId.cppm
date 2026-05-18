@@ -26,7 +26,7 @@ export namespace Extrinsic::ECS::Components
     // equality, ordering, and the exported hasher. Any
     // `StableId -> entt::entity` lookup sidecar (scene-local map,
     // prefab-aware resolver, …) lives in `src/runtime/`; see
-    // `tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`
+    // `tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`
     // Decision 3.
     //
     // The payload is CPU-only and intentionally imports neither `entt`,

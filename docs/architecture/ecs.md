@@ -20,8 +20,7 @@ identifier: it is recycled across entity destruction/creation, is
 insertion-order-dependent, and does not survive scene save/load,
 prefab references, or hot reload. ECS therefore owns a separate
 durable identity contract, recorded in
-[`tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md)
-slice 1:
+[`tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md):
 
 | # | Decision | Pick |
 |---|---|---|

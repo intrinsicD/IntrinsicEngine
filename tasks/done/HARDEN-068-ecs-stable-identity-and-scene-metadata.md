@@ -2,16 +2,19 @@
 
 ## Status
 
-- Status: in-progress (slice 2 / HARDEN-068-Impl-A in flight on a new
-  branch; slice 1 landed on `main` via PR #865 / commit `559134a`).
+- Status: done.
+- Completed: 2026-05-18.
+- Commit: `f2dfaa62` (`HARDEN-068-Impl-A: ship Extrinsic.ECS.Component.StableId payload`), merged via PR #866.
+- Previous slice: slice 1 landed on `main` via PR #865 / commit `559134a`.
 - Owner/agent: Claude on `claude/setup-agentic-workflow-PaRh5` (slice 2);
   previously Claude on `claude/setup-agentic-workflow-9l6ef` (slice 1).
 - Branch: `claude/setup-agentic-workflow-PaRh5`.
-- Started: 2026-05-18 (slice 1), 2026-05-18 (slice 2 on this branch).
-- Current slice: slice 2 — HARDEN-068-Impl-A: ship the
+- Started: 2026-05-18 (slice 1), 2026-05-18 (slice 2 on the follow-up branch).
+- Completed maturity: `CPUContracted` for the `StableId` payload module.
+- Completed slice: slice 2 — HARDEN-068-Impl-A shipped the
   `Extrinsic.ECS.Component.StableId` payload module + CPU-only
   `unit;ecs` payload tests + targeted layering boundary case.
-- Slice 2 deliverables landed in this branch:
+- Slice 2 deliverables:
   - `src/ecs/Components/ECS.Component.StableId.cppm` exporting
     `Extrinsic::ECS::Components::StableId`, `kInvalidStableId`,
     `IsValid`, defaulted equality / `operator<=>`, and the exported
@@ -48,7 +51,7 @@
     row of `docs/migration/nonlegacy-parity-matrix.md`;
     `docs/api/generated/module_inventory.md` (regenerated; new
     `Extrinsic.ECS.Component.StableId` row).
-- Local verification this session:
+- Local verification recorded before retirement:
   - `python3 tools/agents/check_task_policy.py --root . --strict`.
   - `python3 tools/repo/check_layering.py --root src --strict`.
   - `python3 tools/repo/check_test_layout.py --root . --strict`.
@@ -56,24 +59,12 @@
   - `python3 tools/repo/generate_module_inventory.py --root src
     --out docs/api/generated/module_inventory.md` (435 modules;
     `Extrinsic.ECS.Component.StableId` registered).
-  - **Default CPU gate deferred to CI.** The pinned `clang-20` /
-    `clang-scan-deps-20` toolchain required by `CMakePresets.json`
-    is unavailable on this remote-execution host (matches the
-    HARDEN-065 slice-2 precedent and GRAPHICS-033D). Per
-    `/AGENTS.md` §5 ("Do not treat GCC or stale non-preset build
-    trees as valid verification for module changes") the
-    `cmake --preset ci` build + `IntrinsicECSTests` /
-    `IntrinsicEcsContractTests` run on the pinned toolchain via the
-    PR's `pr-fast` workflow row before retirement.
-- Next verification step: monitor the PR's `pr-fast` (pinned-clang-20)
-  job for green; if `IntrinsicECSTests` (label `ecs`,
-  `Test.ECS.StableIdentity.*`) and `IntrinsicEcsContractTests` (label
-  `contract`, `EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly`)
-  both pass, retire this task to
-  `tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`
-  with the completion date (YYYY-MM-DD) and PR/commit reference.
-  HARDEN-068-Impl-B and HARDEN-068-Impl-C remain identified-only and
-  open from the backlog when a concrete consumer demands them.
+  - The pinned `clang-20` / `clang-scan-deps-20` CPU gate ran in the
+    PR #866 `pr-fast` workflow before merge; PR #866 landed on `main`
+    as commit `f2dfaa62`.
+- Follow-up note: HARDEN-068-Impl-B and HARDEN-068-Impl-C remain
+  identified-only and should open from the backlog only when a concrete
+  consumer demands them.
 
 ## Slice plan
 
@@ -227,25 +218,28 @@ then can an `ecs → assets` edge be allowed.
 This is recorded as a Forbidden change in this slice (see below) so a
 later slice cannot quietly widen the contract under the HARDEN-068 ID.
 
-## Implementation children (identified, not opened)
+## Implementation children
 
 - [x] **HARDEN-068-Impl-A — `StableId` payload module + tests.** Landed
-  on `claude/setup-agentic-workflow-PaRh5` as this task's slice 2.
+  via PR #866 / commit `f2dfaa62` as this task's slice 2.
   Added `src/ecs/Components/ECS.Component.StableId.cppm`,
   `tests/unit/ecs/Test.ECS.StableIdentity.cpp`, and the targeted
   `StableIdPayloadStaysCpuOnly` contract case in
   `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`. CPU-only.
   See slice 2 in the slice plan.
-- [ ] **HARDEN-068-Impl-B — Generator + optional runtime lookup.**
-  Adds deterministic and random `StableId` generation helpers
-  (CPU-only in ECS, no global RNG state) and, if a consumer demands
-  it, `Runtime::StableIdRegistry` under `runtime/` (NOT `ecs/`).
-  Open only when a concrete consumer task exists.
-- [ ] **HARDEN-068-Impl-C — Adjacent authoring metadata (optional).**
-  Open only when a scene serializer or prefab ingest task explicitly
-  demands separate `SerializationHints` / `SceneSource` /
-  prefab-provenance components. Each lands as its own focused
-  component; `MetaData` is not extended.
+
+Identified-only follow-ups, not opened by this completed task:
+
+- **HARDEN-068-Impl-B — Generator + optional runtime lookup.** Adds
+  deterministic and random `StableId` generation helpers (CPU-only in
+  ECS, no global RNG state) and, if a consumer demands it,
+  `Runtime::StableIdRegistry` under `runtime/` (NOT `ecs/`). Open only
+  when a concrete consumer task exists.
+- **HARDEN-068-Impl-C — Adjacent authoring metadata (optional).** Open
+  only when a scene serializer or prefab ingest task explicitly demands
+  separate `SerializationHints` / `SceneSource` / prefab-provenance
+  components. Each lands as its own focused component; `MetaData` is
+  not extended.
 
 ## Goal
 
@@ -434,19 +428,11 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 
 ## Next verification step
 
-- Slice 2 / HARDEN-068-Impl-A awaits the pinned-`clang-20` CI run (the
-  `pr-fast` row that invokes `cmake --preset ci` +
-  `IntrinsicECSTests` (label `ecs`, includes the new
-  `Test.ECS.StableIdentity.*` cases) + `IntrinsicEcsContractTests`
-  (label `contract`, includes the new
-  `EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly` case)). Once
-  green, retire to
-  `tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`
-  with the completion date and PR/commit reference. No further
-  HARDEN-068 slices are auto-promoted: HARDEN-068-Impl-B (generator
-  + optional `Runtime::StableIdRegistry` sidecar) and
-  HARDEN-068-Impl-C (adjacent authoring metadata) open from the
-  backlog only when a concrete consumer demands them.
+- No active next verification step remains for HARDEN-068; the task is
+  retired. No further HARDEN-068 slices are auto-promoted:
+  HARDEN-068-Impl-B (generator + optional `Runtime::StableIdRegistry`
+  sidecar) and HARDEN-068-Impl-C (adjacent authoring metadata) open
+  from the backlog only when a concrete consumer demands them.
 
 ## Maturity
 
