@@ -44,7 +44,7 @@ stay outside this slice.
     minimal recipe contract and CPU-mock parity assertions.
   - [`GRAPHICS-031` (done)](../../done/GRAPHICS-031-default-debug-surface-material.md)
     default debug surface material (slot 0).
-  - [`GRAPHICS-033A`](GRAPHICS-033A-vulkan-operational-status-seam.md)
+  - [`GRAPHICS-033A` (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md)
     seam, because the recording prerequisite flag feeds the gate.
 - Planning lock: [`GRAPHICS-033`](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)
   Decisions 1 (gate item 6), 7 (required vs optional capabilities),

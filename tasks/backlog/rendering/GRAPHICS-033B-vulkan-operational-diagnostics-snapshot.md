@@ -31,7 +31,7 @@ new operational gate logic; consumes GRAPHICS-033A.
 ## Context
 - Owning subsystem/layer: `src/graphics/vulkan` for the snapshot;
   `src/runtime` for breadcrumb emission only.
-- Depends on: [`GRAPHICS-033A`](GRAPHICS-033A-vulkan-operational-status-seam.md)
+- Depends on: [`GRAPHICS-033A` (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md)
   for the status / reason enums and the evaluator that drives the
   reconciliation matrix.
 - Planning lock: [`GRAPHICS-033`](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)

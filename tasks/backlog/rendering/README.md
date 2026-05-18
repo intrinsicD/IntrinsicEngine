@@ -434,15 +434,16 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   split, performance characteristics, extensibility, and layering. Implementation
   children `GRAPHICS-033A/B/C/D` are now opened (see below); fail-closed
   behavior is preserved.
-- [GRAPHICS-033A — Vulkan operational status seam and reconciliation matrix](GRAPHICS-033A-vulkan-operational-status-seam.md):
-  first implementation child of GRAPHICS-033. Adds the
+- [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
+  first implementation child of GRAPHICS-033. Landed the
   `VulkanOperationalStatusCode` / `VulkanOperationalReason` /
   `VulkanOperationalInputs` / `VulkanOperationalStatus` types and
-  `EvaluateVulkanOperationalStatus(...)` to `Extrinsic.Backends.Vulkan` as
-  the single source of truth for operational state. CPU `contract;graphics`
-  tests cover every ordered gate item and every reconciliation-matrix row.
-  No counters, no breadcrumb, no command-recording bodies. Depends on
-  GRAPHICS-033 (done). Upstream consumer of GRAPHICS-033B/C/D.
+  `EvaluateVulkanOperationalStatus(...)` in `Extrinsic.Backends.Vulkan` as
+  the single source of truth for operational state, with CPU
+  `contract;graphics` coverage of every gate item and matrix row. The
+  originally-planned `*-vulkan-operational-status-seam.md` backlog entry was
+  superseded by the as-landed `*-evaluator.md` filename and has been
+  retired. Upstream consumer of GRAPHICS-033B/C/D.
 - [GRAPHICS-033B — Vulkan operational diagnostics snapshot and startup breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md):
   second implementation child. Adds `VulkanOperationalDiagnosticsSnapshot`
   with the five process-monotonic counters

@@ -42,7 +42,6 @@ Planning parents (retired):
 - [`rendering/GRAPHICS-031` (done)](../done/GRAPHICS-031-default-debug-surface-material.md)
 - [`rendering/GRAPHICS-032` (done)](../done/GRAPHICS-032-minimal-surface-present-command-path.md)
 - [`rendering/GRAPHICS-033` (done)](../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)
-- [`rendering/GRAPHICS-033A-vulkan-operational-status-seam.md`](rendering/GRAPHICS-033A-vulkan-operational-status-seam.md)
 - [`rendering/GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md`](rendering/GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md)
 - [`rendering/GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md`](rendering/GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md)
 - [`rendering/GRAPHICS-033D-vulkan-visible-triangle-smoke.md`](rendering/GRAPHICS-033D-vulkan-visible-triangle-smoke.md)
@@ -172,16 +171,14 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   wait for the physics layer ownership decision.
 - **GRAPHICS-035..058 ⇐ Theme A.** Rendering modernization leaves stay
   planning-only until the visible-geometry foundation is complete.
-- **GRAPHICS-033A ⇐ GRAPHICS-033 (done).** The operational status seam
-  must land first; GRAPHICS-033B/C/D all consume it.
-- **GRAPHICS-033B ⇐ GRAPHICS-033A.** Diagnostics counters and the
+- **GRAPHICS-033B ⇐ GRAPHICS-033A (done).** Diagnostics counters and the
   `VulkanRequestedButNotOperational` startup breadcrumb depend on the
   status / reason enums and the reconciliation matrix wiring.
-- **GRAPHICS-033C ⇐ GRAPHICS-033A, GRAPHICS-032 (done), GRAPHICS-031
+- **GRAPHICS-033C ⇐ GRAPHICS-033A (done), GRAPHICS-032 (done), GRAPHICS-031
   (done), GRAPHICS-018R (done).** Vulkan recording for the minimal
   recipe needs the gate seam plus the recipe, default material, and
   operational-transition reset seam already in `tasks/done/`.
-- **GRAPHICS-033D ⇐ GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.**
+- **GRAPHICS-033D ⇐ GRAPHICS-033A (done), GRAPHICS-033B, GRAPHICS-033C.**
   The opt-in `gpu;vulkan` visible-triangle smoke composes all three
   prior children and runs only on hosts with Vulkan + GLFW.
 

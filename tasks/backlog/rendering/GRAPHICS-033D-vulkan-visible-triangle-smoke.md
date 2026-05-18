@@ -32,7 +32,7 @@ that expose Vulkan and the required X11/Wayland headers.
   consumes seams from `src/platform`, `src/graphics/vulkan`,
   `src/graphics/renderer`, and `src/runtime`.
 - Depends on:
-  - [`GRAPHICS-033A`](GRAPHICS-033A-vulkan-operational-status-seam.md)
+  - [`GRAPHICS-033A` (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md)
     operational status seam.
   - [`GRAPHICS-033B`](GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md)
     diagnostics snapshot.
