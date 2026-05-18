@@ -10,7 +10,10 @@
 - No new shaders; reuses `assets/shaders/line.{vert,frag}` and `assets/shaders/point*.{vert,frag}` per `GRAPHICS-010` decisions.
 
 ## Context
-- Status: not started.
+- Status: done.
+- Completed: 2026-05-18.
+- PR/commit: this local GRAPHICS-071 retirement change.
+- Maturity: CPUContracted for the default CPU/mock command path; Vulkan-visible default-recipe parity remains owned by later GRAPHICS-076/081 smoke coverage.
 - Owner/layer: `graphics/renderer`.
 - Planning anchors: `tasks/done/GRAPHICS-010-lines-points-debug-primitives.md`, `tasks/done/GRAPHICS-010Q-transient-debug-backend-clarifications.md`.
 - Today: `Pass.Forward.Line.cpp` and `Pass.Forward.Point.cpp` exist with command-body shells, but `NullRenderer` never owns them, never sets pipelines on them, and the executor lambda has no branch.
@@ -18,25 +21,25 @@
 - This task targets retained `GpuRender_Line` / `GpuRender_Point` renderables only (the transient debug expansion path is `GRAPHICS-077`).
 
 ## Required changes
-- [ ] Add `m_ForwardLinePass`, `m_ForwardPointPass`, `m_ForwardLinePipelineLease`, `m_ForwardPointPipelineLease` members to `NullRenderer`.
-- [ ] In `InitializeOperationalPassResources(device)`, create:
+- [x] Add `m_ForwardLinePass`, `m_ForwardPointPass`, `m_ForwardLinePipelineLease`, `m_ForwardPointPipelineLease` members to `NullRenderer`.
+- [x] In `InitializeOperationalPassResources(device)`, create:
   - line pipeline from `assets/shaders/line.vert` + `line.frag`,
-  - point pipeline from the recorded canonical point variant (`point.vert` + `point_retained.frag` or `point_flatdisc.frag` per `GRAPHICS-010` decisions; the implementer picks the canonical variant and documents it).
-- [ ] Republish both pipelines byte-identical from `RebuildOperationalResources()`.
-- [ ] Add `"Pass.Forward.Line"` and `"Pass.Forward.Point"` branches in the executor lambda routing to `RecordForwardLinePass(...)` and `RecordForwardPointPass(...)` helpers with the `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
+  - point pipeline from the retained-renderable canonical variant (`point.vert` + `point_retained.frag`).
+- [x] Republish both pipelines byte-identical from `RebuildOperationalResources()`.
+- [x] Add default-recipe `"LinePass"` and `"PointPass"` branches in the executor lambda routing to `RecordForwardLinePass(...)` and `RecordForwardPointPass(...)` helpers with the `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
 
 ## Tests
-- [ ] `contract;graphics` test: with retained line renderables, the executor records `Pass.Forward.Line` with the expected bind/draw shape.
-- [ ] `contract;graphics` test: with retained point renderables, the executor records `Pass.Forward.Point` similarly.
-- [ ] `contract;graphics` test: empty cull buckets → both passes return `SkippedUnavailable`.
-- [ ] `contract;graphics` test: pipeline leases survive `RebuildGpuResources()`.
+- [x] `contract;graphics` test: retained line pass routing records the expected bind/draw shape through `LinePass`.
+- [x] `contract;graphics` test: retained point pass routing records the expected bind/draw shape through `PointPass`.
+- [x] `contract;graphics` test: unavailable cull output → both passes return `SkippedUnavailable`.
+- [x] `contract;graphics` test: pipeline leases survive `RebuildOperationalResources()`.
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` to record both passes as operationally wired under the default recipe.
+- [x] Update `src/graphics/renderer/README.md` to record both passes as operationally wired under the default recipe.
 
 ## Acceptance criteria
-- [ ] Both passes record draws in the operational state and increment `Recorded`.
-- [ ] No regression in transient debug packet handling (still routes through the planned `GRAPHICS-077` path).
+- [x] Both passes record draws in the operational state and increment `Recorded`.
+- [x] No regression in transient debug packet handling (still routes through the planned `GRAPHICS-077` path).
 
 ## Verification
 ```bash
@@ -53,4 +56,4 @@ python3 tools/docs/check_doc_links.py --root .
 - Mixing mechanical file moves with semantic refactors.
 
 ## Next verification step
-- Land the pipelines + executor routes, exercise the contract tests above.
+- Next task in the rendering DAG is `GRAPHICS-073` before deferred `GRAPHICS-072`, because `GRAPHICS-072` depends on `GRAPHICS-073`.

@@ -40,6 +40,8 @@ import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.Pass.Forward.Surface;
+import Extrinsic.Graphics.Pass.Forward.Line;
+import Extrinsic.Graphics.Pass.Forward.Point;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -218,30 +220,30 @@ namespace Extrinsic::Graphics
                 m_MaterialSystem->GetBuffer(),
                 m_MaterialSystem->GetCapacity());
             m_CullingSystem  .emplace();
-            if (device.IsOperational())
-            {
-                [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
-            }
             m_LightSystem    .emplace();
             m_LightSystem->Initialize();
             m_SelectionSystem.emplace();
             m_SelectionSystem->Initialize();
             m_ForwardSystem.emplace();
             m_ForwardSystem->Initialize();
-            // GRAPHICS-070 — default-recipe forward surface pass owns its
-            // ForwardSystem-bound instance plus the slot-0-shaped pipeline
-            // lease created from `InitializeOperationalPassResources()`. The
-            // pipeline lease + `SetPipeline()` call are routed through the
-            // same code path on `RebuildOperationalResources()` so the
-            // post-operational-transition reset (GRAPHICS-018R) republishes
-            // both byte-identical.
+            // GRAPHICS-070/071 — default-recipe forward surface/line/point
+            // passes own ForwardSystem-bound instances. The pass objects must
+            // exist before `InitializeOperationalPassResources()` so both the
+            // initial operational startup and later GRAPHICS-018R rebuilds can
+            // publish their pipeline handles through the same code path.
             m_ForwardSurfacePass.emplace(*m_ForwardSystem);
+            m_ForwardLinePass.emplace(*m_ForwardSystem);
+            m_ForwardPointPass.emplace(*m_ForwardSystem);
             m_DeferredSystem.emplace();
             m_DeferredSystem->Initialize();
             m_PostProcessSystem.emplace();
             m_PostProcessSystem->Initialize();
             m_ShadowSystem.emplace();
             m_ShadowSystem->Initialize();
+            if (device.IsOperational())
+            {
+                [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
+            }
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
         }
@@ -307,10 +309,12 @@ namespace Extrinsic::Graphics
             if (m_GpuWorld)        m_GpuWorld->Shutdown();
             if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
 
-            // GRAPHICS-070 — drop the forward surface pass before resetting
-            // its ForwardSystem dependency below so the optional's destructor
-            // does not observe a dangling reference.
+            // GRAPHICS-070/071 — drop forward passes before resetting their
+            // ForwardSystem dependency below so optional destructors do not
+            // observe a dangling reference.
             m_ForwardSurfacePass.reset();
+            m_ForwardLinePass.reset();
+            m_ForwardPointPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -327,6 +331,8 @@ namespace Extrinsic::Graphics
             m_DefaultDebugSurfacePipelineLease.reset();
             m_MinimalDebugPresentPipelineLease.reset();
             m_ForwardSurfacePipelineLease.reset();
+            m_ForwardLinePipelineLease.reset();
+            m_ForwardPointPipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -922,6 +928,18 @@ namespace Extrinsic::Graphics
                             RecordForwardSurfacePass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    else if (passName == std::string_view{"LinePass"})
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordForwardLinePass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"PointPass"})
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordForwardPointPass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
                         const RenderCommandPassStatus status =
@@ -1061,6 +1079,36 @@ namespace Extrinsic::Graphics
             return BuildForwardSurfacePipelineDesc();
         }
 
+        [[nodiscard]] RHI::PipelineHandle GetForwardLinePipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_ForwardLinePipelineLease.has_value() ||
+                !m_ForwardLinePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_ForwardLinePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetForwardLinePipelineDesc() const noexcept override
+        {
+            return BuildForwardLinePipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetForwardPointPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_ForwardPointPipelineLease.has_value() ||
+                !m_ForwardPointPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_ForwardPointPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetForwardPointPipelineDesc() const noexcept override
+        {
+            return BuildForwardPointPipelineDesc();
+        }
+
         void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept override
         {
             m_FrameRecipe = kind;
@@ -1167,6 +1215,70 @@ namespace Extrinsic::Graphics
             desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
             desc.DebugName = "Renderer.ForwardSurface";
+            return desc;
+        }
+
+        // GRAPHICS-071 — retained line renderables use the default recipe's
+        // `LinePass` after the surface pass. Lines load `SceneDepth` and append
+        // into `SceneColorHDR`; depth writes stay disabled so surface depth is
+        // preserved for later point/selection/postprocess consumers.
+        [[nodiscard]] static RHI::PipelineDesc BuildForwardLinePipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/line.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/line.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::LineList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = true;
+            desc.ColorBlend[0].SrcColorFactor = RHI::BlendFactor::SrcAlpha;
+            desc.ColorBlend[0].DstColorFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorBlend[0].SrcAlphaFactor = RHI::BlendFactor::One;
+            desc.ColorBlend[0].DstAlphaFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.ForwardLine";
+            return desc;
+        }
+
+        // GRAPHICS-071 — retained point renderables use the BDA-backed
+        // `point.vert` + `point_retained.frag` shader pair. `point_retained` is
+        // the canonical retained-renderable variant; transient debug-point
+        // expansion stays out-of-scope for GRAPHICS-077.
+        [[nodiscard]] static RHI::PipelineDesc BuildForwardPointPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/point.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/point_retained.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::PointList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = true;
+            desc.ColorBlend[0].SrcColorFactor = RHI::BlendFactor::SrcAlpha;
+            desc.ColorBlend[0].DstColorFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorBlend[0].SrcAlphaFactor = RHI::BlendFactor::One;
+            desc.ColorBlend[0].DstAlphaFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.ForwardPoint";
             return desc;
         }
 
@@ -1295,6 +1407,54 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] ForwardSurface pipeline unavailable; default-recipe surface recording will be skipped: error={}",
                                 static_cast<int>(forwardSurfacePipeline.error()));
+            }
+
+            // GRAPHICS-071 — retained line and point forward pipelines. These
+            // use the same reset/republish pattern as GRAPHICS-070 so failed
+            // creates leave the pass in `SkippedUnavailable` rather than
+            // retaining stale device handles across rebuilds.
+            m_ForwardLinePipelineLease.reset();
+            if (m_ForwardLinePass)
+            {
+                m_ForwardLinePass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc forwardLineDesc = BuildForwardLinePipelineDesc();
+            auto forwardLinePipeline = m_PipelineManager->Create(forwardLineDesc);
+            if (forwardLinePipeline.has_value())
+            {
+                m_ForwardLinePipelineLease.emplace(std::move(*forwardLinePipeline));
+                if (m_ForwardLinePass)
+                {
+                    m_ForwardLinePass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_ForwardLinePipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] ForwardLine pipeline unavailable; default-recipe line recording will be skipped: error={}",
+                                static_cast<int>(forwardLinePipeline.error()));
+            }
+
+            m_ForwardPointPipelineLease.reset();
+            if (m_ForwardPointPass)
+            {
+                m_ForwardPointPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc forwardPointDesc = BuildForwardPointPipelineDesc();
+            auto forwardPointPipeline = m_PipelineManager->Create(forwardPointDesc);
+            if (forwardPointPipeline.has_value())
+            {
+                m_ForwardPointPipelineLease.emplace(std::move(*forwardPointPipeline));
+                if (m_ForwardPointPass)
+                {
+                    m_ForwardPointPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_ForwardPointPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] ForwardPoint pipeline unavailable; default-recipe point recording will be skipped: error={}",
+                                static_cast<int>(forwardPointPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -1493,6 +1653,46 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        [[nodiscard]] RenderCommandPassStatus RecordForwardLinePass(RHI::ICommandContext& cmd,
+                                                                    const RHI::CameraUBO& camera,
+                                                                    const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_ForwardLinePass.has_value() ||
+                !m_ForwardLinePipelineLease.has_value() ||
+                !m_ForwardLinePipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_ForwardLinePass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
+        [[nodiscard]] RenderCommandPassStatus RecordForwardPointPass(RHI::ICommandContext& cmd,
+                                                                     const RHI::CameraUBO& camera,
+                                                                     const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_ForwardPointPass.has_value() ||
+                !m_ForwardPointPipelineLease.has_value() ||
+                !m_ForwardPointPipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_ForwardPointPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         [[nodiscard]] RenderCommandPassStatus RecordDepthPrepass(RHI::ICommandContext& cmd,
                                                                  const RHI::CameraUBO& camera,
                                                                  const std::uint32_t frameIndex)
@@ -1628,10 +1828,14 @@ namespace Extrinsic::Graphics
         // `m_ForwardSystem` slot is constructed, and reset in `Shutdown()`
         // before the `ForwardSystem` slot is torn down.
         std::optional<ForwardSurfacePass>    m_ForwardSurfacePass;
+        std::optional<ForwardLinePass>       m_ForwardLinePass;
+        std::optional<ForwardPointPass>      m_ForwardPointPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

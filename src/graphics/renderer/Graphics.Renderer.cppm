@@ -226,6 +226,15 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetForwardSurfacePipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetForwardSurfacePipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-071 — accessors for the default-recipe retained line/point
+        // forward pipelines. The handles are invalid until an operational
+        // device path publishes the leases; descriptors remain deterministic so
+        // contract tests can assert byte-identical rebuild behavior.
+        [[nodiscard]] virtual RHI::PipelineHandle GetForwardLinePipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetForwardLinePipelineDesc() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineHandle GetForwardPointPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetForwardPointPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-032A — opt-in selector for the minimal-debug-surface frame
         // recipe. Default is `FrameRecipeKind::Default`, preserving the
         // existing `BuildDefaultFrameRecipe` path. Runtime callers translate

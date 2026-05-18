@@ -583,8 +583,11 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   `"SurfacePass"` executor routing under the forward lighting path, and the
   default-recipe lighting-path flip so the surface bind/draw shape records
   on the operational CPU/null path. GRAPHICS-072 owns the deferred branch.
-- [GRAPHICS-071 — Default-recipe `Pass.Forward.Line` and `Pass.Forward.Point` wiring](GRAPHICS-071-default-recipe-forward-line-point-wiring.md):
-  depends on GRAPHICS-070.
+- [GRAPHICS-071 — Default-recipe `Pass.Forward.Line` and `Pass.Forward.Point` wiring (done)](../../done/GRAPHICS-071-default-recipe-forward-line-point-wiring.md):
+  depended on GRAPHICS-070. Landed retained line/point `NullRenderer`
+  ownership, pipeline leases, executor routing, CPU contract coverage, and the
+  documented `point.vert` + `point_retained.frag` canonical retained point
+  variant.
 - [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
   depends on GRAPHICS-070, GRAPHICS-073.
 - [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation](GRAPHICS-073-default-recipe-shadow-pass-wiring.md):

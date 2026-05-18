@@ -162,6 +162,7 @@ namespace Extrinsic::Tests
             Dispatch,
             BindIndexBuffer,
             DrawIndexedIndirectCount,
+            DrawIndirectCount,
         };
 
         struct TextureBarrierRecord
@@ -225,7 +226,12 @@ namespace Extrinsic::Tests
             Events.push_back(EventKind::DrawIndexedIndirectCount);
         }
         void DrawIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
-                               std::uint64_t, std::uint32_t) override {}
+                               std::uint64_t, std::uint32_t maxDrawCount) override
+        {
+            ++DrawIndirectCountCalls;
+            LastMaxDrawCount = maxDrawCount;
+            Events.push_back(EventKind::DrawIndirectCount);
+        }
         void Dispatch(std::uint32_t x, std::uint32_t y, std::uint32_t z) override
         {
             ++DispatchCalls;
@@ -264,6 +270,7 @@ namespace Extrinsic::Tests
         int PushConstantsCalls = 0;
         int DispatchCalls = 0;
         int DrawIndexedIndirectCountCalls = 0;
+        int DrawIndirectCountCalls = 0;
         std::uint32_t LastPushConstantSize = 0;
         std::uint32_t LastPushConstantOffset = 0;
         DispatchRecord LastDispatch{};

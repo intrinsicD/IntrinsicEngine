@@ -148,6 +148,19 @@ implementation.
   record draws; the deferred-mode branches in
   `Graphics.FrameRecipe.cpp`/`Test.FrameRecipeContract.cpp` remain
   exercise-able through explicit `FrameRecipeFeatures{}` construction.
+- GRAPHICS-071 wires the default-recipe `"LinePass"` and `"PointPass"` to
+  the existing retained-renderable `ForwardLinePass` and `ForwardPointPass`
+  bodies. `NullRenderer` owns `m_ForwardLinePass`, `m_ForwardPointPass`,
+  `m_ForwardLinePipelineLease`, and `m_ForwardPointPipelineLease` alongside the
+  forward surface pass. The line pipeline uses `shaders/line.vert.spv` +
+  `shaders/line.frag.spv` with `Topology::LineList`; the point pipeline uses
+  `shaders/point.vert.spv` + `shaders/point_retained.frag.spv` with
+  `Topology::PointList`. Both load `SceneDepth`, append into `SceneColorHDR`,
+  disable depth writes, enable alpha blending, use `CullMode::None`, and carry
+  the canonical `GpuScenePushConstants` block. `point_retained.frag` is the
+  canonical retained-renderable point variant for this path; transient
+  debug-point expansion remains owned by GRAPHICS-077 and must not route through
+  the retained `Points` cull bucket.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by
