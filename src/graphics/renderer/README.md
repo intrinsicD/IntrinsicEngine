@@ -129,6 +129,25 @@ implementation.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
   gates, canonical resource declarations, pass-order introspection, and the
   backend-agnostic graph construction path used by the null renderer.
+- GRAPHICS-070 wires the default-recipe `"SurfacePass"` to the existing
+  `ForwardSurfacePass` body. `NullRenderer` owns the
+  `m_ForwardSurfacePass` instance (constructed against the renderer's
+  `m_ForwardSystem`) and the `m_ForwardSurfacePipelineLease`. The pipeline is
+  created in `InitializeOperationalPassResources()` from
+  `BuildForwardSurfacePipelineDesc()` (vertex `shaders/surface.vert.spv`,
+  fragment `shaders/surface.frag.spv`, `DepthCompareOp = Equal` with
+  `DepthWriteEnable = false` matching the depth-prepass-on contract, single
+  RGBA16F color target for `SceneColorHDR`, and `D32_FLOAT` depth), and
+  republished byte-identical through `RebuildOperationalResources()`. The
+  executor's `"SurfacePass"` branch routes to `RecordForwardSurfacePass(...)`
+  only when the active default-recipe features select the forward lighting
+  path; deferred mode falls through to the catch-all soft-skip until
+  GRAPHICS-072 lands its `Pass.Deferred.GBuffers` body. While GRAPHICS-072 is
+  still open, `DeriveDefaultFrameRecipeFeatures()` selects
+  `FrameRecipeLightingPath::Forward` so the default recipe can actually
+  record draws; the deferred-mode branches in
+  `Graphics.FrameRecipe.cpp`/`Test.FrameRecipeContract.cpp` remain
+  exercise-able through explicit `FrameRecipeFeatures{}` construction.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by

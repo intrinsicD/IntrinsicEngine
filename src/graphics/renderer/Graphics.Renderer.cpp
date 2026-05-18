@@ -39,6 +39,7 @@ import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
+import Extrinsic.Graphics.Pass.Forward.Surface;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -227,6 +228,14 @@ namespace Extrinsic::Graphics
             m_SelectionSystem->Initialize();
             m_ForwardSystem.emplace();
             m_ForwardSystem->Initialize();
+            // GRAPHICS-070 — default-recipe forward surface pass owns its
+            // ForwardSystem-bound instance plus the slot-0-shaped pipeline
+            // lease created from `InitializeOperationalPassResources()`. The
+            // pipeline lease + `SetPipeline()` call are routed through the
+            // same code path on `RebuildOperationalResources()` so the
+            // post-operational-transition reset (GRAPHICS-018R) republishes
+            // both byte-identical.
+            m_ForwardSurfacePass.emplace(*m_ForwardSystem);
             m_DeferredSystem.emplace();
             m_DeferredSystem->Initialize();
             m_PostProcessSystem.emplace();
@@ -298,6 +307,10 @@ namespace Extrinsic::Graphics
             if (m_GpuWorld)        m_GpuWorld->Shutdown();
             if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
 
+            // GRAPHICS-070 — drop the forward surface pass before resetting
+            // its ForwardSystem dependency below so the optional's destructor
+            // does not observe a dangling reference.
+            m_ForwardSurfacePass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -313,6 +326,7 @@ namespace Extrinsic::Graphics
             m_DepthPrepassPipelineLease.reset();
             m_DefaultDebugSurfacePipelineLease.reset();
             m_MinimalDebugPresentPipelineLease.reset();
+            m_ForwardSurfacePipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -736,10 +750,16 @@ namespace Extrinsic::Graphics
                 .BackbufferFormat = m_BackbufferFormat,
                 .DepthFormat = RHI::Format::D32_FLOAT,
             };
+            // GRAPHICS-070 — derive default-recipe features once per frame so
+            // the executor lambda below can route `"SurfacePass"` through the
+            // forward or deferred surface body without re-deriving features
+            // for every pass dispatch. The `MinimalDebug` recipe path keeps
+            // its existing zero-feature fixed structure.
+            const FrameRecipeFeatures defaultRecipeFeatures = DeriveDefaultFrameRecipeFeatures(renderWorld);
             const FrameRecipeBuildResult recipe = (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
                 ? BuildMinimalDebugSurfaceRecipe(m_RenderGraph, imports, sizing)
                 : BuildDefaultFrameRecipe(m_RenderGraph,
-                                          DeriveDefaultFrameRecipeFeatures(renderWorld),
+                                          defaultRecipeFeatures,
                                           imports,
                                           sizing);
             if (!recipe.Succeeded)
@@ -792,7 +812,7 @@ namespace Extrinsic::Graphics
             const FrameRecipeIntrospection recipeIntrospection =
                 (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
                     ? DescribeMinimalDebugSurfaceRecipe()
-                    : DescribeDefaultFrameRecipe(DeriveDefaultFrameRecipeFeatures(renderWorld));
+                    : DescribeDefaultFrameRecipe(defaultRecipeFeatures);
             const RenderGraphValidationResult recipeValidation =
                 ValidateRecipeCompiledGraph(recipeIntrospection, *compiled);
             const bool recipeValidationClean =
@@ -821,11 +841,23 @@ namespace Extrinsic::Graphics
             }
 
             const RHI::CameraUBO camera = BuildCameraUbo(renderWorld, frame.FrameIndex);
+            // GRAPHICS-070 — when the active recipe is the default recipe the
+            // executor consults `usesDeferred` to choose between the forward
+            // surface body (this task) and the deferred GBuffer body
+            // (GRAPHICS-072 future scope). Mirrors the anonymous-namespace
+            // `UsesDeferredResources()` predicate inside
+            // `Graphics.FrameRecipe.cpp`: any non-forward lighting path uses
+            // deferred resources. The `MinimalDebug` recipe never declares
+            // `"SurfacePass"`, so this flag is unused there.
+            const bool defaultRecipeUsesDeferred =
+                (m_FrameRecipe != Core::Config::FrameRecipeKind::MinimalDebug) &&
+                (defaultRecipeFeatures.LightingPath != FrameRecipeLightingPath::Forward);
             graphicsContext.Begin();
             const auto executeResult = m_RenderGraphExecutor.Execute(
                 *compiled,
                 {},
-                [this, &graphicsContext, &passNameByIndex, &camera, &frame, &compiled](const std::uint32_t passIndex)
+                [this, &graphicsContext, &passNameByIndex, &camera, &frame, &compiled,
+                 defaultRecipeUsesDeferred](const std::uint32_t passIndex)
                 {
                     if (passIndex >= passNameByIndex.size())
                     {
@@ -878,6 +910,16 @@ namespace Extrinsic::Graphics
                     {
                         const RenderCommandPassStatus status =
                             RecordMinimalDebugSurfacePass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"SurfacePass"} && !defaultRecipeUsesDeferred)
+                    {
+                        // GRAPHICS-070 — default-recipe forward surface pass.
+                        // Deferred mode falls through to the catch-all
+                        // soft-skip below; GRAPHICS-072 will add its own
+                        // `"SurfacePass"` deferred-mode branch.
+                        const RenderCommandPassStatus status =
+                            RecordForwardSurfacePass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == kMinimalDebugPresentPassName)
@@ -1004,6 +1046,21 @@ namespace Extrinsic::Graphics
             return BuildDefaultDebugSurfacePipelineDesc(m_BackbufferFormat);
         }
 
+        [[nodiscard]] RHI::PipelineHandle GetForwardSurfacePipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_ForwardSurfacePipelineLease.has_value() ||
+                !m_ForwardSurfacePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_ForwardSurfacePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetForwardSurfacePipelineDesc() const noexcept override
+        {
+            return BuildForwardSurfacePipelineDesc();
+        }
+
         void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept override
         {
             m_FrameRecipe = kind;
@@ -1079,6 +1136,37 @@ namespace Extrinsic::Graphics
             desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
             desc.DebugName = "Renderer.DefaultDebugSurface";
+            return desc;
+        }
+
+        // GRAPHICS-070 — default-recipe forward surface pipeline descriptor.
+        // Mirrors the depth-prepass-on contract from
+        // `docs/architecture/rendering-three-pass.md`: surface samples
+        // SceneDepth (`Equal` compare) and writes SceneColorHDR without
+        // touching depth. Held byte-identical between the initial
+        // `Initialize()` and any subsequent `RebuildOperationalResources()`
+        // so the pipeline registry/dedupe can return a stable device handle.
+        [[nodiscard]] static RHI::PipelineDesc BuildForwardSurfacePipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/surface.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/surface.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::Back;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.ForwardSurface";
             return desc;
         }
 
@@ -1180,6 +1268,33 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] MinimalVisibleTriangle pipeline unavailable; present recording will be skipped: error={}",
                                 static_cast<int>(minimalVisibleTrianglePipeline.error()));
+            }
+
+            // GRAPHICS-070 — forward surface pipeline. Drop the lease before
+            // republishing so a non-deduped registry would not leak a dangling
+            // entry; `SetPipeline(PipelineHandle{})` zeros the cached handle
+            // so a failed `Create()` leaves the pass in the fail-closed state
+            // that `RecordForwardSurfacePass` interprets as `SkippedUnavailable`.
+            m_ForwardSurfacePipelineLease.reset();
+            if (m_ForwardSurfacePass)
+            {
+                m_ForwardSurfacePass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc forwardSurfaceDesc = BuildForwardSurfacePipelineDesc();
+            auto forwardSurfacePipeline = m_PipelineManager->Create(forwardSurfaceDesc);
+            if (forwardSurfacePipeline.has_value())
+            {
+                m_ForwardSurfacePipelineLease.emplace(std::move(*forwardSurfacePipeline));
+                if (m_ForwardSurfacePass)
+                {
+                    m_ForwardSurfacePass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_ForwardSurfacePipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] ForwardSurface pipeline unavailable; default-recipe surface recording will be skipped: error={}",
+                                static_cast<int>(forwardSurfacePipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -1348,6 +1463,36 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-070 — default-recipe forward surface command recording.
+        // Called from the executor's `"SurfacePass"` branch when the active
+        // recipe is the forward variant (`!usesDeferred`). Routes through the
+        // same `RenderCommandPassStatus` taxonomy as the depth prepass: a
+        // non-operational device returns `SkippedNonOperational`; a missing
+        // pipeline lease or culling output / SurfaceOpaque bucket returns
+        // `SkippedUnavailable`; otherwise the existing `ForwardSurfacePass`
+        // body records the `Bind/Bind/Push/DrawIndexedIndirectCount` shape and
+        // we return `Recorded`. The deferred-mode surface body is owned by
+        // GRAPHICS-072 and falls through to the catch-all soft-skip.
+        [[nodiscard]] RenderCommandPassStatus RecordForwardSurfacePass(RHI::ICommandContext& cmd,
+                                                                       const RHI::CameraUBO& camera,
+                                                                       const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_ForwardSurfacePass.has_value() ||
+                !m_ForwardSurfacePipelineLease.has_value() ||
+                !m_ForwardSurfacePipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_ForwardSurfacePass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         [[nodiscard]] RenderCommandPassStatus RecordDepthPrepass(RHI::ICommandContext& cmd,
                                                                  const RHI::CameraUBO& camera,
                                                                  const std::uint32_t frameIndex)
@@ -1477,9 +1622,16 @@ namespace Extrinsic::Graphics
         DepthPrepassPass                     m_DepthPrepassPass;
         MinimalDebugSurfacePass              m_MinimalDebugSurfacePass;
         MinimalDebugPresentPass              m_MinimalDebugPresentPass;
+        // GRAPHICS-070 — default-recipe forward surface pass. Owned as an
+        // `optional` so the explicit `ForwardSystem&` constructor invariant is
+        // preserved: emplaced in `Initialize()` immediately after the
+        // `m_ForwardSystem` slot is constructed, and reset in `Shutdown()`
+        // before the `ForwardSystem` slot is torn down.
+        std::optional<ForwardSurfacePass>    m_ForwardSurfacePass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;
