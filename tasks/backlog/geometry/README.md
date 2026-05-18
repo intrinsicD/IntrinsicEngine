@@ -13,7 +13,7 @@ map.
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](GEOM-006-indexed-mesh-soup-conversion-contracts.md).
 - [GEOM-007 — Robust predicates and intersection classification foundation](GEOM-007-robust-predicates-intersection-classification.md).
 - [GEOM-008 — Geometry linear algebra and solver infrastructure](GEOM-008-linear-algebra-solver-infrastructure.md).
-- [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](GEOM-009-benchmark-manifests-fixtures-smoke.md).
+- [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md) (done).
 - [GEOM-010 — Point-cloud algorithm pack roadmap](GEOM-010-point-cloud-algorithm-pack-roadmap.md).
 - [GEOM-011 — Parameterization and mapping roadmap](GEOM-011-parameterization-mapping-roadmap.md).
 - [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](GEOM-012-symmetric-domain-views-property-sharing.md).
@@ -30,10 +30,13 @@ map.
 - [GEOM-005](../../done/GEOM-005-api-style-and-numeric-policy.md) is retired in
   `tasks/done` and provides the canonical geometry API/numeric policy for future
   work.
-- GEOM-006 through GEOM-009 are the remaining foundational tasks from the
+- GEOM-006 through GEOM-008 are the remaining foundational tasks from the
   [`src/geometry` gap analysis](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md):
-  mesh/soup contracts, robust predicates, linear algebra, and benchmark
-  manifests.
+  mesh/soup contracts, robust predicates, and linear algebra. GEOM-009
+  (benchmark manifests) is retired in
+  [`tasks/done/`](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md)
+  and provides the manifest-driven smoke harness future geometry method
+  packages plug into.
 - GEOM-010 and GEOM-011 turn point-cloud and parameterization gaps into
   method-compliant roadmap packs before algorithm implementation begins.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible
