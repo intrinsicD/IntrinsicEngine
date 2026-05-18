@@ -49,15 +49,24 @@ Opt-in promoted Vulkan smoke coverage is selected with the label intersection
 form below. `IntrinsicGraphicsVulkanSmokeTests` includes
 `MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`,
 the `GRAPHICS-033D` fixture that drives the reference triangle through the
-bootstrap `FrameRecipe::MinimalDebug` path. It reports `SKIPPED` when GLFW or a
-Vulkan-capable swapchain/device is unavailable and is intentionally excluded
-from the default CPU gate by its `gpu;vulkan` labels. The fixture consumes the
+bootstrap `FrameRecipe::MinimalDebug` path, and
+`MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`,
+the `GRAPHICS-032D` sibling fixture that drives the same recipe but covers
+only the per-frame recipe-selector counters
+(`MinimalSurfacePassExecutions`, `MinimalPresentPassExecutions`,
+`MinimalRecipeMissingPrerequisiteCount`, and the default-disabled
+`MinimalDebugBackbufferReadbackCopyCount == 0`) without arming the
+backbuffer-to-host readback path. Both fixtures share one bounded
+`engine.Run()` driver helper (`BootstrapEngineForMinimalDebug` +
+`DriveOneFrameAndCapture` in the same file) so the driver loop is not
+duplicated. They report `SKIPPED` when GLFW or a Vulkan-capable
+swapchain/device is unavailable and are intentionally excluded from the
+default CPU gate by their `gpu;vulkan` labels. Both fixtures consume the
 reusable `tests/support/MinimalTriangleReadback.hpp` and
-`tests/support/OperationalCounterStability.hpp` helpers so the sibling
-`GRAPHICS-032D` recipe-selector fixture and the canonical `GRAPHICS-076`/
-`GRAPHICS-081` default-recipe smoke can reuse the sample-point table,
-expected-color quantization, and fallback-counter stability contract
-byte-identical. The four-sample pixel assertion runs as a live
+`tests/support/OperationalCounterStability.hpp` helpers so the canonical
+`GRAPHICS-076`/`GRAPHICS-081` default-recipe smoke can reuse the
+sample-point table, expected-color quantization, and fallback-counter
+stability contract byte-identical. The four-sample pixel assertion runs as a live
 `EXPECT_TRUE(Readback::ChannelsWithinTolerance(...))` site on a Vulkan-capable
 host: the renderer's opt-in `SetMinimalDebugBackbufferReadbackBuffer(handle)`
 hook + the RHI `CopyTextureToBuffer`/`ReadBuffer` seam drain the backbuffer

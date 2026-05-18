@@ -550,9 +550,11 @@ independently testable (CPU/null where possible), and gated as recorded.
   default/ci-vulkan gate set passed. Planning-gap fill: the parent
   GRAPHICS-033 planning slice identified Impl-A/B/C/D but did not enumerate
   an explicit child for gates 7/8.
-- [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface`](GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
-  depends on GRAPHICS-033C and GRAPHICS-033D; sibling fixture reusing the
-  GRAPHICS-033D harness for recipe-selector coverage.
+- [GRAPHICS-032D — Opt-in `gpu;vulkan` smoke for `FrameRecipe::MinimalDebugSurface` (done)](../../done/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md):
+  depended on GRAPHICS-033C and GRAPHICS-033D; landed as the
+  `MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
+  sibling sharing the GRAPHICS-033D bounded `engine.Run()` driver helper for
+  recipe-selector coverage.
 - [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan (done)](../../done/GRAPHICS-080-enable-promoted-vulkan-by-default.md):
   depends on GRAPHICS-033C (done).
   Adds the `ci-vulkan` configure preset and flips

@@ -179,10 +179,16 @@ implementation.
 
   All three counters reset per-frame through the existing
   `m_LastRenderGraphStats = {}` cadence in `ResetFrameState()` and
-  `ExecuteFrame()`. The GPU/Vulkan smoke fixture lands in GRAPHICS-032D, and
-  the entire MinimalDebug scaffold (the recipe, the two passes, and the
-  three counters) is deleted by GRAPHICS-081 once the canonical default
-  recipe records every pass body operationally.
+  `ExecuteFrame()`. The GPU/Vulkan recipe-selector smoke landed with
+  GRAPHICS-032D as
+  `MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`,
+  the sibling of the GRAPHICS-033D pixel-readback fixture; both share the
+  bounded `engine.Run()` driver helper in
+  `tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp` so the
+  driver loop is not duplicated. The entire MinimalDebug scaffold (the
+  recipe, the two passes, and the three counters) is deleted by
+  GRAPHICS-081 once the canonical default recipe records every pass body
+  operationally.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is

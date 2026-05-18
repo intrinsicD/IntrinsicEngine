@@ -127,17 +127,36 @@ private:
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
 };
-} // namespace
 
-TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedVulkan)
+// GRAPHICS-032D / GRAPHICS-033D — shared engine bring-up for the MinimalDebug
+// `gpu;vulkan` smokes. Both the pixel-readback fixture
+// (`ReferenceTriangleRecordsOnOperationalPromotedVulkan`) and the
+// recipe-selector fixture (`RecipeSelectorReachesOperationalVulkanCommandStream`)
+// drive the runtime through this one helper so the bounded `engine.Run()`
+// driver loop and the bootstrap skip checks are not duplicated across the two
+// tests.
+struct MinimalDebugBootstrap
+{
+    std::unique_ptr<Engine> EnginePtr;
+    bool Skipped{false};
+    std::string SkipReason;
+};
+
+[[nodiscard]] MinimalDebugBootstrap BootstrapEngineForMinimalDebug(
+    const std::uint32_t targetFrames = 4u,
+    const char* const windowTitle = "Intrinsic MinimalDebug gpu;vulkan smoke")
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
-        GTEST_SKIP() << "GLFW could not initialize in this environment; gpu;vulkan visible-triangle smoke is opt-in.";
+        return MinimalDebugBootstrap{
+            .EnginePtr = nullptr,
+            .Skipped = true,
+            .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan visible-triangle smoke is opt-in.",
+        };
     }
 
     auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
-    config.Window.Title = "Intrinsic MinimalDebug gpu;vulkan smoke";
+    config.Window.Title = windowTitle;
     config.Window.Width = Readback::kFramebufferWidth;
     config.Window.Height = Readback::kFramebufferHeight;
     config.Window.Resizable = false;
@@ -145,15 +164,59 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
     config.Render.EnableVSync = false;
     config.Render.FrameRecipe = FrameRecipeKind::MinimalDebug;
 
-    Engine engine(config, std::make_unique<ExitAfterFramesApp>(4u));
-    engine.Initialize();
+    auto enginePtr = std::make_unique<Engine>(
+        config, std::make_unique<ExitAfterFramesApp>(targetFrames));
+    enginePtr->Initialize();
 
-    const auto initInputs = GetVulkanDeviceOperationalInputs(&engine.GetDevice());
+    const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
     if (!initInputs.LogicalDeviceReady || !initInputs.SwapchainReady || !initInputs.CommandSyncReady)
     {
-        engine.Shutdown();
-        GTEST_SKIP() << "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.";
+        enginePtr->Shutdown();
+        return MinimalDebugBootstrap{
+            .EnginePtr = nullptr,
+            .Skipped = true,
+            .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+        };
     }
+
+    return MinimalDebugBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
+}
+
+struct MinimalDebugRunCapture
+{
+    Counters::Snapshot Before{};
+    Counters::Snapshot After{};
+    Extrinsic::Backends::Vulkan::VulkanOperationalStatus Status{};
+    Extrinsic::Graphics::RenderGraphFrameStats Stats{};
+    Extrinsic::Core::Config::FrameRecipeKind FrameRecipe{Extrinsic::Core::Config::FrameRecipeKind::Default};
+    bool DeviceOperational{false};
+};
+
+// Bounded `engine.Run()` plus before/after operational-counter snapshots and
+// post-frame status/stats capture. Callers wire `SetMinimalDebugBackbufferReadbackBuffer`
+// before invoking when they want the per-frame readback triplet recorded.
+[[nodiscard]] MinimalDebugRunCapture DriveOneFrameAndCapture(Engine& engine)
+{
+    MinimalDebugRunCapture capture;
+    capture.Before = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    engine.Run();
+    capture.Status = EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
+    capture.DeviceOperational = engine.GetDevice().IsOperational();
+    capture.Stats = engine.GetRenderer().GetLastRenderGraphStats();
+    capture.FrameRecipe = engine.GetRenderer().GetFrameRecipe();
+    capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    return capture;
+}
+} // namespace
+
+TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedVulkan)
+{
+    auto bootstrap = BootstrapEngineForMinimalDebug();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
 
     // GRAPHICS-033D readback wiring: allocate a host-visible backend buffer
     // sized for a full mip-0 copy of the backbuffer image and arm the
@@ -190,26 +253,22 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
     }
     renderer.SetMinimalDebugBackbufferReadbackBuffer(readbackBuffer);
 
-    const auto beforeFrameDiagnostics = GetVulkanOperationalDiagnosticsSnapshot();
-    const auto beforeCounters = ToCounterSnapshot(beforeFrameDiagnostics);
+    const auto run = DriveOneFrameAndCapture(engine);
 
-    engine.Run();
-
-    const auto status = EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
-    if (!engine.GetDevice().IsOperational())
+    if (!run.DeviceOperational)
     {
         renderer.SetMinimalDebugBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
         device.DestroyBuffer(readbackBuffer);
         engine.Shutdown();
         GTEST_SKIP() << "Promoted Vulkan operational gate did not flip on this host: status="
-                     << ToString(status.Code) << " reason=" << ToString(status.Reason);
+                     << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason);
     }
 
-    EXPECT_EQ(status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
-    EXPECT_EQ(status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+    EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
 
-    const auto& stats = engine.GetRenderer().GetLastRenderGraphStats();
-    EXPECT_EQ(engine.GetRenderer().GetFrameRecipe(), FrameRecipeKind::MinimalDebug);
+    const auto& stats = run.Stats;
+    EXPECT_EQ(run.FrameRecipe, FrameRecipeKind::MinimalDebug);
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.DeviceOperational);
@@ -217,14 +276,12 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
     EXPECT_EQ(stats.MinimalPresentPassExecutions, 1u);
     EXPECT_EQ(stats.MinimalRecipeMissingPrerequisiteCount, 0u);
 
-    const auto afterFrameDiagnostics = GetVulkanOperationalDiagnosticsSnapshot();
-    const auto afterCounters = ToCounterSnapshot(afterFrameDiagnostics);
-    EXPECT_TRUE(Counters::IsStable(beforeCounters, afterCounters))
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
         << "Vulkan fallback counters incremented across an operational frame: "
-        << "fallbackToNull " << beforeCounters.FallbackToNull << " -> " << afterCounters.FallbackToNull
-        << ", initFailure " << beforeCounters.InitFailure << " -> " << afterCounters.InitFailure
-        << ", validationError " << beforeCounters.ValidationError << " -> " << afterCounters.ValidationError
-        << ", gateFailure " << beforeCounters.OperationalGateFailure << " -> " << afterCounters.OperationalGateFailure;
+        << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+        << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+        << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
 
     // GRAPHICS-033D pixel readback: the four-sample assertion runs against the
     // reusable harness sample-point table now that the backbuffer-to-host
@@ -300,3 +357,59 @@ TEST(MinimalDebugSurfaceGpuSmoke, ReferenceTriangleRecordsOnOperationalPromotedV
     engine.Shutdown();
 }
 
+// GRAPHICS-032D — sibling recipe-selector smoke. Drives one operational frame
+// of `FrameRecipe::MinimalDebugSurface` through the shared bootstrap +
+// `engine.Run()` driver helper and asserts that the recipe selector reached
+// the operational Vulkan command stream by way of the renderer's per-frame
+// minimal-recipe counters. No pixel readback, no readback-buffer wiring: that
+// path is exclusively owned by the GRAPHICS-033D fixture above.
+TEST(MinimalDebugSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommandStream)
+{
+    auto bootstrap = BootstrapEngineForMinimalDebug(
+        4u, "Intrinsic MinimalDebug gpu;vulkan recipe-selector smoke");
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const auto run = DriveOneFrameAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Promoted Vulkan operational gate did not flip on this host: status="
+                     << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason);
+    }
+
+    EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+
+    EXPECT_EQ(run.FrameRecipe, FrameRecipeKind::MinimalDebug);
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.DeviceOperational);
+
+    // Recipe-selector contract per GRAPHICS-032 / GRAPHICS-032D: the selector
+    // reached the operational Vulkan command stream iff the surface and
+    // present pass bodies both recorded exactly once and no per-frame
+    // prerequisite gap was reported.
+    EXPECT_EQ(run.Stats.MinimalSurfacePassExecutions, 1u);
+    EXPECT_EQ(run.Stats.MinimalPresentPassExecutions, 1u);
+    EXPECT_EQ(run.Stats.MinimalRecipeMissingPrerequisiteCount, 0u);
+
+    // The readback path is not armed by this fixture, so the readback counter
+    // must remain at its post-Initialize default. Asserting zero locks the
+    // recipe-selector path against silently regressing into the readback
+    // wiring (which would imply the fixtures are no longer separable).
+    EXPECT_EQ(run.Stats.MinimalDebugBackbufferReadbackCopyCount, 0u);
+
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters incremented across an operational frame: "
+        << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+        << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+        << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+
+    engine.Shutdown();
+}
