@@ -36,7 +36,7 @@ that expose Vulkan and the required X11/Wayland headers.
     operational status seam.
   - [`GRAPHICS-033B` (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md)
     diagnostics snapshot.
-  - [`GRAPHICS-033C`](GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md)
+  - [`GRAPHICS-033C` (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md)
     minimal-recipe command recording bodies.
   - [`GRAPHICS-032` (done)](../../done/GRAPHICS-032-minimal-surface-present-command-path.md)
     recipe definition.

@@ -42,7 +42,6 @@ Planning parents (retired):
 - [`rendering/GRAPHICS-031` (done)](../done/GRAPHICS-031-default-debug-surface-material.md)
 - [`rendering/GRAPHICS-032` (done)](../done/GRAPHICS-032-minimal-surface-present-command-path.md)
 - [`rendering/GRAPHICS-033` (done)](../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)
-- [`rendering/GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md`](rendering/GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md)
 - [`rendering/GRAPHICS-033D-vulkan-visible-triangle-smoke.md`](rendering/GRAPHICS-033D-vulkan-visible-triangle-smoke.md)
 - [`rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md`](rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
@@ -170,11 +169,7 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   wait for the physics layer ownership decision.
 - **GRAPHICS-035..058 ⇐ Theme A.** Rendering modernization leaves stay
   planning-only until the visible-geometry foundation is complete.
-- **GRAPHICS-033C ⇐ GRAPHICS-033A (done), GRAPHICS-032 (done), GRAPHICS-031
-  (done), GRAPHICS-018R (done).** Vulkan recording for the minimal
-  recipe needs the gate seam plus the recipe, default material, and
-  operational-transition reset seam already in `tasks/done/`.
-- **GRAPHICS-033D ⇐ GRAPHICS-033A (done), GRAPHICS-033B (done), GRAPHICS-033C.**
+- **GRAPHICS-033D ⇐ GRAPHICS-033A (done), GRAPHICS-033B (done), GRAPHICS-033C (done).**
   The opt-in `gpu;vulkan` visible-triangle smoke composes all three
   prior children and runs only on hosts with Vulkan + GLFW.
 

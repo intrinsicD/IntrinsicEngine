@@ -465,15 +465,16 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   call site or test covers it yet. A dedicated implementation child
   must land before the `GRAPHICS-033` planning decision is fully
   satisfied.
-- [GRAPHICS-033C — Vulkan command recording for the minimal-debug-surface recipe](GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md):
-  third implementation child. Implements `Pass.Surface.MinimalDebug` and
+- [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface` (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
+  third implementation child. Landed `Pass.Surface.MinimalDebug` and
   `Pass.Present.MinimalDebug` Vulkan recording bodies through the
-  GRAPHICS-018R `RebuildOperationalResources()` seam, asserting CPU-mock
-  parity against the GRAPHICS-032 contract. Clears the
-  `MinimalRecipeRecordingMissing` gate item; full `Operational` still
-  requires the remaining gate items (barrier validation, public service
-  reconciliation). Depends on GRAPHICS-033A, GRAPHICS-032 (done),
-  GRAPHICS-031 (done), GRAPHICS-018R (done).
+  GRAPHICS-018R `RebuildOperationalResources()` seam, with CPU-mock
+  parity against the GRAPHICS-032 contract. Cleared the
+  `MinimalRecipeRecordingMissing` gate item (full `Operational` requires
+  the remaining gate items wired by GRAPHICS-033E / 033F). The
+  originally-planned `*-vulkan-minimal-recipe-command-recording.md`
+  backlog entry was superseded by the as-landed `*-recording.md`
+  filename and has been retired.
 - [GRAPHICS-033D — Opt-in Vulkan visible-triangle smoke fixture](GRAPHICS-033D-vulkan-visible-triangle-smoke.md):
   fourth implementation child. Adds
   `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp` under
