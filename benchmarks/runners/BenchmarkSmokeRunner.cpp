@@ -59,6 +59,7 @@ namespace
     {
         std::string Id;
         std::string Payload;
+        bool        Passed{false};
     };
 
     auto EmitHalfedgeSmoke(const std::string& commit) -> EmittedBenchmark
@@ -92,7 +93,7 @@ namespace
             << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
             << "}\n";
 
-        return EmittedBenchmark{kHalfedgeSmokeBenchmarkId, out.str()};
+        return EmittedBenchmark{kHalfedgeSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
     auto WriteFile(const std::filesystem::path& path, std::string_view payload) -> bool
@@ -124,15 +125,23 @@ auto main(int argc, char** argv) -> int
     std::vector<EmittedBenchmark> emitted;
     emitted.push_back(EmitHalfedgeSmoke(commit));
 
-    // Output target: if the argument names a directory (existing or with no
-    // filename component) write one JSON per benchmark inside it. Otherwise
-    // the first benchmark uses the named file (preserving the previous
-    // single-file artifact path) and any extras land as siblings keyed by id.
-    const bool isDirectoryArg =
-        std::filesystem::is_directory(outArg) ||
-        !outArg.has_filename();
+    // Output target: an existing directory or a path with no extension (or no
+    // filename component) is treated as a directory and gets one JSON per
+    // benchmark inside; create it eagerly so a fresh build tree behaves the
+    // same as a populated one. A path with an extension is treated as an
+    // explicit file (preserving the single-artifact CI path); extras land as
+    // siblings keyed by id.
+    std::error_code dirEc;
+    const bool      isExistingDir = std::filesystem::is_directory(outArg, dirEc);
+    const bool      looksLikeDir  = !outArg.has_filename() || !outArg.has_extension();
+    const bool      isDirectoryArg = isExistingDir || looksLikeDir;
+    if (looksLikeDir && !isExistingDir)
+    {
+        std::filesystem::create_directories(outArg, dirEc);
+    }
 
-    int exitCode = 0;
+    int  exitCode      = 0;
+    bool anyNotPassed  = false;
     for (std::size_t i = 0; i < emitted.size(); ++i)
     {
         std::filesystem::path target;
@@ -155,6 +164,21 @@ auto main(int argc, char** argv) -> int
             continue;
         }
         std::cout << "Wrote benchmark smoke result: " << target << '\n';
+
+        if (!emitted[i].Passed)
+        {
+            anyNotPassed = true;
+            std::cerr << "Benchmark reported non-passed status: " << emitted[i].Id << '\n';
+        }
+    }
+
+    // The result JSON itself remains schema-valid for downstream consumers
+    // even when the workload failed (status="failed" is a valid value), but
+    // the runner exit code must reflect failure so CTest/CI gates do not pass
+    // silently on a broken smoke benchmark.
+    if (anyNotPassed && exitCode == 0)
+    {
+        exitCode = 2;
     }
     return exitCode;
 }
