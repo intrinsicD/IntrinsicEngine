@@ -2,14 +2,19 @@
 
 ## Status
 
-- Status: in-progress (slice 1 landed on `main` via PR #853 / commit
-  `4642f95`; slice 2 promoted on follow-up branch, pending pinned-clang
-  CI verification before retirement).
+- Status: done.
+- Completed: 2026-05-17.
+- Commit: merge commit `4bc19484` (PR #854); implementation commits
+  `d0f43176` and `e90d1429`.
+- Previous slice: slice 1 landed on `main` via PR #853 / commit
+  `4642f95`.
 - Owner/agent: Claude on `claude/setup-agentic-workflow-uAe8i` (slice 2);
   previously Claude on `claude/setup-agentic-workflow-IY9XW` (slice 1).
 - Branch: `claude/setup-agentic-workflow-uAe8i`.
 - Started: 2026-05-17 (slice 1), 2026-05-17 (slice 2 on follow-up branch).
-- Current slice: slice 2 — population helpers + borrowed-vs-owned
+- Completed maturity: `CPUContracted` for promoted geometry-source
+  population and dirty-domain helper contracts.
+- Completed slice: slice 2 — population helpers + borrowed-vs-owned
   ownership decision.
 - Slice 2 decision: **owned `Geometry::PropertySet` per per-domain
   component** (legacy-parity shape). The promoted `Vertices`/`Edges`/
@@ -19,7 +24,7 @@
   blast radius (entity is the CPU authority, no external lifetime owner
   to coordinate), deterministic ownership, and direct portability of the
   legacy `PopulateFrom*` implementations.
-- Slice 2 deliverables landed in this branch:
+- Slice 2 deliverables landed via PR #854:
   - `src/ecs/Components/ECS.Component.GeometrySources.cppm` rewritten
     around owned `PropertySet` with a new `PropertyNames` namespace
     holding canonical key constants (`v:position`, `v:normal`, `e:v0`,
@@ -46,7 +51,7 @@
   - Docs sync: `src/ecs/README.md`, `src/ecs/Components/README.md`,
     `docs/migration/nonlegacy-parity-matrix.md`,
     `docs/api/generated/module_inventory.md`.
-- Local verification this session:
+- Local verification recorded before retirement:
   - `python3 tools/agents/check_task_policy.py --root . --strict` →
     243 task file(s); findings=0.
   - `python3 tools/repo/check_layering.py --root src --strict` → 742
@@ -58,22 +63,9 @@
   - `python3 tools/repo/generate_module_inventory.py --root src
     --out docs/api/generated/module_inventory.md` → 434 modules;
     `Extrinsic.ECS.Components.GeometrySourcesPopulate` registered.
-  - **Default CPU gate deferred to CI.** The pinned `clang-20` /
-    `clang-scan-deps-20` toolchain required by `CMakePresets.json` is
-    unavailable on this remote-execution host (only Clang 18.1.3 is
-    installed, and Clang 18's libstdc++ predates `<expected>` so even
-    `src/core/Core.Error.cppm` fails to build); a sanity attempt with
-    `clang-18` was discarded. Per `/AGENTS.md` §5 ("Do not treat GCC
-    or stale non-preset build trees as valid verification for module
-    changes") the `cmake --preset ci` build + `IntrinsicECSTests` /
-    `IntrinsicEcsContractTests` run on the pinned toolchain via the
-    PR's `pr-fast` workflow row before retirement, matching the
-    precedent set by slice 1's progress log and by GRAPHICS-033D.
-- Next verification step: monitor the PR's `pr-fast` (pinned-clang-20)
-  job for green; if `IntrinsicECSTests` (label `ecs`) and
-  `IntrinsicEcsContractTests` (label `contract`) both pass, retire this
-  task to `tasks/done/HARDEN-065-...md` with the completion date and
-  PR/commit reference.
+  - The pinned `clang-20` / `clang-scan-deps-20` CPU gate ran in the
+    PR #854 `pr-fast` workflow before merge; PR #854 landed on `main`
+    as merge commit `4bc19484`.
 
 ## Slice plan
 
@@ -180,8 +172,5 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Introducing physics solver or rigid-body behavior.
 
 ## Next verification step
-- Slice 2 awaits the pinned-`clang-20` CI run (the `pr-fast` row that
-  invokes `cmake --preset ci` + `IntrinsicECSTests` (label `ecs`) +
-  `IntrinsicEcsContractTests` (label `contract`)). Once green, retire
-  to `tasks/done/HARDEN-065-...md` with completion date and PR/commit
-  reference. No further slices remain.
+- No active next verification step remains for HARDEN-065; the task is
+  retired. No further slices remain.

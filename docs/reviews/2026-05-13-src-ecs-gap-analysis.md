@@ -174,7 +174,7 @@ Recommended focused test additions as gaps are closed:
 
 1. **Finish [`HARDEN-063`](../../tasks/backlog/ecs/HARDEN-063-ecs-events-and-command-seams.md)** — define event and command ownership. This unlocks deterministic mutation, selection decisions, and lifecycle policy.
 2. **Implement [`RUNTIME-091`](../../tasks/done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)** (done) — register/invoke `TransformHierarchy` by default in fixed-step runtime composition before extraction.
-3. **Implement [`HARDEN-065`](../../tasks/backlog/ecs/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md)** — decide owning vs borrowed `GeometrySources` and port/rewrite population helpers with dirty-domain tests.
+3. **Implement [`HARDEN-065`](../../tasks/done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md)** (done) — decide owning vs borrowed `GeometrySources` and port/rewrite population helpers with dirty-domain tests.
 4. **Implement [`HARDEN-066`](../../tasks/done/HARDEN-066-ecs-render-sync-export-policy.md)** (done) — either implement a CPU-only tag/export pass or retire the placeholder and document runtime extraction as the sole owner.
 5. **Implement [`HARDEN-067`](../../tasks/done/HARDEN-067-ecs-bounds-propagation-system.md)** (done) — keep world culling bounds synchronized after promoted transform updates.
 6. **After [`ARCH-001`](../../tasks/backlog/physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md), implement [`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)** — expand collider and add rigid-body authoring components without solver handles.
