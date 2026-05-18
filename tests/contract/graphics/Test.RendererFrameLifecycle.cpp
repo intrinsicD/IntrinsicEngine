@@ -87,13 +87,13 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.DeviceOperational);
-    EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
+    // GRAPHICS-070 — the default-recipe forward surface pass now records its
+    // bind/draw shape under the forward lighting path, so the renderer
+    // reports three routed passes (CullingPass + DepthPrepass + SurfacePass)
+    // instead of two. Remaining unwired passes still soft-skip with
+    // SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 3u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
-    // GRAPHICS-018 §4: every pass emitted by the FrameRecipe produces a
-    // structured status entry. Routed passes (CullingPass/DepthPrepass)
-    // record real work; the remaining passes soft-skip with
-    // SkippedUnavailable so the renderer reports complete per-pass status
-    // until their command bodies are wired.
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -104,7 +104,7 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
@@ -115,19 +115,22 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
     EXPECT_TRUE(ContainsTextureBarrier(device.CommandContext, device.BackbufferHandle));
     EXPECT_GE(device.CommandContext.FillBufferCalls, 8);
-    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 2);
-    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 2);
-    ASSERT_EQ(device.CommandContext.PushConstantSizes.size(), 2u);
+    // GRAPHICS-070 — culling pipeline + depth prepass pipeline + forward
+    // surface pipeline each bind once with one push-constant block.
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 3);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 3);
+    ASSERT_EQ(device.CommandContext.PushConstantSizes.size(), 3u);
     EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[1], sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[2], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.LastDispatch.X,
               (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
                   Extrinsic::RHI::kGpuCullDispatchGroupSize);
     EXPECT_EQ(device.CommandContext.LastDispatch.Y, 1u);
     EXPECT_EQ(device.CommandContext.LastDispatch.Z, 1u);
-    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 1);
-    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 1);
+    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 2);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
     EXPECT_EQ(device.CommandContext.LastMaxDrawCount, Extrinsic::RHI::kMaxIndirectDrawCount);
 
     const int dispatchEvent = FindEventIndex(device.CommandContext,
@@ -332,9 +335,10 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.DeviceOperational);
-    EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
-    // After operational rebuild, routed passes record real work; remaining
-    // passes soft-skip with SkippedUnavailable.
+    // GRAPHICS-070 — three routed passes (Culling/DepthPrepass/SurfacePass)
+    // after the operational rebuild publishes the forward surface pipeline
+    // lease. Remaining unwired passes soft-skip with SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 3u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -343,8 +347,11 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
-    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
 
     renderer->Shutdown();
 }
@@ -370,9 +377,13 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
-    EXPECT_EQ(stats.CommandRecords.Recorded, 1u);
-    // Depth prepass pipeline failure surfaces as SkippedUnavailable; the
-    // remaining unwired passes also report SkippedUnavailable.
+    // GRAPHICS-070 — even when the depth-prepass pipeline lease is missing,
+    // the forward surface pipeline lease is independently created in
+    // `InitializeOperationalPassResources()` and the surface pass still
+    // records its bind/draw shape. The depth prepass entry continues to
+    // report `SkippedUnavailable` so its missing lease cannot regress
+    // silently.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -382,8 +393,11 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
-    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 1);
 
     renderer->Shutdown();
 }
@@ -489,19 +503,22 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
     EXPECT_EQ(device.CommandContext.BeginCalls, 1);
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
 
-    // Default features (deferred lighting + depth prepass + post + ImGui)
-    // emit at least these named passes. Every entry must carry a structured
-    // status so future routing changes can't silently regress to a no-op.
-    static constexpr const char* kRoutedPasses[] = {"CullingPass", "DepthPrepass"};
+    // GRAPHICS-070 — default features now select the forward lighting path
+    // (`CompositionPass` is not declared in forward mode), so the routed set
+    // grows by `SurfacePass` and the soft-skipped set drops `CompositionPass`.
+    // Every entry below must carry a structured status so future routing
+    // changes can't silently regress to a no-op.
+    static constexpr const char* kRoutedPasses[] = {"CullingPass", "DepthPrepass", "SurfacePass"};
     static constexpr const char* kSoftSkippedPasses[] = {
-        "SurfacePass",
-        "CompositionPass",
         "LinePass",
         "PointPass",
         "PostProcessPass",
         "ImGuiPass",
         "Present",
     };
+    EXPECT_EQ(FindCommandPass(stats, "CompositionPass"), nullptr)
+        << "CompositionPass is forward-mode-disabled per GRAPHICS-070; "
+           "GRAPHICS-072 reintroduces it when deferred wiring lands.";
 
     for (const char* name : kRoutedPasses)
     {
@@ -586,6 +603,84 @@ TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebui
     EXPECT_TRUE(rebuiltPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetDefaultDebugSurfacePipelineDesc();
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-070 — default-recipe forward surface pipeline lease + republish
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{181u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetForwardSurfacePipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetForwardSurfacePipelineDesc();
+    // The descriptor must reference the SPIR-V emitted by intrinsic_add_glsl_shaders()
+    // and the depth-prepass-on path documented in
+    // docs/architecture/rendering-three-pass.md.
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with("shaders/surface.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with("shaders/surface.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetForwardSurfacePipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetForwardSurfacePipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-070 — when culling output is unavailable (cull pipeline creation
+// failed), the executor reports the forward surface pass as
+// SkippedUnavailable rather than recording a draw against an empty bucket.
+TEST(RendererFrameLifecycle, ForwardSurfacePassSkipsUnavailableWhenCullOutputMissing)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.FailPipelineCreateCall = 1; // Cull compute pipeline creation fails.
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{182u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
 
     renderer->Shutdown();
 }

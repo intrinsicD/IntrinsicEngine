@@ -118,6 +118,15 @@ namespace Extrinsic::Graphics
     [[nodiscard]] FrameRecipeFeatures DeriveDefaultFrameRecipeFeatures(const RenderWorld& world)
     {
         FrameRecipeFeatures features{};
+        // GRAPHICS-070 — until the deferred GBuffer + lighting wiring lands
+        // (GRAPHICS-072), the default recipe operationally selects the forward
+        // surface path. The deferred-mode resources/passes remain declared and
+        // testable via explicit `FrameRecipeFeatures{}.LightingPath = Deferred`
+        // at the recipe-introspection level (see
+        // `tests/contract/graphics/Test.FrameRecipeContract.cpp`); GRAPHICS-072
+        // is the slice that gates the runtime default back to a coexistence
+        // policy once both surface bodies are wired.
+        features.LightingPath = FrameRecipeLightingPath::Forward;
         features.EnablePicking = world.HasPendingPick || world.PickRequest.Pending;
         features.EnableShadows = world.Shadows.Enabled && world.Shadows.CascadeCount > 0u;
         features.EnableSelectionOutline = world.Selection.HasHovered || !world.Selection.SelectedStableIds.empty();

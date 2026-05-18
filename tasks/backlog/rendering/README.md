@@ -577,8 +577,12 @@ They depend on the Theme A triangle path at minimum through GRAPHICS-031A
 gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
 `GRAPHICS-033D`.
 
-- [GRAPHICS-070 — Default-recipe `Pass.Forward.Surface` operational wiring](GRAPHICS-070-default-recipe-forward-surface-pass-wiring.md):
-  depends on GRAPHICS-031A (slot-0 pipeline) and GRAPHICS-030B (residency).
+- [GRAPHICS-070 — Default-recipe `Pass.Forward.Surface` operational wiring (done)](../../done/GRAPHICS-070-default-recipe-forward-surface-pass-wiring.md):
+  depended on GRAPHICS-031A (slot-0 pipeline) and GRAPHICS-030B (residency).
+  Landed the `NullRenderer`-owned `ForwardSurfacePass` + pipeline lease,
+  `"SurfacePass"` executor routing under the forward lighting path, and the
+  default-recipe lighting-path flip so the surface bind/draw shape records
+  on the operational CPU/null path. GRAPHICS-072 owns the deferred branch.
 - [GRAPHICS-071 — Default-recipe `Pass.Forward.Line` and `Pass.Forward.Point` wiring](GRAPHICS-071-default-recipe-forward-line-point-wiring.md):
   depends on GRAPHICS-070.
 - [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
