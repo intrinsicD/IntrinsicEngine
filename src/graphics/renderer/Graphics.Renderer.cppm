@@ -235,6 +235,13 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetForwardPointPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetForwardPointPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-073 (Slice A) — accessor for the default-recipe depth-only
+        // shadow pipeline. Handle is invalid until an operational device path
+        // publishes the lease; the descriptor remains deterministic so contract
+        // tests can assert byte-identical rebuild behavior.
+        [[nodiscard]] virtual RHI::PipelineHandle GetShadowPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetShadowPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-032A — opt-in selector for the minimal-debug-surface frame
         // recipe. Default is `FrameRecipeKind::Default`, preserving the
         // existing `BuildDefaultFrameRecipe` path. Runtime callers translate

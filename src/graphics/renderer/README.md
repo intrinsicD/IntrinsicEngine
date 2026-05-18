@@ -176,6 +176,27 @@ implementation.
   canonical retained-renderable point variant for this path; transient
   debug-point expansion remains owned by GRAPHICS-077 and must not route through
   the retained `Points` cull bucket.
+- GRAPHICS-073 Slice A wires the default-recipe `"ShadowPass"` to the
+  existing `ShadowPass` body. `NullRenderer` owns `m_ShadowPass` (constructed
+  against `m_ShadowSystem`) and the depth-only `m_ShadowPipelineLease`. The
+  shadow pipeline reuses `shaders/depth_prepass.vert.spv` for the GpuScene
+  push-constant + BDA descriptor contract, declares no fragment shader and no
+  color targets, runs `Topology::TriangleList` with back-face culling, enables
+  depth writes with `DepthOp::LessOrEqual`, targets a single `D32_FLOAT`
+  depth attachment matching the recipe's transient `ShadowAtlas` declaration,
+  and carries the canonical `GpuScenePushConstants` block (the executor still
+  pushes scene-table BDA + `FrameIndex` + `ShadowOpaque` bucket kind, not a
+  per-cascade index — that arrives with the dedicated shadow-depth shader in
+  a later slice). `Initialize()` emplaces `m_ShadowSystem` + `m_ShadowPass`
+  *before* calling `InitializeOperationalPassResources()` so the publisher's
+  `SetPipeline(...)` actually lands on the pass on the initial operational
+  path. The pipeline is republished byte-identical through
+  `RebuildOperationalResources()` using the same reset-then-publish pattern
+  as the forward pipelines. The `ShadowSystem`-owned atlas + sampler and the
+  typed `FrameRecipeShadowSizing` import seam are explicitly out of scope for
+  Slice A per the `GRAPHICS-009Q` decision; they land in Slice B alongside
+  the deferred-lighting `set 0, binding 1` shadow-sampler binding from
+  GRAPHICS-072.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by

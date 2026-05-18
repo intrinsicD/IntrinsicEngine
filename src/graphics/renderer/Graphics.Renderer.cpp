@@ -42,6 +42,7 @@ import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.Pass.Forward.Surface;
 import Extrinsic.Graphics.Pass.Forward.Line;
 import Extrinsic.Graphics.Pass.Forward.Point;
+import Extrinsic.Graphics.Pass.Shadows;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -226,22 +227,28 @@ namespace Extrinsic::Graphics
             m_SelectionSystem->Initialize();
             m_ForwardSystem.emplace();
             m_ForwardSystem->Initialize();
-            // GRAPHICS-070/071 — default-recipe forward surface/line/point
-            // passes own ForwardSystem-bound instances plus pipeline leases
-            // created from `InitializeOperationalPassResources()`. The passes
-            // must be emplaced before that publisher runs so the initial
-            // operational `Initialize()` path can call `SetPipeline(...)` on
-            // each pass — otherwise the first frame would see a `has_value()`
-            // lease but a default-constructed pipeline handle on the pass
-            // itself, and `Execute()` would early-return on
-            // `!m_Pipeline.IsValid()` while the executor still reported
-            // `Recorded`. Pipeline leases + `SetPipeline()` are routed
-            // through the same code path on `RebuildOperationalResources()` so
-            // the post-operational-transition reset (GRAPHICS-018R)
-            // republishes them byte-identical.
+            // GRAPHICS-070/071/073 — default-recipe forward surface/line/point/
+            // shadow passes own their system-bound instances plus pipeline
+            // leases created from `InitializeOperationalPassResources()`. The
+            // passes must be emplaced before that publisher runs so the
+            // initial operational `Initialize()` path can call
+            // `SetPipeline(...)` on each pass — otherwise the first frame
+            // would see a `has_value()` lease but a default-constructed
+            // pipeline handle on the pass itself, and `Execute()` would
+            // early-return on `!m_Pipeline.IsValid()` while the executor still
+            // reported `Recorded`. Pipeline leases + `SetPipeline()` are
+            // routed through the same code path on
+            // `RebuildOperationalResources()` so the post-operational-
+            // transition reset (GRAPHICS-018R) republishes them byte-identical.
             m_ForwardSurfacePass.emplace(*m_ForwardSystem);
             m_ForwardLinePass.emplace(*m_ForwardSystem);
             m_ForwardPointPass.emplace(*m_ForwardSystem);
+            // GRAPHICS-073 Slice A — ShadowSystem must be live before the
+            // operational publisher creates the depth-only shadow pipeline
+            // and calls `SetPipeline(...)` on `m_ShadowPass`.
+            m_ShadowSystem.emplace();
+            m_ShadowSystem->Initialize();
+            m_ShadowPass.emplace(*m_ShadowSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
@@ -250,8 +257,6 @@ namespace Extrinsic::Graphics
             m_DeferredSystem->Initialize();
             m_PostProcessSystem.emplace();
             m_PostProcessSystem->Initialize();
-            m_ShadowSystem.emplace();
-            m_ShadowSystem->Initialize();
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
         }
@@ -317,12 +322,13 @@ namespace Extrinsic::Graphics
             if (m_GpuWorld)        m_GpuWorld->Shutdown();
             if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
 
-            // GRAPHICS-070/071 — drop forward passes before resetting their
-            // ForwardSystem dependency below so optional destructors do not
-            // observe a dangling reference.
+            // GRAPHICS-070/071/073 — drop forward + shadow passes before
+            // resetting their system dependencies below so optional
+            // destructors do not observe a dangling reference.
             m_ForwardSurfacePass.reset();
             m_ForwardLinePass.reset();
             m_ForwardPointPass.reset();
+            m_ShadowPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -341,6 +347,7 @@ namespace Extrinsic::Graphics
             m_ForwardSurfacePipelineLease.reset();
             m_ForwardLinePipelineLease.reset();
             m_ForwardPointPipelineLease.reset();
+            m_ShadowPipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -948,6 +955,12 @@ namespace Extrinsic::Graphics
                             RecordForwardPointPass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    else if (passName == std::string_view{"ShadowPass"})
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordShadowPass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
                         const RenderCommandPassStatus status =
@@ -1115,6 +1128,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetForwardPointPipelineDesc() const noexcept override
         {
             return BuildForwardPointPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetShadowPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_ShadowPipelineLease.has_value() ||
+                !m_ShadowPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_ShadowPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetShadowPipelineDesc() const noexcept override
+        {
+            return BuildShadowPipelineDesc();
         }
 
         void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept override
@@ -1304,6 +1332,38 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-073 Slice A — default-recipe depth-only shadow pipeline.
+        // Reuses `shaders/depth_prepass.vert.spv` so the existing GpuScene
+        // push-constant block (`SceneTableBDA` / `FrameIndex` / `DrawBucket`)
+        // matches `ShadowPass::Execute`. Depth-only: no fragment shader, no
+        // color targets, `DepthWriteEnable = true`, `DepthFunc = LessOrEqual`,
+        // single `D32_FLOAT` depth target matching the recipe's transient
+        // `ShadowAtlas` declaration. A dedicated shadow-depth shader and the
+        // `ShadowSystem`-owned atlas/sampler arrive with Slice B per the
+        // `GRAPHICS-009Q` decision; the legacy `shaders/shadow_depth.vert`
+        // pair pre-dates the GpuScene seam and is deliberately *not*
+        // referenced here.
+        [[nodiscard]] static RHI::PipelineDesc BuildShadowPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/depth_prepass.vert.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::Back;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = true;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 0u;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.Shadow";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -1477,6 +1537,32 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] ForwardPoint pipeline unavailable; default-recipe point recording will be skipped: error={}",
                                 static_cast<int>(forwardPointPipeline.error()));
+            }
+
+            // GRAPHICS-073 Slice A — depth-only shadow pipeline. Same
+            // reset/republish pattern as the forward pipelines so a failed
+            // `Create()` leaves the pass in `SkippedUnavailable` rather than
+            // retaining a stale device handle across rebuilds.
+            m_ShadowPipelineLease.reset();
+            if (m_ShadowPass)
+            {
+                m_ShadowPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc shadowDesc = BuildShadowPipelineDesc();
+            auto shadowPipeline = m_PipelineManager->Create(shadowDesc);
+            if (shadowPipeline.has_value())
+            {
+                m_ShadowPipelineLease.emplace(std::move(*shadowPipeline));
+                if (m_ShadowPass)
+                {
+                    m_ShadowPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_ShadowPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] Shadow pipeline unavailable; default-recipe shadow recording will be skipped: error={}",
+                                static_cast<int>(shadowPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -1715,6 +1801,32 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-073 Slice A — default-recipe `"ShadowPass"` route. The
+        // recipe only declares the pass when `EnableShadows` is on, so the
+        // executor reaches this helper only for shadow-enabled frames. The
+        // `ShadowSystem::IsEnabled()` gate inside `ShadowPass::Execute` keeps
+        // the bind/draw shape silent if cascade/atlas params end up disabled
+        // after the recipe build.
+        [[nodiscard]] RenderCommandPassStatus RecordShadowPass(RHI::ICommandContext& cmd,
+                                                                const RHI::CameraUBO& camera,
+                                                                const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_ShadowPass.has_value() ||
+                !m_ShadowPipelineLease.has_value() ||
+                !m_ShadowPipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_ShadowPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         [[nodiscard]] RenderCommandPassStatus RecordDepthPrepass(RHI::ICommandContext& cmd,
                                                                  const RHI::CameraUBO& camera,
                                                                  const std::uint32_t frameIndex)
@@ -1852,12 +1964,18 @@ namespace Extrinsic::Graphics
         std::optional<ForwardSurfacePass>    m_ForwardSurfacePass;
         std::optional<ForwardLinePass>       m_ForwardLinePass;
         std::optional<ForwardPointPass>      m_ForwardPointPass;
+        // GRAPHICS-073 Slice A — default-recipe shadow pass. Same lifetime
+        // contract as the forward pass optionals: emplaced after
+        // `m_ShadowSystem` in `Initialize()` and reset before the system in
+        // `Shutdown()`.
+        std::optional<ShadowPass>            m_ShadowPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_ShadowPipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

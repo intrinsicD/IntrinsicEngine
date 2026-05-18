@@ -735,6 +735,47 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-073 Slice A — default-recipe depth-only shadow pipeline lease +
+// republish. The CPU/null contract here is the byte-identical descriptor
+// across the initial init and `RebuildOperationalResources()`; Slice B adds
+// the `ShadowSystem`-owned atlas/sampler + `FrameRecipeShadowSizing` import
+// seam.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, ShadowPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{185u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialShadowPipeline = renderer->GetShadowPipeline();
+    EXPECT_TRUE(initialShadowPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialShadowDesc = renderer->GetShadowPipelineDesc();
+    EXPECT_TRUE(initialShadowDesc.VertexShaderPath.ends_with("shaders/depth_prepass.vert.spv"))
+        << initialShadowDesc.VertexShaderPath;
+    EXPECT_TRUE(initialShadowDesc.FragmentShaderPath.empty()) << initialShadowDesc.FragmentShaderPath;
+    EXPECT_EQ(initialShadowDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialShadowDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_TRUE(initialShadowDesc.DepthStencil.DepthTestEnable);
+    EXPECT_TRUE(initialShadowDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialShadowDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::LessEqual);
+    EXPECT_FALSE(initialShadowDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialShadowDesc.ColorTargetCount, 0u);
+    EXPECT_EQ(initialShadowDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    EXPECT_EQ(initialShadowDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    EXPECT_TRUE(renderer->GetShadowPipeline().IsValid());
+    EXPECT_TRUE(PipelineDescBytesEqual(initialShadowDesc, renderer->GetShadowPipelineDesc()));
+
+    renderer->Shutdown();
+}
+
 // GRAPHICS-070 — when culling output is unavailable (cull pipeline creation
 // failed), the executor reports the forward surface pass as
 // SkippedUnavailable rather than recording a draw against an empty bucket.

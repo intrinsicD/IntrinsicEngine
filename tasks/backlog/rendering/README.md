@@ -591,7 +591,8 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   variant.
 - [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
   depends on GRAPHICS-070, GRAPHICS-073.
-- [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation](GRAPHICS-073-default-recipe-shadow-pass-wiring.md):
+- [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation](../../active/GRAPHICS-073-default-recipe-shadow-pass-wiring.md)
+  (active, in-progress; Slice A — depth-only shadow pipeline + executor route — landed; Slice B — `ShadowSystem`-owned atlas/sampler + `FrameRecipeShadowSizing` import seam — open):
   depends on GRAPHICS-070.
 - [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
   depends on GRAPHICS-070.
