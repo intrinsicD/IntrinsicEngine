@@ -192,11 +192,35 @@ implementation.
   `SetPipeline(...)` actually lands on the pass on the initial operational
   path. The pipeline is republished byte-identical through
   `RebuildOperationalResources()` using the same reset-then-publish pattern
-  as the forward pipelines. The `ShadowSystem`-owned atlas + sampler and the
-  typed `FrameRecipeShadowSizing` import seam are explicitly out of scope for
-  Slice A per the `GRAPHICS-009Q` decision; they land in Slice B alongside
-  the deferred-lighting `set 0, binding 1` shadow-sampler binding from
-  GRAPHICS-072.
+  as the forward pipelines.
+- GRAPHICS-073 Slice B promotes `ShadowSystem` to own the depth atlas + the
+  `sampler2DShadow`-bindable sampler. `ShadowSystem::Initialize(device,
+  textureMgr, samplerMgr)` stores manager references and lazily allocates the
+  atlas (`D32_FLOAT`, sized as `AtlasResolution × CascadeCount`-by-
+  `AtlasResolution`) on the first `SetParams(...)` call that enables shadows;
+  the same `Initialize` path runs through the renderer's `m_TextureManager` /
+  `m_SamplerManager` so the atlas survives `RebuildOperationalResources()`
+  byte-identically. The sampler is created `Linear`/`ClampToBorder` with
+  `OpaqueWhiteFloat` border + `CompareEnable=true,Compare=Less` so it matches
+  the `sampler2DShadow` contract from `GRAPHICS-009Q`. `FrameRecipeImports`
+  gains an optional `ShadowAtlas` handle and `FrameRecipeShadowSizing` becomes
+  the typed sizing seam; `BuildDefaultFrameRecipe` imports the
+  `ShadowSystem`-owned atlas with `InitialState=Undefined,
+  FinalState=DepthWrite` (the same idiom the Backbuffer uses) when the
+  handle is valid, and falls back to the Slice A viewport-sized transient
+  otherwise. The `Undefined/DepthWrite` import pair is the cross-frame
+  contract: the compiler seeds imported state from `InitialState` every
+  frame, so a fresh `Undefined→DepthWrite` barrier is emitted at every
+  `Pass.Shadows` entry. Vulkan handles `Undefined→DepthWrite` as a
+  discard-and-transition, which is correct for the shadow atlas (rewritten
+  each frame) and keeps the cross-frame loop closed (`FinalState=DepthWrite`
+  matches the next frame's first-use layout). `Pass.Shadows::Execute` records a new
+  `ShadowDiagnostics::MissingCasterCount` increment when shadows are enabled
+  but the `ShadowOpaque` cull bucket is empty, so operators can distinguish
+  "no casters this frame" from "atlas wiring broken" without inspecting the
+  executor's `SkippedUnavailable` taxonomy. The deferred-lighting
+  `set 0, binding 1` shadow-sampler binding stays gated on GRAPHICS-072 and is
+  tracked as a Slice C follow-up.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by

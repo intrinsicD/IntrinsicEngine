@@ -13,9 +13,13 @@ import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.Pass.Deferred.Lighting;
 import Extrinsic.Graphics.Pass.Shadows;
 import Extrinsic.Graphics.ShadowSystem;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.PipelineManager;
+import Extrinsic.RHI.SamplerManager;
+import Extrinsic.RHI.TextureManager;
 import Extrinsic.RHI.Types;
 
 #include "MockRHI.hpp"
@@ -189,8 +193,11 @@ TEST(GraphicsLightingShadowContracts, DirectionalSnapshotSuppressesFallbackLight
 
 TEST(GraphicsLightingShadowContracts, ShadowParamsClampCascadesAndPackCameraAtlasState)
 {
+    MockDevice device;
+    RHI::SamplerManager samplerMgr{device};
+    RHI::TextureManager textureMgr{device, device.GetBindlessHeap()};
     Graphics::ShadowSystem shadows;
-    shadows.Initialize();
+    shadows.Initialize(device, textureMgr, samplerMgr);
 
     shadows.SetParams(Graphics::ShadowParams{
         .Enabled = true,
@@ -238,8 +245,10 @@ TEST(GraphicsLightingShadowContracts, ShadowPassSkipsDisabledShadowsAndUsesShado
     Graphics::CullingSystem culling;
     ASSERT_TRUE(culling.Initialize(device, bufferMgr, pipelineMgr, "shaders/culling/instance_cull.comp"));
 
+    RHI::SamplerManager samplerMgr{device};
+    RHI::TextureManager textureMgr{device, device.GetBindlessHeap()};
     Graphics::ShadowSystem shadows;
-    shadows.Initialize();
+    shadows.Initialize(device, textureMgr, samplerMgr);
     Graphics::ShadowPass pass{shadows};
     const RHI::PipelineHandle pipeline{301u, 1u};
     pass.SetPipeline(pipeline);
@@ -308,6 +317,150 @@ TEST(GraphicsLightingShadowContracts, DeferredLightingRecordsFullscreenDrawWhenI
     ASSERT_EQ(cmd.LastPushConstants.size(), 16u);
 
     deferred.Shutdown();
+    world.Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-073 Slice B — `ShadowSystem`-owned atlas + `sampler2DShadow`-
+// bindable sampler. The system lazily allocates both on the first
+// `SetParams(...)` call that enables shadows so the operational
+// `Initialize(...)` path (which runs with shadows disabled by default)
+// does not allocate a 2048×2048 D32 atlas that no caller would sample.
+// ---------------------------------------------------------------------------
+
+TEST(GraphicsLightingShadowContracts, ShadowSystemDoesNotAllocateAtlasWhileDisabled)
+{
+    MockDevice device;
+    device.Operational = true;
+    RHI::SamplerManager samplerMgr{device};
+    RHI::TextureManager textureMgr{device, device.GetBindlessHeap()};
+
+    Graphics::ShadowSystem shadows;
+    shadows.Initialize(device, textureMgr, samplerMgr);
+
+    EXPECT_FALSE(shadows.GetAtlasTexture().IsValid());
+    EXPECT_FALSE(shadows.GetAtlasSampler().IsValid());
+    EXPECT_FALSE(shadows.GetAllocatedAtlasDesc().Enabled);
+    EXPECT_EQ(device.CreateTextureCount, 0);
+    EXPECT_EQ(device.CreateSamplerCount, 0);
+}
+
+TEST(GraphicsLightingShadowContracts, ShadowSystemAllocatesAtlasAndSamplerWhenShadowsEnabled)
+{
+    MockDevice device;
+    device.Operational = true;
+    RHI::SamplerManager samplerMgr{device};
+    RHI::TextureManager textureMgr{device, device.GetBindlessHeap()};
+
+    Graphics::ShadowSystem shadows;
+    shadows.Initialize(device, textureMgr, samplerMgr);
+
+    shadows.SetParams(Graphics::ShadowParams{
+        .Enabled = true,
+        .CascadeCount = 3u,
+        .AtlasResolution = 512u,
+    });
+
+    EXPECT_TRUE(shadows.GetAtlasTexture().IsValid());
+    EXPECT_TRUE(shadows.GetAtlasSampler().IsValid());
+
+    const Graphics::ShadowAtlasDesc allocated = shadows.GetAllocatedAtlasDesc();
+    EXPECT_TRUE(allocated.Enabled);
+    EXPECT_EQ(allocated.CascadeCount, 3u);
+    EXPECT_EQ(allocated.Resolution, 512u);
+    EXPECT_EQ(allocated.Width, 512u * 3u);
+    EXPECT_EQ(allocated.Height, 512u);
+
+    EXPECT_EQ(device.CreateTextureCount, 1);
+    EXPECT_EQ(device.CreateSamplerCount, 1);
+
+    // GRAPHICS-073 Slice B — second `SetParams(...)` keeps the atlas
+    // byte-identical (no realloc). An explicit `Resize()` seam is a
+    // GRAPHICS-072 follow-up; today, atlas resizes route through
+    // `Shutdown()` + `Initialize(...)`.
+    const RHI::TextureHandle initialAtlas = shadows.GetAtlasTexture();
+    shadows.SetParams(Graphics::ShadowParams{
+        .Enabled = true,
+        .CascadeCount = 2u,
+        .AtlasResolution = 1024u,
+    });
+    EXPECT_EQ(shadows.GetAtlasTexture(), initialAtlas);
+    EXPECT_EQ(device.CreateTextureCount, 1);
+}
+
+TEST(GraphicsLightingShadowContracts, ShadowSystemReleasesAtlasAndSamplerOnShutdown)
+{
+    MockDevice device;
+    device.Operational = true;
+    RHI::SamplerManager samplerMgr{device};
+    RHI::TextureManager textureMgr{device, device.GetBindlessHeap()};
+
+    Graphics::ShadowSystem shadows;
+    shadows.Initialize(device, textureMgr, samplerMgr);
+    shadows.SetParams(Graphics::ShadowParams{
+        .Enabled = true,
+        .CascadeCount = 2u,
+        .AtlasResolution = 256u,
+    });
+    EXPECT_TRUE(shadows.GetAtlasTexture().IsValid());
+
+    shadows.Shutdown();
+
+    EXPECT_FALSE(shadows.GetAtlasTexture().IsValid());
+    EXPECT_FALSE(shadows.GetAtlasSampler().IsValid());
+    EXPECT_FALSE(shadows.IsInitialized());
+    EXPECT_EQ(device.DestroyTextureCount, 1);
+}
+
+TEST(GraphicsLightingShadowContracts, ShadowPassRecordsMissingCasterDiagnosticWhenBucketEmpty)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    RHI::SamplerManager samplerMgr{device};
+    RHI::TextureManager textureMgr{device, device.GetBindlessHeap()};
+
+    Graphics::GpuWorld world;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, TinyWorldDesc()));
+    world.SyncFrame();
+
+    // GRAPHICS-073 Slice B — intentionally skip `culling.Initialize(...)` so
+    // `GetBucket(ShadowOpaque)` returns the default-constructed bucket with
+    // `Capacity == 0`. This is the "casters never extracted" condition the
+    // missing-caster diagnostic is for.
+    Graphics::CullingSystem culling;
+
+    Graphics::ShadowSystem shadows;
+    shadows.Initialize(device, textureMgr, samplerMgr);
+    shadows.SetParams(Graphics::ShadowParams{
+        .Enabled = true,
+        .CascadeCount = 2u,
+        .AtlasResolution = 256u,
+    });
+
+    Graphics::ShadowPass pass{shadows};
+    pass.SetPipeline(RHI::PipelineHandle{401u, 1u});
+
+    RHI::CameraUBO camera{};
+    RecordingCommandContext cmd;
+
+    EXPECT_EQ(shadows.GetDiagnostics().MissingCasterCount, 0u);
+    pass.Execute(cmd, camera, world, culling, 0u);
+    EXPECT_TRUE(cmd.Events.empty());
+    EXPECT_EQ(shadows.GetDiagnostics().MissingCasterCount, 1u);
+
+    // Repeated executions keep incrementing — the diagnostic is a counter,
+    // not a one-shot flag.
+    pass.Execute(cmd, camera, world, culling, 1u);
+    EXPECT_TRUE(cmd.Events.empty());
+    EXPECT_EQ(shadows.GetDiagnostics().MissingCasterCount, 2u);
+
+    // Disabling shadows turns the pass into the Slice A early-return
+    // (`!IsEnabled()`) which does NOT touch the missing-caster counter.
+    shadows.SetParams(Graphics::ShadowParams{});
+    pass.Execute(cmd, camera, world, culling, 2u);
+    EXPECT_TRUE(cmd.Events.empty());
+    EXPECT_EQ(shadows.GetDiagnostics().MissingCasterCount, 2u);
+
     world.Shutdown();
 }
 

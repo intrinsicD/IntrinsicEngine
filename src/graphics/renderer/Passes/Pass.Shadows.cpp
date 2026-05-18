@@ -27,6 +27,12 @@ namespace Extrinsic::Graphics
         if (!bucket.Indexed || !bucket.IndexedArgsBuffer.IsValid() ||
             !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
         {
+            // GRAPHICS-073 Slice B — shadows are enabled (atlas/sampler/pipeline
+            // all wired) but no caster reached the `ShadowOpaque` cull bucket.
+            // Surface the diagnostic so operators can distinguish empty-scene
+            // frames from a broken extraction path; the executor still reports
+            // `SkippedUnavailable` for this state per GRAPHICS-073 Slice A.
+            m_ShadowSystem.RecordMissingCaster();
             return;
         }
 

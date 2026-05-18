@@ -188,7 +188,13 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::Albedo, "Albedo", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneColorHDR, "SceneColorHDR", true);
-        AddResource(out, FrameRecipeResourceKind::ShadowAtlas, "ShadowAtlas", features.EnableShadows, false, false, true);
+        // GRAPHICS-073 Slice B — declare ShadowAtlas as imported-write-allowed.
+        // `BuildDefaultFrameRecipe` chooses between an imported handle (when
+        // `imports.ShadowAtlas.IsValid()`) and a transient depth target at
+        // build time; the validator only attaches an authorized writer set
+        // when the *compiled* graph marks the resource imported, so the
+        // declaration stays valid for both paths.
+        AddResource(out, FrameRecipeResourceKind::ShadowAtlas, "ShadowAtlas", features.EnableShadows, true, false, true, true);
         AddResource(out, FrameRecipeResourceKind::SceneColorLDR, "SceneColorLDR", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessBloomScratch, "PostProcess.BloomScratch", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessHistogram, "PostProcess.Histogram", features.EnablePostProcess, false, false, true);
@@ -293,7 +299,8 @@ namespace Extrinsic::Graphics
     [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
                                                                         const FrameRecipeFeatures& features,
                                                                         const FrameRecipeImports& imports,
-                                                                        const FrameRecipeSizing& sizing)
+                                                                        const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeShadowSizing& shadowSizing)
     {
         if (!imports.Backbuffer.IsValid())
         {
@@ -361,7 +368,59 @@ namespace Extrinsic::Graphics
         }
         if (features.EnableShadows)
         {
-            shadowAtlas = graph.CreateTexture("ShadowAtlas", DepthTargetDesc(width, height, RHI::Format::D32_FLOAT, "ShadowAtlas"));
+            // GRAPHICS-073 Slice B — prefer the `ShadowSystem`-owned atlas
+            // when the caller plumbs a valid handle into
+            // `imports.ShadowAtlas`. The imported initial state is `Undefined`
+            // and the final state is `DepthWrite` — the same idiom the
+            // Backbuffer uses (`Undefined/Present`). Reasoning:
+            //
+            //  * The render-graph compiler seeds imported texture state from
+            //    `InitialState` on *every* frame; cross-frame state has to
+            //    match what the prior frame's `FinalState` transition left
+            //    the resource in.
+            //  * Declaring `InitialState=Undefined` lets the compiler emit a
+            //    fresh `Undefined→DepthWrite` barrier at the start of each
+            //    `Pass.Shadows` recording. Vulkan treats `Undefined→X`
+            //    transitions as "discard contents and transition to X",
+            //    which is correct for the shadow atlas (it is overwritten by
+            //    the depth-only shadow pipeline at the start of every frame).
+            //  * Declaring `FinalState=DepthWrite` satisfies the framegraph
+            //    builder's "imported && write" writability contract (one of
+            //    `InitialState` / `FinalState` must be a write-capable
+            //    state). It also leaves the atlas in `DepthWrite` at frame
+            //    end, which keeps the cross-frame loop closed — the next
+            //    frame's `Undefined→DepthWrite` transition is a no-op at the
+            //    Vulkan level because the real layout already matches.
+            //
+            // The deferred-lighting `set 0, binding 1` shadow-sampler binding
+            // (GRAPHICS-072 / Slice C) will read the atlas mid-frame, which
+            // routes through the within-frame `DepthWrite→DepthRead`
+            // transition emitted by the surface/composition pass; no change
+            // to the imported `InitialState/FinalState` is needed for that.
+            //
+            // When the import is absent (headless contract tests, or
+            // ShadowSystem allocation deferred), fall back to the Slice A
+            // viewport-sized transient atlas. Slice A's transient sizing is
+            // *not* viewport-correct for production shadow mapping, but it
+            // keeps the recipe build deterministic without a ShadowSystem.
+            if (imports.ShadowAtlas.IsValid())
+            {
+                shadowAtlas = graph.ImportTexture("ShadowAtlas",
+                                                  imports.ShadowAtlas,
+                                                  TextureState::Undefined,
+                                                  TextureState::DepthWrite);
+            }
+            else
+            {
+                const std::uint32_t atlasWidth = (shadowSizing.AtlasResolution > 0u && shadowSizing.CascadeCount > 0u)
+                                                     ? shadowSizing.AtlasResolution * shadowSizing.CascadeCount
+                                                     : width;
+                const std::uint32_t atlasHeight = (shadowSizing.AtlasResolution > 0u)
+                                                      ? shadowSizing.AtlasResolution
+                                                      : height;
+                shadowAtlas = graph.CreateTexture("ShadowAtlas",
+                                                  DepthTargetDesc(atlasWidth, atlasHeight, RHI::Format::D32_FLOAT, "ShadowAtlas"));
+            }
         }
         if (features.EnablePostProcess)
         {
