@@ -2,18 +2,78 @@
 
 ## Status
 
-- Status: in-progress (slice 1 in flight — planning / decision recording only).
-- Owner/agent: Claude on `claude/setup-agentic-workflow-9l6ef`.
-- Branch: `claude/setup-agentic-workflow-9l6ef`.
-- Started: 2026-05-18.
-- Current slice: slice 1 — record stable-identity, optionality, scene-local
-  reference, metadata-component, and AssetId-typing decisions; identify
-  implementation children; update docs. **No C++ source changes in this
-  slice.**
-- Next verification step: run the docs/structural validators listed under
-  "Verification (slice 1)" below; promote slice 2 (HARDEN-068-Impl-A:
-  `Extrinsic.ECS.Component.StableId` module + `unit;ecs` payload tests +
-  layering boundary coverage) once slice 1 lands.
+- Status: in-progress (slice 2 / HARDEN-068-Impl-A in flight on a new
+  branch; slice 1 landed on `main` via PR #865 / commit `559134a`).
+- Owner/agent: Claude on `claude/setup-agentic-workflow-PaRh5` (slice 2);
+  previously Claude on `claude/setup-agentic-workflow-9l6ef` (slice 1).
+- Branch: `claude/setup-agentic-workflow-PaRh5`.
+- Started: 2026-05-18 (slice 1), 2026-05-18 (slice 2 on this branch).
+- Current slice: slice 2 — HARDEN-068-Impl-A: ship the
+  `Extrinsic.ECS.Component.StableId` payload module + CPU-only
+  `unit;ecs` payload tests + targeted layering boundary case.
+- Slice 2 deliverables landed in this branch:
+  - `src/ecs/Components/ECS.Component.StableId.cppm` exporting
+    `Extrinsic::ECS::Components::StableId`, `kInvalidStableId`,
+    `IsValid`, defaulted equality / `operator<=>`, and the exported
+    `StableIdHash` functor (splitmix64-style mix of the two halves
+    plus an asymmetric combiner so swapped halves do not collide).
+    The payload imports only `<compare>`, `<cstddef>`, and `<cstdint>`;
+    no `entt`, `geometry`, `assets`, `runtime`, `graphics`, or
+    `platform` headers.
+  - `src/ecs/Components/CMakeLists.txt` registers the new
+    `CXX_MODULES` file in alphabetical order.
+  - `tests/unit/ecs/Test.ECS.StableIdentity.cpp` covering default
+    construction → sentinel equality, explicit-bit-pattern assertions
+    on `kInvalidStableId`, `IsValid` truth table, equality
+    componentwise, `operator<=>` lexicographic ordering, swapped-halves
+    hash distinguishability, sentinel-vs-near-neighbor hash
+    distinctness, `std::unordered_map<StableId, T, StableIdHash>`
+    cross-module-boundary usage, and the trivially-copyable /
+    standard-layout / 16-byte size invariants. Labels `unit;ecs` via
+    the existing `IntrinsicECSTests` executable.
+  - `tests/CMakeLists.txt` wires the new test file into the
+    `_ecs_test_files` list.
+  - `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` adds
+    `StableIdPayloadStaysCpuOnly` — a targeted case that asserts the
+    StableId payload header does not pull in `entt` or any
+    higher-layer module (the directory-recursive sweep already covers
+    `Extrinsic.{Graphics,RHI,Runtime,Platform,App,Asset}.*`, but the
+    no-`entt` rule is unique to this payload because `entt` is legal
+    elsewhere in `src/ecs`).
+  - Docs sync: `src/ecs/README.md` (public module surface, directory
+    layout, "Stable identity and scene metadata" status block);
+    `src/ecs/Components/README.md` (Contents list,
+    "Stable identity vs `MetaData`" block); `docs/architecture/ecs.md`
+    ("Stable identity and scene metadata" status block); the `ecs`
+    row of `docs/migration/nonlegacy-parity-matrix.md`;
+    `docs/api/generated/module_inventory.md` (regenerated; new
+    `Extrinsic.ECS.Component.StableId` row).
+- Local verification this session:
+  - `python3 tools/agents/check_task_policy.py --root . --strict`.
+  - `python3 tools/repo/check_layering.py --root src --strict`.
+  - `python3 tools/repo/check_test_layout.py --root . --strict`.
+  - `python3 tools/docs/check_doc_links.py --root .`.
+  - `python3 tools/repo/generate_module_inventory.py --root src
+    --out docs/api/generated/module_inventory.md` (435 modules;
+    `Extrinsic.ECS.Component.StableId` registered).
+  - **Default CPU gate deferred to CI.** The pinned `clang-20` /
+    `clang-scan-deps-20` toolchain required by `CMakePresets.json`
+    is unavailable on this remote-execution host (matches the
+    HARDEN-065 slice-2 precedent and GRAPHICS-033D). Per
+    `/AGENTS.md` §5 ("Do not treat GCC or stale non-preset build
+    trees as valid verification for module changes") the
+    `cmake --preset ci` build + `IntrinsicECSTests` /
+    `IntrinsicEcsContractTests` run on the pinned toolchain via the
+    PR's `pr-fast` workflow row before retirement.
+- Next verification step: monitor the PR's `pr-fast` (pinned-clang-20)
+  job for green; if `IntrinsicECSTests` (label `ecs`,
+  `Test.ECS.StableIdentity.*`) and `IntrinsicEcsContractTests` (label
+  `contract`, `EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly`)
+  both pass, retire this task to
+  `tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`
+  with the completion date (YYYY-MM-DD) and PR/commit reference.
+  HARDEN-068-Impl-B and HARDEN-068-Impl-C remain identified-only and
+  open from the backlog when a concrete consumer demands them.
 
 ## Slice plan
 
@@ -27,20 +87,30 @@
   Verification: docs/structural validators only (the pinned `clang-20`
   CPU gate is not exercised because nothing compilable changes).
 
-- **Slice 2 (deferred — HARDEN-068-Impl-A): `StableId` payload module.**
-  Add `src/ecs/Components/ECS.Component.StableId.cppm` exporting the
+- **Slice 2 (in flight on `claude/setup-agentic-workflow-PaRh5` —
+  HARDEN-068-Impl-A): `StableId` payload module.**
+  Adds `src/ecs/Components/ECS.Component.StableId.cppm` exporting the
   `Extrinsic::ECS::Components::StableId` value type (two `std::uint64_t`
-  halves), `kInvalidStableId`, `IsValid`, equality / `operator<=>` /
-  `StableIdHash`, and the "this is metadata, not a registry-wide field"
-  documentation. Add `tests/unit/ecs/Test.ECS.StableIdentity.cpp` with
-  default-construction, sentinel-equality, equality/`operator<=>`,
-  hashability, trivial-copy invariants, and a contract case asserting
-  the new module continues to import only `core` (no `geometry`,
-  `assets`, `runtime`, `graphics`, `platform`, or `entt` types in the
-  payload header). Update the ECS layering boundary test inventory if
-  needed, regenerate `docs/api/generated/module_inventory.md`, run the
-  default CPU gate against `IntrinsicECSTests` + the ECS contract
-  layering test on pinned `clang-20` CI.
+  halves), `kInvalidStableId`, `IsValid`, defaulted equality /
+  `operator<=>`, and the exported `StableIdHash` functor, with the
+  "this is metadata, not a registry-wide field" documentation inline.
+  Adds `tests/unit/ecs/Test.ECS.StableIdentity.cpp` with
+  default-construction, sentinel equality, explicit-bit-pattern
+  assertions, `IsValid` truth table, equality, `operator<=>`
+  lexicographic ordering, hash distinguishability (swapped halves
+  + sentinel vs near neighbors), cross-module
+  `std::unordered_map<StableId, T, StableIdHash>` usage, and
+  trivially-copyable / standard-layout / 16-byte invariants. Extends
+  `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` with the
+  targeted `StableIdPayloadStaysCpuOnly` case (the directory-recursive
+  sweep already covers `Extrinsic.{Graphics,RHI,Runtime,Platform,App,
+  Asset}.*` imports; the targeted case additionally forbids `entt`
+  inside the StableId payload because `entt` is legal elsewhere in
+  `src/ecs`). Regenerates `docs/api/generated/module_inventory.md`
+  (435 modules). Default CPU gate (`cmake --preset ci` +
+  `IntrinsicECSTests` + `IntrinsicEcsContractTests` on the pinned
+  `clang-20` toolchain) runs in CI before retirement, matching the
+  HARDEN-065 slice-2 / GRAPHICS-033D precedent.
 
 - **Slice 3 (deferred — HARDEN-068-Impl-B): generator + scene-local
   lookup contract.** Add a deterministic-by-seed and a random
@@ -159,10 +229,13 @@ later slice cannot quietly widen the contract under the HARDEN-068 ID.
 
 ## Implementation children (identified, not opened)
 
-- [ ] **HARDEN-068-Impl-A — `StableId` payload module + tests.** Add
-  `src/ecs/Components/ECS.Component.StableId.cppm` plus
-  `tests/unit/ecs/Test.ECS.StableIdentity.cpp`. CPU-only; layering
-  contract test extended if needed. See slice 2 in the slice plan.
+- [x] **HARDEN-068-Impl-A — `StableId` payload module + tests.** Landed
+  on `claude/setup-agentic-workflow-PaRh5` as this task's slice 2.
+  Added `src/ecs/Components/ECS.Component.StableId.cppm`,
+  `tests/unit/ecs/Test.ECS.StableIdentity.cpp`, and the targeted
+  `StableIdPayloadStaysCpuOnly` contract case in
+  `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`. CPU-only.
+  See slice 2 in the slice plan.
 - [ ] **HARDEN-068-Impl-B — Generator + optional runtime lookup.**
   Adds deterministic and random `StableId` generation helpers
   (CPU-only in ECS, no global RNG state) and, if a consumer demands
@@ -240,24 +313,32 @@ later slice cannot quietly widen the contract under the HARDEN-068 ID.
   contract under HARDEN-068).
 - [x] Keep serializer IO and runtime scene-manager behavior outside
   ECS (recorded in Decision 3 and the Forbidden changes list).
-- [ ] Add `Extrinsic.ECS.Component.StableId` module
-  (deferred to HARDEN-068-Impl-A; out of scope for slice 1).
-- [ ] Add `tests/unit/ecs/Test.ECS.StableIdentity.cpp` (deferred to
-  HARDEN-068-Impl-A; out of scope for slice 1).
+- [x] Add `Extrinsic.ECS.Component.StableId` module (slice 2 /
+  HARDEN-068-Impl-A; `src/ecs/Components/ECS.Component.StableId.cppm`).
+- [x] Add `tests/unit/ecs/Test.ECS.StableIdentity.cpp` (slice 2 /
+  HARDEN-068-Impl-A).
 
 ## Tests
 
 - [x] Slice 1: docs/structural validators only (see Verification
   below). No new C++ tests in this slice — nothing compilable changes.
-- [ ] Slice 2 (HARDEN-068-Impl-A): add
+- [x] Slice 2 (HARDEN-068-Impl-A): added
   `tests/unit/ecs/Test.ECS.StableIdentity.cpp` covering default
-  construction, sentinel equality, `operator<=>`, hashability,
-  trivial-copy, and explicit-bit-pattern assertions; label
-  `unit;ecs`.
-- [ ] Slice 2 (HARDEN-068-Impl-A): extend
-  `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` (or its
-  module inventory) so the new `ECS.Component.StableId` module is
-  included in the prohibited-import sweep.
+  construction, sentinel equality, `operator<=>` lexicographic
+  ordering, hashability across the module boundary
+  (`std::unordered_map<StableId, T, StableIdHash>`), trivial-copy /
+  standard-layout / 16-byte invariants, and explicit-bit-pattern
+  assertions on `kInvalidStableId`; label `unit;ecs`.
+- [x] Slice 2 (HARDEN-068-Impl-A): extended
+  `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` with the
+  targeted `StableIdPayloadStaysCpuOnly` case so the new
+  `Extrinsic.ECS.Component.StableId` module is included in the
+  prohibited-import sweep. The directory-recursive sweep
+  (`EcsSourcesDoNotImportHigherLayerModules`) auto-includes the new
+  file for the shared `ecs -> {core, geometry}` import constraint;
+  the targeted case additionally forbids `entt` inside the payload
+  because `entt` is legal elsewhere in `src/ecs` (e.g. `DirtyTags`
+  stamping helpers).
 
 ## Docs
 
@@ -274,9 +355,9 @@ later slice cannot quietly widen the contract under the HARDEN-068 ID.
   to reference the recorded HARDEN-068 decisions and to note that
   the `StableId` payload module remains a slice-2 (Impl-A)
   deliverable (slice 1).
-- [ ] Regenerate
+- [x] Regenerate
   [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
-  (deferred to HARDEN-068-Impl-A; slice 1 adds no modules).
+  (slice 2: 435 modules; new `Extrinsic.ECS.Component.StableId` row).
 
 ## Acceptance criteria
 
@@ -289,8 +370,11 @@ later slice cannot quietly widen the contract under the HARDEN-068 ID.
   documented or moved into an explicit architecture follow-up before
   code depends on it (Decision 5: unchanged; explicitly deferred to a
   future `ARCH-*` task that opens only when a consumer demands it).
-- [ ] `Extrinsic.ECS.Component.StableId` exists with payload tests
-  (deferred to HARDEN-068-Impl-A).
+- [x] `Extrinsic.ECS.Component.StableId` exists with payload tests
+  (slice 2 / HARDEN-068-Impl-A:
+  `src/ecs/Components/ECS.Component.StableId.cppm` +
+  `tests/unit/ecs/Test.ECS.StableIdentity.cpp` + the targeted
+  `StableIdPayloadStaysCpuOnly` contract case).
 
 ## Verification
 
@@ -308,15 +392,25 @@ is not exercised because nothing compilable changes. The validators
 above are sufficient verification for a planning-only slice (mirrors
 the `GRAPHICS-029..034` and `ASSETIO-001` precedent).
 
-### Verification (slice 2, HARDEN-068-Impl-A — deferred)
+### Verification (slice 2, HARDEN-068-Impl-A)
+
+Default CPU gate (pinned `clang-20`, runs in the PR's `pr-fast`
+workflow row; deferred locally because the remote-execution host only
+has Clang 18 — same precedent as HARDEN-065 slice 2 and GRAPHICS-033D):
 
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicECSTests IntrinsicEcsContractTests
 ctest --test-dir build/ci -L 'ecs|contract' --output-on-failure --timeout 60
+```
+
+Local structural/docs validators (run this session):
+
+```bash
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 ```
 
@@ -340,24 +434,31 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 
 ## Next verification step
 
-- Run the four validators in "Verification (slice 1)" above and
-  confirm `findings=0` / `No broken relative links found.` /
-  `No layering violations found.` / `findings=0`. Then commit the
-  slice-1 docs delta on `claude/setup-agentic-workflow-9l6ef` and
-  push for review. Slice 2 (HARDEN-068-Impl-A) opens after slice 1
-  lands.
+- Slice 2 / HARDEN-068-Impl-A awaits the pinned-`clang-20` CI run (the
+  `pr-fast` row that invokes `cmake --preset ci` +
+  `IntrinsicECSTests` (label `ecs`, includes the new
+  `Test.ECS.StableIdentity.*` cases) + `IntrinsicEcsContractTests`
+  (label `contract`, includes the new
+  `EcsLayeringBoundaries.StableIdPayloadStaysCpuOnly` case)). Once
+  green, retire to
+  `tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`
+  with the completion date and PR/commit reference. No further
+  HARDEN-068 slices are auto-promoted: HARDEN-068-Impl-B (generator
+  + optional `Runtime::StableIdRegistry` sidecar) and
+  HARDEN-068-Impl-C (adjacent authoring metadata) open from the
+  backlog only when a concrete consumer demands them.
 
 ## Maturity
 
-- Target: `CPUContracted` after HARDEN-068-Impl-A lands (CPU-only
-  `unit;ecs` payload coverage on the pinned `clang-20` CPU gate).
-  `Operational` is not in scope for HARDEN-068; that requires a
-  serializer / prefab / editor consumer task that explicitly drives
-  the payload end-to-end.
-- This slice (slice 1) closes `Scaffolded → Scaffolded` for the
-  identity-contract decision record only; the payload module remains
-  `Scaffolded` (designed, not coded) until HARDEN-068-Impl-A opens.
-  Per the `Scaffolded` closure rule in
-  [`docs/agent/task-maturity.md`](../../docs/agent/task-maturity.md),
-  the explicit follow-up task ID HARDEN-068-Impl-A is recorded
-  above.
+- Target: `CPUContracted` once HARDEN-068-Impl-A passes the pinned
+  `clang-20` CPU gate in CI (CPU-only `unit;ecs` payload coverage on
+  the new `Extrinsic.ECS.Component.StableId` module). `Operational`
+  is not in scope for HARDEN-068; that requires a serializer /
+  prefab / editor consumer task that explicitly drives the payload
+  end-to-end.
+- Slice 1 closed `Scaffolded → Scaffolded` for the identity-contract
+  decision record. Slice 2 / HARDEN-068-Impl-A in this branch
+  promotes the payload module from `Scaffolded` (designed, not
+  coded) to `CPUContracted` once the pinned `clang-20` CPU gate in
+  CI confirms the new module compiles, the `unit;ecs` payload tests
+  pass, and the `StableIdPayloadStaysCpuOnly` contract case passes.

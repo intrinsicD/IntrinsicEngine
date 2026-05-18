@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 1 |
 | `assets` | 7 |
 | `core` | 39 |
-| `ecs` | 25 |
+| `ecs` | 26 |
 | `geometry` | 77 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -87,6 +87,7 @@ Root scanned: `src`
 | `Extrinsic.ECS.Component.ProceduralGeometryRef` | `src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm` | `ecs` |
 | `Extrinsic.ECS.Components.Selection` | `src/ecs/Components/ECS.Component.Selection.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.ShadowCaster` | `src/ecs/Components/ECS.Component.ShadowCaster.cppm` | `ecs` |
+| `Extrinsic.ECS.Component.StableId` | `src/ecs/Components/ECS.Component.StableId.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Transform` | `src/ecs/Components/ECS.Component.Transform.Local.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Transform.WorldMatrix` | `src/ecs/Components/ECS.Component.Transform.World.cppm` | `ecs` |
 | `Extrinsic.ECS.Scene.Bootstrap` | `src/ecs/ECS.Scene.Bootstrap.cppm` | `ecs` |
@@ -461,4 +462,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **434**
+Total modules: **435**

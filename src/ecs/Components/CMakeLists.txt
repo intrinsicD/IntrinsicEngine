@@ -15,6 +15,7 @@ target_sources(${target_name}
         ECS.Component.ProceduralGeometryRef.cppm
         ECS.Component.Selection.cppm
         ECS.Component.ShadowCaster.cppm
+        ECS.Component.StableId.cppm
         ECS.Component.Transform.Local.cppm
         ECS.Component.Transform.World.cppm
         PRIVATE

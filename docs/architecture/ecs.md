@@ -31,10 +31,24 @@ slice 1:
 | 4 | Component placement | **Separate `Extrinsic.ECS.Component.StableId` module.** `MetaData` stays the bootstrap naming contract; future serialization-adjacent metadata lands as additional **focused** components, not as extensions to `MetaData`. |
 | 5 | `AssetInstance::Source::AssetId` typing | **Defer.** Raw `std::uint32_t` retained per `HARDEN-062`; widening to a typed `Extrinsic::Assets::AssetId` is a future `ARCH-*` task that owns the `ecs → assets` allowlist change. HARDEN-068 explicitly does not widen the contract. |
 
-The `Extrinsic.ECS.Component.StableId` module itself does not ship in
-slice 1 (planning-only). It lands in **HARDEN-068-Impl-A** with
-CPU-only `unit;ecs` payload tests and an extension to the
-`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` import-prohibition
-sweep. Generator helpers and the optional `Runtime::StableIdRegistry`
-lookup sidecar land in **HARDEN-068-Impl-B**, only when a concrete
+**Status.** `HARDEN-068-Impl-A` (slice 2) added the payload module
+`Extrinsic.ECS.Component.StableId`
+(`src/ecs/Components/ECS.Component.StableId.cppm`) exporting
+`Extrinsic::ECS::Components::StableId`, `kInvalidStableId`, `IsValid`,
+defaulted equality / `operator<=>`, and the exported `StableIdHash`
+functor. The payload is a pure CPU value type with no `entt`,
+`geometry`, `assets`, `runtime`, `graphics`, or `platform` imports, so
+serializers, editors, and runtime helpers can consume it without taking
+on those dependencies. The targeted contract test
+`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`
+(`StableIdPayloadStaysCpuOnly`) guards the no-`entt` rule on this one
+file; the existing directory-recursive sweep continues to enforce the
+shared `ecs -> {core, geometry}` import constraint. CPU-only
+`unit;ecs` payload tests live in
+`tests/unit/ecs/Test.ECS.StableIdentity.cpp` and cover default
+construction, sentinel equality, `operator<=>`, hashability across the
+module boundary, swapped-halves hash distinguishability, and the
+trivially-copyable / standard-layout / 16-byte size invariants.
+Generator helpers and the optional `Runtime::StableIdRegistry` lookup
+sidecar land in **HARDEN-068-Impl-B**, only when a concrete
 serializer/selection consumer demands them.

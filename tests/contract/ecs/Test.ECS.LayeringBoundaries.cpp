@@ -184,6 +184,46 @@ TEST(EcsLayeringBoundaries, ColliderComponentRejectsRigidBodyAndSolverState)
     EXPECT_EQ(content.find("import Extrinsic.RHI"), std::string::npos);
 }
 
+// The promoted StableId payload module is durable authoring/runtime identity
+// metadata that must remain usable outside ECS (serializer, editor, runtime
+// helpers). HARDEN-068-Impl-A constrains the payload header to a CPU-only
+// pure value type — it must not pull in `entt`, `geometry`, `assets`,
+// `runtime`, `graphics`, or `platform` types so consumers can include it
+// without taking on those dependencies. The directory-recursive sweep above
+// already catches `import Extrinsic.{Graphics,RHI,Runtime,Platform,App,Asset}.*`
+// for every ECS source; this targeted check additionally forbids `entt`
+// includes/uses inside the StableId payload, which is allowed elsewhere
+// in ECS (e.g. DirtyTags helpers take `entt::registry&`).
+TEST(EcsLayeringBoundaries, StableIdPayloadStaysCpuOnly)
+{
+    const auto path = RepoRoot() / "src/ecs/Components/ECS.Component.StableId.cppm";
+    const auto content = ReadFile(path);
+    ASSERT_FALSE(content.empty()) << "Cannot read " << path.string();
+
+    EXPECT_NE(content.find("export module Extrinsic.ECS.Component.StableId"), std::string::npos);
+    EXPECT_NE(content.find("struct StableId"), std::string::npos);
+    EXPECT_NE(content.find("kInvalidStableId"), std::string::npos);
+    EXPECT_NE(content.find("StableIdHash"), std::string::npos);
+
+    // Pure value type: no entt headers and no entt module import. The
+    // substring `entt::entity` is allowed in prose comments (the module
+    // explains *why* it is independent of `entt::entity` recycling), so
+    // the check targets the actual dependency surface — `#include <entt`
+    // and `import entt` lines — rather than the bare token.
+    EXPECT_EQ(content.find("#include <entt"), std::string::npos)
+        << "StableId payload must not include any entt header.";
+    EXPECT_EQ(content.find("import entt"), std::string::npos)
+        << "StableId payload must not import any entt module.";
+    EXPECT_EQ(content.find("import Geometry."), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.Geometry"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.Asset"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.RHI"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.Graphics"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.Runtime"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.Platform"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.App"), std::string::npos);
+}
+
 // Hierarchy components describe the scene-graph parent/child relationship
 // only. The promoted ECS layer must keep scene topology decoupled from any
 // future compound-collider topology that physics may introduce: parents do

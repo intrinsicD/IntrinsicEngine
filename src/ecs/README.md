@@ -44,6 +44,10 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.Component.ProceduralGeometryRef`
 - `Extrinsic.ECS.Component.Selection`
 - `Extrinsic.ECS.Component.ShadowCaster`
+- `Extrinsic.ECS.Component.StableId` — 128-bit UUID-shaped durable identity
+  value type (`HARDEN-068-Impl-A`). Optional sparse component; not assigned
+  by default bootstrap. See `Components/README.md` and the "Stable identity
+  and scene metadata" section below.
 - `Extrinsic.ECS.Component.DirtyTags`
 
 ### Systems
@@ -86,6 +90,7 @@ Components/
   ECS.Component.ProceduralGeometryRef.cppm
   ECS.Component.Selection.cppm
   ECS.Component.ShadowCaster.cppm
+  ECS.Component.StableId.cppm
   ECS.Component.DirtyTags.cppm
 Events/
   ECS.Events.cppm
@@ -193,11 +198,23 @@ records the five contract decisions:
    remains a raw `std::uint32_t`; see the "Asset references on
    components" section above for the cross-link.
 
-Slice 1 is planning-only — it records the decisions and updates the
-ECS docs surface but does not add the `Extrinsic.ECS.Component.StableId`
-module. That module ships in **HARDEN-068-Impl-A** (slice 2);
-generator helpers and the optional `Runtime::StableIdRegistry`
-sidecar ship in **HARDEN-068-Impl-B** (slice 3) only when a concrete
+**Status.** Slice 1 recorded the decisions. Slice 2
+(`HARDEN-068-Impl-A`) added the `Extrinsic.ECS.Component.StableId`
+payload module (`src/ecs/Components/ECS.Component.StableId.cppm`)
+exporting `Extrinsic::ECS::Components::StableId`, `kInvalidStableId`,
+`IsValid`, defaulted `operator<=>`/equality, and the
+`StableIdHash` exported hasher (mirrors the `Extrinsic.Core.StrongHandle`
+pattern). The payload is a pure CPU value type — no `entt`, `geometry`,
+`assets`, `runtime`, `graphics`, or `platform` imports — so serializers,
+editors, and runtime helpers can consume it without taking on those
+dependencies. The contract test
+`tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp`
+(`StableIdPayloadStaysCpuOnly`) enforces the no-`entt` rule on this one
+module specifically; the existing directory-recursive sweep enforces the
+shared `ecs -> {core, geometry}` import constraint. CPU-only `unit;ecs`
+payload tests live in `tests/unit/ecs/Test.ECS.StableIdentity.cpp`.
+Generator helpers and the optional `Runtime::StableIdRegistry` sidecar
+ship in **HARDEN-068-Impl-B** (slice 3) only when a concrete
 serializer/selection consumer demands them.
 
 ## Component boundary contract
