@@ -1,0 +1,16 @@
+# GEOM-009 — geometry halfedge smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_ExampleSmoke.cpp and emitted by the
+# IntrinsicBenchmarkSmoke runner. The benchmark_id below must match the
+# value embedded in the runner output JSON (kHalfedgeSmokeBenchmarkId).
+
+benchmark_id: geometry.halfedge.smoke
+method: geometry.halfedge.icosahedron
+dataset: builtin.icosahedron
+params: {}
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 50
