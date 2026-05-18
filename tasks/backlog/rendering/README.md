@@ -475,14 +475,16 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   originally-planned `*-vulkan-minimal-recipe-command-recording.md`
   backlog entry was superseded by the as-landed `*-recording.md`
   filename and has been retired.
-- [GRAPHICS-033D — Opt-in Vulkan visible-triangle smoke fixture](GRAPHICS-033D-vulkan-visible-triangle-smoke.md):
-  fourth implementation child. Adds
-  `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp` under
-  `gpu;vulkan;graphics` labels (excluded from the default CPU gate). On
-  supported hosts the fixture drives one GRAPHICS-032 minimal-recipe
-  frame through GLFW + real Vulkan device + surface + swapchain and
-  asserts `IsOperational() == true` with no fallback counters or
-  breadcrumbs. Depends on GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.
+- [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture (done)](../../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
+  fourth implementation child. Landed the opt-in `gpu;vulkan;graphics`
+  smoke fixture that drives one GRAPHICS-032 minimal-recipe frame
+  through GLFW + real Vulkan device + surface + swapchain on
+  Vulkan-capable hosts and asserts `IsOperational() == true` with no
+  fallback counters or breadcrumbs. Excluded from the default CPU gate.
+  The originally-planned `*-vulkan-visible-triangle-smoke.md` backlog
+  entry was superseded by the as-landed
+  `*-gpu-vulkan-visible-triangle-smoke.md` filename and has been
+  retired.
 - [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
   planning-only design for the asset-source residency path; locks down
   AssetId-normalization placement, separate runtime cache, key + refcount,

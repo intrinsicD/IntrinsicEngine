@@ -34,7 +34,7 @@ how the *current* backlog maps onto that contract.
 
 Render real geometry from `Sandbox::App` through the promoted runtime/graphics
 path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
-Implementation-children gap follow-up: `tasks/backlog/rendering/GRAPHICS-029A..033D` and `runtime/RUNTIME-070` (`BUILD-001` is done).
+Implementation-children gap follow-up: triangle-path implementation children landed under `tasks/done/GRAPHICS-029A..033F` and `tasks/done/RUNTIME-070`; `BUILD-001` is done.
 
 Planning parents (retired):
 - [`rendering/GRAPHICS-029` (done)](../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
@@ -42,7 +42,6 @@ Planning parents (retired):
 - [`rendering/GRAPHICS-031` (done)](../done/GRAPHICS-031-default-debug-surface-material.md)
 - [`rendering/GRAPHICS-032` (done)](../done/GRAPHICS-032-minimal-surface-present-command-path.md)
 - [`rendering/GRAPHICS-033` (done)](../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md)
-- [`rendering/GRAPHICS-033D-vulkan-visible-triangle-smoke.md`](rendering/GRAPHICS-033D-vulkan-visible-triangle-smoke.md)
 - [`rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md`](rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
 - [`assets/ASSETIO-001-asset-model-texture-ingest-ownership.md`](assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
@@ -169,10 +168,6 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   wait for the physics layer ownership decision.
 - **GRAPHICS-035..058 ⇐ Theme A.** Rendering modernization leaves stay
   planning-only until the visible-geometry foundation is complete.
-- **GRAPHICS-033D ⇐ GRAPHICS-033A (done), GRAPHICS-033B (done), GRAPHICS-033C (done).**
-  The opt-in `gpu;vulkan` visible-triangle smoke composes all three
-  prior children and runs only on hosts with Vulkan + GLFW.
-
 ## Promotion checklist
 
 Before promoting a backlog task to active:
