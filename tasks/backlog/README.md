@@ -117,7 +117,7 @@ Members:
 - [`ecs/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md`](ecs/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md).
 - [`done/HARDEN-066`](../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [`done/HARDEN-067-ecs-bounds-propagation-system.md`](../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
-- [`ecs/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](ecs/HARDEN-068-ecs-stable-identity-and-scene-metadata.md).
+- [`ecs/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (active; slice 1 in flight on `claude/setup-agentic-workflow-9l6ef`).
 
 ### Theme E — Geometry IO completion (P0)
 

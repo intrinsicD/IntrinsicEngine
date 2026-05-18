@@ -22,6 +22,41 @@ This directory contains the `Components` module/files.
 - `ECS.Component.Transform.Local.cppm`
 - `ECS.Component.Transform.World.cppm`
 
+## Stable identity vs `MetaData`
+
+`HARDEN-068` slice 1 (see
+[`tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md`](../../../tasks/active/HARDEN-068-ecs-stable-identity-and-scene-metadata.md))
+records the contract for entity-stable identity:
+
+- `Extrinsic.ECS.Component.MetaData` (`ECS.Component.MetaData.cppm`)
+  stays the **bootstrap naming contract** — every default-bootstrapped
+  entity carries `MetaData::EntityName`. `MetaData` is not extended
+  with stable-identity, prefab, or serialization fields under
+  HARDEN-068 (Decision 4).
+- A future `Extrinsic.ECS.Component.StableId` module
+  (HARDEN-068-Impl-A; not yet landed) carries a 128-bit UUID-shaped
+  `StableId` value type. It is an **optional sparse component**
+  (Decision 2) — authoring/runtime code opts in only when a
+  serializer / undo / prefab / external-reference consumer needs
+  durability across `entt::entity` recycling, save/load, or hot
+  reload.
+- ECS owns only the value type + `kInvalidStableId` + `IsValid` +
+  equality + `operator<=>` + `StableIdHash` (Decision 3). Any
+  `StableId → entt::entity` lookup sidecar lives in `src/runtime/`,
+  not in `src/ecs/`.
+- Future authoring metadata (`SerializationHints`, `SceneSource`,
+  prefab provenance) likewise lands as **separate focused
+  components** opened by their own slices when a concrete consumer
+  exists; do not bundle them onto `MetaData` or a single
+  `EntityIdentity` component.
+
+`AssetInstance::Source::AssetId` stays a raw `std::uint32_t` per the
+existing `HARDEN-062` decision (cross-linked from
+[`../README.md`](../README.md) "Asset references on components"). The
+`ecs -> assets` dependency contract is not widened under HARDEN-068
+(Decision 5); widening would require a separate `ARCH-*` task that
+owns the layering allowlist change.
+
 ## Render residency boundary
 
 Per
