@@ -205,9 +205,16 @@ implementation.
   the `sampler2DShadow` contract from `GRAPHICS-009Q`. `FrameRecipeImports`
   gains an optional `ShadowAtlas` handle and `FrameRecipeShadowSizing` becomes
   the typed sizing seam; `BuildDefaultFrameRecipe` imports the
-  `ShadowSystem`-owned atlas (initial state `DepthWrite`, final state
-  `ShaderRead`) when the handle is valid, and falls back to the Slice A
-  viewport-sized transient otherwise. `Pass.Shadows::Execute` records a new
+  `ShadowSystem`-owned atlas with `InitialState=Undefined,
+  FinalState=DepthWrite` (the same idiom the Backbuffer uses) when the
+  handle is valid, and falls back to the Slice A viewport-sized transient
+  otherwise. The `Undefined/DepthWrite` import pair is the cross-frame
+  contract: the compiler seeds imported state from `InitialState` every
+  frame, so a fresh `Undefined→DepthWrite` barrier is emitted at every
+  `Pass.Shadows` entry. Vulkan handles `Undefined→DepthWrite` as a
+  discard-and-transition, which is correct for the shadow atlas (rewritten
+  each frame) and keeps the cross-frame loop closed (`FinalState=DepthWrite`
+  matches the next frame's first-use layout). `Pass.Shadows::Execute` records a new
   `ShadowDiagnostics::MissingCasterCount` increment when shadows are enabled
   but the `ShadowOpaque` cull bucket is empty, so operators can distinguish
   "no casters this frame" from "atlas wiring broken" without inspecting the

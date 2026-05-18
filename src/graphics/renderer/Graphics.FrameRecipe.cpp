@@ -370,15 +370,33 @@ namespace Extrinsic::Graphics
         {
             // GRAPHICS-073 Slice B — prefer the `ShadowSystem`-owned atlas
             // when the caller plumbs a valid handle into
-            // `imports.ShadowAtlas`. The imported initial state is `DepthWrite`
-            // (matching the ShadowPass's first use of the resource) and the
-            // final state is `ShaderRead` (the atlas is sampled by the
-            // surface/composition passes and survives across frames in that
-            // layout). The `Imported && Write` builder gate requires either
-            // the initial or final state to allow writes — `DepthWrite` is
-            // that contract assertion; without it `builder.Write(shadowAtlas,
-            // DepthWrite)` would be rejected even though the atlas is the
-            // canonical writer.
+            // `imports.ShadowAtlas`. The imported initial state is `Undefined`
+            // and the final state is `DepthWrite` — the same idiom the
+            // Backbuffer uses (`Undefined/Present`). Reasoning:
+            //
+            //  * The render-graph compiler seeds imported texture state from
+            //    `InitialState` on *every* frame; cross-frame state has to
+            //    match what the prior frame's `FinalState` transition left
+            //    the resource in.
+            //  * Declaring `InitialState=Undefined` lets the compiler emit a
+            //    fresh `Undefined→DepthWrite` barrier at the start of each
+            //    `Pass.Shadows` recording. Vulkan treats `Undefined→X`
+            //    transitions as "discard contents and transition to X",
+            //    which is correct for the shadow atlas (it is overwritten by
+            //    the depth-only shadow pipeline at the start of every frame).
+            //  * Declaring `FinalState=DepthWrite` satisfies the framegraph
+            //    builder's "imported && write" writability contract (one of
+            //    `InitialState` / `FinalState` must be a write-capable
+            //    state). It also leaves the atlas in `DepthWrite` at frame
+            //    end, which keeps the cross-frame loop closed — the next
+            //    frame's `Undefined→DepthWrite` transition is a no-op at the
+            //    Vulkan level because the real layout already matches.
+            //
+            // The deferred-lighting `set 0, binding 1` shadow-sampler binding
+            // (GRAPHICS-072 / Slice C) will read the atlas mid-frame, which
+            // routes through the within-frame `DepthWrite→DepthRead`
+            // transition emitted by the surface/composition pass; no change
+            // to the imported `InitialState/FinalState` is needed for that.
             //
             // When the import is absent (headless contract tests, or
             // ShadowSystem allocation deferred), fall back to the Slice A
@@ -389,8 +407,8 @@ namespace Extrinsic::Graphics
             {
                 shadowAtlas = graph.ImportTexture("ShadowAtlas",
                                                   imports.ShadowAtlas,
-                                                  TextureState::DepthWrite,
-                                                  TextureState::ShaderRead);
+                                                  TextureState::Undefined,
+                                                  TextureState::DepthWrite);
             }
             else
             {

@@ -514,8 +514,16 @@ TEST(FrameRecipeContract, ShadowAtlasUsesImportedHandleWhenProvided)
             << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     }
 
-    // The compiled graph should mark ShadowAtlas as imported and resolve its
-    // device handle to the one supplied by the caller.
+    // The compiled graph should mark ShadowAtlas as imported, resolve its
+    // device handle to the one supplied by the caller, AND seed its initial
+    // state as `Undefined` so the next-frame compile emits a fresh
+    // `Undefined→DepthWrite` barrier at the ShadowPass entry. Cross-frame
+    // regression: a previous draft used `InitialState=DepthWrite,
+    // FinalState=ShaderRead`, which caused the compiler to seed
+    // `prev=DepthWrite` on frame N+1 while the real GPU layout was
+    // `ShaderRead` (the prior `FinalState` transition), so no barrier was
+    // emitted and ShadowPass recorded a depth-attachment write against a
+    // shader-read layout. Pin the `Undefined/DepthWrite` import idiom here.
     bool foundShadow = false;
     for (std::size_t idx = 0; idx < compiled->TextureNames.size(); ++idx)
     {
@@ -528,6 +536,10 @@ TEST(FrameRecipeContract, ShadowAtlasUsesImportedHandleWhenProvided)
         EXPECT_TRUE(compiled->TextureImported[idx]);
         ASSERT_LT(idx, compiled->TextureHandles.size());
         EXPECT_EQ(compiled->TextureHandles[idx], shadowAtlasHandle);
+        ASSERT_LT(idx, compiled->TextureInitialStates.size());
+        EXPECT_EQ(compiled->TextureInitialStates[idx], TextureState::Undefined);
+        ASSERT_LT(idx, compiled->TextureFinalStates.size());
+        EXPECT_EQ(compiled->TextureFinalStates[idx], TextureState::DepthWrite);
     }
     EXPECT_TRUE(foundShadow);
 
