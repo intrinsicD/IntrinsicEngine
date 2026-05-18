@@ -667,7 +667,7 @@ testable; each phase derisks the next.
 - [GRAPHICS-039 — Clustered light binning (planning, done)](../../done/GRAPHICS-039-clustered-light-binning.md):
   locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
   binding. Depends on GRAPHICS-009.
-- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (planning)](GRAPHICS-040-taa-and-reconstructor-interface.md):
+- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (planning, done)](../../done/GRAPHICS-040-taa-and-reconstructor-interface.md):
   locks sub-pixel jitter, motion-vector buffer, history color buffer, and the
   vendor-agnostic `IReconstructor` seam (DLSS/FSR/XeSS/MetalFX/NRD plug-in
   point). Depends on GRAPHICS-013A, GRAPHICS-036.
