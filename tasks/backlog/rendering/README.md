@@ -444,16 +444,27 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   originally-planned `*-vulkan-operational-status-seam.md` backlog entry was
   superseded by the as-landed `*-evaluator.md` filename and has been
   retired. Upstream consumer of GRAPHICS-033B/C/D.
-- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and startup breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md):
-  second implementation child. Adds `VulkanOperationalDiagnosticsSnapshot`
-  with the five process-monotonic counters
-  (`VulkanFallbackToNullCount`, `VulkanInitFailureCount`,
+- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done, startup-only)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
+  second implementation child. Landed
+  `VulkanOperationalDiagnosticsSnapshot` with the five process-monotonic
+  counters (`VulkanFallbackToNullCount`, `VulkanInitFailureCount`,
   `VulkanValidationErrorCount`, `VulkanOperationalGateFailureCount`,
   `VulkanDeviceLostOperationalDropCount`) and a reason histogram, and
-  wires the `VulkanRequestedButNotOperational` startup/transition warn
-  breadcrumb in `Runtime.Engine`. CPU `contract;graphics` and
+  wired the `VulkanRequestedButNotOperational` **startup-only** warn
+  breadcrumb in `Runtime.Engine::Initialize()` (one-shot, immediately
+  after device construction). CPU `contract;graphics` and
   `contract;runtime` tests cover row-by-row counter side-effects and
-  one-shot breadcrumb emission. Depends on GRAPHICS-033A.
+  once-per-startup breadcrumb emission. The originally-planned
+  `*-vulkan-operational-diagnostics-snapshot.md` backlog entry was
+  superseded by the as-landed `*-and-breadcrumb.md` filename and has
+  been retired. **Open follow-up:** the transition-path breadcrumb
+  requirement from `GRAPHICS-033` Decision 12 (surface the
+  `Operational → non-Operational` transition with the same diagnostics
+  on device loss / surface loss / swapchain-recreate failure /
+  validation failure during resize) is **not** wired here — no runtime
+  call site or test covers it yet. A dedicated implementation child
+  must land before the `GRAPHICS-033` planning decision is fully
+  satisfied.
 - [GRAPHICS-033C — Vulkan command recording for the minimal-debug-surface recipe](GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md):
   third implementation child. Implements `Pass.Surface.MinimalDebug` and
   `Pass.Present.MinimalDebug` Vulkan recording bodies through the

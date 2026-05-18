@@ -34,7 +34,7 @@ that expose Vulkan and the required X11/Wayland headers.
 - Depends on:
   - [`GRAPHICS-033A` (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md)
     operational status seam.
-  - [`GRAPHICS-033B`](GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md)
+  - [`GRAPHICS-033B` (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md)
     diagnostics snapshot.
   - [`GRAPHICS-033C`](GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md)
     minimal-recipe command recording bodies.
