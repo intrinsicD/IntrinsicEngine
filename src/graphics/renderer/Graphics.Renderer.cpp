@@ -227,23 +227,31 @@ namespace Extrinsic::Graphics
             m_ForwardSystem.emplace();
             m_ForwardSystem->Initialize();
             // GRAPHICS-070/071 — default-recipe forward surface/line/point
-            // passes own ForwardSystem-bound instances. The pass objects must
-            // exist before `InitializeOperationalPassResources()` so both the
-            // initial operational startup and later GRAPHICS-018R rebuilds can
-            // publish their pipeline handles through the same code path.
+            // passes own ForwardSystem-bound instances plus pipeline leases
+            // created from `InitializeOperationalPassResources()`. The passes
+            // must be emplaced before that publisher runs so the initial
+            // operational `Initialize()` path can call `SetPipeline(...)` on
+            // each pass — otherwise the first frame would see a `has_value()`
+            // lease but a default-constructed pipeline handle on the pass
+            // itself, and `Execute()` would early-return on
+            // `!m_Pipeline.IsValid()` while the executor still reported
+            // `Recorded`. Pipeline leases + `SetPipeline()` are routed
+            // through the same code path on `RebuildOperationalResources()` so
+            // the post-operational-transition reset (GRAPHICS-018R)
+            // republishes them byte-identical.
             m_ForwardSurfacePass.emplace(*m_ForwardSystem);
             m_ForwardLinePass.emplace(*m_ForwardSystem);
             m_ForwardPointPass.emplace(*m_ForwardSystem);
+            if (device.IsOperational())
+            {
+                [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
+            }
             m_DeferredSystem.emplace();
             m_DeferredSystem->Initialize();
             m_PostProcessSystem.emplace();
             m_PostProcessSystem->Initialize();
             m_ShadowSystem.emplace();
             m_ShadowSystem->Initialize();
-            if (device.IsOperational())
-            {
-                [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
-            }
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
         }
@@ -1194,13 +1202,27 @@ namespace Extrinsic::Graphics
         // touching depth. Held byte-identical between the initial
         // `Initialize()` and any subsequent `RebuildOperationalResources()`
         // so the pipeline registry/dedupe can return a stable device handle.
+        //
+        // Shader pairing: `ForwardSurfacePass::Execute()` pushes
+        // `RHI::GpuScenePushConstants` (SceneTableBDA / FrameIndex /
+        // DrawBucket) and the pipeline layout's `PushConstantSize` matches
+        // `sizeof(GpuScenePushConstants)`. The shaders must therefore observe
+        // the GpuScene-aware push-constant block and the BDA-only descriptor
+        // contract — pairing with the canonical GpuScene shader pair
+        // (`forward/default_debug_surface.{vert,frag}`) satisfies both
+        // contracts. The legacy `surface.vert/frag` pair predates the
+        // GpuScene seam — it declares `mat4 Model` + `PtrPositions`-style
+        // push constants plus `set = 0/2/3` descriptor sets — and would
+        // either fail Vulkan pipeline-layout validation or read unrelated
+        // push-constant bytes. A dedicated lit forward-surface shader is a
+        // GRAPHICS-072 follow-up.
         [[nodiscard]] static RHI::PipelineDesc BuildForwardSurfacePipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/surface.vert.spv");
+                "shaders/forward/default_debug_surface.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/surface.frag.spv");
+                "shaders/forward/default_debug_surface.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;

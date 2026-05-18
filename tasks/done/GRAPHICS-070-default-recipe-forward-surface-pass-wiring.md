@@ -52,7 +52,13 @@
 - No alpha-mask sub-bucket; the forward surface here is `SurfaceOpaque` only (alpha-mask is reserved by `GRAPHICS-008Q` infrastructure, opened by a separate task when material alpha evaluation lands).
 - No deferred GBuffer wiring (`GRAPHICS-072`).
 - No Forward.Line / Forward.Point wiring (`GRAPHICS-071`).
-- No new shader; reuses `assets/shaders/surface.vert` + `surface_gbuffer.frag` (forward-surface variant) per `GRAPHICS-008` decisions.
+- No new shader; pairs with the canonical GpuScene-aware
+  `assets/shaders/forward/default_debug_surface.{vert,frag}` pair
+  promoted by `GRAPHICS-031A` (the legacy `surface.vert/frag` pair
+  predates the GpuScene seam and is incompatible with the
+  `sizeof(GpuScenePushConstants)` pipeline layout — see review
+  follow-up below). Dedicated lit forward-surface shading is a
+  `GRAPHICS-072` follow-up.
 - No new diagnostics counters beyond reusing the existing `RenderCommandPassStatus` taxonomy.
 
 ## Context
@@ -63,8 +69,8 @@
 - Naming note: the recipe declares the canonical pass under the string label `"SurfacePass"` (per `docs/architecture/rendering-three-pass.md` and `Graphics.FrameRecipe.cpp`), backed by the module `Extrinsic.Graphics.Pass.Forward.Surface` in forward mode. The executor branch added by this task matches the recipe label `"SurfacePass"` and dispatches to `ForwardSurfacePass` only when the recipe is in forward lighting mode; the deferred branch remains owned by `GRAPHICS-072`.
 
 ## Required changes
-- [x] Add `m_ForwardSurfacePass` and `m_ForwardSurfacePipelineLease` members to `NullRenderer`. The pass is held in `std::optional<ForwardSurfacePass>` so the `ForwardSystem&` constructor invariant is preserved; emplaced in `Initialize()` immediately after `m_ForwardSystem`, dropped in `Shutdown()` before `m_ForwardSystem` is reset.
-- [x] In `InitializeOperationalPassResources(device)`, create the forward-surface pipeline via `PipelineManager::Create(BuildForwardSurfacePipelineDesc())` (vertex `shaders/surface.vert.spv` + fragment `shaders/surface.frag.spv`; `DepthCompareOp = Equal`, `DepthWriteEnable = false` matching the depth-prepass-on path; single RGBA16F color target for `SceneColorHDR`; `D32_FLOAT` depth; `sizeof(GpuScenePushConstants)` push range) and call `m_ForwardSurfacePass->SetPipeline(...)`.
+- [x] Add `m_ForwardSurfacePass` and `m_ForwardSurfacePipelineLease` members to `NullRenderer`. The pass is held in `std::optional<ForwardSurfacePass>` so the `ForwardSystem&` constructor invariant is preserved; emplaced in `Initialize()` immediately after `m_ForwardSystem` and **before** `InitializeOperationalPassResources(device)` so the publisher's `SetPipeline(...)` lands on the pass on the initial operational path; dropped in `Shutdown()` before `m_ForwardSystem` is reset.
+- [x] In `InitializeOperationalPassResources(device)`, create the forward-surface pipeline via `PipelineManager::Create(BuildForwardSurfacePipelineDesc())` (vertex `shaders/forward/default_debug_surface.vert.spv` + fragment `shaders/forward/default_debug_surface.frag.spv` — the canonical GpuScene-aware shader pair; `DepthCompareOp = Equal`, `DepthWriteEnable = false` matching the depth-prepass-on path; single RGBA16F color target for `SceneColorHDR`; `D32_FLOAT` depth; `sizeof(GpuScenePushConstants)` push range) and call `m_ForwardSurfacePass->SetPipeline(...)`.
 - [x] In `RebuildOperationalResources()`, republish the pipeline byte-identical (same `BuildForwardSurfacePipelineDesc()` descriptor; the pipeline registry's dedupe yields the same device handle).
 - [x] Add a `"SurfacePass"` branch in the executor lambda (Graphics.Renderer.cpp) routing to `RecordForwardSurfacePass(graphicsContext, camera, frame.FrameIndex)` which:
   - returns `SkippedNonOperational` if device is non-operational,
@@ -111,6 +117,46 @@ python3 tools/docs/check_doc_links.py --root .
   installed in this remote-execution environment) means the local
   `cmake --build --preset ci --target IntrinsicGraphicsContractTests` run is
   deferred to a host with the pinned toolchain.
+
+## Review follow-up — 2026-05-18 (post-PR #868)
+Two bugs flagged on review and fixed in the same branch before opening a
+new PR:
+
+1. **Shader / push-constant contract mismatch.** The first iteration
+   pointed `BuildForwardSurfacePipelineDesc()` at the legacy
+   `assets/shaders/surface.vert/frag` pair, whose push-constant block
+   starts with `mat4 Model` + BDA pointers (`PtrPositions`, …) and which
+   declares `set = 0/2/3` SSBO descriptor sets. The pipeline layout is
+   created with `sizeof(RHI::GpuScenePushConstants)` and the BDA-only
+   descriptor contract, so the legacy shader either fails Vulkan
+   pipeline-layout validation or reads unrelated push-constant bytes.
+   Fixed by pointing the descriptor at the canonical GpuScene-aware
+   shader pair `assets/shaders/forward/default_debug_surface.{vert,frag}`
+   (the same pair GRAPHICS-031A promoted as the canonical
+   missing-material fallback), which declares the
+   `GpuScenePushConstants`-shaped push block (`SceneTableBDA` +
+   `FrameIndex` + `DrawBucket` + `DebugMode` + pad) and the BDA-only
+   descriptor contract. A dedicated lit forward-surface shader is a
+   GRAPHICS-072 follow-up.
+2. **Publish ordering on initial operational `Initialize()`.** The first
+   iteration ran `InitializeOperationalPassResources(device)` (which
+   creates the pipeline lease and calls
+   `m_ForwardSurfacePass->SetPipeline(...)`) *before*
+   `m_ForwardSurfacePass.emplace(*m_ForwardSystem)`. The
+   `if (m_ForwardSurfacePass)` guards inside the publisher therefore
+   silently skipped the `SetPipeline()` call: the lease was created but
+   the pass kept its default-constructed pipeline handle. The first frame
+   then reported `SurfacePass = Recorded` while
+   `ForwardSurfacePass::Execute()` early-returned on
+   `!m_Pipeline.IsValid()`, so no surface draw was issued until
+   `RebuildOperationalResources()` re-ran the publisher. Fixed by moving
+   `m_ForwardSystem` + `m_ForwardSurfacePass` emplacement *before* the
+   `InitializeOperationalPassResources(device)` call in `Initialize()`.
+   The existing
+   `RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext`
+   assertion (`BindPipelineCalls == 3`,
+   `DrawIndexedIndirectCountCalls == 2`) is the regression guard — the
+   bug would have driven those to `2` and `1`.
 
 ## Next verification step
 - Land the pipeline + executor route, exercise the contract tests above.
