@@ -13,7 +13,7 @@
 
 - Status: done.
 - Completed: 2026-05-18.
-- Commit: TBD (filled in when the landing commit is recorded).
+- Commit: `8f3b8f2` (`GEOM-009: real geometry halfedge smoke benchmark + manifest`) on branch `claude/select-backlog-task-XVlj0`.
 - PR: TBD (filled in when the landing PR is opened).
 - Owner/agent: Claude on `claude/select-backlog-task-XVlj0`.
 - Theme: Theme E adjacent (geometry method-readiness foundation, per
