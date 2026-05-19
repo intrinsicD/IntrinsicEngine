@@ -1,5 +1,26 @@
 # GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain
 
+## Status
+
+- State: in-progress (Slice A landing).
+- Owner/agent: local agent workflow.
+- Branch: `claude/setup-agentic-workflow-mf8d0`.
+- Activated: 2026-05-19 — first unblocked Theme A leaf after GRAPHICS-073 retirement and the GRAPHICS-072 deferred-lighting + shadow-atlas binding completion (recent commits `b55a285`, `08dd7d1`, `a3ab39b`).
+- Next verification step: `cmake --preset ci && cmake --build --preset ci --target IntrinsicGraphicsContractTests && ctest --test-dir build/ci --output-on-failure -L 'contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
+
+## Slice plan
+
+The full scope (5 selection-ID pipelines + outline pipeline + host-visible
+`Picking.Readback` buffer + readback drain + `PublishPickResult`/`PublishNoHit`
+wiring + four contract tests) does not fit a single reviewable patch. The
+plan mirrors the GRAPHICS-072/073 slice shape — each slice preserves the
+CPU/null gate and only the final slice exercises the readback drain.
+
+- **Slice A (this slice; EntityId selection pipeline + `"PickingPass"` executor route + GpuScene-aware shader pair).** Add `m_SelectionEntityIdPass` instance + `m_SelectionEntityIdPipelineLease` to `NullRenderer`; emplace the pass before the operational publisher; create the EntityId selection pipeline in `InitializeOperationalPassResources(device)` with the standard reset/republish pattern; route the recipe's `"PickingPass"` executor branch through `RecordSelectionEntityIdPass(...)` with the recorded `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy; expose `GetSelectionEntityIdPipeline()` / `GetSelectionEntityIdPipelineDesc()` on `IRenderer`; reset the pass/lease in `Shutdown()`. Author the GpuScene-aware `selection/entity_id.{vert,frag}` shader pair that pairs the existing GpuScene vertex-fetch chain with two R32_UINT color outputs (`EntityId` = `inst.EntityID`, `PrimitiveId` = `EncodeSelectionId(Entity, 0)`). Contract test: `EntityIdPickingPipelineSurvivesOperationalRebuild` asserts the byte-identical descriptor across `RebuildOperationalResources()`. Adds no `Picking.Readback` buffer and no drain (Slice D scope); does not touch the other three ID pipelines or the outline pipeline (Slices B / C).
+- **Slice B (follow-up; Face/Edge/Point selection ID pipelines + executor branch fan-out).** Add `m_SelectionFaceIdPass` / `m_SelectionEdgeIdPass` / `m_SelectionPointIdPass` instances + their pipeline leases. Extend the `"PickingPass"` executor route to dispatch the requested kind based on `PickRequest`/`SelectionSystem` state (or follow whichever sub-pass-ordering decision `Pass.Selection.*` Execute signatures already encode). Author or wire `selection/face_id.{vert,frag}`, `selection/edge_id.{vert,frag}`, `selection/point_id.{vert,frag}` GpuScene-aware shader pairs, each writing the `EncodeSelectionId(domain, payload)` value into `PrimitiveId` per `GRAPHICS-012Q`. Tests: pipeline-survives-rebuild for each kind.
+- **Slice C (follow-up; outline pipeline + `"SelectionOutlinePass"` executor route).** Add `m_SelectionOutlinePass` instance + lease; pipeline is a fullscreen quad (vertex `post_fullscreen.vert` + fragment `selection_outline.frag`); add the executor branch routing `SelectionOutlinePass::Execute(...)` against the recipe's outline target. Tests: outline pipeline survives rebuild; outline executor records when at least one selectable entity is present.
+- **Slice D (follow-up; `Picking.Readback` buffer allocation + drain + `PublishPickResult`/`PublishNoHit` wiring).** Allocate the host-visible `Picking.Readback` buffer (sized `4 bytes * frames-in-flight * (1 EntityId + 1 PrimitiveId word)` per `GRAPHICS-013AQ`'s histogram-readback drain pattern); record the per-frame copy from the requested pixel(s) of `EntityId` and `PrimitiveId` into the buffer; drain on `BeginFrame()` after the issuing frame's fences complete via timeline-semaphore comparison; route the decoded result through `SelectionSystem::PublishPickResult(...)` for valid samples and `PublishNoHit(...)` for `EntityId == 0` / invalidated requests / readback failures. Tests: (1) hit pixel inside triangle drives `PublishPickResult` with the matching `StableEntityId`; (2) miss outside the triangle drives `PublishNoHit`; (3) Vulkan-only smoke (`gpu;vulkan`) opt-in if and when GRAPHICS-033D's host-buffer pattern extends to picking readback.
+
 ## Goal
 - Wire the existing `Pass.Selection.{EntityId,PointId,EdgeId,FaceId}` and `Pass.Selection.Outline` classes into the renderer executor under the default recipe, allocate the host-visible `Picking.Readback` buffer, implement the readback drain on `BeginFrame()` after the issuing frame's fences complete, and route `SelectionSystem::PublishPickResult` / `PublishNoHit` per `GRAPHICS-012`/`012Q`.
 

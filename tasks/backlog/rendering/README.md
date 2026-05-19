@@ -612,8 +612,14 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   task's `set 0, binding 1` shorthand to `set 1, binding 1` to match
   `assets/shaders/deferred_lighting.frag` (forward path keeps `set 0,
   binding 1`).
-- [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
-  depends on GRAPHICS-070.
+- [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](../../active/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
+  depends on GRAPHICS-070. **In progress (Slice A)** on
+  `claude/setup-agentic-workflow-mf8d0`; Slice A lands the EntityId
+  selection pipeline + `"PickingPass"` executor route + GpuScene-aware
+  `selection/entity_id.{vert,frag}` shader pair. Slices B (Face/Edge/Point
+  pipelines), C (outline pipeline + `"SelectionOutlinePass"` route), and
+  D (`Picking.Readback` buffer + drain + `PublishPickResult`/`PublishNoHit`
+  wiring) remain.
 - [GRAPHICS-075 — Default-recipe postprocess chain wiring](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
   depends on GRAPHICS-072 (HDR scene color producer).
 - [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):

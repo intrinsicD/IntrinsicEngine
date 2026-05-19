@@ -262,6 +262,19 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetDeferredLightingPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-074 (Slice A) — accessor for the default-recipe EntityId
+        // selection pipeline (vertex `selection/entity_id.vert.spv` + fragment
+        // `selection/entity_id.frag.spv`, two R32_UINT color targets `EntityId`
+        // and `PrimitiveId`, `D32_FLOAT` depth, depth-test-on equal-or-less
+        // depth-write-off because the depth prepass already populated
+        // `SceneDepth`). Handle is invalid until an operational device path
+        // publishes the lease; the descriptor remains deterministic so contract
+        // tests can assert byte-identical rebuild behavior. Slices B/C/D add
+        // the Face/Edge/Point selection pipelines, the outline pipeline, and
+        // the `Picking.Readback` drain.
+        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-072 (Slice A) — test seam for the default recipe's runtime
         // lighting path. `DeriveDefaultFrameRecipeFeatures` derives a default
         // of `Forward` so the legacy contract tests stay green; the renderer

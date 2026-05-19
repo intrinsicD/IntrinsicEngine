@@ -382,6 +382,39 @@ Concretely:
   push-constant is the durable wiring. The `DescribeDefaultFrameRecipe`
   introspection removes `ShadowAtlas` from the deferred `SurfacePass`
   inputs to match.
+- GRAPHICS-074 Slice A wires the default-recipe `"PickingPass"` to the
+  existing `EntityIdPass` body. `NullRenderer` owns `m_SelectionEntityIdPass`
+  (constructed against `m_SelectionSystem`) and the
+  `m_SelectionEntityIdPipelineLease`. The pipeline is created in
+  `InitializeOperationalPassResources()` from
+  `BuildSelectionEntityIdPipelineDesc()` and republished byte-identical
+  through `RebuildOperationalResources()` using the same reset-then-publish
+  pattern as the forward, shadow, and deferred pipelines. The shader pair
+  is `shaders/selection/entity_id.vert.spv` + `shaders/selection/entity_id.frag.spv`:
+  the vertex stage reuses the GpuScene-aware fetch chain (matches the
+  `RHI::GpuScenePushConstants` push block byte-for-byte) and forwards the
+  per-instance `inst.EntityID` as a flat varying; the fragment writes two
+  R32_UINT outputs matching the recipe's `PickingPass` color targets —
+  location 0 = stable entity ID into `EntityId`, location 1 =
+  `EncodeSelectionId(SelectionPrimitiveDomain::Entity, 0)` into
+  `PrimitiveId` per `GRAPHICS-012Q`. The legacy
+  `assets/shaders/pick_id.{vert,frag}` declares the pre-GpuScene
+  `mat4 Model + PtrPositions + ... + uint EntityID` push block and is
+  deliberately *not* referenced — see the "Shader push-constant
+  compatibility policy" subsection above for the explicit rule. The
+  executor's `"PickingPass"` branch routes to
+  `RecordSelectionEntityIdPass(...)` with the standard
+  `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy; the
+  recipe declares the pass only when `features.EnablePicking` is true
+  (`world.HasPendingPick || world.PickRequest.Pending`), so the branch is
+  reached only when a pick request is pending. `Initialize()` emplaces
+  `m_SelectionSystem` + `m_SelectionEntityIdPass` *before* calling
+  `InitializeOperationalPassResources()` so the publisher's
+  `SetPipeline(...)` actually lands on the pass on the initial operational
+  path. The Face/Edge/Point selection sub-passes (Slice B), the outline
+  pipeline + `"SelectionOutlinePass"` executor route (Slice C), and the
+  `Picking.Readback` buffer + drain + `PublishPickResult`/`PublishNoHit`
+  wiring (Slice D) remain.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by
