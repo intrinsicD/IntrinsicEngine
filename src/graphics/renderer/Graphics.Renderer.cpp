@@ -1650,21 +1650,19 @@ namespace Extrinsic::Graphics
         // `features.EnablePicking` branch): `EntityId` (R32_UINT) +
         // `PrimitiveId` (R32_UINT).
         //
-        // No depth attachment: `BuildDefaultFrameRecipe` orders `PickingPass`
-        // *before* `DepthPrepass` and the picking pass declaration does not
-        // `Read(depth)` / `Write(depth)`, so the framegraph compiler emits a
-        // color-only render pass for picking. Configuring the pipeline with
-        // `DepthOp::Equal` + `DepthTargetFormat::D32_FLOAT` (the depth-
-        // prepass-on shape the forward / deferred GBuffer pipelines use)
-        // would be render-pass-incompatible here *and* would depth-test
-        // against an uninitialized depth buffer because the prepass has not
-        // run yet — together producing incorrect IDs or consistent no-hit
-        // readbacks once the readback drain (Slice D) lands. The pipeline
-        // therefore runs depth-test-off, depth-write-off, depth-attachment-
-        // less. Depth-sorted picking remains a recipe-side follow-up: add
-        // `Read(depth, DepthRead)` to `PickingPass` and reorder the recipe
-        // so it runs after `DepthPrepass`, then this descriptor can flip
-        // back to the depth-equal shape the other GpuScene pipelines use.
+        // Depth state: `BuildDefaultFrameRecipe` now orders `PickingPass`
+        // *after* `DepthPrepass` and declares `Read(SceneDepth, DepthRead)`
+        // on the picking pass (GRAPHICS-074 recipe-side follow-up). The
+        // framegraph compiler therefore emits a render pass with a
+        // `D32_FLOAT` depth attachment in read-only state, so the pipeline
+        // mirrors the depth-equal / depth-write-off shape the forward and
+        // deferred GBuffer pipelines use against the same depth buffer. The
+        // depth-equal test guarantees only the nearest-surface fragment
+        // wins each pixel — without it the recipe would last-fragment-win
+        // and the Slice D readback drain would return wrong IDs for any
+        // pixel covered by more than one draw. The matching recipe gating
+        // (`EnablePicking && EnableDepthPrepass`) ensures this pipeline is
+        // only requested when a populated `SceneDepth` is available.
         [[nodiscard]] static RHI::PipelineDesc BuildSelectionEntityIdPipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
@@ -1676,15 +1674,16 @@ namespace Extrinsic::Graphics
             desc.Rasterizer.Culling = RHI::CullMode::Back;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
-            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorBlend[1].Enable = false;
             desc.ColorTargetCount = 2u;
             desc.ColorTargetFormats[0] = RHI::Format::R32_UINT; // EntityId
             desc.ColorTargetFormats[1] = RHI::Format::R32_UINT; // PrimitiveId
-            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
             desc.DebugName = "Renderer.SelectionEntityId";
             return desc;
