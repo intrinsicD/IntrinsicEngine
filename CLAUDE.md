@@ -2,18 +2,12 @@
 
 ## Authoritative repository policy
 
-The authoritative repository instructions are in `/AGENTS.md`.
-Follow `/AGENTS.md` exactly.
+The authoritative repository instructions are in `AGENTS.md`.
+Follow `AGENTS.md` exactly.
 
 ## Agent process references
 
-For expanded process guidance, use:
-
-- `/docs/agent/contract.md`
-- `/docs/agent/task-format.md`
-- `/docs/agent/review-checklist.md`
-
-(These documents are tracked by the reorganization backlog and may be introduced incrementally.)
+See `AGENTS.md` §"Related expanded docs" for the authoritative index of agent process references under `docs/agent/`.
 
 ## Tooling note
 
