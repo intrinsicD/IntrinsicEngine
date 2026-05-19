@@ -1648,12 +1648,23 @@ namespace Extrinsic::Graphics
         // shadow precedents. Two color targets match the frame recipe's
         // `PickingPass` attachment formats (`Graphics.FrameRecipe.cpp`,
         // `features.EnablePicking` branch): `EntityId` (R32_UINT) +
-        // `PrimitiveId` (R32_UINT). Depth uses `SceneDepth` (`D32_FLOAT`)
-        // with `DepthOp::Equal` because the depth prepass already populated
-        // it, mirroring the forward-surface and GBuffer pipelines. The
-        // Face/Edge/Point selection pipelines (Slice B) reuse this descriptor
-        // shape with their own shader pairs; the outline pipeline (Slice C)
-        // is a separate fullscreen-quad pipeline.
+        // `PrimitiveId` (R32_UINT).
+        //
+        // No depth attachment: `BuildDefaultFrameRecipe` orders `PickingPass`
+        // *before* `DepthPrepass` and the picking pass declaration does not
+        // `Read(depth)` / `Write(depth)`, so the framegraph compiler emits a
+        // color-only render pass for picking. Configuring the pipeline with
+        // `DepthOp::Equal` + `DepthTargetFormat::D32_FLOAT` (the depth-
+        // prepass-on shape the forward / deferred GBuffer pipelines use)
+        // would be render-pass-incompatible here *and* would depth-test
+        // against an uninitialized depth buffer because the prepass has not
+        // run yet — together producing incorrect IDs or consistent no-hit
+        // readbacks once the readback drain (Slice D) lands. The pipeline
+        // therefore runs depth-test-off, depth-write-off, depth-attachment-
+        // less. Depth-sorted picking remains a recipe-side follow-up: add
+        // `Read(depth, DepthRead)` to `PickingPass` and reorder the recipe
+        // so it runs after `DepthPrepass`, then this descriptor can flip
+        // back to the depth-equal shape the other GpuScene pipelines use.
         [[nodiscard]] static RHI::PipelineDesc BuildSelectionEntityIdPipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
@@ -1665,16 +1676,15 @@ namespace Extrinsic::Graphics
             desc.Rasterizer.Culling = RHI::CullMode::Back;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
-            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthTestEnable = false;
             desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorBlend[1].Enable = false;
             desc.ColorTargetCount = 2u;
             desc.ColorTargetFormats[0] = RHI::Format::R32_UINT; // EntityId
             desc.ColorTargetFormats[1] = RHI::Format::R32_UINT; // PrimitiveId
-            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
             desc.DebugName = "Renderer.SelectionEntityId";
             return desc;

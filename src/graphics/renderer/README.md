@@ -401,11 +401,23 @@ Concretely:
   `assets/shaders/pick_id.{vert,frag}` declares the pre-GpuScene
   `mat4 Model + PtrPositions + ... + uint EntityID` push block and is
   deliberately *not* referenced — see the "Shader push-constant
-  compatibility policy" subsection above for the explicit rule. The
-  executor's `"PickingPass"` branch routes to
-  `RecordSelectionEntityIdPass(...)` with the standard
-  `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy; the
-  recipe declares the pass only when `features.EnablePicking` is true
+  compatibility policy" subsection above for the explicit rule. Pipeline
+  depth state: `BuildDefaultFrameRecipe` orders `PickingPass` *before*
+  `DepthPrepass` and the picking declaration is color-only — no
+  `Read(depth)` / `Write(depth)` — so the pipeline runs depth-test off,
+  depth-write off, with `DepthTargetFormat::Undefined` (no depth
+  attachment). A depth-prepass-on shape (`DepthOp::Equal` +
+  `D32_FLOAT` depth) would be render-pass-incompatible with the
+  recipe-emitted color-only render pass *and* would depth-test against an
+  uninitialized depth buffer because the prepass has not run yet,
+  producing incorrect IDs or consistent no-hit readbacks once Slice D's
+  drain lands. Depth-sorted picking is a recipe-side follow-up:
+  reorder `PickingPass` after `DepthPrepass` and add
+  `Read(depth, DepthRead)` to the declaration, then the pipeline can
+  flip back to the depth-equal shape. The executor's `"PickingPass"`
+  branch routes to `RecordSelectionEntityIdPass(...)` with the standard
+  `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy;
+  the recipe declares the pass only when `features.EnablePicking` is true
   (`world.HasPendingPick || world.PickRequest.Pending`), so the branch is
   reached only when a pick request is pending. `Initialize()` emplaces
   `m_SelectionSystem` + `m_SelectionEntityIdPass` *before* calling
