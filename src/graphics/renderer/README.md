@@ -156,13 +156,12 @@ implementation.
   shader is a GRAPHICS-072 follow-up. The executor's `"SurfacePass"` branch
   routes to `RecordForwardSurfacePass(...)` only when the active
   default-recipe features select the forward lighting path; deferred mode
-  falls through to the catch-all soft-skip until GRAPHICS-072 lands its
-  `Pass.Deferred.GBuffers` body. While GRAPHICS-072 is still open,
-  `DeriveDefaultFrameRecipeFeatures()` selects
-  `FrameRecipeLightingPath::Forward` so the default recipe can actually
-  record draws; the deferred-mode branches in
-  `Graphics.FrameRecipe.cpp`/`Test.FrameRecipeContract.cpp` remain
-  exercise-able through explicit `FrameRecipeFeatures{}` construction.
+  routes to `RecordDeferredGBufferPass(...)` per GRAPHICS-072 Slice A. While
+  GRAPHICS-072 is still open, `DeriveDefaultFrameRecipeFeatures()` selects
+  `FrameRecipeLightingPath::Forward` so the default recipe stays on the
+  forward surface body; contract tests opt into the deferred-mode branch
+  through `IRenderer::SetLightingPath(FrameRecipeLightingPath::Deferred)`
+  (the renderer-stored test seam added in GRAPHICS-072 Slice A).
 - GRAPHICS-071 wires the default-recipe `"LinePass"` and `"PointPass"` to
   the existing retained-renderable `ForwardLinePass` and `ForwardPointPass`
   bodies. `NullRenderer` owns `m_ForwardLinePass`, `m_ForwardPointPass`,
@@ -226,6 +225,34 @@ implementation.
   `set 0, binding 1`) is owned by GRAPHICS-072 (absorbed from the original
   GRAPHICS-073 Slice C scope) and lands alongside the deferred GBuffer +
   lighting passes.
+- GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
+  to the existing `DeferredGBufferPass` body. `NullRenderer` owns
+  `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the
+  `m_DeferredGBufferPipelineLease`. The pipeline is created in
+  `InitializeOperationalPassResources()` from
+  `BuildDeferredGBufferPipelineDesc()` (vertex `shaders/surface.vert.spv`,
+  fragment `shaders/surface_gbuffer.frag.spv`, three color targets matching
+  the frame recipe's deferred attachments — `SceneNormal` RGBA16F, `Albedo`
+  RGBA8, `Material0` RGBA16F — with `D32_FLOAT` depth, `DepthOp::Equal` and
+  `DepthWriteEnable=false` matching the depth-prepass-on contract, and the
+  canonical `GpuScenePushConstants` block), and republished byte-identical
+  through `RebuildOperationalResources()` using the same reset-then-publish
+  pattern as the forward and shadow pipelines. `Initialize()` emplaces
+  `m_DeferredSystem` + `m_DeferredGBufferPass` *before* calling
+  `InitializeOperationalPassResources()` so the publisher's `SetPipeline(...)`
+  actually lands on the pass on the initial operational path. The executor's
+  `"SurfacePass"` branch routes to `RecordDeferredGBufferPass(...)` when the
+  active default-recipe features select the deferred lighting path; forward
+  mode continues to route to `RecordForwardSurfacePass(...)` per GRAPHICS-070.
+  `IRenderer::SetLightingPath(FrameRecipeLightingPath)` is the renderer-stored
+  test seam that flips the runtime `LightingPath` after
+  `DeriveDefaultFrameRecipeFeatures()` derives the default (`Forward`); the
+  derivation continues to return `Forward` by default so existing contract
+  tests stay green, and contract tests opt into the deferred-mode executor
+  branch by calling `SetLightingPath(FrameRecipeLightingPath::Deferred)`. The
+  companion `"CompositionPass"` (deferred lighting) and the deferred-lighting
+  shadow-atlas binding at `set 1, binding 1` are owned by GRAPHICS-072
+  Slices B and C and currently fall through to the catch-all soft-skip.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by

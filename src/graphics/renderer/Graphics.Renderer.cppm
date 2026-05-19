@@ -242,6 +242,26 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetShadowPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetShadowPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-072 (Slice A) — accessor for the default-recipe deferred
+        // GBuffer pipeline (vertex `surface.vert.spv` + fragment
+        // `surface_gbuffer.frag.spv`, three color targets `SceneNormal` /
+        // `Albedo` / `Material0`, `D32_FLOAT` depth). Handle is invalid until
+        // an operational device path publishes the lease; the descriptor
+        // remains deterministic so contract tests can assert byte-identical
+        // rebuild behavior.
+        [[nodiscard]] virtual RHI::PipelineHandle GetDeferredGBufferPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetDeferredGBufferPipelineDesc() const noexcept = 0;
+
+        // GRAPHICS-072 (Slice A) — test seam for the default recipe's runtime
+        // lighting path. `DeriveDefaultFrameRecipeFeatures` derives a default
+        // of `Forward` so the legacy contract tests stay green; the renderer
+        // overrides that derivation with this stored value when set to
+        // `Deferred` or `Hybrid`, allowing contract tests to drive the
+        // deferred surface/composition executor branches without re-deriving
+        // features at the call site. Default is `Forward`.
+        virtual void SetLightingPath(FrameRecipeLightingPath path) noexcept = 0;
+        [[nodiscard]] virtual FrameRecipeLightingPath GetLightingPath() const noexcept = 0;
+
         // GRAPHICS-032A — opt-in selector for the minimal-debug-surface frame
         // recipe. Default is `FrameRecipeKind::Default`, preserving the
         // existing `BuildDefaultFrameRecipe` path. Runtime callers translate
