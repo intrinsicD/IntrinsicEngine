@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@ import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.ShadowSystem;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -1293,6 +1295,279 @@ TEST(RendererFrameLifecycle, DeferredGBufferToCompositionEmitsColorToShaderReadB
                  unique.end());
     EXPECT_EQ(unique.size(), 3u)
         << "Expected three distinct GBuffer textures transitioning ColorAttachment → ShaderReadOnly";
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-072 Slice C — deferred lighting shadow-atlas binding.
+//
+// The deferred lighting pass samples the `ShadowSystem`-owned atlas through
+// the engine's bindless heap; the legacy `set 1, binding 1` `sampler2DShadow`
+// model from `assets/shaders/deferred_lighting.frag` cannot be honored on
+// the promoted Vulkan pipeline layout (which declares only the bindless set
+// at `set = 0`), so the wiring publishes the atlas slot through
+// `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` instead. These
+// tests pin the two contracts that fall out:
+//   1) the recipe emits a `DepthAttachment → ShaderReadOnly` layout
+//      transition for the shadow atlas before `CompositionPass` records;
+//   2) end-to-end, both `ShadowPass` and `CompositionPass` record
+//      `Recorded`, and the bindless index pushed by the lighting pass
+//      matches `ShadowSystem::GetAtlasBindlessIndex()`.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, DeferredLightingShadowAtlasTransitionsDepthToShaderReadBeforeComposition)
+{
+    using EventKind = Extrinsic::Tests::MockCommandContext::EventKind;
+
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{287u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+
+    // Enable shadows so the recipe declares ShadowPass + the
+    // CompositionPass shadow-atlas read. Allocating the atlas through
+    // `SetParams` lets `FrameRecipeImports::ShadowAtlas` carry the
+    // ShadowSystem-owned handle into the recipe, so the barrier the test
+    // looks for transitions that specific texture.
+    Extrinsic::Graphics::ShadowSystem& shadows = renderer->GetShadowSystem();
+    shadows.SetParams(Extrinsic::Graphics::ShadowParams{
+        .Enabled         = true,
+        .CascadeCount    = 2u,
+        .AtlasResolution = 256u,
+    });
+    const Extrinsic::RHI::TextureHandle shadowAtlasHandle = shadows.GetAtlasTexture();
+    ASSERT_TRUE(shadowAtlasHandle.IsValid())
+        << "ShadowSystem must lazily allocate the atlas after SetParams enables shadows";
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    // The default ExtractRenderWorld does not populate Shadows from the
+    // ShadowSystem (runtime publishes that separately). Mirror the runtime
+    // contract here so `DeriveDefaultFrameRecipeFeatures` flips
+    // `EnableShadows` on for this frame.
+    world.Shadows.Enabled         = true;
+    world.Shadows.CascadeCount    = 2u;
+    world.Shadows.AtlasResolution = 256u;
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    ASSERT_NE(FindCommandPass(stats, "ShadowPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "ShadowPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    // Locate the lighting pass's bind in the event stream — the
+    // `CompositionPass` body opens with `BindPipeline` for the deferred
+    // lighting pipeline. The shadow-atlas barrier MUST precede that bind.
+    // The DeferredGBufferToCompositionEmitsColorToShaderReadBarriers test
+    // covers the SceneNormal/Albedo/Material0 transitions emitted at the
+    // same boundary; this test adds the parallel shadow-atlas check.
+    int gbufferDrawEvent = -1;
+    {
+        int dIIC = 0;
+        for (int i = 0; i < static_cast<int>(device.CommandContext.Events.size()); ++i)
+        {
+            if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+                EventKind::DrawIndexedIndirectCount)
+            {
+                ++dIIC;
+                // (1) DepthPrepass DIIC, (2) ShadowPass DIIC, (3) GBuffer DIIC.
+                if (dIIC == 3) { gbufferDrawEvent = i; break; }
+            }
+        }
+    }
+    ASSERT_GE(gbufferDrawEvent, 0)
+        << "Expected a third DrawIndexedIndirectCount event for the deferred "
+           "GBuffer pass (after DepthPrepass and ShadowPass)";
+
+    int compositionBindEvent = -1;
+    for (int i = gbufferDrawEvent + 1; i < static_cast<int>(device.CommandContext.Events.size()); ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+            EventKind::BindPipeline)
+        {
+            compositionBindEvent = i;
+            break;
+        }
+    }
+    ASSERT_GE(compositionBindEvent, 0)
+        << "Expected a CompositionPass BindPipeline event after the GBuffer pass";
+
+    // Walk barrier records in lockstep with TextureBarrier events between
+    // gbufferDrawEvent and compositionBindEvent. Track records that
+    // transition the ShadowSystem-owned atlas from DepthAttachment →
+    // ShaderReadOnly.
+    int textureBarrierIndex = 0;
+    for (int i = 0; i <= gbufferDrawEvent; ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+            EventKind::TextureBarrier)
+        {
+            ++textureBarrierIndex;
+        }
+    }
+    bool sawShadowAtlasDepthToShaderRead = false;
+    for (int i = gbufferDrawEvent + 1; i < compositionBindEvent; ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] !=
+            EventKind::TextureBarrier)
+        {
+            continue;
+        }
+        ASSERT_LT(textureBarrierIndex,
+                  static_cast<int>(device.CommandContext.TextureBarrierCalls.size()))
+            << "TextureBarrier event has no matching entry in TextureBarrierCalls";
+        const auto& barrier =
+            device.CommandContext.TextureBarrierCalls[static_cast<std::size_t>(textureBarrierIndex)];
+        ++textureBarrierIndex;
+        if (barrier.Texture == shadowAtlasHandle &&
+            barrier.Before == Extrinsic::RHI::TextureLayout::DepthAttachment &&
+            barrier.After == Extrinsic::RHI::TextureLayout::ShaderReadOnly)
+        {
+            sawShadowAtlasDepthToShaderRead = true;
+        }
+    }
+    EXPECT_TRUE(sawShadowAtlasDepthToShaderRead)
+        << "Expected a DepthAttachment → ShaderReadOnly barrier on the "
+           "ShadowSystem-owned shadow atlas between the GBuffer pass and "
+           "the deferred lighting pass";
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, DeferredLightingPushConstantsCarryShadowAtlasBindlessIndex)
+{
+    using EventKind = Extrinsic::Tests::MockCommandContext::EventKind;
+
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{288u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+
+    Extrinsic::Graphics::ShadowSystem& shadows = renderer->GetShadowSystem();
+    shadows.SetParams(Extrinsic::Graphics::ShadowParams{
+        .Enabled         = true,
+        .CascadeCount    = 2u,
+        .AtlasResolution = 256u,
+    });
+    const Extrinsic::RHI::BindlessIndex shadowAtlasBindlessIndex =
+        shadows.GetAtlasBindlessIndex();
+    ASSERT_NE(shadowAtlasBindlessIndex, Extrinsic::RHI::kInvalidBindlessIndex)
+        << "ShadowSystem must register the atlas in the bindless heap after "
+           "SetParams enables shadows";
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    world.Shadows.Enabled         = true;
+    world.Shadows.CascadeCount    = 2u;
+    world.Shadows.AtlasResolution = 256u;
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    // End-to-end shadow-casting contract: both passes record Recorded.
+    ASSERT_NE(FindCommandPass(stats, "ShadowPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "ShadowPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    // Find the lighting pass's PushConstants payload. The CompositionPass
+    // body's first BindPipeline marks the start; the next PushConstants
+    // event after it carries the deferred lighting push-constant block.
+    // Map the event index to PushConstantPayloads[] by counting prior
+    // PushConstants events in submission order.
+    int gbufferDrawEvent = -1;
+    {
+        int dIIC = 0;
+        for (int i = 0; i < static_cast<int>(device.CommandContext.Events.size()); ++i)
+        {
+            if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+                EventKind::DrawIndexedIndirectCount)
+            {
+                ++dIIC;
+                if (dIIC == 3) { gbufferDrawEvent = i; break; }
+            }
+        }
+    }
+    ASSERT_GE(gbufferDrawEvent, 0);
+
+    int compositionBindEvent = -1;
+    for (int i = gbufferDrawEvent + 1; i < static_cast<int>(device.CommandContext.Events.size()); ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+            EventKind::BindPipeline)
+        {
+            compositionBindEvent = i;
+            break;
+        }
+    }
+    ASSERT_GE(compositionBindEvent, 0);
+
+    int compositionPushConstantsEvent = -1;
+    for (int i = compositionBindEvent + 1; i < static_cast<int>(device.CommandContext.Events.size()); ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+            EventKind::PushConstants)
+        {
+            compositionPushConstantsEvent = i;
+            break;
+        }
+    }
+    ASSERT_GE(compositionPushConstantsEvent, 0)
+        << "Expected a PushConstants event after the deferred lighting BindPipeline";
+
+    int payloadIndex = 0;
+    for (int i = 0; i < compositionPushConstantsEvent; ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+            EventKind::PushConstants)
+        {
+            ++payloadIndex;
+        }
+    }
+    ASSERT_LT(static_cast<std::size_t>(payloadIndex),
+              device.CommandContext.PushConstantPayloads.size())
+        << "PushConstants event has no matching entry in PushConstantPayloads";
+
+    const auto& payload = device.CommandContext.PushConstantPayloads[
+        static_cast<std::size_t>(payloadIndex)];
+    // The deferred lighting block: 8 bytes SceneTableBDA + 4 bytes
+    // ShadowAtlasBindlessIndex + 4 bytes padding.
+    ASSERT_EQ(payload.size(), 16u);
+    std::uint32_t pushedShadowIndex = 0u;
+    std::memcpy(&pushedShadowIndex, payload.data() + sizeof(std::uint64_t),
+                sizeof(std::uint32_t));
+    EXPECT_EQ(pushedShadowIndex, shadowAtlasBindlessIndex)
+        << "DeferredLightingPass::Execute must push ShadowSystem::GetAtlasBindlessIndex() "
+           "as the ShadowAtlasBindlessIndex push-constant field (the bindless-heap "
+           "equivalent of the legacy `set 1, binding 1` shadow-atlas binding)";
 
     renderer->Shutdown();
 }

@@ -207,12 +207,23 @@ namespace Extrinsic::Tests
             LastIndexType = type;
             Events.push_back(EventKind::BindIndexBuffer);
         }
-        void PushConstants(const void*, std::uint32_t size, std::uint32_t offset) override
+        void PushConstants(const void* data, std::uint32_t size, std::uint32_t offset) override
         {
             ++PushConstantsCalls;
             LastPushConstantSize = size;
             LastPushConstantOffset = offset;
             PushConstantSizes.push_back(size);
+            // GRAPHICS-072 Slice C — record the pushed payload so contract
+            // tests can verify push-constant content (e.g. the deferred
+            // lighting pass's `ShadowAtlasBindlessIndex` field) without
+            // adding new renderer test seams. The lifetime of `data` is
+            // strictly the duration of this call, so we deep-copy here.
+            std::vector<std::byte> payload(size);
+            if (data != nullptr && size > 0u)
+            {
+                std::memcpy(payload.data(), data, size);
+            }
+            PushConstantPayloads.push_back(std::move(payload));
             Events.push_back(EventKind::PushConstants);
         }
         void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
@@ -264,6 +275,10 @@ namespace Extrinsic::Tests
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
         std::vector<EventKind> Events{};
         std::vector<std::uint32_t> PushConstantSizes{};
+        // GRAPHICS-072 Slice C — full payload capture parallel to
+        // `PushConstantSizes`. `PushConstantPayloads[i]` holds the bytes of
+        // the i-th `PushConstants(...)` call in submission order.
+        std::vector<std::vector<std::byte>> PushConstantPayloads{};
         int BeginCalls = 0;
         int EndCalls = 0;
         int FillBufferCalls = 0;

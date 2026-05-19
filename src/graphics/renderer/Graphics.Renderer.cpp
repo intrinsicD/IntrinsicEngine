@@ -274,7 +274,13 @@ namespace Extrinsic::Graphics
             // invariant as the GBuffer pass above: `has_value()` lease but an
             // unset pipeline handle on the pass would silently early-return
             // inside `Execute()` while the executor still reported `Recorded`.
-            m_DeferredLightingPass.emplace(*m_DeferredSystem);
+            // Slice C: the pass also takes the `ShadowSystem&` so
+            // `Execute(...)` can publish the atlas bindless index through the
+            // pushed `DeferredLightingPushConstants::ShadowAtlasBindlessIndex`
+            // field. The system has already been emplaced + Initialize'd
+            // above (m_ShadowSystem), so the reference is live before the
+            // operational publisher runs.
+            m_DeferredLightingPass.emplace(*m_DeferredSystem, *m_ShadowSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
