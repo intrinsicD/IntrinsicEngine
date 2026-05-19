@@ -52,21 +52,25 @@ void main()
     // default/error texture). A full Blinn-Phong + PCF cascade integration
     // matches the legacy `deferred_lighting.frag` shape but requires the
     // G-buffer sampler wiring + CameraUBO cascade matrices, both follow-ups
-    // beyond Slice C; here the binding is exercised to keep the shader's
-    // use-of-binding observable to compilers (`globalTextures[...]` is
-    // referenced, not optimized away), preventing silent regressions where
-    // the bindless index would be pushed but never consumed.
+    // beyond Slice C. The sample MUST feed the fragment output so an
+    // optimizer cannot eliminate the bindless fetch: a constant-zero weight
+    // would constant-fold the texture call away, hiding descriptor/index
+    // wiring regressions. Use the sampled value directly as the shadow
+    // factor; a freshly-cleared atlas (depth 1.0) sampled via the
+    // `CompareEnable=true, Compare=Less` shadow sampler returns ~1.0
+    // (fully lit) so the visible output stays close to the unshadowed
+    // accumulation while the bindless path is guaranteed to be live.
     float shadowFactor = 1.0;
     if (pc.ShadowAtlasBindlessIndex != 0u)
     {
-        const float shadowSample = texture(
+        shadowFactor = texture(
             globalTextures[nonuniformEXT(pc.ShadowAtlasBindlessIndex)],
             vUV).r;
-        shadowFactor = mix(shadowFactor, shadowSample, 0.0);
     }
 
     // Temporary debug composition: encode light accumulation modulated by
-    // the sampled shadow factor (currently a no-op weight; full integration
-    // is a follow-up pass).
+    // the sampled shadow factor. Full Blinn-Phong + PCF cascade integration
+    // is a follow-up pass; `shadowFactor` lives on the output path so the
+    // bindless shadow-atlas fetch above stays alive through optimization.
     outColor = vec4(accum * shadowFactor, 1.0);
 }
