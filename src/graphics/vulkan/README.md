@@ -311,6 +311,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   the reference triangle through the bootstrap `FrameRecipe::MinimalDebug` lane
   after the gate flips, and reports `SKIPPED` when GLFW or Vulkan readiness is
   unavailable on the host.
+- `VulkanDevice::WriteBuffer` caches each host-visible allocation's
+  `HOST_COHERENT` flag at creation time (via `vmaGetAllocationMemoryProperties`)
+  and gates a `vmaFlushAllocation` fallback on the fast path so non-coherent
+  mappings stay visible to the device without slowing the typical coherent
+  desktop/integrated configuration (GRAPHICS-082).
 - Renderer/RHI behavior that is not Vulkan-specific is documented canonically in
   [`docs/architecture/graphics.md`](../../../docs/architecture/graphics.md).
 

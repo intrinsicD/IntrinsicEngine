@@ -372,6 +372,34 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         Extrinsic::RHI::GpuSceneTable emptySceneTable{};
         device->WriteBuffer(sceneTableBuffer, &emptySceneTable, sizeof(emptySceneTable), 0u);
 
+        // GRAPHICS-082: exercise the WriteBuffer fast path on a host-visible
+        // buffer so the cached HostCoherent flag and the gated vmaFlushAllocation
+        // call are covered. vmaFlushAllocation is a no-op on HOST_COHERENT memory
+        // (the typical desktop/integrated configuration), so the round-trip must
+        // succeed regardless of which branch the gate selects.
+        {
+            constexpr std::uint32_t kHostVisiblePattern = 0xA5C3'5AB6u;
+            const Extrinsic::RHI::BufferHandle hostVisibleBuffer = device->CreateBuffer({
+                .SizeBytes = sizeof(kHostVisiblePattern),
+                .Usage = Extrinsic::RHI::BufferUsage::TransferSrc |
+                         Extrinsic::RHI::BufferUsage::TransferDst,
+                .HostVisible = true,
+                .DebugName = "VulkanBootstrapSmoke.HostVisibleWriteFlush",
+            });
+            ASSERT_TRUE(hostVisibleBuffer.IsValid())
+                << "service-ready guarded bootstrap should create host-visible buffers for GRAPHICS-082 flush coverage";
+
+            device->WriteBuffer(hostVisibleBuffer, &kHostVisiblePattern,
+                                sizeof(kHostVisiblePattern), 0u);
+
+            std::uint32_t readback = 0u;
+            device->ReadBuffer(hostVisibleBuffer, &readback, sizeof(readback), 0u);
+            EXPECT_EQ(readback, kHostVisiblePattern)
+                << "WriteBuffer fast path must round-trip whether or not vmaFlushAllocation was required";
+
+            device->DestroyBuffer(hostVisibleBuffer);
+        }
+
         const Extrinsic::RHI::BufferHandle indirectArgsBuffer = device->CreateBuffer({
             .SizeBytes = sizeof(Extrinsic::RHI::GpuDrawIndexedCommand),
             .Usage = Extrinsic::RHI::BufferUsage::Storage |
