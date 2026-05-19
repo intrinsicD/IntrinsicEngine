@@ -12,12 +12,14 @@ Each active task should include:
 ## Currently active
 
 - [`GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md`](GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md)
-  — in-progress (recipe-side follow-up between Slice A and Slice B).
-  Theme A leaf; depends on GRAPHICS-070 (done). Slice A merged via PR #890
-  (commits `ad2e40d` + `08af46e`, merge `558a75d`). The follow-up reorders
-  `PickingPass` after `DepthPrepass`, adds `Read(SceneDepth, DepthRead)`,
-  gates picking on `EnablePicking && EnableDepthPrepass`, and flips the
-  EntityId selection pipeline back to the canonical depth-equal /
-  `D32_FLOAT` shape so the readback drain (Slice D) returns
-  nearest-surface IDs instead of last-fragment-winning.
-  Branch: `claude/setup-agentic-workflow-Xrb7P`.
+  — in-progress (Slice B next). Theme A leaf; depends on GRAPHICS-070
+  (done). Slice A merged via PR #890 (commits `ad2e40d` + `08af46e`,
+  merge `558a75d`). The recipe-side follow-up between Slice A and Slice
+  B (reorder `PickingPass` after `DepthPrepass`, add
+  `Read(SceneDepth, DepthRead)`, gate picking + its `EntityId` /
+  `PrimitiveId` / `Picking.Readback` resources on `EnablePicking &&
+  EnableDepthPrepass`, flip the EntityId selection pipeline to
+  depth-equal / `D32_FLOAT`) merged via PR #891 (commits `dac6f47` +
+  `b78347d`, merge `5b5309d`). Slice B (Face/Edge/Point selection ID
+  pipelines + executor branch fan-out + GpuScene-aware face/edge/point
+  shader pairs) opens on a new agent branch.

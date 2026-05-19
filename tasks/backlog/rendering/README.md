@@ -613,13 +613,21 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   `assets/shaders/deferred_lighting.frag` (forward path keeps `set 0,
   binding 1`).
 - [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](../../active/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
-  depends on GRAPHICS-070. **In progress (Slice A)** on
-  `claude/setup-agentic-workflow-mf8d0`; Slice A lands the EntityId
-  selection pipeline + `"PickingPass"` executor route + GpuScene-aware
-  `selection/entity_id.{vert,frag}` shader pair. Slices B (Face/Edge/Point
-  pipelines), C (outline pipeline + `"SelectionOutlinePass"` route), and
-  D (`Picking.Readback` buffer + drain + `PublishPickResult`/`PublishNoHit`
-  wiring) remain.
+  depends on GRAPHICS-070. **In progress (Slice B next)**. Slice A
+  landed the EntityId selection pipeline + `"PickingPass"` executor
+  route + GpuScene-aware `selection/entity_id.{vert,frag}` shader pair
+  (PR #890; commits `ad2e40d` + `08af46e`, merge `558a75d`). The
+  recipe-side follow-up between Slice A and Slice B then reordered
+  `PickingPass` after `DepthPrepass`, added `Read(SceneDepth, DepthRead)`,
+  gated picking + its `EntityId` / `PrimitiveId` / `Picking.Readback`
+  resources on `pickingActive = EnablePicking && EnableDepthPrepass`
+  (with `EntityId` surviving when `EnableSelectionOutline=true`), and
+  flipped `BuildSelectionEntityIdPipelineDesc()` to depth-equal /
+  `D32_FLOAT` so the picking readback returns nearest-surface IDs
+  (PR #891; commits `dac6f47` + `b78347d`, merge `5b5309d`). Slices B
+  (Face/Edge/Point pipelines), C (outline pipeline +
+  `"SelectionOutlinePass"` route), and D (`Picking.Readback` buffer +
+  drain + `PublishPickResult` / `PublishNoHit` wiring) remain.
 - [GRAPHICS-075 — Default-recipe postprocess chain wiring](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
   depends on GRAPHICS-072 (HDR scene color producer).
 - [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
