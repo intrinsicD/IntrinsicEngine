@@ -31,14 +31,17 @@
   records the durable rule.
 
 ## Context
-- Status: in-progress (Slice A landed; Slice B active on this branch; Slice C pending).
+- State: done. Slices A, B, and C all landed.
 - Owner/agent: local agent workflow.
-- Branch: `claude/setup-agentic-workflow-cQjgU` (Slice B); Slice A landed on
-  `claude/setup-agentic-workflow-HSYdR`.
-- Next verification step: complete Slice B (DeferredLightingPass wiring +
-  `"CompositionPass"` executor branch + GBuffer→Lighting barrier test) and
-  run the verification block below; Slice C (shadow-atlas binding +
-  end-to-end shadow casting test) remains pending on a fresh branch.
+- Branch: Slice A — `claude/setup-agentic-workflow-HSYdR`; Slice B —
+  `claude/setup-agentic-workflow-cQjgU`; Slice C —
+  `claude/setup-agentic-workflow-2HdHw`.
+- PR: Slice A — PR #886; Slice B — PR #887, PR #888; Slice C — pending on
+  branch `claude/setup-agentic-workflow-2HdHw`.
+- Commit: Slice A — `87e5489`, `c4aa607`; Slice B — `9469aaa`, `4127670`;
+  Slice C — `a3ab39b`.
+- Completed: 2026-05-19. Slice C retirement landed via the same branch.
+- Completion verification: see "Completion note" below.
 - Owner/layer: `graphics/renderer`.
 - Planning anchors: `tasks/done/GRAPHICS-008-depth-surface-gbuffer-passes.md`, `tasks/done/GRAPHICS-009-deferred-lighting-and-shadows.md`, `tasks/done/GRAPHICS-009Q-lighting-shadow-clarifications.md`, `tasks/done/GRAPHICS-073-default-recipe-shadow-pass-wiring.md` (Slice C scope folded in: deferred-lighting shadow-sampler binding + cross-pass `DepthAttachment → ShaderRead` barrier-transition test). Note: per `GRAPHICS-009Q`, the shadow atlas binds at `binding 1` of "the global descriptor set already used by `CameraUBO`". In `assets/shaders/deferred_lighting.frag` that set is `set = 1` (because `set = 0` holds the G-buffer sampled textures `uNormal/uAlbedo/uMaterial/uDepth`), so the deferred lighting binding is `set 1, binding 1` even though the forward path (`surface.frag`) uses `set 0, binding 1` for the same logical slot.
 - Today: `Pass.Deferred.GBuffers.cpp` and `Pass.Deferred.Lighting.cpp` exist as command-body shells but are not owned, not piped through the executor, and have no pipelines created. `ShadowSystem` already owns the atlas + `sampler2DShadow`-bindable sampler (GRAPHICS-073 Slice B), so the binding work here is descriptor-set wiring, not resource creation.
@@ -74,13 +77,18 @@
   finalizes them through `Pass.Deferred.Lighting` (Slice A audited; recipe
   declarations match `BuildDeferredGBufferPipelineDesc()` color-target
   formats).
-- [ ] Wire the deferred lighting descriptor set so the `ShadowSystem`-owned
-  shadow atlas is bound at `set 1, binding 1` — i.e. `binding 1` of the same
-  global descriptor set as `CameraUBO` (`set = 1, binding = 0`) per
-  `GRAPHICS-009Q`, matching `assets/shaders/deferred_lighting.frag`'s
-  `layout(set = 1, binding = 1) uniform sampler2DShadow shadowAtlas`. Source
-  the texture/sampler handles from `ShadowSystem::GetAtlasBindlessIndex()`
-  / `GetAtlasSampler()`. (Slice C; absorbed from GRAPHICS-073 Slice C.)
+- [x] Wire the deferred lighting descriptor set so the `ShadowSystem`-owned
+  shadow atlas is bound. The original spec named `set 1, binding 1` matching
+  `assets/shaders/deferred_lighting.frag`'s `layout(set = 1, binding = 1)
+  uniform sampler2DShadow shadowAtlas`; on the promoted Vulkan pipeline
+  layout (bindless-only, `setLayoutCount = 1` with the bindless heap at
+  `set = 0`) the equivalent wiring is the
+  `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` push-constant
+  field sourced from `ShadowSystem::GetAtlasBindlessIndex()`. The shader
+  (`assets/shaders/deferred/lighting.frag`) gained the matching push-constant
+  slot and samples the atlas through
+  `globalTextures[nonuniformEXT(pc.ShadowAtlasBindlessIndex)]`. (Slice C
+  landed; absorbed from GRAPHICS-073 Slice C.)
 - [x] Slice A only: add `IRenderer::SetLightingPath()` /
   `GetLightingPath()` test seam and
   `GetDeferredGBufferPipeline()` / `GetDeferredGBufferPipelineDesc()`
@@ -100,15 +108,18 @@
   Lighting (read) are emitted in the expected order
   (`SceneNormal/Albedo/Material0` ColorAttachment → ShaderRead) (Slice B:
   `RendererFrameLifecycle.DeferredGBufferToCompositionEmitsColorToShaderReadBarriers`).
-- [ ] `contract;graphics` test: barrier packets transition the
+- [x] `contract;graphics` test: barrier packets transition the
   `ShadowSystem`-owned shadow atlas `DepthAttachment → ShaderRead` before
-  `Pass.Deferred.Lighting` (Slice C; absorbed from GRAPHICS-073 Slice C).
-- [ ] `contract;graphics` test: with one shadow-casting renderable + one
-  light wired end-to-end through extraction, the executor reports `Recorded`
-  for `ShadowPass` *and* `Pass.Deferred.Lighting`, and the deferred lighting
-  descriptor set binds the shadow atlas at `set 1, binding 1` (Slice C;
-  absorbed from GRAPHICS-073 Slice C with the binding location corrected to
-  match `deferred_lighting.frag`).
+  `Pass.Deferred.Lighting` (Slice C:
+  `RendererFrameLifecycle.DeferredLightingShadowAtlasTransitionsDepthToShaderReadBeforeComposition`).
+- [x] `contract;graphics` test: with shadows enabled through the renderer's
+  `ShadowSystem` (`SetParams(...)` allocates the atlas + registers it in
+  the bindless heap), the executor reports `Recorded` for `ShadowPass` and
+  `CompositionPass`, and the deferred lighting pass's push constants carry
+  `ShadowAtlasBindlessIndex == ShadowSystem::GetAtlasBindlessIndex()` (the
+  bindless-heap equivalent of the legacy `set 1, binding 1` shadow-atlas
+  binding) (Slice C:
+  `RendererFrameLifecycle.DeferredLightingPushConstantsCarryShadowAtlasBindlessIndex`).
 - [x] `contract;graphics` test: missing GBuffer pipeline lease →
   `SkippedUnavailable` for the deferred-mode `"SurfacePass"` (Slice A:
   `RendererFrameLifecycle.DeferredSurfacePassSkipsUnavailableWhenPipelineMissing`).
@@ -129,19 +140,21 @@
   pending in the Slice B/C bullet of the same file.
 - [x] Slice B: update `src/graphics/renderer/README.md` to record deferred
   lighting as operationally wired.
-- [ ] Slice C: update `src/graphics/renderer/README.md` to record the
-  shadow-atlas binding consumer at `set 1, binding 1` (forward path keeps
-  using `set 0, binding 1`; absorbed from GRAPHICS-073 Slice C with the
-  binding location corrected to match `deferred_lighting.frag`).
-- [ ] Update `docs/architecture/rendering-three-pass.md` if pipeline-order
-  step numbers shift or shadow ordering relative to deferred lighting
-  changes (absorbed from GRAPHICS-073 Slice C).
+- [x] Slice C: update `src/graphics/renderer/README.md` to record the
+  shadow-atlas bindless-index push-constant binding (the bindless-only
+  pipeline-layout equivalent of the legacy `set 1, binding 1`
+  `sampler2DShadow` model); forward path's `surface.frag` shadow-atlas
+  binding stays unaffected.
+- [x] Update `docs/architecture/rendering-three-pass.md` to record that
+  the deferred `SurfacePass` no longer samples the shadow atlas (GBuffer
+  pass) and that `CompositionPass` samples through the bindless heap with
+  the atlas slot pushed via `ShadowAtlasBindlessIndex`.
 
 ## Acceptance criteria
-- [ ] Both passes record draws in the operational state and increment `Recorded`.
-- [ ] Deferred lighting samples the `ShadowSystem`-owned shadow atlas correctly: descriptor set binds it at `set 1, binding 1` (binding 1 of the deferred CameraUBO global set, matching `deferred_lighting.frag`) and the cross-pass barrier transitions it `DepthAttachment → ShaderRead` before `Pass.Deferred.Lighting` (absorbed from GRAPHICS-073 Slice C).
-- [ ] No regression in `Pass.Forward.Surface` (forward and deferred can coexist gated by `RenderConfig` or recipe selection).
-- [ ] No regression in CPU/null tests.
+- [x] Both passes record draws in the operational state and increment `Recorded`.
+- [x] Deferred lighting samples the `ShadowSystem`-owned shadow atlas correctly: the lighting pass pushes the atlas's bindless slot through `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` (the bindless-only pipeline-layout equivalent of the legacy `set 1, binding 1` model), and the cross-pass barrier transitions the atlas `DepthAttachment → ShaderReadOnly` before `Pass.Deferred.Lighting` (absorbed from GRAPHICS-073 Slice C).
+- [x] No regression in `Pass.Forward.Surface` (forward and deferred coexist gated by `SetLightingPath`; forward path's `surface.frag` shadow-atlas read is unaffected).
+- [x] No regression in CPU/null tests.
 
 ## Verification
 ```bash
@@ -202,6 +215,47 @@ gate green.
   Slice C).
 
 ## Next verification step
-- Land Slice A: pipelines + executor route for GBuffer + lighting-path test
-  seam + the three slice-A contract tests. Run the verification block above
-  and assert no regression in the forward-path contract tests.
+- (Historical, Slice A.) Land Slice A: pipelines + executor route for
+  GBuffer + lighting-path test seam + the three slice-A contract tests.
+  Run the verification block above and assert no regression in the
+  forward-path contract tests.
+
+## Completion note
+
+Slice C closed the task on 2026-05-19 with the following verification run
+against branch `claude/setup-agentic-workflow-2HdHw`:
+
+```
+cmake --preset ci
+cmake --build build/ci --target IntrinsicGraphicsContractTests
+cmake --build build/ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -L 'contract' \
+      -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+```
+
+Result: 161/161 contract tests pass, including the two new Slice C tests
+`RendererFrameLifecycle.DeferredLightingShadowAtlasTransitionsDepthToShaderReadBeforeComposition`
+and
+`RendererFrameLifecycle.DeferredLightingPushConstantsCarryShadowAtlasBindlessIndex`.
+Layering / doc-link / task-policy / test-layout checks all clean. The
+`IntrinsicGraphicsRendererCpuUnitTests` (41), `IntrinsicGraphicsUnitTests`
+(28), and `IntrinsicRuntimeGraphicsCpuTests` (22) targets were also run
+to catch incidental regressions from the recipe / push-constant changes;
+all green.
+
+Architectural disposition of the original "set 1, binding 1" spec: the
+promoted Vulkan pipeline layout declares only the bindless heap at
+`set = 0` (`setLayoutCount = 1` in
+`src/graphics/vulkan/Backends.Vulkan.Device.cpp`), so the legacy
+multi-descriptor-set shadow-sampler binding from
+`assets/shaders/deferred_lighting.frag` is not representable. Slice C
+substitutes the equivalent wiring: the atlas's bindless slot is published
+through `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` and
+sampled in `assets/shaders/deferred/lighting.frag` via
+`globalTextures[nonuniformEXT(pc.ShadowAtlasBindlessIndex)]`. The
+forward path's `assets/shaders/surface.frag` `set 0, binding 1`
+`sampler2DShadow` is untouched.

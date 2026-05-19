@@ -153,8 +153,11 @@ namespace Extrinsic::Graphics
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"ShadowAtlas"});
         if (usesDeferred)
         {
+            // GRAPHICS-072 Slice C — the deferred SurfacePass is the GBuffer
+            // pass; it no longer samples `ShadowAtlas`. Shadow sampling moved
+            // to the deferred CompositionPass with `TextureUsage::ShaderRead`.
             AddPass(out, FrameRecipePassKind::Surface, "SurfacePass", true, false,
-                    {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth", "ShadowAtlas"},
+                    {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth"},
                     features.EnableDepthPrepass
                         ? std::initializer_list<std::string_view>{"SceneNormal", "Albedo", "Material0"}
                         : std::initializer_list<std::string_view>{"SceneNormal", "Albedo", "Material0", "SceneDepth"});
@@ -526,7 +529,14 @@ namespace Extrinsic::Graphics
             {
                 builder.Write(depth, TextureUsage::DepthWrite);
             }
-            if (features.EnableShadows)
+            // GRAPHICS-072 Slice C — the deferred `SurfacePass` is the
+            // GBuffer pass; it writes `SceneNormal/Albedo/Material0` and does
+            // *not* sample the shadow atlas. Shadow sampling moved entirely
+            // to the deferred `CompositionPass` (see below), where the
+            // bindless atlas is pushed through `DeferredLightingPushConstants`.
+            // Keep the forward path's shadow-atlas read on `SurfacePass` so
+            // `Pass.Forward.Surface`'s `sampler2DShadow` path stays valid.
+            if (features.EnableShadows && !usesDeferred)
             {
                 builder.Read(shadowAtlas, TextureUsage::DepthRead);
             }
@@ -552,7 +562,21 @@ namespace Extrinsic::Graphics
                 builder.Read(lights, BufferUsage::ShaderRead);
                 if (features.EnableShadows)
                 {
-                    builder.Read(shadowAtlas, TextureUsage::DepthRead);
+                    // GRAPHICS-072 Slice C — the deferred lighting fragment
+                    // shader samples the `ShadowSystem`-owned shadow atlas
+                    // through the global bindless heap (`set = 0`, indexed
+                    // by `DeferredLightingPushConstants::ShadowAtlasBindlessIndex`).
+                    // Declaring the read as `ShaderRead` causes the frame-
+                    // graph compiler to emit a `DepthAttachment →
+                    // ShaderReadOnly` layout transition between `ShadowPass`
+                    // (which wrote the atlas as `DepthWrite`) and this pass.
+                    // The legacy `set 1, binding 1` `sampler2DShadow` model
+                    // from `assets/shaders/deferred_lighting.frag` is not
+                    // representable on the engine's bindless-only pipeline
+                    // layout; the bindless-index push-constant is the
+                    // equivalent wiring. See `src/graphics/renderer/README.md`
+                    // ("Slice C: shadow-atlas binding") for the durable rule.
+                    builder.Read(shadowAtlas, TextureUsage::ShaderRead);
                 }
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
             });

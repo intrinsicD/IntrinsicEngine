@@ -313,8 +313,12 @@ Concretely:
   derivation continues to return `Forward` by default so existing contract
   tests stay green, and contract tests opt into the deferred-mode executor
   branch by calling `SetLightingPath(FrameRecipeLightingPath::Deferred)`. The
-  deferred-lighting shadow-atlas binding at `set 1, binding 1` is owned by
-  GRAPHICS-072 Slice C.
+  deferred-lighting shadow-atlas binding (originally specified as
+  `set 1, binding 1`) is owned by GRAPHICS-072 Slice C; on the promoted
+  Vulkan pipeline layout (bindless-only, `setLayoutCount = 1` with the
+  bindless heap at `set = 0`) the equivalent wiring is the
+  `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` push-constant
+  field sourced from `ShadowSystem::GetAtlasBindlessIndex()`.
 - GRAPHICS-072 Slice B wires the default-recipe `"CompositionPass"` to the
   existing `DeferredLightingPass` body. `NullRenderer` owns
   `m_DeferredLightingPass` (constructed against `m_DeferredSystem` alongside
@@ -343,9 +347,41 @@ Concretely:
   (i.e. `usesDeferred`); the cross-pass `SceneNormal`/`Albedo`/`Material0`
   `ColorAttachment → ShaderReadOnly` barriers are emitted by the framegraph
   compiler from the recipe's `Read(..., ShaderRead)` declarations on the
-  CompositionPass. The shadow-atlas descriptor binding at `set 1,
-  binding 1` and the full G-buffer/CameraUBO sampler wiring remain Slice C
-  scope.
+  CompositionPass. The full G-buffer/CameraUBO sampler wiring remains a
+  follow-up; Slice C completes the shadow-atlas binding contract below.
+- GRAPHICS-072 Slice C wires the deferred lighting pass to the
+  `ShadowSystem`-owned shadow atlas. `DeferredLightingPass` takes a
+  `ShadowSystem&` alongside `DeferredSystem&` so `Execute(...)` can publish
+  the atlas's bindless slot through push constants; the
+  `DeferredLightingPushConstants` struct adds a `ShadowAtlasBindlessIndex`
+  field (replacing the Slice B `_pad0` byte-for-byte, so
+  `BuildDeferredLightingPipelineDesc()` still records a 16-byte
+  `PushConstantSize`) and `assets/shaders/deferred/lighting.frag` adds a
+  matching `uint ShadowAtlasBindlessIndex` slot in its push-constant block,
+  declares `layout(set = 0, binding = 0) uniform sampler2D globalTextures[]`
+  (the engine's bindless heap), and samples the atlas through
+  `globalTextures[nonuniformEXT(pc.ShadowAtlasBindlessIndex)]` when the
+  index is non-zero (slot 0 stays reserved as the engine default/error
+  texture and the `kInvalidBindlessIndex` sentinel keeps shadow sampling
+  off when the atlas has not been allocated). The recipe-side change is
+  twofold: the deferred `SurfacePass` no longer declares
+  `builder.Read(shadowAtlas, ...)` (the GBuffer pass does not sample
+  shadows; that responsibility moved entirely to the composition pass), and
+  the `CompositionPass`'s shadow-atlas read switched from
+  `TextureUsage::DepthRead` to `TextureUsage::ShaderRead` so the
+  framegraph compiler emits a `DepthAttachment → ShaderReadOnly` layout
+  transition between `ShadowPass` (which writes the atlas as `DepthWrite`)
+  and the composition pass. The forward path's `SurfacePass`
+  shadow-atlas read stays as `TextureUsage::DepthRead` (the legacy
+  `assets/shaders/surface.frag` model — a real `sampler2DShadow` at
+  `set = 0, binding = 1` — and is unaffected by this slice). Shadow-atlas
+  binding policy: the legacy `set 1, binding 1` `sampler2DShadow` from
+  `assets/shaders/deferred_lighting.frag` cannot be honored on the
+  bindless-only promoted Vulkan pipeline layout (the engine declares only
+  `set = 0` plus a push-constant range), so the bindless-index
+  push-constant is the durable wiring. The `DescribeDefaultFrameRecipe`
+  introspection removes `ShadowAtlas` from the deferred `SurfacePass`
+  inputs to match.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by

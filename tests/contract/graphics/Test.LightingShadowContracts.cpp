@@ -295,7 +295,14 @@ TEST(GraphicsLightingShadowContracts, DeferredLightingRecordsFullscreenDrawWhenI
     ASSERT_TRUE(world.Initialize(device, bufferMgr, TinyWorldDesc()));
 
     Graphics::DeferredSystem deferred;
-    Graphics::DeferredLightingPass pass{deferred};
+    // GRAPHICS-072 Slice C — DeferredLightingPass takes a `ShadowSystem&`
+    // so `Execute(...)` can publish the atlas bindless index through push
+    // constants. The system is constructed and left uninitialized for this
+    // contract test — `GetAtlasBindlessIndex()` returns
+    // `kInvalidBindlessIndex` in that state, which keeps the pushed
+    // payload deterministic without requiring a backing TextureManager.
+    Graphics::ShadowSystem shadows;
+    Graphics::DeferredLightingPass pass{deferred, shadows};
     const RHI::PipelineHandle pipeline{401u, 1u};
     pass.SetPipeline(pipeline);
 
