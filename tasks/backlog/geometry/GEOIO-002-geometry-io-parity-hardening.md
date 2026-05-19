@@ -23,6 +23,8 @@
 ## Docs
 - [ ] Update `docs/migration/nonlegacy-parity-matrix.md` and `docs/api/generated/module_inventory.md` when public module surfaces change.
 - [ ] Cross-link `GRAPHICS-019` and `ASSETIO-001` from completion notes.
+## Progress notes
+- 2026-05-19 (`GEOIO-002AH` slice): added geometry-owned ambiguous import/export domain metadata helpers for extension routing (PLY requires an explicit caller-side domain hint); remaining importer/exporter parity items stay open.
 ## Acceptance criteria
 - [ ] Geometry IO parity is sufficient for asset/runtime import routing to stop depending on legacy graphics importers/exporters for supported geometry formats.
 - [ ] `src/geometry/*` imports only allowed lower-layer dependencies and remains independent of assets/runtime/graphics.

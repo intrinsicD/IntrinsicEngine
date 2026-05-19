@@ -169,6 +169,16 @@ export namespace Geometry::IO
         return format == nullptr ? std::span<const GeometryIODomain>{} : format->ExportDomains;
     }
 
+    [[nodiscard]] constexpr bool HasAmbiguousImportDomains(std::string_view extension)
+    {
+        return ImportDomainsForExtension(extension).size() > 1;
+    }
+
+    [[nodiscard]] constexpr bool HasAmbiguousExportDomains(std::string_view extension)
+    {
+        return ExportDomainsForExtension(extension).size() > 1;
+    }
+
     [[nodiscard]] constexpr bool SupportsImportDomain(std::string_view extension, GeometryIODomain domain)
     {
         return HasDomain(ImportDomainsForExtension(extension), domain);

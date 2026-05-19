@@ -85,6 +85,8 @@ TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
     using Geometry::IO::FindGeometryIOFormat;
     using Geometry::IO::GeometryIODomain;
     using Geometry::IO::GeometryIOFormatKind;
+    using Geometry::IO::HasAmbiguousExportDomains;
+    using Geometry::IO::HasAmbiguousImportDomains;
     using Geometry::IO::ImportDomainsForExtension;
     using Geometry::IO::SupportedGeometryIOFormats;
     using Geometry::IO::SupportsExportDomain;
@@ -106,10 +108,14 @@ TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
     EXPECT_TRUE(SupportsImportDomain("ply", GeometryIODomain::PointCloud));
     EXPECT_TRUE(SupportsExportDomain("ply", GeometryIODomain::Mesh));
     EXPECT_TRUE(SupportsExportDomain("ply", GeometryIODomain::PointCloud));
+    EXPECT_TRUE(HasAmbiguousImportDomains("ply"));
+    EXPECT_TRUE(HasAmbiguousExportDomains(".PLY"));
 
     EXPECT_TRUE(SupportsImportDomain("obj", GeometryIODomain::Mesh));
     EXPECT_FALSE(SupportsImportDomain("obj", GeometryIODomain::PointCloud));
     EXPECT_TRUE(SupportsExportDomain("obj", GeometryIODomain::Mesh));
+    EXPECT_FALSE(HasAmbiguousImportDomains("obj"));
+    EXPECT_FALSE(HasAmbiguousExportDomains("obj"));
 
     EXPECT_TRUE(SupportsImportDomain("off", GeometryIODomain::Mesh));
     EXPECT_FALSE(SupportsExportDomain("off", GeometryIODomain::Mesh));
@@ -124,6 +130,8 @@ TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
     EXPECT_TRUE(SupportsExportDomain("edges", GeometryIODomain::Graph));
     EXPECT_TRUE(ExportDomainsForExtension("gltf").empty());
     EXPECT_TRUE(ImportDomainsForExtension("").empty());
+    EXPECT_FALSE(HasAmbiguousImportDomains("gltf"));
+    EXPECT_FALSE(HasAmbiguousExportDomains(""));
 }
 
 TEST(GeometryIO_MeshIO, LoadsOFFTriangle)
