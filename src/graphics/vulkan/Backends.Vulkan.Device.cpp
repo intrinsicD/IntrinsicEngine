@@ -2907,7 +2907,15 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     }
 
     if (desc.HostVisible)
+    {
         buf.MappedPtr = info.pMappedData;
+
+        // Cache HOST_COHERENT so the WriteBuffer fast path can skip
+        // vmaFlushAllocation when VMA selected coherent memory.
+        VkMemoryPropertyFlags memProps = 0;
+        vmaGetAllocationMemoryProperties(m_Vma, buf.Allocation, &memProps);
+        buf.HostCoherent = (memProps & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
+    }
 
     if (desc.DebugName && m_ValidationEnabled)
     {
@@ -2966,12 +2974,22 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
         // ----------------------------------------------------------------
         assert(buf->MappedPtr && "HostVisible buffer has null MappedPtr");
         std::memcpy(static_cast<char*>(buf->MappedPtr) + offset, data, size);
-        // Note: VMA_MEMORY_USAGE_CPU_TO_GPU selects HOST_COHERENT memory when
-        // available (integrated GPUs and most desktops).  On some discrete GPUs
-        // that lack HOST_COHERENT the mapping is write-combined; a coherent
-        // flush would be needed.  For strict portability:
-        //   vmaFlushAllocation(m_Vma, buf->Allocation, offset, size);
-        // This is left as a TODO for production hardening.
+        // VMA_MEMORY_USAGE_CPU_TO_GPU selects HOST_COHERENT memory when
+        // available (integrated GPUs and most desktops). On hosts that lack
+        // HOST_COHERENT the mapping is write-combined and the host writes are
+        // not guaranteed to be visible to the device without an explicit flush;
+        // gate the call on the cached coherent flag so the coherent fast path
+        // stays zero-cost.
+        if (!buf->HostCoherent && m_Vma != VK_NULL_HANDLE)
+        {
+            const VkResult flushResult =
+                vmaFlushAllocation(m_Vma, buf->Allocation, offset, size);
+            if (flushResult != VK_SUCCESS)
+            {
+                Core::Log::Warn("[VulkanDevice::WriteBuffer] vmaFlushAllocation reported VkResult={}; device may observe stale CPU writes on non-coherent memory.",
+                                static_cast<int>(flushResult));
+            }
+        }
         return;
     }
 

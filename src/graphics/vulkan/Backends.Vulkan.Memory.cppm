@@ -12,12 +12,13 @@ namespace Extrinsic::Backends::Vulkan
 {
     export struct VulkanBuffer
     {
-        VkBuffer      Buffer      = VK_NULL_HANDLE;
-        VmaAllocation Allocation  = VK_NULL_HANDLE;
-        void*         MappedPtr   = nullptr;
-        uint64_t      SizeBytes   = 0;
-        bool          HostVisible = false;
-        bool          HasBDA      = false;
+        VkBuffer      Buffer       = VK_NULL_HANDLE;
+        VmaAllocation Allocation   = VK_NULL_HANDLE;
+        void*         MappedPtr    = nullptr;
+        uint64_t      SizeBytes    = 0;
+        bool          HostVisible  = false;
+        bool          HostCoherent = false;
+        bool          HasBDA       = false;
     };
 
     export struct VulkanImage
