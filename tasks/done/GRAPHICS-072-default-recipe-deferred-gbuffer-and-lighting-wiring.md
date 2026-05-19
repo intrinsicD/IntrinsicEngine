@@ -36,10 +36,10 @@
 - Branch: Slice A — `claude/setup-agentic-workflow-HSYdR`; Slice B —
   `claude/setup-agentic-workflow-cQjgU`; Slice C —
   `claude/setup-agentic-workflow-2HdHw`.
-- PR: Slice A — PR #886; Slice B — PR #887, PR #888; Slice C — TBD (this
-  branch).
+- PR: Slice A — PR #886; Slice B — PR #887, PR #888; Slice C — pending on
+  branch `claude/setup-agentic-workflow-2HdHw`.
 - Commit: Slice A — `87e5489`, `c4aa607`; Slice B — `9469aaa`, `4127670`;
-  Slice C — TBD (this branch).
+  Slice C — `a3ab39b`.
 - Completed: 2026-05-19. Slice C retirement landed via the same branch.
 - Completion verification: see "Completion note" below.
 - Owner/layer: `graphics/renderer`.
