@@ -590,10 +590,28 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   documented `point.vert` + `point_retained.frag` canonical retained point
   variant.
 - [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
-  depends on GRAPHICS-070, GRAPHICS-073.
-- [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation](../../active/GRAPHICS-073-default-recipe-shadow-pass-wiring.md)
-  (active, in-progress; Slice A — depth-only shadow pipeline + executor route — landed; Slice B — `ShadowSystem`-owned atlas/sampler + `FrameRecipeShadowSizing` import seam — open):
-  depends on GRAPHICS-070.
+  depends on GRAPHICS-070 (done), GRAPHICS-073 (done). Now also owns the
+  shadow-atlas deferred-lighting binding (at `set 1, binding 1` per
+  `assets/shaders/deferred_lighting.frag`, i.e. binding 1 of the same
+  global descriptor set as the deferred-path CameraUBO per
+  `GRAPHICS-009Q`; the forward path keeps using `set 0, binding 1`) and
+  the `DepthAttachment → ShaderRead` cross-pass barrier-transition test
+  absorbed from GRAPHICS-073 Slice C, since both can only be exercised
+  once `Pass.Deferred.Lighting` is recording in the operational executor.
+- [GRAPHICS-073 — Default-recipe `Pass.Shadows` wiring + shadow atlas allocation (done)](../../done/GRAPHICS-073-default-recipe-shadow-pass-wiring.md):
+  depended on GRAPHICS-070. Slice A landed the depth-only shadow pipeline,
+  `NullRenderer` ownership, and the `"ShadowPass"` executor branch
+  (`SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy);
+  Slice B promoted `ShadowSystem` to own the `D32_FLOAT` atlas + the
+  `sampler2DShadow`-bindable sampler, added the `FrameRecipeShadowSizing`
+  typed seam + optional `FrameRecipeImports::ShadowAtlas`, and surfaced the
+  `ShadowDiagnostics::MissingCasterCount` empty-cull-bucket diagnostic.
+  Slice C (deferred-lighting shadow-atlas binding + cross-pass
+  barrier-transition + `Recorded` integration tests) was transferred to
+  GRAPHICS-072 with the binding location corrected from the original
+  task's `set 0, binding 1` shorthand to `set 1, binding 1` to match
+  `assets/shaders/deferred_lighting.frag` (forward path keeps `set 0,
+  binding 1`).
 - [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
   depends on GRAPHICS-070.
 - [GRAPHICS-075 — Default-recipe postprocess chain wiring](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
