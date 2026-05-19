@@ -36,6 +36,13 @@ Render real geometry from `Sandbox::App` through the promoted runtime/graphics
 path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
 Implementation-children gap follow-up: `tasks/backlog/rendering/GRAPHICS-029A..033D` and `runtime/RUNTIME-070` (`BUILD-001` is done).
 
+Current working-sandbox path: the visible-triangle scaffold is complete; the
+remaining path is (1) default-recipe renderer completion, (2) runtime
+`GeometrySources` residency for mesh/graph/point-cloud content, (3) runtime
+selection/refinement handoff, (4) ImGui/editor UI panels, and (5) the final
+`ExtrinsicSandbox` acceptance task. Keep this path in backlog tasks rather than
+`Sandbox::App`, which remains policy-light and imports runtime only.
+
 Planning parents (retired):
 - [`rendering/GRAPHICS-029` (done)](../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
 - [`rendering/GRAPHICS-030` (done)](../done/GRAPHICS-030-runtime-geometry-residency-bridge.md)
@@ -71,6 +78,17 @@ Beyond-triangle full-graphics implementation tasks (Theme B′ in the rendering 
 - Default-recipe ImGui pass: [`GRAPHICS-079`](rendering/GRAPHICS-079-default-recipe-imgui-pass-wiring.md).
 - Runtime adapter umbrellas (clarified by `Q` follow-ups): [`runtime/RUNTIME-080..084`, `RUNTIME-090`](runtime/) — texture asset bridge, camera controllers, spatial-debug adapters, visualization adapters, gizmo interaction, ImGui adapter.
 - Bootstrap scaffold retirement: [`rendering/GRAPHICS-081`](rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) — once `GRAPHICS-070..076` are retired and the default recipe renders the reference triangle, the `MinimalDebugSurface` recipe + `Pass.Surface/Present.MinimalDebug` classes + three diagnostics counters introduced by `GRAPHICS-032`/`033` are deleted. The scaffold exists only to derisk the triangle path; it must not outlive the operational default recipe.
+
+Runtime/UI implementation leaves for the full sandbox app path:
+- [`runtime/RUNTIME-085`](runtime/RUNTIME-085-geometrysources-mesh-residency.md) — runtime-authored mesh `GeometrySources` to retained `GpuWorld` surface geometry.
+- [`runtime/RUNTIME-086`](runtime/RUNTIME-086-geometrysources-graph-residency.md) — graph nodes/edges to retained point/line geometry.
+- [`runtime/RUNTIME-087`](runtime/RUNTIME-087-geometrysources-pointcloud-residency.md) — point-cloud vertices to retained point geometry.
+- [`runtime/RUNTIME-088`](runtime/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh edge/vertex render views for primitive visualization and selection.
+- [`runtime/RUNTIME-089`](runtime/RUNTIME-089-selection-controller.md) — runtime selection controller, pick-request policy, and `RenderWorld.Selection` handoff.
+- [`runtime/RUNTIME-092`](runtime/RUNTIME-092-stable-entity-lookup.md) — runtime stable entity lookup sidecar identified by `HARDEN-068`.
+- [`runtime/RUNTIME-093`](runtime/RUNTIME-093-primitive-selection-refinement.md) — mesh/graph/point-cloud primitive refinement from graphics ID hints and authoritative CPU geometry.
+- [`ui/UI-001`](ui/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass.
+- [`runtime/RUNTIME-095`](runtime/RUNTIME-095-working-sandbox-acceptance.md) — final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud, cameras, selection, outline, and UI.
 
 ### Theme B — Rendering modernization (P1, gated by Theme A)
 
@@ -155,6 +173,21 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
 
 - **GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002.** Asset-backed mesh residency
   depends on promoted asset routing, which depends on geometry decoder parity.
+- **RUNTIME-085..088 ⇐ HARDEN-065, GRAPHICS-030B, GRAPHICS-070/071.** Runtime
+  mesh/graph/point-cloud residency depends on promoted `GeometrySources`, the
+  proven runtime-to-`GpuWorld` upload/bind pattern, and retained surface/line/
+  point pass contracts.
+- **RUNTIME-089 ⇐ GRAPHICS-074; RUNTIME-093 ⇐ RUNTIME-089, RUNTIME-085..088.**
+  Runtime selection policy consumes graphics readback, while primitive
+  refinement requires both selected entities and authoritative geometry
+  residency/source data.
+- **UI-001 ⇐ RUNTIME-090, GRAPHICS-079, RUNTIME-089.** UI panels require ImGui
+  frame production/presentation and runtime-owned selection state; panels must
+  remain command/event producers, not owners of engine state.
+- **RUNTIME-095 ⇐ GRAPHICS-072..079, GRAPHICS-081, ASSETIO-001/RUNTIME-080 as
+  needed for file-backed content, RUNTIME-085..089, RUNTIME-092..093, UI-001.**
+  The final working-sandbox acceptance composes the renderer, runtime
+  residency, selection/refinement, asset handoff, and UI paths.
 - **GRAPHICS-029..034 ⇐ HARDEN-060..062.** Sandbox renderable extraction needs
   promoted ECS scene/hierarchy/transform parity. `HARDEN-060`, `HARDEN-061`,
   and `HARDEN-062` are all retired to `tasks/done/`, so this gate is

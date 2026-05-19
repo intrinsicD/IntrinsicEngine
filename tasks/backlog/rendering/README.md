@@ -640,6 +640,17 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-084` — Gizmo interaction](../runtime/RUNTIME-084-gizmo-interaction.md).
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../runtime/RUNTIME-090-imgui-platform-renderer-adapter.md).
 
+Cross-layer Theme A leaves newly opened for the full working sandbox path:
+- [`runtime/RUNTIME-085` — `GeometrySources` mesh residency bridge](../runtime/RUNTIME-085-geometrysources-mesh-residency.md).
+- [`runtime/RUNTIME-086` — `GeometrySources` graph residency bridge](../runtime/RUNTIME-086-geometrysources-graph-residency.md).
+- [`runtime/RUNTIME-087` — `GeometrySources` point-cloud residency bridge](../runtime/RUNTIME-087-geometrysources-pointcloud-residency.md).
+- [`runtime/RUNTIME-088` — Mesh primitive view lifecycle](../runtime/RUNTIME-088-mesh-primitive-view-lifecycle.md).
+- [`runtime/RUNTIME-089` — Runtime selection controller and snapshot handoff](../runtime/RUNTIME-089-selection-controller.md).
+- [`runtime/RUNTIME-092` — Runtime stable entity lookup sidecar](../runtime/RUNTIME-092-stable-entity-lookup.md).
+- [`runtime/RUNTIME-093` — Primitive selection refinement](../runtime/RUNTIME-093-primitive-selection-refinement.md).
+- [`ui/UI-001` — Sandbox editor shell and core panels](../ui/UI-001-sandbox-editor-shell-panels.md).
+- [`runtime/RUNTIME-095` — Working sandbox app acceptance path](../runtime/RUNTIME-095-working-sandbox-acceptance.md).
+
 ### Modernization roadmap (GRAPHICS-035..058)
 
 The tasks below form the agreed phased path from the current 2025-era

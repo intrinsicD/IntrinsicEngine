@@ -11,10 +11,14 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
+- [UI-001 — Sandbox editor shell and core panels](UI-001-sandbox-editor-shell-panels.md).
 
 ## Convergence
 
 - RORG-031F is part of **Theme F — Architecture/runtime/UI foundation seeds**.
+- UI-001 is part of **Theme A — Working sandbox app path** and depends on
+  `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
+  runtime selection/geometry-residency tasks for live content.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
   parity matrix and the rendering DAG in

@@ -52,6 +52,35 @@ done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
   Dear ImGui platform/renderer adapter producing `ImGuiOverlayFrame` records for
   `ImGuiOverlaySystem::SubmitFrame` (clarified by GRAPHICS-013CQ).
 
+### Working sandbox runtime path
+
+These tasks fill the runtime-owned gaps between the renderer pass DAG and a
+usable sandbox that can show authored mesh, graph, and point-cloud data with
+selection and UI. They are ordered after the visible-triangle foundation and
+compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
+
+- [RUNTIME-085 — `GeometrySources` mesh residency bridge](RUNTIME-085-geometrysources-mesh-residency.md):
+  runtime-authored ECS mesh data (`Vertices`/`Edges`/`Halfedges`/`Faces`) to
+  retained `GpuWorld` surface geometry.
+- [RUNTIME-086 — `GeometrySources` graph residency bridge](RUNTIME-086-geometrysources-graph-residency.md):
+  graph nodes/edges to retained point and line geometry.
+- [RUNTIME-087 — `GeometrySources` point-cloud residency bridge](RUNTIME-087-geometrysources-pointcloud-residency.md):
+  point-cloud vertices to retained point geometry.
+- [RUNTIME-088 — Mesh primitive view lifecycle](RUNTIME-088-mesh-primitive-view-lifecycle.md):
+  optional mesh edge/vertex render views for primitive visualization and later
+  primitive selection.
+- [RUNTIME-089 — Runtime selection controller and snapshot handoff](RUNTIME-089-selection-controller.md):
+  input/pick-result policy, selected/hovered state, and `RenderWorld.Selection`
+  submission.
+- [RUNTIME-092 — Runtime stable entity lookup sidecar](RUNTIME-092-stable-entity-lookup.md):
+  runtime-owned `StableId`/live-entity lookup for selection and editor tooling.
+- [RUNTIME-093 — Primitive selection refinement](RUNTIME-093-primitive-selection-refinement.md):
+  mesh face/edge/vertex, graph edge/node, and point-cloud point refinement from
+  graphics primitive hints plus authoritative `GeometrySources`.
+- [RUNTIME-095 — Working sandbox app acceptance path](RUNTIME-095-working-sandbox-acceptance.md):
+  final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud,
+  camera, selection, outline, and UI.
+
 ## Cross-linked rendering tasks (runtime-owned)
 
 Some rendering backlog tasks are runtime-owned for extraction/wiring even

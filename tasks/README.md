@@ -19,7 +19,10 @@ Use stable task prefixes to reflect ownership and review routing:
 - `RORG-` — repository reorganization and migration.
 - `ARCH-` — architecture and layering decisions.
 - `GRAPHICS-` — renderer, frame graph, and RHI work.
+- `RUNTIME-` — runtime composition, extraction, adapter, and acceptance work.
+- `ASSETIO-` — promoted CPU asset ingest/export ownership and routing work.
 - `GEOM-` — geometry processing and mesh pipeline work.
+- `UI-` — editor/UI integration tasks that emit commands/events to owning systems.
 - `METHOD-` — paper/method implementation workflow.
 - `BENCH-` — benchmark manifests, runners, and baselines.
 - `CI-` — workflow and automation changes.

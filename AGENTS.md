@@ -159,6 +159,12 @@ Every task execution should follow this sequence:
 8. Update generated inventories.
 9. Self-review against PR checklist.
 
+The current cross-domain backlog convergence map, including the working
+`ExtrinsicSandbox` app path from visible triangle to mesh/graph/point-cloud
+rendering with camera, selection, outline, and UI, is tracked in
+`tasks/backlog/README.md`. Keep roadmap details there rather than expanding this
+contract with task-specific plans.
+
 ## 12. Review checklist
 
 Before commit/PR, verify:
