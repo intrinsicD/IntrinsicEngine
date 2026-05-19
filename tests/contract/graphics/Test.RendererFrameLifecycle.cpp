@@ -1572,3 +1572,71 @@ TEST(RendererFrameLifecycle, DeferredLightingPushConstantsCarryShadowAtlasBindle
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-074 Slice A — default-recipe EntityId selection pipeline lease +
+// republish. The CPU/null contract here is the byte-identical descriptor
+// across the initial init and `RebuildOperationalResources()`, plus the
+// shader-path and color-target assertions that catch the GpuScene-aware
+// shader-pair contract (the legacy `assets/shaders/pick_id.{vert,frag}` is a
+// known footgun because it declares the pre-GpuScene `mat4 Model +
+// PtrPositions + ... + uint EntityID` push block and would silently
+// misinterpret the `RHI::GpuScenePushConstants` bytes that
+// `EntityIdPass::Execute` pushes).
+//
+// Render-pass compatibility: `BuildDefaultFrameRecipe` orders `PickingPass`
+// *before* `DepthPrepass` and the picking pass declaration is color-only —
+// no `Read(depth)` / `Write(depth)` — so this pipeline must run depth-
+// test-off, depth-write-off, depth-attachment-less to match the
+// framegraph-emitted render pass and to avoid depth-testing against an
+// uninitialized depth buffer (which on real backends would produce
+// incorrect IDs or consistent no-hit readbacks once Slice D's drain
+// lands). Depth-sorted picking is a recipe-side follow-up that
+// reorders `PickingPass` after `DepthPrepass` and adds
+// `Read(depth, DepthRead)` to its declaration, at which point this
+// descriptor can flip back to the depth-equal shape the other GpuScene
+// pipelines use.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{287u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionEntityIdPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionEntityIdPipelineDesc();
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/selection/entity_id.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/selection/entity_id.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    // Render-pass compatibility with the recipe-declared color-only
+    // PickingPass: depth-test off, depth-write off, no depth attachment.
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionEntityIdPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionEntityIdPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+

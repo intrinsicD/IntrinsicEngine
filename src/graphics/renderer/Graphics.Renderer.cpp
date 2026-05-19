@@ -45,6 +45,7 @@ import Extrinsic.Graphics.Pass.Forward.Surface;
 import Extrinsic.Graphics.Pass.Forward.Line;
 import Extrinsic.Graphics.Pass.Forward.Point;
 import Extrinsic.Graphics.Pass.Shadows;
+import Extrinsic.Graphics.Pass.Selection.EntityId;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -227,6 +228,18 @@ namespace Extrinsic::Graphics
             m_LightSystem->Initialize();
             m_SelectionSystem.emplace();
             m_SelectionSystem->Initialize();
+            // GRAPHICS-074 Slice A — `EntityIdPass` is selection-system-bound
+            // and consumes the `SurfaceOpaque` cull bucket via
+            // `EntityIdPass::Execute(...)`. The pass must be emplaced before
+            // the operational publisher creates the EntityId selection
+            // pipeline and calls `SetPipeline(...)` — same publisher-before-
+            // first-frame invariant as the forward / shadow / deferred passes
+            // below — otherwise the first frame would observe a `has_value()`
+            // lease but a default-constructed pipeline handle on the pass
+            // itself, and `Execute()` would early-return on
+            // `!m_Pipeline.IsValid()` while the executor still reported
+            // `Recorded`.
+            m_SelectionEntityIdPass.emplace(*m_SelectionSystem);
             m_ForwardSystem.emplace();
             m_ForwardSystem->Initialize();
             // GRAPHICS-070/071/073 — default-recipe forward surface/line/point/
@@ -352,15 +365,17 @@ namespace Extrinsic::Graphics
             if (m_GpuWorld)        m_GpuWorld->Shutdown();
             if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
 
-            // GRAPHICS-070/071/072/073 — drop forward, deferred GBuffer, and
-            // shadow passes before resetting their system dependencies below
-            // so optional destructors do not observe a dangling reference.
+            // GRAPHICS-070/071/072/073/074 — drop forward, deferred GBuffer,
+            // shadow, and EntityId selection passes before resetting their
+            // system dependencies below so optional destructors do not observe
+            // a dangling reference.
             m_ForwardSurfacePass.reset();
             m_ForwardLinePass.reset();
             m_ForwardPointPass.reset();
             m_ShadowPass.reset();
             m_DeferredGBufferPass.reset();
             m_DeferredLightingPass.reset();
+            m_SelectionEntityIdPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -382,6 +397,7 @@ namespace Extrinsic::Graphics
             m_ShadowPipelineLease.reset();
             m_DeferredGBufferPipelineLease.reset();
             m_DeferredLightingPipelineLease.reset();
+            m_SelectionEntityIdPipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -1046,6 +1062,21 @@ namespace Extrinsic::Graphics
                             RecordShadowPass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    else if (passName == std::string_view{"PickingPass"})
+                    {
+                        // GRAPHICS-074 Slice A — default-recipe EntityId
+                        // selection pass. The recipe declares `PickingPass`
+                        // only when `features.EnablePicking` is true (i.e. a
+                        // pick request was pending this frame), so the branch
+                        // is reached only when picking is active. Slice B will
+                        // extend this branch with Face/Edge/Point dispatch
+                        // based on the pending pick kind; for now only the
+                        // EntityId sub-pass records and the readback drain
+                        // remains Slice D scope.
+                        const RenderCommandPassStatus status =
+                            RecordSelectionEntityIdPass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
                         const RenderCommandPassStatus status =
@@ -1258,6 +1289,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept override
         {
             return BuildDeferredLightingPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_SelectionEntityIdPipelineLease.has_value() ||
+                !m_SelectionEntityIdPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_SelectionEntityIdPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept override
+        {
+            return BuildSelectionEntityIdPipelineDesc();
         }
 
         void SetLightingPath(FrameRecipeLightingPath path) noexcept override
@@ -1582,6 +1628,68 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-074 Slice A — default-recipe EntityId selection pipeline.
+        // Pairs the GpuScene-aware `selection/entity_id.vert.spv` (reads
+        // positions through `GpuScenePushConstants::SceneTableBDA` → instance
+        // / dynamic / geometry buffer references and forwards the per-instance
+        // stable entity ID as a flat `uint` varying) with the matching
+        // `selection/entity_id.frag.spv` (writes two R32_UINT outputs: location
+        // 0 = stable entity ID into the `EntityId` target, location 1 =
+        // `EncodeSelectionId(SelectionPrimitiveDomain::Entity, 0)` into the
+        // `PrimitiveId` target per the GRAPHICS-012Q encoding contract). The
+        // legacy `assets/shaders/pick_id.{vert,frag}` declares the pre-GpuScene
+        // `mat4 Model + PtrPositions + PtrNormals + PtrAux + uint EntityID`
+        // push-constant block and would silently truncate / misinterpret the
+        // `RHI::GpuScenePushConstants` bytes that `EntityIdPass::Execute`
+        // pushes via `cmd.PushConstants(&pc, sizeof(pc))`, so it is
+        // deliberately *not* referenced here — see
+        // `src/graphics/renderer/README.md` ("Shader push-constant
+        // compatibility policy") for the parallel forward / deferred /
+        // shadow precedents. Two color targets match the frame recipe's
+        // `PickingPass` attachment formats (`Graphics.FrameRecipe.cpp`,
+        // `features.EnablePicking` branch): `EntityId` (R32_UINT) +
+        // `PrimitiveId` (R32_UINT).
+        //
+        // No depth attachment: `BuildDefaultFrameRecipe` orders `PickingPass`
+        // *before* `DepthPrepass` and the picking pass declaration does not
+        // `Read(depth)` / `Write(depth)`, so the framegraph compiler emits a
+        // color-only render pass for picking. Configuring the pipeline with
+        // `DepthOp::Equal` + `DepthTargetFormat::D32_FLOAT` (the depth-
+        // prepass-on shape the forward / deferred GBuffer pipelines use)
+        // would be render-pass-incompatible here *and* would depth-test
+        // against an uninitialized depth buffer because the prepass has not
+        // run yet — together producing incorrect IDs or consistent no-hit
+        // readbacks once the readback drain (Slice D) lands. The pipeline
+        // therefore runs depth-test-off, depth-write-off, depth-attachment-
+        // less. Depth-sorted picking remains a recipe-side follow-up: add
+        // `Read(depth, DepthRead)` to `PickingPass` and reorder the recipe
+        // so it runs after `DepthPrepass`, then this descriptor can flip
+        // back to the depth-equal shape the other GpuScene pipelines use.
+        [[nodiscard]] static RHI::PipelineDesc BuildSelectionEntityIdPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/entity_id.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/entity_id.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::Back;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorBlend[1].Enable = false;
+            desc.ColorTargetCount = 2u;
+            desc.ColorTargetFormats[0] = RHI::Format::R32_UINT; // EntityId
+            desc.ColorTargetFormats[1] = RHI::Format::R32_UINT; // PrimitiveId
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.SelectionEntityId";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -1834,6 +1942,34 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] DeferredLighting pipeline unavailable; default-recipe deferred composition recording will be skipped: error={}",
                                 static_cast<int>(deferredLightingPipeline.error()));
+            }
+
+            // GRAPHICS-074 Slice A — EntityId selection pipeline. Same
+            // reset/republish pattern as the forward, shadow, and deferred
+            // pipelines so a failed `Create()` leaves the pass in
+            // `SkippedUnavailable` rather than retaining a stale device handle
+            // across rebuilds. Slices B/C add the Face/Edge/Point + outline
+            // pipelines; Slice D allocates the `Picking.Readback` buffer.
+            m_SelectionEntityIdPipelineLease.reset();
+            if (m_SelectionEntityIdPass)
+            {
+                m_SelectionEntityIdPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc selectionEntityIdDesc = BuildSelectionEntityIdPipelineDesc();
+            auto selectionEntityIdPipeline = m_PipelineManager->Create(selectionEntityIdDesc);
+            if (selectionEntityIdPipeline.has_value())
+            {
+                m_SelectionEntityIdPipelineLease.emplace(std::move(*selectionEntityIdPipeline));
+                if (m_SelectionEntityIdPass)
+                {
+                    m_SelectionEntityIdPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_SelectionEntityIdPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] SelectionEntityId pipeline unavailable; default-recipe picking recording will be skipped: error={}",
+                                static_cast<int>(selectionEntityIdPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -2098,6 +2234,40 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-074 Slice A — default-recipe `"PickingPass"` route. The
+        // recipe only declares the pass when `features.EnablePicking` is
+        // true (set from `world.HasPendingPick || world.PickRequest.Pending`
+        // in `DeriveDefaultFrameRecipeFeatures`), so this helper is reached
+        // only when a pick request was pending for the frame. Mirrors
+        // `RecordForwardSurfacePass` / `RecordShadowPass`: a non-operational
+        // device → `SkippedNonOperational`; a missing culling output, pass,
+        // lease, `GpuWorld`, or culling system → `SkippedUnavailable`;
+        // otherwise `EntityIdPass::Execute` records the
+        // `Bind/Bind/Push/DrawIndexedIndirectCount` shape against the
+        // `SurfaceOpaque` cull bucket and we return `Recorded`. The
+        // Face/Edge/Point selection sub-passes (Slice B) and the
+        // `Picking.Readback` drain + `PublishPickResult`/`PublishNoHit`
+        // wiring (Slice D) are intentionally not exercised here.
+        [[nodiscard]] RenderCommandPassStatus RecordSelectionEntityIdPass(RHI::ICommandContext& cmd,
+                                                                           const RHI::CameraUBO& camera,
+                                                                           const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_SelectionEntityIdPass.has_value() ||
+                !m_SelectionEntityIdPipelineLease.has_value() ||
+                !m_SelectionEntityIdPipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_SelectionEntityIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-072 Slice A — default-recipe deferred-mode `"SurfacePass"`
         // route. Reached from the executor lambda when
         // `defaultRecipeUsesDeferred` is true and the active pass is
@@ -2327,6 +2497,12 @@ namespace Extrinsic::Graphics
         // `m_DeferredGBufferPass` after `m_DeferredSystem` is initialised,
         // reset before `m_DeferredSystem` in `Shutdown()`.
         std::optional<DeferredLightingPass>  m_DeferredLightingPass;
+        // GRAPHICS-074 Slice A — default-recipe EntityId selection pass.
+        // Same lifetime contract as the forward / shadow / deferred passes:
+        // emplaced after `m_SelectionSystem` is initialised and before the
+        // operational publisher runs; reset before `m_SelectionSystem` in
+        // `Shutdown()`.
+        std::optional<EntityIdPass>          m_SelectionEntityIdPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -2336,6 +2512,7 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_ShadowPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DeferredGBufferPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DeferredLightingPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEntityIdPipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;
