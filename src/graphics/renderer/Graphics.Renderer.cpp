@@ -2125,14 +2125,16 @@ namespace Extrinsic::Graphics
 
         // GRAPHICS-072 Slice B — default-recipe `"CompositionPass"` route.
         // Reached from the executor lambda when `BuildDefaultFrameRecipe`
-        // declared the deferred lighting pass (i.e. `usesDeferred`). Mirrors
-        // `RecordDeferredGBufferPass` but without the cull-output dependency
-        // (lighting samples the GBuffer textures + iterates the GpuScene
-        // light table via BDA, not the SurfaceOpaque indirect bucket): a
-        // non-operational device → `SkippedNonOperational`; a missing pass,
-        // lease, or GpuWorld → `SkippedUnavailable`; otherwise
-        // `DeferredLightingPass::Execute` records the
-        // `Bind/Push/Draw(3,1,0,0)` fullscreen shape and we return
+        // declared the deferred lighting pass (i.e. `usesDeferred`). The
+        // recipe wires `CompositionPass` to read `SceneNormal`/`Albedo`/
+        // `Material0` produced by the deferred-mode `SurfacePass`, so this
+        // helper inherits the GBuffer pass's prerequisites in addition to
+        // its own: a non-operational device → `SkippedNonOperational`;
+        // missing culling output, GBuffer pass/lease, lighting pass/lease,
+        // GpuWorld, or CullingSystem → `SkippedUnavailable` (so a failed
+        // GBuffer record never lets lighting consume cleared/unwritten
+        // attachments); otherwise `DeferredLightingPass::Execute` records
+        // the `Bind/Push/Draw(3,1,0,0)` fullscreen shape and we return
         // `Recorded`. The shadow-atlas descriptor binding at `set 1,
         // binding 1` is Slice C scope.
         [[nodiscard]] RenderCommandPassStatus RecordDeferredLightingPass(RHI::ICommandContext& cmd,
@@ -2143,6 +2145,17 @@ namespace Extrinsic::Graphics
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            // GBuffer prerequisites: if `RecordDeferredGBufferPass` would
+            // have returned `SkippedUnavailable`, the lighting pass must
+            // mirror that taxonomy rather than recording against
+            // uninitialized GBuffer attachments.
+            if (!m_CullingOutputAvailable || !m_DeferredGBufferPass.has_value() ||
+                !m_DeferredGBufferPipelineLease.has_value() ||
+                !m_DeferredGBufferPipelineLease->IsValid() ||
+                !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
             }
             if (!m_DeferredLightingPass.has_value() ||
                 !m_DeferredLightingPipelineLease.has_value() ||

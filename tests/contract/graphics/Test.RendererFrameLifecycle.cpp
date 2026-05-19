@@ -1048,10 +1048,20 @@ TEST(RendererFrameLifecycle, DeferredSurfacePassSkipsUnavailableWhenPipelineMiss
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    // GRAPHICS-072 Slice B — when the GBuffer pass cannot record (here,
+    // because its pipeline lease is missing), the deferred composition pass
+    // must mirror the `SkippedUnavailable` taxonomy rather than lighting
+    // against uninitialized SceneNormal/Albedo/Material0 attachments. The
+    // lighting pipeline itself was created successfully (call #10), so this
+    // test pins the GBuffer-prerequisite gate in `RecordDeferredLightingPass`,
+    // not the lighting-pipeline gate covered by
+    // `DeferredLightingPassSkipsUnavailableWhenPipelineMissing`.
+    ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    EXPECT_TRUE(renderer->GetDeferredLightingPipeline().IsValid());
     // Other passes (DepthPrepass, LinePass, PointPass) still record because
-    // their pipelines were created successfully; the deferred-surface
-    // `SkippedUnavailable` status above is the contract being asserted by
-    // this test.
+    // their pipelines were created successfully.
 
     renderer->Shutdown();
 }
