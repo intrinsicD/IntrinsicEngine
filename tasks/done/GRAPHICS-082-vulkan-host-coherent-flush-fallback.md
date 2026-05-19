@@ -26,7 +26,7 @@
 
 ## Required changes
 - [x] Outcome A (preferred): cache the per-allocation `HOST_COHERENT` flag on `VulkanBuffer` via `vmaGetAllocationMemoryProperties` at `CreateBuffer` time and call `vmaFlushAllocation(m_Vma, buf->Allocation, offset, size)` on the `WriteBuffer` fast path only when the cached flag reports the mapping is non-coherent.
-- [x] Outcome A coverage: extended the opt-in `VulkanBootstrapSmoke` (`tests/gpu/Test.VulkanBootstrapSmoke.cpp`) with a host-visible `WriteBuffer → ReadBuffer` round-trip so the fast path is reached on hosts with a live Vulkan device. The round-trip succeeds whether the gate selects the flush branch or the coherent no-op branch, and the fixture skips on hosts without a Vulkan device.
+- [x] Outcome A coverage: extended the opt-in `VulkanBootstrapSmoke` (`tests/gpu/Test.VulkanBootstrapSmoke.cpp`) so the host write is consumed by the GPU before any host read — `WriteBuffer` stages a pattern into a host-visible `TransferSrc` buffer, the frame's graphics context records `CopyBuffer` from that source into a host-visible `TransferDst` destination, and `ReadBuffer` pulls the device-written bytes from the destination after `Present`. A missing or broken `vmaFlushAllocation` on non-`HOST_COHERENT` memory would let `vkCmdCopyBuffer` consume stale source bytes and the destination readback would fail; on `HOST_COHERENT` hosts the flush is a documented no-op and the GPU still observes the pattern. The fixture skips on hosts without a Vulkan device.
 
 ## Tests
 - [x] Default CPU gate stays green:
@@ -40,7 +40,7 @@
 
 ## Acceptance criteria
 - [x] No bare `TODO for production hardening` text remains in `src/graphics/vulkan/Backends.Vulkan.Device.cpp`.
-- [x] Outcome A: `grep -nE 'TODO[^(]' src/graphics/vulkan/Backends.Vulkan.Device.cpp` returns no hits in the staging-upload region; the new code path is exercised by the `VulkanBootstrapSmoke` round-trip on hosts with a live Vulkan device.
+- [x] Outcome A: `grep -nE 'TODO[^(]' src/graphics/vulkan/Backends.Vulkan.Device.cpp` returns no hits in the staging-upload region; the new code path is exercised by the `VulkanBootstrapSmoke` host→GPU→host round-trip (`WriteBuffer` → `CopyBuffer` → `ReadBuffer`) on hosts with a live Vulkan device.
 - [x] Layering allowlist is unchanged.
 - [x] Promoted Vulkan backend continues to gate on `RHI::IDevice::IsOperational()`, not Vulkan diagnostics (`AGENTS.md` §4).
 

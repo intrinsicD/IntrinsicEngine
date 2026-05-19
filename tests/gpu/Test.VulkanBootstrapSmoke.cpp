@@ -372,33 +372,35 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         Extrinsic::RHI::GpuSceneTable emptySceneTable{};
         device->WriteBuffer(sceneTableBuffer, &emptySceneTable, sizeof(emptySceneTable), 0u);
 
-        // GRAPHICS-082: exercise the WriteBuffer fast path on a host-visible
-        // buffer so the cached HostCoherent flag and the gated vmaFlushAllocation
-        // call are covered. vmaFlushAllocation is a no-op on HOST_COHERENT memory
-        // (the typical desktop/integrated configuration), so the round-trip must
-        // succeed regardless of which branch the gate selects.
-        {
-            constexpr std::uint32_t kHostVisiblePattern = 0xA5C3'5AB6u;
-            const Extrinsic::RHI::BufferHandle hostVisibleBuffer = device->CreateBuffer({
-                .SizeBytes = sizeof(kHostVisiblePattern),
-                .Usage = Extrinsic::RHI::BufferUsage::TransferSrc |
-                         Extrinsic::RHI::BufferUsage::TransferDst,
-                .HostVisible = true,
-                .DebugName = "VulkanBootstrapSmoke.HostVisibleWriteFlush",
-            });
-            ASSERT_TRUE(hostVisibleBuffer.IsValid())
-                << "service-ready guarded bootstrap should create host-visible buffers for GRAPHICS-082 flush coverage";
+        // GRAPHICS-082: stage a pattern into a host-visible TransferSrc buffer
+        // via WriteBuffer; the GPU consumes it later via CopyBuffer inside the
+        // frame loop below, and ReadBuffer pulls the device-visible bytes back
+        // through a separate host-visible TransferDst destination. This routes
+        // the host write through the actual VMA flush gate before any device
+        // read so the assertion would catch a missing or broken
+        // vmaFlushAllocation on non-HOST_COHERENT memory (on HOST_COHERENT
+        // hosts the flush is a documented no-op and the GPU still sees the
+        // pattern).
+        constexpr std::uint32_t kHostVisibleFlushPattern = 0xA5C3'5AB6u;
+        const Extrinsic::RHI::BufferHandle flushSrcBuffer = device->CreateBuffer({
+            .SizeBytes = sizeof(kHostVisibleFlushPattern),
+            .Usage = Extrinsic::RHI::BufferUsage::TransferSrc,
+            .HostVisible = true,
+            .DebugName = "VulkanBootstrapSmoke.HostVisibleWriteFlush.Src",
+        });
+        ASSERT_TRUE(flushSrcBuffer.IsValid())
+            << "service-ready guarded bootstrap should create host-visible buffers for GRAPHICS-082 flush coverage";
+        const Extrinsic::RHI::BufferHandle flushDstBuffer = device->CreateBuffer({
+            .SizeBytes = sizeof(kHostVisibleFlushPattern),
+            .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+            .HostVisible = true,
+            .DebugName = "VulkanBootstrapSmoke.HostVisibleWriteFlush.Dst",
+        });
+        ASSERT_TRUE(flushDstBuffer.IsValid())
+            << "service-ready guarded bootstrap should create the host-visible readback destination for GRAPHICS-082";
 
-            device->WriteBuffer(hostVisibleBuffer, &kHostVisiblePattern,
-                                sizeof(kHostVisiblePattern), 0u);
-
-            std::uint32_t readback = 0u;
-            device->ReadBuffer(hostVisibleBuffer, &readback, sizeof(readback), 0u);
-            EXPECT_EQ(readback, kHostVisiblePattern)
-                << "WriteBuffer fast path must round-trip whether or not vmaFlushAllocation was required";
-
-            device->DestroyBuffer(hostVisibleBuffer);
-        }
+        device->WriteBuffer(flushSrcBuffer, &kHostVisibleFlushPattern,
+                            sizeof(kHostVisibleFlushPattern), 0u);
 
         const Extrinsic::RHI::BufferHandle indirectArgsBuffer = device->CreateBuffer({
             .SizeBytes = sizeof(Extrinsic::RHI::GpuDrawIndexedCommand),
@@ -566,6 +568,11 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 
             Extrinsic::RHI::ICommandContext& graphicsContext = device->GetGraphicsContext(frame.FrameIndex);
             graphicsContext.Begin();
+            // GRAPHICS-082: GPU consumes the host-visible source so the
+            // device actually reads the bytes that WriteBuffer's flush gate
+            // is responsible for making visible.
+            graphicsContext.CopyBuffer(flushSrcBuffer, flushDstBuffer,
+                                       0u, 0u, sizeof(kHostVisibleFlushPattern));
             const Extrinsic::RHI::TextureHandle backbuffer = device->GetBackbufferHandle(frame);
             ASSERT_TRUE(backbuffer.IsValid()) << "acquired Vulkan swapchain image should map to a registered RHI handle";
             graphicsContext.TextureBarrier(backbuffer,
@@ -594,6 +601,17 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
             EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackCommandRecordingAttemptCount(),
                       beforeCommandRecordingFallback)
                 << "guarded empty-frame command recording should use a live Vulkan command buffer";
+
+            // GRAPHICS-082: ReadBuffer drains the queue via vkDeviceWaitIdle
+            // and invalidates the destination mapping before memcpy, so the
+            // assertion reflects what the device actually wrote through
+            // vkCmdCopyBuffer from the host-visible source.
+            std::uint32_t flushReadback = 0u;
+            device->ReadBuffer(flushDstBuffer, &flushReadback,
+                               sizeof(flushReadback), 0u);
+            EXPECT_EQ(flushReadback, kHostVisibleFlushPattern)
+                << "GPU CopyBuffer must observe the host-visible WriteBuffer pattern; "
+                   "a missing vmaFlushAllocation on non-HOST_COHERENT memory would surface here";
         }
         else
         {
@@ -738,6 +756,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         device->DestroyTexture(depthTarget);
         device->DestroyBuffer(indirectArgsBuffer);
         device->DestroyBuffer(sceneTableBuffer);
+        device->DestroyBuffer(flushDstBuffer);
+        device->DestroyBuffer(flushSrcBuffer);
     }
     else
     {
