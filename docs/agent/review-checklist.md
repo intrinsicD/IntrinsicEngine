@@ -33,6 +33,22 @@ Use this checklist before commit and PR creation.
       treat the link as an architecture dependency, not a build-system
       convenience. `tools/repo/check_layering.py --root src --strict`
       covers both C++23 module imports and CMake link edges.
+- [ ] **Shader push-constant compatibility.** For any new or modified
+      pipeline whose pass body calls `cmd.PushConstants(&pc, sizeof(pc))`,
+      the selected vertex/fragment/compute shaders MUST declare a
+      `layout(push_constant) ...` block whose layout mirrors the pushed
+      struct byte-for-byte (and whose descriptor-set expectations match
+      the pipeline layout). The CPU/null contract gate only proves that
+      the renderer issued a `PushConstants` call; on a real Vulkan run a
+      layout mismatch silently reinterprets the bytes. Concretely, never
+      feed `RHI::GpuScenePushConstants` bytes into the legacy
+      `assets/shaders/surface.{vert,frag}` / `surface_gbuffer.frag` /
+      `shadow_depth.vert` pairs (they declare `mat4 Model + uint64_t Ptr*`
+      and `set = 2/3` SSBOs). See
+      `src/graphics/renderer/README.md` ("Shader push-constant
+      compatibility policy") for the GpuScene-aware shader inventory under
+      `assets/shaders/forward/` and `assets/shaders/deferred/` and the
+      `default_debug_*` template pattern.
 
 ## Testing
 

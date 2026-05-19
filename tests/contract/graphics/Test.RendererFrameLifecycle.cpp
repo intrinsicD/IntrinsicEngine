@@ -922,9 +922,21 @@ TEST(RendererFrameLifecycle, DeferredGBufferPipelineSurvivesOperationalRebuild)
     EXPECT_TRUE(initialPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDeferredGBufferPipelineDesc();
 
-    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with("shaders/surface.vert.spv"))
+    // GRAPHICS-072 Slice A — the deferred GBuffer pipeline MUST select
+    // shaders that declare a `layout(push_constant) ScenePC` block matching
+    // `RHI::GpuScenePushConstants` byte-for-byte, because
+    // `DeferredGBufferPass::Execute` pushes that struct verbatim. The
+    // legacy `assets/shaders/surface.vert` + `surface_gbuffer.frag` pair
+    // declares the pre-GpuScene `mat4 Model + Ptr*` push block and must
+    // never be referenced here (the `SceneTableBDA` pointer would land in
+    // `mat4 Model[0]` and every BDA dereference would read garbage on a
+    // real Vulkan run). See the renderer README "Shader push-constant
+    // compatibility policy" subsection.
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/forward/default_debug_surface.vert.spv"))
         << initialDesc.VertexShaderPath;
-    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with("shaders/surface_gbuffer.frag.spv"))
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/deferred/default_debug_gbuffer.frag.spv"))
         << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);

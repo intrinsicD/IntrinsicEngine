@@ -1446,23 +1446,34 @@ namespace Extrinsic::Graphics
         }
 
         // GRAPHICS-072 Slice A — default-recipe deferred GBuffer pipeline.
-        // Reuses `surface.vert.spv` (shared with the forward path) and
-        // `surface_gbuffer.frag.spv`. Three color targets match the frame
+        // Pairs the GpuScene-aware
+        // `forward/default_debug_surface.vert.spv` (shared with the forward
+        // default-debug-surface pipeline) with a minimal three-RT GBuffer
+        // fragment under `deferred/default_debug_gbuffer.frag.spv`. Both
+        // declare a `layout(push_constant) ScenePC` block that matches
+        // `RHI::GpuScenePushConstants` byte-for-byte, which is what
+        // `DeferredGBufferPass::Execute` pushes via `cmd.PushConstants(...)`.
+        // The legacy `assets/shaders/surface.vert` + `surface_gbuffer.frag`
+        // pair declares the pre-GpuScene `mat4 Model + Ptr*` push block and
+        // is deliberately *not* referenced here — feeding `GpuScenePushConstants`
+        // bytes into that layout would silently misinterpret
+        // `SceneTableBDA` as `mat4 Model` and corrupt every BDA dereference.
+        // See `src/graphics/renderer/README.md` ("Shader push-constant
+        // compatibility policy") for the parallel forward / line / point /
+        // shadow precedents and the explicit policy that prevents this
+        // footgun from recurring. Three color targets match the frame
         // recipe's deferred attachment formats: `SceneNormal` (RGBA16F),
         // `Albedo` (RGBA8), `Material0` (RGBA16F). Depth uses the recipe's
-        // `SceneDepth` D32_FLOAT. Depth-test on with `DepthOp::Equal` mirrors
-        // the forward-surface pipeline because the depth prepass already
-        // populated `SceneDepth`; if the depth prepass is disabled, the
-        // recipe builds the surface pass to write depth itself, but the
-        // pipeline still pairs equal-depth-test with no depth write to match
-        // the equal-depth render-pass policy used by the forward surface.
+        // `SceneDepth` D32_FLOAT. Depth-test on with `DepthOp::Equal`
+        // mirrors the forward-surface pipeline because the depth prepass
+        // already populated `SceneDepth`.
         [[nodiscard]] static RHI::PipelineDesc BuildDeferredGBufferPipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/surface.vert.spv");
+                "shaders/forward/default_debug_surface.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/surface_gbuffer.frag.spv");
+                "shaders/deferred/default_debug_gbuffer.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;

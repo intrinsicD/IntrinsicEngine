@@ -8,7 +8,27 @@
 - No virtual shadow maps (`GRAPHICS-047` planning).
 - No PBR feature completeness beyond the existing material model (`GRAPHICS-042` planning).
 - No transparent / special-forward sub-buckets (`GRAPHICS-025` planning).
-- No new shaders; reuses `surface_gbuffer.frag`, `deferred_lighting.frag`, and `surface.vert`.
+- Originally: "No new shaders; reuses `surface_gbuffer.frag`,
+  `deferred_lighting.frag`, and `surface.vert`." **Overridden in Slice A.**
+  The legacy `surface.vert` / `surface_gbuffer.frag` pair declares the
+  pre-GpuScene `mat4 Model + uint64_t Ptr*` push-constant block (and
+  `set = 0/2/3` descriptor sets), so feeding `RHI::GpuScenePushConstants`
+  bytes from `DeferredGBufferPass::Execute` into that layout would
+  silently misinterpret `SceneTableBDA` as `mat4 Model[0]` and corrupt
+  every BDA dereference on real Vulkan. This is the same footgun GRAPHICS-070
+  hit on the forward path, resolved there by authoring
+  `assets/shaders/forward/default_debug_surface.{vert,frag}` against the
+  GpuScene contract. Slice A mirrors that decision for the deferred path:
+  it reuses `forward/default_debug_surface.vert.spv` for the vertex stage
+  and authors a single new minimal three-RT fragment shader
+  (`assets/shaders/deferred/default_debug_gbuffer.frag`) under the
+  GpuScene `ScenePC` push-constant contract. A dedicated lit deferred
+  GBuffer shader pair (material-aware sampling, real normal output,
+  metallic-roughness packing beyond the default-debug fallback) remains a
+  follow-up; Slice B/C still author no new shaders unless deferred
+  lighting requires a fullscreen-vertex variant. The "Shader push-constant
+  compatibility policy" subsection in `src/graphics/renderer/README.md`
+  records the durable rule.
 
 ## Context
 - Status: in-progress (Slice A landed; Slices B/C pending).
