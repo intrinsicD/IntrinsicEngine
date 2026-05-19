@@ -589,7 +589,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   ownership, pipeline leases, executor routing, CPU contract coverage, and the
   documented `point.vert` + `point_retained.frag` canonical retained point
   variant.
-- [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](../../active/GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md) (active; Slice A in progress):
+- [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](../../done/GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md) (active; Slice A in progress):
   depends on GRAPHICS-070 (done), GRAPHICS-073 (done). Now also owns the
   shadow-atlas deferred-lighting binding (at `set 1, binding 1` per
   `assets/shaders/deferred_lighting.frag`, i.e. binding 1 of the same
