@@ -40,6 +40,7 @@ import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.Pass.Deferred.GBuffers;
+import Extrinsic.Graphics.Pass.Deferred.Lighting;
 import Extrinsic.Graphics.Pass.Forward.Surface;
 import Extrinsic.Graphics.Pass.Forward.Line;
 import Extrinsic.Graphics.Pass.Forward.Point;
@@ -267,6 +268,13 @@ namespace Extrinsic::Graphics
             m_DeferredSystem.emplace();
             m_DeferredSystem->Initialize();
             m_DeferredGBufferPass.emplace(*m_DeferredSystem);
+            // GRAPHICS-072 Slice B — DeferredLightingPass must be live before
+            // the operational publisher runs so the initial `Initialize()`
+            // path can call `SetPipeline(...)` on the lighting pass. Same
+            // invariant as the GBuffer pass above: `has_value()` lease but an
+            // unset pipeline handle on the pass would silently early-return
+            // inside `Execute()` while the executor still reported `Recorded`.
+            m_DeferredLightingPass.emplace(*m_DeferredSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
@@ -346,6 +354,7 @@ namespace Extrinsic::Graphics
             m_ForwardPointPass.reset();
             m_ShadowPass.reset();
             m_DeferredGBufferPass.reset();
+            m_DeferredLightingPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -366,6 +375,7 @@ namespace Extrinsic::Graphics
             m_ForwardPointPipelineLease.reset();
             m_ShadowPipelineLease.reset();
             m_DeferredGBufferPipelineLease.reset();
+            m_DeferredLightingPipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -992,11 +1002,24 @@ namespace Extrinsic::Graphics
                     else if (passName == std::string_view{"SurfacePass"} && defaultRecipeUsesDeferred)
                     {
                         // GRAPHICS-072 Slice A — default-recipe deferred
-                        // GBuffer pass. The companion `"CompositionPass"`
-                        // (deferred lighting) is owned by Slice B and still
-                        // falls through to the catch-all soft-skip below.
+                        // GBuffer pass.
                         const RenderCommandPassStatus status =
                             RecordDeferredGBufferPass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"CompositionPass"})
+                    {
+                        // GRAPHICS-072 Slice B — default-recipe deferred
+                        // lighting composition. Only declared by
+                        // `BuildDefaultFrameRecipe` when `usesDeferred` is
+                        // true, so this branch is reached only under the
+                        // deferred lighting path. The shadow-atlas binding
+                        // (`set 1, binding 1`) is Slice C scope and the
+                        // current `DeferredLightingPass::Execute` body only
+                        // pushes the 16-byte `SceneTableBDA` block + draws
+                        // the fullscreen triangle.
+                        const RenderCommandPassStatus status =
+                            RecordDeferredLightingPass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"LinePass"})
@@ -1214,6 +1237,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetDeferredGBufferPipelineDesc() const noexcept override
         {
             return BuildDeferredGBufferPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetDeferredLightingPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_DeferredLightingPipelineLease.has_value() ||
+                !m_DeferredLightingPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_DeferredLightingPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept override
+        {
+            return BuildDeferredLightingPipelineDesc();
         }
 
         void SetLightingPath(FrameRecipeLightingPath path) noexcept override
@@ -1495,6 +1533,49 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-072 Slice B — default-recipe deferred lighting pipeline.
+        // Pairs the fullscreen `post_fullscreen.vert.spv` (no vertex inputs,
+        // no push constants — just emits a fullscreen triangle and a UV
+        // varying) with the GpuScene-aware `deferred/lighting.frag.spv` whose
+        // `layout(push_constant, scalar) PushConstants { uint64_t
+        // SceneTableBDA; uint _pad0; uint _pad1; }` block matches
+        // `DeferredLightingPushConstants` byte-for-byte — what
+        // `DeferredLightingPass::Execute` pushes via
+        // `cmd.PushConstants(&pc, sizeof(pc))`. The legacy
+        // `assets/shaders/deferred_lighting.frag` declares a far larger
+        // `Push { mat4 InvViewProj; vec4 ClearColor; ... }` block plus
+        // multiple descriptor sets (4 G-buffer samplers + CameraUBO +
+        // sampler2DShadow) and would silently truncate / misinterpret the
+        // pushed bytes, so it is deliberately *not* referenced here — see
+        // `src/graphics/renderer/README.md` ("Shader push-constant
+        // compatibility policy") for the policy. Single RGBA16F color
+        // target (`SceneColorHDR`); no depth test/write (composition reads
+        // depth via shader sampling in a future slice but the pipeline
+        // itself runs without a depth attachment). The shadow-atlas
+        // descriptor wiring at `set 1, binding 1` is Slice C scope.
+        [[nodiscard]] static RHI::PipelineDesc BuildDeferredLightingPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_fullscreen.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/deferred/lighting.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT; // SceneColorHDR
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = 16u; // sizeof(DeferredLightingPushConstants)
+            desc.DebugName = "Renderer.DeferredLighting";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -1720,6 +1801,33 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] DeferredGBuffer pipeline unavailable; default-recipe deferred surface recording will be skipped: error={}",
                                 static_cast<int>(deferredGBufferPipeline.error()));
+            }
+
+            // GRAPHICS-072 Slice B — deferred lighting pipeline. Same
+            // reset/republish pattern as the forward, shadow, and GBuffer
+            // pipelines so a failed `Create()` leaves the pass in
+            // `SkippedUnavailable` rather than retaining a stale device handle
+            // across rebuilds.
+            m_DeferredLightingPipelineLease.reset();
+            if (m_DeferredLightingPass)
+            {
+                m_DeferredLightingPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc deferredLightingDesc = BuildDeferredLightingPipelineDesc();
+            auto deferredLightingPipeline = m_PipelineManager->Create(deferredLightingDesc);
+            if (deferredLightingPipeline.has_value())
+            {
+                m_DeferredLightingPipelineLease.emplace(std::move(*deferredLightingPipeline));
+                if (m_DeferredLightingPass)
+                {
+                    m_DeferredLightingPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_DeferredLightingPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] DeferredLighting pipeline unavailable; default-recipe deferred composition recording will be skipped: error={}",
+                                static_cast<int>(deferredLightingPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -2015,6 +2123,39 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-072 Slice B — default-recipe `"CompositionPass"` route.
+        // Reached from the executor lambda when `BuildDefaultFrameRecipe`
+        // declared the deferred lighting pass (i.e. `usesDeferred`). Mirrors
+        // `RecordDeferredGBufferPass` but without the cull-output dependency
+        // (lighting samples the GBuffer textures + iterates the GpuScene
+        // light table via BDA, not the SurfaceOpaque indirect bucket): a
+        // non-operational device → `SkippedNonOperational`; a missing pass,
+        // lease, or GpuWorld → `SkippedUnavailable`; otherwise
+        // `DeferredLightingPass::Execute` records the
+        // `Bind/Push/Draw(3,1,0,0)` fullscreen shape and we return
+        // `Recorded`. The shadow-atlas descriptor binding at `set 1,
+        // binding 1` is Slice C scope.
+        [[nodiscard]] RenderCommandPassStatus RecordDeferredLightingPass(RHI::ICommandContext& cmd,
+                                                                          const RHI::CameraUBO& camera,
+                                                                          const std::uint32_t frameIndex)
+        {
+            (void)frameIndex;
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_DeferredLightingPass.has_value() ||
+                !m_DeferredLightingPipelineLease.has_value() ||
+                !m_DeferredLightingPipelineLease->IsValid() ||
+                !m_GpuWorld.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_DeferredLightingPass->Execute(cmd, camera, *m_GpuWorld);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         [[nodiscard]] RenderCommandPassStatus RecordDepthPrepass(RHI::ICommandContext& cmd,
                                                                  const RHI::CameraUBO& camera,
                                                                  const std::uint32_t frameIndex)
@@ -2162,6 +2303,11 @@ namespace Extrinsic::Graphics
         // and before the operational publisher runs; reset before
         // `m_DeferredSystem` in `Shutdown()`.
         std::optional<DeferredGBufferPass>   m_DeferredGBufferPass;
+        // GRAPHICS-072 Slice B — default-recipe deferred lighting pass. Same
+        // lifetime contract as the GBuffer pass: emplaced alongside
+        // `m_DeferredGBufferPass` after `m_DeferredSystem` is initialised,
+        // reset before `m_DeferredSystem` in `Shutdown()`.
+        std::optional<DeferredLightingPass>  m_DeferredLightingPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -2170,6 +2316,7 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ShadowPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DeferredGBufferPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_DeferredLightingPipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

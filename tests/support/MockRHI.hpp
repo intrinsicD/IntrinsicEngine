@@ -163,6 +163,7 @@ namespace Extrinsic::Tests
             BindIndexBuffer,
             DrawIndexedIndirectCount,
             DrawIndirectCount,
+            TextureBarrier,
         };
 
         struct TextureBarrierRecord
@@ -242,6 +243,7 @@ namespace Extrinsic::Tests
         void TextureBarrier(RHI::TextureHandle texture, RHI::TextureLayout before, RHI::TextureLayout after) override
         {
             TextureBarrierCalls.push_back({texture, before, after});
+            Events.push_back(EventKind::TextureBarrier);
         }
 
         void BufferBarrier(RHI::BufferHandle buffer, RHI::MemoryAccess before, RHI::MemoryAccess after) override

@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
@@ -994,10 +996,12 @@ TEST(RendererFrameLifecycle, DeferredSurfacePassRecordsWhenLightingPathIsDeferre
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    // Slice B owns the `"CompositionPass"` executor branch.
+    // GRAPHICS-072 Slice B — the `"CompositionPass"` executor branch now
+    // records the deferred lighting pass's `Bind/Push/Draw(3,1,0,0)`
+    // fullscreen shape.
     ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
 
     renderer->Shutdown();
 }
@@ -1048,6 +1052,237 @@ TEST(RendererFrameLifecycle, DeferredSurfacePassSkipsUnavailableWhenPipelineMiss
     // their pipelines were created successfully; the deferred-surface
     // `SkippedUnavailable` status above is the contract being asserted by
     // this test.
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-072 Slice B — the deferred lighting pipeline must survive
+// `RebuildOperationalResources()` byte-identically. The descriptor is also
+// asserted shader-path-explicit so the shader push-constant compatibility
+// policy (see `src/graphics/renderer/README.md`) is enforced at the contract
+// level: the lighting pipeline MUST pair `post_fullscreen.vert.spv` with
+// `deferred/lighting.frag.spv`, whose `layout(push_constant, scalar)
+// PushConstants { uint64_t SceneTableBDA; uint _pad0; uint _pad1; }` block
+// matches `DeferredLightingPushConstants` byte-for-byte. The legacy
+// `assets/shaders/deferred_lighting.frag` declares a much larger Push block
+// plus multiple descriptor sets and would silently misinterpret the pushed
+// bytes — referencing it here is a known footgun that this test catches.
+TEST(RendererFrameLifecycle, DeferredLightingPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{284u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetDeferredLightingPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDeferredLightingPipelineDesc();
+
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/deferred/lighting.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    EXPECT_EQ(initialDesc.PushConstantSize, 16u);
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetDeferredLightingPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetDeferredLightingPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-072 Slice B — when the deferred lighting pipeline could not be
+// created, the `"CompositionPass"` executor branch reports
+// `SkippedUnavailable` rather than recording against an unset pipeline
+// handle. The GBuffer pipeline must remain available so `"SurfacePass"`
+// still records `Recorded`; only the composition pass should soft-skip.
+TEST(RendererFrameLifecycle, DeferredLightingPassSkipsUnavailableWhenPipelineMissing)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    // Publisher pipeline order (1-indexed): 1 culling compute, 2 depth
+    // prepass, 3 default debug surface, 4 minimal visible triangle,
+    // 5 forward surface, 6 forward line, 7 forward point, 8 shadow,
+    // 9 deferred GBuffer, 10 deferred lighting. Failing call #10 leaves
+    // the lighting lease empty while every upstream pipeline (including
+    // the GBuffer at #9) succeeds.
+    device.FailPipelineCreateCall = 10;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{285u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+    EXPECT_TRUE(renderer->GetDeferredGBufferPipeline().IsValid());
+    EXPECT_FALSE(renderer->GetDeferredLightingPipeline().IsValid());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-072 Slice B — between the deferred-mode `"SurfacePass"`
+// (GBuffer write) and `"CompositionPass"` (GBuffer read), the frame-graph
+// compiler MUST emit `ColorAttachment → ShaderReadOnly` layout transitions
+// for the three GBuffer textures (`SceneNormal`, `Albedo`, `Material0`).
+// The MockCommandContext interleaves `TextureBarrier` events into its
+// `Events` log alongside `BindPipeline`/`DrawIndexedIndirectCount`/etc.,
+// so the test can sequence: the GBuffer pass's `DrawIndexedIndirectCount`
+// must precede a run of three `ColorAttachment → ShaderReadOnly`
+// `TextureBarrier` events on three *distinct* texture handles, which must
+// precede the lighting pass's next `BindPipeline` event.
+TEST(RendererFrameLifecycle, DeferredGBufferToCompositionEmitsColorToShaderReadBarriers)
+{
+    using EventKind = Extrinsic::Tests::MockCommandContext::EventKind;
+
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{286u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    ASSERT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
+    ASSERT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    // GPU order for the deferred frame (mock-visible events only — the
+    // mock does not tally non-indirect `Draw` calls):
+    //   1) Culling: BindPipeline → PushConstants → Dispatch
+    //   2) DepthPrepass: BindPipeline → BindIndexBuffer → PushConstants
+    //      → DrawIndexedIndirectCount (first DIIC)
+    //   3) GBuffer (deferred surface pass): BindPipeline → BindIndexBuffer
+    //      → PushConstants → DrawIndexedIndirectCount (second DIIC)
+    //   4) Cross-pass barriers (ColorAttachment → ShaderReadOnly ×3 for
+    //      SceneNormal/Albedo/Material0).
+    //   5) Lighting (CompositionPass): BindPipeline → PushConstants → Draw
+    int gbufferDrawEvent = -1;
+    {
+        int dIIC = 0;
+        for (int i = 0; i < static_cast<int>(device.CommandContext.Events.size()); ++i)
+        {
+            if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+                EventKind::DrawIndexedIndirectCount)
+            {
+                ++dIIC;
+                if (dIIC == 2) { gbufferDrawEvent = i; break; }
+            }
+        }
+    }
+    ASSERT_GE(gbufferDrawEvent, 0)
+        << "Expected a second DrawIndexedIndirectCount event for the deferred GBuffer pass";
+
+    int compositionBindEvent = -1;
+    for (int i = gbufferDrawEvent + 1; i < static_cast<int>(device.CommandContext.Events.size()); ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+            EventKind::BindPipeline)
+        {
+            compositionBindEvent = i;
+            break;
+        }
+    }
+    ASSERT_GE(compositionBindEvent, 0)
+        << "Expected a CompositionPass BindPipeline event after the GBuffer pass";
+
+    // Walk the events between the GBuffer draw and the composition bind,
+    // pulling barrier records out of `TextureBarrierCalls` in lockstep
+    // with `EventKind::TextureBarrier` markers. Count distinct texture
+    // handles transitioning ColorAttachment → ShaderReadOnly.
+    int textureBarrierIndex = 0;
+    for (int i = 0; i <= gbufferDrawEvent; ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] ==
+            EventKind::TextureBarrier)
+        {
+            ++textureBarrierIndex;
+        }
+    }
+    std::vector<Extrinsic::RHI::TextureHandle> crossPassColorToShaderRead;
+    for (int i = gbufferDrawEvent + 1; i < compositionBindEvent; ++i)
+    {
+        if (device.CommandContext.Events[static_cast<std::size_t>(i)] !=
+            EventKind::TextureBarrier)
+        {
+            continue;
+        }
+        ASSERT_LT(textureBarrierIndex,
+                  static_cast<int>(device.CommandContext.TextureBarrierCalls.size()))
+            << "TextureBarrier event has no matching entry in TextureBarrierCalls";
+        const auto& barrier =
+            device.CommandContext.TextureBarrierCalls[static_cast<std::size_t>(textureBarrierIndex)];
+        ++textureBarrierIndex;
+        if (barrier.Before == Extrinsic::RHI::TextureLayout::ColorAttachment &&
+            barrier.After == Extrinsic::RHI::TextureLayout::ShaderReadOnly)
+        {
+            crossPassColorToShaderRead.push_back(barrier.Texture);
+        }
+    }
+
+    EXPECT_EQ(crossPassColorToShaderRead.size(), 3u)
+        << "Expected ColorAttachment→ShaderReadOnly barriers for SceneNormal, Albedo, Material0";
+    // Distinct handles — the recipe declares SceneNormal/Albedo/Material0 as
+    // three separate transient color attachments, not a single shared one.
+    std::vector<Extrinsic::RHI::TextureHandle> unique = crossPassColorToShaderRead;
+    std::sort(unique.begin(), unique.end(),
+              [](const Extrinsic::RHI::TextureHandle& a, const Extrinsic::RHI::TextureHandle& b) {
+                  if (a.Index != b.Index) { return a.Index < b.Index; }
+                  return a.Generation < b.Generation;
+              });
+    unique.erase(std::unique(unique.begin(), unique.end(),
+                             [](const Extrinsic::RHI::TextureHandle& a, const Extrinsic::RHI::TextureHandle& b) {
+                                 return a.Index == b.Index && a.Generation == b.Generation;
+                             }),
+                 unique.end());
+    EXPECT_EQ(unique.size(), 3u)
+        << "Expected three distinct GBuffer textures transitioning ColorAttachment → ShaderReadOnly";
 
     renderer->Shutdown();
 }

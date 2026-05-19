@@ -31,14 +31,14 @@
   records the durable rule.
 
 ## Context
-- Status: in-progress (Slice A landed; Slices B/C pending).
+- Status: in-progress (Slice A landed; Slice B active on this branch; Slice C pending).
 - Owner/agent: local agent workflow.
-- Branch: `claude/setup-agentic-workflow-HSYdR`.
-- Next verification step: pick up Slice B (DeferredLightingPass wiring +
-  `"CompositionPass"` executor branch + GBuffer→Lighting barrier test) on
-  a fresh branch; current Slice A has the full CPU CTest gate green
-  (1988/1988 ran, 125/125 graphics contract tests, layering + docs + task
-  policy + test layout structural checks clean).
+- Branch: `claude/setup-agentic-workflow-cQjgU` (Slice B); Slice A landed on
+  `claude/setup-agentic-workflow-HSYdR`.
+- Next verification step: complete Slice B (DeferredLightingPass wiring +
+  `"CompositionPass"` executor branch + GBuffer→Lighting barrier test) and
+  run the verification block below; Slice C (shadow-atlas binding +
+  end-to-end shadow casting test) remains pending on a fresh branch.
 - Owner/layer: `graphics/renderer`.
 - Planning anchors: `tasks/done/GRAPHICS-008-depth-surface-gbuffer-passes.md`, `tasks/done/GRAPHICS-009-deferred-lighting-and-shadows.md`, `tasks/done/GRAPHICS-009Q-lighting-shadow-clarifications.md`, `tasks/done/GRAPHICS-073-default-recipe-shadow-pass-wiring.md` (Slice C scope folded in: deferred-lighting shadow-sampler binding + cross-pass `DepthAttachment → ShaderRead` barrier-transition test). Note: per `GRAPHICS-009Q`, the shadow atlas binds at `binding 1` of "the global descriptor set already used by `CameraUBO`". In `assets/shaders/deferred_lighting.frag` that set is `set = 1` (because `set = 0` holds the G-buffer sampled textures `uNormal/uAlbedo/uMaterial/uDepth`), so the deferred lighting binding is `set 1, binding 1` even though the forward path (`surface.frag`) uses `set 0, binding 1` for the same logical slot.
 - Today: `Pass.Deferred.GBuffers.cpp` and `Pass.Deferred.Lighting.cpp` exist as command-body shells but are not owned, not piped through the executor, and have no pipelines created. `ShadowSystem` already owns the atlas + `sampler2DShadow`-bindable sampler (GRAPHICS-073 Slice B), so the binding work here is descriptor-set wiring, not resource creation.
@@ -47,25 +47,28 @@
 ## Required changes
 - [x] Add `m_DeferredGBufferPass`, `m_DeferredGBufferPipelineLease` members
   to `NullRenderer` (Slice A landed).
-- [ ] Add `m_DeferredLightingPass`, `m_DeferredLightingPipelineLease` members
-  to `NullRenderer` (Slice B).
+- [x] Add `m_DeferredLightingPass`, `m_DeferredLightingPipelineLease` members
+  to `NullRenderer` (Slice B landed).
 - [x] In `InitializeOperationalPassResources(device)`, create the GBuffer
   pipeline from `shaders/surface.vert.spv` + `surface_gbuffer.frag.spv` with
   the recorded multi-target output (`SceneNormal` RGBA16F, `Albedo` RGBA8,
   `Material0` RGBA16F) + `SceneDepth` D32_FLOAT (Slice A landed).
-- [ ] In `InitializeOperationalPassResources(device)`, create the deferred
-  lighting pipeline from a fullscreen vertex + `deferred_lighting.frag.spv`
-  consuming the GBuffer + light SSBO + the `ShadowSystem`-owned shadow atlas
-  + sampler (Slice B / Slice C).
+- [x] In `InitializeOperationalPassResources(device)`, create the deferred
+  lighting pipeline from `shaders/post_fullscreen.vert.spv` +
+  `shaders/deferred/lighting.frag.spv` (the GpuScene-aware minimal variant
+  whose `layout(push_constant, scalar) PushConstants { uint64_t
+  SceneTableBDA; uint _pad0; uint _pad1; }` block matches
+  `DeferredLightingPushConstants` byte-for-byte). Full G-buffer sampler +
+  shadow-atlas descriptor wiring remains Slice C scope (Slice B landed).
 - [x] Republish the GBuffer pipeline byte-identical from
   `RebuildOperationalResources()` (Slice A landed).
-- [ ] Republish the deferred lighting pipeline byte-identical from
-  `RebuildOperationalResources()` (Slice B).
+- [x] Republish the deferred lighting pipeline byte-identical from
+  `RebuildOperationalResources()` (Slice B landed).
 - [x] Add deferred-mode `"SurfacePass"` executor branch with the
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy
   (Slice A landed; routes through `RecordDeferredGBufferPass(...)`).
-- [ ] Add `"CompositionPass"` executor branch with the same taxonomy
-  (Slice B).
+- [x] Add `"CompositionPass"` executor branch with the same taxonomy
+  (Slice B landed; routes through `RecordDeferredLightingPass(...)`).
 - [x] Confirm `BuildDefaultFrameRecipe` declares the deferred resources
   (`SceneNormal`, `Albedo`, `Material0`) with the recorded formats and
   finalizes them through `Pass.Deferred.Lighting` (Slice A audited; recipe
@@ -89,13 +92,14 @@
   `"SurfacePass"` records and `RenderGraphCommandPassStats::Recorded`
   includes it (Slice A:
   `RendererFrameLifecycle.DeferredSurfacePassRecordsWhenLightingPathIsDeferred`).
-- [ ] `contract;graphics` test: with one extracted procedural surface and the
+- [x] `contract;graphics` test: with one extracted procedural surface and the
   default recipe, both deferred passes record and
-  `RenderGraphCommandPassStats::Recorded` includes them (Slice B will extend
-  the Slice A test to also cover `"CompositionPass"`).
-- [ ] `contract;graphics` test: barrier packets between GBuffers (write) and
+  `RenderGraphCommandPassStats::Recorded` includes them (Slice B extended the
+  Slice A test to also assert `"CompositionPass"` records `Recorded`).
+- [x] `contract;graphics` test: barrier packets between GBuffers (write) and
   Lighting (read) are emitted in the expected order
-  (`SceneNormal/Albedo/Material0` ColorAttachment → ShaderRead) (Slice B).
+  (`SceneNormal/Albedo/Material0` ColorAttachment → ShaderRead) (Slice B:
+  `RendererFrameLifecycle.DeferredGBufferToCompositionEmitsColorToShaderReadBarriers`).
 - [ ] `contract;graphics` test: barrier packets transition the
   `ShadowSystem`-owned shadow atlas `DepthAttachment → ShaderRead` before
   `Pass.Deferred.Lighting` (Slice C; absorbed from GRAPHICS-073 Slice C).
@@ -108,20 +112,22 @@
 - [x] `contract;graphics` test: missing GBuffer pipeline lease →
   `SkippedUnavailable` for the deferred-mode `"SurfacePass"` (Slice A:
   `RendererFrameLifecycle.DeferredSurfacePassSkipsUnavailableWhenPipelineMissing`).
-- [ ] `contract;graphics` test: missing deferred lighting pipeline lease →
-  `SkippedUnavailable` for `"CompositionPass"` (Slice B).
+- [x] `contract;graphics` test: missing deferred lighting pipeline lease →
+  `SkippedUnavailable` for `"CompositionPass"` (Slice B:
+  `RendererFrameLifecycle.DeferredLightingPassSkipsUnavailableWhenPipelineMissing`).
 - [x] `contract;graphics` test: GBuffer pipeline lease survives
   `RebuildOperationalResources()` byte-identically (Slice A:
   `RendererFrameLifecycle.DeferredGBufferPipelineSurvivesOperationalRebuild`).
-- [ ] `contract;graphics` test: deferred lighting pipeline lease survives
-  `RebuildOperationalResources()` byte-identically (Slice B).
+- [x] `contract;graphics` test: deferred lighting pipeline lease survives
+  `RebuildOperationalResources()` byte-identically (Slice B:
+  `RendererFrameLifecycle.DeferredLightingPipelineSurvivesOperationalRebuild`).
 
 ## Docs
 - [x] Slice A: update `src/graphics/renderer/README.md` to record deferred
   GBuffer as operationally wired plus the `IRenderer::SetLightingPath()`
   test seam; deferred lighting + shadow-atlas binding documentation stays
   pending in the Slice B/C bullet of the same file.
-- [ ] Slice B: update `src/graphics/renderer/README.md` to record deferred
+- [x] Slice B: update `src/graphics/renderer/README.md` to record deferred
   lighting as operationally wired.
 - [ ] Slice C: update `src/graphics/renderer/README.md` to record the
   shadow-atlas binding consumer at `set 1, binding 1` (forward path keeps

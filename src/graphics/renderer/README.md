@@ -313,9 +313,39 @@ Concretely:
   derivation continues to return `Forward` by default so existing contract
   tests stay green, and contract tests opt into the deferred-mode executor
   branch by calling `SetLightingPath(FrameRecipeLightingPath::Deferred)`. The
-  companion `"CompositionPass"` (deferred lighting) and the deferred-lighting
-  shadow-atlas binding at `set 1, binding 1` are owned by GRAPHICS-072
-  Slices B and C and currently fall through to the catch-all soft-skip.
+  deferred-lighting shadow-atlas binding at `set 1, binding 1` is owned by
+  GRAPHICS-072 Slice C.
+- GRAPHICS-072 Slice B wires the default-recipe `"CompositionPass"` to the
+  existing `DeferredLightingPass` body. `NullRenderer` owns
+  `m_DeferredLightingPass` (constructed against `m_DeferredSystem` alongside
+  `m_DeferredGBufferPass`) and the `m_DeferredLightingPipelineLease`. The
+  pipeline is created in `InitializeOperationalPassResources()` from
+  `BuildDeferredLightingPipelineDesc()` (vertex
+  `shaders/post_fullscreen.vert.spv` — the canonical fullscreen-triangle
+  generator with no vertex inputs and no push constants — paired with
+  `shaders/deferred/lighting.frag.spv` whose
+  `layout(push_constant, scalar) PushConstants { uint64_t SceneTableBDA;
+  uint _pad0; uint _pad1; }` block matches `DeferredLightingPushConstants`
+  byte-for-byte, single RGBA16F color target for `SceneColorHDR`, no depth
+  attachment, `CullMode::None`, depth test off, blend off), and republished
+  byte-identical through `RebuildOperationalResources()` using the same
+  reset-then-publish pattern as the GBuffer pipeline. The legacy
+  `assets/shaders/deferred_lighting.frag` is deliberately *not* referenced:
+  it declares a much larger Blinn-Phong `Push { mat4 InvViewProj; ... }`
+  block plus multiple descriptor sets (G-buffer samplers + CameraUBO +
+  sampler2DShadow) that no current `DeferredLightingPass::Execute` body
+  satisfies, and feeding `DeferredLightingPushConstants` bytes into that
+  layout would silently misinterpret `SceneTableBDA` as part of
+  `mat4 InvViewProj[0]` — the same footgun shape Slice A documents above
+  and the renderer push-constant compatibility policy prohibits. The
+  executor's `"CompositionPass"` branch routes to
+  `RecordDeferredLightingPass(...)` whenever the recipe declares the pass
+  (i.e. `usesDeferred`); the cross-pass `SceneNormal`/`Albedo`/`Material0`
+  `ColorAttachment → ShaderReadOnly` barriers are emitted by the framegraph
+  compiler from the recipe's `Read(..., ShaderRead)` declarations on the
+  CompositionPass. The shadow-atlas descriptor binding at `set 1,
+  binding 1` and the full G-buffer/CameraUBO sampler wiring remain Slice C
+  scope.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by
