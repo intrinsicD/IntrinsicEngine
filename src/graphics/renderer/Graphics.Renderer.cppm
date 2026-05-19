@@ -262,20 +262,24 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetDeferredLightingPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept = 0;
 
-        // GRAPHICS-074 (Slice A) — accessor for the default-recipe EntityId
-        // selection pipeline (vertex `selection/entity_id.vert.spv` + fragment
-        // `selection/entity_id.frag.spv`, two R32_UINT color targets `EntityId`
-        // and `PrimitiveId`, no depth attachment, depth-test off, depth-write
-        // off). The depth-attachment-less shape matches `BuildDefaultFrameRecipe`,
-        // which orders `PickingPass` before `DepthPrepass` and declares the
-        // pass color-only; a depth-equal / depth-prepass-on configuration
-        // would be render-pass-incompatible here and would depth-test against
-        // an uninitialized buffer. Depth-sorted picking is a recipe-side
-        // follow-up that reorders the pass and adds `Read(depth, DepthRead)`.
-        // Handle is invalid until an operational device path publishes the
-        // lease; the descriptor remains deterministic so contract tests can
-        // assert byte-identical rebuild behavior. Slices B/C/D add the
-        // Face/Edge/Point selection pipelines, the outline pipeline, and the
+        // GRAPHICS-074 (Slice A + recipe-side follow-up) — accessor for the
+        // default-recipe EntityId selection pipeline (vertex
+        // `selection/entity_id.vert.spv` + fragment
+        // `selection/entity_id.frag.spv`, two R32_UINT color targets
+        // `EntityId` and `PrimitiveId`, `D32_FLOAT` depth attachment,
+        // `DepthOp::Equal` + `DepthWriteEnable=false`). The depth-equal
+        // shape matches `BuildDefaultFrameRecipe`, which now orders
+        // `PickingPass` after `DepthPrepass` and declares
+        // `Read(SceneDepth, DepthRead)` on the picking pass so the
+        // pipeline samples the prepass-populated nearest-surface depth and
+        // never last-fragment-wins into `EntityId`/`PrimitiveId`. The
+        // recipe also gates the pass on `EnablePicking &&
+        // EnableDepthPrepass` so this pipeline is only requested when a
+        // populated `SceneDepth` exists. Handle is invalid until an
+        // operational device path publishes the lease; the descriptor
+        // remains deterministic so contract tests can assert byte-identical
+        // rebuild behavior. Slices B/C/D add the Face/Edge/Point selection
+        // pipelines (same depth-equal shape), the outline pipeline, and the
         // `Picking.Readback` drain.
         [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept = 0;

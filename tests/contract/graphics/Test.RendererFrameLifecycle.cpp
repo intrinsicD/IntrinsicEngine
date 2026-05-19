@@ -1583,18 +1583,16 @@ TEST(RendererFrameLifecycle, DeferredLightingPushConstantsCarryShadowAtlasBindle
 // misinterpret the `RHI::GpuScenePushConstants` bytes that
 // `EntityIdPass::Execute` pushes).
 //
-// Render-pass compatibility: `BuildDefaultFrameRecipe` orders `PickingPass`
-// *before* `DepthPrepass` and the picking pass declaration is color-only —
-// no `Read(depth)` / `Write(depth)` — so this pipeline must run depth-
-// test-off, depth-write-off, depth-attachment-less to match the
-// framegraph-emitted render pass and to avoid depth-testing against an
-// uninitialized depth buffer (which on real backends would produce
-// incorrect IDs or consistent no-hit readbacks once Slice D's drain
-// lands). Depth-sorted picking is a recipe-side follow-up that
-// reorders `PickingPass` after `DepthPrepass` and adds
-// `Read(depth, DepthRead)` to its declaration, at which point this
-// descriptor can flip back to the depth-equal shape the other GpuScene
-// pipelines use.
+// Render-pass compatibility: GRAPHICS-074's recipe-side follow-up reordered
+// `BuildDefaultFrameRecipe` so `PickingPass` runs *after* `DepthPrepass` and
+// declares `Read(SceneDepth, DepthRead)`. The framegraph compiler therefore
+// emits a render pass with a `D32_FLOAT` depth attachment in read-only state,
+// so this pipeline mirrors the depth-equal / depth-write-off shape the
+// forward and deferred GBuffer pipelines use. The depth-equal test guarantees
+// only the nearest-surface fragment wins each pixel — without it the readback
+// drain would return wrong IDs for any pixel covered by more than one draw.
+// The recipe gates picking on `EnablePicking && EnableDepthPrepass`, so the
+// pipeline is only requested when a populated `SceneDepth` is available.
 // ---------------------------------------------------------------------------
 
 TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
@@ -1619,16 +1617,17 @@ TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
     EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
-    // Render-pass compatibility with the recipe-declared color-only
-    // PickingPass: depth-test off, depth-write off, no depth attachment.
-    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+    // Render-pass compatibility with the recipe-declared depth-read
+    // PickingPass: depth-test on, depth-equal, depth-write off, D32_FLOAT.
+    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
     EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
     EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
     EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
     EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
     EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
-    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
     EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));

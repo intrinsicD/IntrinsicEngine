@@ -144,11 +144,20 @@ namespace Extrinsic::Graphics
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
                 {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.EntityConfig", "GpuWorld.GeometryRecords", "GpuWorld.Bounds", "Material.Buffer", "GpuWorld.Lights"},
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"});
-        AddPass(out, FrameRecipePassKind::Picking, "PickingPass", features.EnablePicking, false,
-                {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
-                {"EntityId", "PrimitiveId", "Picking.Readback"});
         AddPass(out, FrameRecipePassKind::DepthPrepass, "DepthPrepass", features.EnableDepthPrepass, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"SceneDepth"});
+        // GRAPHICS-074 recipe-side follow-up — picking now runs *after*
+        // `DepthPrepass` and reads `SceneDepth` so the picking pipeline can
+        // depth-equal-test against the nearest-surface depth instead of
+        // last-fragment-winning into the `EntityId`/`PrimitiveId` targets.
+        // The pass is therefore gated on both `EnablePicking` and
+        // `EnableDepthPrepass`; with `EnableDepthPrepass=false` the recipe
+        // would not produce a valid `SceneDepth` and the depth-equal pipeline
+        // would be render-pass-incompatible.
+        AddPass(out, FrameRecipePassKind::Picking, "PickingPass",
+                features.EnablePicking && features.EnableDepthPrepass, false,
+                {"SceneDepth", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
+                {"EntityId", "PrimitiveId", "Picking.Readback"});
         AddPass(out, FrameRecipePassKind::Shadow, "ShadowPass", features.EnableShadows, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"ShadowAtlas"});
         if (usesDeferred)
@@ -479,9 +488,28 @@ namespace Extrinsic::Graphics
             builder.Write(pointDrawCount, BufferUsage::ShaderWrite);
         });
 
-        if (features.EnablePicking)
+        if (features.EnableDepthPrepass)
+        {
+            addOrderedPass("DepthPrepass", [=](RenderGraphBuilder& builder) {
+                builder.Read(drawIndirect, BufferUsage::IndirectRead);
+                builder.Read(drawCount, BufferUsage::IndirectRead);
+                builder.Write(depth, TextureUsage::DepthWrite);
+            });
+        }
+
+        // GRAPHICS-074 recipe-side follow-up — picking is ordered after
+        // `DepthPrepass` and reads `SceneDepth` as `DepthRead` so the
+        // selection-ID pipelines can depth-equal-test against the
+        // nearest-surface depth populated by the prepass. The pass is gated
+        // on `EnablePicking && EnableDepthPrepass`: without `DepthPrepass`
+        // the picking render pass would lack a depth attachment and the
+        // depth-equal pipeline would be render-pass-incompatible. The
+        // matching introspection gate in `DescribeDefaultFrameRecipe`
+        // keeps the declared and built pass sets aligned.
+        if (features.EnablePicking && features.EnableDepthPrepass)
         {
             addOrderedPass("PickingPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(depth, TextureUsage::DepthRead);
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
@@ -492,15 +520,6 @@ namespace Extrinsic::Graphics
                 builder.Write(primitiveId, TextureUsage::ColorAttachmentWrite);
                 builder.Write(pickingReadback, BufferUsage::TransferDst);
                 builder.SideEffect();
-            });
-        }
-
-        if (features.EnableDepthPrepass)
-        {
-            addOrderedPass("DepthPrepass", [=](RenderGraphBuilder& builder) {
-                builder.Read(drawIndirect, BufferUsage::IndirectRead);
-                builder.Read(drawCount, BufferUsage::IndirectRead);
-                builder.Write(depth, TextureUsage::DepthWrite);
             });
         }
 
