@@ -324,14 +324,16 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     EXPECT_TRUE(present->FinalizesBackbuffer);
 }
 
-// GRAPHICS-074 recipe-side follow-up — picking is gated on
-// `EnablePicking && EnableDepthPrepass`. Without the depth prepass the
-// recipe cannot produce a populated `SceneDepth` and the depth-equal
-// selection-ID pipelines would be render-pass-incompatible with a depth-
-// less PickingPass, so the introspection drops the pass entirely and the
-// compiled graph contains no PickingPass node. The matching builder gate
-// in `BuildDefaultFrameRecipe` keeps the declared and built pass sets
-// aligned.
+// GRAPHICS-074 recipe-side follow-up — picking and its picking-only
+// resources are gated on `EnablePicking && EnableDepthPrepass`. Without
+// the depth prepass the recipe cannot produce a populated `SceneDepth`
+// and the depth-equal selection-ID pipelines would be render-pass-
+// incompatible with a depth-less PickingPass, so the introspection drops
+// the pass and its `PrimitiveId` / `Picking.Readback` resources entirely
+// and the compiled graph contains no PickingPass node. `EntityId` follows
+// the same gate when `EnableSelectionOutline` is also false (its only
+// other consumer). The matching builder gate in `BuildDefaultFrameRecipe`
+// keeps the declared and built resource/pass sets aligned.
 TEST(FrameRecipeContract, PickingRequiresDepthPrepass)
 {
     FrameRecipeFeatures features{};
@@ -342,6 +344,12 @@ TEST(FrameRecipeContract, PickingRequiresDepthPrepass)
     const auto* picking = FindPass(description, FrameRecipePassKind::Picking);
     ASSERT_NE(picking, nullptr);
     EXPECT_FALSE(picking->Enabled);
+    // Picking-only resources must be dropped along with the pass; otherwise
+    // the recipe would allocate dead full-resolution R32_UINT targets and
+    // a host-visible readback buffer that no pass writes or reads.
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::EntityId));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PrimitiveId));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PickingReadback));
 
     RenderGraph graph;
     const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
@@ -360,6 +368,48 @@ TEST(FrameRecipeContract, PickingRequiresDepthPrepass)
     const std::vector<std::string> passNames = OrderedPassNames(*compiled);
     EXPECT_EQ(std::ranges::find(passNames, "PickingPass"), passNames.end());
     EXPECT_EQ(std::ranges::find(passNames, "DepthPrepass"), passNames.end());
+    // The picking-only resources must not appear in the compiled graph either.
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "PrimitiveId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->BufferNames, "Picking.Readback"), compiled->BufferNames.end());
+    // EntityId is shared with SelectionOutlinePass — disabled here too — so
+    // it must also be dropped.
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
+}
+
+// GRAPHICS-074 recipe-side follow-up — `EntityId` is shared between
+// PickingPass and SelectionOutlinePass. When picking is gated off but
+// SelectionOutline is enabled, the recipe must still allocate `EntityId`
+// (the outline pass reads it) but must continue to drop the picking-only
+// `PrimitiveId` and `Picking.Readback` resources.
+TEST(FrameRecipeContract, EntityIdSurvivesForSelectionOutlineWithoutPicking)
+{
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    features.EnableDepthPrepass = false;
+    features.EnableSelectionOutline = true;
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features);
+    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::EntityId));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PrimitiveId));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PickingReadback));
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+    EXPECT_NE(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "PrimitiveId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->BufferNames, "Picking.Readback"), compiled->BufferNames.end());
 }
 
 // GRAPHICS-074 recipe-side follow-up — when picking *and* the depth prepass

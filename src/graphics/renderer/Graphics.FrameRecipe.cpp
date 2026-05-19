@@ -139,6 +139,15 @@ namespace Extrinsic::Graphics
     [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features)
     {
         const bool usesDeferred = UsesDeferredResources(features);
+        // GRAPHICS-074 recipe-side follow-up — picking-active is the
+        // recipe-wide condition that gates `PickingPass`, its `PrimitiveId`
+        // and `Picking.Readback` outputs, and the `EntityId` half of its
+        // output (jointly with `EnableSelectionOutline`, which is the only
+        // other consumer of `EntityId`). Centralising the conjunction keeps
+        // the pass declaration and the resource declarations from drifting
+        // and avoids allocating the full-resolution R32_UINT `PrimitiveId`
+        // target / the `Picking.Readback` buffer when picking is dropped.
+        const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         FrameRecipeIntrospection out{};
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
@@ -150,12 +159,12 @@ namespace Extrinsic::Graphics
         // `DepthPrepass` and reads `SceneDepth` so the picking pipeline can
         // depth-equal-test against the nearest-surface depth instead of
         // last-fragment-winning into the `EntityId`/`PrimitiveId` targets.
-        // The pass is therefore gated on both `EnablePicking` and
-        // `EnableDepthPrepass`; with `EnableDepthPrepass=false` the recipe
+        // The pass is therefore gated on `pickingActive` (`EnablePicking &&
+        // EnableDepthPrepass`); with `EnableDepthPrepass=false` the recipe
         // would not produce a valid `SceneDepth` and the depth-equal pipeline
         // would be render-pass-incompatible.
         AddPass(out, FrameRecipePassKind::Picking, "PickingPass",
-                features.EnablePicking && features.EnableDepthPrepass, false,
+                pickingActive, false,
                 {"SceneDepth", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
                 {"EntityId", "PrimitiveId", "Picking.Readback"});
         AddPass(out, FrameRecipePassKind::Shadow, "ShadowPass", features.EnableShadows, false,
@@ -194,8 +203,15 @@ namespace Extrinsic::Graphics
 
         AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
         AddResource(out, FrameRecipeResourceKind::SceneDepth, "SceneDepth", true);
-        AddResource(out, FrameRecipeResourceKind::EntityId, "EntityId", features.EnablePicking || features.EnableSelectionOutline, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PrimitiveId, "PrimitiveId", features.EnablePicking, false, false, true);
+        // GRAPHICS-074 recipe-side follow-up — `EntityId` is consumed by
+        // PickingPass (active iff `pickingActive`) and SelectionOutlinePass
+        // (active iff `EnableSelectionOutline`); `PrimitiveId` and
+        // `Picking.Readback` are consumed only by PickingPass. Gating these
+        // on the same conjunction the pass uses avoids allocating dead
+        // full-resolution R32_UINT targets / the host-visible readback
+        // buffer when picking is dropped because the depth prepass is off.
+        AddResource(out, FrameRecipeResourceKind::EntityId, "EntityId", pickingActive || features.EnableSelectionOutline, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PrimitiveId, "PrimitiveId", pickingActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneNormal, "SceneNormal", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Albedo, "Albedo", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
@@ -227,7 +243,7 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::LinesCount, "Cull.Lines.Count", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PointsNonIndexedArgs, "Cull.Points.NonIndexedArgs", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PointsCount, "Cull.Points.Count", true, true, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PickingReadback, "Picking.Readback", features.EnablePicking, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PickingReadback, "Picking.Readback", pickingActive, false, false, true);
         return out;
     }
 
@@ -323,6 +339,12 @@ namespace Extrinsic::Graphics
         }
 
         const bool usesDeferred = UsesDeferredResources(features);
+        // GRAPHICS-074 recipe-side follow-up — same `pickingActive`
+        // conjunction `DescribeDefaultFrameRecipe` uses; keep the
+        // declaration and the build wired identically so the `EntityId` /
+        // `PrimitiveId` / `Picking.Readback` resources are not allocated
+        // when `PickingPass` is dropped.
+        const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const auto width = ClampExtent(sizing.Width);
         const auto height = ClampExtent(sizing.Height);
         const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features);
@@ -359,11 +381,11 @@ namespace Extrinsic::Graphics
         BufferRef postProcessHistogram{};
         BufferRef pickingReadback{};
 
-        if (features.EnablePicking || features.EnableSelectionOutline)
+        if (pickingActive || features.EnableSelectionOutline)
         {
             entityId = graph.CreateTexture("EntityId", ColorTargetDesc(width, height, RHI::Format::R32_UINT, "EntityId"));
         }
-        if (features.EnablePicking)
+        if (pickingActive)
         {
             primitiveId = graph.CreateTexture("PrimitiveId", ColorTargetDesc(width, height, RHI::Format::R32_UINT, "PrimitiveId"));
             pickingReadback = graph.CreateBuffer("Picking.Readback", RHI::BufferDesc{
@@ -500,13 +522,15 @@ namespace Extrinsic::Graphics
         // GRAPHICS-074 recipe-side follow-up — picking is ordered after
         // `DepthPrepass` and reads `SceneDepth` as `DepthRead` so the
         // selection-ID pipelines can depth-equal-test against the
-        // nearest-surface depth populated by the prepass. The pass is gated
-        // on `EnablePicking && EnableDepthPrepass`: without `DepthPrepass`
-        // the picking render pass would lack a depth attachment and the
-        // depth-equal pipeline would be render-pass-incompatible. The
-        // matching introspection gate in `DescribeDefaultFrameRecipe`
-        // keeps the declared and built pass sets aligned.
-        if (features.EnablePicking && features.EnableDepthPrepass)
+        // nearest-surface depth populated by the prepass. The pass and its
+        // `PrimitiveId` / `Picking.Readback` resources are gated on
+        // `pickingActive` (`EnablePicking && EnableDepthPrepass`): without
+        // `DepthPrepass` the picking render pass would lack a depth
+        // attachment and the depth-equal pipeline would be render-pass-
+        // incompatible. The matching introspection gate in
+        // `DescribeDefaultFrameRecipe` keeps the declared and built pass
+        // sets aligned.
+        if (pickingActive)
         {
             addOrderedPass("PickingPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);

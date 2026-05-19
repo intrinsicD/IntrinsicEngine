@@ -420,19 +420,26 @@ Concretely:
   `features.EnablePicking && features.EnableDepthPrepass` and lists
   `SceneDepth` in the pass's reads; the recipe declares the pass only
   when a pick request is pending (`world.HasPendingPick ||
-  world.PickRequest.Pending`) *and* a depth prepass is configured.
-  `BuildSelectionEntityIdPipelineDesc()` now mirrors the depth-equal /
-  depth-write-off / `D32_FLOAT` shape the forward and deferred GBuffer
-  pipelines use against the same depth buffer, so the recipe-emitted
-  render pass with a read-only `D32_FLOAT` depth attachment is render-
-  pass-compatible *and* the depth-equal test guarantees only the
-  nearest-surface fragment wins each pixel of `EntityId`/`PrimitiveId`.
-  Without this reorder Slice D's readback drain would return wrong IDs
-  for any pixel covered by more than one draw because the previous
-  color-only picking pass had no nearest-surface fragment selection.
-  The Face/Edge/Point selection pipelines added by Slice B follow this
-  same depth-equal shape; the outline pipeline (Slice C) is unaffected
-  by the reorder.
+  world.PickRequest.Pending`) *and* a depth prepass is configured. Both
+  `DescribeDefaultFrameRecipe` and `BuildDefaultFrameRecipe` derive the
+  same `pickingActive = EnablePicking && EnableDepthPrepass` conjunction
+  and gate the picking-only `PrimitiveId` color target and
+  `Picking.Readback` host-visible buffer on it (and the `EntityId` color
+  target on `pickingActive || EnableSelectionOutline`, since
+  SelectionOutlinePass is the only other `EntityId` consumer), so the
+  recipe never allocates dead full-resolution R32_UINT targets / the
+  readback buffer when picking is dropped. `BuildSelectionEntityIdPipelineDesc()`
+  now mirrors the depth-equal / depth-write-off / `D32_FLOAT` shape the
+  forward and deferred GBuffer pipelines use against the same depth
+  buffer, so the recipe-emitted render pass with a read-only `D32_FLOAT`
+  depth attachment is render-pass-compatible *and* the depth-equal test
+  guarantees only the nearest-surface fragment wins each pixel of
+  `EntityId`/`PrimitiveId`. Without this reorder Slice D's readback
+  drain would return wrong IDs for any pixel covered by more than one
+  draw because the previous color-only picking pass had no
+  nearest-surface fragment selection. The Face/Edge/Point selection
+  pipelines added by Slice B follow this same depth-equal shape; the
+  outline pipeline (Slice C) is unaffected by the reorder.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by
