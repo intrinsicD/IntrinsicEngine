@@ -129,6 +129,59 @@ implementation.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
   gates, canonical resource declarations, pass-order introspection, and the
   backend-agnostic graph construction path used by the null renderer.
+
+### Shader push-constant compatibility policy
+
+Every default-recipe pass whose `Execute()` body calls
+`cmd.PushConstants(&pc, sizeof(pc))` MUST be paired with a pipeline whose
+shaders declare a `layout(push_constant) ...` block that mirrors the pushed
+struct byte-for-byte. The CPU/null contract gate happily reports `Recorded`
+when a pipeline has a valid handle, but on a real Vulkan run a mismatched
+push-constant layout silently reinterprets the bytes — the canonical bug
+shape is the renderer pushing `RHI::GpuScenePushConstants` (starting with
+`uint64_t SceneTableBDA`) into a shader that declares `mat4 Model + uint64_t
+PtrPositions + ...`, so the scene-table pointer lands in `Model[0]` and
+every subsequent BDA dereference reads garbage.
+
+Concretely:
+
+- The promoted retained passes (`Pass.DepthPrepass`, `Pass.Forward.Surface`,
+  `Pass.Forward.Line`, `Pass.Forward.Point`, `Pass.Shadows`,
+  `Pass.Deferred.GBuffers`, `Pass.Deferred.Lighting`) push
+  `RHI::GpuScenePushConstants { uint64_t SceneTableBDA; uint FrameIndex;
+  uint DrawBucket; uint DebugMode; uint _pad0; }` (and small post-prefix
+  extensions like `Pass.Deferred.Lighting`'s `SceneTableBDA`-only variant).
+  Their pipelines MUST select shaders that declare the matching
+  `layout(push_constant, scalar) ScenePC { uint64_t SceneTableBDA; uint
+  FrameIndex; uint DrawBucket; uint DebugMode; uint _pad0; }` block — i.e.
+  the shader files under `assets/shaders/forward/`,
+  `assets/shaders/deferred/`, and the GpuScene-aware
+  `assets/shaders/depth_prepass.vert`.
+- The legacy shader pairs under `assets/shaders/` root —
+  `surface.vert`, `surface.frag`, `surface_gbuffer.frag`,
+  `shadow_depth.vert`, etc. — declare the pre-GpuScene push block
+  (`mat4 Model + uint64_t Ptr*`) and DescriptorSet expectations
+  (`set = 2/3` SSBOs) that no promoted retained pipeline can satisfy.
+  They MUST NOT be referenced by any new `BuildXxxPipelineDesc()`.
+  GRAPHICS-070 (forward surface), GRAPHICS-071 (forward line/point),
+  GRAPHICS-073 (shadow), and GRAPHICS-072 (deferred GBuffer) each
+  resolved this by selecting GpuScene-aware shader pairs from
+  `assets/shaders/forward/` or `assets/shaders/deferred/`; new pass
+  wirings must follow the same precedent.
+- When the natural new-pipeline path would otherwise be the legacy
+  shaders, author a `default_debug_*` minimal variant under the matching
+  `forward/` or `deferred/` directory rather than feeding the legacy
+  layout — see `assets/shaders/forward/default_debug_surface.{vert,frag}`
+  (GRAPHICS-031A) and `assets/shaders/deferred/default_debug_gbuffer.frag`
+  (GRAPHICS-072 Slice A) as the canonical templates.
+- Reviewers and `docs/agent/review-checklist.md` should treat this as a
+  hard gate: a passing CPU/null contract test that asserts only
+  `Recorded` is *not* sufficient evidence that the pipeline is well-formed
+  on a real backend. Either assert the SPV path explicitly in the
+  contract test (`EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+  "shaders/forward/...")`) or pair the test with a corresponding
+  `gpu;vulkan` smoke that runs the pass.
+
 - GRAPHICS-070 wires the default-recipe `"SurfacePass"` to the existing
   `ForwardSurfacePass` body. `NullRenderer` owns the
   `m_ForwardSurfacePass` instance (constructed against the renderer's
@@ -156,13 +209,12 @@ implementation.
   shader is a GRAPHICS-072 follow-up. The executor's `"SurfacePass"` branch
   routes to `RecordForwardSurfacePass(...)` only when the active
   default-recipe features select the forward lighting path; deferred mode
-  falls through to the catch-all soft-skip until GRAPHICS-072 lands its
-  `Pass.Deferred.GBuffers` body. While GRAPHICS-072 is still open,
-  `DeriveDefaultFrameRecipeFeatures()` selects
-  `FrameRecipeLightingPath::Forward` so the default recipe can actually
-  record draws; the deferred-mode branches in
-  `Graphics.FrameRecipe.cpp`/`Test.FrameRecipeContract.cpp` remain
-  exercise-able through explicit `FrameRecipeFeatures{}` construction.
+  routes to `RecordDeferredGBufferPass(...)` per GRAPHICS-072 Slice A. While
+  GRAPHICS-072 is still open, `DeriveDefaultFrameRecipeFeatures()` selects
+  `FrameRecipeLightingPath::Forward` so the default recipe stays on the
+  forward surface body; contract tests opt into the deferred-mode branch
+  through `IRenderer::SetLightingPath(FrameRecipeLightingPath::Deferred)`
+  (the renderer-stored test seam added in GRAPHICS-072 Slice A).
 - GRAPHICS-071 wires the default-recipe `"LinePass"` and `"PointPass"` to
   the existing retained-renderable `ForwardLinePass` and `ForwardPointPass`
   bodies. `NullRenderer` owns `m_ForwardLinePass`, `m_ForwardPointPass`,
@@ -226,6 +278,44 @@ implementation.
   `set 0, binding 1`) is owned by GRAPHICS-072 (absorbed from the original
   GRAPHICS-073 Slice C scope) and lands alongside the deferred GBuffer +
   lighting passes.
+- GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
+  to the existing `DeferredGBufferPass` body. `NullRenderer` owns
+  `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the
+  `m_DeferredGBufferPipelineLease`. The pipeline is created in
+  `InitializeOperationalPassResources()` from
+  `BuildDeferredGBufferPipelineDesc()` (vertex
+  `shaders/forward/default_debug_surface.vert.spv` — shared with the
+  forward default-debug-surface pipeline so the GpuScene push-constant
+  block matches `DeferredGBufferPass::Execute`'s
+  `cmd.PushConstants(&GpuScenePushConstants, sizeof(...))` byte-for-byte —
+  paired with the new GpuScene-aware
+  `shaders/deferred/default_debug_gbuffer.frag.spv` that emits the three
+  GBuffer color attachments matching the frame recipe's deferred
+  declarations — `SceneNormal` RGBA16F, `Albedo` RGBA8, `Material0` RGBA16F
+  — with `D32_FLOAT` depth, `DepthOp::Equal` and `DepthWriteEnable=false`
+  matching the depth-prepass-on contract). The legacy
+  `assets/shaders/surface.vert` + `surface_gbuffer.frag` pair is
+  deliberately *not* referenced — see the "Shader push-constant
+  compatibility policy" subsection above for the explicit rule and the
+  silent-misinterpretation bug shape it prevents. The pipeline is
+  republished byte-identical through `RebuildOperationalResources()`
+  using the same reset-then-publish pattern as the forward and shadow
+  pipelines. `Initialize()` emplaces
+  `m_DeferredSystem` + `m_DeferredGBufferPass` *before* calling
+  `InitializeOperationalPassResources()` so the publisher's `SetPipeline(...)`
+  actually lands on the pass on the initial operational path. The executor's
+  `"SurfacePass"` branch routes to `RecordDeferredGBufferPass(...)` when the
+  active default-recipe features select the deferred lighting path; forward
+  mode continues to route to `RecordForwardSurfacePass(...)` per GRAPHICS-070.
+  `IRenderer::SetLightingPath(FrameRecipeLightingPath)` is the renderer-stored
+  test seam that flips the runtime `LightingPath` after
+  `DeriveDefaultFrameRecipeFeatures()` derives the default (`Forward`); the
+  derivation continues to return `Forward` by default so existing contract
+  tests stay green, and contract tests opt into the deferred-mode executor
+  branch by calling `SetLightingPath(FrameRecipeLightingPath::Deferred)`. The
+  companion `"CompositionPass"` (deferred lighting) and the deferred-lighting
+  shadow-atlas binding at `set 1, binding 1` are owned by GRAPHICS-072
+  Slices B and C and currently fall through to the catch-all soft-skip.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by

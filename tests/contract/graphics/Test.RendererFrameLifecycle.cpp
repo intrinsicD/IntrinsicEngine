@@ -6,6 +6,7 @@
 #include <string>
 
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.ShadowSystem;
@@ -860,6 +861,7 @@ TEST(RendererFrameLifecycle, ForwardSurfacePassSkipsUnavailableWhenCullOutputMis
 }
 
 // GRAPHICS-071 — retained line/point pass routing is fail-closed on culling
+
 // output availability. This preserves the transient-debug split: invalid or
 // absent retained buckets soft-skip here rather than routing debug packets
 // through the retained line/point lanes.
@@ -894,6 +896,158 @@ TEST(RendererFrameLifecycle, ForwardLinePointPassesSkipUnavailableWhenCullOutput
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
     EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 0);
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-072 Slice A — default-recipe deferred GBuffer pipeline lease +
+// republish, deferred-mode `"SurfacePass"` executor branch routing, and
+// fail-closed `SkippedUnavailable` taxonomy when the pipeline lease is
+// missing. Slice B owns the `"CompositionPass"` executor branch (deferred
+// lighting); Slice C owns the shadow-atlas descriptor binding and the
+// end-to-end shadow-casting recorded-for-both-passes test.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, DeferredGBufferPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{281u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetDeferredGBufferPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetDeferredGBufferPipelineDesc();
+
+    // GRAPHICS-072 Slice A — the deferred GBuffer pipeline MUST select
+    // shaders that declare a `layout(push_constant) ScenePC` block matching
+    // `RHI::GpuScenePushConstants` byte-for-byte, because
+    // `DeferredGBufferPass::Execute` pushes that struct verbatim. The
+    // legacy `assets/shaders/surface.vert` + `surface_gbuffer.frag` pair
+    // declares the pre-GpuScene `mat4 Model + Ptr*` push block and must
+    // never be referenced here (the `SceneTableBDA` pointer would land in
+    // `mat4 Model[0]` and every BDA dereference would read garbage on a
+    // real Vulkan run). See the renderer README "Shader push-constant
+    // compatibility policy" subsection.
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/forward/default_debug_surface.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/deferred/default_debug_gbuffer.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 3u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::RGBA8_UNORM);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[2], Extrinsic::RHI::Format::RGBA16_FLOAT);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetDeferredGBufferPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetDeferredGBufferPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-072 Slice A — when `SetLightingPath(Deferred)` is in effect and
+// the operational publisher has produced both the cull-output and the GBuffer
+// pipeline, the deferred-mode `"SurfacePass"` executor branch records the
+// GBuffer pass's bind/draw shape and reports `Recorded`. The companion
+// `"CompositionPass"` (deferred lighting) is owned by Slice B and currently
+// soft-skips to `SkippedUnavailable`.
+TEST(RendererFrameLifecycle, DeferredSurfacePassRecordsWhenLightingPathIsDeferred)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{282u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+    EXPECT_EQ(renderer->GetLightingPath(),
+              Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    // Slice B owns the `"CompositionPass"` executor branch.
+    ASSERT_NE(FindCommandPass(stats, "CompositionPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "CompositionPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-072 Slice A — when the deferred surface pipeline could not be
+// created (here, the device fails the corresponding `CreatePipeline` call),
+// the deferred-mode `"SurfacePass"` executor branch reports
+// `SkippedUnavailable` rather than recording against an unset pipeline
+// handle. Mirrors the forward-path
+// `ForwardSurfacePassSkipsUnavailableWhenCullOutputMissing` policy.
+TEST(RendererFrameLifecycle, DeferredSurfacePassSkipsUnavailableWhenPipelineMissing)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    // The deferred GBuffer pipeline is the eighth (1-indexed) pipeline
+    // created by the operational publisher: 1 culling compute, 2 depth
+    // prepass, 3 default debug surface, 4 minimal visible triangle, 5
+    // forward surface, 6 forward line, 7 forward point, 8 shadow,
+    // 9 deferred GBuffer. Fail call #9 so all upstream pipelines succeed
+    // (including culling, which keeps `m_CullingOutputAvailable=true`) but
+    // the GBuffer lease is left empty. The `SkippedUnavailable` taxonomy
+    // distinguishes this from the `SkippedNonOperational` path.
+    device.FailPipelineCreateCall = 9;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{283u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetLightingPath(Extrinsic::Graphics::FrameRecipeLightingPath::Deferred);
+    EXPECT_FALSE(renderer->GetDeferredGBufferPipeline().IsValid());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    // Other passes (DepthPrepass, LinePass, PointPass) still record because
+    // their pipelines were created successfully; the deferred-surface
+    // `SkippedUnavailable` status above is the contract being asserted by
+    // this test.
 
     renderer->Shutdown();
 }
