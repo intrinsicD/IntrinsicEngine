@@ -252,6 +252,16 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetDeferredGBufferPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetDeferredGBufferPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-072 (Slice B) — accessor for the default-recipe deferred
+        // lighting pipeline (vertex `post_fullscreen.vert.spv` + fragment
+        // `deferred/lighting.frag.spv`, single `SceneColorHDR` RGBA16F color
+        // target, no depth target). Handle is invalid until an operational
+        // device path publishes the lease; the descriptor remains
+        // deterministic so contract tests can assert byte-identical rebuild
+        // behavior.
+        [[nodiscard]] virtual RHI::PipelineHandle GetDeferredLightingPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-072 (Slice A) — test seam for the default recipe's runtime
         // lighting path. `DeriveDefaultFrameRecipeFeatures` derives a default
         // of `Forward` so the legacy contract tests stay green; the renderer
