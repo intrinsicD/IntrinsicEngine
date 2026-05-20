@@ -432,8 +432,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   validation-layer fail-closed policy, required-vs-optional capability split,
   queue-family ownership rules, swapchain/device-loss transition handling, test
   split, performance characteristics, extensibility, and layering. Implementation
-  children `GRAPHICS-033A/B/C/D` are now opened (see below); fail-closed
-  behavior is preserved.
+  children `GRAPHICS-033A/B/C/D` and gate follow-ups `GRAPHICS-033E/F` are
+  retired; fail-closed behavior is preserved.
 - [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
   first implementation child of GRAPHICS-033. Landed the
   `VulkanOperationalStatusCode` / `VulkanOperationalReason` /
@@ -444,32 +444,32 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   originally-planned `*-vulkan-operational-status-seam.md` backlog entry was
   superseded by the as-landed `*-evaluator.md` filename and has been
   retired. Upstream consumer of GRAPHICS-033B/C/D.
-- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and startup breadcrumb](GRAPHICS-033B-vulkan-operational-diagnostics-snapshot.md):
-  second implementation child. Adds `VulkanOperationalDiagnosticsSnapshot`
+- [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
+  retired second implementation child. Added `VulkanOperationalDiagnosticsSnapshot`
   with the five process-monotonic counters
   (`VulkanFallbackToNullCount`, `VulkanInitFailureCount`,
   `VulkanValidationErrorCount`, `VulkanOperationalGateFailureCount`,
   `VulkanDeviceLostOperationalDropCount`) and a reason histogram, and
-  wires the `VulkanRequestedButNotOperational` startup/transition warn
+  wired the `VulkanRequestedButNotOperational` startup/transition warn
   breadcrumb in `Runtime.Engine`. CPU `contract;graphics` and
-  `contract;runtime` tests cover row-by-row counter side-effects and
+  `contract;runtime` tests cover row-by-row counter side effects and
   one-shot breadcrumb emission. Depends on GRAPHICS-033A.
-- [GRAPHICS-033C — Vulkan command recording for the minimal-debug-surface recipe](GRAPHICS-033C-vulkan-minimal-recipe-command-recording.md):
-  third implementation child. Implements `Pass.Surface.MinimalDebug` and
+- [GRAPHICS-033C — Vulkan command recording for the minimal-debug-surface recipe (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
+  retired third implementation child. Implemented `Pass.Surface.MinimalDebug` and
   `Pass.Present.MinimalDebug` Vulkan recording bodies through the
   GRAPHICS-018R `RebuildOperationalResources()` seam, asserting CPU-mock
-  parity against the GRAPHICS-032 contract. Clears the
+  parity against the GRAPHICS-032 contract. Cleared the
   `MinimalRecipeRecordingMissing` gate item; full `Operational` still
-  requires the remaining gate items (barrier validation, public service
-  reconciliation). Depends on GRAPHICS-033A, GRAPHICS-032 (done),
-  GRAPHICS-031 (done), GRAPHICS-018R (done).
-- [GRAPHICS-033D — Opt-in Vulkan visible-triangle smoke fixture](GRAPHICS-033D-vulkan-visible-triangle-smoke.md):
-  fourth implementation child. Adds
-  `tests/integration/graphics/Test.VulkanVisibleTriangleSmoke.cpp` under
+  required the follow-up gate items (barrier validation, public service
+  reconciliation) before GRAPHICS-033E/F retired. Depends on GRAPHICS-033A,
+  GRAPHICS-032 (done), GRAPHICS-031 (done), GRAPHICS-018R (done).
+- [GRAPHICS-033D — Opt-in Vulkan visible-triangle smoke fixture (done)](../../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
+  retired fourth implementation child. Added
+  `tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp` under
   `gpu;vulkan;graphics` labels (excluded from the default CPU gate). On
-  supported hosts the fixture drives one GRAPHICS-032 minimal-recipe
+  supported hosts the fixture drove one GRAPHICS-032 minimal-recipe
   frame through GLFW + real Vulkan device + surface + swapchain and
-  asserts `IsOperational() == true` with no fallback counters or
+  asserted `IsOperational() == true` with no fallback counters or
   breadcrumbs. Depends on GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.
 - [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
   planning-only design for the asset-source residency path; locks down
@@ -589,7 +589,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   ownership, pipeline leases, executor routing, CPU contract coverage, and the
   documented `point.vert` + `point_retained.frag` canonical retained point
   variant.
-- [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring](../../done/GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md) (active; Slice A in progress):
+- [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring (done)](../../done/GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
   depends on GRAPHICS-070 (done), GRAPHICS-073 (done). Now also owns the
   shadow-atlas deferred-lighting binding (at `set 1, binding 1` per
   `assets/shaders/deferred_lighting.frag`, i.e. binding 1 of the same
@@ -613,7 +613,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   `assets/shaders/deferred_lighting.frag` (forward path keeps `set 0,
   binding 1`).
 - [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](../../active/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
-  depends on GRAPHICS-070. **In progress (Slice B next)**. Slice A
+  depends on GRAPHICS-070. **In progress (Slice D next)**. Slice A
   landed the EntityId selection pipeline + `"PickingPass"` executor
   route + GpuScene-aware `selection/entity_id.{vert,frag}` shader pair
   (PR #890; commits `ad2e40d` + `08af46e`, merge `558a75d`). The
@@ -624,10 +624,10 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   (with `EntityId` surviving when `EnableSelectionOutline=true`), and
   flipped `BuildSelectionEntityIdPipelineDesc()` to depth-equal /
   `D32_FLOAT` so the picking readback returns nearest-surface IDs
-  (PR #891; commits `dac6f47` + `b78347d`, merge `5b5309d`). Slices B
-  (Face/Edge/Point pipelines), C (outline pipeline +
-  `"SelectionOutlinePass"` route), and D (`Picking.Readback` buffer +
-  drain + `PublishPickResult` / `PublishNoHit` wiring) remain.
+  (PR #891; commits `dac6f47` + `b78347d`, merge `5b5309d`). Slice B
+  (Face/Edge/Point pipelines) and Slice C (outline pipeline +
+  `"SelectionOutlinePass"` route) have landed; Slice D (`Picking.Readback`
+  buffer + drain + `PublishPickResult` / `PublishNoHit` wiring) remains.
 - [GRAPHICS-075 — Default-recipe postprocess chain wiring](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
   depends on GRAPHICS-072 (HDR scene color producer).
 - [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):

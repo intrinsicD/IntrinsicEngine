@@ -25,6 +25,9 @@ map.
   inventories promoted modules whose value types, pure data contracts, or
   dependency-free APIs appear to live in higher layers than their true owner and
   creates one scoped follow-up task per accepted move/split.
+- [HARDEN-069 — Rebind legacy layering allowlist entries to active retirement tasks](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md):
+  metadata-only rebinding of legacy allowlist rows from the retired `HARDEN-010`
+  ID to current legacy-retirement task IDs, preserving the allowlisted edge set.
 - [DOCS-001 — Reduce `docs/architecture/graphics.md` to contract + status](../../done/DOCS-001-reduce-graphics-architecture-prose.md)
   (done 2026-05-17): shrank the 793-line `graphics.md` to 118 lines by
   extracting 15 embedded decision records into ADRs `0004..0018` and adding a
@@ -42,6 +45,9 @@ map.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
+- [LEGACY-002 — Seed retirement tasks for remaining `src/legacy/` subtrees](LEGACY-002-seed-src-legacy-retirement-backlog.md):
+  opens one structured `LEGACY-*` retirement task per remaining legacy subtree
+  so allowlist entries and migration docs can point at concrete removal owners.
 - [REVIEW-001 — Establish weekly human-led review of agent-authored slices](../../done/REVIEW-001-human-led-agent-week-review-cadence.md)
   (done 2026-05-17): landed `docs/agent/agent-output-review-checklist.md` with
   the nine-row failure-mode checklist, added the cadence pointer to

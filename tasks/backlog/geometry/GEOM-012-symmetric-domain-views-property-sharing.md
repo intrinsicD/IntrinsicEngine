@@ -21,7 +21,6 @@
 - [ ] Define a domain-view policy for `Mesh`, `Graph`, and `Cloud`: borrowed view, owning copy, and move/consume semantics.
 - [ ] Add explicit view/adaptor APIs for mesh-backed graph input that preserve the existing shared `v:point`, `v:connectivity`, `h:connectivity`, deletion-count, and edge-property behavior.
 - [ ] Add explicit view/adaptor APIs for mesh-backed and graph-backed point-cloud input that map semantic point attributes without duplicating position data.
-- [x] Standardize mesh, graph, and point-cloud positions on the canonical `v:point` property.
 - [ ] Add const/read-only view types where algorithms should not mutate borrowed storage.
 - [ ] Define mutable-borrow rules: algorithms may mutate borrowed storage only when mutation is the documented primary effect; otherwise they must return new owned results or require an explicit copy.
 - [ ] Define hard-copy conversion helpers for algorithms that change topology/cardinality or need independent lifetime.

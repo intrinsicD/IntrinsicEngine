@@ -26,6 +26,8 @@ map.
 - [METHOD-006 — Cross-field / frame-field design reference backend](METHOD-006-cross-field-design-reference-backend.md).
 - [METHOD-007 — Constrained Delaunay tetrahedralization reference backend](METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
   (hard-gated by [`geometry/GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md)).
+- [METHOD-008 — Resolve `_example_vector_heat` method manifest placeholders](METHOD-008-example-vector-heat-manifest-placeholders.md)
+  (metadata/intake cleanup; no CPU reference backend in this task).
 
 ## Convergence
 
