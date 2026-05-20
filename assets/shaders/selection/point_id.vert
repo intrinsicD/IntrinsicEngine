@@ -6,12 +6,24 @@
 // GRAPHICS-074 Slice B — GpuScene-aware PointId picking vertex shader.
 //
 // Pairs with `selection/point_id.frag`. Mirrors `selection/entity_id.vert`
-// so the PointId selection pipeline reuses the same GpuScene-aware
-// vertex-fetch chain. PointIdPass dispatches against the `Points` cull
-// bucket through `DrawIndirectCount` (non-indexed), so this shader sees
-// point-list draws over the managed vertex stream. The fragment shader
-// writes `EncodeSelectionId(Point, pointIndex)` where `pointIndex` is
-// sourced from `gl_PrimitiveID` per GRAPHICS-012Q.
+// for the position fetch chain and `assets/shaders/forward/point.vert` for
+// the `gl_PointSize` write. PointIdPass dispatches against the `Points`
+// cull bucket through `DrawIndirectCount` (non-indexed), so this shader
+// sees point-list draws over the managed vertex stream. The fragment
+// shader writes `EncodeSelectionId(Point, pointIndex)` where `pointIndex`
+// is sourced from `gl_PrimitiveID` per GRAPHICS-012Q.
+//
+// Point-size publication: `BuildSelectionPointIdPipelineDesc()` configures
+// the pipeline with `Topology::PointList`, which requires the vertex stage
+// to emit a valid `gl_PointSize` — without it Vulkan pipeline creation can
+// fail point-size validation, and even when accepted the rasterizer falls
+// back to 1-pixel points and picking misses every entity rendered with a
+// larger configured point size. `forward/point.vert` already publishes
+// `gl_PointSize = max(cfg.PointSize, 1.0)`, so picking must match for the
+// visible point to be hittable. This shader therefore reads
+// `GpuEntityConfig::PointSize` through `scene.EntityConfigBDA` indexed by
+// `inst.ConfigSlot` (the same chain `forward/point.vert` uses) and writes
+// the same `gl_PointSize` value.
 //
 // Push-constant compatibility: the block below MUST mirror
 // `RHI::GpuScenePushConstants` exactly. `PointIdPass::Execute` pushes
@@ -46,9 +58,13 @@ void main() {
     const GpuInstanceStatic inst = GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[gl_InstanceIndex];
     const GpuInstanceDynamic dyn = GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[gl_InstanceIndex];
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
+    const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[inst.ConfigSlot];
 
     const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex];
 
     gl_Position = dyn.Model * vec4(v.Position, 1.0);
+    // Match `forward/point.vert`'s point-size publication so the picking
+    // footprint covers the same pixels the visible point covers.
+    gl_PointSize = max(cfg.PointSize, 1.0);
     fragEntityID = inst.EntityID;
 }
