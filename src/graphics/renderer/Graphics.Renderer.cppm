@@ -318,6 +318,24 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetSelectionOutlinePipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
+        // visible `Picking.Readback` buffer. The buffer is sized for
+        // `8 * frames-in-flight` bytes (one 4-byte `EntityId` word + one
+        // 4-byte `EncodedSelectionId` word per in-flight frame slot per
+        // `GRAPHICS-012Q`'s `EncodedSelectionId` payload layout), allocated
+        // with `HostVisible = true` and `BufferUsage::TransferDst` so the
+        // recipe (Slice D.2) can import it as the destination of a
+        // `CopyTextureToBuffer(EntityId/PrimitiveId, ...)` after the
+        // selection-ID sub-passes record, and the renderer (Slice D.3) can
+        // map it on `BeginFrame()` once the issuing frame has completed.
+        // Handle is invalid until an operational device path allocates the
+        // lease; size accessor returns the allocation size in bytes (0 when
+        // the buffer is not yet allocated). Slices D.2/D.3 wire the
+        // recipe-side import, per-frame copy, drain, and
+        // `PublishPickResult` / `PublishNoHit` routing.
+        [[nodiscard]] virtual RHI::BufferHandle GetPickingReadbackBuffer() const noexcept = 0;
+        [[nodiscard]] virtual std::uint64_t GetPickingReadbackBufferSize() const noexcept = 0;
+
         // GRAPHICS-072 (Slice A) — test seam for the default recipe's runtime
         // lighting path. `DeriveDefaultFrameRecipeFeatures` derives a default
         // of `Forward` so the legacy contract tests stay green; the renderer

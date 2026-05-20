@@ -1916,3 +1916,59 @@ TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPres
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-074 Slice D.1 — renderer-owned host-visible `Picking.Readback`
+// buffer lifecycle. The operational publisher allocates the buffer the first
+// time `InitializeOperationalPassResources()` runs and intentionally does
+// *not* re-allocate it on subsequent `RebuildOperationalResources()` calls,
+// so the handle Slice D.2 will import into the recipe stays byte-identical
+// across rebuilds (same pattern `ShadowSystem` uses for its depth atlas).
+// The buffer is sized for `8 * frames-in-flight` bytes per `GRAPHICS-012Q`'s
+// `EncodedSelectionId` payload (one 4-byte `EntityId` word + one 4-byte
+// `EncodedSelectionId` word per in-flight frame slot) and allocated with
+// `HostVisible = true` + `BufferUsage::TransferDst` so Slice D.2 can record
+// `CopyTextureToBuffer(EntityId/PrimitiveId, ..., m_PickingReadbackBuffer,
+// slot * 8 [+4])` after the four selection-ID sub-passes and Slice D.3 can
+// map the buffer on `BeginFrame()` once the issuing frame has completed.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PickingReadbackBufferSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{293u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle initialBuffer = renderer->GetPickingReadbackBuffer();
+    EXPECT_TRUE(initialBuffer.IsValid());
+
+    // Size = 8 bytes per in-flight frame slot (one 4-byte `EntityId` word +
+    // one 4-byte `EncodedSelectionId` word). `MockDevice::GetFramesInFlight()`
+    // returns 2, so the allocation must be 16 bytes.
+    const std::uint64_t initialSize = renderer->GetPickingReadbackBufferSize();
+    EXPECT_EQ(initialSize, static_cast<std::uint64_t>(8u) *
+                               static_cast<std::uint64_t>(device.GetFramesInFlight()));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+
+    // The buffer survives the rebuild byte-identical: same handle (so the
+    // recipe import Slice D.2 wires up stays stable across rebuilds) and
+    // same size.
+    const Extrinsic::RHI::BufferHandle rebuiltBuffer = renderer->GetPickingReadbackBuffer();
+    EXPECT_TRUE(rebuiltBuffer.IsValid());
+    EXPECT_EQ(rebuiltBuffer.Index, initialBuffer.Index);
+    EXPECT_EQ(rebuiltBuffer.Generation, initialBuffer.Generation);
+    EXPECT_EQ(renderer->GetPickingReadbackBufferSize(), initialSize);
+
+    renderer->Shutdown();
+
+    // After `Shutdown()` the lease is released and a fresh accessor returns
+    // an invalid handle / zero size, so a later `Initialize()` would
+    // allocate against the new BufferManager rather than handing out a
+    // dangling handle.
+    EXPECT_FALSE(renderer->GetPickingReadbackBuffer().IsValid());
+    EXPECT_EQ(renderer->GetPickingReadbackBufferSize(), 0u);
+}
+
