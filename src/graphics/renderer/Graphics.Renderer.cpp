@@ -2474,19 +2474,37 @@ namespace Extrinsic::Graphics
 
             // GRAPHICS-074 Slice D.3 — keep the per-slot picking metadata
             // arrays sized to match the current `frames-in-flight` slot
-            // count. When the slot count grew (FIF promoted), the new slots
-            // start in a clean non-pending state. When the slot count
-            // shrank or stayed the same, any *previously* pending slot that
-            // is still within the new slot bound is invalidated so the
-            // upcoming `BeginFrame()` drain publishes `PublishNoHit` rather
-            // than a stale pre-rebuild hit (the buffer itself is preserved
-            // across same-FIF rebuilds, so the underlying bytes would still
-            // decode to a hit — that's exactly the case the test
-            // `PublishesNoHitForInvalidatedRequest` exercises). Slot indices
-            // past the new slot count are dropped entirely.
+            // count. Three cases:
+            //   1. Slot count shrank (FIF demoted, e.g. triple → double
+            //      buffered). Slots at indices `>= newSlotCount` are about
+            //      to be truncated, so any pending readback in that tail is
+            //      *resolved* by publishing `PublishNoHit()` before the
+            //      array shrinks — otherwise the SelectionSystem would
+            //      keep its `PendingPick` visible to the runtime/editor
+            //      forever (the new slot indexing addresses a strictly
+            //      smaller range, so the dropped slots can never be
+            //      drained naturally).
+            //   2. Slot count unchanged or grew with previously pending
+            //      slots still within the new bound. Those still-pending
+            //      slots are flagged `Invalidated=true` so the upcoming
+            //      `BeginFrame()` drain publishes `PublishNoHit` rather
+            //      than a stale pre-rebuild hit (the buffer itself is
+            //      preserved across same-FIF rebuilds, so the underlying
+            //      bytes would still decode to a hit — that's exactly the
+            //      case the test `PublishesNoHitForInvalidatedRequest`
+            //      exercises).
+            //   3. Slot count grew (FIF promoted). New trailing entries
+            //      start in a clean non-pending state.
             const std::size_t newSlotCount = static_cast<std::size_t>(pickingFramesInFlight);
             if (m_PickingSlotPending.size() > newSlotCount)
             {
+                for (std::size_t slot = newSlotCount; slot < m_PickingSlotPending.size(); ++slot)
+                {
+                    if (m_PickingSlotPending[slot] && m_SelectionSystem)
+                    {
+                        m_SelectionSystem->PublishNoHit();
+                    }
+                }
                 m_PickingSlotPending.resize(newSlotCount);
                 m_PickingSlotIssuedFrame.resize(newSlotCount);
                 m_PickingSlotRequest.resize(newSlotCount);

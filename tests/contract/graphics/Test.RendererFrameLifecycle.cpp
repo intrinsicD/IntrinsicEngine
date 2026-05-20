@@ -2406,3 +2406,89 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForInvalidatedRequest)
     renderer->Shutdown();
 }
 
+// GRAPHICS-074 Slice D.3 — when `RebuildOperationalResources()` shrinks
+// the frames-in-flight count (e.g. a swapchain rebuild demotes the device
+// from triple- to double-buffered), slot indices `>= newSlotCount` are
+// truncated from the per-slot picking metadata arrays. Any pending
+// readback in that tail must be *resolved* with `PublishNoHit()` before
+// the truncation, otherwise the SelectionSystem keeps its `PendingPick`
+// visible to the runtime/editor forever (the new slot indexing addresses
+// a strictly smaller range, so the dropped slots can never be drained
+// naturally).
+TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForTruncatedSlotOnFifShrink)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{300u, 1u};
+    // Triple-buffered initially so frame 2 routes to slot index 2 (which
+    // the shrink-to-FIF=2 rebuild below will drop).
+    device.FramesInFlight = 3u;
+    device.NextFrame.FrameIndex = 0u;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle pickingBuffer = renderer->GetPickingReadbackBuffer();
+    ASSERT_TRUE(pickingBuffer.IsValid());
+    ASSERT_EQ(renderer->GetPickingReadbackBufferSize(),
+              static_cast<std::uint64_t>(8u) * 3u);
+
+    // Step the device's `FrameIndex` to 2 so the executor populates the
+    // tail slot (slot 2) inside `m_PickingSlot*`. Run BeginFrame +
+    // ExtractRenderWorld + ExecuteFrame + EndFrame once to issue a
+    // copy that flags slot 2 as `Pending=true, IssuedFrame=2`.
+    device.NextFrame.FrameIndex = 2u;
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    ASSERT_EQ(frame.FrameIndex, 2u);
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+        .HasPendingPick = true,
+        .Pick = Extrinsic::Graphics::PickPixelRequest{.X = 5u, .Y = 9u, .Pending = true},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    ASSERT_TRUE(world.PickRequest.Pending);
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    ASSERT_EQ(renderer->GetLastRenderGraphStats().PickingReadbackCopyCount, 1u);
+
+    [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
+
+    // The pre-rebuild SelectionSystem state must have no resolved pick
+    // yet — the drain only runs at the *next* BeginFrame, which we never
+    // reach because the FIF-shrink rebuild fires first.
+    {
+        const Extrinsic::Graphics::SelectionSystem& preRebuildSelection = renderer->GetSelectionSystem();
+        EXPECT_FALSE(preRebuildSelection.GetLastPickResult().has_value());
+    }
+
+    // Simulate the swapchain demoting the device from triple- to
+    // double-buffered. `RebuildOperationalResources()` reallocates the
+    // buffer (size shrinks to 16 bytes) and truncates the per-slot
+    // bookkeeping to 2 entries. Slot 2 was `Pending=true` — without the
+    // truncation-time NoHit publish, that pending readback would leak
+    // silently and the SelectionSystem would keep showing the pre-rebuild
+    // pending pick to consumers.
+    device.FramesInFlight = 2u;
+    ASSERT_TRUE(renderer->RebuildOperationalResources(device));
+    ASSERT_EQ(renderer->GetPickingReadbackBufferSize(),
+              static_cast<std::uint64_t>(8u) * 2u);
+
+    const Extrinsic::Graphics::SelectionSystem& selection = renderer->GetSelectionSystem();
+    const std::optional<Extrinsic::Graphics::PickReadbackResult> last = selection.GetLastPickResult();
+    ASSERT_TRUE(last.has_value())
+        << "Truncated pending slot must publish NoHit during the rebuild "
+           "so SelectionSystem state matches the new slot indexing.";
+    EXPECT_FALSE(last->Hit);
+    EXPECT_EQ(last->StableEntityId, 0u);
+    EXPECT_EQ(last->EncodedId.Value, 0u);
+
+    const Extrinsic::Graphics::SelectionSystemDiagnostics diag = selection.GetDiagnostics();
+    EXPECT_EQ(diag.PickHitCount, 0u);
+    EXPECT_EQ(diag.PickNoHitCount, 1u);
+
+    renderer->Shutdown();
+}
+
