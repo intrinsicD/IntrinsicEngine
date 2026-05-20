@@ -1781,3 +1781,138 @@ TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-074 Slice C — default-recipe selection outline pipeline lease +
+// republish, and executor-branch routing. The outline pipeline is a fullscreen
+// quad (`post_fullscreen.vert` + `selection_outline.frag`) bound by the
+// `"SelectionOutlinePass"` executor branch when the recipe's
+// `features.EnableSelectionOutline` is true (driven by
+// `world.Selection.HasHovered || !world.Selection.SelectedStableIds.empty()`
+// in `DeriveDefaultFrameRecipeFeatures`).
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{291u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionOutlinePipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionOutlinePipelineDesc();
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/selection_outline.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+    // Color target matches the recipe's `SelectionOutline` texture, which is
+    // allocated with `FrameRecipeSizing::BackbufferFormat`; the MockDevice
+    // does not override `GetBackbufferFormat()` so the renderer's stored
+    // format is `RHI::Format::RGBA8_UNORM`.
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+    // Render-pass-compatible with the recipe-declared depth attachment
+    // (`builder.Read(SceneDepth, DepthRead)`) even though the pipeline does
+    // not test or write depth itself.
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    // Matches `SelectionOutlinePushConstants` in `Pass.Selection.Outline.cpp`,
+    // which mirrors the `selection_outline.frag` `Push` block byte-for-byte
+    // (vec4 OutlineColor + vec4 HoverColor + 12 floats/uints + uint[16]
+    // SelectedIds = 144 bytes under Vulkan std430). The pass body pushes a
+    // zero-initialised instance every frame so the shader sees defined
+    // values rather than stale push memory left by a prior draw.
+    EXPECT_EQ(initialDesc.PushConstantSize, 144u);
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionOutlinePipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionOutlinePipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPresent)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{292u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    // Force `features.EnableSelectionOutline = true` so the recipe declares
+    // `SelectionOutlinePass`. Without this the recipe drops the pass and
+    // `FindCommandPass(stats, "SelectionOutlinePass")` would correctly return
+    // null — covering only the "outline is gated off" path, not Slice C's
+    // executor-route contract.
+    world.Selection.HasHovered = true;
+    world.Selection.HoveredStableId = 42u;
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* outlinePass =
+        FindCommandPass(stats, "SelectionOutlinePass");
+    ASSERT_NE(outlinePass, nullptr);
+    EXPECT_EQ(outlinePass->Status, Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    // GRAPHICS-074 Slice C — the outline pass must push deterministic
+    // 144-byte zero-initialised push constants before its fullscreen draw
+    // so the shader never reads stale push memory from a prior pass. Walk
+    // the captured `PushConstants(...)` payloads and require at least one
+    // 144-byte all-zero payload (the outline pass's contribution) to
+    // appear; earlier passes in the same frame contribute their own
+    // (`GpuScenePushConstants`, etc.) so we cannot just assert payload
+    // count == 1.
+    bool foundOutlinePush = false;
+    for (const std::vector<std::byte>& payload : device.CommandContext.PushConstantPayloads)
+    {
+        if (payload.size() != 144u)
+        {
+            continue;
+        }
+        bool allZero = true;
+        for (const std::byte b : payload)
+        {
+            if (b != std::byte{0})
+            {
+                allZero = false;
+                break;
+            }
+        }
+        if (allZero)
+        {
+            foundOutlinePush = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundOutlinePush)
+        << "SelectionOutlinePass must push a deterministic 144-byte zero-"
+        << "initialised SelectionOutlinePushConstants block before its draw.";
+
+    renderer->Shutdown();
+}
+

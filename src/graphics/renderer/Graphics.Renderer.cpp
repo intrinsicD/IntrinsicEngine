@@ -49,6 +49,7 @@ import Extrinsic.Graphics.Pass.Selection.EntityId;
 import Extrinsic.Graphics.Pass.Selection.FaceId;
 import Extrinsic.Graphics.Pass.Selection.EdgeId;
 import Extrinsic.Graphics.Pass.Selection.PointId;
+import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -254,6 +255,16 @@ namespace Extrinsic::Graphics
             m_SelectionFaceIdPass.emplace(*m_SelectionSystem);
             m_SelectionEdgeIdPass.emplace(*m_SelectionSystem);
             m_SelectionPointIdPass.emplace(*m_SelectionSystem);
+            // GRAPHICS-074 Slice C — `SelectionOutlinePass` is selection-system-
+            // bound and renders a fullscreen quad into `SelectionOutline`. Same
+            // publisher-before-first-frame invariant as the other selection
+            // passes above: emplaced here so the operational publisher can
+            // `SetPipeline(...)` on the pass instance before any executor
+            // branch reaches `Execute(...)`. `Execute()` early-returns when
+            // the pipeline handle or `SelectionSystem` is not initialised, so
+            // a missing pipeline yields `SkippedUnavailable` on the executor
+            // taxonomy rather than a silently-recorded no-op.
+            m_SelectionOutlinePass.emplace(*m_SelectionSystem);
             m_ForwardSystem.emplace();
             m_ForwardSystem->Initialize();
             // GRAPHICS-070/071/073 — default-recipe forward surface/line/point/
@@ -393,6 +404,7 @@ namespace Extrinsic::Graphics
             m_SelectionFaceIdPass.reset();
             m_SelectionEdgeIdPass.reset();
             m_SelectionPointIdPass.reset();
+            m_SelectionOutlinePass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -418,6 +430,7 @@ namespace Extrinsic::Graphics
             m_SelectionFaceIdPipelineLease.reset();
             m_SelectionEdgeIdPipelineLease.reset();
             m_SelectionPointIdPipelineLease.reset();
+            m_SelectionOutlinePipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -1082,6 +1095,30 @@ namespace Extrinsic::Graphics
                             RecordShadowPass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    else if (passName == std::string_view{"SelectionOutlinePass"})
+                    {
+                        // GRAPHICS-074 Slice C — default-recipe selection
+                        // outline route. The recipe declares
+                        // `SelectionOutlinePass` only when
+                        // `features.EnableSelectionOutline` is true (set from
+                        // `world.Selection.HasHovered ||
+                        // !world.Selection.SelectedStableIds.empty()` in
+                        // `DeriveDefaultFrameRecipeFeatures`), so this branch
+                        // is reached only when at least one selectable entity
+                        // is present this frame. `RecordSelectionOutlinePass`
+                        // mirrors the selection-ID helpers: non-operational
+                        // device → `SkippedNonOperational`; missing pass /
+                        // lease → `SkippedUnavailable`; otherwise the
+                        // fullscreen `Bind/Draw(3,1,0,0)` shape records and
+                        // we return `Recorded`. The
+                        // `selection_outline.frag` push block (outline
+                        // color/width/selected-id list) plumbing remains
+                        // future-slice scope alongside the `Picking.Readback`
+                        // drain (Slice D).
+                        const RenderCommandPassStatus status =
+                            RecordSelectionOutlinePass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                     else if (passName == std::string_view{"PickingPass"})
                     {
                         // GRAPHICS-074 Slice A + B — default-recipe selection
@@ -1399,6 +1436,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetSelectionPointIdPipelineDesc() const noexcept override
         {
             return BuildSelectionPointIdPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetSelectionOutlinePipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_SelectionOutlinePipelineLease.has_value() ||
+                !m_SelectionOutlinePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_SelectionOutlinePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept override
+        {
+            return BuildSelectionOutlinePipelineDesc(m_BackbufferFormat);
         }
 
         void SetLightingPath(FrameRecipeLightingPath path) noexcept override
@@ -1876,6 +1928,71 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-074 Slice C — default-recipe selection outline pipeline.
+        // Pairs the fullscreen `post_fullscreen.vert.spv` (no vertex inputs,
+        // no push constants — just emits a fullscreen triangle and a UV
+        // varying) with `selection_outline.frag.spv` (samples the `EntityId`
+        // R32_UINT target through `usampler2D uPickID` and writes the outline
+        // RGBA into the `SelectionOutline` color target). The recipe's
+        // `"SelectionOutlinePass"` declares
+        // `Read(presentSource, ShaderRead) + Read(EntityId, ShaderRead) +
+        // Read(SceneDepth, DepthRead) + Write(SelectionOutline,
+        // ColorAttachmentWrite)`, so the render pass attaches `SelectionOutline`
+        // (backbuffer format, per `FrameRecipeSizing::BackbufferFormat`) and
+        // `SceneDepth` (D32_FLOAT, read-only). Depth state stays off — the
+        // shader does not test or write depth — but the pipeline declares the
+        // matching `DepthTargetFormat` so it remains render-pass-compatible
+        // with the declared depth attachment.
+        //
+        // Push constants: `PushConstantSize = 144` matches
+        // `SelectionOutlinePushConstants` defined in
+        // `Passes/Pass.Selection.Outline.cpp`, which mirrors the
+        // `selection_outline.frag` `layout(push_constant) uniform Push`
+        // block byte-for-byte under Vulkan std430. The pass body pushes a
+        // zero-initialised instance every frame so the shader never reads
+        // stale push memory from a prior draw — without this, `OutlineWidth`
+        // and `SelectedCount` could be arbitrary, producing nondeterministic
+        // outlines and an unbounded fragment loop. Runtime-driven outline
+        // state plumbing (selected/hovered IDs, colours, animation) is
+        // deferred alongside the `Picking.Readback` drain (Slice D).
+        // Portability caveat: 144 bytes exceeds the Vulkan-guaranteed
+        // minimum `maxPushConstantsSize` of 128; reducing the block (e.g.
+        // moving `SelectedIds[16]` into a UBO or bindless buffer) is the
+        // tracked follow-up so the pipeline is portable across all
+        // conformant devices. Current desktop Vulkan implementations expose
+        // 256-byte push ranges, so this is non-blocking for the default
+        // gate.
+        //
+        // The legacy shaders that previously sourced the outline overlay
+        // (`forward/outline_overlay.frag` and friends) declared
+        // incompatible push-constant blocks and descriptor sets and are
+        // deliberately *not* referenced here — see
+        // `src/graphics/renderer/README.md` ("Shader push-constant
+        // compatibility policy") for the policy.
+        [[nodiscard]] static RHI::PipelineDesc BuildSelectionOutlinePipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_fullscreen.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection_outline.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = colorFormat;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = 144u; // sizeof(SelectionOutlinePushConstants)
+            desc.DebugName = "Renderer.SelectionOutline";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -2227,6 +2344,33 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] SelectionPointId pipeline unavailable; default-recipe point picking recording will be skipped: error={}",
                                 static_cast<int>(selectionPointIdPipeline.error()));
+            }
+
+            // GRAPHICS-074 Slice C — selection outline pipeline. Same reset/
+            // republish pattern as the four selection-ID pipelines above so a
+            // failed `Create()` leaves the outline pass in `SkippedUnavailable`
+            // rather than retaining a stale device handle across rebuilds.
+            m_SelectionOutlinePipelineLease.reset();
+            if (m_SelectionOutlinePass)
+            {
+                m_SelectionOutlinePass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc selectionOutlineDesc =
+                BuildSelectionOutlinePipelineDesc(m_BackbufferFormat);
+            auto selectionOutlinePipeline = m_PipelineManager->Create(selectionOutlineDesc);
+            if (selectionOutlinePipeline.has_value())
+            {
+                m_SelectionOutlinePipelineLease.emplace(std::move(*selectionOutlinePipeline));
+                if (m_SelectionOutlinePass)
+                {
+                    m_SelectionOutlinePass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_SelectionOutlinePipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] SelectionOutline pipeline unavailable; default-recipe selection outline recording will be skipped: error={}",
+                                static_cast<int>(selectionOutlinePipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -2605,6 +2749,37 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-074 Slice C — default-recipe `"SelectionOutlinePass"`
+        // route. The recipe only declares the pass when
+        // `features.EnableSelectionOutline` is true, so this helper is
+        // reached only when at least one selectable entity is present this
+        // frame. Mirrors the selection-ID helpers above with the
+        // fullscreen-pass shape (no culling/GpuWorld prerequisites since
+        // the pass body is `BindPipeline + Draw(3,1,0,0)`): a non-
+        // operational device → `SkippedNonOperational`; missing pass /
+        // lease → `SkippedUnavailable`; otherwise
+        // `SelectionOutlinePass::Execute` records the fullscreen draw and
+        // we return `Recorded`. The `Picking.Readback` drain +
+        // `PublishPickResult` / `PublishNoHit` wiring remain Slice D scope.
+        [[nodiscard]] RenderCommandPassStatus RecordSelectionOutlinePass(RHI::ICommandContext& cmd,
+                                                                          const RHI::CameraUBO& camera,
+                                                                          const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_SelectionOutlinePass.has_value() ||
+                !m_SelectionOutlinePipelineLease.has_value() ||
+                !m_SelectionOutlinePipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_SelectionOutlinePass->Execute(cmd, camera, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-072 Slice A — default-recipe deferred-mode `"SurfacePass"`
         // route. Reached from the executor lambda when
         // `defaultRecipeUsesDeferred` is true and the active pass is
@@ -2848,6 +3023,11 @@ namespace Extrinsic::Graphics
         std::optional<FaceIdPass>            m_SelectionFaceIdPass;
         std::optional<EdgeIdPass>            m_SelectionEdgeIdPass;
         std::optional<PointIdPass>           m_SelectionPointIdPass;
+        // GRAPHICS-074 Slice C — default-recipe selection outline pass.
+        // Same lifetime contract as the selection-ID passes above: emplaced
+        // after `m_SelectionSystem` is initialised and before the operational
+        // publisher runs; reset before `m_SelectionSystem` in `Shutdown()`.
+        std::optional<SelectionOutlinePass>  m_SelectionOutlinePass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -2861,6 +3041,7 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionFaceIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEdgeIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionPointIdPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_SelectionOutlinePipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

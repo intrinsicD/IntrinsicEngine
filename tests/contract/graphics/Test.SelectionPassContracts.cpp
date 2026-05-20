@@ -237,10 +237,24 @@ TEST(GraphicsSelectionPassContracts, SelectionOutlinePassDrawsFullscreenTriangle
     selection.Initialize();
     RecordingCommandContext cmd;
     pass.Execute(cmd, camera, 7u);
-    ASSERT_EQ(cmd.Events.size(), 2u);
+    // GRAPHICS-074 Slice C — the pass body is now
+    // `BindPipeline → PushConstants → Draw(3,1,0,0)`. The push-constant
+    // step writes a 144-byte zero-initialised `SelectionOutlinePushConstants`
+    // instance so the `selection_outline.frag` shader sees defined values
+    // rather than stale push-constant memory left by an earlier draw —
+    // without this, `OutlineWidth` could be arbitrary bytes and the
+    // fragment shader's neighbour-sampling loop would run for an unbounded
+    // number of iterations.
+    ASSERT_EQ(cmd.Events.size(), 3u);
     EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
-    EXPECT_EQ(cmd.Events[1].Kind, EventKind::Draw);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::Draw);
     EXPECT_EQ(cmd.LastPipeline, (RHI::PipelineHandle{705u, 1u}));
     EXPECT_EQ(cmd.LastVertexCount, 3u);
+    ASSERT_EQ(cmd.LastPushConstants.size(), 144u);
+    for (const std::byte b : cmd.LastPushConstants)
+    {
+        EXPECT_EQ(b, std::byte{0});
+    }
 }
 
