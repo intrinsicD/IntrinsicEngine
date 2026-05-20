@@ -1639,3 +1639,145 @@ TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-074 Slice B — default-recipe Face / Edge / Point selection ID
+// pipeline lease + republish. Each test mirrors the EntityId pipeline check:
+// the operational publisher creates the pipeline on initial init, the
+// descriptor matches the shader-pair contract (the legacy
+// `assets/shaders/pick_mesh.{vert,frag}` / `pick_line.{vert,frag}` /
+// `pick_point.{vert,frag}` shaders are pre-GpuScene footguns and are
+// deliberately *not* used here — see `src/graphics/renderer/README.md`
+// "Shader push-constant compatibility policy"), and
+// `RebuildOperationalResources()` republishes a byte-identical descriptor.
+// All three pipelines share the EntityId pipeline's depth-equal / depth-write-
+// off / two-R32_UINT-color-target render-pass shape so they can be bound
+// inside the same recipe-declared `PickingPass` render pass; they differ only
+// in primitive topology and cull mode.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, FaceIdPickingPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{288u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionFaceIdPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionFaceIdPipelineDesc();
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/selection/face_id.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/selection/face_id.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionFaceIdPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionFaceIdPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, EdgeIdPickingPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{289u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionEdgeIdPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionEdgeIdPipelineDesc();
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/selection/edge_id.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/selection/edge_id.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::LineList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionEdgeIdPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionEdgeIdPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, PointIdPickingPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{290u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetSelectionPointIdPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetSelectionPointIdPipelineDesc();
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/selection/point_id.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/selection/point_id.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::PointList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_FALSE(initialDesc.ColorBlend[1].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 2u);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.ColorTargetFormats[1], Extrinsic::RHI::Format::R32_UINT);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionPointIdPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionPointIdPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+

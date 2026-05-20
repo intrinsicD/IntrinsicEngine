@@ -284,6 +284,25 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-074 (Slice B) — accessors for the default-recipe Face /
+        // Edge / Point selection ID pipelines. Each pipeline mirrors the
+        // EntityId pipeline's depth-equal / depth-write-off / two-R32_UINT
+        // color-target shape required by the recipe's `PickingPass`
+        // render-pass declaration, differing only in primitive topology
+        // (`TriangleList` / `LineList` / `PointList`), cull bucket (consumed
+        // through the respective `FaceIdPass` / `EdgeIdPass` / `PointIdPass`
+        // `Execute(...)`), and the shader-side `EncodeSelectionId(domain,
+        // payload)` value packed into `PrimitiveId`. Handles are invalid
+        // until an operational device path publishes the leases; descriptors
+        // remain deterministic so contract tests can assert byte-identical
+        // rebuild behavior.
+        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionFaceIdPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionFaceIdPipelineDesc() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionEdgeIdPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionEdgeIdPipelineDesc() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionPointIdPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionPointIdPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-072 (Slice A) — test seam for the default recipe's runtime
         // lighting path. `DeriveDefaultFrameRecipeFeatures` derives a default
         // of `Forward` so the legacy contract tests stay green; the renderer

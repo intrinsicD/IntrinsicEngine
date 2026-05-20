@@ -46,6 +46,9 @@ import Extrinsic.Graphics.Pass.Forward.Line;
 import Extrinsic.Graphics.Pass.Forward.Point;
 import Extrinsic.Graphics.Pass.Shadows;
 import Extrinsic.Graphics.Pass.Selection.EntityId;
+import Extrinsic.Graphics.Pass.Selection.FaceId;
+import Extrinsic.Graphics.Pass.Selection.EdgeId;
+import Extrinsic.Graphics.Pass.Selection.PointId;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -240,6 +243,17 @@ namespace Extrinsic::Graphics
             // `!m_Pipeline.IsValid()` while the executor still reported
             // `Recorded`.
             m_SelectionEntityIdPass.emplace(*m_SelectionSystem);
+            // GRAPHICS-074 Slice B — Face/Edge/Point ID selection passes
+            // share the same publisher-before-first-frame invariant as the
+            // EntityId pass above: each is emplaced here so the operational
+            // publisher can `SetPipeline(...)` on the pass instance before
+            // any executor branch reaches `Execute(...)`. Same fail-closed
+            // semantics: `has_value()` lease + default pipeline handle on
+            // the pass would silently early-return inside `Execute()` while
+            // the executor still reported `Recorded`.
+            m_SelectionFaceIdPass.emplace(*m_SelectionSystem);
+            m_SelectionEdgeIdPass.emplace(*m_SelectionSystem);
+            m_SelectionPointIdPass.emplace(*m_SelectionSystem);
             m_ForwardSystem.emplace();
             m_ForwardSystem->Initialize();
             // GRAPHICS-070/071/073 — default-recipe forward surface/line/point/
@@ -376,6 +390,9 @@ namespace Extrinsic::Graphics
             m_DeferredGBufferPass.reset();
             m_DeferredLightingPass.reset();
             m_SelectionEntityIdPass.reset();
+            m_SelectionFaceIdPass.reset();
+            m_SelectionEdgeIdPass.reset();
+            m_SelectionPointIdPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -398,6 +415,9 @@ namespace Extrinsic::Graphics
             m_DeferredGBufferPipelineLease.reset();
             m_DeferredLightingPipelineLease.reset();
             m_SelectionEntityIdPipelineLease.reset();
+            m_SelectionFaceIdPipelineLease.reset();
+            m_SelectionEdgeIdPipelineLease.reset();
+            m_SelectionPointIdPipelineLease.reset();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -1064,18 +1084,48 @@ namespace Extrinsic::Graphics
                     }
                     else if (passName == std::string_view{"PickingPass"})
                     {
-                        // GRAPHICS-074 Slice A — default-recipe EntityId
-                        // selection pass. The recipe declares `PickingPass`
-                        // only when `features.EnablePicking` is true (i.e. a
-                        // pick request was pending this frame), so the branch
-                        // is reached only when picking is active. Slice B will
-                        // extend this branch with Face/Edge/Point dispatch
-                        // based on the pending pick kind; for now only the
-                        // EntityId sub-pass records and the readback drain
-                        // remains Slice D scope.
-                        const RenderCommandPassStatus status =
+                        // GRAPHICS-074 Slice A + B — default-recipe selection
+                        // ID sub-passes. The recipe declares `PickingPass`
+                        // only when `features.EnablePicking &&
+                        // features.EnableDepthPrepass` is true, so the branch
+                        // is reached only when picking is active and a
+                        // populated `SceneDepth` exists. The four sub-passes
+                        // share the recipe's `PickingPass` render pass and
+                        // dispatch back-to-back: EntityId first (so its
+                        // `(Entity, 0)` `PrimitiveId` is the fallback when no
+                        // sub-element pass covers a pixel), then
+                        // Face/Edge/Point — each writes the matching
+                        // `EncodeSelectionId(domain, gl_PrimitiveID)` into
+                        // `PrimitiveId` over its own cull bucket
+                        // (`SurfaceOpaque` / `Lines` / `Points`). With
+                        // depth-equal / depth-write-off, only the
+                        // nearest-surface fragment per pixel can write, so
+                        // the most refined domain code that survives the
+                        // prepass depth test wins per pixel. The status is
+                        // accumulated under the single `PickingPass` name to
+                        // keep the executor's per-pass status taxonomy the
+                        // same shape the rest of the recipe uses: any
+                        // sub-pass that records bumps the aggregate to
+                        // `Recorded`; a sub-pass with a not-yet-ready
+                        // pipeline downgrades to `SkippedUnavailable` per
+                        // `AccumulateCommandRecordStatus`'s usual rules; a
+                        // non-operational device produces
+                        // `SkippedNonOperational` uniformly. The
+                        // `Picking.Readback` drain +
+                        // `PublishPickResult`/`PublishNoHit` wiring remain
+                        // Slice D scope.
+                        const RenderCommandPassStatus entityStatus =
                             RecordSelectionEntityIdPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
+                        AccumulateCommandRecordStatus(passName, entityStatus);
+                        const RenderCommandPassStatus faceStatus =
+                            RecordSelectionFaceIdPass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, faceStatus);
+                        const RenderCommandPassStatus edgeStatus =
+                            RecordSelectionEdgeIdPass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, edgeStatus);
+                        const RenderCommandPassStatus pointStatus =
+                            RecordSelectionPointIdPass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, pointStatus);
                     }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
@@ -1304,6 +1354,51 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept override
         {
             return BuildSelectionEntityIdPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetSelectionFaceIdPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_SelectionFaceIdPipelineLease.has_value() ||
+                !m_SelectionFaceIdPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_SelectionFaceIdPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetSelectionFaceIdPipelineDesc() const noexcept override
+        {
+            return BuildSelectionFaceIdPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetSelectionEdgeIdPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_SelectionEdgeIdPipelineLease.has_value() ||
+                !m_SelectionEdgeIdPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_SelectionEdgeIdPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetSelectionEdgeIdPipelineDesc() const noexcept override
+        {
+            return BuildSelectionEdgeIdPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetSelectionPointIdPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_SelectionPointIdPipelineLease.has_value() ||
+                !m_SelectionPointIdPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_SelectionPointIdPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetSelectionPointIdPipelineDesc() const noexcept override
+        {
+            return BuildSelectionPointIdPipelineDesc();
         }
 
         void SetLightingPath(FrameRecipeLightingPath path) noexcept override
@@ -1689,6 +1784,98 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-074 (Slice B) — Face / Edge / Point selection ID
+        // pipeline descriptors. Each mirrors the EntityId descriptor's
+        // render-pass-compatible shape (two R32_UINT color targets,
+        // D32_FLOAT depth target, depth-equal / depth-test-on /
+        // depth-write-off) so all four pipelines can be bound inside the
+        // same recipe-declared `PickingPass` render pass. They differ
+        // only in:
+        //   - shader pair (`selection/{face,edge,point}_id.{vert,frag}`),
+        //   - primitive topology (TriangleList / LineList / PointList),
+        //   - cull mode (Back for faces, None for edges/points; mirrors
+        //     `BuildForwardLinePipelineDesc` / `BuildForwardPointPipelineDesc`),
+        //   - debug name.
+        // The shader-side `EncodeSelectionId(domain, payload)` differs per
+        // pipeline and lives in each fragment shader, not the descriptor.
+        [[nodiscard]] static RHI::PipelineDesc BuildSelectionFaceIdPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/face_id.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/face_id.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::Back;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorBlend[1].Enable = false;
+            desc.ColorTargetCount = 2u;
+            desc.ColorTargetFormats[0] = RHI::Format::R32_UINT; // EntityId
+            desc.ColorTargetFormats[1] = RHI::Format::R32_UINT; // PrimitiveId
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.SelectionFaceId";
+            return desc;
+        }
+
+        [[nodiscard]] static RHI::PipelineDesc BuildSelectionEdgeIdPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/edge_id.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/edge_id.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::LineList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorBlend[1].Enable = false;
+            desc.ColorTargetCount = 2u;
+            desc.ColorTargetFormats[0] = RHI::Format::R32_UINT; // EntityId
+            desc.ColorTargetFormats[1] = RHI::Format::R32_UINT; // PrimitiveId
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.SelectionEdgeId";
+            return desc;
+        }
+
+        [[nodiscard]] static RHI::PipelineDesc BuildSelectionPointIdPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/point_id.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/selection/point_id.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::PointList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = true;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthFunc = RHI::DepthOp::Equal;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorBlend[1].Enable = false;
+            desc.ColorTargetCount = 2u;
+            desc.ColorTargetFormats[0] = RHI::Format::R32_UINT; // EntityId
+            desc.ColorTargetFormats[1] = RHI::Format::R32_UINT; // PrimitiveId
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
+            desc.DebugName = "Renderer.SelectionPointId";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -1969,6 +2156,77 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] SelectionEntityId pipeline unavailable; default-recipe picking recording will be skipped: error={}",
                                 static_cast<int>(selectionEntityIdPipeline.error()));
+            }
+
+            // GRAPHICS-074 Slice B — Face / Edge / Point selection ID
+            // pipelines. Same reset/republish pattern as the EntityId
+            // pipeline above so a failed `Create()` leaves the matching
+            // pass in `SkippedUnavailable` rather than retaining a stale
+            // device handle across rebuilds.
+            m_SelectionFaceIdPipelineLease.reset();
+            if (m_SelectionFaceIdPass)
+            {
+                m_SelectionFaceIdPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc selectionFaceIdDesc = BuildSelectionFaceIdPipelineDesc();
+            auto selectionFaceIdPipeline = m_PipelineManager->Create(selectionFaceIdDesc);
+            if (selectionFaceIdPipeline.has_value())
+            {
+                m_SelectionFaceIdPipelineLease.emplace(std::move(*selectionFaceIdPipeline));
+                if (m_SelectionFaceIdPass)
+                {
+                    m_SelectionFaceIdPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_SelectionFaceIdPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] SelectionFaceId pipeline unavailable; default-recipe face picking recording will be skipped: error={}",
+                                static_cast<int>(selectionFaceIdPipeline.error()));
+            }
+
+            m_SelectionEdgeIdPipelineLease.reset();
+            if (m_SelectionEdgeIdPass)
+            {
+                m_SelectionEdgeIdPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc selectionEdgeIdDesc = BuildSelectionEdgeIdPipelineDesc();
+            auto selectionEdgeIdPipeline = m_PipelineManager->Create(selectionEdgeIdDesc);
+            if (selectionEdgeIdPipeline.has_value())
+            {
+                m_SelectionEdgeIdPipelineLease.emplace(std::move(*selectionEdgeIdPipeline));
+                if (m_SelectionEdgeIdPass)
+                {
+                    m_SelectionEdgeIdPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_SelectionEdgeIdPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] SelectionEdgeId pipeline unavailable; default-recipe edge picking recording will be skipped: error={}",
+                                static_cast<int>(selectionEdgeIdPipeline.error()));
+            }
+
+            m_SelectionPointIdPipelineLease.reset();
+            if (m_SelectionPointIdPass)
+            {
+                m_SelectionPointIdPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc selectionPointIdDesc = BuildSelectionPointIdPipelineDesc();
+            auto selectionPointIdPipeline = m_PipelineManager->Create(selectionPointIdDesc);
+            if (selectionPointIdPipeline.has_value())
+            {
+                m_SelectionPointIdPipelineLease.emplace(std::move(*selectionPointIdPipeline));
+                if (m_SelectionPointIdPass)
+                {
+                    m_SelectionPointIdPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_SelectionPointIdPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] SelectionPointId pipeline unavailable; default-recipe point picking recording will be skipped: error={}",
+                                static_cast<int>(selectionPointIdPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -2267,6 +2525,86 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-074 Slice B — default-recipe Face / Edge / Point
+        // sub-pass routes inside the `"PickingPass"` executor branch.
+        // Each helper mirrors `RecordSelectionEntityIdPass` exactly: a
+        // non-operational device → `SkippedNonOperational`; missing
+        // culling output, pass, lease, GpuWorld, or CullingSystem →
+        // `SkippedUnavailable`; otherwise the bucket-bound
+        // `FaceIdPass` / `EdgeIdPass` / `PointIdPass` `Execute(...)`
+        // records the matching `Bind/Bind/Push/DrawIndexedIndirectCount`
+        // (or non-indexed `DrawIndirectCount` for points) shape and
+        // returns `Recorded`. The four sub-passes share the recipe's
+        // `PickingPass` render pass, so all bound pipelines are
+        // render-pass-compatible (two R32_UINT color targets + D32_FLOAT
+        // depth, depth-equal / depth-write-off). The Face/Edge/Point
+        // pipelines write the matching `EncodeSelectionId(domain,
+        // gl_PrimitiveID)` value into `PrimitiveId` while still emitting
+        // the per-instance stable entity ID into `EntityId`, so the
+        // last-pass-wins-per-pixel behavior after depth-equal yields the
+        // most refined domain code that survives the prepass depth test.
+        // The `Picking.Readback` drain + `PublishPickResult` /
+        // `PublishNoHit` wiring remain Slice D scope.
+        [[nodiscard]] RenderCommandPassStatus RecordSelectionFaceIdPass(RHI::ICommandContext& cmd,
+                                                                         const RHI::CameraUBO& camera,
+                                                                         const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_SelectionFaceIdPass.has_value() ||
+                !m_SelectionFaceIdPipelineLease.has_value() ||
+                !m_SelectionFaceIdPipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_SelectionFaceIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
+        [[nodiscard]] RenderCommandPassStatus RecordSelectionEdgeIdPass(RHI::ICommandContext& cmd,
+                                                                         const RHI::CameraUBO& camera,
+                                                                         const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_SelectionEdgeIdPass.has_value() ||
+                !m_SelectionEdgeIdPipelineLease.has_value() ||
+                !m_SelectionEdgeIdPipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_SelectionEdgeIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
+        [[nodiscard]] RenderCommandPassStatus RecordSelectionPointIdPass(RHI::ICommandContext& cmd,
+                                                                          const RHI::CameraUBO& camera,
+                                                                          const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_CullingOutputAvailable || !m_SelectionPointIdPass.has_value() ||
+                !m_SelectionPointIdPipelineLease.has_value() ||
+                !m_SelectionPointIdPipelineLease->IsValid() ||
+                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_SelectionPointIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-072 Slice A — default-recipe deferred-mode `"SurfacePass"`
         // route. Reached from the executor lambda when
         // `defaultRecipeUsesDeferred` is true and the active pass is
@@ -2502,6 +2840,14 @@ namespace Extrinsic::Graphics
         // operational publisher runs; reset before `m_SelectionSystem` in
         // `Shutdown()`.
         std::optional<EntityIdPass>          m_SelectionEntityIdPass;
+        // GRAPHICS-074 Slice B — default-recipe Face / Edge / Point
+        // selection ID passes. Same lifetime contract as the EntityId pass
+        // above: each is emplaced after `m_SelectionSystem` is initialised
+        // and before the operational publisher runs; reset before
+        // `m_SelectionSystem` in `Shutdown()`.
+        std::optional<FaceIdPass>            m_SelectionFaceIdPass;
+        std::optional<EdgeIdPass>            m_SelectionEdgeIdPass;
+        std::optional<PointIdPass>           m_SelectionPointIdPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -2512,6 +2858,9 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_DeferredGBufferPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DeferredLightingPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEntityIdPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_SelectionFaceIdPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEdgeIdPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_SelectionPointIdPipelineLease;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;
