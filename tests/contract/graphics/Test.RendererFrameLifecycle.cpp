@@ -1825,7 +1825,13 @@ TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
     // (`builder.Read(SceneDepth, DepthRead)`) even though the pipeline does
     // not test or write depth itself.
     EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::D32_FLOAT);
-    EXPECT_EQ(initialDesc.PushConstantSize, 0u);
+    // Matches `SelectionOutlinePushConstants` in `Pass.Selection.Outline.cpp`,
+    // which mirrors the `selection_outline.frag` `Push` block byte-for-byte
+    // (vec4 OutlineColor + vec4 HoverColor + 12 floats/uints + uint[16]
+    // SelectedIds = 144 bytes under Vulkan std430). The pass body pushes a
+    // zero-initialised instance every frame so the shader sees defined
+    // values rather than stale push memory left by a prior draw.
+    EXPECT_EQ(initialDesc.PushConstantSize, 144u);
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
     const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionOutlinePipeline();
@@ -1872,6 +1878,40 @@ TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPres
         FindCommandPass(stats, "SelectionOutlinePass");
     ASSERT_NE(outlinePass, nullptr);
     EXPECT_EQ(outlinePass->Status, Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    // GRAPHICS-074 Slice C — the outline pass must push deterministic
+    // 144-byte zero-initialised push constants before its fullscreen draw
+    // so the shader never reads stale push memory from a prior pass. Walk
+    // the captured `PushConstants(...)` payloads and require at least one
+    // 144-byte all-zero payload (the outline pass's contribution) to
+    // appear; earlier passes in the same frame contribute their own
+    // (`GpuScenePushConstants`, etc.) so we cannot just assert payload
+    // count == 1.
+    bool foundOutlinePush = false;
+    for (const std::vector<std::byte>& payload : device.CommandContext.PushConstantPayloads)
+    {
+        if (payload.size() != 144u)
+        {
+            continue;
+        }
+        bool allZero = true;
+        for (const std::byte b : payload)
+        {
+            if (b != std::byte{0})
+            {
+                allZero = false;
+                break;
+            }
+        }
+        if (allZero)
+        {
+            foundOutlinePush = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundOutlinePush)
+        << "SelectionOutlinePass must push a deterministic 144-byte zero-"
+        << "initialised SelectionOutlinePushConstants block before its draw.";
 
     renderer->Shutdown();
 }

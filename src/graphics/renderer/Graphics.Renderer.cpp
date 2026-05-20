@@ -1942,17 +1942,33 @@ namespace Extrinsic::Graphics
         // `SceneDepth` (D32_FLOAT, read-only). Depth state stays off — the
         // shader does not test or write depth — but the pipeline declares the
         // matching `DepthTargetFormat` so it remains render-pass-compatible
-        // with the declared depth attachment. `PushConstantSize = 0` matches
-        // `SelectionOutlinePass::Execute`, which currently only binds the
-        // pipeline and issues `Draw(3,1,0,0)`; routing the
-        // `selection_outline.frag` push block (outline color/width/selected-id
-        // list) is deferred to a follow-up slice along with the
-        // `Picking.Readback` drain. The legacy shaders that previously sourced
-        // the outline overlay (`forward/outline_overlay.frag` and friends)
-        // declared incompatible push-constant blocks and descriptor sets and
-        // are deliberately *not* referenced here — see
-        // `src/graphics/renderer/README.md` ("Shader push-constant compatibility
-        // policy") for the policy.
+        // with the declared depth attachment.
+        //
+        // Push constants: `PushConstantSize = 144` matches
+        // `SelectionOutlinePushConstants` defined in
+        // `Passes/Pass.Selection.Outline.cpp`, which mirrors the
+        // `selection_outline.frag` `layout(push_constant) uniform Push`
+        // block byte-for-byte under Vulkan std430. The pass body pushes a
+        // zero-initialised instance every frame so the shader never reads
+        // stale push memory from a prior draw — without this, `OutlineWidth`
+        // and `SelectedCount` could be arbitrary, producing nondeterministic
+        // outlines and an unbounded fragment loop. Runtime-driven outline
+        // state plumbing (selected/hovered IDs, colours, animation) is
+        // deferred alongside the `Picking.Readback` drain (Slice D).
+        // Portability caveat: 144 bytes exceeds the Vulkan-guaranteed
+        // minimum `maxPushConstantsSize` of 128; reducing the block (e.g.
+        // moving `SelectedIds[16]` into a UBO or bindless buffer) is the
+        // tracked follow-up so the pipeline is portable across all
+        // conformant devices. Current desktop Vulkan implementations expose
+        // 256-byte push ranges, so this is non-blocking for the default
+        // gate.
+        //
+        // The legacy shaders that previously sourced the outline overlay
+        // (`forward/outline_overlay.frag` and friends) declared
+        // incompatible push-constant blocks and descriptor sets and are
+        // deliberately *not* referenced here — see
+        // `src/graphics/renderer/README.md` ("Shader push-constant
+        // compatibility policy") for the policy.
         [[nodiscard]] static RHI::PipelineDesc BuildSelectionOutlinePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -1972,7 +1988,7 @@ namespace Extrinsic::Graphics
             desc.ColorTargetCount = 1u;
             desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
-            desc.PushConstantSize = 0u;
+            desc.PushConstantSize = 144u; // sizeof(SelectionOutlinePushConstants)
             desc.DebugName = "Renderer.SelectionOutline";
             return desc;
         }

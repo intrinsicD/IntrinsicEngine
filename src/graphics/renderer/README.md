@@ -505,11 +505,23 @@ Concretely:
   shader does not test or write depth) but the descriptor declares the
   matching `D32_FLOAT` depth target so the pipeline remains
   render-pass-compatible with the recipe's `Read(SceneDepth, DepthRead)`
-  declaration on `"SelectionOutlinePass"`. `PushConstantSize = 0` matches
-  the current `SelectionOutlinePass::Execute` body (`BindPipeline +
-  Draw(3,1,0,0)`); routing the `selection_outline.frag` push block
-  (outline color/width/selected-id list) is deferred to a follow-up
-  alongside the `Picking.Readback` drain. The executor's
+  declaration on `"SelectionOutlinePass"`. `PushConstantSize = 144`
+  matches `SelectionOutlinePushConstants` defined in
+  `Passes/Pass.Selection.Outline.cpp`, which mirrors the
+  `selection_outline.frag` `layout(push_constant) uniform Push { ... }`
+  block byte-for-byte under Vulkan std430 (vec4 OutlineColor + vec4
+  HoverColor + 12 floats/uints + uint[16] SelectedIds). The pass body
+  pushes a zero-initialised instance every frame so the shader never
+  reads stale push-constant memory left by a prior draw; with
+  `SelectedCount = 0`, `HoveredId = 0`, and `OutlineWidth = 0` the
+  fragment shader's early-out fires on every pixel and emits transparent
+  black, keeping the pass a deterministic no-op overlay until the
+  runtime-driven outline state (selected/hovered IDs, colours, width,
+  animation) is plumbed in alongside the Slice D `Picking.Readback`
+  drain. Portability note: 144 bytes exceeds the Vulkan-guaranteed
+  minimum `maxPushConstantsSize` of 128 — reducing the block (e.g.
+  moving `SelectedIds[16]` to a UBO or bindless buffer) is tracked as
+  part of the Slice D outline-state plumbing. The executor's
   `"SelectionOutlinePass"` branch routes through
   `RecordSelectionOutlinePass(...)` with the standard
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy,
