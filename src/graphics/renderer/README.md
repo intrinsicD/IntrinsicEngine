@@ -485,8 +485,37 @@ Concretely:
   accumulated per sub-pass. With depth-equal / depth-write-off, only the
   nearest-surface fragment that survives the prepass depth test can
   write, so the most refined domain code (Face / Edge / Point) wins per
-  pixel over the EntityId fallback. The outline pipeline +
-  `"SelectionOutlinePass"` executor route (Slice C) and the
+  pixel over the EntityId fallback. The
+  `Picking.Readback` buffer + drain +
+  `PublishPickResult`/`PublishNoHit` wiring (Slice D) remain.
+- GRAPHICS-074 Slice C wires the default-recipe `"SelectionOutlinePass"`
+  executor branch. `NullRenderer` owns `m_SelectionOutlinePass`
+  (constructed against `m_SelectionSystem`, emplaced *before*
+  `InitializeOperationalPassResources()` runs so the publisher's
+  `SetPipeline(...)` actually lands on the pass on the initial operational
+  path) and `m_SelectionOutlinePipelineLease`. The pipeline is created in
+  `InitializeOperationalPassResources()` from
+  `BuildSelectionOutlinePipelineDesc(m_BackbufferFormat)` and republished
+  byte-identical through `RebuildOperationalResources()` using the same
+  reset-then-publish pattern as the four selection-ID pipelines. The
+  pipeline pairs the fullscreen `shaders/post_fullscreen.vert.spv` with
+  `shaders/selection_outline.frag.spv` and writes a single color target
+  whose format matches the recipe's `SelectionOutline` texture
+  (`FrameRecipeSizing::BackbufferFormat`); depth state stays off (the
+  shader does not test or write depth) but the descriptor declares the
+  matching `D32_FLOAT` depth target so the pipeline remains
+  render-pass-compatible with the recipe's `Read(SceneDepth, DepthRead)`
+  declaration on `"SelectionOutlinePass"`. `PushConstantSize = 0` matches
+  the current `SelectionOutlinePass::Execute` body (`BindPipeline +
+  Draw(3,1,0,0)`); routing the `selection_outline.frag` push block
+  (outline color/width/selected-id list) is deferred to a follow-up
+  alongside the `Picking.Readback` drain. The executor's
+  `"SelectionOutlinePass"` branch routes through
+  `RecordSelectionOutlinePass(...)` with the standard
+  `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy,
+  and is reached only when `features.EnableSelectionOutline` is true
+  (`world.Selection.HasHovered ||
+  !world.Selection.SelectedStableIds.empty()`). The
   `Picking.Readback` buffer + drain +
   `PublishPickResult`/`PublishNoHit` wiring (Slice D) remain.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in

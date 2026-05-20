@@ -303,6 +303,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetSelectionPointIdPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetSelectionPointIdPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-074 (Slice C) — accessor for the default-recipe selection
+        // outline pipeline (vertex `post_fullscreen.vert.spv` + fragment
+        // `selection_outline.frag.spv`, single color target matching the
+        // backbuffer format the recipe uses for the `SelectionOutline`
+        // texture, depth-test/write off). The pipeline is a fullscreen
+        // triangle (no vertex inputs) that the recipe's
+        // `"SelectionOutlinePass"` branch binds and draws into the
+        // `SelectionOutline` color target. Handle is invalid until an
+        // operational device path publishes the lease; the descriptor
+        // remains deterministic so contract tests can assert byte-identical
+        // rebuild behavior. Slice D adds the `Picking.Readback` buffer +
+        // drain + `PublishPickResult` / `PublishNoHit` wiring.
+        [[nodiscard]] virtual RHI::PipelineHandle GetSelectionOutlinePipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept = 0;
+
         // GRAPHICS-072 (Slice A) — test seam for the default recipe's runtime
         // lighting path. `DeriveDefaultFrameRecipeFeatures` derives a default
         // of `Forward` so the legacy contract tests stay green; the renderer
