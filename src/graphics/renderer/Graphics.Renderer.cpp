@@ -437,6 +437,15 @@ namespace Extrinsic::Graphics
             // (the manager's `Release` path calls `IDevice::DestroyBuffer`).
             m_PickingReadbackBuffer.reset();
             m_PickingReadbackBufferSize = 0u;
+            // GRAPHICS-074 Slice D.3 — drop the per-slot picking metadata
+            // alongside the buffer so a later `Initialize(device)` allocates
+            // fresh bookkeeping against the new BufferManager. Pending
+            // readbacks are simply discarded (the `SelectionSystem` is also
+            // about to be torn down on the line above).
+            m_PickingSlotPending.clear();
+            m_PickingSlotIssuedFrame.clear();
+            m_PickingSlotRequest.clear();
+            m_PickingSlotInvalidated.clear();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -466,6 +475,22 @@ namespace Extrinsic::Graphics
                 Core::Log::Error("[Graphics] BeginFrame failed: device missing");
                 return false;
             }
+            // GRAPHICS-074 Slice D.3 — drain completed picking-readback slots
+            // before acquiring the next frame. We use
+            // `IDevice::GetGlobalFrameNumber()` (the post-EndFrame counter)
+            // as the "completed-frame number" proxy: stub/null backends
+            // complete GPU work synchronously inside `EndFrame(...)` so any
+            // slot whose `IssuedFrame < GlobalFrameNumber` has flushed; real
+            // async backends (Vulkan) signal post-submit fences out of band
+            // and a follow-up task may specialise this check via a
+            // dedicated `GetCompletedFrameNumber()` / `HasFrameCompleted()`
+            // IDevice seam once that lifecycle is plumbed. Each drained
+            // slot decodes one 4-byte `EntityId` + one 4-byte
+            // `EncodedSelectionId` word at `slot * 8` per `GRAPHICS-012Q`
+            // and is routed to the `SelectionSystem` via
+            // `PublishPickResult` (live hit) or `PublishNoHit` (zero
+            // EntityId, invalidated request, or read failure).
+            DrainCompletedPickingSlots();
             return m_Device->BeginFrame(outFrame);
         }
 
@@ -1274,6 +1299,31 @@ namespace Extrinsic::Graphics
                                                                 RHI::TextureLayout::TransferSrc,
                                                                 RHI::TextureLayout::ColorAttachment);
                                 ++m_LastRenderGraphStats.PickingReadbackCopyCount;
+
+                                // GRAPHICS-074 Slice D.3 — record the per-
+                                // slot metadata the next BeginFrame() drain
+                                // keys off. The slot arrays were sized to
+                                // `frames-in-flight` in
+                                // InitializeOperationalPassResources(), so
+                                // `slot` is always within range when we
+                                // reach this site (operational device =>
+                                // arrays sized). `Invalidated` is reset to
+                                // false on issue because the copy we just
+                                // recorded supersedes any prior slot
+                                // contents; a subsequent
+                                // RebuildOperationalResources() may flip it
+                                // back to true before the drain runs.
+                                if (slot < m_PickingSlotPending.size())
+                                {
+                                    m_PickingSlotPending[slot] = true;
+                                    m_PickingSlotIssuedFrame[slot] = frame.FrameIndex;
+                                    m_PickingSlotRequest[slot] = PickPixelRequest{
+                                        .X = pickX,
+                                        .Y = pickY,
+                                        .Pending = true,
+                                    };
+                                    m_PickingSlotInvalidated[slot] = false;
+                                }
                             }
                         }
                     }
@@ -2392,9 +2442,10 @@ namespace Extrinsic::Graphics
             // never overruns the buffer. Slice D.2 imports the handle into
             // the recipe and records `CopyTextureToBuffer(...)`; Slice D.3
             // drains it on `BeginFrame()`.
+            const std::uint32_t pickingFramesInFlight = std::max(1u, device.GetFramesInFlight());
             const std::uint64_t pickingReadbackBytes =
                 static_cast<std::uint64_t>(8u) *
-                static_cast<std::uint64_t>(device.GetFramesInFlight());
+                static_cast<std::uint64_t>(pickingFramesInFlight);
             const bool pickingReadbackNeedsAllocation =
                 !m_PickingReadbackBuffer.has_value() ||
                 !m_PickingReadbackBuffer->IsValid() ||
@@ -2419,6 +2470,41 @@ namespace Extrinsic::Graphics
                     Core::Log::Warn("[Graphics] Picking.Readback buffer unavailable; default-recipe picking readback will be skipped: error={}",
                                     static_cast<int>(pickingReadbackOr.error()));
                 }
+            }
+
+            // GRAPHICS-074 Slice D.3 — keep the per-slot picking metadata
+            // arrays sized to match the current `frames-in-flight` slot
+            // count. When the slot count grew (FIF promoted), the new slots
+            // start in a clean non-pending state. When the slot count
+            // shrank or stayed the same, any *previously* pending slot that
+            // is still within the new slot bound is invalidated so the
+            // upcoming `BeginFrame()` drain publishes `PublishNoHit` rather
+            // than a stale pre-rebuild hit (the buffer itself is preserved
+            // across same-FIF rebuilds, so the underlying bytes would still
+            // decode to a hit — that's exactly the case the test
+            // `PublishesNoHitForInvalidatedRequest` exercises). Slot indices
+            // past the new slot count are dropped entirely.
+            const std::size_t newSlotCount = static_cast<std::size_t>(pickingFramesInFlight);
+            if (m_PickingSlotPending.size() > newSlotCount)
+            {
+                m_PickingSlotPending.resize(newSlotCount);
+                m_PickingSlotIssuedFrame.resize(newSlotCount);
+                m_PickingSlotRequest.resize(newSlotCount);
+                m_PickingSlotInvalidated.resize(newSlotCount);
+            }
+            for (std::size_t slot = 0; slot < m_PickingSlotPending.size(); ++slot)
+            {
+                if (m_PickingSlotPending[slot])
+                {
+                    m_PickingSlotInvalidated[slot] = true;
+                }
+            }
+            if (m_PickingSlotPending.size() < newSlotCount)
+            {
+                m_PickingSlotPending.resize(newSlotCount, false);
+                m_PickingSlotIssuedFrame.resize(newSlotCount, 0u);
+                m_PickingSlotRequest.resize(newSlotCount, PickPixelRequest{});
+                m_PickingSlotInvalidated.resize(newSlotCount, false);
             }
 
             // GRAPHICS-074 Slice A — EntityId selection pipeline. Same
@@ -2604,6 +2690,89 @@ namespace Extrinsic::Graphics
                 out.HasAttachments = true;
             }
             return out;
+        }
+
+        // GRAPHICS-074 Slice D.3 — drain any picking-readback slot whose
+        // issuing frame has completed since its copy was recorded. Called at
+        // the top of `BeginFrame()` so the `SelectionSystem` observes the
+        // pick result before the runtime extracts the next frame's
+        // `RenderWorld` (the runtime/editor decides what to do with the
+        // resolved hit during this frame's extraction phase). The drain is
+        // gated on (a) a live operational device, (b) a valid
+        // renderer-owned `Picking.Readback` lease, and (c) at least one
+        // slot whose `IssuedFrame` predates the current `GlobalFrameNumber`
+        // (slots issued this very frame have not yet had the chance to
+        // run their copy + complete, so they stay pending). The routing
+        // matches the Slice D.3 task contract:
+        //   - `Invalidated` (set by `RebuildOperationalResources()` for
+        //     in-flight slots, simulating a device-lost recovery whose
+        //     pre-rebuild copy is no longer trustworthy) → `PublishNoHit()`.
+        //   - `EntityId == 0` (background pixel after the depth prepass
+        //     decided no surface won the depth-equal test for that pixel)
+        //     → `PublishNoHit()`.
+        //   - Otherwise → `PublishPickResult({EncodedId, StableEntityId,
+        //     Hit=true})`.
+        // A read failure (no host-mapped contents, MockDevice without
+        // seeded bytes, etc.) leaves the local decode buffer zeroed and
+        // therefore falls through to the `EntityId == 0` NoHit branch —
+        // safe by construction.
+        void DrainCompletedPickingSlots()
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return;
+            }
+            if (!m_PickingReadbackBuffer.has_value() || !m_PickingReadbackBuffer->IsValid())
+            {
+                return;
+            }
+            if (m_PickingSlotPending.empty() || !m_SelectionSystem)
+            {
+                return;
+            }
+            const std::uint64_t completedFrameNumber = m_Device->GetGlobalFrameNumber();
+            const RHI::BufferHandle bufferHandle = m_PickingReadbackBuffer->GetHandle();
+            for (std::size_t slot = 0; slot < m_PickingSlotPending.size(); ++slot)
+            {
+                if (!m_PickingSlotPending[slot])
+                {
+                    continue;
+                }
+                // Slot's copy was issued in `IssuedFrame`. The post-EndFrame
+                // counter advances exactly once per `EndFrame(...)`, so
+                // `IssuedFrame < GlobalFrameNumber` means the issuing frame
+                // has at minimum been submitted. See the comment at
+                // `BeginFrame()` for the async-backend caveat.
+                if (m_PickingSlotIssuedFrame[slot] >= completedFrameNumber)
+                {
+                    continue;
+                }
+                std::uint32_t entityId    = 0u;
+                std::uint32_t encodedBits = 0u;
+                const std::uint64_t slotOffset = static_cast<std::uint64_t>(slot) * 8ull;
+                if (slotOffset + 8ull <= m_PickingReadbackBufferSize)
+                {
+                    m_Device->ReadBuffer(bufferHandle, &entityId,    sizeof(entityId),    slotOffset);
+                    m_Device->ReadBuffer(bufferHandle, &encodedBits, sizeof(encodedBits), slotOffset + 4ull);
+                }
+                const EncodedSelectionId encoded{.Value = encodedBits};
+                if (m_PickingSlotInvalidated[slot] || entityId == 0u)
+                {
+                    m_SelectionSystem->PublishNoHit();
+                }
+                else
+                {
+                    m_SelectionSystem->PublishPickResult(PickReadbackResult{
+                        .EncodedId      = encoded,
+                        .StableEntityId = entityId,
+                        .Hit            = true,
+                    });
+                }
+                m_PickingSlotPending[slot] = false;
+                m_PickingSlotInvalidated[slot] = false;
+                m_PickingSlotIssuedFrame[slot] = 0u;
+                m_PickingSlotRequest[slot] = PickPixelRequest{};
+            }
         }
 
         void ResetFrameState()
@@ -3234,6 +3403,31 @@ namespace Extrinsic::Graphics
         // drains it on `BeginFrame()`.
         std::optional<RHI::BufferManager::BufferLease> m_PickingReadbackBuffer;
         std::uint64_t                                  m_PickingReadbackBufferSize{0u};
+        // GRAPHICS-074 Slice D.3 — per-slot picking-readback metadata. Sized
+        // to match the buffer's `frames-in-flight` slot count whenever
+        // `InitializeOperationalPassResources()` (re-)allocates the buffer,
+        // so every slot in `m_PickingReadbackBuffer` has matching bookkeeping
+        // entries. The metadata is populated in `ExecuteFrame` immediately
+        // after the D.2 `CopyTextureToBuffer` pair records (`Pending` flips
+        // to true, `IssuedFrame` captures `frame.FrameIndex`, `Request`
+        // captures the world-space pick coordinates, `Invalidated` resets to
+        // false), and drained at the start of the *next* `BeginFrame(...)`
+        // call before `m_Device->BeginFrame(...)` acquires the next frame.
+        // The drain decodes the 8 bytes the executor copied — one 4-byte
+        // `EntityId` word + one 4-byte `EncodedSelectionId` word per
+        // `GRAPHICS-012Q` — and routes to `SelectionSystem::PublishPickResult`
+        // (`EntityId != 0` && !`Invalidated`) or `PublishNoHit()`
+        // (`EntityId == 0`, `Invalidated`, or read failure). `Invalidated`
+        // is set to true by `RebuildOperationalResources()` for every
+        // pending slot at the time of the rebuild so a device-lost recovery
+        // path publishes NoHit rather than a stale pre-rebuild hit; the
+        // buffer itself is preserved across same-FIF rebuilds (Slice D.1
+        // invariant), so the drained bytes are well-defined even when
+        // invalidation forces a NoHit publish.
+        std::vector<bool>                              m_PickingSlotPending;
+        std::vector<std::uint64_t>                     m_PickingSlotIssuedFrame;
+        std::vector<PickPixelRequest>                  m_PickingSlotRequest;
+        std::vector<bool>                              m_PickingSlotInvalidated;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

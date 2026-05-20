@@ -13,6 +13,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
@@ -2161,6 +2162,246 @@ TEST(RendererFrameLifecycle, PickingReadbackCopySkippedWhenNotPending)
     // the recipe drops the pass entirely when `EnablePicking = false`.
     EXPECT_EQ(FindCommandPass(stats, "PickingPass"), nullptr)
         << "Recipe must drop PickingPass entirely when no pick is pending.";
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-074 Slice D.3 — `BeginFrame()`-side drain that decodes the
+// per-slot `Picking.Readback` bytes and routes the result to
+// `SelectionSystem::PublishPickResult(...)` / `PublishNoHit()`. The
+// `MockCommandContext::CopyTextureToBuffer(...)` is a no-op (no GPU traffic),
+// so each test seeds the renderer's host-visible buffer via
+// `MockDevice::BufferContents[handle.Index]` to simulate the bytes the
+// GRAPHICS-072 / GRAPHICS-012Q EntityId + EncodedSelectionId pipeline pair
+// would have written into slot 0 (`MockDevice::FramesInFlight = 2` keeps the
+// arithmetic compatible with the production sizing). The slot bookkeeping
+// the drain keys off (`m_PickingSlotPending[slot]`,
+// `m_PickingSlotIssuedFrame[slot]`, `m_PickingSlotInvalidated[slot]`) is
+// populated by the D.2 copy-pair recording site under
+// `world.PickRequest.Pending = true`; the drain then runs at the *next*
+// `BeginFrame()` once `IDevice::GetGlobalFrameNumber()` has incremented past
+// the issuing frame.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    // Helper: encode 8 bytes for slot 0 (`EntityId` word + `EncodedSelectionId`
+    // word) into `MockDevice::BufferContents` so the next `BeginFrame()`
+    // drain reads them back. The slot mirrors the
+    // `slot * 8 [+4]` offsets the D.2 executor records.
+    void SeedPickingReadbackSlot(Extrinsic::Tests::MockDevice& device,
+                                 const Extrinsic::RHI::BufferHandle& buffer,
+                                 const std::uint64_t bufferSize,
+                                 const std::size_t slot,
+                                 const std::uint32_t entityId,
+                                 const Extrinsic::Graphics::EncodedSelectionId encoded)
+    {
+        std::vector<std::byte>& contents = device.BufferContents[buffer.Index];
+        contents.assign(static_cast<std::size_t>(bufferSize), std::byte{0});
+        const std::size_t offset = slot * 8u;
+        std::memcpy(contents.data() + offset,                &entityId,         sizeof(entityId));
+        std::memcpy(contents.data() + offset + sizeof(std::uint32_t), &encoded.Value, sizeof(encoded.Value));
+    }
+}
+
+TEST(RendererFrameLifecycle, PickingReadbackPublishesPickResultForHitPixel)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{297u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle pickingBuffer = renderer->GetPickingReadbackBuffer();
+    ASSERT_TRUE(pickingBuffer.IsValid());
+    const std::uint64_t pickingBufferSize = renderer->GetPickingReadbackBufferSize();
+    ASSERT_GE(pickingBufferSize, 8u);
+
+    // Frame 0 — record the copy. `world.PickRequest.Pending = true` after
+    // extraction causes the executor to populate the slot-0 metadata
+    // (`Pending=true`, `IssuedFrame=0`).
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+        .HasPendingPick = true,
+        .Pick = Extrinsic::Graphics::PickPixelRequest{.X = 17u, .Y = 23u, .Pending = true},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    ASSERT_TRUE(world.PickRequest.Pending);
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    ASSERT_EQ(renderer->GetLastRenderGraphStats().PickingReadbackCopyCount, 1u);
+
+    [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
+    ASSERT_GE(device.GlobalFrameNumber, 1u);
+
+    // Seed the renderer-owned host-visible buffer with the bytes the GPU
+    // would have copied into slot 0 for a hit pixel: `EntityId = 42`,
+    // `EncodedSelectionId = EncodeSelectionId(Entity, 0)`. The drain at the
+    // next BeginFrame reads these via `MockDevice::ReadBuffer`.
+    constexpr std::uint32_t hitStableEntityId = 42u;
+    const Extrinsic::Graphics::EncodedSelectionId hitEncoded =
+        Extrinsic::Graphics::EncodeSelectionId(
+            Extrinsic::Graphics::SelectionPrimitiveDomain::Entity, 0u);
+    SeedPickingReadbackSlot(device, pickingBuffer, pickingBufferSize,
+                            /*slot=*/0u, hitStableEntityId, hitEncoded);
+
+    // Frame 1 — the drain runs at the top of `BeginFrame()` before
+    // `m_Device->BeginFrame(...)`. Slot 0 has `IssuedFrame=0 <
+    // GlobalFrameNumber=1`, so the drain reads the bytes we seeded and
+    // routes to `PublishPickResult` (non-zero EntityId, not invalidated).
+    device.NextFrame.FrameIndex = 1u;
+    Extrinsic::RHI::FrameHandle nextFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(nextFrame));
+
+    const Extrinsic::Graphics::SelectionSystem& selection = renderer->GetSelectionSystem();
+    const std::optional<Extrinsic::Graphics::PickReadbackResult> last = selection.GetLastPickResult();
+    ASSERT_TRUE(last.has_value()) << "Drain must publish a PickReadbackResult for a hit slot.";
+    EXPECT_TRUE(last->Hit);
+    EXPECT_EQ(last->StableEntityId, hitStableEntityId);
+    EXPECT_EQ(last->EncodedId.Value, hitEncoded.Value);
+
+    const Extrinsic::Graphics::SelectionSystemDiagnostics diag = selection.GetDiagnostics();
+    EXPECT_EQ(diag.PickHitCount, 1u);
+    EXPECT_EQ(diag.PickNoHitCount, 0u);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForMissPixel)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{298u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle pickingBuffer = renderer->GetPickingReadbackBuffer();
+    ASSERT_TRUE(pickingBuffer.IsValid());
+    const std::uint64_t pickingBufferSize = renderer->GetPickingReadbackBufferSize();
+    ASSERT_GE(pickingBufferSize, 8u);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+        .HasPendingPick = true,
+        .Pick = Extrinsic::Graphics::PickPixelRequest{.X = 11u, .Y = 4u, .Pending = true},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    ASSERT_TRUE(world.PickRequest.Pending);
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    ASSERT_EQ(renderer->GetLastRenderGraphStats().PickingReadbackCopyCount, 1u);
+
+    [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
+
+    // Seed the buffer with the bytes a "background" pixel would emit:
+    // `EntityId = 0` (no surface won the depth-equal test). The drain
+    // must route this to `PublishNoHit()` rather than reporting a hit
+    // with `StableEntityId = 0`.
+    SeedPickingReadbackSlot(device, pickingBuffer, pickingBufferSize,
+                            /*slot=*/0u, /*entityId=*/0u,
+                            Extrinsic::Graphics::EncodedSelectionId{.Value = 0u});
+
+    device.NextFrame.FrameIndex = 1u;
+    Extrinsic::RHI::FrameHandle nextFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(nextFrame));
+
+    const Extrinsic::Graphics::SelectionSystem& selection = renderer->GetSelectionSystem();
+    const std::optional<Extrinsic::Graphics::PickReadbackResult> last = selection.GetLastPickResult();
+    ASSERT_TRUE(last.has_value())
+        << "Drain must publish a NoHit result (an empty PickReadbackResult), not stay silent.";
+    EXPECT_FALSE(last->Hit);
+    EXPECT_EQ(last->StableEntityId, 0u);
+    EXPECT_EQ(last->EncodedId.Value, 0u);
+
+    const Extrinsic::Graphics::SelectionSystemDiagnostics diag = selection.GetDiagnostics();
+    EXPECT_EQ(diag.PickHitCount, 0u);
+    EXPECT_EQ(diag.PickNoHitCount, 1u);
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForInvalidatedRequest)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{299u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle pickingBuffer = renderer->GetPickingReadbackBuffer();
+    ASSERT_TRUE(pickingBuffer.IsValid());
+    const std::uint64_t pickingBufferSize = renderer->GetPickingReadbackBufferSize();
+    ASSERT_GE(pickingBufferSize, 8u);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+        .HasPendingPick = true,
+        .Pick = Extrinsic::Graphics::PickPixelRequest{.X = 17u, .Y = 23u, .Pending = true},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    ASSERT_TRUE(world.PickRequest.Pending);
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    ASSERT_EQ(renderer->GetLastRenderGraphStats().PickingReadbackCopyCount, 1u);
+
+    [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
+
+    // Seed slot 0 with bytes that *would* normally publish a hit — the
+    // point of this test is that the invalidation path overrides the byte
+    // content. If the drain ignored `Invalidated[0]` it would publish
+    // `PickResult{EntityId=99, Hit=true}` and this test would fail.
+    constexpr std::uint32_t poisonStableEntityId = 99u;
+    const Extrinsic::Graphics::EncodedSelectionId poisonEncoded =
+        Extrinsic::Graphics::EncodeSelectionId(
+            Extrinsic::Graphics::SelectionPrimitiveDomain::Entity, 0u);
+    SeedPickingReadbackSlot(device, pickingBuffer, pickingBufferSize,
+                            /*slot=*/0u, poisonStableEntityId, poisonEncoded);
+
+    // Simulate a device-lost / swapchain-rebuild recovery: any in-flight
+    // pending pick is marked invalidated by
+    // `RebuildOperationalResources()` so the upcoming drain publishes
+    // NoHit rather than the now-untrusted pre-rebuild bytes. The buffer
+    // itself survives the rebuild byte-identical (Slice D.1 invariant) so
+    // the drain *can* read those bytes — it just refuses to trust them.
+    ASSERT_TRUE(renderer->RebuildOperationalResources(device));
+    // The buffer survives the rebuild byte-identical when frames-in-flight
+    // is unchanged, so the same handle is still valid.
+    ASSERT_EQ(renderer->GetPickingReadbackBuffer().Index, pickingBuffer.Index);
+    ASSERT_EQ(renderer->GetPickingReadbackBuffer().Generation, pickingBuffer.Generation);
+
+    device.NextFrame.FrameIndex = 1u;
+    Extrinsic::RHI::FrameHandle nextFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(nextFrame));
+
+    const Extrinsic::Graphics::SelectionSystem& selection = renderer->GetSelectionSystem();
+    const std::optional<Extrinsic::Graphics::PickReadbackResult> last = selection.GetLastPickResult();
+    ASSERT_TRUE(last.has_value())
+        << "Drain must publish a NoHit result for an invalidated slot.";
+    EXPECT_FALSE(last->Hit)
+        << "Invalidated slot must publish NoHit even when the slot bytes "
+           "would otherwise decode to a hit.";
+    EXPECT_EQ(last->StableEntityId, 0u);
+    EXPECT_EQ(last->EncodedId.Value, 0u);
+
+    const Extrinsic::Graphics::SelectionSystemDiagnostics diag = selection.GetDiagnostics();
+    EXPECT_EQ(diag.PickHitCount, 0u);
+    EXPECT_EQ(diag.PickNoHitCount, 1u);
 
     renderer->Shutdown();
 }
