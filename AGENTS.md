@@ -2,11 +2,31 @@
 
 This file is the authoritative repository contract for all coding agents operating in this repository.
 
-It **supersedes policy text** in `CLAUDE.md`, `.github/copilot-instructions.md`, and `.codex/config.yaml` when those files disagree.
+It **supersedes policy text** in `CLAUDE.md`, `.github/copilot-instructions.md`, and `.codex/config.yaml` when those
+files disagree.
+
+## Agent skills
+
+This repository ships agent skills at `tools/agents/skills/` (also surfaced
+via `.claude/skills/` and `.codex/skills/`). At the start of every session,
+read the skill manifests by running:
+
+    cat tools/agents/skills/intrinsicengine-core/SKILL.md
+
+This skill is the master entry point and routes to specialist skills for
+task workflow, review, methods, benchmarks, and docs sync. Load specialist
+skills on demand per the routing table inside `intrinsicengine-core`.
+
+If you are operating in an environment without auto-discovery of agent
+skills (e.g. Claude Code on the web, or any bare API client), treat the
+files under `tools/agents/skills/` as required reading mirroring
+`docs/agent/*` — the SKILL.md bodies summarize, and `references/` files
+contain the authoritative source.
 
 ## 1. Mission
 
-Build and maintain IntrinsicEngine as a modular, high-performance, scientifically rigorous engine for graphics, geometry processing, and method-driven research integration.
+Build and maintain IntrinsicEngine as a modular, high-performance, scientifically rigorous engine for graphics, geometry
+processing, and method-driven research integration.
 
 All agent work must preserve:
 
@@ -26,7 +46,9 @@ The following dependency boundaries are mandatory:
 - `ecs` -> `core`; may use geometry handles/types only when explicitly required.
 - `graphics/rhi` -> `core`.
 - `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic.
-- `graphics/vulkan` -> `core`, `graphics/rhi`, backend-local Vulkan dependencies (`Vulkan::Vulkan`, `volk`, `VulkanMemoryAllocator`, `glfw`); no ECS, runtime, or live asset-service knowledge, and no `Vk*` types through RHI/renderer APIs.
+- `graphics/vulkan` -> `core`, `graphics/rhi`, backend-local Vulkan dependencies (`Vulkan::Vulkan`, `volk`,
+  `VulkanMemoryAllocator`, `glfw`); no ECS, runtime, or live asset-service knowledge, and no `Vk*` types through
+  RHI/renderer APIs.
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views; **no live ECS knowledge**.
 - `platform` -> `core`.
 - `runtime` -> all lower layers; owns composition/wiring.
@@ -46,7 +68,8 @@ Target source layout:
 - `src/assets/`.
 - `src/ecs/`.
 - `src/geometry/`.
-- `src/graphics/rhi/`, `src/graphics/assets/`, `src/graphics/vulkan/`, `src/graphics/framegraph/`, `src/graphics/renderer/`.
+- `src/graphics/rhi/`, `src/graphics/assets/`, `src/graphics/vulkan/`, `src/graphics/framegraph/`,
+  `src/graphics/renderer/`.
 - `src/runtime/`.
 - `src/platform/`.
 - `src/app/`.
@@ -54,7 +77,8 @@ Target source layout:
 Supporting architecture roots are mandatory parts of the system contract:
 
 - `methods/`, `benchmarks/`, `tests/`, `docs/`, `tasks/`, `tools/`, `cmake/`, `.github/workflows/`.
-- `assets/` contains checked-in shaders/models/fonts used by app, graphics, and tests; `external/cache/` and `third_party/` contain dependency sources/cache state and are not engine layers.
+- `assets/` contains checked-in shaders/models/fonts used by app, graphics, and tests; `external/cache/` and
+  `third_party/` contain dependency sources/cache state and are not engine layers.
 
 ## 4. Layering rules
 
@@ -63,10 +87,15 @@ Agents must enforce ownership and dependency flow:
 - Lower layers never import higher layers.
 - Runtime wiring remains in `runtime`; lower subsystems remain reusable.
 - Graphics subsystems operate on snapshots/views, not live gameplay ownership.
-- `assets` is CPU-only and GPU-agnostic; GPU-side asset state lives in `src/graphics/assets/` and is wired by `runtime` from asset events.
+- `assets` is CPU-only and GPU-agnostic; GPU-side asset state lives in `src/graphics/assets/` and is wired by `runtime`
+  from asset events.
 - `platform` exposes window/input ports and explicit backends; it must not import `graphics`, `ecs`, or `runtime`.
-- Platform backend selection is explicit: `INTRINSIC_PLATFORM_BACKEND=Auto|Null|Glfw`; use `Null`/`INTRINSIC_HEADLESS_NO_GLFW=ON` for headless work unless a task specifically needs GLFW/Vulkan surface coverage.
-- Runtime owns graphics backend selection. Promoted Vulkan is opt-in only when `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` and `RenderConfig::EnablePromotedVulkanDevice` are both enabled; otherwise Vulkan requests fall back to the Null device. Renderer/runtime code must gate on `RHI::IDevice::IsOperational()`, not Vulkan diagnostics.
+- Platform backend selection is explicit: `INTRINSIC_PLATFORM_BACKEND=Auto|Null|Glfw`; use `Null`/
+  `INTRINSIC_HEADLESS_NO_GLFW=ON` for headless work unless a task specifically needs GLFW/Vulkan surface coverage.
+- Runtime owns graphics backend selection. Promoted Vulkan is opt-in only when
+  `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` and `RenderConfig::EnablePromotedVulkanDevice` are both enabled;
+  otherwise Vulkan requests fall back to the Null device. Renderer/runtime code must gate on
+  `RHI::IDevice::IsOperational()`, not Vulkan diagnostics.
 - `src/legacy` may contain transitional exceptions only when tracked in migration docs/tasks.
 
 Every new dependency edge must be justifiable by layer policy and reflected in docs when architectural.
@@ -79,10 +108,15 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 - Avoid introducing new engine features during reorganization tasks.
 - Keep patches small and scoped to one task when possible.
 - Prefer deterministic, testable APIs with explicit ownership and failure states.
-- Use out-of-source CMake presets only; `CMakeLists.txt` rejects in-source configure. Default agent build setup is `cmake --preset ci` followed by `cmake --build --preset ci --target IntrinsicTests`.
-- Presets pin `clang-20` / `clang++-20`; C++ module configuration also requires a matching `clang-scan-deps` (`clang-scan-deps-20` or newer). Do not treat GCC or stale non-preset build trees as valid verification for module changes.
-- Add C++23 module libraries with `intrinsic_add_module_library(...)` from `cmake/IntrinsicModule.cmake` and declare module interfaces via `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
-- FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated.
+- Use out-of-source CMake presets only; `CMakeLists.txt` rejects in-source configure. Default agent build setup is
+  `cmake --preset ci` followed by `cmake --build --preset ci --target IntrinsicTests`.
+- Presets pin `clang-20` / `clang++-20`; C++ module configuration also requires a matching `clang-scan-deps` (
+  `clang-scan-deps-20` or newer). Do not treat GCC or stale non-preset build trees as valid verification for module
+  changes.
+- Add C++23 module libraries with `intrinsic_add_module_library(...)` from `cmake/IntrinsicModule.cmake` and declare
+  module interfaces via `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
+- FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use
+  `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated.
 
 ## 6. Method implementation protocol
 
@@ -103,13 +137,19 @@ For each change:
 - Run the strongest relevant subset of repository verification commands.
 - Add/update tests for behavior changes.
 - Preserve or improve pass rate unless a temporary shim is documented.
-- Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (`unit`, `contract`, `integration`, `regression`, `benchmark`, subsystem labels, backend/capability labels such as `gpu`/`vulkan`, and opt-in labels such as `slow`/`flaky-quarantine`). New labels must update both files in the same change.
-- New C++ test files use `Test.<Name>.cpp`; existing `Test_*.cpp` files are compatibility carryover and should only be renamed by explicit mechanical cleanup tasks.
+- Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (`unit`, `contract`,
+  `integration`, `regression`, `benchmark`, subsystem labels, backend/capability labels such as `gpu`/`vulkan`, and
+  opt-in labels such as `slow`/`flaky-quarantine`). New labels must update both files in the same change.
+- New C++ test files use `Test.<Name>.cpp`; existing `Test_*.cpp` files are compatibility carryover and should only be
+  renamed by explicit mechanical cleanup tasks.
 - Verification hygiene:
-  - Prefer configured presets and task-specific focused targets before broad or long-running targets.
-  - Treat non-default build trees as valid evidence only after confirming their compiler/toolchain satisfies the repository C++23 requirements; stale trees with older compilers are not valid verification.
-  - Treat `Testing/Temporary/LastTestsFailed.log` as historical state only; current pass/fail state comes from the CTest command just run.
-  - For noisy commands, capture full output with `tee`, display a bounded tail, and use `set -o pipefail` so filtering does not hide failures.
+    - Prefer configured presets and task-specific focused targets before broad or long-running targets.
+    - Treat non-default build trees as valid evidence only after confirming their compiler/toolchain satisfies the
+      repository C++23 requirements; stale trees with older compilers are not valid verification.
+    - Treat `Testing/Temporary/LastTestsFailed.log` as historical state only; current pass/fail state comes from the
+      CTest command just run.
+    - For noisy commands, capture full output with `tee`, display a bounded tail, and use `set -o pipefail` so filtering
+      does not hide failures.
 - The default CPU-supported correctness gate is:
 
   ```bash
@@ -117,7 +157,8 @@ For each change:
   ```
 
   GPU/Vulkan, slow, and explicitly quarantined tests are opt-in and must be justified by label policy.
-- `CMakePresets.json` defines configure/build presets but no CTest presets; invoke CTest with `--test-dir build/ci` rather than `ctest --preset ci`.
+- `CMakePresets.json` defines configure/build presets but no CTest presets; invoke CTest with `--test-dir build/ci`
+  rather than `ctest --preset ci`.
 
 ## 8. Benchmarking protocol
 
@@ -133,7 +174,8 @@ When code, structure, or policy changes:
 - Update relevant architecture/migration/task docs in the same PR.
 - Update references and links for moved files.
 - Regenerate inventories when required by tooling.
-- After module surface changes, refresh `docs/api/generated/module_inventory.md` with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- After module surface changes, refresh `docs/api/generated/module_inventory.md` with
+  `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
 - Keep docs factual (current state), not aspirational unless clearly labeled.
 
 ## 10. CI expectations
@@ -141,8 +183,13 @@ When code, structure, or policy changes:
 - PR checks must remain green for touched areas.
 - Structural checks (tasks/docs/layering/manifests) should run in warning mode until explicitly tightened.
 - Workflow definitions must stay readable and split by purpose.
-- Agent/Codex verification must configure the `ci` preset, build a meaningful target such as `IntrinsicTests` (never `help` as a stand-in), and run CTest. The current Codex verification command mirrors the default CPU-supported gate from the testing protocol.
-- Touched-scope structural checks use the repository tools, for example `python3 tools/agents/check_task_policy.py --root . --strict`, `python3 tools/docs/check_doc_links.py --root .`, `python3 tools/repo/check_layering.py --root src --strict`, and `python3 tools/repo/check_test_layout.py --root . --strict`.
+- Agent/Codex verification must configure the `ci` preset, build a meaningful target such as `IntrinsicTests` (never
+  `help` as a stand-in), and run CTest. The current Codex verification command mirrors the default CPU-supported gate
+  from the testing protocol.
+- Touched-scope structural checks use the repository tools, for example
+  `python3 tools/agents/check_task_policy.py --root . --strict`, `python3 tools/docs/check_doc_links.py --root .`,
+  `python3 tools/repo/check_layering.py --root src --strict`, and
+  `python3 tools/repo/check_test_layout.py --root . --strict`.
 
 ## 11. Task execution workflow
 
@@ -151,7 +198,8 @@ Every task execution should follow this sequence:
 1. Inspect existing code and docs.
 2. Identify owning subsystem and layer.
 3. Write or update task file.
-   - Base new task files on `tasks/templates/`; do not create long-lived root-level planning checklists once work belongs in `tasks/backlog/`, `tasks/active/`, or `tasks/done/`.
+    - Base new task files on `tasks/templates/`; do not create long-lived root-level planning checklists once work
+      belongs in `tasks/backlog/`, `tasks/active/`, or `tasks/done/`.
 4. Implement the smallest useful patch.
 5. Add or update tests.
 6. Add or update docs.
@@ -189,18 +237,19 @@ Undocumented exceptions are policy violations.
 
 ## Related expanded docs
 
-Read this `AGENTS.md` file at the start of every session/task; it is the authoritative contract. Read expanded `docs/agent/` procedures when their trigger applies rather than reading every specialized guide for every task:
+Read this `AGENTS.md` file at the start of every session/task; it is the authoritative contract. Read expanded
+`docs/agent/` procedures when their trigger applies rather than reading every specialized guide for every task:
 
-| Document | Read when |
-| --- | --- |
-| `docs/agent/contract.md` | You need expanded rationale or detail for this contract, especially during onboarding or policy edits. |
-| `docs/agent/task-format.md` | Creating, promoting, retiring, or materially updating files under `tasks/`. |
-| `docs/agent/review-checklist.md` | Before committing or reporting completion for any non-trivial change. |
-| `docs/agent/architecture-review-checklist.md` | Changing dependency boundaries, module ownership, source layout, runtime wiring, or architecture docs. |
-| `docs/agent/method-workflow.md` | Implementing or modifying paper/method work under `methods/` or method-backed integrations. |
-| `docs/agent/method-review-checklist.md` | Reviewing method/paper changes before commit or PR. |
-| `docs/agent/benchmark-workflow.md` | Adding, changing, or running benchmark harnesses, manifests, datasets, baselines, or reports. |
-| `docs/agent/benchmark-review-checklist.md` | Reviewing benchmark changes or performance claims before commit or PR. |
-| `docs/agent/docs-sync-policy.md` | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed. |
-| `docs/agent/roles.md` | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions. |
-| `docs/agent/task-maturity.md` | Closing a task whose stop-state is ambiguous, especially rendering, Vulkan, asset ingest, hot reload, pass command bodies, runtime composition, or legacy retirement; reviewers checking the `Scaffolded` closure rule. |
+| Document                                      | Read when                                                                                                                                                                                                               |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `docs/agent/contract.md`                      | You need expanded rationale or detail for this contract, especially during onboarding or policy edits.                                                                                                                  |
+| `docs/agent/task-format.md`                   | Creating, promoting, retiring, or materially updating files under `tasks/`.                                                                                                                                             |
+| `docs/agent/review-checklist.md`              | Before committing or reporting completion for any non-trivial change.                                                                                                                                                   |
+| `docs/agent/architecture-review-checklist.md` | Changing dependency boundaries, module ownership, source layout, runtime wiring, or architecture docs.                                                                                                                  |
+| `docs/agent/method-workflow.md`               | Implementing or modifying paper/method work under `methods/` or method-backed integrations.                                                                                                                             |
+| `docs/agent/method-review-checklist.md`       | Reviewing method/paper changes before commit or PR.                                                                                                                                                                     |
+| `docs/agent/benchmark-workflow.md`            | Adding, changing, or running benchmark harnesses, manifests, datasets, baselines, or reports.                                                                                                                           |
+| `docs/agent/benchmark-review-checklist.md`    | Reviewing benchmark changes or performance claims before commit or PR.                                                                                                                                                  |
+| `docs/agent/docs-sync-policy.md`              | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed.                                                                               |
+| `docs/agent/roles.md`                         | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions.                                                                                                                           |
+| `docs/agent/task-maturity.md`                 | Closing a task whose stop-state is ambiguous, especially rendering, Vulkan, asset ingest, hot reload, pass command bodies, runtime composition, or legacy retirement; reviewers checking the `Scaffolded` closure rule. |
