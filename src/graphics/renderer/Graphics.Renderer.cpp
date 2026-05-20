@@ -431,6 +431,12 @@ namespace Extrinsic::Graphics
             m_SelectionEdgeIdPipelineLease.reset();
             m_SelectionPointIdPipelineLease.reset();
             m_SelectionOutlinePipelineLease.reset();
+            // GRAPHICS-074 Slice D.1 — drop the renderer-owned
+            // `Picking.Readback` lease before the BufferManager is torn
+            // down so the lease's destructor still observes a live manager
+            // (the manager's `Release` path calls `IDevice::DestroyBuffer`).
+            m_PickingReadbackBuffer.reset();
+            m_PickingReadbackBufferSize = 0u;
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -1453,6 +1459,20 @@ namespace Extrinsic::Graphics
             return BuildSelectionOutlinePipelineDesc(m_BackbufferFormat);
         }
 
+        [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
+        {
+            if (!m_PickingReadbackBuffer.has_value() || !m_PickingReadbackBuffer->IsValid())
+            {
+                return RHI::BufferHandle{};
+            }
+            return m_PickingReadbackBuffer->GetHandle();
+        }
+
+        [[nodiscard]] std::uint64_t GetPickingReadbackBufferSize() const noexcept override
+        {
+            return m_PickingReadbackBufferSize;
+        }
+
         void SetLightingPath(FrameRecipeLightingPath path) noexcept override
         {
             m_LightingPath = path;
@@ -2245,6 +2265,53 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] DeferredLighting pipeline unavailable; default-recipe deferred composition recording will be skipped: error={}",
                                 static_cast<int>(deferredLightingPipeline.error()));
+            }
+
+            // GRAPHICS-074 Slice D.1 — renderer-owned host-visible
+            // `Picking.Readback` buffer. Allocated lazily so the buffer
+            // survives `RebuildOperationalResources()` byte-identical when
+            // `device.GetFramesInFlight()` is unchanged (same pattern
+            // `ShadowSystem` follows for its depth atlas); the
+            // `m_BufferManager` itself is torn down in `Shutdown()` along
+            // with the lease, so a fresh `Initialize(device)` after
+            // `Shutdown()` will allocate a new buffer against the new
+            // manager. Sized for `8 * frames-in-flight` bytes per
+            // `GRAPHICS-012Q`'s `EncodedSelectionId` payload (one 4-byte
+            // `EntityId` word + one 4-byte `EncodedSelectionId` word per
+            // in-flight frame slot). If the expected size differs from the
+            // current allocation (e.g. the device reports a different
+            // frames-in-flight after a swapchain rebuild), the lease is
+            // dropped and re-created so Slice D.2's `slot * 8` addressing
+            // never overruns the buffer. Slice D.2 imports the handle into
+            // the recipe and records `CopyTextureToBuffer(...)`; Slice D.3
+            // drains it on `BeginFrame()`.
+            const std::uint64_t pickingReadbackBytes =
+                static_cast<std::uint64_t>(8u) *
+                static_cast<std::uint64_t>(device.GetFramesInFlight());
+            const bool pickingReadbackNeedsAllocation =
+                !m_PickingReadbackBuffer.has_value() ||
+                !m_PickingReadbackBuffer->IsValid() ||
+                m_PickingReadbackBufferSize != pickingReadbackBytes;
+            if (pickingReadbackNeedsAllocation)
+            {
+                m_PickingReadbackBuffer.reset();
+                m_PickingReadbackBufferSize = 0u;
+                auto pickingReadbackOr = m_BufferManager->Create({
+                    .SizeBytes   = pickingReadbackBytes,
+                    .Usage       = RHI::BufferUsage::TransferDst,
+                    .HostVisible = true,
+                    .DebugName   = "Renderer.PickingReadback",
+                });
+                if (pickingReadbackOr.has_value())
+                {
+                    m_PickingReadbackBuffer.emplace(std::move(*pickingReadbackOr));
+                    m_PickingReadbackBufferSize = pickingReadbackBytes;
+                }
+                else
+                {
+                    Core::Log::Warn("[Graphics] Picking.Readback buffer unavailable; default-recipe picking readback will be skipped: error={}",
+                                    static_cast<int>(pickingReadbackOr.error()));
+                }
             }
 
             // GRAPHICS-074 Slice A — EntityId selection pipeline. Same
@@ -3042,6 +3109,24 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEdgeIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionPointIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionOutlinePipelineLease;
+        // GRAPHICS-074 Slice D.1 — renderer-owned host-visible `Picking.Readback`
+        // buffer. Allocated by `InitializeOperationalPassResources()` when
+        // the device first becomes operational and re-used across
+        // `RebuildOperationalResources()` calls as long as the expected
+        // `8 * device.GetFramesInFlight()` size matches the current
+        // `m_PickingReadbackBufferSize` (same pattern `ShadowSystem` follows
+        // for its depth atlas). When the device reports a different
+        // frames-in-flight after a swapchain rebuild the lease is dropped
+        // and re-created so Slice D.2's `slot * 8` per-frame copy
+        // addressing never overruns the allocation. The lease is reset in
+        // `Shutdown()` before `m_BufferManager` so the destruction order
+        // matches the rest of the lease-owning members above. Slice D.1
+        // only exposes the buffer through `GetPickingReadbackBuffer()` /
+        // `GetPickingReadbackBufferSize()`; Slice D.2 imports it into the
+        // recipe and records the `CopyTextureToBuffer` calls, Slice D.3
+        // drains it on `BeginFrame()`.
+        std::optional<RHI::BufferManager::BufferLease> m_PickingReadbackBuffer;
+        std::uint64_t                                  m_PickingReadbackBufferSize{0u};
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

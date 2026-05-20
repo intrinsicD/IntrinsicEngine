@@ -31,10 +31,10 @@ This document defines how to create and review benchmark work.
 
 ## Related documentation
 
-- [Benchmarking docs index](../benchmarking/index.md)
-- [Benchmark manifest schema](../benchmarking/benchmark-manifest-schema.md)
-- [Benchmark result JSON schema](../benchmarking/result-json-schema.md)
-- [Benchmark report template](../benchmarking/report-template.md)
+- [Benchmarking docs index](../../../../../docs/benchmarking/index.md)
+- [Benchmark manifest schema](../../../../../docs/benchmarking/benchmark-manifest-schema.md)
+- [Benchmark result JSON schema](../../../../../docs/benchmarking/result-json-schema.md)
+- [Benchmark report template](../../../../../docs/benchmarking/report-template.md)
 
 
 ## Review checklist

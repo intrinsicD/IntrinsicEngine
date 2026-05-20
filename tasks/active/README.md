@@ -12,7 +12,7 @@ Each active task should include:
 ## Currently active
 
 - [`GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md`](GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md)
-  — in-progress (Slice D.1 next; Slice D split into D.1/D.2/D.3/D.4
+  — in-progress (Slice D.2 next; Slice D split into D.1/D.2/D.3/D.4
   sub-slices). Theme A leaf; depends on GRAPHICS-070 (done). Slice A
   merged via PR #890 (commits `ad2e40d` + `08af46e`, merge `558a75d`).
   The recipe-side follow-up between Slice A and Slice B (reorder
@@ -29,7 +29,8 @@ Each active task should include:
   D.1..D.4 sub-slices landed on
   `claude/setup-agentic-workflow-duMR0` (task-file only — no source
   changes). Slice D.1 (renderer-owned host-visible `Picking.Readback`
-  buffer lifecycle, no copy / no drain) opens on a new agent branch;
-  D.2 wires the recipe import + per-frame copy; D.3 wires the
+  buffer lifecycle, no copy / no drain) landed on
+  `claude/setup-agentic-workflow-rLwIT`; Slice D.2 (recipe import +
+  per-frame copy) opens on a new agent branch; D.3 wires the
   `BeginFrame` drain + `PublishPickResult` / `PublishNoHit`; D.4
   plumbs the outline push constants.

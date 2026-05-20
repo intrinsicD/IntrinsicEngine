@@ -1916,3 +1916,114 @@ TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPres
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-074 Slice D.1 — renderer-owned host-visible `Picking.Readback`
+// buffer lifecycle. The operational publisher allocates the buffer the first
+// time `InitializeOperationalPassResources()` runs and intentionally does
+// *not* re-allocate it on subsequent `RebuildOperationalResources()` calls,
+// so the handle Slice D.2 will import into the recipe stays byte-identical
+// across rebuilds (same pattern `ShadowSystem` uses for its depth atlas).
+// The buffer is sized for `8 * frames-in-flight` bytes per `GRAPHICS-012Q`'s
+// `EncodedSelectionId` payload (one 4-byte `EntityId` word + one 4-byte
+// `EncodedSelectionId` word per in-flight frame slot) and allocated with
+// `HostVisible = true` + `BufferUsage::TransferDst` so Slice D.2 can record
+// `CopyTextureToBuffer(EntityId/PrimitiveId, ..., m_PickingReadbackBuffer,
+// slot * 8 [+4])` after the four selection-ID sub-passes and Slice D.3 can
+// map the buffer on `BeginFrame()` once the issuing frame has completed.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PickingReadbackBufferSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{293u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle initialBuffer = renderer->GetPickingReadbackBuffer();
+    EXPECT_TRUE(initialBuffer.IsValid());
+
+    // Size = 8 bytes per in-flight frame slot (one 4-byte `EntityId` word +
+    // one 4-byte `EncodedSelectionId` word). `MockDevice::GetFramesInFlight()`
+    // returns 2, so the allocation must be 16 bytes.
+    const std::uint64_t initialSize = renderer->GetPickingReadbackBufferSize();
+    EXPECT_EQ(initialSize, static_cast<std::uint64_t>(8u) *
+                               static_cast<std::uint64_t>(device.GetFramesInFlight()));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+
+    // The buffer survives the rebuild byte-identical: same handle (so the
+    // recipe import Slice D.2 wires up stays stable across rebuilds) and
+    // same size.
+    const Extrinsic::RHI::BufferHandle rebuiltBuffer = renderer->GetPickingReadbackBuffer();
+    EXPECT_TRUE(rebuiltBuffer.IsValid());
+    EXPECT_EQ(rebuiltBuffer.Index, initialBuffer.Index);
+    EXPECT_EQ(rebuiltBuffer.Generation, initialBuffer.Generation);
+    EXPECT_EQ(renderer->GetPickingReadbackBufferSize(), initialSize);
+
+    renderer->Shutdown();
+
+    // After `Shutdown()` the lease is released and a fresh accessor returns
+    // an invalid handle / zero size, so a later `Initialize()` would
+    // allocate against the new BufferManager rather than handing out a
+    // dangling handle.
+    EXPECT_FALSE(renderer->GetPickingReadbackBuffer().IsValid());
+    EXPECT_EQ(renderer->GetPickingReadbackBufferSize(), 0u);
+}
+
+// GRAPHICS-074 Slice D.1 — when `RebuildOperationalResources()` runs against
+// a device whose `GetFramesInFlight()` differs from the previous allocation
+// (e.g. a swapchain rebuild changed the in-flight count), the lazy allocator
+// must drop the old lease and re-create the buffer so Slice D.2's
+// `slot * 8` per-frame copy addressing never overruns the allocation.
+TEST(RendererFrameLifecycle, PickingReadbackBufferReallocatesWhenFramesInFlightChanges)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{294u, 1u};
+    device.FramesInFlight = 2u;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle initialBuffer = renderer->GetPickingReadbackBuffer();
+    ASSERT_TRUE(initialBuffer.IsValid());
+    EXPECT_EQ(renderer->GetPickingReadbackBufferSize(),
+              static_cast<std::uint64_t>(8u) * 2u);
+
+    // Simulate a swapchain rebuild that promotes the device from
+    // double- to triple-buffered. The lease must be reallocated so the
+    // buffer is sized for three slots, not the original two.
+    device.FramesInFlight = 3u;
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+
+    const Extrinsic::RHI::BufferHandle resizedBuffer = renderer->GetPickingReadbackBuffer();
+    ASSERT_TRUE(resizedBuffer.IsValid());
+    EXPECT_EQ(renderer->GetPickingReadbackBufferSize(),
+              static_cast<std::uint64_t>(8u) * 3u);
+    // The reallocation must surface as a *different* handle so downstream
+    // recipe imports (Slice D.2) re-import the new buffer rather than
+    // continuing to copy into the freed allocation. `BufferManager`
+    // recycles slot indices through a free list and bumps `Generation` on
+    // each free, so the new handle typically reuses the same index with a
+    // newer generation — assert handle inequality (either component
+    // differs) rather than just index inequality.
+    EXPECT_TRUE(resizedBuffer.Index != initialBuffer.Index ||
+                resizedBuffer.Generation != initialBuffer.Generation)
+        << "Expected the reallocated buffer to have a different handle than "
+        << "the original (got Index=" << resizedBuffer.Index
+        << " Generation=" << resizedBuffer.Generation << " both before and after).";
+
+    // Subsequent rebuilds with the same frames-in-flight count must keep
+    // the handle stable (the lazy path of the allocator).
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::BufferHandle stableBuffer = renderer->GetPickingReadbackBuffer();
+    EXPECT_EQ(stableBuffer.Index, resizedBuffer.Index);
+    EXPECT_EQ(stableBuffer.Generation, resizedBuffer.Generation);
+    EXPECT_EQ(renderer->GetPickingReadbackBufferSize(),
+              static_cast<std::uint64_t>(8u) * 3u);
+
+    renderer->Shutdown();
+}
+
