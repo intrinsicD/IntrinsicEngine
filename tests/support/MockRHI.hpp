@@ -20,6 +20,7 @@
 #include <cstring>
 #include <expected>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <span>
 #include <vector>
@@ -433,6 +434,41 @@ namespace Extrinsic::Tests
                 std::memcpy(rec.Data.data(), src, static_cast<std::size_t>(size));
             }
             BufferWrites.push_back(std::move(rec));
+        }
+
+        // GRAPHICS-074 Slice D.3 — host-visible buffer content seeding for
+        // `ReadBuffer(...)`. Tests populate `BufferContents[handle.Index]`
+        // with the bytes the renderer's `BeginFrame()`-side picking-readback
+        // drain should observe, since `MockCommandContext::CopyTextureToBuffer`
+        // is a no-op and the renderer needs to see *some* deterministic
+        // contents at `slot * 8` (one 4-byte `EntityId` + one 4-byte
+        // `EncodedSelectionId`). `ReadBuffer(...)` below copies from this
+        // table when the requested handle has a matching entry; unknown
+        // handles preserve the default no-op contract documented on
+        // `IDevice::ReadBuffer`.
+        std::unordered_map<std::uint32_t, std::vector<std::byte>> BufferContents;
+
+        void ReadBuffer(RHI::BufferHandle handle, void* data, std::uint64_t size, std::uint64_t offset) override
+        {
+            if (data == nullptr || size == 0u)
+            {
+                return;
+            }
+            auto it = BufferContents.find(handle.Index);
+            if (it == BufferContents.end())
+            {
+                return;
+            }
+            const std::vector<std::byte>& contents = it->second;
+            if (offset >= contents.size())
+            {
+                return;
+            }
+            const std::uint64_t available = static_cast<std::uint64_t>(contents.size()) - offset;
+            const std::uint64_t toCopy    = (size < available) ? size : available;
+            std::memcpy(data,
+                        contents.data() + static_cast<std::size_t>(offset),
+                        static_cast<std::size_t>(toCopy));
         }
         [[nodiscard]] std::uint64_t GetBufferDeviceAddress(RHI::BufferHandle) const override { return 0; }
 
