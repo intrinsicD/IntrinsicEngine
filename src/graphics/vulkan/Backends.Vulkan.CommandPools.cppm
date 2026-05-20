@@ -94,7 +94,11 @@ namespace Extrinsic::Backends::Vulkan
                                  RHI::TextureLayout srcLayout,
                                  uint32_t mipLevel, uint32_t arrayLayer,
                                  RHI::BufferHandle dst,
-                                 uint64_t dstOffset) override;
+                                 uint64_t dstOffset,
+                                 uint32_t srcOffsetX,
+                                 uint32_t srcOffsetY,
+                                 uint32_t srcWidth,
+                                 uint32_t srcHeight) override;
 
     private:
         [[nodiscard]] bool CanBegin() const;

@@ -117,6 +117,18 @@ namespace Extrinsic::Graphics
         // When invalid, the recipe falls back to the GRAPHICS-073 Slice A
         // transient path (`graph.CreateTexture("ShadowAtlas", ...)`).
         RHI::TextureHandle ShadowAtlas{};
+        // GRAPHICS-074 Slice D.2 — renderer-owned host-visible
+        // `Picking.Readback` buffer (allocated by Slice D.1's
+        // `InitializeOperationalPassResources`). When `pickingActive` is true
+        // (`EnablePicking && EnableDepthPrepass`), `BuildDefaultFrameRecipe`
+        // imports this handle as the canonical destination for the
+        // `PickingPass` texture-to-buffer copies via `ImportBuffer(...,
+        // BufferState::TransferDst, BufferState::HostReadback)`. The handle
+        // must be valid when `pickingActive` is true; the renderer always
+        // populates it from `m_PickingReadbackBuffer` and the picking
+        // feature itself requires an operational publisher to have wired
+        // the buffer first.
+        RHI::BufferHandle PickingReadback{};
     };
 
     // GRAPHICS-073 Slice B — typed sizing seam for the shadow atlas. When
