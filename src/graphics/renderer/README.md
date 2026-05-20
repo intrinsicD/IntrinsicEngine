@@ -440,6 +440,55 @@ Concretely:
   nearest-surface fragment selection. The Face/Edge/Point selection
   pipelines added by Slice B follow this same depth-equal shape; the
   outline pipeline (Slice C) is unaffected by the reorder.
+- GRAPHICS-074 Slice B extends the default-recipe `"PickingPass"` executor
+  branch to fan out to the Face / Edge / Point selection ID sub-passes
+  alongside the EntityId sub-pass. `NullRenderer` owns
+  `m_SelectionFaceIdPass` / `m_SelectionEdgeIdPass` /
+  `m_SelectionPointIdPass` (each constructed against `m_SelectionSystem`,
+  emplaced *before* `InitializeOperationalPassResources()` runs so the
+  publisher's `SetPipeline(...)` actually lands on each pass on the
+  initial operational path) and the matching pipeline leases
+  `m_Selection{Face,Edge,Point}IdPipelineLease`. Each pipeline is created
+  in `InitializeOperationalPassResources()` from
+  `BuildSelection{Face,Edge,Point}IdPipelineDesc()` and republished
+  byte-identical through `RebuildOperationalResources()` using the same
+  reset-then-publish pattern as the EntityId / forward / shadow / deferred
+  pipelines. The three pipelines share the EntityId pipeline's
+  render-pass-compatible shape (two R32_UINT color targets `EntityId` +
+  `PrimitiveId`, `D32_FLOAT` depth target, depth-test on, depth-equal,
+  depth-write off, color blend off on both targets) so all four selection
+  pipelines can be bound inside the same recipe-declared `PickingPass`
+  render pass; they differ only in primitive topology (`TriangleList` for
+  Face, `LineList` for Edge, `PointList` for Point) and cull mode (`Back`
+  for Face — matching the surface bucket — `None` for Edge / Point,
+  mirroring the forward line / point pipelines). The shader pairs are
+  `shaders/selection/{face,edge,point}_id.{vert,frag}.spv`: each vertex
+  stage reuses the GpuScene-aware fetch chain (matches the
+  `RHI::GpuScenePushConstants` push block byte-for-byte) and forwards the
+  per-instance `inst.EntityID` as a flat varying; each fragment writes
+  `EncodeSelectionId(domain, gl_PrimitiveID)` into `PrimitiveId` per
+  `GRAPHICS-012Q` where `domain` is `Face`, `Edge`, or `Point` and
+  `gl_PrimitiveID` is the per-draw-call primitive index over the
+  respective `SurfaceOpaque` / `Lines` / `Points` cull bucket; the
+  per-instance stable entity ID is still written into `EntityId`. The
+  legacy `assets/shaders/pick_mesh.{vert,frag}` /
+  `assets/shaders/pick_line.{vert,frag}` /
+  `assets/shaders/pick_point.{vert,frag}` shaders declare the pre-GpuScene
+  push block and are deliberately *not* referenced — see the "Shader
+  push-constant compatibility policy" subsection above. The executor's
+  `"PickingPass"` branch now routes through
+  `RecordSelectionEntityIdPass(...)` then
+  `RecordSelectionFaceIdPass(...)` then
+  `RecordSelectionEdgeIdPass(...)` then
+  `RecordSelectionPointIdPass(...)` with the standard
+  `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy
+  accumulated per sub-pass. With depth-equal / depth-write-off, only the
+  nearest-surface fragment that survives the prepass depth test can
+  write, so the most refined domain code (Face / Edge / Point) wins per
+  pixel over the EntityId fallback. The outline pipeline +
+  `"SelectionOutlinePass"` executor route (Slice C) and the
+  `Picking.Readback` buffer + drain +
+  `PublishPickResult`/`PublishNoHit` wiring (Slice D) remain.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by
