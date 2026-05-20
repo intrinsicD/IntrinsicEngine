@@ -343,6 +343,12 @@ namespace Extrinsic::Tests
         RHI::FrameHandle NextFrame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
         RHI::TextureHandle BackbufferHandle{100u, 1u};
         std::uint64_t GlobalFrameNumber = 0;
+        // Default mirrors a typical double-buffered swapchain (matches the
+        // RHI's historical fixed value); tests that need to exercise
+        // frame-count-dependent allocations (e.g. picking readback buffer
+        // sizing in GRAPHICS-074 Slice D.1) flip this between
+        // `Initialize()` and `RebuildOperationalResources()` calls.
+        std::uint32_t FramesInFlight = 2u;
 
         // ---- Counters ------------------------------------------------------
         int CreateBufferCount    = 0;
@@ -469,7 +475,7 @@ namespace Extrinsic::Tests
         RHI::IBindlessHeap& GetBindlessHeap() override { return Bindless; }
         RHI::IProfiler* GetProfiler() override { return nullptr; }
 
-        [[nodiscard]] std::uint32_t GetFramesInFlight()    const override { return 2; }
+        [[nodiscard]] std::uint32_t GetFramesInFlight()    const override { return FramesInFlight; }
         [[nodiscard]] std::uint64_t GetGlobalFrameNumber() const override { return GlobalFrameNumber; }
 
     private:

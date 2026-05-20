@@ -34,10 +34,10 @@ This workflow governs scientific paper/method implementation in IntrinsicEngine.
 
 ## Required references
 
-- [Methods docs index](../methods/index.md)
-- [Reference implementation policy](../methods/reference-implementation-policy.md)
-- [Backend policy](../methods/backend-policy.md)
-- [Numerical robustness policy](../methods/numerical-robustness-policy.md)
-- [Dataset policy](../methods/dataset-policy.md)
-- [Method report template](../methods/report-template.md)
+- [Methods docs index](../../../../../docs/methods/index.md)
+- [Reference implementation policy](../../../../../docs/methods/reference-implementation-policy.md)
+- [Backend policy](../../../../../docs/methods/backend-policy.md)
+- [Numerical robustness policy](../../../../../docs/methods/numerical-robustness-policy.md)
+- [Dataset policy](../../../../../docs/methods/dataset-policy.md)
+- [Method report template](../../../../../docs/methods/report-template.md)
 - [Method implementation review checklist](./method-review-checklist.md)
