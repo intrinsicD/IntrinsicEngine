@@ -32,6 +32,12 @@ namespace
             .LinesCount = Extrinsic::RHI::BufferHandle{13u, 1u},
             .PointsNonIndexedArgs = Extrinsic::RHI::BufferHandle{14u, 1u},
             .PointsCount = Extrinsic::RHI::BufferHandle{15u, 1u},
+            // GRAPHICS-074 Slice D.2 — renderer-owned host-visible
+            // `Picking.Readback` buffer is now imported by the recipe rather
+            // than transient; supply a valid handle so picking-enabled
+            // contract tests keep their compile path. Tests that disable
+            // picking ignore this import (recipe drops the resource).
+            .PickingReadback = Extrinsic::RHI::BufferHandle{16u, 1u},
         };
     }
 
@@ -443,6 +449,73 @@ TEST(FrameRecipeContract, PickingPassRunsAfterDepthPrepass)
     ASSERT_NE(depthIt, passNames.end());
     ASSERT_NE(pickingIt, passNames.end());
     EXPECT_LT(depthIt, pickingIt);
+}
+
+// GRAPHICS-074 Slice D.2 — when the recipe is built with a valid
+// `imports.PickingReadback` handle (the renderer's host-visible buffer from
+// Slice D.1) and picking is active, the compiled graph must mark
+// `Picking.Readback` as imported, route the renderer's handle through, and
+// carry the `(InitialState = TransferDst, FinalState = HostReadback)` pair
+// required by the framegraph's imported-write contract for the PickingPass
+// `Write(..., BufferUsage::TransferDst)` plus Slice D.3's `BeginFrame()`
+// host-mapped drain.
+TEST(FrameRecipeContract, PickingReadbackImportedFromRenderer)
+{
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    // EnableDepthPrepass defaults to true.
+
+    const Extrinsic::RHI::BufferHandle rendererPickingBuffer{0xAB12u, 3u};
+    FrameRecipeImports imports = MakeImports();
+    imports.PickingReadback = rendererPickingBuffer;
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    const auto it = std::ranges::find(compiled->BufferNames, "Picking.Readback");
+    ASSERT_NE(it, compiled->BufferNames.end())
+        << "Picking.Readback must appear in the compiled graph when picking is active.";
+    const std::size_t index =
+        static_cast<std::size_t>(std::distance(compiled->BufferNames.begin(), it));
+
+    ASSERT_LT(index, compiled->BufferImported.size());
+    EXPECT_TRUE(compiled->BufferImported[index])
+        << "Picking.Readback must be imported (not transient) when the renderer "
+        << "supplies a valid buffer handle.";
+
+    ASSERT_LT(index, compiled->BufferHandles.size());
+    EXPECT_EQ(compiled->BufferHandles[index], rendererPickingBuffer)
+        << "Imported Picking.Readback handle must match the renderer-supplied buffer.";
+
+    ASSERT_LT(index, compiled->BufferInitialStates.size());
+    EXPECT_EQ(compiled->BufferInitialStates[index], BufferState::TransferDst)
+        << "Initial state must be TransferDst so the framegraph's imported-write "
+        << "contract authorises PickingPass's `Write(..., TransferDst)`.";
+
+    ASSERT_LT(index, compiled->BufferFinalStates.size());
+    EXPECT_EQ(compiled->BufferFinalStates[index], BufferState::HostReadback)
+        << "Final state must be HostReadback so the buffer is host-mappable for "
+        << "Slice D.3's BeginFrame() drain.";
+
+    // The recipe-aware validator must accept the imported write — PickingPass
+    // is the authorized writer via the description's `Writes` entry +
+    // `ImportedWriteAllowed=true` on the resource declaration.
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(features);
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
+    EXPECT_FALSE(validation.HasErrors())
+        << (validation.Findings.empty() ? "<no findings>" : validation.Findings.front().Message);
 }
 
 TEST(FrameRecipeContract, MissingBackbufferReportsDiagnostic)

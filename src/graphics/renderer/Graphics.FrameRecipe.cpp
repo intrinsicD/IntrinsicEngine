@@ -243,7 +243,15 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::LinesCount, "Cull.Lines.Count", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PointsNonIndexedArgs, "Cull.Points.NonIndexedArgs", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PointsCount, "Cull.Points.Count", true, true, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PickingReadback, "Picking.Readback", pickingActive, false, false, true);
+        // GRAPHICS-074 Slice D.2 — the Picking.Readback buffer is now the
+        // renderer-owned host-visible buffer imported through
+        // `FrameRecipeImports::PickingReadback` rather than a transient
+        // `graph.CreateBuffer(...)`. Declare it as imported (so the
+        // recipe-aware validator authorises `PickingPass` to write to it via
+        // `ImportedWriteAllowed=true` + the matching "Picking.Readback"
+        // entry in the pass's `Writes` list) while keeping `optional=true`
+        // since the resource still only exists when `pickingActive` is true.
+        AddResource(out, FrameRecipeResourceKind::PickingReadback, "Picking.Readback", pickingActive, true, false, true, true);
         return out;
     }
 
@@ -388,11 +396,21 @@ namespace Extrinsic::Graphics
         if (pickingActive)
         {
             primitiveId = graph.CreateTexture("PrimitiveId", ColorTargetDesc(width, height, RHI::Format::R32_UINT, "PrimitiveId"));
-            pickingReadback = graph.CreateBuffer("Picking.Readback", RHI::BufferDesc{
-                .SizeBytes = sizeof(std::uint32_t),
-                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
-                .DebugName = "Picking.Readback",
-            });
+            // GRAPHICS-074 Slice D.2 — import the renderer-owned host-visible
+            // `Picking.Readback` buffer rather than allocating a transient
+            // one (Slice D.1 owns the lease; this slice wires it into the
+            // recipe). The `TransferDst` initial state satisfies the
+            // framegraph's imported-write contract (`BufferStateAllowsWrite`
+            // requires `ShaderWrite`/`TransferDst` on initial or final state
+            // when an imported buffer is written), and the `HostReadback`
+            // final state leaves the buffer host-readable for Slice D.3's
+            // `BeginFrame()` drain. Renderer wiring guarantees
+            // `imports.PickingReadback` is valid when `pickingActive` is true
+            // (publisher fail-closed otherwise), so we always import here.
+            pickingReadback = graph.ImportBuffer("Picking.Readback",
+                                                 imports.PickingReadback,
+                                                 BufferState::TransferDst,
+                                                 BufferState::HostReadback);
         }
         if (usesDeferred)
         {

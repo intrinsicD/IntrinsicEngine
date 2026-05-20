@@ -104,6 +104,18 @@ namespace Extrinsic::Graphics
         // asserts this is 1 after a single operational frame so the readback
         // wiring cannot silently regress to a no-op.
         std::uint32_t MinimalDebugBackbufferReadbackCopyCount = 0;
+        // GRAPHICS-074 Slice D.2 — count of frames in which the default
+        // recipe's PickingPass executor branch recorded the picking-readback
+        // copy pair (EntityId + PrimitiveId → renderer-owned
+        // `Picking.Readback` buffer at slot
+        // `frame.FrameIndex % frames-in-flight`). Each operational frame with
+        // a pending pick request increments by 1 (the pair records together
+        // or not at all); stays at zero when no pick is pending, when the
+        // device is non-operational, or when the picking pass is otherwise
+        // gated off. Slice D.3 builds on top of this counter for the
+        // `BeginFrame()` drain + `SelectionSystem::PublishPickResult` /
+        // `PublishNoHit` routing.
+        std::uint32_t PickingReadbackCopyCount = 0;
     };
 
     export struct RuntimeRenderSnapshotBatch

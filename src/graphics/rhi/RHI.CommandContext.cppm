@@ -277,18 +277,28 @@ namespace Extrinsic::RHI
         // `gpu;vulkan` MinimalDebug visible-triangle smoke (and the canonical
         // GRAPHICS-076/081 default-recipe equivalent once those land). The
         // caller is responsible for transitioning `src` into TransferSrc layout
-        // before this call and back to its prior layout afterwards. The whole
-        // mip-0 / layer-0 image extent is copied into `dst` starting at
-        // `dstOffset`; `dst` must have been created with
-        // `BufferUsage::TransferDst`. The default body is a no-op so existing
-        // CPU contract mocks remain unaffected; the Vulkan backend overrides
-        // it to issue `vkCmdCopyImageToBuffer`.
+        // before this call and back to its prior layout afterwards. The mip-
+        // level / array-layer subresource extent specified by
+        // `(srcOffsetX, srcOffsetY, srcWidth, srcHeight)` is copied into `dst`
+        // starting at `dstOffset`; `dst` must have been created with
+        // `BufferUsage::TransferDst`. The default `(0, 0, 0, 0)` extent means
+        // "copy the whole mip extent" — backwards compatible with the
+        // GRAPHICS-033D backbuffer readback. GRAPHICS-074 Slice D.2 uses the
+        // single-pixel form `(pickPixel.X, pickPixel.Y, 1, 1)` to read one
+        // EntityId/PrimitiveId texel into the renderer-owned 8-byte slot.
+        // The default body is a no-op so existing CPU contract mocks remain
+        // unaffected; the Vulkan backend overrides it to issue
+        // `vkCmdCopyImageToBuffer`.
         virtual void CopyTextureToBuffer(TextureHandle src,
                                          TextureLayout srcLayout,
                                          std::uint32_t mipLevel,
                                          std::uint32_t arrayLayer,
                                          BufferHandle  dst,
-                                         std::uint64_t dstOffset)
+                                         std::uint64_t dstOffset,
+                                         std::uint32_t srcOffsetX = 0u,
+                                         std::uint32_t srcOffsetY = 0u,
+                                         std::uint32_t srcWidth   = 0u,
+                                         std::uint32_t srcHeight  = 0u)
         {
             (void)src;
             (void)srcLayout;
@@ -296,6 +306,10 @@ namespace Extrinsic::RHI
             (void)arrayLayer;
             (void)dst;
             (void)dstOffset;
+            (void)srcOffsetX;
+            (void)srcOffsetY;
+            (void)srcWidth;
+            (void)srcHeight;
         }
     };
 }

@@ -654,7 +654,11 @@ void VulkanCommandContext::CopyTextureToBuffer(RHI::TextureHandle src,
                                                 RHI::TextureLayout srcLayout,
                                                 uint32_t mipLevel, uint32_t arrayLayer,
                                                 RHI::BufferHandle dst,
-                                                uint64_t dstOffset)
+                                                uint64_t dstOffset,
+                                                uint32_t srcOffsetX,
+                                                uint32_t srcOffsetY,
+                                                uint32_t srcWidth,
+                                                uint32_t srcHeight)
 {
     if (!CanRecord("[VulkanCommandContext] CopyTextureToBuffer skipped; command context is not recording"))
         return;
@@ -670,11 +674,24 @@ void VulkanCommandContext::CopyTextureToBuffer(RHI::TextureHandle src,
     if (!s || !d || s->Image == VK_NULL_HANDLE || d->Buffer == VK_NULL_HANDLE) return;
     if (mipLevel >= s->MipLevels || arrayLayer >= s->ArrayLayers) return;
 
+    const uint32_t mipWidth  = std::max(1u, s->Width  >> mipLevel);
+    const uint32_t mipHeight = std::max(1u, s->Height >> mipLevel);
+    if (srcOffsetX >= mipWidth || srcOffsetY >= mipHeight) return;
+    // GRAPHICS-074 Slice D.2 — `(srcWidth, srcHeight) = (0, 0)` means
+    // "whole mip extent" (the GRAPHICS-033D backbuffer-readback contract);
+    // any non-zero width/height pins the copy to that sub-rect (the
+    // single-pixel picking readback uses 1x1). Clamp so callers cannot
+    // overrun the mip even if they pass an oversized region.
+    const uint32_t copyWidth  = (srcWidth  == 0u) ? (mipWidth  - srcOffsetX)
+                                                  : std::min(srcWidth,  mipWidth  - srcOffsetX);
+    const uint32_t copyHeight = (srcHeight == 0u) ? (mipHeight - srcOffsetY)
+                                                  : std::min(srcHeight, mipHeight - srcOffsetY);
+
     VkBufferImageCopy region{};
     region.bufferOffset     = dstOffset;
     region.imageSubresource = {AspectFromFormat(s->Format), mipLevel, arrayLayer, 1};
-    region.imageExtent      = {std::max(1u, s->Width >> mipLevel),
-                                std::max(1u, s->Height >> mipLevel), 1};
+    region.imageOffset      = {static_cast<int32_t>(srcOffsetX), static_cast<int32_t>(srcOffsetY), 0};
+    region.imageExtent      = {copyWidth, copyHeight, 1};
     vkCmdCopyImageToBuffer(m_Cmd, s->Image, ToVkImageLayout(srcLayout),
                            d->Buffer, 1, &region);
 }

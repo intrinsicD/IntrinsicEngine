@@ -861,6 +861,15 @@ namespace Extrinsic::Graphics
                 // enabled, which keeps default-CPU/null fixtures on the
                 // transient fallback.
                 .ShadowAtlas = m_ShadowSystem ? m_ShadowSystem->GetAtlasTexture() : RHI::TextureHandle{},
+                // GRAPHICS-074 Slice D.2 — hand the renderer-owned host-
+                // visible `Picking.Readback` lease to the recipe so it is
+                // imported (with `TransferDst → HostReadback`) rather than
+                // allocated as a transient. The handle is invalid until
+                // Slice D.1's operational publisher has run, which lines up
+                // with `pickingActive` requiring an operational device.
+                .PickingReadback = (m_PickingReadbackBuffer.has_value() && m_PickingReadbackBuffer->IsValid())
+                                       ? m_PickingReadbackBuffer->GetHandle()
+                                       : RHI::BufferHandle{},
             };
             const FrameRecipeSizing sizing{
                 .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
@@ -996,7 +1005,7 @@ namespace Extrinsic::Graphics
                 *compiled,
                 {},
                 [this, &graphicsContext, &passNameByIndex, &camera, &frame, &compiled,
-                 defaultRecipeUsesDeferred](const std::uint32_t passIndex)
+                 defaultRecipeUsesDeferred, &renderWorld](const std::uint32_t passIndex)
                 {
                     if (passIndex >= passNameByIndex.size())
                     {
@@ -1028,11 +1037,19 @@ namespace Extrinsic::Graphics
                         graphicsContext.SetScissor(0, 0, width, height);
                     }
 
-                    const auto endActiveRenderPass = [&graphicsContext, &activeRenderPass]
+                    // GRAPHICS-074 Slice D.2 — the picking executor branch
+                    // needs to end the render pass mid-branch so it can
+                    // record the texture-to-buffer copies (which must run
+                    // outside any render pass). The outer `endActiveRenderPass()`
+                    // at the bottom of the lambda would then double-end, so
+                    // we track whether the inner branch already ended it.
+                    bool renderPassEnded = false;
+                    const auto endActiveRenderPass = [&graphicsContext, &activeRenderPass, &renderPassEnded]
                     {
-                        if (activeRenderPass.HasAttachments)
+                        if (!renderPassEnded && activeRenderPass.HasAttachments)
                         {
                             graphicsContext.EndRenderPass();
+                            renderPassEnded = true;
                         }
                     };
                     if (passName == std::string_view{"CullingPass"})
@@ -1169,6 +1186,96 @@ namespace Extrinsic::Graphics
                         const RenderCommandPassStatus pointStatus =
                             RecordSelectionPointIdPass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, pointStatus);
+
+                        // GRAPHICS-074 Slice D.2 — picking-readback copy
+                        // pair. After the four selection-ID sub-passes have
+                        // recorded against the shared `PickingPass` render
+                        // pass, copy one pixel each from `EntityId` and
+                        // `PrimitiveId` (at the requested pick coordinates)
+                        // into the renderer-owned host-visible
+                        // `Picking.Readback` buffer at the per-frame slot
+                        // (`slot * 8` for `EntityId`, `slot * 8 + 4` for the
+                        // `EncodedSelectionId`). The two copies are wrapped
+                        // by `ColorAttachment → TransferSrc → ColorAttachment`
+                        // transitions per the GRAPHICS-033D
+                        // `MinimalDebugReadbackBuffer` pattern, but executed
+                        // *outside* the render pass — so we end it first and
+                        // let the outer `endActiveRenderPass()` skip via the
+                        // `renderPassEnded` latch. The copy is gated on:
+                        //   (a) operational device,
+                        //   (b) renderer's `Picking.Readback` buffer wired,
+                        //   (c) `renderWorld.PickRequest.Pending` (the same
+                        //       signal that enabled `EnablePicking` upstream).
+                        // When any gate fails, no copy or barriers record so
+                        // the per-slot `PickingReadbackCopyCount` counter
+                        // accurately distinguishes pending-pick frames from
+                        // skipped frames. Slice D.3 drains the buffer on
+                        // `BeginFrame()` once the issuing frame completes.
+                        if (m_Device != nullptr && m_Device->IsOperational() &&
+                            m_PickingReadbackBuffer.has_value() &&
+                            m_PickingReadbackBuffer->IsValid() &&
+                            renderWorld.PickRequest.Pending)
+                        {
+                            const RHI::BufferHandle pickingBuffer =
+                                m_PickingReadbackBuffer->GetHandle();
+                            RHI::TextureHandle entityIdHandle{};
+                            RHI::TextureHandle primitiveIdHandle{};
+                            for (std::size_t i = 0; i < compiled->TextureNames.size(); ++i)
+                            {
+                                if (i >= compiled->TextureHandles.size())
+                                {
+                                    break;
+                                }
+                                if (compiled->TextureNames[i] == std::string_view{"EntityId"})
+                                {
+                                    entityIdHandle = compiled->TextureHandles[i];
+                                }
+                                else if (compiled->TextureNames[i] == std::string_view{"PrimitiveId"})
+                                {
+                                    primitiveIdHandle = compiled->TextureHandles[i];
+                                }
+                            }
+                            if (entityIdHandle.IsValid() && primitiveIdHandle.IsValid())
+                            {
+                                endActiveRenderPass();
+                                const std::uint32_t framesInFlight =
+                                    std::max(1u, m_Device->GetFramesInFlight());
+                                const std::uint32_t slot =
+                                    frame.FrameIndex % framesInFlight;
+                                const std::uint64_t slotOffset =
+                                    static_cast<std::uint64_t>(slot) * 8ull;
+                                const std::uint32_t pickX = renderWorld.PickRequest.X;
+                                const std::uint32_t pickY = renderWorld.PickRequest.Y;
+
+                                graphicsContext.TextureBarrier(entityIdHandle,
+                                                                RHI::TextureLayout::ColorAttachment,
+                                                                RHI::TextureLayout::TransferSrc);
+                                graphicsContext.TextureBarrier(primitiveIdHandle,
+                                                                RHI::TextureLayout::ColorAttachment,
+                                                                RHI::TextureLayout::TransferSrc);
+                                graphicsContext.CopyTextureToBuffer(entityIdHandle,
+                                                                     RHI::TextureLayout::TransferSrc,
+                                                                     0u, 0u,
+                                                                     pickingBuffer,
+                                                                     slotOffset,
+                                                                     pickX, pickY,
+                                                                     1u, 1u);
+                                graphicsContext.CopyTextureToBuffer(primitiveIdHandle,
+                                                                     RHI::TextureLayout::TransferSrc,
+                                                                     0u, 0u,
+                                                                     pickingBuffer,
+                                                                     slotOffset + 4ull,
+                                                                     pickX, pickY,
+                                                                     1u, 1u);
+                                graphicsContext.TextureBarrier(entityIdHandle,
+                                                                RHI::TextureLayout::TransferSrc,
+                                                                RHI::TextureLayout::ColorAttachment);
+                                graphicsContext.TextureBarrier(primitiveIdHandle,
+                                                                RHI::TextureLayout::TransferSrc,
+                                                                RHI::TextureLayout::ColorAttachment);
+                                ++m_LastRenderGraphStats.PickingReadbackCopyCount;
+                            }
+                        }
                     }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
