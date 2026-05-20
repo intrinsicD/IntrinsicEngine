@@ -4,21 +4,23 @@ This prompt is the default generic onboarding for any agent session. It tells yo
 
 # Authority and reading order
 
+If the `intrinsicengine-core` skill is available in this session, its description and routing table are the canonical entry point — let it load on the first task-shaped prompt and use its routing to specialist skills (`intrinsicengine-task-workflow`, `intrinsicengine-review`, `intrinsicengine-method`, `intrinsicengine-benchmark`, `intrinsicengine-docs-sync`). The skills mirror this prompt and the `docs/agent/*` procedures; their `references/` are the same content. Reading a skill does not replace reading `/AGENTS.md`, but it does replace reading the matching `docs/agent/*` file by hand — do not read both. If no skills are available (bare API client, web sandbox without skill auto-discovery, etc.), follow the file-path reading order below unchanged.
+
 Read in this order, only as deep as the touched scope requires:
 
-1. `/AGENTS.md` — authoritative contract. Mission, layering invariants, source-tree map, coding rules, method/test/benchmark/docs/CI protocols, task workflow. Re-read at the start of every session.
+1. `/AGENTS.md` — authoritative contract. Mission, layering invariants, source-tree map, coding rules, method/test/benchmark/docs/CI protocols, task workflow. Re-read at the start of every session. Skills do not supersede this file.
 2. `tasks/active/README.md` and the contents of `tasks/active/` — currently in-progress or blocked work that may already be assigned to your branch/owner.
 3. `tasks/backlog/README.md` — convergence themes, priorities, and cross-domain dependency anchors. This file is the authoritative source for what is in-scope, what is gated, and in what order to pick from the backlog. Do not duplicate its priorities or anchors into this prompt.
-4. `docs/agent/*` — read only the routing-table entry that applies:
-   - `task-format.md` before creating, promoting, retiring, or materially editing a task file;
-   - `review-checklist.md` before committing or reporting completion;
-   - `architecture-review-checklist.md` when changing dependency boundaries, source layout, or runtime wiring;
-   - `method-workflow.md` / `method-review-checklist.md` for paper/method work under `methods/`;
-   - `benchmark-workflow.md` / `benchmark-review-checklist.md` for benchmark manifests, runners, baselines, or reports;
-   - `docs-sync-policy.md` when moving files, changing public APIs, or refreshing generated inventories;
-   - `roles.md` when clarifying handoff or role-specific expectations.
+4. `docs/agent/*` (or the equivalent `intrinsicengine-*` skill) — read only the routing-table entry that applies. The skill bodies and their `references/` mirror the docs; pick whichever path is available, do not load both:
+   - `task-format.md` / `intrinsicengine-task-workflow` before creating, promoting, retiring, or materially editing a task file;
+   - `review-checklist.md` / `intrinsicengine-review` before committing or reporting completion;
+   - `architecture-review-checklist.md` / `intrinsicengine-review` (architecture-review section) when changing dependency boundaries, source layout, or runtime wiring;
+   - `method-workflow.md` / `method-review-checklist.md` / `intrinsicengine-method` for paper/method work under `methods/`;
+   - `benchmark-workflow.md` / `benchmark-review-checklist.md` / `intrinsicengine-benchmark` for benchmark manifests, runners, baselines, or reports;
+   - `docs-sync-policy.md` / `intrinsicengine-docs-sync` when moving files, changing public APIs, or refreshing generated inventories;
+   - `roles.md` / `intrinsicengine-core` (roles reference) when clarifying handoff or role-specific expectations.
 
-Do not load every guide for every task. Do not invent task-specific policy not present in these files.
+Do not load every guide for every task. Do not invent task-specific policy not present in these files. For pure lookup-shaped questions that a direct grep of `AGENTS.md` answers (e.g. "what does layer X depend on"), grepping the contract directly is appropriate and skills should not be force-loaded — they add value on multi-step procedural work, not single-fact lookups.
 
 # Inspect state before choosing work
 
@@ -41,7 +43,7 @@ Apply this priority strictly:
 
 Read the chosen task file completely before touching code. Treat it as the source of all task-specific goals, non-goals, required changes, tests, docs, acceptance criteria, verification commands, forbidden changes, and slice plan. If the task file disagrees with this prompt on task-specific policy, the task file wins; if it disagrees with `/AGENTS.md` on repository contract, `/AGENTS.md` wins.
 
-If you intend to land more than one slice, promote the task into `tasks/active/` with status, owner, branch, and next verification step (see `docs/agent/task-format.md`). Single-slice patches may stay in `tasks/backlog/` while you work them.
+If you intend to land more than one slice, promote the task into `tasks/active/` with status, owner, branch, and next verification step (see `docs/agent/task-format.md` or `intrinsicengine-task-workflow`). Single-slice patches may stay in `tasks/backlog/` while you work them.
 
 # Implement the smallest robust slice
 
@@ -96,7 +98,7 @@ Verification hygiene:
 
 # Review before commit
 
-Apply `docs/agent/review-checklist.md` to the touched scope. Confirm:
+Apply `docs/agent/review-checklist.md` (or the `intrinsicengine-review` skill if loaded) to the touched scope. Confirm:
 - scope matches exactly one task or one documented slice from it,
 - layering invariants intact,
 - tests/docs/task records/generated inventories synchronized,
@@ -128,3 +130,4 @@ Apply `docs/agent/review-checklist.md` to the touched scope. Confirm:
 - Bypassing the layering check by adding allowlist exceptions without a tracked removal task.
 - Reporting completion without running the task's verification commands in the current session.
 - Embedding task-specific policy, theme priorities, or dependency anchors into this prompt instead of into `tasks/backlog/README.md` or the task file.
+- Loading both the `docs/agent/*` file and its mirror `intrinsicengine-*` skill for the same touched scope — they are equivalent content; pick one and continue.
