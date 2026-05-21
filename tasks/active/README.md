@@ -11,6 +11,13 @@ Each active task should include:
 
 ## Currently active
 
+- [`GEOM-006`](GEOM-006-indexed-mesh-soup-conversion-contracts.md) — Indexed
+  mesh/soup container and conversion contracts. Promoted from
+  `tasks/backlog/geometry/` on 2026-05-21 for Slice 1: owning
+  `Geometry.MeshSoup` container, borrowed view naming, `PropertySet`-backed
+  vertex/face/corner domains, validation diagnostics, unit tests, docs, and
+  module inventory. Status: in-progress; next
+  verification step is focused `IntrinsicGeometryTests` plus structural checks.
 - [`GRAPHICS-075`](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md) —
   Default-recipe postprocess chain wiring (Histogram → Bloom → ToneMap →
   FXAA/SMAA). Promoted from `tasks/backlog/rendering/` on 2026-05-21 as the

@@ -50,6 +50,7 @@ target_sources(${target_name}
         Geometry.KMeans.cppm
         Geometry.LinearSolver.cppm
         Geometry.MarchingCubes.cppm
+        Geometry.MeshSoup.cppm
         Geometry.MeshOperator.cppm
         Geometry.NormalEstimation.cppm
         Geometry.OBB.cppm

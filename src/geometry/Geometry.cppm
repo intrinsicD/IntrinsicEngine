@@ -52,6 +52,7 @@ export import Geometry.CatmullClark;
 export import Geometry.Grid;
 export import Geometry.ImplicitPlaneField;
 export import Geometry.MarchingCubes;
+export import Geometry.MeshSoup;
 export import Geometry.HalfedgeMesh.Repair;
 export import Geometry.HalfedgeMesh.Boundary;
 export import Geometry.HalfedgeMesh.Quality;

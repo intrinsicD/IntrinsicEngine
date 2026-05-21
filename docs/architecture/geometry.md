@@ -67,6 +67,24 @@ Mesh, graph, and point-cloud vertex positions use the canonical `v:point`
 must be handled by an explicit compatibility/conversion path rather than by a
 borrowed view.
 
+## Indexed mesh and polygon-soup staging
+
+`Geometry::MeshSoup::IndexedMesh` is the lightweight owning container for
+algorithms and import/reconstruction stages that need positions plus indexed
+triangle or polygon faces but do not require halfedge connectivity. The
+container stores canonical vertex positions in the `v:point` `PropertySet`
+entry and owns separate `PropertySet` domains for vertices, faces, and corners.
+`Geometry::MeshSoup::Validate` returns structured diagnostics for duplicate
+vertices, invalid indices, degenerate faces, non-manifold edges, inconsistent
+winding, and property-domain arity mismatches.
+
+No-copy adaptation must be named as borrowing, such as
+`Geometry::MeshSoup::BorrowView`, while topology-changing or lifetime-owning
+conversion APIs should use explicit `To*`/`From*` names and report diagnostics.
+Halfedge, point-cloud, and renderer-upload conversions remain geometry-owned
+data-shape contracts; geometry must not import assets, graphics, runtime, ECS,
+platform, or app layers to satisfy renderer staging needs.
+
 ## Migration note
 
 As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining `src/legacy` geometry shims (if any) must be temporary, tracked, and removed via follow-up migration tasks.

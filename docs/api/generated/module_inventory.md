@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 39 |
 | `ecs` | 26 |
-| `geometry` | 77 |
+| `geometry` | 78 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 52 |
@@ -148,6 +148,7 @@ Root scanned: `src`
 | `Geometry.LinearSolver` | `src/geometry/Geometry.LinearSolver.cppm` | `geometry` |
 | `Geometry.MarchingCubes` | `src/geometry/Geometry.MarchingCubes.cppm` | `geometry` |
 | `Geometry.MeshOperator` | `src/geometry/Geometry.MeshOperator.cppm` | `geometry` |
+| `Geometry.MeshSoup` | `src/geometry/Geometry.MeshSoup.cppm` | `geometry` |
 | `Geometry.NormalEstimation` | `src/geometry/Geometry.NormalEstimation.cppm` | `geometry` |
 | `Geometry.OBB` | `src/geometry/Geometry.OBB.cppm` | `geometry` |
 | `Geometry.Octree` | `src/geometry/Geometry.Octree.cppm` | `geometry` |
@@ -462,4 +463,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **435**
+Total modules: **436**
