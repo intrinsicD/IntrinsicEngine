@@ -391,19 +391,20 @@ namespace Extrinsic::Graphics
         // GRAPHICS-075 (Slice D.1) — accessors for the three SMAA pipelines
         // (vertex `post_fullscreen.vert.spv` paired with fragments
         // `post_smaa_edge.frag.spv` / `post_smaa_blend.frag.spv` /
-        // `post_smaa_resolve.frag.spv`). Targets per pipeline mirror the
-        // SMAA Slice D.2 `PostProcess.AATemp.{Edges,Weights}` split:
-        // - edge: single `RG8_UNORM` color target (luma edge mask),
-        //   `PushConstantSize = sizeof(PostProcessSMAAEdgePushConstants)`
-        //   (16 bytes, `vec2 InvResolution + float EdgeThreshold + float
-        //   _pad0` std430 mirroring `post_smaa_edge.frag`);
-        // - blend: single `RGBA8_UNORM` color target (per-pixel blend
-        //   weights), `PushConstantSize =
+        // `post_smaa_resolve.frag.spv`). All three pipelines target the
+        // current `PostProcess.AATemp` recipe attachment (allocated with
+        // `FrameRecipeSizing::BackbufferFormat`), so the renderer
+        // creates them with the same `m_BackbufferFormat` it feeds the
+        // FXAA pipeline. Per-stage push constants:
+        // - edge: `PushConstantSize =
+        //   sizeof(PostProcessSMAAEdgePushConstants)` (16 bytes, `vec2
+        //   InvResolution + float EdgeThreshold + float _pad0` std430
+        //   mirroring `post_smaa_edge.frag`);
+        // - blend: `PushConstantSize =
         //   sizeof(PostProcessSMAABlendPushConstants)` (16 bytes, `vec2
         //   InvResolution + int MaxSearchSteps + int MaxSearchStepsDiag`
         //   std430 mirroring `post_smaa_blend.frag`);
-        // - resolve: single backbuffer-format color target (final
-        //   anti-aliased LDR), `PushConstantSize =
+        // - resolve: `PushConstantSize =
         //   sizeof(PostProcessSMAAResolvePushConstants)` (16 bytes, `vec2
         //   InvResolution + float _pad0 + float _pad1` std430 mirroring
         //   `post_smaa_resolve.frag`).
@@ -416,10 +417,14 @@ namespace Extrinsic::Graphics
         // visually-meaningless SMAA output. Handles are invalid until an
         // operational device path publishes the leases; the descriptors
         // remain deterministic so contract tests can assert byte-identical
-        // rebuild behavior. Retained `AreaTex` / `SearchTex` LUT textures
-        // (sampled by the blend pipeline) + exposure-adaptation history
-        // buffer land in Slice D.2 alongside the recipe-side
-        // `PostProcess.AATemp.{Edges,Weights}` split.
+        // rebuild behavior. Slice D.2 retargets edge to `RG8_UNORM` and
+        // blend to `RGBA8_UNORM` once the recipe-side
+        // `PostProcess.AATemp.{Edges,Weights}` split lands; D.1
+        // deliberately matches the current single-attachment AA pass so
+        // the umbrella render pass / pipeline stay format-compatible on
+        // Vulkan. Retained `AreaTex` / `SearchTex` LUT textures (sampled
+        // by the blend pipeline) + exposure-adaptation history buffer
+        // land in Slice D.2 alongside the recipe-side AATemp split.
         [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAAEdgePipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAAEdgePipelineDesc() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAABlendPipeline() const noexcept = 0;

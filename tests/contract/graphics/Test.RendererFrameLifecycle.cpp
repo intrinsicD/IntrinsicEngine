@@ -2173,13 +2173,18 @@ TEST(RendererFrameLifecycle, PostProcessFXAAPipelineSurvivesOperationalRebuild)
 // ---------------------------------------------------------------------------
 // GRAPHICS-075 Slice D.1 — default-recipe postprocess SMAA pipelines lease +
 // republish. Three pipelines (edge / blend / resolve) created in the
-// `"PostProcessAAPass"` branch alongside FXAA. The edge pipeline targets
-// the SMAA Slice D.2 `PostProcess.AATemp.Edges` (`RG8_UNORM`); the blend
-// pipeline targets `PostProcess.AATemp.Weights` (`RGBA8_UNORM`); the
-// resolve pipeline targets the backbuffer format (same `colorFormat`
-// parameter the FXAA pipeline takes). Each push block is 16 bytes and
-// mirrors its shader's std430 layout byte-for-byte. Each descriptor
-// must survive `RebuildOperationalResources()` byte-identical.
+// `"PostProcessAAPass"` branch alongside FXAA. All three target the
+// current `PostProcess.AATemp` recipe attachment (allocated with
+// `FrameRecipeSizing::BackbufferFormat`); the renderer feeds them
+// `m_BackbufferFormat` for render-pass / pipeline format compatibility
+// with the AA umbrella's single-attachment scope. MockDevice keeps the
+// default `RHI::Format::RGBA8_UNORM`, so all three pipeline descriptors
+// report that format. Slice D.2 retargets edge to `RG8_UNORM` and blend
+// to `RGBA8_UNORM` once the recipe declares
+// `PostProcess.AATemp.{Edges,Weights}` as separate transient resources.
+// Each push block is 16 bytes and mirrors its shader's std430 layout
+// byte-for-byte. Each descriptor must survive
+// `RebuildOperationalResources()` byte-identical.
 // ---------------------------------------------------------------------------
 
 TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
@@ -2215,8 +2220,11 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     EXPECT_FALSE(initialEdgeDesc.DepthStencil.DepthWriteEnable);
     EXPECT_FALSE(initialEdgeDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialEdgeDesc.ColorTargetCount, 1u);
-    // SMAA edge writes the luma edge mask to AATemp.Edges (`RG8_UNORM`).
-    EXPECT_EQ(initialEdgeDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RG8_UNORM);
+    // Slice D.1: pipeline targets the current `PostProcess.AATemp`
+    // attachment (`BackbufferFormat` = `RGBA8_UNORM` under MockDevice).
+    // Slice D.2 retargets to `RG8_UNORM` once the recipe declares
+    // `AATemp.Edges`.
+    EXPECT_EQ(initialEdgeDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
     EXPECT_EQ(initialEdgeDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
     // 16-byte std430 block: `vec2 InvResolution + float EdgeThreshold + float _pad0`.
     EXPECT_EQ(initialEdgeDesc.PushConstantSize,
@@ -2234,7 +2242,10 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     EXPECT_FALSE(initialBlendDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialBlendDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialBlendDesc.ColorTargetCount, 1u);
-    // SMAA blend writes per-pixel weights to AATemp.Weights (`RGBA8_UNORM`).
+    // Slice D.1: same `PostProcess.AATemp` attachment as the edge
+    // pipeline; happens to share the backbuffer-format byte shape that
+    // Slice D.2's `AATemp.Weights` will declare, but the dependency must
+    // be on the *recipe* attachment until D.2 lands.
     EXPECT_EQ(initialBlendDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
     EXPECT_EQ(initialBlendDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
     // 16-byte std430 block: `vec2 InvResolution + int MaxSearchSteps + int MaxSearchStepsDiag`.

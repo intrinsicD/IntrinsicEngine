@@ -140,25 +140,32 @@ a readback drain.
       `PostProcessSMAABlendPushConstants`,
       `PostProcessSMAAResolvePushConstants`, each 16 bytes mirroring
       `post_smaa_{edge,blend,resolve}.frag` std430 byte-for-byte) +
-      leases + `IRenderer` accessors. `PostProcessSMAAPass` reshapes to
-      hold three pipelines (`SetEdgePipeline` / `SetBlendPipeline` /
-      `SetResolvePipeline`) and `Execute(...)` records three
-      Bind/Push/Draw triples when `AntiAliasing == SMAA`, mirroring the
-      bloom helper's per-stage early-skip on individual pipeline
-      `IsValid()` so a partial outage still records the surviving
-      stages. `RecordPostProcessSMAAPass(...)` fans out behind the
-      existing `"PostProcessAAPass"` umbrella alongside FXAA (mutually
-      exclusive per `PostProcessSettings::AntiAliasing`, with both pass
-      bodies' `IsStageEnabled` gate enforcing the selector so both
-      helpers can run unconditionally and only the active stage emits
-      bind/push/draw). Contract tests:
+      leases + `IRenderer` accessors. All three pipelines target the
+      *current* `PostProcess.AATemp` recipe attachment (allocated with
+      `FrameRecipeSizing::BackbufferFormat`) so the AA umbrella render
+      pass stays format-compatible with the bound pipelines on Vulkan;
+      Slice D.2's `AATemp.{Edges,Weights}` split is what retargets edge
+      to `RG8_UNORM` and blend to `RGBA8_UNORM`. `PostProcessSMAAPass`
+      reshapes to hold three pipelines (`SetEdgePipeline` /
+      `SetBlendPipeline` / `SetResolvePipeline`) and `Execute(...)`
+      records three Bind/Push/Draw triples when `AntiAliasing == SMAA`,
+      mirroring the bloom helper's per-stage early-skip on individual
+      pipeline `IsValid()` so a partial outage still records the
+      surviving stages. `RecordPostProcessSMAAPass(...)` fans out
+      behind the existing `"PostProcessAAPass"` umbrella alongside
+      FXAA (mutually exclusive per `PostProcessSettings::AntiAliasing`,
+      with both pass bodies' `IsStageEnabled` gate enforcing the
+      selector so both helpers can run unconditionally and only the
+      active stage emits bind/push/draw). Contract tests:
       `PostProcessSMAAPipelinesSurviveOperationalRebuild`,
       `SMAAPushFeedsNonZeroInvResolutionForAllStages`,
       `SMAASkipsWhenAntiAliasingNotSMAA`,
       `SMAARecordsPerStageIndependently`. Defers retained `AreaTex`/
       `SearchTex` allocation, exposure-adaptation history buffer,
-      recipe-side `PostProcess.AATemp.{Edges,Weights}` rename, and the
-      survive-rebuild contract test for the retained LUTs to Slice D.2.
+      recipe-side `PostProcess.AATemp.{Edges,Weights}` rename (and the
+      edge/blend pipeline retargeting to `RG8_UNORM`/`RGBA8_UNORM`), and
+      the survive-rebuild contract test for the retained LUTs to
+      Slice D.2.
     - **Slice D.2.** Retained `AreaTex` (`R8G8_UNORM`, 160×560) +
       `SearchTex` (`R8_UNORM`, 66×33) LUT textures + exposure-adaptation
       history buffer allocated via the device-aware
@@ -168,8 +175,11 @@ a readback drain.
       `Shutdown()` releases the retained resources. Recipe-side
       `PostProcess.AATemp` declaration splits into
       `PostProcess.AATemp.Edges` (`RG8_UNORM`) +
-      `PostProcess.AATemp.Weights` (`RGBA8_UNORM`). Survive-rebuild
-      contract test
+      `PostProcess.AATemp.Weights` (`RGBA8_UNORM`); the edge / blend
+      pipeline builders flip from the Slice D.1 backbuffer-format
+      target to the matching split-resource format in the same patch
+      so the AA umbrella render pass stays format-compatible across
+      the transition. Survive-rebuild contract test
       `PostProcessSMAALookupTexturesSurviveOperationalRebuild` asserts
       both LUT handles and dimensions survive `RebuildGpuResources()`
       byte-identical.
@@ -256,7 +266,7 @@ a readback drain.
   - tonemap pipeline (`post_tonemap.frag`), **Slice A** *(done)*
   - bloom downsample + upsample pipelines (`post_bloom_downsample.frag` + `post_bloom_upsample.frag` with a fullscreen vertex), **Slice B.1** *(done)*; per-mip iteration + recipe-side `BloomScratch.MipLevels = ComputeBloomMipChainLevels(width, height)` (clamped against Vulkan's `mipLevels <= floor(log2(maxDim)) + 1` rule) + renderer-side per-frame `PostProcess.BloomScratch` handle + clamped mip-count republish, **Slice B.2** *(done)*. Per-mip subresource barriers between iterations are *deferred*: the pass body emits no `TextureBarrier(...)` (the umbrella render pass is active when `Execute(...)` runs and Vulkan rejects layout transitions inside render-pass scope), and the inter-pass `BloomScratch ColorAttachment → ShaderReadOnly` between bloom and tonemap is owned by the framegraph compiler from the recipe-level read/write declarations
   - FXAA pipeline (`post_fxaa.frag`), **Slice C** *(done)*. `m_PostProcessFXAAPipelineLease` + `m_PostProcessFXAAPass` follow the same reset/republish pattern as the tonemap + bloom leases. The pipeline takes the backbuffer format (same `colorFormat` parameter the tonemap pipeline does) so it stays render-pass-compatible with the tonemap leg's `SceneColorLDR` output. `PostProcessFXAAPushConstants` (20 bytes, std430-matched to `post_fxaa.frag`) replaces the canonical `PostProcessPushConstants` in the pass body
-  - SMAA edge/blend/resolve pipelines (`post_smaa_edge.frag`, `post_smaa_blend.frag`, `post_smaa_resolve.frag`), **Slice D.1** *(done)*. `m_PostProcessSMAA{Edge,Blend,Resolve}PipelineLease` + `m_PostProcessSMAAPass` follow the same reset/republish pattern as the FXAA + tonemap + bloom leases. Pipeline target formats mirror the Slice D.2 `PostProcess.AATemp.{Edges,Weights}` split: edge → `RG8_UNORM`, blend → `RGBA8_UNORM`, resolve → backbuffer format. Three 16-byte std430 push blocks (`PostProcessSMAAEdgePushConstants`, `PostProcessSMAABlendPushConstants`, `PostProcessSMAAResolvePushConstants`) replace the canonical 20-byte block per the shader-push-constant compatibility policy
+  - SMAA edge/blend/resolve pipelines (`post_smaa_edge.frag`, `post_smaa_blend.frag`, `post_smaa_resolve.frag`), **Slice D.1** *(done)*. `m_PostProcessSMAA{Edge,Blend,Resolve}PipelineLease` + `m_PostProcessSMAAPass` follow the same reset/republish pattern as the FXAA + tonemap + bloom leases. All three pipelines target the current `PostProcess.AATemp` recipe attachment (allocated with `FrameRecipeSizing::BackbufferFormat`) so the AA umbrella render pass stays format-compatible with the pipelines bound inside it; Slice D.2 retargets edge to `RG8_UNORM` and blend to `RGBA8_UNORM` once the recipe declares `PostProcess.AATemp.{Edges,Weights}` as separate transient resources. Three 16-byte std430 push blocks (`PostProcessSMAAEdgePushConstants`, `PostProcessSMAABlendPushConstants`, `PostProcessSMAAResolvePushConstants`) replace the canonical 20-byte block per the shader-push-constant compatibility policy
   - histogram compute pipeline (`post_histogram.comp`), **Slice E**.
 - [ ] Add executor fan-out for the postprocess legs. **Slice A** lands ToneMap inside the `"PostProcessPass"` umbrella; **Slice B.1** adds the bloom helper ahead of tonemap inside the same `"PostProcessPass"` umbrella; **Slice C** *(done)* moves FXAA into its *own* `"PostProcessAAPass"` umbrella branch (a separate ordered graph pass declared by the recipe with `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph compiler emits the `SceneColorLDR ColorAttachment → ShaderRead` transition between the two umbrella render-pass scopes; sharing `PostProcessPass` would alias the umbrella's own color attachment as a sampled image mid-render-pass, Vulkan's read-after-write feedback hazard); **Slice D.1** *(done)* fans `RecordPostProcessSMAAPass(...)` out behind the same `"PostProcessAAPass"` branch alongside FXAA (mutually exclusive per `PostProcessSettings::AntiAliasing`, with both pass bodies' `IsStageEnabled` gate enforcing the selector so both helpers can run unconditionally and only the active stage emits bind/push/draw); **Slice E** adds the Histogram helper behind the existing `"PostProcessPass"` umbrella (compute pipeline + readback drain). Each helper records under the `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
 - [ ] **Slice E**: Implement the histogram readback drain on `BeginFrame()` after the issuing frame's fences complete; surface results through `PostProcessSystem::PublishHistogramReadback(...)` (mirror the `Picking.Readback` drain).

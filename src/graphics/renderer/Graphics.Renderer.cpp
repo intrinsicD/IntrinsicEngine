@@ -1893,7 +1893,7 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAAEdgePipelineDesc() const noexcept override
         {
-            return BuildPostProcessSMAAEdgePipelineDesc();
+            return BuildPostProcessSMAAEdgePipelineDesc(m_BackbufferFormat);
         }
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAABlendPipeline() const noexcept override
@@ -1908,7 +1908,7 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAABlendPipelineDesc() const noexcept override
         {
-            return BuildPostProcessSMAABlendPipelineDesc();
+            return BuildPostProcessSMAABlendPipelineDesc(m_BackbufferFormat);
         }
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAAResolvePipeline() const noexcept override
@@ -2663,20 +2663,31 @@ namespace Extrinsic::Graphics
 
         // GRAPHICS-075 Slice D.1 — three default-recipe postprocess SMAA
         // pipelines. Each pairs `post_fullscreen.vert.spv` with the
-        // matching SMAA fragment shader and selects the color target
-        // format that mirrors the SMAA Slice D.2
-        // `PostProcess.AATemp.{Edges,Weights}` recipe-side split (edge
-        // writes a luma edge mask, blend writes per-pixel blend weights,
-        // resolve writes the final anti-aliased LDR back to the backbuffer
-        // format). Push-constant sizes match each shader's std430 push
-        // block byte-for-byte (16 bytes per stage); the canonical 20-byte
+        // matching SMAA fragment shader. All three pipelines target the
+        // current `PostProcess.AATemp` recipe attachment, which
+        // `BuildDefaultFrameRecipe` allocates with
+        // `FrameRecipeSizing::BackbufferFormat` — so the
+        // `colorFormat` parameter follows the same pattern the FXAA
+        // builder uses, and the renderer passes `m_BackbufferFormat`
+        // when it creates the lease. The Slice D.2 recipe-side
+        // `PostProcess.AATemp.{Edges,Weights}` split is what retargets
+        // edge to a 2-channel mask (`RG8_UNORM`) and blend to a 4-channel
+        // weights texture (`RGBA8_UNORM`); D.1 deliberately keeps the
+        // pipeline format aligned with the *current* AA attachment so
+        // the AA umbrella render pass / pipeline stay format-compatible
+        // on Vulkan (a mismatched attachment-vs-pipeline color format is
+        // a render-pass-compatibility rule violation and would fail
+        // validation or silently skip the bound stage). Push-constant
+        // sizes match each shader's std430 push block byte-for-byte (16
+        // bytes per stage); the canonical 20-byte
         // `PostProcessPushConstants` is intentionally not reused per the
         // "Shader push-constant compatibility policy" — see
         // `Pass.PostProcess.SMAA.cppm` for the aliasing rationale. The
         // retained `AreaTex` / `SearchTex` LUT textures sampled by the
         // blend pipeline are owned by `PostProcessSystem` and allocated
         // in Slice D.2.
-        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAAEdgePipelineDesc() noexcept
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAAEdgePipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
@@ -2692,18 +2703,20 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorTargetCount = 1u;
-            // `RG8_UNORM` mirrors the AATemp.Edges target Slice D.2
-            // declares; only the .rg channels carry the horizontal /
-            // vertical edge mask, matching `post_smaa_edge.frag`'s
-            // `outEdges` write shape.
-            desc.ColorTargetFormats[0] = RHI::Format::RG8_UNORM;
+            // Matches the current `PostProcess.AATemp` recipe attachment
+            // (allocated with `FrameRecipeSizing::BackbufferFormat`).
+            // Slice D.2 retargets to `RG8_UNORM` once the recipe declares
+            // `AATemp.Edges`; the shader's `outEdges = vec4(edges, 0, 0)`
+            // write still only carries useful data in .rg either way.
+            desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessSMAAEdgePushConstants));
             desc.DebugName = "Renderer.PostProcess.SMAA.Edge";
             return desc;
         }
 
-        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAABlendPipelineDesc() noexcept
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAABlendPipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
@@ -2719,12 +2732,14 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorTargetCount = 1u;
-            // `RGBA8_UNORM` mirrors the AATemp.Weights target Slice D.2
-            // declares; the four channels carry the area-texture-decoded
-            // blend weights (`weights.rg` for horizontal edges,
-            // `weights.ba` for vertical edges) matching
-            // `post_smaa_blend.frag`'s `outWeights` write shape.
-            desc.ColorTargetFormats[0] = RHI::Format::RGBA8_UNORM;
+            // Matches the current `PostProcess.AATemp` recipe attachment
+            // for the same render-pass-compatibility reason as the edge
+            // pipeline above. Slice D.2 retargets to `RGBA8_UNORM`
+            // explicitly once the recipe declares `AATemp.Weights`
+            // (which happens to be the same byte shape as the default
+            // backbuffer format, but the dependency must be on the
+            // *recipe* declaration rather than a coincidence).
+            desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessSMAABlendPushConstants));
             desc.DebugName = "Renderer.PostProcess.SMAA.Blend";
@@ -2750,9 +2765,10 @@ namespace Extrinsic::Graphics
             desc.ColorTargetCount = 1u;
             // Resolve writes the final anti-aliased LDR to the backbuffer
             // format (same `colorFormat` parameter the FXAA pipeline
-            // takes) so it stays render-pass-compatible with the tonemap
-            // leg's `SceneColorLDR` output across the
-            // `PostProcessPass`/`PostProcessAAPass` umbrella boundary.
+            // takes) so it stays render-pass-compatible with the current
+            // `PostProcess.AATemp` attachment. Slice D.2's recipe-side
+            // change reroutes resolve's color target to the final LDR
+            // scene output once present routing flips to AATemp.Weights.
             desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessSMAAResolvePushConstants));
@@ -3378,7 +3394,7 @@ namespace Extrinsic::Graphics
                 m_PostProcessSMAAPass->SetResolvePipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc postProcessSMAAEdgeDesc =
-                BuildPostProcessSMAAEdgePipelineDesc();
+                BuildPostProcessSMAAEdgePipelineDesc(m_BackbufferFormat);
             auto postProcessSMAAEdgePipeline = m_PipelineManager->Create(postProcessSMAAEdgeDesc);
             if (postProcessSMAAEdgePipeline.has_value())
             {
@@ -3395,7 +3411,7 @@ namespace Extrinsic::Graphics
                                 static_cast<int>(postProcessSMAAEdgePipeline.error()));
             }
             const RHI::PipelineDesc postProcessSMAABlendDesc =
-                BuildPostProcessSMAABlendPipelineDesc();
+                BuildPostProcessSMAABlendPipelineDesc(m_BackbufferFormat);
             auto postProcessSMAABlendPipeline = m_PipelineManager->Create(postProcessSMAABlendDesc);
             if (postProcessSMAABlendPipeline.has_value())
             {

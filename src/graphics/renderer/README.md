@@ -1022,9 +1022,12 @@ Concretely:
   when `EnableBloom = false`. `GRAPHICS-075` Slice D.1 adds the three
   SMAA pipelines (vertex `post_fullscreen.vert.spv` paired with
   `post_smaa_edge.frag.spv` / `post_smaa_blend.frag.spv` /
-  `post_smaa_resolve.frag.spv`); pipeline target formats mirror the
-  Slice D.2 `PostProcess.AATemp.{Edges,Weights}` recipe split (edge →
-  `RG8_UNORM`, blend → `RGBA8_UNORM`, resolve → backbuffer format). Each
+  `post_smaa_resolve.frag.spv`); all three target the current
+  `PostProcess.AATemp` recipe attachment (allocated with
+  `FrameRecipeSizing::BackbufferFormat`) so the AA umbrella render pass
+  stays format-compatible with the pipelines bound inside it. Slice D.2
+  retargets edge to `RG8_UNORM` and blend to `RGBA8_UNORM` once the
+  recipe splits `AATemp` into `AATemp.{Edges,Weights}` siblings. Each
   pipeline carries its own 16-byte std430 push block
   (`PostProcessSMAAEdgePushConstants` / `PostProcessSMAABlendPushConstants`
   / `PostProcessSMAAResolvePushConstants`) mirroring the matching
