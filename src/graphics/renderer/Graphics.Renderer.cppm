@@ -366,6 +366,28 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessBloomUpsamplePipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessBloomUpsamplePipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-075 (Slice C) — accessor for the default-recipe
+        // postprocess FXAA pipeline (vertex `post_fullscreen.vert.spv` +
+        // fragment `post_fxaa.frag.spv`, single backbuffer-format color
+        // target, no depth target, `PushConstantSize =
+        // sizeof(PostProcessFXAAPushConstants)` — 20 bytes mirroring the
+        // shader's `vec2 InvResolution + float ContrastThreshold + float
+        // RelativeThreshold + float SubpixelBlending` std430 push block).
+        // The pipeline is a fullscreen triangle that the `"PostProcessPass"`
+        // umbrella executor branch binds and draws after tonemap when
+        // `PostProcessSettings::AntiAliasing == FXAA`; with `None` the
+        // pass body short-circuits and the helper still reports
+        // `Recorded` under the umbrella's accumulator (the same
+        // "structurally-recorded no-op" taxonomy Slice B.1 added for
+        // bloom-disabled). Handle is invalid until an operational device
+        // path publishes the lease; the descriptor remains deterministic
+        // so contract tests can assert byte-identical rebuild behavior.
+        // SMAA + retained `AreaTex`/`SearchTex` LUTs land with Slice D;
+        // histogram compute + readback drain lands with Slice E behind
+        // the same umbrella branch.
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessFXAAPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessFXAAPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for
         // `8 * frames-in-flight` bytes (one 4-byte `EntityId` word + one

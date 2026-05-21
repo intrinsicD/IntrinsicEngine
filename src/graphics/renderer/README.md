@@ -979,12 +979,55 @@ Concretely:
   transitions interleaved with the down/up chain remain a follow-up
   slice that needs both an `ICommandContext::TextureBarrier(handle,
   mipRange, ...)` RHI extension and per-mip render-pass restarts
-  between iterations. The remaining Slices C/D/E `FXAA` / `SMAA` / `Histogram`
-  helpers fan out from the same umbrella branch (mirroring
-  `GRAPHICS-074`'s `"PickingPass"` fan-out) once their pipelines +
-  retained LUTs + histogram readback drain land, and each is free to
-  define its own pass-local push block where the shader interface
-  demands more than the canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
+  between iterations. `GRAPHICS-075` Slice C adds the FXAA pipeline
+  (vertex `post_fullscreen.vert.spv` + fragment `post_fxaa.frag.spv`,
+  single backbuffer-format color target matching the tonemap leg's
+  `SceneColorLDR` output, no depth, `PushConstantSize =
+  sizeof(PostProcessFXAAPushConstants)` — 20 bytes mirroring the
+  shader's `vec2 InvResolution + float ContrastThreshold + float
+  RelativeThreshold + float SubpixelBlending` std430 push block). The
+  `NullRenderer` owns `m_PostProcessFXAAPass` +
+  `m_PostProcessFXAAPipelineLease`, both republished byte-identical
+  across `RebuildOperationalResources()`. **FXAA runs in its own
+  ordered graph pass** (`"PostProcessAAPass"`) declared by the recipe
+  with `Read(SceneColorLDR, ShaderRead) + Write(PostProcess.AATemp,
+  ColorAttachmentWrite)` so the framegraph compiler emits the
+  `SceneColorLDR ColorAttachment → ShaderRead` transition between the
+  `PostProcessPass` umbrella render-pass scope (bloom + tonemap) and
+  the FXAA umbrella scope. Sharing the `PostProcessPass` umbrella with
+  the tonemap leg would have made FXAA's sampled-image read alias the
+  umbrella's own color attachment mid-render-pass — Vulkan's classic
+  read-after-write feedback hazard. `presentSource` stays on
+  `SceneColorLDR` for now; flipping present routing to consume
+  `PostProcess.AATemp` (or its Slice D `AATemp.Edges` / `AATemp.Weights`
+  SMAA siblings) when AA is enabled is Slice D's recipe-level change.
+  `BuildPostProcessFXAAPushConstants(settings, viewportWidth,
+  viewportHeight)` derives `InvResolution` from
+  `RHI::CameraUBO::Viewport{Width,Height}` (a zero / negative extent
+  maps to a zero inverse so the shader's neighbour-tap UVs degenerate
+  gracefully) and keeps `ContrastThreshold` / `RelativeThreshold` /
+  `SubpixelBlending` at the FXAA 3.11 quality defaults documented in
+  `assets/shaders/post_fxaa.frag`; future `PostProcessSettings::FXAA*`
+  fields flow through this builder so the pass body and pipeline desc
+  stay unchanged. The canonical 20-byte `PostProcessPushConstants`
+  block is intentionally not reused even though the wire size matches
+  — under std430 it would alias `Exposure` onto `InvResolution.x`,
+  `Gamma` onto `InvResolution.y`, `BloomIntensity` onto
+  `ContrastThreshold`, etc., and produce visually-meaningless FXAA
+  output. The FXAA leg is gated by `PostProcessSettings::AntiAliasing ==
+  FXAA` inside the pass body (which `IsStageEnabled` enforces); `None`
+  or `SMAA` short-circuits `Execute(...)` to a no-op while the helper
+  still returns `Recorded` under the `"PostProcessAAPass"` accumulator,
+  mirroring the bloom helper's "structurally-recorded no-op" taxonomy
+  when `EnableBloom = false`. SMAA (Slice D) will fan out from the
+  same `"PostProcessAAPass"` umbrella branch alongside FXAA (mutually
+  exclusive per `PostProcessSettings::AntiAliasing`, with retained
+  `AreaTex` / `SearchTex` LUTs + exposure-adaptation history buffer);
+  Histogram (Slice E, compute pipeline + readback drain) fans out
+  behind the existing `"PostProcessPass"` umbrella alongside bloom +
+  tonemap. Each AA stage is free to define its own pass-local push
+  block where the shader interface demands more than the canonical 20
+  bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
   postprocess-owned intermediates; concrete Vulkan descriptors/shaders
   remain backend follow-ups. Per `GRAPHICS-013AQ`,

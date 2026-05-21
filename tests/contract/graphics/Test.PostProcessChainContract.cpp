@@ -210,12 +210,65 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresHdrToLdrResources)
     EXPECT_TRUE(Contains(post->Writes, "SceneColorLDR"));
     EXPECT_TRUE(Contains(post->Writes, "PostProcess.BloomScratch"));
     EXPECT_TRUE(Contains(post->Writes, "PostProcess.Histogram"));
-    EXPECT_TRUE(Contains(post->Writes, "PostProcess.AATemp"));
+    // GRAPHICS-075 Slice C — `PostProcess.AATemp` moved to the
+    // `PostProcessAAPass` pass so the FXAA/SMAA legs sample the
+    // freshly-written `SceneColorLDR` through a framegraph
+    // read-after-write barrier (see the new test
+    // `FrameRecipeSplitsAAPassFromPostProcessPass` below).
+    EXPECT_FALSE(Contains(post->Writes, "PostProcess.AATemp"))
+        << "PostProcess.AATemp must move to PostProcessAAPass per Slice C "
+           "so the FXAA leg reads SceneColorLDR via a real read-after-write "
+           "barrier instead of aliasing the umbrella's color attachment.";
 
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp", true));
+}
+
+// GRAPHICS-075 Slice C — the postprocess chain is split into two
+// ordered graph passes so the FXAA/SMAA legs (`PostProcessAAPass`) can
+// sample the freshly-written `SceneColorLDR` through a real framegraph
+// read-after-write barrier rather than aliasing the `PostProcessPass`
+// umbrella's own color attachment mid-render-pass — Vulkan's classic
+// read-after-write feedback hazard. This contract pins the split so
+// future scope creep cannot collapse the FXAA recording back into the
+// umbrella branch without flagging the regression.
+TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAPassFromPostProcessPass)
+{
+    const Graphics::FrameRecipeIntrospection description = Graphics::DescribeDefaultFrameRecipe(Graphics::FrameRecipeFeatures{});
+
+    const auto* aa = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAA);
+    ASSERT_NE(aa, nullptr);
+    EXPECT_TRUE(aa->Enabled);
+    EXPECT_TRUE(Contains(aa->Reads, "SceneColorLDR"))
+        << "PostProcessAAPass must declare a recipe-level Read(SceneColorLDR) "
+           "so the framegraph compiler emits the ColorAttachment → ShaderRead "
+           "transition between PostProcessPass and PostProcessAAPass.";
+    EXPECT_TRUE(Contains(aa->Writes, "PostProcess.AATemp"))
+        << "PostProcessAAPass owns the AATemp write so it cannot also be "
+           "declared on PostProcessPass (the umbrella SceneColorLDR target).";
+
+    Graphics::RenderGraph graph;
+    const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
+        graph,
+        Graphics::FrameRecipeFeatures{},
+        MakeImports(),
+        Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    const auto& compileResult = graph.GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    const std::vector<std::string> order = OrderedPassNames(*compiled);
+    const auto postIt = std::find(order.begin(), order.end(), "PostProcessPass");
+    const auto aaIt = std::find(order.begin(), order.end(), "PostProcessAAPass");
+    ASSERT_NE(postIt, order.end());
+    ASSERT_NE(aaIt, order.end());
+    EXPECT_LT(postIt, aaIt)
+        << "PostProcessAAPass must run after PostProcessPass so the FXAA "
+           "shader's sampled-image read sees the tonemap leg's write.";
 }
 
 TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
@@ -227,6 +280,12 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
     const auto* post = FindPass(description, Graphics::FrameRecipePassKind::PostProcess);
     ASSERT_NE(post, nullptr);
     EXPECT_FALSE(post->Enabled);
+    // GRAPHICS-075 Slice C — `PostProcessAAPass` shares the same
+    // `EnablePostProcess` gate (FXAA / SMAA are postprocess stages),
+    // so disabling postprocess also disables the AA pass.
+    const auto* aa = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAA);
+    ASSERT_NE(aa, nullptr);
+    EXPECT_FALSE(aa->Enabled);
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", false));
@@ -246,6 +305,7 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<std::string> order = OrderedPassNames(*compiled);
     EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessPass"), order.end());
+    EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAAPass"), order.end());
     EXPECT_NE(std::find(order.begin(), order.end(), "Present"), order.end());
 }
 
@@ -657,6 +717,121 @@ static_assert(Graphics::kBloomMipChainLevels == 6u,
               "docs/architecture/rendering-three-pass.md; updating the cap "
               "requires synchronising the architecture doc, the GRAPHICS-075 "
               "slice plan, and this assertion.");
+
+// GRAPHICS-075 Slice C — when `AntiAliasing == FXAA` the FXAA pass body
+// must push a `PostProcessFXAAPushConstants` block whose `InvResolution`
+// matches `1 / vec2(viewportWidth, viewportHeight)`. A zero
+// `InvResolution` would make every neighbour-tap UV in `post_fxaa.frag`
+// collapse onto the center pixel, silently degenerating FXAA into a
+// pass-through. This mirrors Slice B.1's
+// `BloomDownsamplePushFeedsNonZeroInvSrcResolution` for the bloom
+// per-tap kernel offsets.
+TEST(GraphicsPostProcessChainContract, FXAAPushFeedsNonZeroInvResolution)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::FXAA,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1920.0f;
+    camera.ViewportHeight = 1080.0f;
+
+    Graphics::PostProcessFXAAPass fxaa{post};
+    fxaa.SetPipeline(RHI::PipelineHandle{80u, 1u});
+    RecordingCommandContext cmd;
+    fxaa.Execute(cmd, camera);
+
+    ASSERT_EQ(cmd.Events.size(), 3u);
+    EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::Draw);
+    EXPECT_EQ(cmd.LastDrawVertexCount, 3u);
+    // The push payload must be the FXAA-shaped 20-byte block, not the
+    // canonical 20-byte `PostProcessPushConstants` block (which would
+    // alias Exposure/Gamma/etc. onto the FXAA shader's InvResolution/
+    // ContrastThreshold/etc. and produce visually-meaningless output
+    // even though the wire size happens to match).
+    EXPECT_EQ(cmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessFXAAPushConstants));
+    ASSERT_EQ(cmd.LastPushConstants.size(),
+              sizeof(Graphics::PostProcessFXAAPushConstants));
+    Graphics::PostProcessFXAAPushConstants observed{};
+    std::memcpy(&observed, cmd.LastPushConstants.data(),
+                sizeof(Graphics::PostProcessFXAAPushConstants));
+    EXPECT_FLOAT_EQ(observed.InvResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(observed.InvResolution[1], 1.0f / 1080.0f);
+    EXPECT_FLOAT_EQ(observed.ContrastThreshold, 0.0312f);
+    EXPECT_FLOAT_EQ(observed.RelativeThreshold, 0.063f);
+    EXPECT_FLOAT_EQ(observed.SubpixelBlending, 0.75f);
+
+    // Cross-check the published builder produces the same byte shape so
+    // future settings extensions cannot drift the pass body away from
+    // the contract.
+    const Graphics::PostProcessFXAAPushConstants built =
+        Graphics::BuildPostProcessFXAAPushConstants(post.GetSettings(),
+                                                    camera.ViewportWidth,
+                                                    camera.ViewportHeight);
+    EXPECT_FLOAT_EQ(built.InvResolution[0], observed.InvResolution[0]);
+    EXPECT_FLOAT_EQ(built.InvResolution[1], observed.InvResolution[1]);
+    EXPECT_FLOAT_EQ(built.ContrastThreshold, observed.ContrastThreshold);
+}
+
+// GRAPHICS-075 Slice C — `PostProcessSettings::AntiAliasing` is the
+// branch selector for the typed AA stages: `FXAA` enables FXAA and
+// keeps SMAA off; `SMAA` does the reverse; `None` disables both. The
+// FXAA pass body must respect the selector and emit no bind/push/draw
+// when the stage is gated off, mirroring the existing SMAA-skipped
+// behavior in `PassesRecordOnlyEnabledStages` (which sets
+// `AntiAliasing = FXAA` and expects the SMAA pass to record empty).
+TEST(GraphicsPostProcessChainContract, FXAASkipsWhenAntiAliasingNotFXAA)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1280.0f;
+    camera.ViewportHeight = 720.0f;
+
+    // AntiAliasing == None — FXAA must stay silent.
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::None,
+    });
+    Graphics::PostProcessFXAAPass fxaaNone{post};
+    fxaaNone.SetPipeline(RHI::PipelineHandle{81u, 1u});
+    RecordingCommandContext noneCmd;
+    fxaaNone.Execute(noneCmd, camera);
+    EXPECT_TRUE(noneCmd.Events.empty());
+
+    // AntiAliasing == SMAA — FXAA still stays silent (mutually exclusive
+    // per `PostProcessSettings::AntiAliasing`).
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::SMAA,
+    });
+    Graphics::PostProcessFXAAPass fxaaSmaa{post};
+    fxaaSmaa.SetPipeline(RHI::PipelineHandle{82u, 1u});
+    RecordingCommandContext smaaCmd;
+    fxaaSmaa.Execute(smaaCmd, camera);
+    EXPECT_TRUE(smaaCmd.Events.empty());
+
+    // AntiAliasing == FXAA — FXAA records.
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::FXAA,
+    });
+    Graphics::PostProcessFXAAPass fxaaActive{post};
+    fxaaActive.SetPipeline(RHI::PipelineHandle{83u, 1u});
+    RecordingCommandContext activeCmd;
+    fxaaActive.Execute(activeCmd, camera);
+    ASSERT_EQ(activeCmd.Events.size(), 3u);
+    EXPECT_EQ(activeCmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(activeCmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(activeCmd.Events[2].Kind, EventKind::Draw);
+}
 
 TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)
 {

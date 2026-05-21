@@ -2,19 +2,27 @@
 
 ## Status
 
-- State: in-progress (Slice B.2 landing). Maturity reached so far: Slice A
+- State: in-progress (Slice C landing). Maturity reached so far: Slice A
   closed `Scaffolded → CPUContracted` on the ToneMap leaf and the
   `"PostProcessPass"` umbrella executor branch (merged via PR #902);
   Slice B.1 added the bloom downsample + upsample pipeline leases +
   `RecordPostProcessBloomPass(...)` umbrella fan-out and closed
-  `Scaffolded → CPUContracted` on both bloom pipelines.
+  `Scaffolded → CPUContracted` on both bloom pipelines; Slice B.2 added
+  per-mip iteration + recipe-side `BloomScratch.MipLevels` clamping +
+  the multi-mip barrier-sequence contract test (merged via PR #904) and
+  closed bloom toward `Operational` on the CPU/null gate. Slice C adds
+  the FXAA pipeline + `RecordPostProcessFXAAPass(...)` umbrella fan-out
+  + `PostProcessFXAAPushConstants` 20-byte std430 push block + contract
+  tests and closes `Scaffolded → CPUContracted` on the FXAA leaf.
 - Owner/agent: local agent workflow.
-- Branch: Slice B.2 on `claude/graphics-task-Owmgw`.
+- Branch: Slice C on `claude/setup-agent-workflow-ReViy`.
 - Activated: 2026-05-21 — first unblocked Theme A default-recipe leaf after
   GRAPHICS-074 retirement.
-- Next verification step: after Slice B.2's CPU/null contract gate green, open
-  Slice C (FXAA pipeline + `RecordPostProcessFXAAPass(...)` helper behind the
-  same `"PostProcessPass"` umbrella branch).
+- Next verification step: after Slice C's CPU/null contract gate green, open
+  Slice D (SMAA edge/blend/resolve pipelines + retained `AreaTex` / `SearchTex`
+  LUT textures + exposure-adaptation history buffer + recipe-side
+  `PostProcess.AATemp.{Edges,Weights}` rename, behind the same
+  `"PostProcessPass"` umbrella branch).
 
 ## Slice plan
 
@@ -69,8 +77,49 @@ a readback drain.
       up mip chain with inline `ColorAttachment → ShaderRead →
       ColorAttachment` barriers) + the multi-mip barrier-sequence contract
       test.
-- **Slice C.** FXAA pipeline + `RecordPostProcessFXAAPass(...)` helper.
-  `PostProcessSettings::AntiAliasing == FXAA` enables the branch.
+- **Slice C (this slice).** FXAA pipeline +
+  `RecordPostProcessFXAAPass(...)` helper running in its own ordered
+  graph pass (`"PostProcessAAPass"`) declared by the recipe with
+  `Read(SceneColorLDR, ShaderRead) + Write(PostProcess.AATemp,
+  ColorAttachmentWrite)` so the framegraph compiler emits the
+  `SceneColorLDR ColorAttachment → ShaderRead` transition between the
+  `PostProcessPass` umbrella render-pass scope (bloom + tonemap) and
+  the FXAA umbrella scope. Sharing the `PostProcessPass` umbrella with
+  the tonemap leg (Slice C's first attempt) was reverted because it
+  aliased the umbrella's own color attachment as a sampled image mid-
+  render-pass — Vulkan's classic read-after-write feedback hazard.
+  `presentSource` stays on `SceneColorLDR`; flipping present routing
+  to consume `PostProcess.AATemp` (or its Slice D
+  `AATemp.{Edges,Weights}` siblings) when AA is enabled is Slice D's
+  recipe-level change. `NullRenderer` owns `m_PostProcessFXAAPass` +
+  `m_PostProcessFXAAPipelineLease` (constructed alongside the existing
+  bloom + tonemap passes, reset in `Shutdown()` before
+  `m_PostProcessSystem` is reset). The pipeline is created in
+  `InitializeOperationalPassResources(device)` from
+  `BuildPostProcessFXAAPipelineDesc(m_BackbufferFormat)` (vertex
+  `post_fullscreen.vert.spv` + fragment `post_fxaa.frag.spv`, single
+  backbuffer-format color target, no depth) and republished byte-
+  identical across `RebuildOperationalResources()`. `IRenderer`
+  exposes `GetPostProcessFXAAPipeline()` /
+  `GetPostProcessFXAAPipelineDesc()`. Pass-local
+  `PostProcessFXAAPushConstants` (20 bytes: `vec2 InvResolution + float
+  ContrastThreshold + float RelativeThreshold + float SubpixelBlending`)
+  mirrors the shader's std430 push block byte-for-byte; the canonical
+  20-byte `PostProcessPushConstants` block is intentionally not reused
+  even though the wire size matches — under std430 it would alias
+  `Exposure`/`Gamma`/`BloomIntensity`/`HistogramBinCount`/`StageKind`
+  onto `InvResolution`/`ContrastThreshold`/`RelativeThreshold`/
+  `SubpixelBlending` and produce visually-meaningless FXAA output. The
+  pass body short-circuits when `IsStageEnabled(FXAA)` is false
+  (`AntiAliasing == None` or `SMAA`), but the helper still returns
+  `Recorded` under the `"PostProcessAAPass"` accumulator per the same
+  "structurally-recorded no-op" taxonomy the bloom helper follows when
+  `EnableBloom = false`. Adds `FrameRecipePassKind::PostProcessAA` so
+  the introspection table tracks the new pass slot. Defers SMAA
+  pipelines + retained LUTs + recipe-side
+  `PostProcess.AATemp.{Edges,Weights}` rename + `presentSource = AATemp`
+  flip when AA is enabled to Slice D, and Histogram compute + readback
+  drain to Slice E.
 - **Slice D.** SMAA edge/blend/resolve pipelines + retained `AreaTex`
   (`R8G8_UNORM`, 160×560) + `SearchTex` (`R8_UNORM`, 256×33) LUT textures +
   exposure-adaptation history buffer allocated via a device-aware
@@ -123,6 +172,16 @@ a readback drain.
   extension and per-mip render-pass restarts; today's inter-pass
   bloom→tonemap transition is owned by the framegraph compiler from
   the recipe-level read/write declarations.
+- Slice C closes `Scaffolded → CPUContracted` on the FXAA leaf and the
+  `RecordPostProcessFXAAPass(...)` umbrella fan-out: the pipeline lease
+  + accessors + executor route + 20-byte `PostProcessFXAAPushConstants`
+  push block + the `AntiAliasing == FXAA` selector gate inside the pass
+  body land on the CPU/null contract gate. Full `Operational` for the
+  FXAA leaf is gated by Slice D's recipe-side `PostProcess.AATemp`
+  rename + the opt-in `gpu;vulkan` smoke; the SMAA branch + retained
+  `AreaTex`/`SearchTex` LUTs + exposure-adaptation history buffer are
+  owned by Slice D, and the Histogram compute pipeline + readback drain
+  are owned by Slice E.
 
 ## Required changes
 - [x] **Slice A**: `NullRenderer` owns `m_PostProcessToneMapPass` + `m_PostProcessToneMapPipelineLease`; emplaced alongside the existing GRAPHICS-070..074 passes, reset in `Shutdown()` before `m_PostProcessSystem` is reset. Tonemap pipeline created in `InitializeOperationalPassResources(device)` from `BuildPostProcessToneMapPipelineDesc()` (vertex `post_fullscreen.vert.spv` + fragment `post_tonemap.frag.spv`, single backbuffer-format color target, no depth, `PushConstantSize = sizeof(PostProcessPushConstants)`); republished byte-identical across `RebuildOperationalResources()`. `"PostProcessPass"` executor branch routes through `RecordPostProcessToneMapPass(...)` with the recorded `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy. `IRenderer` exposes `GetPostProcessToneMapPipeline()` / `GetPostProcessToneMapPipelineDesc()`.
@@ -131,10 +190,10 @@ a readback drain.
 - [ ] In `NullRenderer::InitializeOperationalPassResources(device)`, create:
   - tonemap pipeline (`post_tonemap.frag`), **Slice A** *(done)*
   - bloom downsample + upsample pipelines (`post_bloom_downsample.frag` + `post_bloom_upsample.frag` with a fullscreen vertex), **Slice B.1** *(done)*; per-mip iteration + recipe-side `BloomScratch.MipLevels = ComputeBloomMipChainLevels(width, height)` (clamped against Vulkan's `mipLevels <= floor(log2(maxDim)) + 1` rule) + renderer-side per-frame `PostProcess.BloomScratch` handle + clamped mip-count republish, **Slice B.2** *(done)*. Per-mip subresource barriers between iterations are *deferred*: the pass body emits no `TextureBarrier(...)` (the umbrella render pass is active when `Execute(...)` runs and Vulkan rejects layout transitions inside render-pass scope), and the inter-pass `BloomScratch ColorAttachment → ShaderReadOnly` between bloom and tonemap is owned by the framegraph compiler from the recipe-level read/write declarations
-  - FXAA pipeline (`post_fxaa.frag`), **Slice C**
+  - FXAA pipeline (`post_fxaa.frag`), **Slice C** *(done)*. `m_PostProcessFXAAPipelineLease` + `m_PostProcessFXAAPass` follow the same reset/republish pattern as the tonemap + bloom leases. The pipeline takes the backbuffer format (same `colorFormat` parameter the tonemap pipeline does) so it stays render-pass-compatible with the tonemap leg's `SceneColorLDR` output. `PostProcessFXAAPushConstants` (20 bytes, std430-matched to `post_fxaa.frag`) replaces the canonical `PostProcessPushConstants` in the pass body
   - SMAA edge/blend/resolve pipelines (`post_smaa_edge.frag`, `post_smaa_blend.frag`, `post_smaa_resolve.frag`), **Slice D**
   - histogram compute pipeline (`post_histogram.comp`), **Slice E**.
-- [ ] Add executor fan-out inside the `"PostProcessPass"` umbrella branch (mirroring the GRAPHICS-074 `"PickingPass"` fan-out) routing through `RecordPostProcessHistogramPass(...)`, `…BloomPass(...)`, `…ToneMapPass(...)`, `…FXAAPass(...)`, `…SMAAPass(...)` helpers with the recorded taxonomy. AA selection per `PostProcessSettings::AntiAliasing` (FXAA xor SMAA). **Slice A** lands ToneMap only; **Slice B.1** adds the bloom helper ahead of tonemap; Slices C/D/E add the other helpers behind the same umbrella branch.
+- [ ] Add executor fan-out for the postprocess legs. **Slice A** lands ToneMap inside the `"PostProcessPass"` umbrella; **Slice B.1** adds the bloom helper ahead of tonemap inside the same `"PostProcessPass"` umbrella; **Slice C** *(done)* moves FXAA into its *own* `"PostProcessAAPass"` umbrella branch (a separate ordered graph pass declared by the recipe with `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph compiler emits the `SceneColorLDR ColorAttachment → ShaderRead` transition between the two umbrella render-pass scopes; sharing `PostProcessPass` would alias the umbrella's own color attachment as a sampled image mid-render-pass, Vulkan's read-after-write feedback hazard); **Slice D** fans SMAA out behind the same `"PostProcessAAPass"` branch alongside FXAA (mutually exclusive per `PostProcessSettings::AntiAliasing`); **Slice E** adds the Histogram helper behind the existing `"PostProcessPass"` umbrella (compute pipeline + readback drain). Each helper records under the `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
 - [ ] **Slice E**: Implement the histogram readback drain on `BeginFrame()` after the issuing frame's fences complete; surface results through `PostProcessSystem::PublishHistogramReadback(...)` (mirror the `Picking.Readback` drain).
 - [ ] **Slice B**: Confirm `BuildDefaultFrameRecipe` declares `SceneColorHDR`, `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp.Edges`, `PostProcess.AATemp.Weights` with the recorded formats. **Slice B.2** *(partial)*: `PostProcess.BloomScratch` now declares `MipLevels = kBloomMipChainLevels` so the per-mip iteration has the subresource storage it needs; the `AATemp.{Edges, Weights}` rename remains a Slice D follow-up.
 
@@ -146,7 +205,7 @@ a readback drain.
   - `BloomMipChainClampedToVulkanMipRule` pins `ComputeBloomMipChainLevels` against the boundary sizes that matter (1920x1080 → 6; 16x16 → 5; 8x8 → 4; 1x1 → 1; 0x0 → 1) so the recipe-side `MipLevels` declaration cannot regress to an out-of-range value for tiny viewports.
   - `BloomPassIterationFollowsClampedMipCount` exercises the pass with a 16x16 viewport (5 mips → 4 down + 4 up) and a degenerate single-mip pyramid (no iteration), confirming the pass's iteration count tracks the recipe-allocated mip range rather than the canonical cap.
   - A static_assert pins the canonical depth at compile time; existing `GraphicsPostProcessChainContract` tests updated to match the new per-mip iteration shape.
-- [ ] **Slice C**: `contract;graphics` test for FXAA pipeline rebuild + `AntiAliasing == FXAA` records, `None` skips.
+- [x] **Slice C**: `contract;graphics` test `PostProcessFXAAPipelineSurvivesOperationalRebuild` asserts the FXAA pipeline lease is valid after `Initialize()`, the descriptor's shader paths + single backbuffer-format color target + `Undefined` depth + `PushConstantSize = sizeof(PostProcessFXAAPushConstants)` match `BuildPostProcessFXAAPipelineDesc()`, and that the descriptor is byte-identical across `RebuildOperationalResources()`. `FXAAPushFeedsNonZeroInvResolution` asserts the pass body pushes the 20-byte `PostProcessFXAAPushConstants` block (not the canonical 20-byte `PostProcessPushConstants`) with `InvResolution = 1 / vec2(viewportWidth, viewportHeight)` derived from the camera UBO + FXAA 3.11 quality defaults (`ContrastThreshold = 0.0312`, `RelativeThreshold = 0.063`, `SubpixelBlending = 0.75`). `FXAASkipsWhenAntiAliasingNotFXAA` asserts the pass body emits no bind/push/draw for `AntiAliasing == None` and `AntiAliasing == SMAA`, and records the 3-event bind/push/draw triple for `AntiAliasing == FXAA`. New `FrameRecipeSplitsAAPassFromPostProcessPass` pins the recipe-level split (`PostProcessPass` retains Bloom + ToneMap; `PostProcessAAPass` reads `SceneColorLDR` + writes `PostProcess.AATemp`; AA pass runs strictly after PostProcessPass) so future scope creep cannot collapse the FXAA recording back into the umbrella and reintroduce the read-after-write hazard. `FrameRecipeContract.DefaultRecipeBuildsCanonicalPassOrder` adds `"PostProcessAAPass"` between `"PostProcessPass"` and `"ImGuiPass"`. `RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext` (+ rebuild / depth-failure / culling-failure variants) bumps the recorded-pass counter from 7/6/2 to 8/7/3; the new tick lands under `"PostProcessAAPass"` rather than `"PostProcessPass"`, and `kRoutedPasses` is extended to include the new pass name. The default `AntiAliasing == None` short-circuits the body, so bind/push counts stay at 6.
 - [ ] **Slice D**: `contract;graphics` test for SMAA pipeline rebuild + `AreaTex`/`SearchTex` survive `RebuildGpuResources()` byte-identical + FXAA/SMAA mutual exclusion.
 - [ ] **Slice E**: `contract;graphics` test that the histogram readback drain calls `PostProcessSystem::PublishHistogramReadback` after the issuing frame's fence completes.
 - [ ] **Slice E**: `contract;graphics` test: `PostProcessDiagnostics` reports zero failure counters after a full chain init.
@@ -155,18 +214,21 @@ a readback drain.
 - [x] **Slice A**: Update `src/graphics/renderer/README.md` to record the tonemap leg of the postprocess chain as operationally wired (umbrella `"PostProcessPass"` reports `Recorded`); call out Slices B–E as the bloom / FXAA / SMAA / histogram followups.
 - [x] **Slice B.1**: Extend `src/graphics/renderer/README.md` to record the bloom downsample + upsample legs as CPU-contract wired behind the umbrella `"PostProcessPass"`; call out Slice B.2 + Slices C/D/E as the remaining followups.
 - [x] **Slice B.2**: `src/graphics/renderer/README.md` now records the bloom leg as operationally wired on the CPU/null gate (per-mip iteration over the canonical six-mip pyramid + inline `ColorAttachment ↔ ShaderRead` barriers + renderer-side per-frame `PostProcess.BloomScratch` handle republish); calls out Slices C/D/E as the remaining FXAA/SMAA/Histogram followups.
-- [ ] **Slices C–E**: Extend `src/graphics/renderer/README.md` as each pass family lands.
-- [ ] **Any slice**: Update `docs/architecture/rendering-three-pass.md` if pipeline-order step numbers shift — Slice A: not applicable (the recipe-level umbrella stays at the same step).
+- [x] **Slice C**: `src/graphics/renderer/README.md` now records the FXAA leg as CPU-contract wired behind a *separate* ordered graph pass (`"PostProcessAAPass"`) declared by the recipe with `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph compiler emits the read-after-write barrier the FXAA shader needs; calls out Slices D/E (SMAA shares the AA umbrella; Histogram fans out under `PostProcessPass`) as the remaining followups.
+- [ ] **Slices D–E**: Extend `src/graphics/renderer/README.md` as each pass family lands.
+- [ ] **Any slice**: Update `docs/architecture/rendering-three-pass.md` if pipeline-order step numbers shift — Slice A: not applicable (the recipe-level umbrella stays at the same step). Slice C: not applicable (FXAA fan-out lands behind the same `"PostProcessPass"` umbrella step, no numbered-step reflow).
 
 ## Acceptance criteria
 - [x] **Slice A**: ToneMap pipeline records or `SkippedUnavailable` deterministically; `"PostProcessPass"` reports `Recorded` on the operational CPU/null gate.
 - [x] **Slice B.1**: Bloom helper records (or `SkippedUnavailable`) deterministically; `"PostProcessPass"` umbrella reports `Recorded` after fan-out on the operational CPU/null gate.
 - [x] **Slice B.2**: Bloom pass records the per-mip chain (or `SkippedUnavailable` when pipelines/system are missing) deterministically; the bloom mip-chain barrier-sequence contract test (`BloomMipChainBarrierSequence`) exercises the inline `ColorAttachment ↔ ShaderRead` barriers against a synthetic `PostProcess.BloomScratch` handle.
-- [ ] **Slices C–E**: Each remaining postprocess pass records or `SkippedUnavailable` deterministically.
+- [x] **Slice C**: FXAA pass records (or `SkippedUnavailable` when pipeline/system are missing) deterministically; helper runs inside the *separate* `"PostProcessAAPass"` graph pass declared with `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph compiler emits the `SceneColorLDR ColorAttachment → ShaderRead` transition between the `PostProcessPass` (bloom + tonemap) and `PostProcessAAPass` (FXAA, SMAA Slice D) render-pass scopes — avoiding the read-after-write feedback hazard that would arise from sharing the umbrella. Default `AntiAliasing == None` short-circuits the pass body to a no-op while the helper still reports `Recorded` under the `"PostProcessAAPass"` accumulator (the same "structurally-recorded no-op" taxonomy the bloom helper follows when `EnableBloom = false`).
+- [ ] **Slices D–E**: Each remaining postprocess pass records or `SkippedUnavailable` deterministically.
 - [ ] **Slice E**: Histogram readback drain produces deterministic CPU-visible results.
 - [x] **Slice A**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice A).
 - [x] **Slice B.1**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.1).
 - [x] **Slice B.2**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.2).
+- [x] **Slice C**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice C).
 
 ## Verification
 ```bash
@@ -184,4 +246,15 @@ python3 tools/docs/check_doc_links.py --root .
 - Mutating canonical `PostProcessPushConstants` packing.
 
 ## Next verification step
-- Allocate retained resources, create the pipelines, wire the executor routes + drain, exercise the contract tests above.
+- Slice C verification (run from a build with `clang-20`/`clang++-20`/`clang-scan-deps-20` on PATH, or pass the C/C++ compiler overrides as Slice 2 of GEOM-006 documents):
+  ```bash
+  cmake --preset ci
+  cmake --build --preset ci --target IntrinsicGraphicsContractTests
+  ctest --test-dir build/ci --output-on-failure -L 'contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+  python3 tools/repo/check_layering.py --root src --strict
+  python3 tools/docs/check_doc_links.py --root .
+  ```
+- After Slice C lands, open Slice D (SMAA edge/blend/resolve pipelines +
+  retained `AreaTex` / `SearchTex` LUT textures + exposure-adaptation
+  history buffer + recipe-side `PostProcess.AATemp.{Edges,Weights}`
+  rename, behind the same `"PostProcessPass"` umbrella branch).

@@ -193,8 +193,24 @@ namespace Extrinsic::Graphics
                 {"SceneDepth", "Cull.Lines.IndexedArgs", "Cull.Lines.Count"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false,
                 {"SceneDepth", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"}, {"SceneColorHDR"});
+        // GRAPHICS-075 Slice C — postprocess chain is split across two
+        // graph passes so the FXAA/SMAA legs can sample the
+        // freshly-written `SceneColorLDR` through a proper framegraph
+        // read-after-write barrier. `PostProcessPass` owns
+        // Bloom + ToneMap (Histogram lands with Slice E) and writes
+        // `SceneColorLDR`; `PostProcessAAPass` reads `SceneColorLDR` +
+        // writes `PostProcess.AATemp` so the framegraph compiler emits
+        // the `SceneColorLDR ColorAttachment → ShaderRead` transition
+        // between the umbrella render-pass scopes. With
+        // `AntiAliasing == None` the AA pass body emits no bind/push/
+        // draw (the helper still routes `Recorded`); the present source
+        // remains `SceneColorLDR` until Slice D promotes AA-active
+        // viewports to consume `PostProcess.AATemp` (or its Slice D
+        // SMAA-renamed `AATemp.Edges`/`AATemp.Weights` siblings).
         AddPass(out, FrameRecipePassKind::PostProcess, "PostProcessPass", features.EnablePostProcess, false,
-                {"SceneColorHDR"}, {"PostProcess.BloomScratch", "PostProcess.Histogram", "PostProcess.AATemp", "SceneColorLDR"});
+                {"SceneColorHDR"}, {"PostProcess.BloomScratch", "PostProcess.Histogram", "SceneColorLDR"});
+        AddPass(out, FrameRecipePassKind::PostProcessAA, "PostProcessAAPass", features.EnablePostProcess, false,
+                {"SceneColorLDR"}, {"PostProcess.AATemp"});
         AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", features.EnableSelectionOutline, false,
                 {"FrameRecipe.PresentSource", "EntityId", "SceneDepth"}, {"SelectionOutline"});
         AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
@@ -674,12 +690,30 @@ namespace Extrinsic::Graphics
         TextureRef presentSource = hdr;
         if (features.EnablePostProcess)
         {
+            // GRAPHICS-075 Slice C — split the postprocess chain into two
+            // ordered graph passes so the FXAA/SMAA legs sample the
+            // freshly-written `SceneColorLDR` through a proper framegraph
+            // read-after-write barrier rather than reading the umbrella
+            // pass's own color attachment mid-render-pass. `PostProcessPass`
+            // owns Bloom (Slice B) + ToneMap (Slice A); `PostProcessAAPass`
+            // owns FXAA (Slice C) + SMAA (Slice D). The framegraph compiler
+            // emits the `SceneColorLDR ColorAttachment → ShaderRead`
+            // transition between the two umbrella render-pass scopes.
+            // `presentSource` stays on `SceneColorLDR` for now — flipping
+            // present routing to `PostProcess.AATemp` (or the Slice D
+            // SMAA-renamed `AATemp.Edges`/`AATemp.Weights` siblings) is
+            // Slice D's recipe-level change; with `AntiAliasing == None`
+            // the AA pass body short-circuits to a no-op so an empty
+            // AATemp transient does not regress the present output.
             addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(hdr, TextureUsage::ShaderRead);
                 builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
                 builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
-                builder.Write(postProcessAATemp, TextureUsage::ColorAttachmentWrite);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
+            });
+            addOrderedPass("PostProcessAAPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(ldr, TextureUsage::ShaderRead);
+                builder.Write(postProcessAATemp, TextureUsage::ColorAttachmentWrite);
             });
             presentSource = ldr;
         }
