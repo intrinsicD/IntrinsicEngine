@@ -66,6 +66,7 @@ export import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 export import Geometry.ConvexHullBuilder;
 export import Geometry.KMeans;
 export import Geometry.PointCloud;
+export import Geometry.PointCloud.Conversion;
 export import Geometry.PointCloud.Utils;
 export import Geometry.PointCloud.IO;
 export import Geometry.Boolean;

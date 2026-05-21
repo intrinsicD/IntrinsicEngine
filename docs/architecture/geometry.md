@@ -89,9 +89,20 @@ rather than silent `bool`/`std::optional` failure. Soup validation errors stop
 soup-to-halfedge conversion before topology is built; halfedge-to-soup
 conversion preserves canonical `v:point` positions and reports warnings when
 deleted source elements force compaction or when generic attributes stay on the
-source container. Point-cloud and renderer-upload conversions remain planned
-geometry-owned data-shape contracts; geometry must not import assets, graphics,
-runtime, ECS, platform, or app layers to satisfy renderer staging needs.
+source container.
+
+`Geometry.PointCloud.Conversion` owns the explicit MeshSoup ↔ PointCloud
+conversion surface for cases where positions are the only shared shape (no
+topology, no face/corner domain). `Geometry::PointCloud::Conversion::ToIndexedMesh`
+copies cloud positions into a face-less soup and reports
+`DeletedPointsOmitted` and `AttributeRemapSkipped` warnings when the source
+cloud has deleted points or generic per-point attributes;
+`Geometry::PointCloud::Conversion::ToPointCloud` copies soup positions into a
+cloud, reports `FacesDropped` when topology is discarded, and reports
+`AttributeRemapSkipped` when generic vertex/face/corner attributes remain on
+the source soup. Renderer-upload staging remains a planned geometry-owned
+data-shape contract; geometry must not import assets, graphics, runtime, ECS,
+platform, or app layers to satisfy renderer staging needs.
 
 ## Migration note
 

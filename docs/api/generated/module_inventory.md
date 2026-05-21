@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 39 |
 | `ecs` | 26 |
-| `geometry` | 79 |
+| `geometry` | 80 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 52 |
@@ -156,6 +156,7 @@ Root scanned: `src`
 | `Geometry.Overlap` | `src/geometry/Geometry.Overlap.cppm` | `geometry` |
 | `Geometry.PCA` | `src/geometry/Geometry.PCA.cppm` | `geometry` |
 | `Geometry.Plane` | `src/geometry/Geometry.Plane.cppm` | `geometry` |
+| `Geometry.PointCloud.Conversion` | `src/geometry/Geometry.PointCloud.Conversion.cppm` | `geometry` |
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
 | `Geometry.PointCloud.IO` | `src/geometry/Geometry.PointCloud.IO.cppm` | `geometry` |
 | `Geometry.PointCloud.Utils` | `src/geometry/Geometry.PointCloud.Utils.cppm` | `geometry` |
@@ -464,4 +465,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **437**
+Total modules: **438**
