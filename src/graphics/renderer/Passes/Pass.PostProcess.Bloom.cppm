@@ -12,6 +12,15 @@ import Extrinsic.Graphics.PostProcessSystem;
 
 namespace Extrinsic::Graphics
 {
+	// GRAPHICS-075 Slice B.2 — canonical bloom mip-chain depth shared by the
+	// recipe-side `PostProcess.BloomScratch` declaration and the per-mip
+	// iteration in `PostProcessBloomPass::Execute`. The cap of six mips
+	// matches `docs/architecture/rendering-three-pass.md` ("capped at six
+	// mips, truncating at extents below 8x8"); centralising it keeps the
+	// recipe's `RHI::TextureDesc::MipLevels` and the pass's iteration count
+	// in lock-step so a future cap change touches one site instead of two.
+	export inline constexpr std::uint32_t kBloomMipChainLevels = 6u;
+
 	// GRAPHICS-075 Slice B.1 — pass-local push-constant block mirroring the
 	// `assets/shaders/post_bloom_downsample.frag` `layout(push_constant) Push`
 	// declaration byte-for-byte under Vulkan std430. `vec2` is 8-byte aligned
@@ -84,11 +93,22 @@ namespace Extrinsic::Graphics
 
 		void SetDownsamplePipeline(RHI::PipelineHandle pipeline) noexcept;
 		void SetUpsamplePipeline(RHI::PipelineHandle pipeline) noexcept;
+		// GRAPHICS-075 Slice B.2 — receives the per-frame `PostProcess.BloomScratch`
+		// transient handle so `Execute(...)` can emit the inline
+		// `ColorAttachment ↔ ShaderRead` barriers between mip iterations.
+		// The handle is transient (re-published each frame by the renderer
+		// after framegraph compile). When unset (default-constructed) the
+		// pass still records the per-mip bind/push/draw sequence but skips
+		// the barriers — the contract test sets a synthetic handle to drive
+		// the barrier-sequence assertion, and the renderer publishes the
+		// real transient handle just before invoking `Execute(...)`.
+		void SetBloomScratch(RHI::TextureHandle texture) noexcept;
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 
 	private:
 		PostProcessSystem& m_PostProcessSystem;
 		RHI::PipelineHandle m_DownsamplePipeline{};
 		RHI::PipelineHandle m_UpsamplePipeline{};
+		RHI::TextureHandle m_BloomScratch{};
 	};
 }

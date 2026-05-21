@@ -947,12 +947,27 @@ Concretely:
   across `RebuildOperationalResources()`. The umbrella branch fans out to
   `RecordPostProcessBloomPass(...)` *before* `RecordPostProcessToneMapPass(...)`
   so the bloom write naturally precedes the tonemap read of the bloom
-  buffer in recorded order; Slice B.1 keeps the helper's body at a single
+  buffer in recorded order; Slice B.1 kept the helper's body at a single
   bind/push/draw per stage (placeholder coverage for the CPU contract
-  gate), and Slice B.2 adds per-mip iteration over the
-  `BloomScratch.MipLevels = 6` mip chain together with the
-  `ColorAttachment → ShaderRead → ColorAttachment` inline barriers
-  between mips. The remaining Slices C/D/E `FXAA` / `SMAA` / `Histogram`
+  gate), and Slice B.2 now iterates the canonical
+  `BloomScratch.MipLevels = 6` mip pyramid: the recipe declares
+  `PostProcess.BloomScratch` with `MipLevels = kBloomMipChainLevels`
+  (the single source of truth shared with the pass body), the renderer
+  resolves the per-frame `PostProcess.BloomScratch` transient handle
+  from the compiled graph and republishes it via
+  `PostProcessBloomPass::SetBloomScratch(...)` before the helper runs,
+  and `Execute(...)` records `N-1 = 5` downsamples (mip 0 → 1, …,
+  N-2 → N-1) followed by `N-1 = 5` upsamples (mip N-1 → N-2, …, 1 → 0)
+  with the per-shader push payload sized for each step's *source* mip
+  extent and inline
+  `ColorAttachment → ShaderReadOnly → ColorAttachment` barriers
+  between iterations. The trailing `ColorAttachment → ShaderReadOnly`
+  on the final upsample (mip 1 → mip 0) leaves the bloom pyramid root
+  in `ShaderReadOnly` so the downstream tonemap read sees the right
+  layout without an extra framegraph-emitted barrier. `IsFirstMip = 1`
+  fires only on the mip 0 → mip 1 downsample (the `SceneColorHDR`-
+  sourced read), keeping the soft-threshold knee off the coarser
+  pyramid mips. The remaining Slices C/D/E `FXAA` / `SMAA` / `Histogram`
   helpers fan out from the same umbrella branch (mirroring
   `GRAPHICS-074`'s `"PickingPass"` fan-out) once their pipelines +
   retained LUTs + histogram readback drain land, and each is free to

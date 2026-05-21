@@ -1386,6 +1386,37 @@ namespace Extrinsic::Graphics
                         // `AccumulateCommandRecordStatus`'s usual rules; a
                         // non-operational device produces
                         // `SkippedNonOperational` uniformly.
+                        // GRAPHICS-075 Slice B.2 — resolve the per-frame
+                        // `PostProcess.BloomScratch` transient handle from the
+                        // compiled graph and republish it to the bloom pass
+                        // so `Execute(...)` can emit the inline
+                        // `ColorAttachment ↔ ShaderRead` barriers between
+                        // mip iterations against the correct texture. The
+                        // transient resource may be absent (e.g. when
+                        // `EnablePostProcess = false`); when absent we
+                        // publish `TextureHandle{}` and the pass falls
+                        // back to recording the per-mip bind/push/draw
+                        // sequence without barriers. The lookup walks the
+                        // compiled `TextureNames`/`TextureHandles` parallel
+                        // arrays the same way `PickingPass` resolves
+                        // `EntityId`/`PrimitiveId` upstream.
+                        if (m_PostProcessBloomPass.has_value())
+                        {
+                            RHI::TextureHandle bloomScratchHandle{};
+                            for (std::size_t i = 0; i < compiled->TextureNames.size(); ++i)
+                            {
+                                if (i >= compiled->TextureHandles.size())
+                                {
+                                    break;
+                                }
+                                if (compiled->TextureNames[i] == std::string_view{"PostProcess.BloomScratch"})
+                                {
+                                    bloomScratchHandle = compiled->TextureHandles[i];
+                                    break;
+                                }
+                            }
+                            m_PostProcessBloomPass->SetBloomScratch(bloomScratchHandle);
+                        }
                         const RenderCommandPassStatus bloomStatus =
                             RecordPostProcessBloomPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, bloomStatus);

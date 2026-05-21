@@ -4,6 +4,8 @@ module;
 
 module Extrinsic.Graphics.Pass.PostProcess.Bloom;
 
+import Extrinsic.RHI.Descriptors;
+
 namespace Extrinsic::Graphics
 {
 	namespace
@@ -11,6 +13,17 @@ namespace Extrinsic::Graphics
 		[[nodiscard]] float SafeInverse(const std::uint32_t dim) noexcept
 		{
 			return dim > 0u ? 1.0f / static_cast<float>(dim) : 0.0f;
+		}
+
+		// Compute the integer extent of mip `mipIndex` derived from `base` with
+		// the standard Vulkan mip-chain rule (`max(1, base >> mipIndex)`). The
+		// minimum-1 floor keeps the smallest mip valid even when the viewport
+		// is small enough that `base >> kBloomMipChainLevels-1` would otherwise
+		// underflow to zero.
+		[[nodiscard]] std::uint32_t MipExtent(const std::uint32_t base, const std::uint32_t mipIndex) noexcept
+		{
+			const std::uint32_t shifted = base >> mipIndex;
+			return shifted > 0u ? shifted : 1u;
 		}
 	}
 
@@ -29,9 +42,8 @@ namespace Extrinsic::Graphics
 		// upsample tent filter doesn't smear noise across the pyramid. The
 		// canonical default of 0.05 maps to a near-pass-through threshold
 		// of 1.0 (the shader's `SoftThreshold` knee is gentle around 1.0)
-		// which keeps Slice B.1's CPU contract gate deterministic while
-		// leaving headroom for Slice B.2's per-mip iteration to drive the
-		// threshold from a future `PostProcessSettings::BloomThreshold`
+		// which keeps the CPU contract gate deterministic while leaving
+		// headroom for a future `PostProcessSettings::BloomThreshold`
 		// field.
 		pc.Threshold = 1.0f;
 		pc.IsFirstMip = isFirstMip ? 1 : 0;
@@ -62,6 +74,11 @@ namespace Extrinsic::Graphics
 		m_UpsamplePipeline = pipeline;
 	}
 
+	void PostProcessBloomPass::SetBloomScratch(const RHI::TextureHandle texture) noexcept
+	{
+		m_BloomScratch = texture;
+	}
+
 	void PostProcessBloomPass::Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
 	{
 		if (!m_PostProcessSystem.IsInitialized() ||
@@ -70,55 +87,116 @@ namespace Extrinsic::Graphics
 			return;
 		}
 
-		// GRAPHICS-075 Slice B.1 — placeholder per-stage recording. The pass
-		// records one downsample bind/push/draw (when the downsample
-		// pipeline is available) and one upsample bind/push/draw (when the
-		// upsample pipeline is available). Both stages early-skip
-		// independently so a partially-published lease pair (e.g. only the
-		// downsample pipeline created) still surfaces structurally without
-		// faulting. Push-payload resolutions are sourced from the
-		// `CameraUBO`'s `ViewportWidth/Height` so the downsample shader's
-		// `vec2 InvSrcResolution = 1 / vec2(W, H)` and the upsample
-		// shader's `vec2 InvCoarserResolution = 1 / vec2(W/2, H/2)`
-		// produce real per-tap kernel offsets even in this placeholder
-		// step — feeding zero dimensions would collapse every sample tap
-		// onto the same texel and silently break the spatial filter shape
-		// the next Vulkan smoke would exercise. Slice B.2 replaces the
-		// single-step recording with per-mip iteration over
-		// `BloomScratch.MipLevels` mips, threading the matching per-mip
-		// inverse-resolution + `IsFirstMip` flag through the push payload
-		// and emitting the `ColorAttachment → ShaderRead → ColorAttachment`
-		// barriers between mips.
+		const bool hasDownsamplePipeline = m_DownsamplePipeline.IsValid();
+		const bool hasUpsamplePipeline = m_UpsamplePipeline.IsValid();
+		if (!hasDownsamplePipeline && !hasUpsamplePipeline)
+		{
+			return;
+		}
+
+		// GRAPHICS-075 Slice B.2 — iterate the canonical six-mip pyramid that
+		// the recipe declares (see `BuildDefaultFrameRecipe`'s
+		// `bloomScratchDesc.MipLevels = kBloomMipChainLevels`). For
+		// `N = kBloomMipChainLevels` we record `N-1` downsamples (mip 0 → 1,
+		// 1 → 2, …, N-2 → N-1) followed by `N-1` upsamples (mip N-1 → N-2,
+		// …, 1 → 0). Each step pushes the *source* mip extent for its
+		// shader's std430 push block (`InvSrcResolution` for downsample,
+		// `InvCoarserResolution` for upsample) so the 13-tap downsample
+		// kernel and 9-tap tent upsample kernel sample real per-mip texels
+		// rather than collapsing onto the origin of one fixed resolution.
+		// `IsFirstMip = 1` only on the mip-0 → mip-1 downsample step (the
+		// `SceneColorHDR`-sourced read that needs the soft-threshold knee).
+		//
+		// Between each step the pass emits `ColorAttachment ↔ ShaderRead`
+		// barriers on `m_BloomScratch` so the next step's read sees the
+		// previous step's write at the right layout. The barrier API
+		// (`ICommandContext::TextureBarrier`) operates on a whole texture
+		// rather than a single mip subresource, so the inline barriers
+		// codify the canonical *recording-shape* contract — fine-grained
+		// per-mip layout state would need a future
+		// `TextureBarrier(handle, mipRange, before, after)` RHI extension.
+		// When `m_BloomScratch` is unset (default-constructed) the pass
+		// still records the per-mip bind/push/draw sequence but skips the
+		// barriers; the contract test sets a synthetic handle to exercise
+		// the barrier-sequence assertion, and the renderer publishes the
+		// real transient handle just before invoking `Execute(...)`.
 		const PostProcessSettings& settings = m_PostProcessSystem.GetSettings();
 		const auto viewportWidth = static_cast<std::uint32_t>(
 			camera.ViewportWidth > 0.0f ? camera.ViewportWidth : 0.0f);
 		const auto viewportHeight = static_cast<std::uint32_t>(
 			camera.ViewportHeight > 0.0f ? camera.ViewportHeight : 0.0f);
-		if (m_DownsamplePipeline.IsValid())
+		const bool emitBarriers = m_BloomScratch.IsValid();
+
+		if (hasDownsamplePipeline)
 		{
-			// First downsample reads `SceneColorHDR` at full viewport
-			// extent and writes mip 1 of `BloomScratch`; `IsFirstMip = 1`
-			// applies the soft-threshold knee.
-			const PostProcessBloomDownsamplePushConstants downPc =
-				BuildPostProcessBloomDownsamplePushConstants(
-					settings, viewportWidth, viewportHeight, true);
-			cmd.BindPipeline(m_DownsamplePipeline);
-			cmd.PushConstants(&downPc, sizeof(downPc));
-			cmd.Draw(3u, 1u, 0u, 0u);
+			for (std::uint32_t step = 1u; step < kBloomMipChainLevels; ++step)
+			{
+				// Each downsample step reads mip `step - 1` and writes mip
+				// `step`. Push the *source* mip's extent so the shader's
+				// `InvSrcResolution = 1 / vec2(W, H)` produces the
+				// per-tap kernel offsets for that mip. `IsFirstMip = 1`
+				// only on step 1 (the `SceneColorHDR`-sourced read) so
+				// only the highest-resolution downsample applies the
+				// soft-threshold knee.
+				const std::uint32_t srcMip = step - 1u;
+				const std::uint32_t srcW = MipExtent(viewportWidth, srcMip);
+				const std::uint32_t srcH = MipExtent(viewportHeight, srcMip);
+				const bool isFirstMip = (step == 1u);
+				const PostProcessBloomDownsamplePushConstants downPc =
+					BuildPostProcessBloomDownsamplePushConstants(settings, srcW, srcH, isFirstMip);
+				cmd.BindPipeline(m_DownsamplePipeline);
+				cmd.PushConstants(&downPc, sizeof(downPc));
+				cmd.Draw(3u, 1u, 0u, 0u);
+				// After writing mip `step` as a color attachment, transition
+				// it to a shader-readable layout so the next step (the next
+				// downsample read or the first upsample read) can sample
+				// it. Emitting the barrier after every downsample (rather
+				// than only between adjacent downsamples) keeps the inline
+				// recording pattern uniform across the chain.
+				if (emitBarriers)
+				{
+					cmd.TextureBarrier(m_BloomScratch,
+					                   RHI::TextureLayout::ColorAttachment,
+					                   RHI::TextureLayout::ShaderReadOnly);
+				}
+			}
 		}
-		if (m_UpsamplePipeline.IsValid())
+
+		if (hasUpsamplePipeline)
 		{
-			// Single-step placeholder upsample reads from the coarser
-			// half-viewport mip; Slice B.2's per-mip iteration drives the
-			// actual coarser dimension per upsample step.
-			const std::uint32_t coarserWidth = viewportWidth > 1u ? viewportWidth / 2u : viewportWidth;
-			const std::uint32_t coarserHeight = viewportHeight > 1u ? viewportHeight / 2u : viewportHeight;
-			const PostProcessBloomUpsamplePushConstants upPc =
-				BuildPostProcessBloomUpsamplePushConstants(
-					settings, coarserWidth, coarserHeight);
-			cmd.BindPipeline(m_UpsamplePipeline);
-			cmd.PushConstants(&upPc, sizeof(upPc));
-			cmd.Draw(3u, 1u, 0u, 0u);
+			for (std::uint32_t step = kBloomMipChainLevels - 1u; step >= 1u; --step)
+			{
+				// Each upsample step reads mip `step` (the coarser mip) and
+				// writes mip `step - 1` (the finer mip). Before writing the
+				// destination mip, transition it back from `ShaderReadOnly`
+				// (where it was left by the downsample chain) to
+				// `ColorAttachment` so the upsample's color attachment
+				// write is layout-valid. After the draw a trailing
+				// `ColorAttachment → ShaderReadOnly` barrier readies the
+				// just-written finer mip for the next upsample step's
+				// read; the final iteration's trailing barrier also leaves
+				// mip 0 in `ShaderReadOnly` so the downstream tonemap pass
+				// can sample the bloom pyramid root.
+				if (emitBarriers)
+				{
+					cmd.TextureBarrier(m_BloomScratch,
+					                   RHI::TextureLayout::ShaderReadOnly,
+					                   RHI::TextureLayout::ColorAttachment);
+				}
+				const std::uint32_t coarserW = MipExtent(viewportWidth, step);
+				const std::uint32_t coarserH = MipExtent(viewportHeight, step);
+				const PostProcessBloomUpsamplePushConstants upPc =
+					BuildPostProcessBloomUpsamplePushConstants(settings, coarserW, coarserH);
+				cmd.BindPipeline(m_UpsamplePipeline);
+				cmd.PushConstants(&upPc, sizeof(upPc));
+				cmd.Draw(3u, 1u, 0u, 0u);
+				if (emitBarriers)
+				{
+					cmd.TextureBarrier(m_BloomScratch,
+					                   RHI::TextureLayout::ColorAttachment,
+					                   RHI::TextureLayout::ShaderReadOnly);
+				}
+			}
 		}
 	}
 }

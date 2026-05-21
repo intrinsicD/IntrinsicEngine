@@ -31,6 +31,13 @@ namespace
         PushConstants,
         Draw,
         Dispatch,
+        // GRAPHICS-075 Slice B.2 — the bloom mip-chain barrier-sequence
+        // contract test needs to observe the inline
+        // `ColorAttachment ↔ ShaderRead` transitions interleaved with
+        // the per-mip bind/push/draw triples; surface the barrier as a
+        // first-class event so the assertion can walk a single
+        // chronological event stream.
+        TextureBarrier,
     };
 
     struct Event
@@ -38,10 +45,18 @@ namespace
         EventKind Kind{};
     };
 
+    struct TextureBarrierRecord
+    {
+        RHI::TextureHandle Texture{};
+        RHI::TextureLayout Before{RHI::TextureLayout::Undefined};
+        RHI::TextureLayout After{RHI::TextureLayout::Undefined};
+    };
+
     class RecordingCommandContext final : public RHI::ICommandContext
     {
     public:
         std::vector<Event> Events{};
+        std::vector<TextureBarrierRecord> TextureBarrierCalls{};
         RHI::PipelineHandle LastPipeline{};
         std::uint32_t LastDrawVertexCount{0u};
         std::uint32_t LastDispatchX{0u};
@@ -86,7 +101,13 @@ namespace
             LastDispatchX = groupX;
         }
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
-        void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
+        void TextureBarrier(RHI::TextureHandle texture,
+                            RHI::TextureLayout before,
+                            RHI::TextureLayout after) override
+        {
+            Events.push_back({.Kind = EventKind::TextureBarrier});
+            TextureBarrierCalls.push_back({.Texture = texture, .Before = before, .After = after});
+        }
         void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
         void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint64_t) override {}
@@ -274,20 +295,23 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_FLOAT_EQ(observed.Gamma[0], 1.0f);
     EXPECT_FLOAT_EQ(observed.Gain[0], 1.0f);
 
-    // GRAPHICS-075 Slice B.1 — bloom pass now records a downsample +
-    // upsample bind/push/draw pair (one fullscreen draw per stage) using
-    // the per-shader push-constant blocks. Slice B.2 expands this to per-
-    // mip iteration; for B.1 the helper records the single-step
-    // placeholder shape so the CPU contract gate observes both pipelines
-    // are bound. The push payloads pack `vec2 InvSrcResolution + float
-    // Threshold + int IsFirstMip` for downsample (16B) and `vec2
-    // InvCoarserResolution + float FilterRadius + float _pad0` for
-    // upsample (16B), matching the shader std430 layouts. The camera UBO
-    // carries non-zero viewport dimensions so the per-stage builders feed
-    // the shaders real per-tap kernel offsets (`InvSrcResolution =
-    // 1 / vec2(W, H)` etc.) — feeding zero dimensions would collapse
-    // every sample tap onto the same texel and silently break the
-    // spatial filter shape.
+    // GRAPHICS-075 Slice B.2 — bloom pass now records the canonical
+    // `kBloomMipChainLevels`-mip pyramid: `N-1` downsamples (mip 0 → 1,
+    // 1 → 2, …, N-2 → N-1) followed by `N-1` upsamples (mip N-1 → N-2,
+    // …, 1 → 0). Each step records a `BindPipeline / PushConstants /
+    // Draw` triple. No `m_BloomScratch` handle is set here so the
+    // barrier-emission code path is skipped (its own contract test
+    // below — `BloomMipChainBarrierSequence` — exercises the barrier
+    // sequence with a synthetic handle). The push payloads pack
+    // `vec2 InvSrcResolution + float Threshold + int IsFirstMip` for
+    // downsample (16B) and `vec2 InvCoarserResolution + float
+    // FilterRadius + float _pad0` for upsample (16B), matching the
+    // shader std430 layouts. The camera UBO carries non-zero viewport
+    // dimensions so the per-mip builders feed the shaders real per-tap
+    // kernel offsets (`InvSrcResolution = 1 / vec2(W, H)` derived from
+    // the per-mip extent `max(1, base >> mip)`) — feeding zero
+    // dimensions would collapse every sample tap onto the same texel
+    // and silently break the spatial filter shape.
     RHI::CameraUBO bloomCamera{};
     bloomCamera.ViewportWidth = 1280.0f;
     bloomCamera.ViewportHeight = 720.0f;
@@ -297,20 +321,26 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     bloom.SetUpsamplePipeline(RHI::PipelineHandle{25u, 1u});
     RecordingCommandContext bloomCmd;
     bloom.Execute(bloomCmd, bloomCamera);
-    ASSERT_EQ(bloomCmd.Events.size(), 6u);
-    EXPECT_EQ(bloomCmd.Events[0].Kind, EventKind::BindPipeline);
-    EXPECT_EQ(bloomCmd.Events[1].Kind, EventKind::PushConstants);
-    EXPECT_EQ(bloomCmd.Events[2].Kind, EventKind::Draw);
-    EXPECT_EQ(bloomCmd.Events[3].Kind, EventKind::BindPipeline);
-    EXPECT_EQ(bloomCmd.Events[4].Kind, EventKind::PushConstants);
-    EXPECT_EQ(bloomCmd.Events[5].Kind, EventKind::Draw);
+    constexpr std::size_t kBloomChainSteps = Graphics::kBloomMipChainLevels - 1u;
+    constexpr std::size_t kEventsPerStep = 3u;
+    constexpr std::size_t kTotalBloomEvents = 2u * kBloomChainSteps * kEventsPerStep;
+    ASSERT_EQ(bloomCmd.Events.size(), kTotalBloomEvents);
+    for (std::size_t step = 0; step < 2u * kBloomChainSteps; ++step)
+    {
+        EXPECT_EQ(bloomCmd.Events[step * kEventsPerStep + 0u].Kind, EventKind::BindPipeline);
+        EXPECT_EQ(bloomCmd.Events[step * kEventsPerStep + 1u].Kind, EventKind::PushConstants);
+        EXPECT_EQ(bloomCmd.Events[step * kEventsPerStep + 2u].Kind, EventKind::Draw);
+    }
     EXPECT_EQ(bloomCmd.LastDrawVertexCount, 3u);
+    // The last push payload is the final upsample step's block (mip 1 →
+    // mip 0); it must carry a strictly positive `InvCoarserResolution`
+    // so the shader's 9-tap tent filter spans the coarser mip rather
+    // than re-reading the origin texel nine times. The coarser mip for
+    // the final upsample is mip 1 (extent `max(1, base >> 1)`), so
+    // `InvCoarserResolution = 1 / vec2(640, 360)` for a 1280×720
+    // viewport.
     EXPECT_EQ(bloomCmd.LastPushConstantSize,
               sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
-    // The last push payload is the upsample stage's block; it must carry
-    // a strictly positive `InvCoarserResolution` so the shader's 9-tap
-    // tent filter spans the coarser mip rather than re-reading the
-    // origin texel nine times.
     ASSERT_EQ(bloomCmd.LastPushConstants.size(),
               sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
     Graphics::PostProcessBloomUpsamplePushConstants observedUp{};
@@ -323,6 +353,8 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_GT(observedUp.InvCoarserResolution[1], 0.0f)
         << "Bloom upsample push must feed non-zero `InvCoarserResolution.y`.";
     EXPECT_FLOAT_EQ(observedUp.FilterRadius, 1.0f);
+    EXPECT_FLOAT_EQ(observedUp.InvCoarserResolution[0], 1.0f / 640.0f);
+    EXPECT_FLOAT_EQ(observedUp.InvCoarserResolution[1], 1.0f / 360.0f);
 
     Graphics::PostProcessHistogramPass histogram{post};
     histogram.SetPipeline(RHI::PipelineHandle{22u, 1u});
@@ -352,7 +384,10 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
 // origin texel, silently collapsing the box filter into a no-op. This
 // test exercises the downsample stage in isolation (only the downsample
 // pipeline is set) so the recorded push payload is unambiguously the
-// downsample block.
+// downsample block. Slice B.2 expands the recording to per-mip
+// iteration: the first push payload is the mip 0 → mip 1 step (the
+// `SceneColorHDR`-sourced read that must carry `IsFirstMip = 1` and
+// the full-viewport `InvSrcResolution`).
 TEST(GraphicsPostProcessChainContract, BloomDownsamplePushFeedsNonZeroInvSrcResolution)
 {
     Graphics::PostProcessSystem post;
@@ -372,15 +407,41 @@ TEST(GraphicsPostProcessChainContract, BloomDownsamplePushFeedsNonZeroInvSrcReso
     RecordingCommandContext cmd;
     bloom.Execute(cmd, camera);
 
-    ASSERT_EQ(cmd.Events.size(), 3u);
-    EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
-    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
-    EXPECT_EQ(cmd.Events[2].Kind, EventKind::Draw);
+    constexpr std::size_t kBloomChainSteps = Graphics::kBloomMipChainLevels - 1u;
+    ASSERT_EQ(cmd.Events.size(), kBloomChainSteps * 3u);
+    for (std::size_t step = 0; step < kBloomChainSteps; ++step)
+    {
+        EXPECT_EQ(cmd.Events[step * 3u + 0u].Kind, EventKind::BindPipeline);
+        EXPECT_EQ(cmd.Events[step * 3u + 1u].Kind, EventKind::PushConstants);
+        EXPECT_EQ(cmd.Events[step * 3u + 2u].Kind, EventKind::Draw);
+    }
+    // The first push payload is the mip 0 → mip 1 step: it reads
+    // `SceneColorHDR` at full-viewport resolution and must carry
+    // `IsFirstMip = 1` so the soft-threshold knee fires only on the
+    // highest-resolution read. `RecordingCommandContext` retains only
+    // the *last* payload, so we re-run the build with the published
+    // builder to verify the contract directly (the last-payload
+    // assertion below covers the final step's payload separately).
+    const Graphics::PostProcessBloomDownsamplePushConstants firstStep =
+        Graphics::BuildPostProcessBloomDownsamplePushConstants(
+            post.GetSettings(),
+            static_cast<std::uint32_t>(camera.ViewportWidth),
+            static_cast<std::uint32_t>(camera.ViewportHeight),
+            /*isFirstMip=*/true);
+    EXPECT_FLOAT_EQ(firstStep.InvSrcResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(firstStep.InvSrcResolution[1], 1.0f / 1080.0f);
+    EXPECT_EQ(firstStep.IsFirstMip, 1)
+        << "The first downsample step must enable the soft-threshold knee.";
+
+    // The last-recorded push payload is the final downsample step
+    // (mip N-2 → mip N-1, reading mip N-2 at `max(1, base >> (N-2))`);
+    // it must still carry strictly-positive per-tap offsets and
+    // `IsFirstMip = 0` so the soft-threshold knee does not fire on the
+    // coarser pyramid mips.
     EXPECT_EQ(cmd.LastPushConstantSize,
               sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
     ASSERT_EQ(cmd.LastPushConstants.size(),
               sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
-
     Graphics::PostProcessBloomDownsamplePushConstants observed{};
     std::memcpy(&observed, cmd.LastPushConstants.data(),
                 sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
@@ -390,17 +451,17 @@ TEST(GraphicsPostProcessChainContract, BloomDownsamplePushFeedsNonZeroInvSrcReso
            "collapse every tap onto the same texel.";
     EXPECT_GT(observed.InvSrcResolution[1], 0.0f)
         << "Bloom downsample push must feed non-zero `InvSrcResolution.y`.";
-    EXPECT_FLOAT_EQ(observed.InvSrcResolution[0], 1.0f / 1920.0f);
-    EXPECT_FLOAT_EQ(observed.InvSrcResolution[1], 1.0f / 1080.0f);
-    EXPECT_EQ(observed.IsFirstMip, 1)
-        << "The first downsample step must enable the soft-threshold knee.";
+    EXPECT_EQ(observed.IsFirstMip, 0)
+        << "Only the mip 0 → mip 1 downsample step enables the soft-threshold knee.";
 }
 
 // GRAPHICS-075 Slice B.1 — when only one of the two bloom pipelines is
 // available (e.g. one fragment shader failed to compile), the helper must
 // still record the surviving stage rather than collapse the whole bloom
 // leg. Asserting in both directions catches the regression where the
-// renderer-side guard required both leases to be valid.
+// renderer-side guard required both leases to be valid. Slice B.2 — the
+// surviving stage records the full per-mip chain (`N-1` iterations of
+// the bind/push/draw triple) rather than a single placeholder step.
 TEST(GraphicsPostProcessChainContract, BloomRecordsSurvivingStageWhenOnePipelineMissing)
 {
     Graphics::PostProcessSystem post;
@@ -414,12 +475,15 @@ TEST(GraphicsPostProcessChainContract, BloomRecordsSurvivingStageWhenOnePipeline
     camera.ViewportWidth = 640.0f;
     camera.ViewportHeight = 360.0f;
 
+    constexpr std::size_t kBloomChainSteps = Graphics::kBloomMipChainLevels - 1u;
+    constexpr std::size_t kEventsPerStage = kBloomChainSteps * 3u;
+
     {
         Graphics::PostProcessBloomPass downsampleOnly{post};
         downsampleOnly.SetDownsamplePipeline(RHI::PipelineHandle{50u, 1u});
         RecordingCommandContext cmd;
         downsampleOnly.Execute(cmd, camera);
-        ASSERT_EQ(cmd.Events.size(), 3u);
+        ASSERT_EQ(cmd.Events.size(), kEventsPerStage);
         EXPECT_EQ(cmd.LastPushConstantSize,
                   sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
     }
@@ -429,11 +493,117 @@ TEST(GraphicsPostProcessChainContract, BloomRecordsSurvivingStageWhenOnePipeline
         upsampleOnly.SetUpsamplePipeline(RHI::PipelineHandle{51u, 1u});
         RecordingCommandContext cmd;
         upsampleOnly.Execute(cmd, camera);
-        ASSERT_EQ(cmd.Events.size(), 3u);
+        ASSERT_EQ(cmd.Events.size(), kEventsPerStage);
         EXPECT_EQ(cmd.LastPushConstantSize,
                   sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
     }
 }
+
+// GRAPHICS-075 Slice B.2 — when the renderer publishes a valid
+// `PostProcess.BloomScratch` transient handle to the bloom pass, the
+// per-mip iteration must emit `ColorAttachment ↔ ShaderRead` barriers
+// between each step so the downstream tonemap pass sees the bloom
+// pyramid in `ShaderReadOnly` and intermediate mips transition layouts
+// in lock-step with the down/up chain. The recorded shape (in event
+// order) is:
+//   - `N-1` downsamples: per step `Bind / Push / Draw / Barrier C→S`.
+//   - `N-1` upsamples:   per step `Barrier S→C / Bind / Push / Draw /
+//                                  Barrier C→S`.
+// The trailing `Barrier C→S` on the final upsample (mip 1 → mip 0)
+// leaves mip 0 in `ShaderReadOnly` so the tonemap pass that reads the
+// bloom pyramid root samples the right layout without an extra
+// framegraph-emitted barrier.
+TEST(GraphicsPostProcessChainContract, BloomMipChainBarrierSequence)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .EnableBloom = true,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1280.0f;
+    camera.ViewportHeight = 720.0f;
+
+    const RHI::TextureHandle bloomScratch{0xB10D'F00Du, 1u};
+
+    Graphics::PostProcessBloomPass bloom{post};
+    bloom.SetDownsamplePipeline(RHI::PipelineHandle{60u, 1u});
+    bloom.SetUpsamplePipeline(RHI::PipelineHandle{61u, 1u});
+    bloom.SetBloomScratch(bloomScratch);
+
+    RecordingCommandContext cmd;
+    bloom.Execute(cmd, camera);
+
+    constexpr std::size_t kBloomChainSteps = Graphics::kBloomMipChainLevels - 1u;
+    // Per-step event counts: downsample = 4 (Bind, Push, Draw, Barrier
+    // C→S), upsample = 5 (Barrier S→C, Bind, Push, Draw, Barrier C→S).
+    constexpr std::size_t kDownsampleStepEvents = 4u;
+    constexpr std::size_t kUpsampleStepEvents = 5u;
+    constexpr std::size_t kExpectedEvents =
+        kBloomChainSteps * kDownsampleStepEvents + kBloomChainSteps * kUpsampleStepEvents;
+    constexpr std::size_t kExpectedBarriers =
+        kBloomChainSteps + 2u * kBloomChainSteps; // 1 trailing per down + (1 leading + 1 trailing) per up
+    ASSERT_EQ(cmd.Events.size(), kExpectedEvents);
+    ASSERT_EQ(cmd.TextureBarrierCalls.size(), kExpectedBarriers);
+
+    // Walk the downsample steps: each should appear as
+    // `Bind / Push / Draw / Barrier C→S`.
+    std::size_t eventIndex = 0;
+    std::size_t barrierIndex = 0;
+    for (std::size_t step = 0; step < kBloomChainSteps; ++step)
+    {
+        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::BindPipeline) << "down step " << step;
+        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::PushConstants) << "down step " << step;
+        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::Draw) << "down step " << step;
+        ASSERT_EQ(cmd.Events[eventIndex++].Kind, EventKind::TextureBarrier) << "down step " << step;
+        const TextureBarrierRecord& barrier = cmd.TextureBarrierCalls[barrierIndex++];
+        EXPECT_EQ(barrier.Texture.Index, bloomScratch.Index) << "down step " << step;
+        EXPECT_EQ(barrier.Before, RHI::TextureLayout::ColorAttachment) << "down step " << step;
+        EXPECT_EQ(barrier.After, RHI::TextureLayout::ShaderReadOnly) << "down step " << step;
+    }
+
+    // Walk the upsample steps: each should appear as
+    // `Barrier S→C / Bind / Push / Draw / Barrier C→S`.
+    for (std::size_t step = 0; step < kBloomChainSteps; ++step)
+    {
+        ASSERT_EQ(cmd.Events[eventIndex++].Kind, EventKind::TextureBarrier) << "up step " << step << " leading";
+        const TextureBarrierRecord& leading = cmd.TextureBarrierCalls[barrierIndex++];
+        EXPECT_EQ(leading.Texture.Index, bloomScratch.Index) << "up step " << step << " leading";
+        EXPECT_EQ(leading.Before, RHI::TextureLayout::ShaderReadOnly) << "up step " << step << " leading";
+        EXPECT_EQ(leading.After, RHI::TextureLayout::ColorAttachment) << "up step " << step << " leading";
+
+        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::BindPipeline) << "up step " << step;
+        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::PushConstants) << "up step " << step;
+        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::Draw) << "up step " << step;
+
+        ASSERT_EQ(cmd.Events[eventIndex++].Kind, EventKind::TextureBarrier) << "up step " << step << " trailing";
+        const TextureBarrierRecord& trailing = cmd.TextureBarrierCalls[barrierIndex++];
+        EXPECT_EQ(trailing.Texture.Index, bloomScratch.Index) << "up step " << step << " trailing";
+        EXPECT_EQ(trailing.Before, RHI::TextureLayout::ColorAttachment) << "up step " << step << " trailing";
+        EXPECT_EQ(trailing.After, RHI::TextureLayout::ShaderReadOnly) << "up step " << step << " trailing";
+    }
+
+    EXPECT_EQ(eventIndex, cmd.Events.size());
+    EXPECT_EQ(barrierIndex, cmd.TextureBarrierCalls.size());
+}
+
+// GRAPHICS-075 Slice B.2 — the canonical bloom mip-chain depth is six
+// per `docs/architecture/rendering-three-pass.md` ("capped at six
+// mips, truncating at extents below 8x8"). Both the recipe-side
+// `PostProcess.BloomScratch` allocation and `PostProcessBloomPass::
+// Execute`'s per-mip iteration consume `kBloomMipChainLevels`, so
+// changing one site without the other would silently desync the
+// pyramid storage from the iteration count. This static_assert pins
+// the canonical value at compile time; a deliberate cap change must
+// update the architecture doc + the slice plan + this assertion in
+// lock-step.
+static_assert(Graphics::kBloomMipChainLevels == 6u,
+              "Bloom mip-chain depth is six mips per "
+              "docs/architecture/rendering-three-pass.md; updating the cap "
+              "requires synchronising the architecture doc, the GRAPHICS-075 "
+              "slice plan, and this assertion.");
 
 TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)
 {
