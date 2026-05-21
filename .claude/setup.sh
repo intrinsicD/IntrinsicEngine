@@ -39,20 +39,42 @@ fi
 # --------------------------------------------------------------------------
 # Fast path: nothing to install. Return immediately, no async, no log churn.
 # --------------------------------------------------------------------------
+# Fast path requires BOTH the C++23 toolchain AND the windowing/Vulkan dev
+# headers consumed by the `ci-vulkan` preset + GLFW. Checking only clang would
+# pass on a base image where clang-20 is preinstalled but the X11/Vulkan
+# packages are not, leaving `ci-linux-clang`/`ci-vulkan`/`nightly-deep` unable
+# to build. The probe stays cheap: a handful of `dpkg -s` calls.
 toolchain_present() {
-    local ver
+    local ver pkg
+    local required_pkgs=(
+        libvulkan-dev
+        vulkan-tools
+        spirv-tools
+        libx11-dev
+        libxcursor-dev
+        libxrandr-dev
+        libxinerama-dev
+        libxi-dev
+        libxext-dev
+        libxfixes-dev
+        libwayland-dev
+        libxkbcommon-dev
+        libgl1-mesa-dev
+    )
     for ver in 22 21 20; do
-        if command -v "clang-${ver}" >/dev/null 2>&1 \
-            && command -v "clang++-${ver}" >/dev/null 2>&1 \
-            && command -v "clang-scan-deps-${ver}" >/dev/null 2>&1; then
-            return 0
-        fi
+        command -v "clang-${ver}"            >/dev/null 2>&1 || continue
+        command -v "clang++-${ver}"          >/dev/null 2>&1 || continue
+        command -v "clang-scan-deps-${ver}"  >/dev/null 2>&1 || continue
+        for pkg in "${required_pkgs[@]}"; do
+            dpkg -s "$pkg" >/dev/null 2>&1 || return 1
+        done
+        return 0
     done
     return 1
 }
 
 if toolchain_present; then
-    printf 'IntrinsicEngine: clang-20+ toolchain already present; skipping provisioning.\n' >"$LOG"
+    printf 'IntrinsicEngine: clang-20+ toolchain and windowing/Vulkan dev headers already present; skipping provisioning.\n' >"$LOG"
     : >"$DONE_MARKER"
     rm -f "$FAIL_MARKER"
     exit 0
