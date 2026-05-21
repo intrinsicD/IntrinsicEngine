@@ -28,8 +28,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-rYQnA`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Predecessor slice: `tasks/done/GEOIO-002E-mesh-ply-binary-importer.md`
   introduced the `PlyFormat`/`PlyScalar`/`PlyProperty`/`PlyElement`
   helpers and the `ParseBinaryPLY` pattern for mesh PLY in
@@ -282,4 +282,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
     domain-selection metadata for asset/runtime routing, importer
     parity hardening for additional point-cloud variants) stays
     tracked under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

@@ -1,6 +1,7 @@
 module;
 
 #include <cstdio>
+#include <cmath>
 #include <fstream>
 #include <ios>
 #include <optional>
@@ -61,6 +62,11 @@ namespace Geometry::GraphIO
         [[nodiscard]] Core::Expected<GraphIOResult> InvalidGraphFormat()
         {
             return Core::Err<GraphIOResult>(Core::ErrorCode::InvalidFormat);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
         }
 
         void ApplyPathInfo(GraphIOResult& result, std::string_view path)
@@ -126,6 +132,10 @@ namespace Geometry::GraphIO
                     if (x && y && z)
                     {
                         position = glm::vec3(*x, *y, *z);
+                        if (!IsFinite(position))
+                        {
+                            return InvalidGraphFormat();
+                        }
                         labelStart = 4;
                     }
                 }
@@ -169,6 +179,10 @@ namespace Geometry::GraphIO
                 {
                     if (const auto weight = ParseNumber<float>(tokens[2]))
                     {
+                        if (!std::isfinite(*weight))
+                        {
+                            return InvalidGraphFormat();
+                        }
                         if (!edgeWeights.IsValid())
                         {
                             edgeWeights = result.Graph.GetOrAddEdgeProperty<float>("e:weight", 1.0f);
@@ -263,6 +277,10 @@ namespace Geometry::GraphIO
             {
                 if (const auto weight = ParseNumber<float>(tokens[2]))
                 {
+                    if (!std::isfinite(*weight))
+                    {
+                        return InvalidGraphFormat();
+                    }
                     if (!edgeWeights.IsValid())
                     {
                         edgeWeights = result.Graph.GetOrAddEdgeProperty<float>("e:weight", 1.0f);
@@ -323,6 +341,10 @@ namespace Geometry::GraphIO
                 continue;
             }
             const glm::vec3 p = source.VertexPosition(v);
+            if (!IsFinite(p))
+            {
+                return GraphIOWriteStatus::FileWriteError;
+            }
             int written = std::snprintf(buffer, sizeof(buffer),
                                         "%zu %.6f %.6f %.6f",
                                         i,
@@ -376,6 +398,10 @@ namespace Geometry::GraphIO
             if (weightPresent || labelPresent)
             {
                 const float weight = weightPresent ? edgeWeights[e.Index] : 1.0f;
+                if (!std::isfinite(weight))
+                {
+                    return GraphIOWriteStatus::FileWriteError;
+                }
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %.6f",
                                         static_cast<double>(weight));
@@ -455,6 +481,10 @@ namespace Geometry::GraphIO
             if (hasEdgeWeights || labelPresent)
             {
                 const float weight = hasEdgeWeights ? edgeWeights[e.Index] : 1.0f;
+                if (!std::isfinite(weight))
+                {
+                    return GraphIOWriteStatus::FileWriteError;
+                }
                 written = std::snprintf(buffer, sizeof(buffer),
                                         " %.6f",
                                         static_cast<double>(weight));

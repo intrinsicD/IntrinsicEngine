@@ -32,8 +32,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-ZGCu4`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002J` shipped the symmetric ASCII PLY point-cloud writer
   (`Geometry::PointCloudIO::WritePLY`). `GEOIO-002K` shipped the binary
   little-endian PLY point-cloud writer
@@ -205,4 +205,4 @@ python3 tools/docs/check_doc_links.py --root .
     parity hardening; packed-`rgb`/`rgba` PCD plus
     `binary_compressed` LZF decompression) stays tracked under the
     parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

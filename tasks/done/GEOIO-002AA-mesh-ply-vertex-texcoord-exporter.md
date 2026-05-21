@@ -14,7 +14,7 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `main` local agent workflow.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002T` and `GEOIO-002U` added OBJ vertex-texcoord import/export parity.
 - `GEOIO-002Z` added mesh PLY vertex-texcoord import parity for paired `s/t`, `u/v`, `texture_u/texture_v`, `texcoord_u/texcoord_v`, or `u0/v0` Float32 properties.
 - Before this slice, `WritePLY` and `WritePLYBinary` serialized positions plus optional normals/colors but dropped a sized `v:texcoord` property.

@@ -24,7 +24,7 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-rX6Um`.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Predecessor slice: `tasks/done/GEOIO-002A-mesh-obj-exporter.md` introduced
   `MeshIOWriteStatus` and `WriteOBJ` with `EmptyMesh`/`InvalidFace`/
   `InvalidPath`/`FileWriteError` diagnostics; this slice reuses the same
@@ -190,4 +190,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
     `WritesPLY*`/`WritePLYRejects*` cases).
   - The remaining `GEOIO-002` exporter slice (STL) is still tracked
     under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

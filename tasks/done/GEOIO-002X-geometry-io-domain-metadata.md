@@ -13,7 +13,7 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `main` local workspace.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002` requires domain-selection metadata needed by asset/runtime import routing while preserving geometry's independence from assets/runtime/graphics.
 - `ASSETIO-001` remains responsible for byte transport, asset payload registration, ambiguity policy, and higher-layer routing decisions.
 

@@ -15,7 +15,7 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-8m8X9`.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002W` added mesh PLY vertex normal/color **import** (ASCII and binary readers populate `v:normal` and `v:color`); `GEOIO-002Y` added mesh PLY vertex color **export**. Mesh PLY texture coordinates are not yet imported, so PLY-sourced meshes with per-vertex UVs lose them at the geometry boundary.
 - The legacy mesh PLY importer (`src/legacy/Graphics/Importers/Graphics.Importers.PLY.cpp`) recognizes the texcoord alias set `s|u|texture_u|texcoord_u|u0` and `t|v|texture_v|texcoord_v|v0`; this slice mirrors the same alias set for geometry-owned PLY.
 - The OBJ importer (`Geometry::MeshIO::LoadOBJ`) already attaches a `v:texcoord` `glm::vec2` property when `vt` lockstep matches the vertex count (`GEOIO-002T`), and the OBJ writer (`Geometry::MeshIO::WriteOBJ`) round-trips that property (`GEOIO-002U`). Adding PLY texcoord import lets mesh data flow between OBJ and PLY without losing UVs through the geometry seam.

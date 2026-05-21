@@ -38,8 +38,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-POcO4`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002A`/`L` shipped the geometry-owned OBJ writer pair
   (`WriteOBJ` ASCII and `WritePLYBinary`/`WritePLY` PLY peers).
   `WriteOBJ` already emits `vn nx ny nz` lines in lockstep with
@@ -210,4 +210,4 @@ python3 tools/docs/check_doc_links.py --root .
     duplication or `vt` UV ingest; packed-`rgb`/`rgba` PCD
     plus `binary_compressed` LZF decompression) stays tracked
     under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

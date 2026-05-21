@@ -4,6 +4,7 @@ module;
 #include <array>
 #include <bit>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -141,6 +142,35 @@ namespace Geometry::PointCloudIO
             return value > 1.0f ? std::clamp(value / 255.0f, 0.0f, 1.0f) : std::clamp(value, 0.0f, 1.0f);
         }
 
+        [[nodiscard]] bool IsFinite(const glm::vec3& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec4& value)
+        {
+            return std::isfinite(value.r) && std::isfinite(value.g) &&
+                   std::isfinite(value.b) && std::isfinite(value.a);
+        }
+
+        [[nodiscard]] bool IsFinite(float value)
+        {
+            return std::isfinite(value);
+        }
+
+        template <typename T>
+        [[nodiscard]] bool AllFinite(std::span<const T> values)
+        {
+            for (const T& value : values)
+            {
+                if (!IsFinite(value))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         [[nodiscard]] std::optional<glm::vec4> ParseRgb(std::span<const std::string_view> tokens, std::size_t offset)
         {
             if (tokens.size() < offset + 3)
@@ -151,6 +181,10 @@ namespace Geometry::PointCloudIO
             const auto g = ParseNumber<float>(tokens[offset + 1]);
             const auto b = ParseNumber<float>(tokens[offset + 2]);
             if (!r || !g || !b)
+            {
+                return std::nullopt;
+            }
+            if (!IsFinite(*r) || !IsFinite(*g) || !IsFinite(*b))
             {
                 return std::nullopt;
             }
@@ -177,6 +211,10 @@ namespace Geometry::PointCloudIO
             {
                 if (const auto intensity = ParseNumber<float>(tokens[3]))
                 {
+                    if (!IsFinite(*intensity))
+                    {
+                        return std::nullopt;
+                    }
                     const float c = NormalizeColorChannel(*intensity);
                     return glm::vec4(c, c, c, 1.0f);
                 }
@@ -500,7 +538,12 @@ namespace Geometry::PointCloudIO
                 {
                     return InvalidPointCloudFormat();
                 }
-                const auto point = result.Cloud.AddPoint(glm::vec3(*x, *y, *z));
+                const glm::vec3 position(*x, *y, *z);
+                if (!IsFinite(position))
+                {
+                    return InvalidPointCloudFormat();
+                }
+                const auto point = result.Cloud.AddPoint(position);
 
                 if (hasNormals)
                 {
@@ -511,7 +554,12 @@ namespace Geometry::PointCloudIO
                     {
                         return InvalidPointCloudFormat();
                     }
-                    result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
+                    const glm::vec3 normal(*nx, *ny, *nz);
+                    if (!IsFinite(normal))
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Normal(point) = normal;
                 }
                 if (hasColors)
                 {
@@ -522,7 +570,12 @@ namespace Geometry::PointCloudIO
                     {
                         return InvalidPointCloudFormat();
                     }
-                    result.Cloud.Color(point) = glm::vec4(NormalizeColorChannel(*r), NormalizeColorChannel(*g), NormalizeColorChannel(*b), 1.0f);
+                    const glm::vec3 rawColor(*r, *g, *b);
+                    if (!IsFinite(rawColor))
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Color(point) = glm::vec4(NormalizeColorChannel(rawColor.r), NormalizeColorChannel(rawColor.g), NormalizeColorChannel(rawColor.b), 1.0f);
                 }
             }
 
@@ -652,16 +705,26 @@ namespace Geometry::PointCloudIO
                     for (std::size_t row = 0; row < element.Count; ++row)
                     {
                         const std::byte* base = cursor + row * vertexStride;
-                        const auto point = result.Cloud.AddPoint(glm::vec3(
+                        const glm::vec3 position(
                             ReadFloatingScalarAt(base, vertexOffsets[xIndex], vertexElement->Properties[xIndex].ScalarType, bigEndian),
                             ReadFloatingScalarAt(base, vertexOffsets[yIndex], vertexElement->Properties[yIndex].ScalarType, bigEndian),
-                            ReadFloatingScalarAt(base, vertexOffsets[zIndex], vertexElement->Properties[zIndex].ScalarType, bigEndian)));
+                            ReadFloatingScalarAt(base, vertexOffsets[zIndex], vertexElement->Properties[zIndex].ScalarType, bigEndian));
+                        if (!IsFinite(position))
+                        {
+                            return InvalidPointCloudFormat();
+                        }
+                        const auto point = result.Cloud.AddPoint(position);
                         if (hasNormals)
                         {
-                            result.Cloud.Normal(point) = glm::vec3(
+                            const glm::vec3 normal(
                                 ReadFloatingScalarAt(base, vertexOffsets[nxIndex], vertexElement->Properties[nxIndex].ScalarType, bigEndian),
                                 ReadFloatingScalarAt(base, vertexOffsets[nyIndex], vertexElement->Properties[nyIndex].ScalarType, bigEndian),
                                 ReadFloatingScalarAt(base, vertexOffsets[nzIndex], vertexElement->Properties[nzIndex].ScalarType, bigEndian));
+                            if (!IsFinite(normal))
+                            {
+                                return InvalidPointCloudFormat();
+                            }
+                            result.Cloud.Normal(point) = normal;
                         }
                         if (hasColors)
                         {
@@ -739,6 +802,19 @@ namespace Geometry::PointCloudIO
                    (field.Type == 'F' || field.Type == 'I' || field.Type == 'U');
         }
 
+        [[nodiscard]] bool IsSupportedPCDScalarLayout(std::size_t size, char type)
+        {
+            if (type == 'F')
+            {
+                return size == 4 || size == 8;
+            }
+            if (type == 'I' || type == 'U')
+            {
+                return size == 1 || size == 2 || size == 4 || size == 8;
+            }
+            return false;
+        }
+
         [[nodiscard]] glm::vec4 DecodePCDPackedColor(std::uint32_t packed, bool hasAlpha)
         {
             const auto r = static_cast<float>((packed >> 16u) & 0xffu);
@@ -764,6 +840,10 @@ namespace Geometry::PointCloudIO
             {
                 const auto value = ParseNumber<float>(token);
                 if (!value)
+                {
+                    return std::nullopt;
+                }
+                if (!IsFinite(*value))
                 {
                     return std::nullopt;
                 }
@@ -934,6 +1014,11 @@ namespace Geometry::PointCloudIO
             std::size_t scalarOffset = 0;
             for (std::size_t i = 0; i < fieldNames.size(); ++i)
             {
+                if (!IsSupportedPCDScalarLayout(fieldSizes[i], fieldTypes[i]))
+                {
+                    return std::nullopt;
+                }
+
                 PcdField field;
                 field.Name = std::move(fieldNames[i]);
                 field.Size = fieldSizes[i];
@@ -1098,13 +1183,27 @@ namespace Geometry::PointCloudIO
                 continue;
             }
 
+            const glm::vec3 position(*x, *y, *z);
+            if (!IsFinite(position))
+            {
+                return InvalidPointCloudFormat();
+            }
+
+            for (std::size_t i = 3; i < tokens.size(); ++i)
+            {
+                if (const auto attribute = ParseNumber<float>(tokens[i]); attribute && !IsFinite(*attribute))
+                {
+                    return InvalidPointCloudFormat();
+                }
+            }
+
             const std::optional<glm::vec4> color = ParseXYZPointColor(tokens);
 
             if (color && !result.Cloud.HasColors())
             {
                 result.Cloud.EnableColors(glm::vec4(1.0f));
             }
-            const auto point = result.Cloud.AddPoint(glm::vec3(*x, *y, *z));
+            const auto point = result.Cloud.AddPoint(position);
             if (color)
             {
                 result.Cloud.Color(point) = *color;
@@ -1196,7 +1295,12 @@ namespace Geometry::PointCloudIO
                 {
                     return InvalidPointCloudFormat();
                 }
-                const auto point = result.Cloud.AddPoint(glm::vec3(*x, *y, *z));
+                const glm::vec3 position(*x, *y, *z);
+                if (!IsFinite(position))
+                {
+                    return InvalidPointCloudFormat();
+                }
+                const auto point = result.Cloud.AddPoint(position);
 
                 if (hasNormals)
                 {
@@ -1207,7 +1311,12 @@ namespace Geometry::PointCloudIO
                     {
                         return InvalidPointCloudFormat();
                     }
-                    result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
+                    const glm::vec3 normal(*nx, *ny, *nz);
+                    if (!IsFinite(normal))
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Normal(point) = normal;
                 }
                 if (hasSeparateColors)
                 {
@@ -1218,10 +1327,15 @@ namespace Geometry::PointCloudIO
                     {
                         return InvalidPointCloudFormat();
                     }
+                    const glm::vec3 rawColor(*r, *g, *b);
+                    if (!IsFinite(rawColor))
+                    {
+                        return InvalidPointCloudFormat();
+                    }
                     result.Cloud.Color(point) = glm::vec4(
-                        NormalizeColorChannel(*r),
-                        NormalizeColorChannel(*g),
-                        NormalizeColorChannel(*b),
+                        NormalizeColorChannel(rawColor.r),
+                        NormalizeColorChannel(rawColor.g),
+                        NormalizeColorChannel(rawColor.b),
                         1.0f);
                 }
                 else if (hasPackedColors)
@@ -1287,7 +1401,12 @@ namespace Geometry::PointCloudIO
                 {
                     return InvalidPointCloudFormat();
                 }
-                const auto point = result.Cloud.AddPoint(glm::vec3(*x, *y, *z));
+                const glm::vec3 position(*x, *y, *z);
+                if (!IsFinite(position))
+                {
+                    return InvalidPointCloudFormat();
+                }
+                const auto point = result.Cloud.AddPoint(position);
 
                 if (hasNormals)
                 {
@@ -1298,7 +1417,12 @@ namespace Geometry::PointCloudIO
                     {
                         return InvalidPointCloudFormat();
                     }
-                    result.Cloud.Normal(point) = glm::vec3(*nx, *ny, *nz);
+                    const glm::vec3 normal(*nx, *ny, *nz);
+                    if (!IsFinite(normal))
+                    {
+                        return InvalidPointCloudFormat();
+                    }
+                    result.Cloud.Normal(point) = normal;
                 }
                 if (hasSeparateColors)
                 {
@@ -1309,10 +1433,15 @@ namespace Geometry::PointCloudIO
                     {
                         return InvalidPointCloudFormat();
                     }
+                    const glm::vec3 rawColor(*r, *g, *b);
+                    if (!IsFinite(rawColor))
+                    {
+                        return InvalidPointCloudFormat();
+                    }
                     result.Cloud.Color(point) = glm::vec4(
-                        NormalizeColorChannel(*r),
-                        NormalizeColorChannel(*g),
-                        NormalizeColorChannel(*b),
+                        NormalizeColorChannel(rawColor.r),
+                        NormalizeColorChannel(rawColor.g),
+                        NormalizeColorChannel(rawColor.b),
                         1.0f);
                 }
                 else if (hasPackedColors)
@@ -1379,7 +1508,7 @@ namespace Geometry::PointCloudIO
             }
             if (tokens[0] == "format")
             {
-                if (tokens.size() < 2)
+                if (tokens.size() != 3 || tokens[2] != "1.0")
                 {
                     return InvalidPointCloudFormat();
                 }
@@ -1491,6 +1620,15 @@ namespace Geometry::PointCloudIO
         const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
         const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
         const bool hasRadii = source.HasRadii() && source.Radii().size() == pointCount;
+        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+        const auto radii = hasRadii ? source.Radii() : std::span<const float>{};
+
+        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
+            (hasColors && !AllFinite(colors)) || (hasRadii && !AllFinite(radii)))
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
@@ -1533,10 +1671,6 @@ namespace Geometry::PointCloudIO
             stream << "property float radius\n";
         }
         stream << "end_header\n";
-
-        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
-        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
-        const auto radii = hasRadii ? source.Radii() : std::span<const float>{};
 
         auto encodeColorChannel = [](float channel) -> unsigned int {
             const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
@@ -1631,6 +1765,15 @@ namespace Geometry::PointCloudIO
         const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
         const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
         const bool hasRadii = source.HasRadii() && source.Radii().size() == pointCount;
+        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+        const auto radii = hasRadii ? source.Radii() : std::span<const float>{};
+
+        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
+            (hasColors && !AllFinite(colors)) || (hasRadii && !AllFinite(radii)))
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
@@ -1673,10 +1816,6 @@ namespace Geometry::PointCloudIO
             stream << "property float radius\n";
         }
         stream << "end_header\n";
-
-        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
-        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
-        const auto radii = hasRadii ? source.Radii() : std::span<const float>{};
 
         auto encodeColorChannel = [](float channel) -> std::uint8_t {
             const float clamped = channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
@@ -1766,14 +1905,18 @@ namespace Geometry::PointCloudIO
         const std::size_t pointCount = positions.size();
 
         const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+
+        if (!AllFinite(positions) || (hasColors && !AllFinite(colors)))
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
         {
             return PointCloudIOWriteStatus::InvalidPath;
         }
-
-        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
 
         char buffer[256];
         for (std::size_t i = 0; i < pointCount; ++i)
@@ -1836,6 +1979,14 @@ namespace Geometry::PointCloudIO
 
         const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
         const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+
+        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
+            (hasColors && !AllFinite(colors)))
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
@@ -1916,9 +2067,6 @@ namespace Geometry::PointCloudIO
         }
         stream << "DATA ascii\n";
 
-        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
-        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
-
         auto clampUnit = [](float channel) -> float {
             return channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);
         };
@@ -1996,6 +2144,14 @@ namespace Geometry::PointCloudIO
 
         const bool hasNormals = source.HasNormals() && source.Normals().size() == pointCount;
         const bool hasColors = source.HasColors() && source.Colors().size() == pointCount;
+        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
+        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
+
+        if (!AllFinite(positions) || (hasNormals && !AllFinite(normals)) ||
+            (hasColors && !AllFinite(colors)))
+        {
+            return PointCloudIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
@@ -2076,8 +2232,6 @@ namespace Geometry::PointCloudIO
         }
         stream << "DATA binary\n";
 
-        const auto normals = hasNormals ? source.Normals() : std::span<const glm::vec3>{};
-        const auto colors = hasColors ? source.Colors() : std::span<const glm::vec4>{};
 
         auto clampUnit = [](float channel) -> float {
             return channel < 0.0f ? 0.0f : (channel > 1.0f ? 1.0f : channel);

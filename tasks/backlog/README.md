@@ -57,7 +57,7 @@ Planning parents (retired):
 - [`rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md`](rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
 - [`assets/ASSETIO-001-asset-model-texture-ingest-ownership.md`](assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
-- [`geometry/GEOIO-002-geometry-io-parity-hardening.md`](geometry/GEOIO-002-geometry-io-parity-hardening.md)
+- [`GEOIO-002` (done)](../done/GEOIO-002-geometry-io-parity-hardening.md)
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md)
@@ -144,7 +144,7 @@ Finish geometry-owned IO parity so legacy graphics importers/exporters can
 retire and asset ingest can route through promoted decoders.
 
 Members:
-- [`geometry/GEOIO-002-geometry-io-parity-hardening.md`](geometry/GEOIO-002-geometry-io-parity-hardening.md).
+- [`GEOIO-002` (done)](../done/GEOIO-002-geometry-io-parity-hardening.md).
 
 ### Theme F — Architecture/runtime/UI foundation seeds
 

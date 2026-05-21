@@ -59,6 +59,13 @@ namespace
         }
     };
 
+    template <typename T>
+    void AppendPod(std::string& bytes, const T& value)
+    {
+        const auto* data = reinterpret_cast<const char*>(&value);
+        bytes.append(data, sizeof(T));
+    }
+
     void ExpectTriangleMeshProperties(const Geometry::MeshIO::MeshIOResult& mesh)
     {
         EXPECT_EQ(mesh.Vertices.Size(), 3u);
@@ -132,6 +139,65 @@ TEST(GeometryIO_Metadata, ReportsSupportedImportAndExportDomains)
     EXPECT_TRUE(ImportDomainsForExtension("").empty());
     EXPECT_FALSE(HasAmbiguousImportDomains("gltf"));
     EXPECT_FALSE(HasAmbiguousExportDomains(""));
+}
+
+TEST(GeometryIO_Metadata, ReportsAssetRoutingReadinessForAllPromotedFormats)
+{
+    using Geometry::IO::FindGeometryIOFormat;
+    using Geometry::IO::GeometryIODomain;
+    using Geometry::IO::GeometryIOFormatKind;
+    using Geometry::IO::HasAmbiguousExportDomains;
+    using Geometry::IO::HasAmbiguousImportDomains;
+    using Geometry::IO::SupportsExportDomain;
+    using Geometry::IO::SupportsImportDomain;
+
+    struct ExpectedFormat
+    {
+        const char* Extension = "";
+        GeometryIOFormatKind Kind = GeometryIOFormatKind::OBJ;
+        bool MeshImport = false;
+        bool PointCloudImport = false;
+        bool GraphImport = false;
+        bool MeshExport = false;
+        bool PointCloudExport = false;
+        bool GraphExport = false;
+        bool BinaryImport = false;
+        bool BinaryExport = false;
+        bool AmbiguousImport = false;
+        bool AmbiguousExport = false;
+    };
+
+    const std::array<ExpectedFormat, 10> expected{{
+        {"obj", GeometryIOFormatKind::OBJ, true, false, false, true, false, false, false, false, false, false},
+        {"off", GeometryIOFormatKind::OFF, true, false, false, false, false, false, false, false, false, false},
+        {"stl", GeometryIOFormatKind::STL, true, false, false, true, false, false, true, true, false, false},
+        {"ply", GeometryIOFormatKind::PLY, true, true, false, true, true, false, true, true, true, true},
+        {"xyz", GeometryIOFormatKind::XYZ, false, true, false, false, true, false, false, false, false, false},
+        {"pts", GeometryIOFormatKind::PTS, false, true, false, false, false, false, false, false, false, false},
+        {"xyzrgb", GeometryIOFormatKind::XYZRGB, false, true, false, false, false, false, false, false, false, false},
+        {"pcd", GeometryIOFormatKind::PCD, false, true, false, false, true, false, true, true, false, false},
+        {"tgf", GeometryIOFormatKind::TGF, false, false, true, false, false, true, false, false, false, false},
+        {"edges", GeometryIOFormatKind::EdgeList, false, false, true, false, false, true, false, false, false, false},
+    }};
+
+    for (const auto& item : expected)
+    {
+        SCOPED_TRACE(item.Extension);
+        const auto* format = FindGeometryIOFormat(item.Extension);
+        ASSERT_NE(format, nullptr);
+        EXPECT_EQ(format->Kind, item.Kind);
+        EXPECT_EQ(format->SupportsBinaryImport, item.BinaryImport);
+        EXPECT_EQ(format->SupportsBinaryExport, item.BinaryExport);
+
+        EXPECT_EQ(SupportsImportDomain(item.Extension, GeometryIODomain::Mesh), item.MeshImport);
+        EXPECT_EQ(SupportsImportDomain(item.Extension, GeometryIODomain::PointCloud), item.PointCloudImport);
+        EXPECT_EQ(SupportsImportDomain(item.Extension, GeometryIODomain::Graph), item.GraphImport);
+        EXPECT_EQ(SupportsExportDomain(item.Extension, GeometryIODomain::Mesh), item.MeshExport);
+        EXPECT_EQ(SupportsExportDomain(item.Extension, GeometryIODomain::PointCloud), item.PointCloudExport);
+        EXPECT_EQ(SupportsExportDomain(item.Extension, GeometryIODomain::Graph), item.GraphExport);
+        EXPECT_EQ(HasAmbiguousImportDomains(item.Extension), item.AmbiguousImport);
+        EXPECT_EQ(HasAmbiguousExportDomains(item.Extension), item.AmbiguousExport);
+    }
 }
 
 TEST(GeometryIO_MeshIO, LoadsOFFTriangle)
@@ -894,6 +960,211 @@ TEST(GeometryIO_MeshIO, LoadsASCIISTLTriangle)
     ExpectTriangleMeshProperties(*result);
 }
 
+TEST(GeometryIO_MeshIO, MeshImportersRejectNonFinitePositions)
+{
+    TempFile obj(".obj", "v nan 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+    const auto objResult = Geometry::MeshIO::LoadOBJ(obj.Path);
+    ASSERT_FALSE(objResult.has_value());
+    EXPECT_EQ(objResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile off(".off", "OFF\n3 1 0\n0 0 0\ninf 0 0\n0 1 0\n3 0 1 2\n");
+    const auto offResult = Geometry::MeshIO::LoadOFF(off.Path);
+    ASSERT_FALSE(offResult.has_value());
+    EXPECT_EQ(offResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile asciiPly(".ply",
+                      "ply\n"
+                      "format ascii 1.0\n"
+                      "element vertex 3\n"
+                      "property float x\n"
+                      "property float y\n"
+                      "property float z\n"
+                      "element face 1\n"
+                      "property list uchar int vertex_indices\n"
+                      "end_header\n"
+                      "0 0 0\n"
+                      "1 nan 0\n"
+                      "0 1 0\n"
+                      "3 0 1 2\n");
+    const auto asciiPlyResult = Geometry::MeshIO::LoadPLY(asciiPly.Path);
+    ASSERT_FALSE(asciiPlyResult.has_value());
+    EXPECT_EQ(asciiPlyResult.error(), Core::ErrorCode::InvalidFormat);
+
+    std::string binaryPly =
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element vertex 3\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "element face 1\n"
+        "property list uchar int vertex_indices\n"
+        "end_header\n";
+    const float zero = 0.0f;
+    const float one = 1.0f;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, one);
+    AppendPod(binaryPly, nan);
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, one);
+    AppendPod(binaryPly, zero);
+    const std::uint8_t count = 3;
+    AppendPod(binaryPly, count);
+    AppendPod(binaryPly, std::int32_t{0});
+    AppendPod(binaryPly, std::int32_t{1});
+    AppendPod(binaryPly, std::int32_t{2});
+    TempFile binaryPlyFile(".ply", binaryPly);
+    const auto binaryPlyResult = Geometry::MeshIO::LoadPLY(binaryPlyFile.Path);
+    ASSERT_FALSE(binaryPlyResult.has_value());
+    EXPECT_EQ(binaryPlyResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile asciiStl(".stl",
+                      "solid tri\n"
+                      "facet normal 0 0 1\n"
+                      "outer loop\n"
+                      "vertex 0 0 0\n"
+                      "vertex inf 0 0\n"
+                      "vertex 0 1 0\n"
+                      "endloop\n"
+                      "endfacet\n"
+                      "endsolid tri\n");
+    const auto asciiStlResult = Geometry::MeshIO::LoadSTL(asciiStl.Path);
+    ASSERT_FALSE(asciiStlResult.has_value());
+    EXPECT_EQ(asciiStlResult.error(), Core::ErrorCode::InvalidFormat);
+
+    std::string binaryStl(80, '\0');
+    AppendPod(binaryStl, std::uint32_t{1});
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, one);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, nan);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, one);
+    AppendPod(binaryStl, zero);
+    AppendPod(binaryStl, std::uint16_t{0});
+    TempFile binaryStlFile(".stl", binaryStl);
+    const auto binaryStlResult = Geometry::MeshIO::LoadSTL(binaryStlFile.Path);
+    ASSERT_FALSE(binaryStlResult.has_value());
+    EXPECT_EQ(binaryStlResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, MeshImportersRejectNonFiniteVertexColors)
+{
+    TempFile obj(".obj", "v 0 0 0 nan 0 0\nv 1 0 0 0 1 0\nv 0 1 0 0 0 1\nf 1 2 3\n");
+    const auto objResult = Geometry::MeshIO::LoadOBJ(obj.Path);
+    ASSERT_FALSE(objResult.has_value());
+    EXPECT_EQ(objResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile off(".off",
+                 "COFF\n"
+                 "3 1 0\n"
+                 "0 0 0 nan 0 0\n"
+                 "1 0 0 0 255 0\n"
+                 "0 1 0 0 0 255\n"
+                 "3 0 1 2\n");
+    const auto offResult = Geometry::MeshIO::LoadOFF(off.Path);
+    ASSERT_FALSE(offResult.has_value());
+    EXPECT_EQ(offResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile ply(".ply",
+                 "ply\n"
+                 "format ascii 1.0\n"
+                 "element vertex 3\n"
+                 "property float x\n"
+                 "property float y\n"
+                 "property float z\n"
+                 "property uchar red\n"
+                 "property uchar green\n"
+                 "property uchar blue\n"
+                 "element face 1\n"
+                 "property list uchar int vertex_indices\n"
+                 "end_header\n"
+                 "0 0 0 nan 0 0\n"
+                 "1 0 0 0 255 0\n"
+                 "0 1 0 0 0 255\n"
+                 "3 0 1 2\n");
+    const auto plyResult = Geometry::MeshIO::LoadPLY(ply.Path);
+    ASSERT_FALSE(plyResult.has_value());
+    EXPECT_EQ(plyResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, MeshImportersRejectNonFiniteVertexNormals)
+{
+    TempFile obj(".obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nvn 0 nan 1\nf 1//1 2//1 3//1\n");
+    const auto objResult = Geometry::MeshIO::LoadOBJ(obj.Path);
+    ASSERT_FALSE(objResult.has_value());
+    EXPECT_EQ(objResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile off(".off",
+                 "NOFF\n"
+                 "3 1 0\n"
+                 "0 0 0 0 nan 1\n"
+                 "1 0 0 0 0 1\n"
+                 "0 1 0 0 0 1\n"
+                 "3 0 1 2\n");
+    const auto offResult = Geometry::MeshIO::LoadOFF(off.Path);
+    ASSERT_FALSE(offResult.has_value());
+    EXPECT_EQ(offResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile ply(".ply",
+                 "ply\n"
+                 "format ascii 1.0\n"
+                 "element vertex 3\n"
+                 "property float x\n"
+                 "property float y\n"
+                 "property float z\n"
+                 "property float nx\n"
+                 "property float ny\n"
+                 "property float nz\n"
+                 "element face 1\n"
+                 "property list uchar int vertex_indices\n"
+                 "end_header\n"
+                 "0 0 0 0 nan 1\n"
+                 "1 0 0 0 0 1\n"
+                 "0 1 0 0 0 1\n"
+                 "3 0 1 2\n");
+    const auto plyResult = Geometry::MeshIO::LoadPLY(ply.Path);
+    ASSERT_FALSE(plyResult.has_value());
+    EXPECT_EQ(plyResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, MeshImportersRejectNonFiniteVertexTexcoords)
+{
+    TempFile obj(".obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 nan\nf 1/1 2/1 3/1\n");
+    const auto objResult = Geometry::MeshIO::LoadOBJ(obj.Path);
+    ASSERT_FALSE(objResult.has_value());
+    EXPECT_EQ(objResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile ply(".ply",
+                 "ply\n"
+                 "format ascii 1.0\n"
+                 "element vertex 3\n"
+                 "property float x\n"
+                 "property float y\n"
+                 "property float z\n"
+                 "property float s\n"
+                 "property float t\n"
+                 "element face 1\n"
+                 "property list uchar int vertex_indices\n"
+                 "end_header\n"
+                 "0 0 0 0 nan\n"
+                 "1 0 0 1 0\n"
+                 "0 1 0 0 1\n"
+                 "3 0 1 2\n");
+    const auto plyResult = Geometry::MeshIO::LoadPLY(ply.Path);
+    ASSERT_FALSE(plyResult.has_value());
+    EXPECT_EQ(plyResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
 TEST(GeometryIO_PointCloudIO, LoadsXYZWithColor)
 {
     TempFile file(".xyz", "2\n0 0 0 255 0 0\n1 0 0 0 255 0\n");
@@ -981,6 +1252,213 @@ TEST(GeometryIO_PointCloudIO, LoadXYZRejectsAllMalformedInput)
     const auto result = Geometry::PointCloudIO::LoadXYZ(file.Path);
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, PointCloudImportersRejectNonFinitePositions)
+{
+    TempFile xyz(".xyz", "0 0 0\nnan 1 2\n");
+    const auto xyzResult = Geometry::PointCloudIO::LoadXYZ(xyz.Path);
+    ASSERT_FALSE(xyzResult.has_value());
+    EXPECT_EQ(xyzResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile asciiPcd(".pcd",
+                      "# .PCD v0.7\n"
+                      "FIELDS x y z\n"
+                      "SIZE 4 4 4\n"
+                      "TYPE F F F\n"
+                      "COUNT 1 1 1\n"
+                      "WIDTH 1\n"
+                      "HEIGHT 1\n"
+                      "POINTS 1\n"
+                      "DATA ascii\n"
+                      "nan 1 2\n");
+    const auto asciiPcdResult = Geometry::PointCloudIO::LoadPCD(asciiPcd.Path);
+    ASSERT_FALSE(asciiPcdResult.has_value());
+    EXPECT_EQ(asciiPcdResult.error(), Core::ErrorCode::InvalidFormat);
+
+    std::string binaryPcd =
+        "# .PCD v0.7\n"
+        "FIELDS x y z\n"
+        "SIZE 4 4 4\n"
+        "TYPE F F F\n"
+        "COUNT 1 1 1\n"
+        "WIDTH 1\n"
+        "HEIGHT 1\n"
+        "POINTS 1\n"
+        "DATA binary\n";
+    const float zero = 0.0f;
+    const float one = 1.0f;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    AppendPod(binaryPcd, nan);
+    AppendPod(binaryPcd, one);
+    AppendPod(binaryPcd, zero);
+    TempFile binaryPcdFile(".pcd", binaryPcd);
+    const auto binaryPcdResult = Geometry::PointCloudIO::LoadPCD(binaryPcdFile.Path);
+    ASSERT_FALSE(binaryPcdResult.has_value());
+    EXPECT_EQ(binaryPcdResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile asciiPly(".ply",
+                      "ply\n"
+                      "format ascii 1.0\n"
+                      "element vertex 1\n"
+                      "property float x\n"
+                      "property float y\n"
+                      "property float z\n"
+                      "end_header\n"
+                      "nan 1 2\n");
+    const auto asciiPlyResult = Geometry::PointCloudIO::LoadPLY(asciiPly.Path);
+    ASSERT_FALSE(asciiPlyResult.has_value());
+    EXPECT_EQ(asciiPlyResult.error(), Core::ErrorCode::InvalidFormat);
+
+    std::string binaryPly =
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element vertex 1\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "end_header\n";
+    AppendPod(binaryPly, nan);
+    AppendPod(binaryPly, one);
+    AppendPod(binaryPly, zero);
+    TempFile binaryPlyFile(".ply", binaryPly);
+    const auto binaryPlyResult = Geometry::PointCloudIO::LoadPLY(binaryPlyFile.Path);
+    ASSERT_FALSE(binaryPlyResult.has_value());
+    EXPECT_EQ(binaryPlyResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, PointCloudImportersRejectNonFiniteColors)
+{
+    TempFile xyz(".xyz", "0 0 0 nan 0 0\n");
+    const auto xyzResult = Geometry::PointCloudIO::LoadXYZ(xyz.Path);
+    ASSERT_FALSE(xyzResult.has_value());
+    EXPECT_EQ(xyzResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile separatePcd(".pcd",
+                         "# .PCD v0.7\n"
+                         "FIELDS x y z r g b\n"
+                         "SIZE 4 4 4 4 4 4\n"
+                         "TYPE F F F F F F\n"
+                         "COUNT 1 1 1 1 1 1\n"
+                         "WIDTH 1\n"
+                         "HEIGHT 1\n"
+                         "POINTS 1\n"
+                         "DATA ascii\n"
+                         "0 1 2 nan 0 255\n");
+    const auto separatePcdResult = Geometry::PointCloudIO::LoadPCD(separatePcd.Path);
+    ASSERT_FALSE(separatePcdResult.has_value());
+    EXPECT_EQ(separatePcdResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile packedPcd(".pcd",
+                       "# .PCD v0.7\n"
+                       "FIELDS x y z rgb\n"
+                       "SIZE 4 4 4 4\n"
+                       "TYPE F F F F\n"
+                       "COUNT 1 1 1 1\n"
+                       "WIDTH 1\n"
+                       "HEIGHT 1\n"
+                       "POINTS 1\n"
+                       "DATA ascii\n"
+                       "0 1 2 nan\n");
+    const auto packedPcdResult = Geometry::PointCloudIO::LoadPCD(packedPcd.Path);
+    ASSERT_FALSE(packedPcdResult.has_value());
+    EXPECT_EQ(packedPcdResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile ply(".ply",
+                 "ply\n"
+                 "format ascii 1.0\n"
+                 "element vertex 1\n"
+                 "property float x\n"
+                 "property float y\n"
+                 "property float z\n"
+                 "property uchar red\n"
+                 "property uchar green\n"
+                 "property uchar blue\n"
+                 "end_header\n"
+                 "0 1 2 nan 0 255\n");
+    const auto plyResult = Geometry::PointCloudIO::LoadPLY(ply.Path);
+    ASSERT_FALSE(plyResult.has_value());
+    EXPECT_EQ(plyResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, PointCloudImportersRejectNonFiniteNormals)
+{
+    TempFile asciiPcd(".pcd",
+                      "# .PCD v0.7\n"
+                      "FIELDS x y z normal_x normal_y normal_z\n"
+                      "SIZE 4 4 4 4 4 4\n"
+                      "TYPE F F F F F F\n"
+                      "COUNT 1 1 1 1 1 1\n"
+                      "WIDTH 1\n"
+                      "HEIGHT 1\n"
+                      "POINTS 1\n"
+                      "DATA ascii\n"
+                      "0 1 2 0 nan 1\n");
+    const auto asciiPcdResult = Geometry::PointCloudIO::LoadPCD(asciiPcd.Path);
+    ASSERT_FALSE(asciiPcdResult.has_value());
+    EXPECT_EQ(asciiPcdResult.error(), Core::ErrorCode::InvalidFormat);
+
+    std::string binaryPcd =
+        "# .PCD v0.7\n"
+        "FIELDS x y z normal_x normal_y normal_z\n"
+        "SIZE 4 4 4 4 4 4\n"
+        "TYPE F F F F F F\n"
+        "COUNT 1 1 1 1 1 1\n"
+        "WIDTH 1\n"
+        "HEIGHT 1\n"
+        "POINTS 1\n"
+        "DATA binary\n";
+    const float zero = 0.0f;
+    const float one = 1.0f;
+    const float inf = std::numeric_limits<float>::infinity();
+    AppendPod(binaryPcd, zero);
+    AppendPod(binaryPcd, one);
+    AppendPod(binaryPcd, zero);
+    AppendPod(binaryPcd, zero);
+    AppendPod(binaryPcd, inf);
+    AppendPod(binaryPcd, one);
+    TempFile binaryPcdFile(".pcd", binaryPcd);
+    const auto binaryPcdResult = Geometry::PointCloudIO::LoadPCD(binaryPcdFile.Path);
+    ASSERT_FALSE(binaryPcdResult.has_value());
+    EXPECT_EQ(binaryPcdResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile asciiPly(".ply",
+                      "ply\n"
+                      "format ascii 1.0\n"
+                      "element vertex 1\n"
+                      "property float x\n"
+                      "property float y\n"
+                      "property float z\n"
+                      "property float nx\n"
+                      "property float ny\n"
+                      "property float nz\n"
+                      "end_header\n"
+                      "0 1 2 0 nan 1\n");
+    const auto asciiPlyResult = Geometry::PointCloudIO::LoadPLY(asciiPly.Path);
+    ASSERT_FALSE(asciiPlyResult.has_value());
+    EXPECT_EQ(asciiPlyResult.error(), Core::ErrorCode::InvalidFormat);
+
+    std::string binaryPly =
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element vertex 1\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "property float nx\n"
+        "property float ny\n"
+        "property float nz\n"
+        "end_header\n";
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, one);
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, zero);
+    AppendPod(binaryPly, inf);
+    AppendPod(binaryPly, one);
+    TempFile binaryPlyFile(".ply", binaryPly);
+    const auto binaryPlyResult = Geometry::PointCloudIO::LoadPLY(binaryPlyFile.Path);
+    ASSERT_FALSE(binaryPlyResult.has_value());
+    EXPECT_EQ(binaryPlyResult.error(), Core::ErrorCode::InvalidFormat);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadsASCIIPCDWithNormalsAndColor)
@@ -1122,6 +1600,28 @@ TEST(GeometryIO_GraphIO, LoadsEdgeListWithImplicitVertices)
     auto edgeWeights = result->Graph.EdgeProperties().Get<float>("e:weight");
     ASSERT_TRUE(edgeWeights.IsValid());
     EXPECT_FLOAT_EQ(edgeWeights[1], 2.0f);
+}
+
+TEST(GeometryIO_GraphIO, LoadTGFRejectsNonFiniteVertexPosition)
+{
+    TempFile file(".tgf", "1 nan 0 0 bad\n#\n");
+
+    const auto result = Geometry::GraphIO::LoadTGF(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_GraphIO, GraphImportersRejectNonFiniteEdgeWeight)
+{
+    TempFile tgf(".tgf", "1 0 0 0 first\n2 1 0 0 second\n#\n1 2 inf bad\n");
+    const auto tgfResult = Geometry::GraphIO::LoadTGF(tgf.Path);
+    ASSERT_FALSE(tgfResult.has_value());
+    EXPECT_EQ(tgfResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile edges(".edges", "A B inf bad\n");
+    const auto edgeResult = Geometry::GraphIO::LoadEdgeList(edges.Path);
+    ASSERT_FALSE(edgeResult.has_value());
+    EXPECT_EQ(edgeResult.error(), Core::ErrorCode::InvalidFormat);
 }
 
 TEST(GeometryIO_GraphIO, WritesTGFRoundTripsVerticesAndEdges)
@@ -1403,6 +1903,36 @@ TEST(GeometryIO_GraphIO, WriteEdgeListRejectsBadPath)
               Geometry::GraphIO::GraphIOWriteStatus::InvalidPath);
     EXPECT_EQ(Geometry::GraphIO::WriteEdgeList("/nonexistent_geometry_io_dir_xyz/out.edges", source),
               Geometry::GraphIO::GraphIOWriteStatus::InvalidPath);
+}
+
+TEST(GeometryIO_GraphIO, WriteTGFRejectsNonFiniteVertexPosition)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    source.Graph.AddVertex(glm::vec3(std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f));
+
+    TempFile file(".tgf", "");
+    EXPECT_EQ(Geometry::GraphIO::WriteTGF(file.Path, source),
+              Geometry::GraphIO::GraphIOWriteStatus::FileWriteError);
+}
+
+TEST(GeometryIO_GraphIO, GraphExportersRejectNonFiniteEdgeWeight)
+{
+    Geometry::GraphIO::GraphIOResult source;
+    const auto a = source.Graph.AddVertex(glm::vec3(0.0f));
+    const auto b = source.Graph.AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
+    ASSERT_TRUE(a.IsValid());
+    ASSERT_TRUE(b.IsValid());
+    const auto edge = source.Graph.AddEdge(a, b);
+    ASSERT_TRUE(edge.has_value());
+    auto weights = source.Graph.GetOrAddEdgeProperty<float>("e:weight", 1.0f);
+    weights[*edge] = std::numeric_limits<float>::infinity();
+
+    TempFile tgf(".tgf", "");
+    TempFile edges(".edges", "");
+    EXPECT_EQ(Geometry::GraphIO::WriteTGF(tgf.Path, source),
+              Geometry::GraphIO::GraphIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::GraphIO::WriteEdgeList(edges.Path, source),
+              Geometry::GraphIO::GraphIOWriteStatus::FileWriteError);
 }
 
 namespace
@@ -2382,6 +2912,117 @@ TEST(GeometryIO_MeshIO, WritePLYBinaryRejectsBadPath)
               Geometry::MeshIO::MeshIOWriteStatus::InvalidPath);
 }
 
+TEST(GeometryIO_MeshIO, MeshExportersRejectNonFinitePositions)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{nan, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+
+    TempFile obj(".obj", "");
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+    TempFile stl(".stl", "");
+    TempFile binaryStl(".stl", "");
+
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(obj.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLY(ply.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(binaryPly.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WriteSTL(stl.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WriteSTLBinary(binaryStl.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+}
+
+TEST(GeometryIO_MeshIO, MeshExportersRejectNonFiniteVertexColors)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces);
+    auto colorProperty = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4(1.0f));
+    colorProperty[1] = glm::vec4(1.0f, std::numeric_limits<float>::infinity(), 0.0f, 1.0f);
+
+    TempFile obj(".obj", "");
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(obj.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLY(ply.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(binaryPly.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+}
+
+TEST(GeometryIO_MeshIO, MeshExportersRejectNonFiniteVertexNormals)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec3, 3> normals{
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, std::numeric_limits<float>::infinity(), 1.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, normals);
+
+    TempFile obj(".obj", "");
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(obj.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLY(ply.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(binaryPly.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+}
+
+TEST(GeometryIO_MeshIO, MeshExportersRejectNonFiniteVertexTexcoords)
+{
+    Geometry::MeshIO::MeshIOResult mesh;
+    const std::array<glm::vec3, 3> positions{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    const std::array<glm::vec2, 3> texcoords{
+        glm::vec2{0.0f, 0.0f},
+        glm::vec2{std::numeric_limits<float>::quiet_NaN(), 0.0f},
+        glm::vec2{0.0f, 1.0f},
+    };
+    const std::array<std::vector<std::uint32_t>, 1> faces{{{0u, 1u, 2u}}};
+    PopulateTriangleMesh(mesh, positions, faces, {}, texcoords);
+
+    TempFile obj(".obj", "");
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+
+    EXPECT_EQ(Geometry::MeshIO::WriteOBJ(obj.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLY(ply.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::MeshIO::WritePLYBinary(binaryPly.Path, mesh),
+              Geometry::MeshIO::MeshIOWriteStatus::FileWriteError);
+}
+
 namespace
 {
     [[nodiscard]] std::string WriteBinarySTLFixture(std::span<const std::array<glm::vec3, 3>> triangles,
@@ -3201,6 +3842,107 @@ TEST(GeometryIO_MeshIO, LoadsAsciiPLYAfterBinaryDispatch)
     ExpectTriangleMeshProperties(*result);
 }
 
+TEST(GeometryIO_MeshIO, LoadPLYRejectsUnsupportedFormatVersion)
+{
+    TempFile missingVersion(".ply",
+                            "ply\n"
+                            "format ascii\n"
+                            "element vertex 3\n"
+                            "property float x\n"
+                            "property float y\n"
+                            "property float z\n"
+                            "element face 1\n"
+                            "property list uchar int vertex_indices\n"
+                            "end_header\n"
+                            "0 0 0\n"
+                            "1 0 0\n"
+                            "0 1 0\n"
+                            "3 0 1 2\n");
+    const auto missingVersionResult = Geometry::MeshIO::LoadPLY(missingVersion.Path);
+    ASSERT_FALSE(missingVersionResult.has_value());
+    EXPECT_EQ(missingVersionResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile unsupportedVersion(".ply",
+                                "ply\n"
+                                "format binary_little_endian 2.0\n"
+                                "element vertex 3\n"
+                                "property float x\n"
+                                "property float y\n"
+                                "property float z\n"
+                                "element face 1\n"
+                                "property list uchar int vertex_indices\n"
+                                "end_header\n");
+    const auto unsupportedVersionResult = Geometry::MeshIO::LoadPLY(unsupportedVersion.Path);
+    ASSERT_FALSE(unsupportedVersionResult.has_value());
+    EXPECT_EQ(unsupportedVersionResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, MeshImportersRejectDuplicateVertexFaces)
+{
+    TempFile obj(".obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 1 2\n");
+    const auto objResult = Geometry::MeshIO::LoadOBJ(obj.Path);
+    ASSERT_FALSE(objResult.has_value());
+    EXPECT_EQ(objResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile off(".off", "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 0 1\n");
+    const auto offResult = Geometry::MeshIO::LoadOFF(off.Path);
+    ASSERT_FALSE(offResult.has_value());
+    EXPECT_EQ(offResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile asciiPly(".ply",
+                      "ply\n"
+                      "format ascii 1.0\n"
+                      "element vertex 3\n"
+                      "property float x\n"
+                      "property float y\n"
+                      "property float z\n"
+                      "element face 1\n"
+                      "property list uchar int vertex_indices\n"
+                      "end_header\n"
+                      "0 0 0\n"
+                      "1 0 0\n"
+                      "0 1 0\n"
+                      "3 0 0 1\n");
+    const auto asciiPlyResult = Geometry::MeshIO::LoadPLY(asciiPly.Path);
+    ASSERT_FALSE(asciiPlyResult.has_value());
+    EXPECT_EQ(asciiPlyResult.error(), Core::ErrorCode::InvalidFormat);
+
+    const std::array<BinaryPlyVertex, 3> vertices{{
+        {glm::vec3{0.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{1.0f, 0.0f, 0.0f}, false, 0, 0, 0},
+        {glm::vec3{0.0f, 1.0f, 0.0f}, false, 0, 0, 0},
+    }};
+    const std::array<std::vector<std::uint32_t>, 1> duplicateFace{{{0u, 0u, 1u}}};
+    TempBinaryPLY binaryPly(vertices, duplicateFace, BinaryPlyEndian::Little);
+    const auto binaryPlyResult = Geometry::MeshIO::LoadPLY(binaryPly.Path);
+    ASSERT_FALSE(binaryPlyResult.has_value());
+    EXPECT_EQ(binaryPlyResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile asciiStl(".stl",
+                      "solid duplicate\n"
+                      "facet normal 0 0 1\n"
+                      "outer loop\n"
+                      "vertex 0 0 0\n"
+                      "vertex 0 0 0\n"
+                      "vertex 0 1 0\n"
+                      "endloop\n"
+                      "endfacet\n"
+                      "endsolid duplicate\n");
+    const auto asciiStlResult = Geometry::MeshIO::LoadSTL(asciiStl.Path);
+    ASSERT_FALSE(asciiStlResult.has_value());
+    EXPECT_EQ(asciiStlResult.error(), Core::ErrorCode::InvalidFormat);
+
+    const std::array<std::array<glm::vec3, 3>, 1> triangles{{
+        {glm::vec3{0.0f, 0.0f, 0.0f},
+         glm::vec3{0.0f, 0.0f, 0.0f},
+         glm::vec3{0.0f, 1.0f, 0.0f}},
+    }};
+    TempBinarySTL binaryStl(triangles, 1u);
+    const auto binaryStlResult = Geometry::MeshIO::LoadSTL(binaryStl.Path);
+    ASSERT_FALSE(binaryStlResult.has_value());
+    EXPECT_EQ(binaryStlResult.error(), Core::ErrorCode::InvalidFormat);
+}
+
 namespace
 {
     struct BinaryPlyPointCloudVertex
@@ -3511,6 +4253,34 @@ TEST(GeometryIO_PointCloudIO, LoadsAsciiPLYPointCloudAfterBinaryDispatch)
     EXPECT_TRUE(result->Cloud.HasColors());
     EXPECT_EQ(result->Cloud.Position(Geometry::VertexHandle{0}), glm::vec3(1.0f, 2.0f, 3.0f));
     EXPECT_NEAR(result->Cloud.Color(Geometry::VertexHandle{0}).y, 128.0f / 255.0f, 1.0e-6f);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadPLYPointCloudRejectsUnsupportedFormatVersion)
+{
+    TempFile missingVersion(".ply",
+                            "ply\n"
+                            "format ascii\n"
+                            "element vertex 1\n"
+                            "property float x\n"
+                            "property float y\n"
+                            "property float z\n"
+                            "end_header\n"
+                            "1 2 3\n");
+    const auto missingVersionResult = Geometry::PointCloudIO::LoadPLY(missingVersion.Path);
+    ASSERT_FALSE(missingVersionResult.has_value());
+    EXPECT_EQ(missingVersionResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile unsupportedVersion(".ply",
+                                "ply\n"
+                                "format binary_big_endian 2.0\n"
+                                "element vertex 1\n"
+                                "property float x\n"
+                                "property float y\n"
+                                "property float z\n"
+                                "end_header\n");
+    const auto unsupportedVersionResult = Geometry::PointCloudIO::LoadPLY(unsupportedVersion.Path);
+    ASSERT_FALSE(unsupportedVersionResult.has_value());
+    EXPECT_EQ(unsupportedVersionResult.error(), Core::ErrorCode::InvalidFormat);
 }
 
 TEST(GeometryIO_PointCloudIO, LoadAsciiPLYPointCloudRejectsListPropertyInVertex)
@@ -3843,6 +4613,38 @@ TEST(GeometryIO_PointCloudIO, LoadPCDRejectsZeroSizeField)
     std::remove(path.c_str());
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_PointCloudIO, LoadPCDRejectsUnsupportedScalarFieldLayouts)
+{
+    TempFile unsupportedFloatSize(".pcd",
+                                  "# .PCD v0.7\n"
+                                  "FIELDS x y z\n"
+                                  "SIZE 3 4 4\n"
+                                  "TYPE F F F\n"
+                                  "COUNT 1 1 1\n"
+                                  "WIDTH 1\n"
+                                  "HEIGHT 1\n"
+                                  "POINTS 1\n"
+                                  "DATA ascii\n"
+                                  "0 0 0\n");
+    const auto unsupportedFloatSizeResult = Geometry::PointCloudIO::LoadPCD(unsupportedFloatSize.Path);
+    ASSERT_FALSE(unsupportedFloatSizeResult.has_value());
+    EXPECT_EQ(unsupportedFloatSizeResult.error(), Core::ErrorCode::InvalidFormat);
+
+    TempFile unsupportedIntegerSize(".pcd",
+                                    "# .PCD v0.7\n"
+                                    "FIELDS x y z\n"
+                                    "SIZE 4 4 16\n"
+                                    "TYPE F F U\n"
+                                    "COUNT 1 1 1\n"
+                                    "WIDTH 1\n"
+                                    "HEIGHT 1\n"
+                                    "POINTS 1\n"
+                                    "DATA binary\n");
+    const auto unsupportedIntegerSizeResult = Geometry::PointCloudIO::LoadPCD(unsupportedIntegerSize.Path);
+    ASSERT_FALSE(unsupportedIntegerSizeResult.has_value());
+    EXPECT_EQ(unsupportedIntegerSizeResult.error(), Core::ErrorCode::InvalidFormat);
 }
 
 TEST(GeometryIO_PointCloudIO, WritesPLYPointCloud)
@@ -4404,4 +5206,90 @@ TEST(GeometryIO_PointCloudIO, WritePCDBinaryRejectsBadPath)
         std::to_string(static_cast<long long>(getpid())) + ".pcd";
     EXPECT_EQ(Geometry::PointCloudIO::WritePCDBinary(path, cloud),
               Geometry::PointCloudIO::PointCloudIOWriteStatus::InvalidPath);
+}
+
+TEST(GeometryIO_PointCloudIO, PointCloudExportersRejectNonFinitePositions)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.AddPoint(glm::vec3(std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f));
+
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+    TempFile xyz(".xyz", "");
+    TempFile pcd(".pcd", "");
+    TempFile binaryPcd(".pcd", "");
+
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(ply.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary(binaryPly.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WriteXYZ(xyz.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCD(pcd.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCDBinary(binaryPcd.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+}
+
+TEST(GeometryIO_PointCloudIO, PointCloudExportersRejectNonFiniteColors)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.EnableColors(glm::vec4(1.0f));
+    const auto vertex = cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.Color(vertex) = glm::vec4(1.0f, std::numeric_limits<float>::infinity(), 0.0f, 1.0f);
+
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+    TempFile xyz(".xyz", "");
+    TempFile pcd(".pcd", "");
+    TempFile binaryPcd(".pcd", "");
+
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(ply.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary(binaryPly.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WriteXYZ(xyz.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCD(pcd.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCDBinary(binaryPcd.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+}
+
+TEST(GeometryIO_PointCloudIO, PointCloudExportersRejectNonFiniteNormalsWhenSerialized)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.EnableNormals();
+    const auto vertex = cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.Normal(vertex) = glm::vec3(0.0f, std::numeric_limits<float>::infinity(), 1.0f);
+
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+    TempFile pcd(".pcd", "");
+    TempFile binaryPcd(".pcd", "");
+
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(ply.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary(binaryPly.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCD(pcd.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePCDBinary(binaryPcd.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+}
+
+TEST(GeometryIO_PointCloudIO, PointCloudPLYExportersRejectNonFiniteRadii)
+{
+    Geometry::PointCloudIO::PointCloudIOResult cloud;
+    cloud.Cloud.EnableRadii(0.0f);
+    const auto vertex = cloud.Cloud.AddPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+    cloud.Cloud.Radius(vertex) = std::numeric_limits<float>::quiet_NaN();
+
+    TempFile ply(".ply", "");
+    TempFile binaryPly(".ply", "");
+
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLY(ply.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
+    EXPECT_EQ(Geometry::PointCloudIO::WritePLYBinary(binaryPly.Path, cloud),
+              Geometry::PointCloudIO::PointCloudIOWriteStatus::FileWriteError);
 }

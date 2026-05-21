@@ -41,8 +41,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-7bq9k`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002S` (`tasks/done/GEOIO-002S-mesh-obj-vertex-normal-importer.md`)
   introduced the lockstep `vn` ingest pattern this slice mirrors
   for `vt`.
@@ -214,4 +214,4 @@ python3 tools/docs/check_doc_links.py --root .
     writer emission; packed-`rgb`/`rgba` PCD plus
     `binary_compressed` LZF decompression) stays tracked under
     the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

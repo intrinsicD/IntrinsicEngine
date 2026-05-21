@@ -30,8 +30,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-6ZFQb`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002J..M` shipped point-cloud and mesh writers symmetric to
   the existing readers in `Geometry.PointCloud.IO` /
   `Geometry.HalfedgeMesh.IO`. The graph IO module currently has only
@@ -249,4 +249,4 @@ python3 tools/docs/check_doc_links.py --root .
     diagnostics; OBJ ASCII parity hardening; packed-`rgb`/`rgba`
     PCD plus `binary_compressed` LZF decompression; binary STL
     mesh writer) stays tracked under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

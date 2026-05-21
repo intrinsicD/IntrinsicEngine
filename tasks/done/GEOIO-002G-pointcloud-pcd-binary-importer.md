@@ -33,8 +33,8 @@
 ## Context
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-B6Efb`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Predecessor slice: `tasks/done/GEOIO-002F-pointcloud-ply-binary-importer.md`
   introduced the binary point-cloud pattern (header parse with full
   per-property records, ASCII helper extraction, binary helper
@@ -330,4 +330,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
     importer parity hardening for additional point-cloud variants
     such as packed `rgb`/`rgba` PCD and `binary_compressed` LZF
     decompression) stays tracked under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

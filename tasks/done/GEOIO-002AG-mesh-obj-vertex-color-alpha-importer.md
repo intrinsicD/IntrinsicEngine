@@ -36,8 +36,8 @@
 
 ## Context
 - Owner/agent: `geometry -> core` only.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Predecessors:
   - `GEOIO-002AE` landed the seven-token `v x y z r g b` importer
     and established the lockstep + face-attribute remap branches for
@@ -222,4 +222,4 @@ python3 tools/docs/check_doc_links.py --root .
     further OBJ ASCII parity, packed-`rgb` / `rgba` PCD export
     plus `binary_compressed` LZF decompression) stays tracked
     under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

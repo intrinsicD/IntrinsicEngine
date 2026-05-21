@@ -14,7 +14,7 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-Qvotd`.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002W` added mesh PLY vertex normal/color **import**: ASCII and binary readers populate `v:color` (`glm::vec4`) from `red green blue [alpha]` properties.
 - The existing mesh PLY writers emit positions and optional `nx ny nz` normals but ignore `v:color`, so color data round-trips one-way only.
 - The point-cloud PLY writer (`Geometry::PointCloudIO::WritePLY` / `WritePLYBinary`) emits `uchar red/green/blue` (no alpha) when colors exist. This slice mirrors that convention for the mesh writers.

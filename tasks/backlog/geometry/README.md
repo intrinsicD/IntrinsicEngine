@@ -9,7 +9,7 @@ map.
 
 ## Tasks
 
-- [GEOIO-002 — Geometry IO parity hardening and exporters](GEOIO-002-geometry-io-parity-hardening.md).
+- [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](GEOM-006-indexed-mesh-soup-conversion-contracts.md).
 - [GEOM-007 — Robust predicates and intersection classification foundation](GEOM-007-robust-predicates-intersection-classification.md).
 - [GEOM-008 — Geometry linear algebra and solver infrastructure](GEOM-008-linear-algebra-solver-infrastructure.md).
@@ -23,8 +23,9 @@ map.
 
 ## Convergence
 
-- GEOIO-002 contributes to **Theme E — Geometry IO completion** and is the
-  upstream gate for [`assets/ASSETIO-001`](../assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
+- GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
+  and contributes to **Theme E — Geometry IO completion** as the upstream gate
+  for [`assets/ASSETIO-001`](../assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
   and asset-backed mesh residency in **Theme A — Shortest path to sandbox
   visible geometry** (`rendering/GRAPHICS-034`).
 - [GEOM-005](../../done/GEOM-005-api-style-and-numeric-policy.md) is retired in

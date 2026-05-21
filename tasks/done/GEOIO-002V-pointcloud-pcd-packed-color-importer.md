@@ -14,7 +14,7 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `main` local workspace.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Prior `GEOIO-002` slices added PCD ASCII/binary point-cloud import/export for separate `r g b` fields and recorded packed `rgb`/`rgba` PCD as remaining scope.
 - Common PCD producers, including PCL-style files, encode color as a single 32-bit `rgb` or `rgba` scalar whose bits are `0xAARRGGBB`/`0x00RRGGBB`; ASCII files often print the same bits through a `float` field.
 

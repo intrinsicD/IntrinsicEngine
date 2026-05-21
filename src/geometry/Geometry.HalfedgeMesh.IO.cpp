@@ -194,6 +194,86 @@ namespace Geometry::MeshIO
             return Core::Err<MeshIOResult>(Core::ErrorCode::InvalidFormat);
         }
 
+        [[nodiscard]] bool HasDuplicateFaceIndices(std::span<const std::uint32_t> indices)
+        {
+            for (std::size_t i = 0; i < indices.size(); ++i)
+            {
+                for (std::size_t j = i + 1; j < indices.size(); ++j)
+                {
+                    if (indices[i] == indices[j])
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool HasDuplicateOBJFacePositions(std::span<const OBJFaceVertex> face)
+        {
+            for (std::size_t i = 0; i < face.size(); ++i)
+            {
+                for (std::size_t j = i + 1; j < face.size(); ++j)
+                {
+                    if (face[i].Position == face[j].Position)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool SamePosition(const glm::vec3& lhs, const glm::vec3& rhs)
+        {
+            return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
+        }
+
+        [[nodiscard]] bool FaceHasDuplicatePositions(std::span<const glm::vec3> positions,
+                                                     std::span<const std::uint32_t> indices)
+        {
+            for (std::size_t i = 0; i < indices.size(); ++i)
+            {
+                for (std::size_t j = i + 1; j < indices.size(); ++j)
+                {
+                    if (SamePosition(positions[indices[i]], positions[indices[j]]))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec2& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec4& value)
+        {
+            return std::isfinite(value.r) && std::isfinite(value.g) &&
+                   std::isfinite(value.b) && std::isfinite(value.a);
+        }
+
+        template <typename T>
+        [[nodiscard]] bool AllFinite(const std::vector<T>& values)
+        {
+            for (const T& value : values)
+            {
+                if (!IsFinite(value))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         enum class OFFVariant
         {
             Standard,
@@ -513,7 +593,12 @@ namespace Geometry::MeshIO
                 {
                     return InvalidMeshFormat();
                 }
-                vertices.emplace_back(*x, *y, *z);
+                const glm::vec3 position(*x, *y, *z);
+                if (!IsFinite(position))
+                {
+                    return InvalidMeshFormat();
+                }
+                vertices.push_back(position);
                 if (hasNormals)
                 {
                     const auto nx = ParseNumber<float>(tokens[*nxIndex]);
@@ -523,7 +608,12 @@ namespace Geometry::MeshIO
                     {
                         return InvalidMeshFormat();
                     }
-                    normals.emplace_back(*nx, *ny, *nz);
+                    const glm::vec3 normal(*nx, *ny, *nz);
+                    if (!IsFinite(normal))
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    normals.push_back(normal);
                 }
                 if (hasColors)
                 {
@@ -535,10 +625,15 @@ namespace Geometry::MeshIO
                     {
                         return InvalidMeshFormat();
                     }
-                    colors.emplace_back(NormalizePLYColorChannel(*r),
-                                        NormalizePLYColorChannel(*g),
-                                        NormalizePLYColorChannel(*b),
-                                        NormalizePLYColorChannel(*a));
+                    const glm::vec4 color(*r, *g, *b, *a);
+                    if (!IsFinite(color))
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    colors.emplace_back(NormalizePLYColorChannel(color.r),
+                                        NormalizePLYColorChannel(color.g),
+                                        NormalizePLYColorChannel(color.b),
+                                        NormalizePLYColorChannel(color.a));
                 }
                 if (hasTexcoords)
                 {
@@ -548,7 +643,12 @@ namespace Geometry::MeshIO
                     {
                         return InvalidMeshFormat();
                     }
-                    texcoords.emplace_back(*u, *v);
+                    const glm::vec2 texcoord(*u, *v);
+                    if (!IsFinite(texcoord))
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    texcoords.push_back(texcoord);
                 }
             }
 
@@ -580,6 +680,10 @@ namespace Geometry::MeshIO
                         return InvalidMeshFormat();
                     }
                     face.push_back(static_cast<std::uint32_t>(*index));
+                }
+                if (HasDuplicateFaceIndices(face))
+                {
+                    return InvalidMeshFormat();
                 }
                 faces.push_back(std::move(face));
             }
@@ -783,16 +887,26 @@ namespace Geometry::MeshIO
                     for (std::size_t row = 0; row < element.Count; ++row)
                     {
                         const std::byte* base = cursor + row * vertexStride;
-                        vertices.emplace_back(
+                        const glm::vec3 position(
                             ReadFloatingScalarAt(base, vertexOffsets[xIndex], vertexElement->Properties[xIndex].ScalarType, bigEndian),
                             ReadFloatingScalarAt(base, vertexOffsets[yIndex], vertexElement->Properties[yIndex].ScalarType, bigEndian),
                             ReadFloatingScalarAt(base, vertexOffsets[zIndex], vertexElement->Properties[zIndex].ScalarType, bigEndian));
+                        if (!IsFinite(position))
+                        {
+                            return InvalidMeshFormat();
+                        }
+                        vertices.push_back(position);
                         if (hasNormals)
                         {
-                            normals.emplace_back(
+                            const glm::vec3 normal(
                                 ReadFloatingScalarAt(base, vertexOffsets[nxIndex], vertexElement->Properties[nxIndex].ScalarType, bigEndian),
                                 ReadFloatingScalarAt(base, vertexOffsets[nyIndex], vertexElement->Properties[nyIndex].ScalarType, bigEndian),
                                 ReadFloatingScalarAt(base, vertexOffsets[nzIndex], vertexElement->Properties[nzIndex].ScalarType, bigEndian));
+                            if (!IsFinite(normal))
+                            {
+                                return InvalidMeshFormat();
+                            }
+                            normals.push_back(normal);
                         }
                         if (hasColors)
                         {
@@ -807,9 +921,14 @@ namespace Geometry::MeshIO
                         }
                         if (hasTexcoords)
                         {
-                            texcoords.emplace_back(
+                            const glm::vec2 texcoord(
                                 ReadFloatingScalarAt(base, vertexOffsets[texUIndex], vertexElement->Properties[texUIndex].ScalarType, bigEndian),
                                 ReadFloatingScalarAt(base, vertexOffsets[texVIndex], vertexElement->Properties[texVIndex].ScalarType, bigEndian));
+                            if (!IsFinite(texcoord))
+                            {
+                                return InvalidMeshFormat();
+                            }
+                            texcoords.push_back(texcoord);
                         }
                     }
                     cursor += total;
@@ -870,6 +989,10 @@ namespace Geometry::MeshIO
                             }
                         }
                         if (face.empty())
+                        {
+                            return InvalidMeshFormat();
+                        }
+                        if (HasDuplicateFaceIndices(face))
                         {
                             return InvalidMeshFormat();
                         }
@@ -994,6 +1117,15 @@ namespace Geometry::MeshIO
                     std::memcpy(&y, vertexPtr + 4, sizeof(float));
                     std::memcpy(&z, vertexPtr + 8, sizeof(float));
                     triangle[v] = glm::vec3(x, y, z);
+                    if (!IsFinite(triangle[v]))
+                    {
+                        return InvalidMeshFormat();
+                    }
+                }
+                if (SamePosition(triangle[0], triangle[1]) || SamePosition(triangle[0], triangle[2]) ||
+                    SamePosition(triangle[1], triangle[2]))
+                {
+                    return InvalidMeshFormat();
                 }
                 const auto baseIndex = static_cast<std::uint32_t>(vertices.size());
                 vertices.push_back(triangle[0]);
@@ -1058,7 +1190,12 @@ namespace Geometry::MeshIO
                 {
                     return InvalidMeshFormat();
                 }
-                vertices.emplace_back(*x, *y, *z);
+                const glm::vec3 position(*x, *y, *z);
+                if (!IsFinite(position))
+                {
+                    return InvalidMeshFormat();
+                }
+                vertices.push_back(position);
                 if (tokens.size() == 7)
                 {
                     const auto r = ParseNumber<float>(tokens[4]);
@@ -1068,7 +1205,12 @@ namespace Geometry::MeshIO
                     {
                         return InvalidMeshFormat();
                     }
-                    colors.emplace_back(*r, *g, *b, 1.0f);
+                    const glm::vec4 color(*r, *g, *b, 1.0f);
+                    if (!IsFinite(color))
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    colors.push_back(color);
                 }
                 else if (tokens.size() == 8)
                 {
@@ -1080,7 +1222,12 @@ namespace Geometry::MeshIO
                     {
                         return InvalidMeshFormat();
                     }
-                    colors.emplace_back(*r, *g, *b, *a);
+                    const glm::vec4 color(*r, *g, *b, *a);
+                    if (!IsFinite(color))
+                    {
+                        return InvalidMeshFormat();
+                    }
+                    colors.push_back(color);
                 }
             }
             else if (tokens[0] == "vn")
@@ -1096,7 +1243,12 @@ namespace Geometry::MeshIO
                 {
                     return InvalidMeshFormat();
                 }
-                normals.emplace_back(*x, *y, *z);
+                const glm::vec3 normal(*x, *y, *z);
+                if (!IsFinite(normal))
+                {
+                    return InvalidMeshFormat();
+                }
+                normals.push_back(normal);
             }
             else if (tokens[0] == "vt")
             {
@@ -1110,7 +1262,12 @@ namespace Geometry::MeshIO
                 {
                     return InvalidMeshFormat();
                 }
-                texcoords.emplace_back(*u, *v);
+                const glm::vec2 texcoord(*u, *v);
+                if (!IsFinite(texcoord))
+                {
+                    return InvalidMeshFormat();
+                }
+                texcoords.push_back(texcoord);
             }
             else if (tokens[0] == "f")
             {
@@ -1136,6 +1293,10 @@ namespace Geometry::MeshIO
                         hasFaceNormals = true;
                     }
                     face.push_back(*parsed);
+                }
+                if (HasDuplicateOBJFacePositions(face))
+                {
+                    return InvalidMeshFormat();
                 }
                 faceVertices.push_back(std::move(face));
             }
@@ -1342,7 +1503,12 @@ namespace Geometry::MeshIO
             {
                 return InvalidMeshFormat();
             }
-            vertices.emplace_back(*x, *y, *z);
+            const glm::vec3 position(*x, *y, *z);
+            if (!IsFinite(position))
+            {
+                return InvalidMeshFormat();
+            }
+            vertices.push_back(position);
 
             std::size_t tokenIdx = 3;
 
@@ -1357,6 +1523,10 @@ namespace Geometry::MeshIO
                     if (nx && ny && nz)
                     {
                         normal = glm::vec3(*nx, *ny, *nz);
+                        if (!IsFinite(normal))
+                        {
+                            return InvalidMeshFormat();
+                        }
                     }
                 }
                 normals.push_back(normal);
@@ -1373,9 +1543,14 @@ namespace Geometry::MeshIO
                     const auto b = ParseNumber<float>(tokens[tokenIdx + 2]);
                     if (r && g && b)
                     {
-                        color = glm::vec4(NormalizeOFFColorChannel(*r),
-                                          NormalizeOFFColorChannel(*g),
-                                          NormalizeOFFColorChannel(*b),
+                        const glm::vec3 rawColor(*r, *g, *b);
+                        if (!IsFinite(rawColor))
+                        {
+                            return InvalidMeshFormat();
+                        }
+                        color = glm::vec4(NormalizeOFFColorChannel(rawColor.r),
+                                          NormalizeOFFColorChannel(rawColor.g),
+                                          NormalizeOFFColorChannel(rawColor.b),
                                           1.0f);
                     }
                     tokenIdx += 3;
@@ -1426,6 +1601,10 @@ namespace Geometry::MeshIO
                 }
                 face.push_back(static_cast<std::uint32_t>(*index));
             }
+                if (HasDuplicateFaceIndices(face))
+                {
+                    return InvalidMeshFormat();
+                }
             faces.push_back(std::move(face));
         }
 
@@ -1483,7 +1662,7 @@ namespace Geometry::MeshIO
             }
             if (tokens[0] == "format")
             {
-                if (tokens.size() < 2)
+                if (tokens.size() != 3 || tokens[2] != "1.0")
                 {
                     return InvalidMeshFormat();
                 }
@@ -1610,10 +1789,19 @@ namespace Geometry::MeshIO
                 {
                     return InvalidMeshFormat();
                 }
-                vertices.emplace_back(*x, *y, *z);
+                const glm::vec3 position(*x, *y, *z);
+                if (!IsFinite(position))
+                {
+                    return InvalidMeshFormat();
+                }
+                vertices.push_back(position);
                 currentFace.push_back(static_cast<std::uint32_t>(vertices.size() - 1));
                 if (currentFace.size() == 3)
                 {
+                    if (FaceHasDuplicatePositions(vertices, currentFace))
+                    {
+                        return InvalidMeshFormat();
+                    }
                     faces.push_back(currentFace);
                     currentFace.clear();
                 }
@@ -1647,6 +1835,11 @@ namespace Geometry::MeshIO
         }
         const auto& positions = positionsView.Vector();
 
+        if (!AllFinite(positions))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
         const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
         if (!facesView.IsValid() || facesView.Vector().empty())
         {
@@ -1671,12 +1864,24 @@ namespace Geometry::MeshIO
 
         const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
         const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
+        if (hasNormals && !AllFinite(normalsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
         const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
+        if (hasTexcoords && !AllFinite(texcoordsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
         const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
+        if (hasColors && !AllFinite(colorsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
@@ -1805,6 +2010,11 @@ namespace Geometry::MeshIO
         }
         const auto& positions = positionsView.Vector();
 
+        if (!AllFinite(positions))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
         const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
         if (!facesView.IsValid() || facesView.Vector().empty())
         {
@@ -1829,12 +2039,24 @@ namespace Geometry::MeshIO
 
         const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
         const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
+        if (hasNormals && !AllFinite(normalsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
         const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
+        if (hasColors && !AllFinite(colorsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
         const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
+        if (hasTexcoords && !AllFinite(texcoordsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
@@ -2001,6 +2223,11 @@ namespace Geometry::MeshIO
         }
         const auto& positions = positionsView.Vector();
 
+        if (!AllFinite(positions))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
         const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
         if (!facesView.IsValid() || facesView.Vector().empty())
         {
@@ -2029,12 +2256,24 @@ namespace Geometry::MeshIO
 
         const auto normalsView = mesh.Vertices.Get<glm::vec3>("v:normal");
         const bool hasNormals = normalsView.IsValid() && normalsView.Vector().size() == positions.size();
+        if (hasNormals && !AllFinite(normalsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         const auto colorsView = mesh.Vertices.Get<glm::vec4>("v:color");
         const bool hasColors = colorsView.IsValid() && colorsView.Vector().size() == positions.size();
+        if (hasColors && !AllFinite(colorsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         const auto texcoordsView = mesh.Vertices.Get<glm::vec2>("v:texcoord");
         const bool hasTexcoords = texcoordsView.IsValid() && texcoordsView.Vector().size() == positions.size();
+        if (hasTexcoords && !AllFinite(texcoordsView.Vector()))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         std::ofstream stream(std::string(absolute_path), std::ios::binary | std::ios::trunc);
         if (!stream)
@@ -2200,6 +2439,11 @@ namespace Geometry::MeshIO
         }
         const auto& positions = positionsView.Vector();
 
+        if (!AllFinite(positions))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
+
         const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
         if (!facesView.IsValid() || facesView.Vector().empty())
         {
@@ -2298,6 +2542,11 @@ namespace Geometry::MeshIO
             return MeshIOWriteStatus::EmptyMesh;
         }
         const auto& positions = positionsView.Vector();
+
+        if (!AllFinite(positions))
+        {
+            return MeshIOWriteStatus::FileWriteError;
+        }
 
         const auto facesView = mesh.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
         if (!facesView.IsValid() || facesView.Vector().empty())

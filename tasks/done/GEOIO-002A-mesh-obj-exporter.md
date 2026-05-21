@@ -22,7 +22,7 @@
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/agentic-workflow-session-eaW9t` (implementation),
   retired on `claude/setup-agentic-workflow-PjgiX`.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-001` landed minimal `LoadOBJ`/`LoadOFF`/`LoadPLY`/`LoadSTL`
   importers in `src/geometry/Geometry.HalfedgeMesh.IO.{cppm,cpp}`. The exporter side
   is currently empty; legacy reference implementations live under
@@ -160,4 +160,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
     `tests/unit/geometry/Test.GeometryIO.cpp` (six new
     `WritesOBJ*`/`WriteOBJRejects*` cases).
   - Follow-up PLY/STL exporter slices remain tracked under the parent
-    backlog task `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    parent task `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

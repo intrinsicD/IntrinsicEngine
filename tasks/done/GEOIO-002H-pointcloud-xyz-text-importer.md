@@ -34,8 +34,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-xwz1l`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`
   explicitly lists "XYZ/PTS/XYZRGB-style text point clouds" as part
   of the importer parity scope.
 - Predecessor slices: `tasks/done/GEOIO-002F-pointcloud-ply-binary-importer.md`
@@ -260,4 +260,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
     graph importer hardening, and packed-`rgb`/`rgba` PCD plus
     `binary_compressed` LZF decompression) stays tracked under the
     parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

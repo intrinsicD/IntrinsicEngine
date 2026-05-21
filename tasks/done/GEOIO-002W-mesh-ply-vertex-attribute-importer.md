@@ -14,7 +14,7 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `main` local workspace.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Mesh PLY import already parsed vertex positions and face topology for ASCII and binary PLY, but dropped vertex normal/color properties even when geometry-owned PLY writers emitted normals and point-cloud PLY loaders preserved colors.
 - This slice keeps the existing `MeshIOResult` property contract: positions in `v:point`, optional normals in `v:normal`, and optional colors in `v:color`.
 

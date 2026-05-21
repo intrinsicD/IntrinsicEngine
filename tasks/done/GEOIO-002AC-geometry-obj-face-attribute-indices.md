@@ -11,7 +11,7 @@
 
 ## Context
 - Owner: `geometry -> core` only.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Prior slices added lockstep OBJ vertex normal and texcoord import/export. Common OBJ files store positions, texcoords, and normals in separate arrays and reference them from face tokens.
 - The promoted geometry result can represent these as duplicated vertices where distinct face attribute tuples reference the same position with different attributes.
 

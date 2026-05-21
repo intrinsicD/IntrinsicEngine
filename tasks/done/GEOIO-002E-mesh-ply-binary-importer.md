@@ -32,8 +32,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-Yxe9K`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Predecessor slices:
   - `tasks/done/GEOIO-002A-mesh-obj-exporter.md` introduced
     `MeshIOWriteStatus` and `WriteOBJ`.
@@ -282,4 +282,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
     across OBJ/OFF/PLY/STL, domain-selection metadata for
     asset/runtime routing, importer parity hardening for additional
     point-cloud variants) stays tracked under the parent backlog
-    task `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    task `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

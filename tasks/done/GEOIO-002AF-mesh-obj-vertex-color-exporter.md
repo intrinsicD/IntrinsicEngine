@@ -35,8 +35,8 @@
 
 ## Context
 - Owner/agent: `geometry -> core` only.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Predecessors:
   - `GEOIO-002U` added the OBJ ASCII vertex-texcoord lockstep export
     (the symmetric writer side for `v:texcoord`).
@@ -233,4 +233,4 @@ python3 tools/docs/check_doc_links.py --root .
     reader-side status codes, further OBJ ASCII parity, packed
     `rgb` / `rgba` PCD plus `binary_compressed` LZF
     decompression) stays tracked under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

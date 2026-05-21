@@ -35,8 +35,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-xMjLy`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002C` shipped the symmetric ASCII STL mesh writer
   (`Geometry::MeshIO::WriteSTL`) emitting
   `solid IntrinsicEngine\n...endsolid IntrinsicEngine\n` with
@@ -260,4 +260,4 @@ python3 tools/docs/check_doc_links.py --root .
     `binary_compressed` LZF decompression; binary PCD writer;
     edge-list `.edges` graph writer) stays tracked under the
     parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

@@ -10,7 +10,7 @@
 
 ## Context
 - Owner: `geometry -> core` only.
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - Existing binary PLY import already parses `float32` vertex fields and rejects unsupported topology/header failures with `Core::ErrorCode::InvalidFormat`.
 
 ## Required changes

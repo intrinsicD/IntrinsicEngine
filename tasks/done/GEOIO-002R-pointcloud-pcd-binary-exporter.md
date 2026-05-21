@@ -45,8 +45,8 @@
 - Status: done.
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-EP5PN`.
-- Parent backlog task:
-  `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task:
+  `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-002J..N` shipped point-cloud and graph writers
   symmetric to existing readers in `Geometry.PointCloud.IO` /
   `Geometry.Graph.IO`. `GEOIO-002O` added the geometry-owned
@@ -269,4 +269,4 @@ python3 tools/docs/check_doc_links.py --root .
     OBJ ASCII parity hardening; packed-`rgb`/`rgba` PCD plus
     `binary_compressed` LZF decompression) stays tracked under
     the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.

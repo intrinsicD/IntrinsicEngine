@@ -26,7 +26,7 @@
 - Owner/agent: `geometry -> core` only.
 - Branch: `claude/setup-agentic-workflow-aHpQ0` (implementation),
   `claude/setup-agentic-workflow-58MLx` (retirement).
-- Parent backlog task: `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+- Parent task: `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
 - `GEOIO-001`/`GEOIO-002F`/`GEOIO-002G`/`GEOIO-002H` cover ASCII+binary
   PLY/PCD/XYZ point-cloud importers in
   `src/geometry/Geometry.PointCloud.IO.{cppm,cpp}`. There is currently no
@@ -151,4 +151,4 @@ python3 tools/docs/check_doc_links.py --root .
     `MeshIOReadStatus`/`PointCloudIOReadStatus` diagnostics; OBJ ASCII
     parity hardening; packed-`rgb`/`rgba` PCD plus `binary_compressed`
     LZF decompression) stays tracked under the parent backlog task
-    `tasks/backlog/geometry/GEOIO-002-geometry-io-parity-hardening.md`.
+    `tasks/done/GEOIO-002-geometry-io-parity-hardening.md`.
