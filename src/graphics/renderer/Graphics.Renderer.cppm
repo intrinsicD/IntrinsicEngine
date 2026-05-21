@@ -330,6 +330,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetSelectionOutlinePipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-075 (Slice A) — accessor for the default-recipe postprocess
+        // tonemap pipeline (vertex `post_fullscreen.vert.spv` + fragment
+        // `post_tonemap.frag.spv`, single backbuffer-format color target, no
+        // depth target, `PushConstantSize = sizeof(PostProcessPushConstants)`).
+        // The pipeline is a fullscreen triangle that the `"PostProcessPass"`
+        // umbrella executor branch binds and draws into the recipe's
+        // `SceneColorLDR` color target after reading the prior frame's
+        // `SceneColorHDR`. Handle is invalid until an operational device path
+        // publishes the lease; the descriptor remains deterministic so
+        // contract tests can assert byte-identical rebuild behavior. Slices
+        // B–E add the bloom / FXAA / SMAA / histogram pipelines behind the
+        // same umbrella branch.
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessToneMapPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessToneMapPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for
         // `8 * frames-in-flight` bytes (one 4-byte `EntityId` word + one

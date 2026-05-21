@@ -907,10 +907,36 @@ Concretely:
   and no new graphics acceptance criteria.
 - `PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain settings,
   deterministic stage description, sanitized diagnostics, and push-constant
-  packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. Frame
-  recipe resources `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
-  `PostProcess.AATemp` are transient postprocess-owned intermediates; concrete
-  Vulkan descriptors/shaders remain backend follow-ups. Per `GRAPHICS-013AQ`,
+  packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. The
+  `ToneMap` leaf is operationally wired under `GRAPHICS-075` Slice A: the
+  `NullRenderer` owns `m_PostProcessToneMapPass` +
+  `m_PostProcessToneMapPipelineLease`, the tonemap pipeline (vertex
+  `post_fullscreen.vert.spv` + fragment `post_tonemap.frag.spv`, single
+  backbuffer-format color target, no depth, `PushConstantSize =
+  sizeof(PostProcessPushConstants)`) is created in
+  `InitializeOperationalPassResources(device)` and republished byte-identical
+  across `RebuildOperationalResources()`, and the recipe's
+  `"PostProcessPass"` umbrella executor branch routes through
+  `RecordPostProcessToneMapPass(...)` with the recorded
+  `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
+  Push-constant compatibility note: the renderer pushes the 20-byte
+  canonical `PostProcessPushConstants` block (Exposure + Gamma +
+  BloomIntensity + HistogramBinCount + StageKind), while
+  `assets/shaders/post_tonemap.frag` declares the larger 240-byte color-
+  grading push block. Vulkan permits partially-written push ranges; the
+  shader's in-fragment defaults (`pc.Operator == 0` → ACES) produce a
+  deterministic result against zero-init tail bytes, which keeps the
+  CPU/null contract gate well-formed. Extending the canonical struct (or
+  migrating the shader to a slim 20-byte block) is gated by the GPU/Vulkan
+  `Operational` claim outside Slice A's scope and is tracked alongside the
+  Slices B–E retained-resource and histogram-readback work below. The
+  Slices B–E `Histogram` / `Bloom` / `FXAA` / `SMAA` helpers fan out from
+  the same umbrella branch (mirroring `GRAPHICS-074`'s `"PickingPass"`
+  fan-out) once their pipelines + retained LUTs + histogram readback drain
+  land. Frame recipe resources `PostProcess.BloomScratch`,
+  `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
+  postprocess-owned intermediates; concrete Vulkan descriptors/shaders
+  remain backend follow-ups. Per `GRAPHICS-013AQ`,
   `PostProcessSystem` is the sole owner of the retained postprocess resources
   (SMAA `AreaTex` `R8G8_UNORM` 160x560 and `SearchTex` `R8_UNORM` 256x33
   lookup textures, plus the exposure-adaptation history buffer holding

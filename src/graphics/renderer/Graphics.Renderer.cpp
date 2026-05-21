@@ -50,6 +50,7 @@ import Extrinsic.Graphics.Pass.Selection.FaceId;
 import Extrinsic.Graphics.Pass.Selection.EdgeId;
 import Extrinsic.Graphics.Pass.Selection.PointId;
 import Extrinsic.Graphics.Pass.Selection.Outline;
+import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -319,12 +320,23 @@ namespace Extrinsic::Graphics
             // above (m_ShadowSystem), so the reference is live before the
             // operational publisher runs.
             m_DeferredLightingPass.emplace(*m_DeferredSystem, *m_ShadowSystem);
+            // GRAPHICS-075 Slice A — `PostProcessSystem` must be live before
+            // the operational publisher runs so the initial `Initialize()`
+            // path can call `SetPipeline(...)` on `m_PostProcessToneMapPass`.
+            // Same invariant the forward / shadow / deferred / selection
+            // passes follow above: a `has_value()` lease but a default-
+            // constructed pipeline handle on the pass would silently early-
+            // return inside `PostProcessToneMapPass::Execute()` while the
+            // executor still reported `Recorded`. The PostProcessSystem
+            // constructor + `Initialize()` are CPU-only today (the
+            // device-aware retained-LUT allocation arrives with Slice D).
+            m_PostProcessSystem.emplace();
+            m_PostProcessSystem->Initialize();
+            m_PostProcessToneMapPass.emplace(*m_PostProcessSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
             }
-            m_PostProcessSystem.emplace();
-            m_PostProcessSystem->Initialize();
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
         }
@@ -405,6 +417,11 @@ namespace Extrinsic::Graphics
             m_SelectionEdgeIdPass.reset();
             m_SelectionPointIdPass.reset();
             m_SelectionOutlinePass.reset();
+            // GRAPHICS-075 Slice A — reset the tonemap pass before its system
+            // dependency below so the optional destructor does not observe a
+            // dangling `PostProcessSystem&`. Same lifetime contract as the
+            // selection / forward / deferred / shadow passes above.
+            m_PostProcessToneMapPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -431,6 +448,7 @@ namespace Extrinsic::Graphics
             m_SelectionEdgeIdPipelineLease.reset();
             m_SelectionPointIdPipelineLease.reset();
             m_SelectionOutlinePipelineLease.reset();
+            m_PostProcessToneMapPipelineLease.reset();
             // GRAPHICS-074 Slice D.1 — drop the renderer-owned
             // `Picking.Readback` lease before the BufferManager is torn
             // down so the lease's destructor still observes a live manager
@@ -1328,6 +1346,32 @@ namespace Extrinsic::Graphics
                             }
                         }
                     }
+                    else if (passName == std::string_view{"PostProcessPass"})
+                    {
+                        // GRAPHICS-075 Slice A — default-recipe postprocess
+                        // umbrella branch. The recipe declares
+                        // `"PostProcessPass"` whenever
+                        // `features.EnablePostProcess` is true (its current
+                        // unconditional default in
+                        // `DeriveDefaultFrameRecipeFeatures`). Slice A only
+                        // routes ToneMap; the Slices B–E Histogram / Bloom /
+                        // FXAA / SMAA sub-passes will fan out from this same
+                        // branch as their pipelines and helpers land,
+                        // mirroring the GRAPHICS-074 `"PickingPass"` fan-out.
+                        // The status is accumulated under the single
+                        // `"PostProcessPass"` name to keep the executor's
+                        // per-pass status taxonomy the same shape the rest of
+                        // the recipe uses: any sub-pass that records bumps
+                        // the aggregate to `Recorded`; a sub-pass with a
+                        // not-yet-ready pipeline downgrades to
+                        // `SkippedUnavailable` per
+                        // `AccumulateCommandRecordStatus`'s usual rules; a
+                        // non-operational device produces
+                        // `SkippedNonOperational` uniformly.
+                        const RenderCommandPassStatus toneMapStatus =
+                            RecordPostProcessToneMapPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, toneMapStatus);
+                    }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
                         const RenderCommandPassStatus status =
@@ -1615,6 +1659,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept override
         {
             return BuildSelectionOutlinePipelineDesc(m_BackbufferFormat);
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetPostProcessToneMapPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_PostProcessToneMapPipelineLease.has_value() ||
+                !m_PostProcessToneMapPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_PostProcessToneMapPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetPostProcessToneMapPipelineDesc() const noexcept override
+        {
+            return BuildPostProcessToneMapPipelineDesc(m_BackbufferFormat);
         }
 
         [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
@@ -2171,6 +2230,54 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-075 Slice A — default-recipe postprocess tonemap pipeline.
+        // Pairs the fullscreen `post_fullscreen.vert.spv` (no vertex inputs,
+        // no push constants; emits a fullscreen triangle and a UV varying)
+        // with `post_tonemap.frag.spv` (samples the prior frame's HDR scene
+        // color through `sampler2D uSceneColor` + bloom mix through
+        // `sampler2D uBloomColor` and writes LDR back to the recipe's
+        // `SceneColorLDR` target). The recipe's `"PostProcessPass"` declares
+        // `Read(SceneColorHDR, ShaderRead) + Write(SceneColorLDR,
+        // ColorAttachmentWrite)` (plus the bloom / histogram / AATemp
+        // transient writes that the later slices' helpers consume), so the
+        // render pass attaches `SceneColorLDR` (backbuffer format, per
+        // `FrameRecipeSizing::BackbufferFormat`) with no depth attachment.
+        //
+        // Push constants: `PushConstantSize = sizeof(PostProcessPushConstants)`
+        // matches the 20-byte canonical block the existing
+        // `PostProcessToneMapPass::Execute` body pushes. The shader's full
+        // 240-byte color-grading push block is intentionally larger; the
+        // unwritten tail is implementation-defined per the Vulkan
+        // `vkCmdPushConstants` rules but the in-shader `pc.Operator`/grading
+        // defaults already produce a deterministic ACES path with zero-init
+        // tail bytes for CPU/null contract testing. Migrating the shader
+        // to read only the 20-byte canonical block — or extending the
+        // canonical push struct — is tracked separately and gated by the
+        // GPU/Vulkan operational claim outside this slice's scope.
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessToneMapPipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_fullscreen.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_tonemap.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = colorFormat;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessPushConstants));
+            desc.DebugName = "Renderer.PostProcess.ToneMap";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -2650,6 +2757,36 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] SelectionOutline pipeline unavailable; default-recipe selection outline recording will be skipped: error={}",
                                 static_cast<int>(selectionOutlinePipeline.error()));
+            }
+
+            // GRAPHICS-075 Slice A — postprocess tonemap pipeline. Same
+            // reset/republish pattern as the selection-outline pipeline
+            // above so a failed `Create()` leaves the pass in
+            // `SkippedUnavailable` rather than retaining a stale device
+            // handle across rebuilds. Bloom/Histogram/FXAA/SMAA pipelines
+            // arrive with Slices B–E behind the same umbrella executor
+            // branch.
+            m_PostProcessToneMapPipelineLease.reset();
+            if (m_PostProcessToneMapPass)
+            {
+                m_PostProcessToneMapPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc postProcessToneMapDesc =
+                BuildPostProcessToneMapPipelineDesc(m_BackbufferFormat);
+            auto postProcessToneMapPipeline = m_PipelineManager->Create(postProcessToneMapDesc);
+            if (postProcessToneMapPipeline.has_value())
+            {
+                m_PostProcessToneMapPipelineLease.emplace(std::move(*postProcessToneMapPipeline));
+                if (m_PostProcessToneMapPass)
+                {
+                    m_PostProcessToneMapPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_PostProcessToneMapPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] PostProcess.ToneMap pipeline unavailable; default-recipe tonemap recording will be skipped: error={}",
+                                static_cast<int>(postProcessToneMapPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -3147,6 +3284,41 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-075 Slice A — default-recipe `"PostProcessPass"` umbrella
+        // executor route, ToneMap leg. Mirrors the selection-outline helper
+        // above (fullscreen-pass shape: no `GpuWorld` / `CullingSystem`
+        // prerequisites since `PostProcessToneMapPass::Execute` records
+        // `BindPipeline + PushConstants + Draw(3,1,0,0)`): a non-operational
+        // device → `SkippedNonOperational`; a missing pass / lease /
+        // `PostProcessSystem` → `SkippedUnavailable`; otherwise the tonemap
+        // pass records the fullscreen draw and we return `Recorded`. The
+        // `Pass::Execute` body additionally early-returns when
+        // `IsStageEnabled(ToneMap)` is false (i.e. when
+        // `PostProcessSettings::Enabled` was flipped off), so a disabled
+        // chain becomes a structurally-recorded no-op rather than altering
+        // the executor's per-pass status taxonomy. The Slices B–E
+        // Histogram / Bloom / FXAA / SMAA helpers fan out from the same
+        // umbrella branch (mirroring the GRAPHICS-074 `"PickingPass"`
+        // sub-pass pattern).
+        [[nodiscard]] RenderCommandPassStatus RecordPostProcessToneMapPass(RHI::ICommandContext& cmd,
+                                                                            const RHI::CameraUBO& camera)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_PostProcessSystem.has_value() ||
+                !m_PostProcessToneMapPass.has_value() ||
+                !m_PostProcessToneMapPipelineLease.has_value() ||
+                !m_PostProcessToneMapPipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_PostProcessToneMapPass->Execute(cmd, camera);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-072 Slice A — default-recipe deferred-mode `"SurfacePass"`
         // route. Reached from the executor lambda when
         // `defaultRecipeUsesDeferred` is true and the active pass is
@@ -3395,6 +3567,14 @@ namespace Extrinsic::Graphics
         // after `m_SelectionSystem` is initialised and before the operational
         // publisher runs; reset before `m_SelectionSystem` in `Shutdown()`.
         std::optional<SelectionOutlinePass>  m_SelectionOutlinePass;
+        // GRAPHICS-075 Slice A — default-recipe postprocess tonemap pass.
+        // Same lifetime contract as the selection / forward / deferred /
+        // shadow passes above: emplaced after `m_PostProcessSystem` is
+        // initialised and before the operational publisher runs; reset
+        // before `m_PostProcessSystem` in `Shutdown()`. Slices B–E add the
+        // sibling Histogram / Bloom / FXAA / SMAA pass instances behind
+        // the same `"PostProcessPass"` umbrella executor branch.
+        std::optional<PostProcessToneMapPass> m_PostProcessToneMapPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -3409,6 +3589,12 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionEdgeIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionPointIdPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_SelectionOutlinePipelineLease;
+        // GRAPHICS-075 Slice A — postprocess tonemap pipeline lease. Same
+        // reset/republish pattern as the selection-outline lease above so a
+        // failed `Create()` leaves `m_PostProcessToneMapPass` in
+        // `SkippedUnavailable` rather than retaining a stale device handle
+        // across rebuilds.
+        std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessToneMapPipelineLease;
         // GRAPHICS-074 Slice D.1 — renderer-owned host-visible `Picking.Readback`
         // buffer. Allocated by `InitializeOperationalPassResources()` when
         // the device first becomes operational and re-used across

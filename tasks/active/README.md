@@ -11,10 +11,13 @@ Each active task should include:
 
 ## Currently active
 
-- _(none)_ — GRAPHICS-074 retired to
-  [`tasks/done/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md`](../done/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md)
-  on 2026-05-21 after Slice D.4 (PR #900, merge `7c29e10`). With Theme A's
-  selection/outline/picking-readback leaf closed, the next unblocked Theme A
-  default-recipe leaf is `rendering/GRAPHICS-075` (postprocess chain),
-  followed by `GRAPHICS-076` (debug view + canonical present), per the
-  ordering recorded in [`tasks/backlog/rendering/README.md`](../backlog/rendering/README.md).
+- [`GRAPHICS-075`](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md) —
+  Default-recipe postprocess chain wiring (Histogram → Bloom → ToneMap →
+  FXAA/SMAA). Promoted from `tasks/backlog/rendering/` on 2026-05-21 as the
+  next unblocked Theme A default-recipe leaf after GRAPHICS-074's retirement.
+  Status: in-progress; Slice A (ToneMap pipeline + `"PostProcessPass"`
+  umbrella executor branch routing through `RecordPostProcessToneMapPass`)
+  on branch `claude/setup-agent-workflow-dFrfe`. Slices B–E (bloom, FXAA,
+  SMAA + retained LUTs, histogram compute + readback drain) queued behind
+  Slice A's CPU/null contract gate. Next verification step after Slice A
+  lands: open Slice B for the bloom downsample/upsample pipelines + helper.
