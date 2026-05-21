@@ -907,10 +907,42 @@ Concretely:
   and no new graphics acceptance criteria.
 - `PostProcessSystem` owns the backend-agnostic HDR-to-LDR chain settings,
   deterministic stage description, sanitized diagnostics, and push-constant
-  packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. Frame
-  recipe resources `PostProcess.BloomScratch`, `PostProcess.Histogram`, and
-  `PostProcess.AATemp` are transient postprocess-owned intermediates; concrete
-  Vulkan descriptors/shaders remain backend follow-ups. Per `GRAPHICS-013AQ`,
+  packet data for `Histogram`, `Bloom`, `ToneMap`, `FXAA`, and `SMAA`. The
+  `ToneMap` leaf is operationally wired under `GRAPHICS-075` Slice A: the
+  `NullRenderer` owns `m_PostProcessToneMapPass` +
+  `m_PostProcessToneMapPipelineLease`, the tonemap pipeline (vertex
+  `post_fullscreen.vert.spv` + fragment `post_tonemap.frag.spv`, single
+  backbuffer-format color target, no depth, `PushConstantSize =
+  sizeof(PostProcessPushConstants)`) is created in
+  `InitializeOperationalPassResources(device)` and republished byte-identical
+  across `RebuildOperationalResources()`, and the recipe's
+  `"PostProcessPass"` umbrella executor branch routes through
+  `RecordPostProcessToneMapPass(...)` with the recorded
+  `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
+  The pass body pushes the pass-local `PostProcessToneMapPushConstants`
+  block exported by `Pass.PostProcess.ToneMap` (80 bytes — `Exposure +
+  Operator + BloomIntensity + ColorGradingOn` header + four grading
+  scalars + three `vec3 + float pad` rows under std430), which mirrors
+  the `assets/shaders/post_tonemap.frag` `layout(push_constant)`
+  declaration byte-for-byte; `BuildPostProcessToneMapPushConstants(
+  settings)` derives `Exposure`/`BloomIntensity` from
+  `PostProcessSettings` and keeps the operator at ACES with grading off
+  for a deterministic neutral tonemap. The canonical 20-byte
+  `PostProcessPushConstants` block shared by the other postprocess
+  stages is intentionally not used for tonemap — pushing it would alias
+  `HistogramBinCount` onto `ColorGradingOn` (a 256-bin default would
+  enable grading) and `StageKind` onto `Saturation`
+  (`bit_cast<float>(2)` ≈ 0 → grayscale), with the remaining 60 bytes
+  reading implementation-defined memory, the standing "Shader
+  push-constant compatibility policy" hard gate. The Slices B–E
+  `Histogram` / `Bloom` / `FXAA` / `SMAA` helpers fan out from the same
+  umbrella branch (mirroring `GRAPHICS-074`'s `"PickingPass"` fan-out)
+  once their pipelines + retained LUTs + histogram readback drain land,
+  and each is free to define its own pass-local push block where the
+  shader interface demands more than the canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
+  `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
+  postprocess-owned intermediates; concrete Vulkan descriptors/shaders
+  remain backend follow-ups. Per `GRAPHICS-013AQ`,
   `PostProcessSystem` is the sole owner of the retained postprocess resources
   (SMAA `AreaTex` `R8G8_UNORM` 160x560 and `SearchTex` `R8_UNORM` 256x33
   lookup textures, plus the exposure-adaptation history buffer holding

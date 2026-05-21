@@ -635,8 +635,10 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   `SelectedIds[16]` to a UBO/bindless tail so the outline push block
   stays <= 128 bytes on hosts at the Vulkan-guaranteed minimum (tracked
   separately, intentionally out-of-scope here).
-- [GRAPHICS-075 — Default-recipe postprocess chain wiring](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
-  depends on GRAPHICS-072 (HDR scene color producer).
+- [GRAPHICS-075 — Default-recipe postprocess chain wiring](../../active/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
+  depends on GRAPHICS-072 (HDR scene color producer). Promoted to
+  `tasks/active/` on 2026-05-21; Slice A (ToneMap pipeline + umbrella
+  executor branch) in-progress.
 - [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
   depends on GRAPHICS-075.
 - [GRAPHICS-077 — Backend transient-debug-primitive upload helper](GRAPHICS-077-transient-debug-primitive-upload-helper.md):

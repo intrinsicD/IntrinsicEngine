@@ -14,7 +14,9 @@
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
+import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Selection.Outline;
+import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.SelectionSystem;
@@ -100,9 +102,12 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.DeviceOperational);
     // GRAPHICS-071 — the default-recipe retained forward surface/line/point
-    // passes now record their bind/draw shape under the forward lighting path.
+    // passes record their bind/draw shape under the forward lighting path.
+    // GRAPHICS-075 Slice A — the default-recipe `"PostProcessPass"` umbrella
+    // branch now routes the tonemap leg as well, adding one more Recorded
+    // pass + one bind + one push (canonical `PostProcessPushConstants`).
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 5u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -121,6 +126,9 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     ASSERT_NE(FindCommandPass(stats, "PointPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PointPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
@@ -132,15 +140,18 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_TRUE(ContainsTextureBarrier(device.CommandContext, device.BackbufferHandle));
     EXPECT_GE(device.CommandContext.FillBufferCalls, 8);
     // GRAPHICS-071 — culling pipeline plus depth/surface/line/point draw
-    // pipelines each bind once. The draw passes all carry scene push constants.
-    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 5);
-    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 5);
-    ASSERT_EQ(device.CommandContext.PushConstantSizes.size(), 5u);
+    // pipelines each bind once. The draw passes all carry scene push
+    // constants. GRAPHICS-075 Slice A adds the tonemap fullscreen bind +
+    // canonical `PostProcessPushConstants` push.
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 6);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 6);
+    ASSERT_EQ(device.CommandContext.PushConstantSizes.size(), 6u);
     EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[1], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[2], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[3], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[4], sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[5], sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.LastDispatch.X,
               (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
@@ -356,8 +367,11 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     EXPECT_TRUE(stats.Execute.DeviceOperational);
     // GRAPHICS-071 — five routed passes (Culling/DepthPrepass/Surface/Line/Point)
     // after the operational rebuild publishes the forward pass pipeline leases.
-    // Remaining unwired passes soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 5u);
+    // GRAPHICS-075 Slice A — the post-rebuild publish also publishes the
+    // tonemap pipeline lease, so the `"PostProcessPass"` umbrella branch
+    // routes its tonemap leg and `Recorded` climbs to 6. Remaining unwired
+    // passes still soft-skip with SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -374,6 +388,9 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PointPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PointPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
@@ -408,8 +425,10 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // `InitializeOperationalPassResources()` and the surface pass still
     // records its bind/draw shape. The depth prepass entry continues to
     // report `SkippedUnavailable` so its missing lease cannot regress
-    // silently.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 4u);
+    // silently. GRAPHICS-075 Slice A — the tonemap pipeline is created
+    // after the depth-prepass failure point and is unaffected by it, so
+    // `"PostProcessPass"` still routes Recorded → bumps the count to 5.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 5u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -427,6 +446,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PointPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PointPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
@@ -456,10 +478,12 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
-    EXPECT_EQ(stats.CommandRecords.Recorded, 0u);
-    // Culling pipeline failure leaves both routed passes unavailable; all
-    // remaining passes also report SkippedUnavailable since the device is
-    // operational but their command bodies are not yet wired.
+    // GRAPHICS-075 Slice A — culling-pipeline failure still leaves the
+    // tonemap pipeline lease intact (`PostProcessSystem` + tonemap pipeline
+    // do not depend on `m_CullingOutputAvailable`), so
+    // `"PostProcessPass"` still routes Recorded. Every other routed pass
+    // requires the culling output and reports `SkippedUnavailable`.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 1u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -469,6 +493,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
 
@@ -541,9 +568,15 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
     // surface/line/point passes are routed by the renderer.
     // Every entry below must carry a structured status so future routing
     // changes can't silently regress to a no-op.
-    static constexpr const char* kRoutedPasses[] = {"CullingPass", "DepthPrepass", "SurfacePass", "LinePass", "PointPass"};
-    static constexpr const char* kSoftSkippedPasses[] = {
+    static constexpr const char* kRoutedPasses[] = {
+        "CullingPass", "DepthPrepass", "SurfacePass", "LinePass", "PointPass",
+        // GRAPHICS-075 Slice A — `"PostProcessPass"` is now wired through the
+        // umbrella executor branch (ToneMap leg) and reports `Recorded` on
+        // the operational CPU/null gate. Slices B–E add the bloom / FXAA /
+        // SMAA / histogram sub-passes behind the same umbrella branch.
         "PostProcessPass",
+    };
+    static constexpr const char* kSoftSkippedPasses[] = {
         "ImGuiPass",
         "Present",
     };
@@ -1843,6 +1876,67 @@ TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
     const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetSelectionOutlinePipeline();
     EXPECT_TRUE(rebuiltPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetSelectionOutlinePipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice A — default-recipe postprocess tonemap pipeline lease +
+// republish. Mirrors the SelectionOutline rebuild test above for the
+// fullscreen `post_fullscreen.vert` + `post_tonemap.frag` shader pair.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PostProcessToneMapPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{293u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetPostProcessToneMapPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetPostProcessToneMapPipelineDesc();
+    EXPECT_TRUE(initialDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.ends_with(
+        "shaders/post_tonemap.frag.spv"))
+        << initialDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
+    // The recipe's `SceneColorLDR` is allocated with
+    // `FrameRecipeSizing::BackbufferFormat`; MockDevice keeps the default
+    // `RHI::Format::RGBA8_UNORM`.
+    EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+    // No depth attachment is required by `"PostProcessPass"`, so the
+    // tonemap pipeline declares `DepthTargetFormat::Undefined` (unlike the
+    // SelectionOutline pipeline, which stays render-pass-compatible with
+    // the recipe-read SceneDepth attachment).
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    // Matches the pass-local `PostProcessToneMapPushConstants` block
+    // exported by `Pass.PostProcess.ToneMap` (80 bytes — `Exposure +
+    // Operator + BloomIntensity + ColorGradingOn` + 4 grading scalars +
+    // three `vec3 + float pad` rows under std430). The block mirrors the
+    // shader's `layout(push_constant) Push { ... }` declaration byte-for-
+    // byte; the canonical 20-byte `PostProcessPushConstants` block
+    // shared by the other postprocess stages is intentionally not used
+    // for tonemap since it aliases `HistogramBinCount` /
+    // `StageKind` onto `ColorGradingOn` / `Saturation` and leaves the
+    // grading tail unwritten.
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetPostProcessToneMapPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessToneMapPipelineDesc();
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
 
     renderer->Shutdown();

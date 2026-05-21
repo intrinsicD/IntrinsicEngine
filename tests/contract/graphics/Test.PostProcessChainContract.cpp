@@ -45,6 +45,7 @@ namespace
         RHI::PipelineHandle LastPipeline{};
         std::uint32_t LastDrawVertexCount{0u};
         std::uint32_t LastDispatchX{0u};
+        std::uint32_t LastPushConstantSize{0u};
         std::vector<std::byte> LastPushConstants{};
 
         void Begin() override {}
@@ -62,6 +63,7 @@ namespace
         void PushConstants(const void* data, std::uint32_t size, std::uint32_t) override
         {
             Events.push_back({.Kind = EventKind::PushConstants});
+            LastPushConstantSize = size;
             LastPushConstants.resize(size);
             if (data != nullptr && size > 0u)
             {
@@ -249,6 +251,28 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_EQ(toneMapCmd.Events[1].Kind, EventKind::PushConstants);
     EXPECT_EQ(toneMapCmd.Events[2].Kind, EventKind::Draw);
     EXPECT_EQ(toneMapCmd.LastDrawVertexCount, 3u);
+    // GRAPHICS-075 Slice A — the pass body now pushes the pass-local
+    // `PostProcessToneMapPushConstants` block (80 bytes, std430-matched to
+    // `post_tonemap.frag`) so the shader actually sees `Exposure` /
+    // `BloomIntensity` plus deterministic ACES / no-grading defaults
+    // instead of the canonical 20-byte block aliasing
+    // `HistogramBinCount`/`StageKind` onto `ColorGradingOn`/`Saturation`.
+    EXPECT_EQ(toneMapCmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessToneMapPushConstants));
+    ASSERT_EQ(toneMapCmd.LastPushConstants.size(),
+              sizeof(Graphics::PostProcessToneMapPushConstants));
+    Graphics::PostProcessToneMapPushConstants observed{};
+    std::memcpy(&observed, toneMapCmd.LastPushConstants.data(),
+                sizeof(Graphics::PostProcessToneMapPushConstants));
+    EXPECT_FLOAT_EQ(observed.Exposure, 1.25f);
+    EXPECT_FLOAT_EQ(observed.BloomIntensity, 0.05f);
+    EXPECT_EQ(observed.Operator, 0);          // ACES
+    EXPECT_EQ(observed.ColorGradingOn, 0);    // grading off by default
+    EXPECT_FLOAT_EQ(observed.Saturation, 1.0f);
+    EXPECT_FLOAT_EQ(observed.Contrast, 1.0f);
+    EXPECT_FLOAT_EQ(observed.Lift[0], 0.0f);
+    EXPECT_FLOAT_EQ(observed.Gamma[0], 1.0f);
+    EXPECT_FLOAT_EQ(observed.Gain[0], 1.0f);
 
     Graphics::PostProcessBloomPass bloom{post};
     bloom.SetPipeline(RHI::PipelineHandle{21u, 1u});
