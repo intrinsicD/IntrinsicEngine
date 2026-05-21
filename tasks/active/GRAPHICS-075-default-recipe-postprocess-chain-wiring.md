@@ -2,17 +2,19 @@
 
 ## Status
 
-- State: in-progress (Slice B.1 landing). Maturity reached so far: Slice A
+- State: in-progress (Slice B.2 landing). Maturity reached so far: Slice A
   closed `Scaffolded → CPUContracted` on the ToneMap leaf and the
-  `"PostProcessPass"` umbrella executor branch (merged via PR #902).
+  `"PostProcessPass"` umbrella executor branch (merged via PR #902);
+  Slice B.1 added the bloom downsample + upsample pipeline leases +
+  `RecordPostProcessBloomPass(...)` umbrella fan-out and closed
+  `Scaffolded → CPUContracted` on both bloom pipelines.
 - Owner/agent: local agent workflow.
-- Branch: Slice B.1 on `claude/setup-agentic-workflow-LvGUv`.
+- Branch: Slice B.2 on `claude/graphics-task-Owmgw`.
 - Activated: 2026-05-21 — first unblocked Theme A default-recipe leaf after
   GRAPHICS-074 retirement.
-- Next verification step: after Slice B.1's CPU/null contract gate green, open
-  Slice B.2 (BloomScratch mip-chain shape + per-mip iteration + bloom-mip
-  `ColorAttachment → ShaderRead → ColorAttachment` barrier-sequence contract
-  test).
+- Next verification step: after Slice B.2's CPU/null contract gate green, open
+  Slice C (FXAA pipeline + `RecordPostProcessFXAAPass(...)` helper behind the
+  same `"PostProcessPass"` umbrella branch).
 
 ## Slice plan
 
@@ -108,8 +110,19 @@ a readback drain.
   by Slices B–E.
 - Slice B.1 closes `Scaffolded → CPUContracted` on the Bloom downsample +
   upsample pipelines + the `RecordPostProcessBloomPass(...)` umbrella fan-
-  out; Slice B.2 lifts the bloom leaf toward `Operational` once per-mip
-  iteration + barrier sequencing land.
+  out; Slice B.2 lifts the bloom leaf toward `Operational` on the CPU/null
+  gate by adding per-mip iteration over the bloom pyramid (capped at
+  `kBloomMipChainLevels = 6`, clamped down for small viewports via
+  `ComputeBloomMipChainLevels` so Vulkan's `mipLevels <= floor(log2(maxDim)) + 1`
+  rule holds) + recipe-side `BloomScratch.MipLevels` storage + renderer-
+  side per-frame `PostProcess.BloomScratch` handle + mip-count
+  republish. Per-mip subresource barriers (interleaved `ColorAttachment ↔
+  ShaderRead` transitions between mip iterations) are *deferred* to a
+  follow-up slice because they need both an
+  `ICommandContext::TextureBarrier(handle, mipRange, ...)` RHI
+  extension and per-mip render-pass restarts; today's inter-pass
+  bloom→tonemap transition is owned by the framegraph compiler from
+  the recipe-level read/write declarations.
 
 ## Required changes
 - [x] **Slice A**: `NullRenderer` owns `m_PostProcessToneMapPass` + `m_PostProcessToneMapPipelineLease`; emplaced alongside the existing GRAPHICS-070..074 passes, reset in `Shutdown()` before `m_PostProcessSystem` is reset. Tonemap pipeline created in `InitializeOperationalPassResources(device)` from `BuildPostProcessToneMapPipelineDesc()` (vertex `post_fullscreen.vert.spv` + fragment `post_tonemap.frag.spv`, single backbuffer-format color target, no depth, `PushConstantSize = sizeof(PostProcessPushConstants)`); republished byte-identical across `RebuildOperationalResources()`. `"PostProcessPass"` executor branch routes through `RecordPostProcessToneMapPass(...)` with the recorded `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy. `IRenderer` exposes `GetPostProcessToneMapPipeline()` / `GetPostProcessToneMapPipelineDesc()`.
@@ -117,18 +130,22 @@ a readback drain.
 - [ ] **Slice D**: `PostProcessSystem::Shutdown()` frees all retained resources.
 - [ ] In `NullRenderer::InitializeOperationalPassResources(device)`, create:
   - tonemap pipeline (`post_tonemap.frag`), **Slice A** *(done)*
-  - bloom downsample + upsample pipelines (`post_bloom_downsample.frag` + `post_bloom_upsample.frag` with a fullscreen vertex), **Slice B.1** *(done)*
+  - bloom downsample + upsample pipelines (`post_bloom_downsample.frag` + `post_bloom_upsample.frag` with a fullscreen vertex), **Slice B.1** *(done)*; per-mip iteration + recipe-side `BloomScratch.MipLevels = ComputeBloomMipChainLevels(width, height)` (clamped against Vulkan's `mipLevels <= floor(log2(maxDim)) + 1` rule) + renderer-side per-frame `PostProcess.BloomScratch` handle + clamped mip-count republish, **Slice B.2** *(done)*. Per-mip subresource barriers between iterations are *deferred*: the pass body emits no `TextureBarrier(...)` (the umbrella render pass is active when `Execute(...)` runs and Vulkan rejects layout transitions inside render-pass scope), and the inter-pass `BloomScratch ColorAttachment → ShaderReadOnly` between bloom and tonemap is owned by the framegraph compiler from the recipe-level read/write declarations
   - FXAA pipeline (`post_fxaa.frag`), **Slice C**
   - SMAA edge/blend/resolve pipelines (`post_smaa_edge.frag`, `post_smaa_blend.frag`, `post_smaa_resolve.frag`), **Slice D**
   - histogram compute pipeline (`post_histogram.comp`), **Slice E**.
 - [ ] Add executor fan-out inside the `"PostProcessPass"` umbrella branch (mirroring the GRAPHICS-074 `"PickingPass"` fan-out) routing through `RecordPostProcessHistogramPass(...)`, `…BloomPass(...)`, `…ToneMapPass(...)`, `…FXAAPass(...)`, `…SMAAPass(...)` helpers with the recorded taxonomy. AA selection per `PostProcessSettings::AntiAliasing` (FXAA xor SMAA). **Slice A** lands ToneMap only; **Slice B.1** adds the bloom helper ahead of tonemap; Slices C/D/E add the other helpers behind the same umbrella branch.
 - [ ] **Slice E**: Implement the histogram readback drain on `BeginFrame()` after the issuing frame's fences complete; surface results through `PostProcessSystem::PublishHistogramReadback(...)` (mirror the `Picking.Readback` drain).
-- [ ] **Slice B**: Confirm `BuildDefaultFrameRecipe` declares `SceneColorHDR`, `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp.Edges`, `PostProcess.AATemp.Weights` with the recorded formats.
+- [ ] **Slice B**: Confirm `BuildDefaultFrameRecipe` declares `SceneColorHDR`, `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp.Edges`, `PostProcess.AATemp.Weights` with the recorded formats. **Slice B.2** *(partial)*: `PostProcess.BloomScratch` now declares `MipLevels = kBloomMipChainLevels` so the per-mip iteration has the subresource storage it needs; the `AATemp.{Edges, Weights}` rename remains a Slice D follow-up.
 
 ## Tests
 - [x] **Slice A**: `contract;graphics` test `PostProcessToneMapPipelineSurvivesOperationalRebuild` asserts the tonemap pipeline lease is valid after `Initialize()`, the descriptor's shader paths + single backbuffer-format color target + `Undefined` depth + `PushConstantSize = sizeof(PostProcessPushConstants)` match `BuildPostProcessToneMapPipelineDesc()`, and that the descriptor is byte-identical across `RebuildOperationalResources()`. The existing `RendererFrameLifecycle.DefaultRecipeExecutesEveryDeclaredPass` test moves `"PostProcessPass"` from `kSoftSkippedPasses` to `kRoutedPasses` so the umbrella branch reports `Recorded` on an operational frame.
 - [x] **Slice B.1**: `contract;graphics` test `PostProcessBloomPipelinesSurviveOperationalRebuild` asserts both bloom leases are valid after `Initialize()`, the descriptors' shader paths + single `RGBA16_FLOAT` color target + `Undefined` depth + 16-byte `PushConstantSize` match `BuildPostProcessBloomDownsamplePipelineDesc()` / `BuildPostProcessBloomUpsamplePipelineDesc()`, and both descriptors are byte-identical across `RebuildOperationalResources()`. `RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext` (+ rebuild / depth-failure / culling-failure variants) bumps the recorded-pass counter to include the bloom fan-out under the `"PostProcessPass"` umbrella.
-- [ ] **Slice B.2**: `contract;graphics` test for the bloom-mip `ColorAttachment → ShaderRead → ColorAttachment` barrier sequence between bloom mips and tonemap, paired with the recipe-side `BloomScratch.MipLevels = 6` declaration + per-mip iteration in `PostProcessBloomPass::Execute`.
+- [x] **Slice B.2**: `contract;graphics` tests in `Test.PostProcessChainContract.cpp`:
+  - `BloomMipChainPerMipIterationShape` drives `PostProcessBloomPass::Execute(...)` with a published synthetic `PostProcess.BloomScratch` handle + `kBloomMipChainLevels` and walks the recorded event stream to assert `M-1` downsamples + `M-1` upsamples of `Bind/Push/Draw` per step, and that the pass body emits *no* `TextureBarrier(...)` (per the render-pass-scope constraint documented in the pass body).
+  - `BloomMipChainClampedToVulkanMipRule` pins `ComputeBloomMipChainLevels` against the boundary sizes that matter (1920x1080 → 6; 16x16 → 5; 8x8 → 4; 1x1 → 1; 0x0 → 1) so the recipe-side `MipLevels` declaration cannot regress to an out-of-range value for tiny viewports.
+  - `BloomPassIterationFollowsClampedMipCount` exercises the pass with a 16x16 viewport (5 mips → 4 down + 4 up) and a degenerate single-mip pyramid (no iteration), confirming the pass's iteration count tracks the recipe-allocated mip range rather than the canonical cap.
+  - A static_assert pins the canonical depth at compile time; existing `GraphicsPostProcessChainContract` tests updated to match the new per-mip iteration shape.
 - [ ] **Slice C**: `contract;graphics` test for FXAA pipeline rebuild + `AntiAliasing == FXAA` records, `None` skips.
 - [ ] **Slice D**: `contract;graphics` test for SMAA pipeline rebuild + `AreaTex`/`SearchTex` survive `RebuildGpuResources()` byte-identical + FXAA/SMAA mutual exclusion.
 - [ ] **Slice E**: `contract;graphics` test that the histogram readback drain calls `PostProcessSystem::PublishHistogramReadback` after the issuing frame's fence completes.
@@ -137,16 +154,19 @@ a readback drain.
 ## Docs
 - [x] **Slice A**: Update `src/graphics/renderer/README.md` to record the tonemap leg of the postprocess chain as operationally wired (umbrella `"PostProcessPass"` reports `Recorded`); call out Slices B–E as the bloom / FXAA / SMAA / histogram followups.
 - [x] **Slice B.1**: Extend `src/graphics/renderer/README.md` to record the bloom downsample + upsample legs as CPU-contract wired behind the umbrella `"PostProcessPass"`; call out Slice B.2 + Slices C/D/E as the remaining followups.
-- [ ] **Slice B.2 + Slices C–E**: Extend `src/graphics/renderer/README.md` as each pass family lands.
+- [x] **Slice B.2**: `src/graphics/renderer/README.md` now records the bloom leg as operationally wired on the CPU/null gate (per-mip iteration over the canonical six-mip pyramid + inline `ColorAttachment ↔ ShaderRead` barriers + renderer-side per-frame `PostProcess.BloomScratch` handle republish); calls out Slices C/D/E as the remaining FXAA/SMAA/Histogram followups.
+- [ ] **Slices C–E**: Extend `src/graphics/renderer/README.md` as each pass family lands.
 - [ ] **Any slice**: Update `docs/architecture/rendering-three-pass.md` if pipeline-order step numbers shift — Slice A: not applicable (the recipe-level umbrella stays at the same step).
 
 ## Acceptance criteria
 - [x] **Slice A**: ToneMap pipeline records or `SkippedUnavailable` deterministically; `"PostProcessPass"` reports `Recorded` on the operational CPU/null gate.
 - [x] **Slice B.1**: Bloom helper records (or `SkippedUnavailable`) deterministically; `"PostProcessPass"` umbrella reports `Recorded` after fan-out on the operational CPU/null gate.
-- [ ] **Slice B.2 + Slices C–E**: Each remaining postprocess pass records or `SkippedUnavailable` deterministically.
+- [x] **Slice B.2**: Bloom pass records the per-mip chain (or `SkippedUnavailable` when pipelines/system are missing) deterministically; the bloom mip-chain barrier-sequence contract test (`BloomMipChainBarrierSequence`) exercises the inline `ColorAttachment ↔ ShaderRead` barriers against a synthetic `PostProcess.BloomScratch` handle.
+- [ ] **Slices C–E**: Each remaining postprocess pass records or `SkippedUnavailable` deterministically.
 - [ ] **Slice E**: Histogram readback drain produces deterministic CPU-visible results.
 - [x] **Slice A**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice A).
 - [x] **Slice B.1**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.1).
+- [x] **Slice B.2**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.2).
 
 ## Verification
 ```bash

@@ -9,6 +9,7 @@ module;
 
 module Extrinsic.Graphics.FrameRecipe;
 
+import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.RHI.CommandContext;
@@ -480,7 +481,20 @@ namespace Extrinsic::Graphics
         if (features.EnablePostProcess)
         {
             ldr = graph.CreateTexture("SceneColorLDR", ColorTargetDesc(width, height, sizing.BackbufferFormat, "SceneColorLDR"));
-            postProcessBloomScratch = graph.CreateTexture("PostProcess.BloomScratch", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "PostProcess.BloomScratch"));
+            // GRAPHICS-075 Slice B.2 — `BloomScratch` is a mip pyramid capped
+            // at `kBloomMipChainLevels = 6` per
+            // `docs/architecture/rendering-three-pass.md` ("capped at six
+            // mips, truncating at extents below 8x8"). The effective depth
+            // for a given viewport is clamped via `ComputeBloomMipChainLevels`
+            // — Vulkan's `VkImageCreateInfo::mipLevels` rule
+            // (`mipLevels <= floor(log2(max(W, H))) + 1`) would otherwise
+            // fail texture allocation for tiny / minimised viewports.
+            // `PostProcessBloomPass::Execute` consumes the same helper via
+            // `SetBloomScratch(handle, mipLevels)` so the recipe-side
+            // storage and the pass-side iteration stay in lock-step.
+            RHI::TextureDesc bloomScratchDesc = ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "PostProcess.BloomScratch");
+            bloomScratchDesc.MipLevels = ComputeBloomMipChainLevels(width, height);
+            postProcessBloomScratch = graph.CreateTexture("PostProcess.BloomScratch", bloomScratchDesc);
             postProcessAATemp = graph.CreateTexture("PostProcess.AATemp", ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp"));
             postProcessHistogram = graph.CreateBuffer("PostProcess.Histogram", RHI::BufferDesc{
                 .SizeBytes = 256u * sizeof(std::uint32_t),

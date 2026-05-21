@@ -947,12 +947,39 @@ Concretely:
   across `RebuildOperationalResources()`. The umbrella branch fans out to
   `RecordPostProcessBloomPass(...)` *before* `RecordPostProcessToneMapPass(...)`
   so the bloom write naturally precedes the tonemap read of the bloom
-  buffer in recorded order; Slice B.1 keeps the helper's body at a single
+  buffer in recorded order; Slice B.1 kept the helper's body at a single
   bind/push/draw per stage (placeholder coverage for the CPU contract
-  gate), and Slice B.2 adds per-mip iteration over the
-  `BloomScratch.MipLevels = 6` mip chain together with the
-  `ColorAttachment → ShaderRead → ColorAttachment` inline barriers
-  between mips. The remaining Slices C/D/E `FXAA` / `SMAA` / `Histogram`
+  gate), and Slice B.2 now iterates the bloom mip pyramid that the
+  recipe declared. `BuildDefaultFrameRecipe` clamps
+  `PostProcess.BloomScratch.MipLevels` via
+  `ComputeBloomMipChainLevels(width, height)` so the declaration
+  honors Vulkan's `mipLevels <= floor(log2(max(W, H))) + 1` rule for
+  tiny/minimised viewports (the canonical cap is
+  `kBloomMipChainLevels = 6`, applied only when the viewport supports
+  it). The renderer resolves the per-frame `PostProcess.BloomScratch`
+  transient handle from the compiled graph and republishes it
+  alongside the same clamped mip count via
+  `PostProcessBloomPass::SetBloomScratch(handle, mipLevels)` so the
+  pass-side iteration matches the texture's actual mip range. For an
+  effective depth `M >= 2` the pass records `M-1` downsamples (mip 0 →
+  1, …, M-2 → M-1) followed by `M-1` upsamples (mip M-1 → M-2, …, 1 →
+  0) with the per-shader push payload sized for each step's *source*
+  mip extent. `IsFirstMip = 1` fires only on the mip 0 → mip 1
+  downsample (the `SceneColorHDR`-sourced read), keeping the soft-
+  threshold knee off the coarser pyramid mips. The pass body emits
+  *no* inline `TextureBarrier(...)` calls: the umbrella render pass is
+  active when `Execute(...)` runs, and Vulkan rejects layout
+  transitions issued in a render-pass scope on the attachment
+  currently being rendered. The inter-pass `BloomScratch
+  ColorAttachment → ShaderReadOnly` transition between the bloom and
+  tonemap legs is owned by the framegraph compiler from the recipe-
+  level `Write(BloomScratch, ColorAttachmentWrite)` /
+  `Read(BloomScratch, ShaderRead)` declarations, which is layout-safe
+  for the whole-texture case. Correct *per-mip* subresource
+  transitions interleaved with the down/up chain remain a follow-up
+  slice that needs both an `ICommandContext::TextureBarrier(handle,
+  mipRange, ...)` RHI extension and per-mip render-pass restarts
+  between iterations. The remaining Slices C/D/E `FXAA` / `SMAA` / `Histogram`
   helpers fan out from the same umbrella branch (mirroring
   `GRAPHICS-074`'s `"PickingPass"` fan-out) once their pipelines +
   retained LUTs + histogram readback drain land, and each is free to

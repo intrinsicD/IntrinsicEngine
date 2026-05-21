@@ -12,6 +12,44 @@ import Extrinsic.Graphics.PostProcessSystem;
 
 namespace Extrinsic::Graphics
 {
+	// GRAPHICS-075 Slice B.2 — canonical bloom mip-chain depth shared by the
+	// recipe-side `PostProcess.BloomScratch` declaration and the per-mip
+	// iteration in `PostProcessBloomPass::Execute`. The cap of six mips
+	// matches `docs/architecture/rendering-three-pass.md` ("capped at six
+	// mips, truncating at extents below 8x8"); centralising it keeps the
+	// recipe's `RHI::TextureDesc::MipLevels` and the pass's iteration count
+	// in lock-step so a future cap change touches one site instead of two.
+	export inline constexpr std::uint32_t kBloomMipChainLevels = 6u;
+
+	// GRAPHICS-075 Slice B.2 — derive the *effective* bloom mip-chain depth
+	// for a given render target extent. Vulkan's
+	// `VkImageCreateInfo::mipLevels` must satisfy
+	// `mipLevels <= floor(log2(max(width, height, depth))) + 1`; declaring a
+	// fixed `kBloomMipChainLevels = 6` against tiny extents (e.g. a 16x16
+	// minimised viewport — only 5 legal mips) would fail
+	// `RHI::TextureManager::Create(...)` and break the postprocess chain.
+	// This helper caps the declared depth at the canonical six mips for
+	// large enough viewports while clamping down at small extents so the
+	// recipe-side allocation and the pass-side iteration stay in lock-step.
+	// `width = height = 0` is treated as `1` (single-mip degenerate),
+	// matching `BuildDefaultFrameRecipe`'s `ClampExtent` convention. The
+	// helper is `constexpr` so the recipe and the renderer can call it
+	// from anywhere without dragging in a runtime dependency.
+	export [[nodiscard]] constexpr std::uint32_t ComputeBloomMipChainLevels(
+		std::uint32_t width, std::uint32_t height) noexcept
+	{
+		std::uint32_t maxDim = width > height ? width : height;
+		if (maxDim == 0u) { maxDim = 1u; }
+		std::uint32_t levels = 1u;
+		std::uint32_t dim = maxDim;
+		while (dim > 1u && levels < kBloomMipChainLevels)
+		{
+			dim >>= 1u;
+			++levels;
+		}
+		return levels;
+	}
+
 	// GRAPHICS-075 Slice B.1 — pass-local push-constant block mirroring the
 	// `assets/shaders/post_bloom_downsample.frag` `layout(push_constant) Push`
 	// declaration byte-for-byte under Vulkan std430. `vec2` is 8-byte aligned
@@ -84,11 +122,27 @@ namespace Extrinsic::Graphics
 
 		void SetDownsamplePipeline(RHI::PipelineHandle pipeline) noexcept;
 		void SetUpsamplePipeline(RHI::PipelineHandle pipeline) noexcept;
+		// GRAPHICS-075 Slice B.2 — receives the per-frame `PostProcess.BloomScratch`
+		// transient handle together with the *effective* mip-chain depth
+		// the recipe allocated (clamped per `ComputeBloomMipChainLevels`
+		// against the current viewport extent, never above
+		// `kBloomMipChainLevels`). `Execute(...)`'s per-mip iteration count
+		// follows `mipLevels` so the bind/push/draw shape stays in lock-
+		// step with the recipe-side `RHI::TextureDesc::MipLevels` — a
+		// regression where the recipe clamps but the pass iterates 6 mips
+		// would silently re-draw past the allocated mip range. When the
+		// pass is not configured (e.g. headless contract tests that do not
+		// publish a transient handle) the canonical `kBloomMipChainLevels`
+		// is assumed so the recording shape still matches the default-
+		// viewport recipe declaration.
+		void SetBloomScratch(RHI::TextureHandle texture, std::uint32_t mipLevels) noexcept;
 		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 
 	private:
 		PostProcessSystem& m_PostProcessSystem;
 		RHI::PipelineHandle m_DownsamplePipeline{};
 		RHI::PipelineHandle m_UpsamplePipeline{};
+		RHI::TextureHandle m_BloomScratch{};
+		std::uint32_t m_BloomScratchMipLevels{kBloomMipChainLevels};
 	};
 }
