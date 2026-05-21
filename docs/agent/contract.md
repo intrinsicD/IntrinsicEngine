@@ -35,6 +35,13 @@ Required dependency boundaries:
 - Do not mix mechanical moves and semantic refactors in one task.
 - Avoid introducing new engine features during reorganization.
 - Keep patches scoped to one task unless explicitly batched.
+- Keep `.cppm` module interfaces focused on exported types, declarations, small
+  inline accessors, and templates that must be visible to importers. Put
+  non-trivial implementations in matching `.cpp` module implementation units and
+  add them as private target sources. Treat an implementation as non-trivial when
+  it owns algorithm/control-flow bodies, allocation-heavy work, topology/container
+  traversal, backend calls, diagnostics assembly, file/IO handling, or imports
+  other modules only needed by the implementation rather than the public API.
 
 ## Method implementation protocol
 

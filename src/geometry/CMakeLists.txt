@@ -50,6 +50,7 @@ target_sources(${target_name}
         Geometry.KMeans.cppm
         Geometry.LinearSolver.cppm
         Geometry.MarchingCubes.cppm
+        Geometry.Mesh.Conversion.cppm
         Geometry.MeshSoup.cppm
         Geometry.MeshOperator.cppm
         Geometry.NormalEstimation.cppm
@@ -112,6 +113,7 @@ target_sources(${target_name}
         Geometry.KDTree.cpp
         Geometry.KMeans.cpp
         Geometry.MarchingCubes.cpp
+        Geometry.Mesh.Conversion.cpp
         Geometry.NormalEstimation.cpp
         Geometry.Octree.cpp
         Geometry.PCA.cpp

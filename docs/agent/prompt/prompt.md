@@ -54,6 +54,7 @@ If you intend to land more than one slice, promote the task into `tasks/active/`
 - Add or update tests for any behavior change. Label by category (`unit`, `contract`, `integration`, `regression`, `gpu`, `benchmark`, etc., per `tests/README.md`).
 - Update docs and task records in the same patch as the code that motivates them.
 - Regenerate `docs/api/generated/module_inventory.md` (`python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`) when public module surfaces change.
+- Keep `.cppm` module interfaces limited to exported types, declarations, small inline accessors, and templates that must be visible to importers. Move non-trivial bodies into matching `.cpp` module implementation units and add them as private target sources; non-trivial means algorithm/control-flow bodies, allocation-heavy work, topology/container traversal, backend calls, diagnostics assembly, file/IO handling, or imports only needed by implementation details.
 - Do not introduce new engine features during reorganization or hardening tasks.
 - Do not introduce backwards-compatibility shims unless the task records a removal task ID and timeline.
 - Do not import across layers in violation of `AGENTS.md` §2; runtime owns composition, graphics never sees live ECS, assets are CPU-only, etc.

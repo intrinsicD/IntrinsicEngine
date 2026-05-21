@@ -317,6 +317,7 @@ set(_geometry_test_files
     Test_BVH.cpp
     Test_DEC.cpp
     Test_MeshOperations.cpp
+    Test.MeshConversion.cpp
     Test.MeshSoup.cpp
     Test_MeshBuilder.cpp
     Test_GeometryProcessing.cpp

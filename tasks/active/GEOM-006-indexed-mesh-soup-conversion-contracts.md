@@ -21,14 +21,14 @@
 ## Slice plan
 
 - **Slice 1 (this slice).** Add the owning `Geometry.MeshSoup` container, borrowed view naming, `PropertySet`-backed vertex/face/corner attribute domains, validation diagnostics, unit tests, architecture docs, and module inventory updates. Defers halfedge and point-cloud conversions to Slice 2.
-- **Slice 2.** Add soup ↔ halfedge mesh and soup ↔ point-cloud owning conversions with structured conversion diagnostics and round-trip tests.
+- **Slice 2 (2026-05-21).** Add soup ↔ halfedge mesh owning conversions in `Geometry.Mesh.Conversion` with structured conversion diagnostics and round-trip tests. The public `.cppm` declares the conversion surface and the non-trivial bodies live in `Geometry.Mesh.Conversion.cpp`. Default CMake/CTest verification remains blocked by the local dependency-cache state recorded below.
 - **Slice 3.** Integrate future IO/reconstruction/render-staging references that can consume the canonical container without importing higher layers.
 
 ## Required changes
 - [x] Define an indexed mesh/soup module in `src/geometry` with positions, face/index buffers, optional polygon support, and attribute domains.
 - [x] Provide validation diagnostics for duplicate vertices, invalid indices, degenerate faces, non-manifold edges, inconsistent winding, and attribute arity mismatches.
-- [ ] Add conversion from soup to `Geometry::HalfedgeMesh::Mesh` with explicit failure diagnostics for unsupported topology.
-- [ ] Add conversion from `Geometry::HalfedgeMesh::Mesh` to indexed triangle/polygon soup while preserving supported vertex/face attributes.
+- [x] Add conversion from soup to `Geometry::HalfedgeMesh::Mesh` with explicit failure diagnostics for unsupported topology.
+- [x] Add conversion from `Geometry::HalfedgeMesh::Mesh` to indexed triangle/polygon soup while preserving supported vertex/face attributes.
 - [ ] Add conversion between point-cloud positions and soup vertices where appropriate.
 - [x] Ensure conversion APIs are named to distinguish no-copy views from hard-copy owning conversions.
 - [x] Document renderer upload staging as a data-shape compatibility goal without importing graphics or runtime layers.
@@ -37,12 +37,13 @@
 ## Tests
 - [x] Add `tests/unit/geometry/Test.MeshSoup.cpp` using the `Test.<Name>.cpp` naming style.
 - [x] Cover empty input, valid triangle soup, polygon soup, duplicate vertices, invalid indices, degenerate faces, non-manifold edge detection, winding diagnostics, and attribute size mismatches.
-- [ ] Cover round-trip conversions for simple halfedge meshes and point-cloud-derived vertices.
+- [x] Cover round-trip conversions for simple halfedge meshes.
+- [ ] Cover round-trip conversions for point-cloud-derived vertices.
 - [ ] Run focused geometry tests.
 
 ## Docs
 - [x] Update `docs/architecture/geometry.md` with the soup/container role and conversion boundaries.
-- [ ] Update `docs/api/generated/module_inventory.md` after module surface changes.
+- [x] Update `docs/api/generated/module_inventory.md` after module surface changes.
 - [ ] Reference this container from future IO/reconstruction/render-staging tasks where relevant.
 
 ## Acceptance criteria
@@ -72,6 +73,20 @@ Slice 1 verification notes (2026-05-21):
 - Passed: `python3 tools/agents/check_task_policy.py --root . --strict`.
 - Blocked: `cmake --preset ci` with default compiler names because `clang-20`/`clang++-20` are not on PATH in this shell.
 - Blocked: `cmake --preset ci -D CMAKE_C_COMPILER=/usr/bin/clang-22 -D CMAKE_CXX_COMPILER=/usr/bin/clang++-22 -D CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-22` during generate by cached Draco targets with empty source lists; focused `IntrinsicGeometryTests`/CTest remain pending until the build tree/dependency cache is repaired.
+
+Slice 2 verification notes (2026-05-21):
+
+- Passed: direct `clang++-22` module interface compile for `Geometry.Properties`, `Geometry.Graph.Fwd`, `Geometry.Circulators`, `Geometry.HalfedgeMesh.Fwd`, `Geometry.HalfedgeMesh`, `Geometry.PointCloud.Fwd`, `Geometry.PointCloud`, `Geometry.MeshSoup`, and `Geometry.Mesh.Conversion` with cached GLM include path.
+- Passed: direct `clang++-22` implementation compile for `Geometry.Properties.cpp`, `Geometry.HalfedgeMesh.cpp`, and `Geometry.Mesh.Conversion.cpp` against the prebuilt module interfaces.
+- Passed: direct `clang++-22` smoke executable covering soup → halfedge → soup conversions.
+- Passed: `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- Passed: `python3 tools/repo/check_layering.py --root src --strict`.
+- Passed: `python3 tools/repo/check_test_layout.py --root . --strict`.
+- Passed: `python3 tools/docs/check_doc_links.py --root .`.
+- Passed: `python3 tools/agents/check_task_policy.py --root . --strict`.
+- Passed: `cmake --preset ci -D CMAKE_C_COMPILER=/usr/bin/clang-22 -D CMAKE_CXX_COMPILER=/usr/bin/clang++-22 -D CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-22` regenerated `build/ci`.
+- Passed: `cmake --build --preset ci --target IntrinsicGeometryTests` linked `bin/IntrinsicGeometryTests` (user rerun) and a follow-up retry reported `ninja: no work to do`.
+- Passed: `ctest --test-dir build/ci --output-on-failure -R 'MeshSoup|MeshConversion|GeometryIO|MeshBuilder|HalfedgeMesh' --timeout 60` (`278/278` tests passed).
 
 ## Forbidden changes
 - Do not add renderer, runtime, ECS, assets, platform, or app dependencies.

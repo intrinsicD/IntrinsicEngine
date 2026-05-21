@@ -115,6 +115,11 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
   changes.
 - Add C++23 module libraries with `intrinsic_add_module_library(...)` from `cmake/IntrinsicModule.cmake` and declare
   module interfaces via `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
+- Keep `.cppm` module interfaces focused on exported types, declarations, small inline accessors, and templates that
+  must be visible to importers. Put non-trivial implementations in matching `.cpp` module implementation units and add
+  them as private target sources. Treat an implementation as non-trivial when it owns algorithm/control-flow bodies,
+  allocation-heavy work, topology/container traversal, backend calls, diagnostics assembly, file/IO handling, or imports
+  other modules only needed by the implementation rather than the public API.
 - FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use
   `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated.
 

@@ -81,9 +81,17 @@ winding, and property-domain arity mismatches.
 No-copy adaptation must be named as borrowing, such as
 `Geometry::MeshSoup::BorrowView`, while topology-changing or lifetime-owning
 conversion APIs should use explicit `To*`/`From*` names and report diagnostics.
-Halfedge, point-cloud, and renderer-upload conversions remain geometry-owned
-data-shape contracts; geometry must not import assets, graphics, runtime, ECS,
-platform, or app layers to satisfy renderer staging needs.
+`Geometry.Mesh.Conversion` owns the explicit MeshSoup ↔ HalfedgeMesh conversion
+surface so the core container modules do not import each other only for
+adaptation convenience. `Geometry::Mesh::Conversion::ToHalfedgeMesh` and
+`ToIndexedMesh` return result objects with structured conversion diagnostics
+rather than silent `bool`/`std::optional` failure. Soup validation errors stop
+soup-to-halfedge conversion before topology is built; halfedge-to-soup
+conversion preserves canonical `v:point` positions and reports warnings when
+deleted source elements force compaction or when generic attributes stay on the
+source container. Point-cloud and renderer-upload conversions remain planned
+geometry-owned data-shape contracts; geometry must not import assets, graphics,
+runtime, ECS, platform, or app layers to satisfy renderer staging needs.
 
 ## Migration note
 
