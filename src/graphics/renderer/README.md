@@ -919,21 +919,27 @@ Concretely:
   `"PostProcessPass"` umbrella executor branch routes through
   `RecordPostProcessToneMapPass(...)` with the recorded
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
-  Push-constant compatibility note: the renderer pushes the 20-byte
-  canonical `PostProcessPushConstants` block (Exposure + Gamma +
-  BloomIntensity + HistogramBinCount + StageKind), while
-  `assets/shaders/post_tonemap.frag` declares the larger 240-byte color-
-  grading push block. Vulkan permits partially-written push ranges; the
-  shader's in-fragment defaults (`pc.Operator == 0` → ACES) produce a
-  deterministic result against zero-init tail bytes, which keeps the
-  CPU/null contract gate well-formed. Extending the canonical struct (or
-  migrating the shader to a slim 20-byte block) is gated by the GPU/Vulkan
-  `Operational` claim outside Slice A's scope and is tracked alongside the
-  Slices B–E retained-resource and histogram-readback work below. The
-  Slices B–E `Histogram` / `Bloom` / `FXAA` / `SMAA` helpers fan out from
-  the same umbrella branch (mirroring `GRAPHICS-074`'s `"PickingPass"`
-  fan-out) once their pipelines + retained LUTs + histogram readback drain
-  land. Frame recipe resources `PostProcess.BloomScratch`,
+  The pass body pushes the pass-local `PostProcessToneMapPushConstants`
+  block exported by `Pass.PostProcess.ToneMap` (80 bytes — `Exposure +
+  Operator + BloomIntensity + ColorGradingOn` header + four grading
+  scalars + three `vec3 + float pad` rows under std430), which mirrors
+  the `assets/shaders/post_tonemap.frag` `layout(push_constant)`
+  declaration byte-for-byte; `BuildPostProcessToneMapPushConstants(
+  settings)` derives `Exposure`/`BloomIntensity` from
+  `PostProcessSettings` and keeps the operator at ACES with grading off
+  for a deterministic neutral tonemap. The canonical 20-byte
+  `PostProcessPushConstants` block shared by the other postprocess
+  stages is intentionally not used for tonemap — pushing it would alias
+  `HistogramBinCount` onto `ColorGradingOn` (a 256-bin default would
+  enable grading) and `StageKind` onto `Saturation`
+  (`bit_cast<float>(2)` ≈ 0 → grayscale), with the remaining 60 bytes
+  reading implementation-defined memory, the standing "Shader
+  push-constant compatibility policy" hard gate. The Slices B–E
+  `Histogram` / `Bloom` / `FXAA` / `SMAA` helpers fan out from the same
+  umbrella branch (mirroring `GRAPHICS-074`'s `"PickingPass"` fan-out)
+  once their pipelines + retained LUTs + histogram readback drain land,
+  and each is free to define its own pass-local push block where the
+  shader interface demands more than the canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
   postprocess-owned intermediates; concrete Vulkan descriptors/shaders
   remain backend follow-ups. Per `GRAPHICS-013AQ`,

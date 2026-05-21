@@ -14,6 +14,7 @@
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
+import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -150,7 +151,7 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(device.CommandContext.PushConstantSizes[2], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[3], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[4], sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[5], sizeof(Extrinsic::Graphics::PostProcessPushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[5], sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.LastDispatch.X,
               (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
@@ -1920,14 +1921,17 @@ TEST(RendererFrameLifecycle, PostProcessToneMapPipelineSurvivesOperationalRebuil
     // SelectionOutline pipeline, which stays render-pass-compatible with
     // the recipe-read SceneDepth attachment).
     EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
-    // Matches the canonical `PostProcessPushConstants` block defined in
-    // `Graphics.PostProcessSystem.cppm` (20 bytes: Exposure + Gamma +
-    // BloomIntensity + HistogramBinCount + StageKind). The shader's
-    // full color-grading push block is intentionally larger — extending
-    // the canonical struct or migrating the shader to read only the
-    // 20-byte block is a separate slice gated by the GPU/Vulkan
-    // operational claim.
-    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::Graphics::PostProcessPushConstants));
+    // Matches the pass-local `PostProcessToneMapPushConstants` block
+    // exported by `Pass.PostProcess.ToneMap` (80 bytes — `Exposure +
+    // Operator + BloomIntensity + ColorGradingOn` + 4 grading scalars +
+    // three `vec3 + float pad` rows under std430). The block mirrors the
+    // shader's `layout(push_constant) Push { ... }` declaration byte-for-
+    // byte; the canonical 20-byte `PostProcessPushConstants` block
+    // shared by the other postprocess stages is intentionally not used
+    // for tonemap since it aliases `HistogramBinCount` /
+    // `StageKind` onto `ColorGradingOn` / `Saturation` and leaves the
+    // grading tail unwritten.
+    EXPECT_EQ(initialDesc.PushConstantSize, sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
     const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetPostProcessToneMapPipeline();

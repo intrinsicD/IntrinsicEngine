@@ -2243,17 +2243,23 @@ namespace Extrinsic::Graphics
         // render pass attaches `SceneColorLDR` (backbuffer format, per
         // `FrameRecipeSizing::BackbufferFormat`) with no depth attachment.
         //
-        // Push constants: `PushConstantSize = sizeof(PostProcessPushConstants)`
-        // matches the 20-byte canonical block the existing
-        // `PostProcessToneMapPass::Execute` body pushes. The shader's full
-        // 240-byte color-grading push block is intentionally larger; the
-        // unwritten tail is implementation-defined per the Vulkan
-        // `vkCmdPushConstants` rules but the in-shader `pc.Operator`/grading
-        // defaults already produce a deterministic ACES path with zero-init
-        // tail bytes for CPU/null contract testing. Migrating the shader
-        // to read only the 20-byte canonical block — or extending the
-        // canonical push struct — is tracked separately and gated by the
-        // GPU/Vulkan operational claim outside this slice's scope.
+        // Push constants: `PushConstantSize = sizeof(PostProcessToneMapPushConstants)`
+        // (80 bytes) mirrors the shader's `layout(push_constant) Push { ... }`
+        // block byte-for-byte under Vulkan std430 (4×4 bytes header + 4×4
+        // bytes grading scalars + 3× `vec3 + float pad`). The pass body
+        // builds the payload through `BuildPostProcessToneMapPushConstants(
+        // m_PostProcessSystem.GetSettings())`, which derives `Exposure` /
+        // `BloomIntensity` from settings and uses deterministic defaults
+        // (`Operator = 0` ACES, `ColorGradingOn = 0`, neutral
+        // `Saturation`/`Contrast`/`Lift`/`Gamma`/`Gain`) for the rest. The
+        // canonical 20-byte `PostProcessPushConstants` block shared by the
+        // other postprocess stages is intentionally *not* used here: under
+        // std430 it aliases `HistogramBinCount` onto `ColorGradingOn` (so a
+        // 256-bin default would enable grading) and `StageKind` onto
+        // `Saturation` (`bit_cast<float>(2)` ≈ 0 → grayscale), with the
+        // remaining 60 bytes of `Lift`/`Gamma`/`Gain` reading implementation
+        // -defined memory — the standing "Shader push-constant compatibility
+        // policy" hard gate.
         [[nodiscard]] static RHI::PipelineDesc BuildPostProcessToneMapPipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -2273,7 +2279,7 @@ namespace Extrinsic::Graphics
             desc.ColorTargetCount = 1u;
             desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::Undefined;
-            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessPushConstants));
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessToneMapPushConstants));
             desc.DebugName = "Renderer.PostProcess.ToneMap";
             return desc;
         }
