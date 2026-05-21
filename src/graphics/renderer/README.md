@@ -1019,10 +1019,39 @@ Concretely:
   or `SMAA` short-circuits `Execute(...)` to a no-op while the helper
   still returns `Recorded` under the `"PostProcessAAPass"` accumulator,
   mirroring the bloom helper's "structurally-recorded no-op" taxonomy
-  when `EnableBloom = false`. SMAA (Slice D) will fan out from the
-  same `"PostProcessAAPass"` umbrella branch alongside FXAA (mutually
-  exclusive per `PostProcessSettings::AntiAliasing`, with retained
-  `AreaTex` / `SearchTex` LUTs + exposure-adaptation history buffer);
+  when `EnableBloom = false`. `GRAPHICS-075` Slice D.1 adds the three
+  SMAA pipelines (vertex `post_fullscreen.vert.spv` paired with
+  `post_smaa_edge.frag.spv` / `post_smaa_blend.frag.spv` /
+  `post_smaa_resolve.frag.spv`); pipeline target formats mirror the
+  Slice D.2 `PostProcess.AATemp.{Edges,Weights}` recipe split (edge →
+  `RG8_UNORM`, blend → `RGBA8_UNORM`, resolve → backbuffer format). Each
+  pipeline carries its own 16-byte std430 push block
+  (`PostProcessSMAAEdgePushConstants` / `PostProcessSMAABlendPushConstants`
+  / `PostProcessSMAAResolvePushConstants`) mirroring the matching
+  shader's `Push` declaration byte-for-byte; the canonical 20-byte
+  `PostProcessPushConstants` is intentionally not reused per the same
+  shader-push-constant compatibility policy that motivated the
+  Slice A / B / C pass-local push blocks. `NullRenderer` owns
+  `m_PostProcessSMAAPass` + `m_PostProcessSMAA{Edge,Blend,Resolve}PipelineLease`,
+  all four republished byte-identical across
+  `RebuildOperationalResources()`. `RecordPostProcessSMAAPass(...)`
+  fans out behind the same `"PostProcessAAPass"` branch alongside the
+  FXAA helper; both pass bodies' `IsStageEnabled` gate enforces the
+  `PostProcessSettings::AntiAliasing` selector so the helpers run
+  unconditionally and only the active stage emits bind/push/draw. The
+  pass body records three Bind/Push/Draw triples (edge → blend →
+  resolve) when `AntiAliasing == SMAA`, mirroring the bloom helper's
+  per-stage early-skip on individual pipeline `IsValid()` so a partial
+  outage still records the surviving stages. Each SMAA push builder
+  derives `InvResolution` from `RHI::CameraUBO::Viewport{Width,Height}`
+  (zero / negative extent maps to a zero inverse so the shaders'
+  neighbour-tap UVs degenerate gracefully) and keeps `EdgeThreshold` /
+  `MaxSearchSteps` / `MaxSearchStepsDiag` at the SMAA reference
+  defaults; future `PostProcessSettings::SMAA*` fields flow through
+  these builders without touching the pass body or pipeline descs.
+  Retained `AreaTex` / `SearchTex` LUT textures sampled by the blend
+  pipeline + exposure-adaptation history buffer + recipe-side
+  `PostProcess.AATemp.{Edges,Weights}` rename land in Slice D.2.
   Histogram (Slice E, compute pipeline + readback drain) fans out
   behind the existing `"PostProcessPass"` umbrella alongside bloom +
   tonemap. Each AA stage is free to define its own pass-local push
@@ -1032,8 +1061,11 @@ Concretely:
   postprocess-owned intermediates; concrete Vulkan descriptors/shaders
   remain backend follow-ups. Per `GRAPHICS-013AQ`,
   `PostProcessSystem` is the sole owner of the retained postprocess resources
-  (SMAA `AreaTex` `R8G8_UNORM` 160x560 and `SearchTex` `R8_UNORM` 256x33
-  lookup textures, plus the exposure-adaptation history buffer holding
+  (SMAA `AreaTex` `R8G8_UNORM` 160x560 and `SearchTex` `R8_UNORM` 66x33
+  lookup textures — the historic `256x33` notation tracked the wrong
+  width; the SMAA reference and `post_smaa_blend.frag` both define
+  `SMAA_SEARCHTEX_SIZE = vec2(66, 33)` — plus the exposure-adaptation
+  history buffer holding
   `previous_average_log_lum` / `adaptation_velocity` / `frame_index`),
   allocated once at `Initialize()` through
   `RHI::TextureManager`/`RHI::BufferManager` and freed at `Shutdown()`. Bloom

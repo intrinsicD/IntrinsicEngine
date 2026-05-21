@@ -388,6 +388,45 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessFXAAPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessFXAAPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-075 (Slice D.1) — accessors for the three SMAA pipelines
+        // (vertex `post_fullscreen.vert.spv` paired with fragments
+        // `post_smaa_edge.frag.spv` / `post_smaa_blend.frag.spv` /
+        // `post_smaa_resolve.frag.spv`). Targets per pipeline mirror the
+        // SMAA Slice D.2 `PostProcess.AATemp.{Edges,Weights}` split:
+        // - edge: single `RG8_UNORM` color target (luma edge mask),
+        //   `PushConstantSize = sizeof(PostProcessSMAAEdgePushConstants)`
+        //   (16 bytes, `vec2 InvResolution + float EdgeThreshold + float
+        //   _pad0` std430 mirroring `post_smaa_edge.frag`);
+        // - blend: single `RGBA8_UNORM` color target (per-pixel blend
+        //   weights), `PushConstantSize =
+        //   sizeof(PostProcessSMAABlendPushConstants)` (16 bytes, `vec2
+        //   InvResolution + int MaxSearchSteps + int MaxSearchStepsDiag`
+        //   std430 mirroring `post_smaa_blend.frag`);
+        // - resolve: single backbuffer-format color target (final
+        //   anti-aliased LDR), `PushConstantSize =
+        //   sizeof(PostProcessSMAAResolvePushConstants)` (16 bytes, `vec2
+        //   InvResolution + float _pad0 + float _pad1` std430 mirroring
+        //   `post_smaa_resolve.frag`).
+        // All three pipelines have no depth attachment. The canonical
+        // 20-byte `PostProcessPushConstants` block is intentionally not
+        // reused per the standing "Shader push-constant compatibility
+        // policy": pushing it under any SMAA shader's std430 push block
+        // would alias `Exposure` / `Gamma` / etc. onto `InvResolution.x` /
+        // `InvResolution.y` / threshold scalars and produce
+        // visually-meaningless SMAA output. Handles are invalid until an
+        // operational device path publishes the leases; the descriptors
+        // remain deterministic so contract tests can assert byte-identical
+        // rebuild behavior. Retained `AreaTex` / `SearchTex` LUT textures
+        // (sampled by the blend pipeline) + exposure-adaptation history
+        // buffer land in Slice D.2 alongside the recipe-side
+        // `PostProcess.AATemp.{Edges,Weights}` split.
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAAEdgePipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAAEdgePipelineDesc() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAABlendPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAABlendPipelineDesc() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAAResolvePipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAAResolvePipelineDesc() const noexcept = 0;
+
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for
         // `8 * frames-in-flight` bytes (one 4-byte `EntityId` word + one

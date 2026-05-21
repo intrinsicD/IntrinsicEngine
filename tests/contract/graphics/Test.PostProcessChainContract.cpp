@@ -424,8 +424,16 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_EQ(histogramCmd.Events[2].Kind, EventKind::Dispatch);
     EXPECT_EQ(histogramCmd.LastDispatchX, 1u);
 
+    // GRAPHICS-075 Slice D.1 — the SMAA pass reshaped to hold three
+    // pipelines (edge / blend / resolve), so the test wires them through
+    // the new per-stage setter API. `AntiAliasing == FXAA` short-circuits
+    // the body to a no-op via `IsStageEnabled(SMAA)`, so even with all
+    // three pipelines bound the SMAA pass must stay silent here
+    // (mirroring `SMAASkipsWhenAntiAliasingNotSMAA` below).
     Graphics::PostProcessSMAAPass smaa{post};
-    smaa.SetPipeline(RHI::PipelineHandle{23u, 1u});
+    smaa.SetEdgePipeline(RHI::PipelineHandle{23u, 1u});
+    smaa.SetBlendPipeline(RHI::PipelineHandle{27u, 1u});
+    smaa.SetResolvePipeline(RHI::PipelineHandle{28u, 1u});
     RecordingCommandContext smaaCmd;
     smaa.Execute(smaaCmd, camera);
     EXPECT_TRUE(smaaCmd.Events.empty());
@@ -831,6 +839,191 @@ TEST(GraphicsPostProcessChainContract, FXAASkipsWhenAntiAliasingNotFXAA)
     EXPECT_EQ(activeCmd.Events[0].Kind, EventKind::BindPipeline);
     EXPECT_EQ(activeCmd.Events[1].Kind, EventKind::PushConstants);
     EXPECT_EQ(activeCmd.Events[2].Kind, EventKind::Draw);
+}
+
+// GRAPHICS-075 Slice D.1 — when `AntiAliasing == SMAA` the SMAA pass
+// body must record three Bind/Push/Draw triples (edge → blend →
+// resolve), each carrying a 16-byte std430 push block whose
+// `InvResolution` matches `1 / vec2(viewportWidth, viewportHeight)`.
+// A zero `InvResolution` would make every neighbour-tap UV in the
+// SMAA shaders collapse onto the center pixel, silently degenerating
+// SMAA into a pass-through (and the blend pipeline's `SearchTex` /
+// `AreaTex` taps would degenerate completely). The recorded push
+// payloads must be the SMAA-shaped 16-byte blocks, not the canonical
+// 20-byte `PostProcessPushConstants` block — under std430 the latter
+// would alias `Exposure` / `Gamma` / etc. onto each SMAA shader's
+// `InvResolution.{x,y}` plus threshold scalars and produce
+// visually-meaningless output.
+TEST(GraphicsPostProcessChainContract, SMAAPushFeedsNonZeroInvResolutionForAllStages)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::SMAA,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1920.0f;
+    camera.ViewportHeight = 1080.0f;
+
+    Graphics::PostProcessSMAAPass smaa{post};
+    smaa.SetEdgePipeline(RHI::PipelineHandle{90u, 1u});
+    smaa.SetBlendPipeline(RHI::PipelineHandle{91u, 1u});
+    smaa.SetResolvePipeline(RHI::PipelineHandle{92u, 1u});
+    RecordingCommandContext cmd;
+    smaa.Execute(cmd, camera);
+
+    // Three Bind/Push/Draw triples: edge, blend, resolve.
+    ASSERT_EQ(cmd.Events.size(), 9u);
+    for (std::size_t stage = 0; stage < 3u; ++stage)
+    {
+        EXPECT_EQ(cmd.Events[stage * 3u + 0u].Kind, EventKind::BindPipeline);
+        EXPECT_EQ(cmd.Events[stage * 3u + 1u].Kind, EventKind::PushConstants);
+        EXPECT_EQ(cmd.Events[stage * 3u + 2u].Kind, EventKind::Draw);
+    }
+    EXPECT_EQ(cmd.LastDrawVertexCount, 3u);
+
+    // The last recorded push payload is the resolve stage's
+    // `PostProcessSMAAResolvePushConstants` block (16 bytes mirroring
+    // `vec2 InvResolution + float _pad0 + float _pad1`).
+    EXPECT_EQ(cmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessSMAAResolvePushConstants));
+    ASSERT_EQ(cmd.LastPushConstants.size(),
+              sizeof(Graphics::PostProcessSMAAResolvePushConstants));
+    Graphics::PostProcessSMAAResolvePushConstants observedResolve{};
+    std::memcpy(&observedResolve, cmd.LastPushConstants.data(),
+                sizeof(Graphics::PostProcessSMAAResolvePushConstants));
+    EXPECT_FLOAT_EQ(observedResolve.InvResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(observedResolve.InvResolution[1], 1.0f / 1080.0f);
+
+    // Cross-check each published builder produces a non-zero
+    // `InvResolution` plus SMAA reference defaults so future settings
+    // extensions cannot drift the pass body away from the contract.
+    const Graphics::PostProcessSMAAEdgePushConstants builtEdge =
+        Graphics::BuildPostProcessSMAAEdgePushConstants(post.GetSettings(),
+                                                       camera.ViewportWidth,
+                                                       camera.ViewportHeight);
+    EXPECT_FLOAT_EQ(builtEdge.InvResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(builtEdge.InvResolution[1], 1.0f / 1080.0f);
+    EXPECT_FLOAT_EQ(builtEdge.EdgeThreshold, 0.1f);
+
+    const Graphics::PostProcessSMAABlendPushConstants builtBlend =
+        Graphics::BuildPostProcessSMAABlendPushConstants(post.GetSettings(),
+                                                        camera.ViewportWidth,
+                                                        camera.ViewportHeight);
+    EXPECT_FLOAT_EQ(builtBlend.InvResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(builtBlend.InvResolution[1], 1.0f / 1080.0f);
+    EXPECT_EQ(builtBlend.MaxSearchSteps, 16);
+    EXPECT_EQ(builtBlend.MaxSearchStepsDiag, 8);
+
+    const Graphics::PostProcessSMAAResolvePushConstants builtResolve =
+        Graphics::BuildPostProcessSMAAResolvePushConstants(post.GetSettings(),
+                                                          camera.ViewportWidth,
+                                                          camera.ViewportHeight);
+    EXPECT_FLOAT_EQ(builtResolve.InvResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(builtResolve.InvResolution[1], 1.0f / 1080.0f);
+}
+
+// GRAPHICS-075 Slice D.1 — `PostProcessSettings::AntiAliasing` is the
+// branch selector for the typed AA stages; the SMAA pass body must
+// respect the selector and emit no bind/push/draw when the stage is
+// gated off, mirroring `FXAASkipsWhenAntiAliasingNotFXAA`. With
+// `AntiAliasing == None` or `FXAA`, SMAA stays silent even with all
+// three pipelines bound; with `AntiAliasing == SMAA`, SMAA records
+// three Bind/Push/Draw triples. This contract also pins the FXAA/SMAA
+// mutual-exclusion invariant from the SMAA side.
+TEST(GraphicsPostProcessChainContract, SMAASkipsWhenAntiAliasingNotSMAA)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1280.0f;
+    camera.ViewportHeight = 720.0f;
+
+    // AntiAliasing == None — SMAA must stay silent.
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::None,
+    });
+    Graphics::PostProcessSMAAPass smaaNone{post};
+    smaaNone.SetEdgePipeline(RHI::PipelineHandle{93u, 1u});
+    smaaNone.SetBlendPipeline(RHI::PipelineHandle{94u, 1u});
+    smaaNone.SetResolvePipeline(RHI::PipelineHandle{95u, 1u});
+    RecordingCommandContext noneCmd;
+    smaaNone.Execute(noneCmd, camera);
+    EXPECT_TRUE(noneCmd.Events.empty());
+
+    // AntiAliasing == FXAA — SMAA still stays silent (mutually exclusive
+    // per `PostProcessSettings::AntiAliasing`).
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::FXAA,
+    });
+    Graphics::PostProcessSMAAPass smaaFxaa{post};
+    smaaFxaa.SetEdgePipeline(RHI::PipelineHandle{96u, 1u});
+    smaaFxaa.SetBlendPipeline(RHI::PipelineHandle{97u, 1u});
+    smaaFxaa.SetResolvePipeline(RHI::PipelineHandle{98u, 1u});
+    RecordingCommandContext fxaaCmd;
+    smaaFxaa.Execute(fxaaCmd, camera);
+    EXPECT_TRUE(fxaaCmd.Events.empty());
+
+    // AntiAliasing == SMAA — SMAA records three Bind/Push/Draw triples.
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::SMAA,
+    });
+    Graphics::PostProcessSMAAPass smaaActive{post};
+    smaaActive.SetEdgePipeline(RHI::PipelineHandle{99u, 1u});
+    smaaActive.SetBlendPipeline(RHI::PipelineHandle{100u, 1u});
+    smaaActive.SetResolvePipeline(RHI::PipelineHandle{101u, 1u});
+    RecordingCommandContext activeCmd;
+    smaaActive.Execute(activeCmd, camera);
+    ASSERT_EQ(activeCmd.Events.size(), 9u);
+    EXPECT_EQ(activeCmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(activeCmd.Events[3].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(activeCmd.Events[6].Kind, EventKind::BindPipeline);
+}
+
+// GRAPHICS-075 Slice D.1 — partial SMAA pipeline outage: the pass body
+// must independently gate each Bind/Push/Draw triple on its own
+// pipeline's `IsValid()` so a missing edge/blend/resolve pipeline only
+// drops the affected stage rather than collapsing the whole leg. This
+// mirrors the bloom helper's per-stage early-skip on the downsample /
+// upsample leases.
+TEST(GraphicsPostProcessChainContract, SMAARecordsPerStageIndependently)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::SMAA,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1280.0f;
+    camera.ViewportHeight = 720.0f;
+
+    // Only the edge pipeline is bound — the blend + resolve stages stay
+    // silent.
+    Graphics::PostProcessSMAAPass edgeOnly{post};
+    edgeOnly.SetEdgePipeline(RHI::PipelineHandle{110u, 1u});
+    RecordingCommandContext edgeOnlyCmd;
+    edgeOnly.Execute(edgeOnlyCmd, camera);
+    ASSERT_EQ(edgeOnlyCmd.Events.size(), 3u);
+    EXPECT_EQ(edgeOnlyCmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessSMAAEdgePushConstants));
+
+    // Only the resolve pipeline is bound — the edge + blend stages stay
+    // silent and the single recorded push payload is the resolve block.
+    Graphics::PostProcessSMAAPass resolveOnly{post};
+    resolveOnly.SetResolvePipeline(RHI::PipelineHandle{111u, 1u});
+    RecordingCommandContext resolveOnlyCmd;
+    resolveOnly.Execute(resolveOnlyCmd, camera);
+    ASSERT_EQ(resolveOnlyCmd.Events.size(), 3u);
+    EXPECT_EQ(resolveOnlyCmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessSMAAResolvePushConstants));
 }
 
 TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)
