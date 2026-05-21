@@ -14,6 +14,7 @@
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
+import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.PostProcessSystem;
@@ -106,8 +107,15 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // GRAPHICS-075 Slice A — the default-recipe `"PostProcessPass"` umbrella
     // branch now routes the tonemap leg as well, adding one more Recorded
     // pass + one bind + one push (canonical `PostProcessPushConstants`).
-    // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
+    // GRAPHICS-075 Slice B.1 — the umbrella branch now fans out to the
+    // bloom helper *before* the tonemap helper. `EnableBloom` defaults to
+    // false so the bloom `Execute` body emits no bind/push/draw, but the
+    // helper still returns `Recorded` per the same "structurally-recorded
+    // no-op" taxonomy the tonemap helper follows when the chain is
+    // disabled. The umbrella therefore adds two Recorded entries
+    // (`PostProcessPass` × {bloom, tonemap}). Remaining unwired passes
+    // still soft-skip with SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 7u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -369,9 +377,13 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // after the operational rebuild publishes the forward pass pipeline leases.
     // GRAPHICS-075 Slice A — the post-rebuild publish also publishes the
     // tonemap pipeline lease, so the `"PostProcessPass"` umbrella branch
-    // routes its tonemap leg and `Recorded` climbs to 6. Remaining unwired
+    // routes its tonemap leg. GRAPHICS-075 Slice B.1 — the rebuild also
+    // publishes the bloom downsample + upsample leases, so the umbrella
+    // fans out to the bloom helper too (returning Recorded under the
+    // "structurally-recorded no-op" taxonomy even though `EnableBloom`
+    // defaults to false). Total `Recorded` climbs to 7. Remaining unwired
     // passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 7u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -427,8 +439,11 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // report `SkippedUnavailable` so its missing lease cannot regress
     // silently. GRAPHICS-075 Slice A — the tonemap pipeline is created
     // after the depth-prepass failure point and is unaffected by it, so
-    // `"PostProcessPass"` still routes Recorded → bumps the count to 5.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 5u);
+    // `"PostProcessPass"` still routes Recorded. GRAPHICS-075 Slice B.1 —
+    // the bloom downsample + upsample pipelines are likewise created
+    // after the depth-prepass failure point, so the umbrella also fans
+    // out to the bloom helper → bumps the count to 6.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -483,7 +498,10 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // do not depend on `m_CullingOutputAvailable`), so
     // `"PostProcessPass"` still routes Recorded. Every other routed pass
     // requires the culling output and reports `SkippedUnavailable`.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 1u);
+    // GRAPHICS-075 Slice B.1 — the bloom pipelines have the same
+    // culling-independence as the tonemap pipeline, so the umbrella adds
+    // a second Recorded entry for the bloom helper.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 2u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -1938,6 +1956,95 @@ TEST(RendererFrameLifecycle, PostProcessToneMapPipelineSurvivesOperationalRebuil
     EXPECT_TRUE(rebuiltPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessToneMapPipelineDesc();
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice B.1 — default-recipe postprocess bloom downsample +
+// upsample pipeline leases + republish. Mirrors the tonemap rebuild test
+// above for the two fullscreen bloom shader pairs
+// (`post_fullscreen.vert` + `post_bloom_downsample.frag` /
+//  `post_fullscreen.vert` + `post_bloom_upsample.frag`).
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PostProcessBloomPipelinesSurviveOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{295u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialDownsamplePipeline =
+        renderer->GetPostProcessBloomDownsamplePipeline();
+    EXPECT_TRUE(initialDownsamplePipeline.IsValid());
+    const Extrinsic::RHI::PipelineHandle initialUpsamplePipeline =
+        renderer->GetPostProcessBloomUpsamplePipeline();
+    EXPECT_TRUE(initialUpsamplePipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDownsampleDesc =
+        renderer->GetPostProcessBloomDownsamplePipelineDesc();
+    EXPECT_TRUE(initialDownsampleDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialDownsampleDesc.VertexShaderPath;
+    EXPECT_TRUE(initialDownsampleDesc.FragmentShaderPath.ends_with(
+        "shaders/post_bloom_downsample.frag.spv"))
+        << initialDownsampleDesc.FragmentShaderPath;
+    EXPECT_EQ(initialDownsampleDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialDownsampleDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_FALSE(initialDownsampleDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialDownsampleDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_FALSE(initialDownsampleDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialDownsampleDesc.ColorTargetCount, 1u);
+    // BloomScratch is declared as `RGBA16_FLOAT` in `BuildDefaultFrameRecipe`,
+    // so both bloom pipelines target that format (independent of the
+    // backbuffer format the tonemap pipeline picks up).
+    EXPECT_EQ(initialDownsampleDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
+    EXPECT_EQ(initialDownsampleDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    // 16-byte std430 block: `vec2 InvSrcResolution + float Threshold +
+    // int IsFirstMip`. The canonical 20-byte block is intentionally not
+    // used here per the standing shader-push-constant compatibility
+    // policy.
+    EXPECT_EQ(initialDownsampleDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::PostProcessBloomDownsamplePushConstants));
+
+    const Extrinsic::RHI::PipelineDesc initialUpsampleDesc =
+        renderer->GetPostProcessBloomUpsamplePipelineDesc();
+    EXPECT_TRUE(initialUpsampleDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialUpsampleDesc.VertexShaderPath;
+    EXPECT_TRUE(initialUpsampleDesc.FragmentShaderPath.ends_with(
+        "shaders/post_bloom_upsample.frag.spv"))
+        << initialUpsampleDesc.FragmentShaderPath;
+    EXPECT_EQ(initialUpsampleDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialUpsampleDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_FALSE(initialUpsampleDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialUpsampleDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_FALSE(initialUpsampleDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialUpsampleDesc.ColorTargetCount, 1u);
+    EXPECT_EQ(initialUpsampleDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
+    EXPECT_EQ(initialUpsampleDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    // 16-byte std430 block: `vec2 InvCoarserResolution + float FilterRadius +
+    // float _pad0`. Slice B.2 keeps this layout and feeds it per upsample
+    // step.
+    EXPECT_EQ(initialUpsampleDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::PostProcessBloomUpsamplePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltDownsamplePipeline =
+        renderer->GetPostProcessBloomDownsamplePipeline();
+    EXPECT_TRUE(rebuiltDownsamplePipeline.IsValid());
+    const Extrinsic::RHI::PipelineHandle rebuiltUpsamplePipeline =
+        renderer->GetPostProcessBloomUpsamplePipeline();
+    EXPECT_TRUE(rebuiltUpsamplePipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDownsampleDesc =
+        renderer->GetPostProcessBloomDownsamplePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltUpsampleDesc =
+        renderer->GetPostProcessBloomUpsamplePipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDownsampleDesc, rebuiltDownsampleDesc));
+    EXPECT_TRUE(PipelineDescBytesEqual(initialUpsampleDesc, rebuiltUpsampleDesc));
 
     renderer->Shutdown();
 }

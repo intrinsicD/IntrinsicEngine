@@ -934,12 +934,30 @@ Concretely:
   enable grading) and `StageKind` onto `Saturation`
   (`bit_cast<float>(2)` ≈ 0 → grayscale), with the remaining 60 bytes
   reading implementation-defined memory, the standing "Shader
-  push-constant compatibility policy" hard gate. The Slices B–E
-  `Histogram` / `Bloom` / `FXAA` / `SMAA` helpers fan out from the same
-  umbrella branch (mirroring `GRAPHICS-074`'s `"PickingPass"` fan-out)
-  once their pipelines + retained LUTs + histogram readback drain land,
-  and each is free to define its own pass-local push block where the
-  shader interface demands more than the canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
+  push-constant compatibility policy" hard gate. `GRAPHICS-075` Slice B.1
+  adds the bloom downsample + upsample pipelines (vertex
+  `post_fullscreen.vert.spv` + fragment `post_bloom_downsample.frag.spv`
+  / `post_bloom_upsample.frag.spv`, single `RGBA16_FLOAT` color target
+  matching the `PostProcess.BloomScratch` recipe declaration, no depth,
+  `PushConstantSize = sizeof(PostProcessBloom{Downsample,Upsample}PushConstants)`
+  — each 16 bytes mirroring the shader's std430 push block). The
+  `NullRenderer` owns `m_PostProcessBloomPass` plus
+  `m_PostProcessBloomDownsamplePipelineLease` +
+  `m_PostProcessBloomUpsamplePipelineLease`, both republished byte-identical
+  across `RebuildOperationalResources()`. The umbrella branch fans out to
+  `RecordPostProcessBloomPass(...)` *before* `RecordPostProcessToneMapPass(...)`
+  so the bloom write naturally precedes the tonemap read of the bloom
+  buffer in recorded order; Slice B.1 keeps the helper's body at a single
+  bind/push/draw per stage (placeholder coverage for the CPU contract
+  gate), and Slice B.2 adds per-mip iteration over the
+  `BloomScratch.MipLevels = 6` mip chain together with the
+  `ColorAttachment → ShaderRead → ColorAttachment` inline barriers
+  between mips. The remaining Slices C/D/E `FXAA` / `SMAA` / `Histogram`
+  helpers fan out from the same umbrella branch (mirroring
+  `GRAPHICS-074`'s `"PickingPass"` fan-out) once their pipelines +
+  retained LUTs + histogram readback drain land, and each is free to
+  define its own pass-local push block where the shader interface
+  demands more than the canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
   postprocess-owned intermediates; concrete Vulkan descriptors/shaders
   remain backend follow-ups. Per `GRAPHICS-013AQ`,

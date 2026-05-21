@@ -345,6 +345,27 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessToneMapPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessToneMapPipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-075 (Slice B.1) — accessors for the default-recipe
+        // postprocess bloom pipelines: a fullscreen 13-tap downsample
+        // (`post_fullscreen.vert.spv` + `post_bloom_downsample.frag.spv`)
+        // and a 9-tap tent-filter upsample (`post_fullscreen.vert.spv` +
+        // `post_bloom_upsample.frag.spv`). Both pipelines target the
+        // recipe's `PostProcess.BloomScratch` RGBA16F transient (`RGBA16_FLOAT`
+        // is the BloomScratch declaration in `BuildDefaultFrameRecipe`), no
+        // depth attachment, `PushConstantSize =
+        // sizeof(PostProcessBloomDownsamplePushConstants)` /
+        // `sizeof(PostProcessBloomUpsamplePushConstants)` (each 16 bytes
+        // matching the shader's std430 push block). Handles are invalid
+        // until an operational device publishes the leases; the descriptors
+        // remain deterministic so contract tests can assert byte-identical
+        // rebuild behavior. Slice B.2 keeps the same pipeline shapes and
+        // adds per-mip iteration + recipe-side `BloomScratch.MipLevels` +
+        // the multi-mip barrier-sequence contract test.
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessBloomDownsamplePipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessBloomDownsamplePipelineDesc() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessBloomUpsamplePipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessBloomUpsamplePipelineDesc() const noexcept = 0;
+
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for
         // `8 * frames-in-flight` bytes (one 4-byte `EntityId` word + one

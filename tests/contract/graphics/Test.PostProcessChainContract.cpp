@@ -274,12 +274,30 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_FLOAT_EQ(observed.Gamma[0], 1.0f);
     EXPECT_FLOAT_EQ(observed.Gain[0], 1.0f);
 
+    // GRAPHICS-075 Slice B.1 — bloom pass now records a downsample +
+    // upsample bind/push/draw pair (one fullscreen draw per stage) using
+    // the per-shader push-constant blocks. Slice B.2 expands this to per-
+    // mip iteration; for B.1 the helper records the single-step
+    // placeholder shape so the CPU contract gate observes both pipelines
+    // are bound. The push payloads pack `vec2 InvSrcResolution + float
+    // Threshold + int IsFirstMip` for downsample (16B) and `vec2
+    // InvCoarserResolution + float FilterRadius + float _pad0` for
+    // upsample (16B), matching the shader std430 layouts.
     Graphics::PostProcessBloomPass bloom{post};
-    bloom.SetPipeline(RHI::PipelineHandle{21u, 1u});
+    bloom.SetDownsamplePipeline(RHI::PipelineHandle{21u, 1u});
+    bloom.SetUpsamplePipeline(RHI::PipelineHandle{25u, 1u});
     RecordingCommandContext bloomCmd;
     bloom.Execute(bloomCmd, camera);
-    ASSERT_EQ(bloomCmd.Events.size(), 3u);
+    ASSERT_EQ(bloomCmd.Events.size(), 6u);
+    EXPECT_EQ(bloomCmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(bloomCmd.Events[1].Kind, EventKind::PushConstants);
     EXPECT_EQ(bloomCmd.Events[2].Kind, EventKind::Draw);
+    EXPECT_EQ(bloomCmd.Events[3].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(bloomCmd.Events[4].Kind, EventKind::PushConstants);
+    EXPECT_EQ(bloomCmd.Events[5].Kind, EventKind::Draw);
+    EXPECT_EQ(bloomCmd.LastDrawVertexCount, 3u);
+    EXPECT_EQ(bloomCmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
 
     Graphics::PostProcessHistogramPass histogram{post};
     histogram.SetPipeline(RHI::PipelineHandle{22u, 1u});
