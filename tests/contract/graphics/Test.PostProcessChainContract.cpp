@@ -282,12 +282,21 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     // are bound. The push payloads pack `vec2 InvSrcResolution + float
     // Threshold + int IsFirstMip` for downsample (16B) and `vec2
     // InvCoarserResolution + float FilterRadius + float _pad0` for
-    // upsample (16B), matching the shader std430 layouts.
+    // upsample (16B), matching the shader std430 layouts. The camera UBO
+    // carries non-zero viewport dimensions so the per-stage builders feed
+    // the shaders real per-tap kernel offsets (`InvSrcResolution =
+    // 1 / vec2(W, H)` etc.) — feeding zero dimensions would collapse
+    // every sample tap onto the same texel and silently break the
+    // spatial filter shape.
+    RHI::CameraUBO bloomCamera{};
+    bloomCamera.ViewportWidth = 1280.0f;
+    bloomCamera.ViewportHeight = 720.0f;
+
     Graphics::PostProcessBloomPass bloom{post};
     bloom.SetDownsamplePipeline(RHI::PipelineHandle{21u, 1u});
     bloom.SetUpsamplePipeline(RHI::PipelineHandle{25u, 1u});
     RecordingCommandContext bloomCmd;
-    bloom.Execute(bloomCmd, camera);
+    bloom.Execute(bloomCmd, bloomCamera);
     ASSERT_EQ(bloomCmd.Events.size(), 6u);
     EXPECT_EQ(bloomCmd.Events[0].Kind, EventKind::BindPipeline);
     EXPECT_EQ(bloomCmd.Events[1].Kind, EventKind::PushConstants);
@@ -298,6 +307,22 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_EQ(bloomCmd.LastDrawVertexCount, 3u);
     EXPECT_EQ(bloomCmd.LastPushConstantSize,
               sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
+    // The last push payload is the upsample stage's block; it must carry
+    // a strictly positive `InvCoarserResolution` so the shader's 9-tap
+    // tent filter spans the coarser mip rather than re-reading the
+    // origin texel nine times.
+    ASSERT_EQ(bloomCmd.LastPushConstants.size(),
+              sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
+    Graphics::PostProcessBloomUpsamplePushConstants observedUp{};
+    std::memcpy(&observedUp, bloomCmd.LastPushConstants.data(),
+                sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
+    EXPECT_GT(observedUp.InvCoarserResolution[0], 0.0f)
+        << "Bloom upsample push must feed non-zero `InvCoarserResolution.x` "
+           "so the tent filter spans the coarser mip; a zero offset would "
+           "collapse every tap onto the same texel.";
+    EXPECT_GT(observedUp.InvCoarserResolution[1], 0.0f)
+        << "Bloom upsample push must feed non-zero `InvCoarserResolution.y`.";
+    EXPECT_FLOAT_EQ(observedUp.FilterRadius, 1.0f);
 
     Graphics::PostProcessHistogramPass histogram{post};
     histogram.SetPipeline(RHI::PipelineHandle{22u, 1u});
@@ -319,6 +344,95 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     fxaa.Execute(fxaaCmd, camera);
     ASSERT_EQ(fxaaCmd.Events.size(), 3u);
     EXPECT_EQ(fxaaCmd.Events[2].Kind, EventKind::Draw);
+}
+
+// GRAPHICS-075 Slice B.1 — the downsample push block must carry the
+// shader's real per-tap kernel offsets. A zero `InvSrcResolution` would
+// make every one of the 13 taps in `post_bloom_downsample.frag` read the
+// origin texel, silently collapsing the box filter into a no-op. This
+// test exercises the downsample stage in isolation (only the downsample
+// pipeline is set) so the recorded push payload is unambiguously the
+// downsample block.
+TEST(GraphicsPostProcessChainContract, BloomDownsamplePushFeedsNonZeroInvSrcResolution)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .EnableBloom = true,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1920.0f;
+    camera.ViewportHeight = 1080.0f;
+
+    Graphics::PostProcessBloomPass bloom{post};
+    bloom.SetDownsamplePipeline(RHI::PipelineHandle{40u, 1u});
+    // Intentionally leave the upsample pipeline unset.
+    RecordingCommandContext cmd;
+    bloom.Execute(cmd, camera);
+
+    ASSERT_EQ(cmd.Events.size(), 3u);
+    EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::Draw);
+    EXPECT_EQ(cmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
+    ASSERT_EQ(cmd.LastPushConstants.size(),
+              sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
+
+    Graphics::PostProcessBloomDownsamplePushConstants observed{};
+    std::memcpy(&observed, cmd.LastPushConstants.data(),
+                sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
+    EXPECT_GT(observed.InvSrcResolution[0], 0.0f)
+        << "Bloom downsample push must feed non-zero `InvSrcResolution.x` so the "
+           "13-tap kernel spans real source-mip texels; a zero offset would "
+           "collapse every tap onto the same texel.";
+    EXPECT_GT(observed.InvSrcResolution[1], 0.0f)
+        << "Bloom downsample push must feed non-zero `InvSrcResolution.y`.";
+    EXPECT_FLOAT_EQ(observed.InvSrcResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(observed.InvSrcResolution[1], 1.0f / 1080.0f);
+    EXPECT_EQ(observed.IsFirstMip, 1)
+        << "The first downsample step must enable the soft-threshold knee.";
+}
+
+// GRAPHICS-075 Slice B.1 — when only one of the two bloom pipelines is
+// available (e.g. one fragment shader failed to compile), the helper must
+// still record the surviving stage rather than collapse the whole bloom
+// leg. Asserting in both directions catches the regression where the
+// renderer-side guard required both leases to be valid.
+TEST(GraphicsPostProcessChainContract, BloomRecordsSurvivingStageWhenOnePipelineMissing)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .EnableBloom = true,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 640.0f;
+    camera.ViewportHeight = 360.0f;
+
+    {
+        Graphics::PostProcessBloomPass downsampleOnly{post};
+        downsampleOnly.SetDownsamplePipeline(RHI::PipelineHandle{50u, 1u});
+        RecordingCommandContext cmd;
+        downsampleOnly.Execute(cmd, camera);
+        ASSERT_EQ(cmd.Events.size(), 3u);
+        EXPECT_EQ(cmd.LastPushConstantSize,
+                  sizeof(Graphics::PostProcessBloomDownsamplePushConstants));
+    }
+
+    {
+        Graphics::PostProcessBloomPass upsampleOnly{post};
+        upsampleOnly.SetUpsamplePipeline(RHI::PipelineHandle{51u, 1u});
+        RecordingCommandContext cmd;
+        upsampleOnly.Execute(cmd, camera);
+        ASSERT_EQ(cmd.Events.size(), 3u);
+        EXPECT_EQ(cmd.LastPushConstantSize,
+                  sizeof(Graphics::PostProcessBloomUpsamplePushConstants));
+    }
 }
 
 TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)

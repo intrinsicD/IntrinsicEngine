@@ -64,7 +64,6 @@ namespace Extrinsic::Graphics
 
 	void PostProcessBloomPass::Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
 	{
-		(void)camera;
 		if (!m_PostProcessSystem.IsInitialized() ||
 		    !m_PostProcessSystem.IsStageEnabled(PostProcessStageKind::Bloom))
 		{
@@ -77,25 +76,46 @@ namespace Extrinsic::Graphics
 		// upsample pipeline is available). Both stages early-skip
 		// independently so a partially-published lease pair (e.g. only the
 		// downsample pipeline created) still surfaces structurally without
-		// faulting. Slice B.2 replaces the single-step recording with
-		// per-mip iteration over `BloomScratch.MipLevels` mips, threading
-		// the matching inverse-resolution and `IsFirstMip` flag through the
-		// push payload and emitting the
-		// `ColorAttachment → ShaderRead → ColorAttachment` barriers between
-		// mips.
+		// faulting. Push-payload resolutions are sourced from the
+		// `CameraUBO`'s `ViewportWidth/Height` so the downsample shader's
+		// `vec2 InvSrcResolution = 1 / vec2(W, H)` and the upsample
+		// shader's `vec2 InvCoarserResolution = 1 / vec2(W/2, H/2)`
+		// produce real per-tap kernel offsets even in this placeholder
+		// step — feeding zero dimensions would collapse every sample tap
+		// onto the same texel and silently break the spatial filter shape
+		// the next Vulkan smoke would exercise. Slice B.2 replaces the
+		// single-step recording with per-mip iteration over
+		// `BloomScratch.MipLevels` mips, threading the matching per-mip
+		// inverse-resolution + `IsFirstMip` flag through the push payload
+		// and emitting the `ColorAttachment → ShaderRead → ColorAttachment`
+		// barriers between mips.
 		const PostProcessSettings& settings = m_PostProcessSystem.GetSettings();
+		const auto viewportWidth = static_cast<std::uint32_t>(
+			camera.ViewportWidth > 0.0f ? camera.ViewportWidth : 0.0f);
+		const auto viewportHeight = static_cast<std::uint32_t>(
+			camera.ViewportHeight > 0.0f ? camera.ViewportHeight : 0.0f);
 		if (m_DownsamplePipeline.IsValid())
 		{
+			// First downsample reads `SceneColorHDR` at full viewport
+			// extent and writes mip 1 of `BloomScratch`; `IsFirstMip = 1`
+			// applies the soft-threshold knee.
 			const PostProcessBloomDownsamplePushConstants downPc =
-				BuildPostProcessBloomDownsamplePushConstants(settings, 0u, 0u, true);
+				BuildPostProcessBloomDownsamplePushConstants(
+					settings, viewportWidth, viewportHeight, true);
 			cmd.BindPipeline(m_DownsamplePipeline);
 			cmd.PushConstants(&downPc, sizeof(downPc));
 			cmd.Draw(3u, 1u, 0u, 0u);
 		}
 		if (m_UpsamplePipeline.IsValid())
 		{
+			// Single-step placeholder upsample reads from the coarser
+			// half-viewport mip; Slice B.2's per-mip iteration drives the
+			// actual coarser dimension per upsample step.
+			const std::uint32_t coarserWidth = viewportWidth > 1u ? viewportWidth / 2u : viewportWidth;
+			const std::uint32_t coarserHeight = viewportHeight > 1u ? viewportHeight / 2u : viewportHeight;
 			const PostProcessBloomUpsamplePushConstants upPc =
-				BuildPostProcessBloomUpsamplePushConstants(settings, 0u, 0u);
+				BuildPostProcessBloomUpsamplePushConstants(
+					settings, coarserWidth, coarserHeight);
 			cmd.BindPipeline(m_UpsamplePipeline);
 			cmd.PushConstants(&upPc, sizeof(upPc));
 			cmd.Draw(3u, 1u, 0u, 0u);

@@ -3508,11 +3508,19 @@ namespace Extrinsic::Graphics
         // GRAPHICS-075 Slice B.1 — default-recipe `"PostProcessPass"`
         // umbrella executor route, Bloom leg. Mirrors the tonemap helper
         // above: a non-operational device → `SkippedNonOperational`; a
-        // missing pass / system / both leases → `SkippedUnavailable`;
-        // otherwise the bloom pass records its placeholder downsample +
-        // upsample bind/push/draw and we return `Recorded`. The
-        // `PostProcessBloomPass::Execute` body additionally early-returns
-        // when `IsStageEnabled(Bloom)` is false (i.e. when
+        // missing pass / system → `SkippedUnavailable`; both bloom leases
+        // missing or invalid → `SkippedUnavailable`; otherwise the bloom
+        // pass records its placeholder downsample + upsample bind/push/
+        // draw for whichever stage's lease succeeded and we return
+        // `Recorded`. Crucially the helper requires only ONE valid bloom
+        // pipeline lease to proceed — the per-stage early-skips inside
+        // `PostProcessBloomPass::Execute` independently gate the
+        // downsample and upsample bind/push/draw on their own lease
+        // validity, so a partial pipeline outage (e.g. only the upsample
+        // shader compiles) still records the surviving stage rather than
+        // collapsing the whole bloom leg into a SkippedUnavailable. The
+        // `Execute` body additionally early-returns when
+        // `IsStageEnabled(Bloom)` is false (i.e. when
         // `PostProcessSettings::EnableBloom` is off or the chain is
         // globally disabled), so a disabled bloom chain becomes a
         // structurally-recorded no-op rather than altering the executor's
@@ -3525,12 +3533,15 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
+            const bool hasDownsamplePipeline =
+                m_PostProcessBloomDownsamplePipelineLease.has_value() &&
+                m_PostProcessBloomDownsamplePipelineLease->IsValid();
+            const bool hasUpsamplePipeline =
+                m_PostProcessBloomUpsamplePipelineLease.has_value() &&
+                m_PostProcessBloomUpsamplePipelineLease->IsValid();
             if (!m_PostProcessSystem.has_value() ||
                 !m_PostProcessBloomPass.has_value() ||
-                !m_PostProcessBloomDownsamplePipelineLease.has_value() ||
-                !m_PostProcessBloomDownsamplePipelineLease->IsValid() ||
-                !m_PostProcessBloomUpsamplePipelineLease.has_value() ||
-                !m_PostProcessBloomUpsamplePipelineLease->IsValid())
+                (!hasDownsamplePipeline && !hasUpsamplePipeline))
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
