@@ -59,6 +59,7 @@ target_sources(${target_name}
         Geometry.Overlap.cppm
         Geometry.PCA.cppm
         Geometry.Plane.cppm
+        Geometry.PointCloud.Conversion.cppm
         Geometry.PointCloud.IO.cppm
         Geometry.PointCloud.Utils.cppm
         Geometry.PointCloud.cppm
@@ -117,6 +118,7 @@ target_sources(${target_name}
         Geometry.NormalEstimation.cpp
         Geometry.Octree.cpp
         Geometry.PCA.cpp
+        Geometry.PointCloud.Conversion.cpp
         Geometry.PointCloud.IO.cpp
         Geometry.PointCloud.Utils.cpp
         Geometry.PointCloud.cpp
