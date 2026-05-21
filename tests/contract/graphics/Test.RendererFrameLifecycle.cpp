@@ -16,6 +16,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.FXAA;
+import Extrinsic.Graphics.Pass.PostProcess.SMAA;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.PostProcessSystem;
@@ -119,11 +120,17 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // aliasing the umbrella's color attachment. `AntiAliasing` defaults
     // to `None` so the FXAA `Execute` body emits no bind/push/draw, but
     // the helper still returns `Recorded` under the same "structurally-
-    // recorded no-op" taxonomy. Total Recorded entries: 5 routed
+    // recorded no-op" taxonomy. GRAPHICS-075 Slice D.1 — SMAA fans out
+    // alongside FXAA behind the same `"PostProcessAAPass"` umbrella and
+    // accumulates its own `Recorded` entry per the umbrella's per-helper
+    // accumulator (mutually exclusive with FXAA per
+    // `PostProcessSettings::AntiAliasing`; `AntiAliasing` defaults to
+    // `None` so the SMAA pass body emits no bind/push/draw and the bind
+    // counts below stay at 6). Total Recorded entries: 5 routed
     // (Culling/Depth/Surface/Line/Point) + 2 under `"PostProcessPass"`
-    // (bloom + tonemap) + 1 under `"PostProcessAAPass"` (fxaa) = 8.
+    // (bloom + tonemap) + 2 under `"PostProcessAAPass"` (fxaa + smaa) = 9.
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 8u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -404,11 +411,15 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // publishes the FXAA pipeline lease and the recipe declares the
     // `"PostProcessAAPass"` ordered graph pass (a *separate* umbrella
     // from `PostProcessPass` so the FXAA read of `SceneColorLDR`
-    // crosses a real framegraph read-after-write barrier). Total
-    // `Recorded` climbs to 8: 5 routed + 2 under `PostProcessPass`
-    // (bloom + tonemap) + 1 under `PostProcessAAPass` (fxaa).
+    // crosses a real framegraph read-after-write barrier).
+    // GRAPHICS-075 Slice D.1 — the rebuild also publishes the three
+    // SMAA pipeline leases (edge / blend / resolve) and the SMAA helper
+    // fans out under the same `"PostProcessAAPass"` umbrella alongside
+    // FXAA, adding a second Recorded entry under that pass name. Total
+    // `Recorded` climbs to 9: 5 routed + 2 under `PostProcessPass`
+    // (bloom + tonemap) + 2 under `PostProcessAAPass` (fxaa + smaa).
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 8u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -474,9 +485,13 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // is created last in `InitializeOperationalPassResources()` and is
     // also independent of the depth-prepass failure point, so the
     // *separate* `"PostProcessAAPass"` graph pass adds one more Recorded
-    // entry → total climbs to 7 (4 routed + 2 under PostProcessPass +
-    // 1 under PostProcessAAPass).
-    EXPECT_EQ(stats.CommandRecords.Recorded, 7u);
+    // entry. GRAPHICS-075 Slice D.1 — the three SMAA pipelines are
+    // similarly created independently of the depth-prepass failure
+    // point, so the SMAA helper also fans out under
+    // `"PostProcessAAPass"` and accumulates a second entry → total
+    // climbs to 8 (4 routed + 2 under PostProcessPass + 2 under
+    // PostProcessAAPass).
+    EXPECT_EQ(stats.CommandRecords.Recorded, 8u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -539,8 +554,11 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // a second Recorded entry for the bloom helper. GRAPHICS-075 Slice C
     // — the FXAA pipeline has the same culling-independence, and FXAA
     // now runs in its own `"PostProcessAAPass"` graph pass, so a third
-    // Recorded entry lands under the AA umbrella.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 3u);
+    // Recorded entry lands under the AA umbrella. GRAPHICS-075 Slice
+    // D.1 — the three SMAA pipelines are similarly culling-independent;
+    // SMAA fans out alongside FXAA under `"PostProcessAAPass"` and
+    // accumulates a fourth Recorded entry.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 4u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -2148,6 +2166,125 @@ TEST(RendererFrameLifecycle, PostProcessFXAAPipelineSurvivesOperationalRebuild)
     EXPECT_TRUE(rebuiltPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessFXAAPipelineDesc();
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice D.1 — default-recipe postprocess SMAA pipelines lease +
+// republish. Three pipelines (edge / blend / resolve) created in the
+// `"PostProcessAAPass"` branch alongside FXAA. All three target the
+// current `PostProcess.AATemp` recipe attachment (allocated with
+// `FrameRecipeSizing::BackbufferFormat`); the renderer feeds them
+// `m_BackbufferFormat` for render-pass / pipeline format compatibility
+// with the AA umbrella's single-attachment scope. MockDevice keeps the
+// default `RHI::Format::RGBA8_UNORM`, so all three pipeline descriptors
+// report that format. Slice D.2 retargets edge to `RG8_UNORM` and blend
+// to `RGBA8_UNORM` once the recipe declares
+// `PostProcess.AATemp.{Edges,Weights}` as separate transient resources.
+// Each push block is 16 bytes and mirrors its shader's std430 layout
+// byte-for-byte. Each descriptor must survive
+// `RebuildOperationalResources()` byte-identical.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{298u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialEdgePipeline =
+        renderer->GetPostProcessSMAAEdgePipeline();
+    EXPECT_TRUE(initialEdgePipeline.IsValid());
+    const Extrinsic::RHI::PipelineHandle initialBlendPipeline =
+        renderer->GetPostProcessSMAABlendPipeline();
+    EXPECT_TRUE(initialBlendPipeline.IsValid());
+    const Extrinsic::RHI::PipelineHandle initialResolvePipeline =
+        renderer->GetPostProcessSMAAResolvePipeline();
+    EXPECT_TRUE(initialResolvePipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialEdgeDesc =
+        renderer->GetPostProcessSMAAEdgePipelineDesc();
+    EXPECT_TRUE(initialEdgeDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialEdgeDesc.VertexShaderPath;
+    EXPECT_TRUE(initialEdgeDesc.FragmentShaderPath.ends_with(
+        "shaders/post_smaa_edge.frag.spv"))
+        << initialEdgeDesc.FragmentShaderPath;
+    EXPECT_EQ(initialEdgeDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_EQ(initialEdgeDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
+    EXPECT_FALSE(initialEdgeDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialEdgeDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_FALSE(initialEdgeDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialEdgeDesc.ColorTargetCount, 1u);
+    // Slice D.1: pipeline targets the current `PostProcess.AATemp`
+    // attachment (`BackbufferFormat` = `RGBA8_UNORM` under MockDevice).
+    // Slice D.2 retargets to `RG8_UNORM` once the recipe declares
+    // `AATemp.Edges`.
+    EXPECT_EQ(initialEdgeDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+    EXPECT_EQ(initialEdgeDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    // 16-byte std430 block: `vec2 InvResolution + float EdgeThreshold + float _pad0`.
+    EXPECT_EQ(initialEdgeDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::PostProcessSMAAEdgePushConstants));
+
+    const Extrinsic::RHI::PipelineDesc initialBlendDesc =
+        renderer->GetPostProcessSMAABlendPipelineDesc();
+    EXPECT_TRUE(initialBlendDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialBlendDesc.VertexShaderPath;
+    EXPECT_TRUE(initialBlendDesc.FragmentShaderPath.ends_with(
+        "shaders/post_smaa_blend.frag.spv"))
+        << initialBlendDesc.FragmentShaderPath;
+    EXPECT_EQ(initialBlendDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_FALSE(initialBlendDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialBlendDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialBlendDesc.ColorTargetCount, 1u);
+    // Slice D.1: same `PostProcess.AATemp` attachment as the edge
+    // pipeline; happens to share the backbuffer-format byte shape that
+    // Slice D.2's `AATemp.Weights` will declare, but the dependency must
+    // be on the *recipe* attachment until D.2 lands.
+    EXPECT_EQ(initialBlendDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+    EXPECT_EQ(initialBlendDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    // 16-byte std430 block: `vec2 InvResolution + int MaxSearchSteps + int MaxSearchStepsDiag`.
+    EXPECT_EQ(initialBlendDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::PostProcessSMAABlendPushConstants));
+
+    const Extrinsic::RHI::PipelineDesc initialResolveDesc =
+        renderer->GetPostProcessSMAAResolvePipelineDesc();
+    EXPECT_TRUE(initialResolveDesc.VertexShaderPath.ends_with(
+        "shaders/post_fullscreen.vert.spv"))
+        << initialResolveDesc.VertexShaderPath;
+    EXPECT_TRUE(initialResolveDesc.FragmentShaderPath.ends_with(
+        "shaders/post_smaa_resolve.frag.spv"))
+        << initialResolveDesc.FragmentShaderPath;
+    EXPECT_EQ(initialResolveDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+    EXPECT_FALSE(initialResolveDesc.DepthStencil.DepthTestEnable);
+    EXPECT_FALSE(initialResolveDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialResolveDesc.ColorTargetCount, 1u);
+    // SMAA resolve writes the final anti-aliased LDR to the backbuffer
+    // format; MockDevice keeps the default `RHI::Format::RGBA8_UNORM`.
+    EXPECT_EQ(initialResolveDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+    EXPECT_EQ(initialResolveDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    // 16-byte std430 block: `vec2 InvResolution + float _pad0 + float _pad1`.
+    EXPECT_EQ(initialResolveDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::PostProcessSMAAResolvePushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    EXPECT_TRUE(renderer->GetPostProcessSMAAEdgePipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPostProcessSMAABlendPipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPostProcessSMAAResolvePipeline().IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltEdgeDesc =
+        renderer->GetPostProcessSMAAEdgePipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltBlendDesc =
+        renderer->GetPostProcessSMAABlendPipelineDesc();
+    const Extrinsic::RHI::PipelineDesc rebuiltResolveDesc =
+        renderer->GetPostProcessSMAAResolvePipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialEdgeDesc, rebuiltEdgeDesc));
+    EXPECT_TRUE(PipelineDescBytesEqual(initialBlendDesc, rebuiltBlendDesc));
+    EXPECT_TRUE(PipelineDescBytesEqual(initialResolveDesc, rebuiltResolveDesc));
 
     renderer->Shutdown();
 }
