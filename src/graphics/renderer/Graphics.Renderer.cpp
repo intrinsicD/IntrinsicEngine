@@ -50,6 +50,7 @@ import Extrinsic.Graphics.Pass.Selection.FaceId;
 import Extrinsic.Graphics.Pass.Selection.EdgeId;
 import Extrinsic.Graphics.Pass.Selection.PointId;
 import Extrinsic.Graphics.Pass.Selection.Outline;
+import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
@@ -333,6 +334,13 @@ namespace Extrinsic::Graphics
             m_PostProcessSystem.emplace();
             m_PostProcessSystem->Initialize();
             m_PostProcessToneMapPass.emplace(*m_PostProcessSystem);
+            // GRAPHICS-075 Slice B.1 — same lifetime contract as the
+            // tonemap pass above: emplace after `m_PostProcessSystem` is
+            // initialised and before the operational publisher runs, so
+            // the initial `Initialize()` path can call
+            // `SetDownsamplePipeline(...)` / `SetUpsamplePipeline(...)` on
+            // `m_PostProcessBloomPass`.
+            m_PostProcessBloomPass.emplace(*m_PostProcessSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
@@ -422,6 +430,9 @@ namespace Extrinsic::Graphics
             // dangling `PostProcessSystem&`. Same lifetime contract as the
             // selection / forward / deferred / shadow passes above.
             m_PostProcessToneMapPass.reset();
+            // GRAPHICS-075 Slice B.1 — bloom pass shares the same lifetime
+            // contract as the tonemap pass above.
+            m_PostProcessBloomPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -449,6 +460,11 @@ namespace Extrinsic::Graphics
             m_SelectionPointIdPipelineLease.reset();
             m_SelectionOutlinePipelineLease.reset();
             m_PostProcessToneMapPipelineLease.reset();
+            // GRAPHICS-075 Slice B.1 — drop the bloom pipeline leases
+            // alongside the tonemap lease before the BufferManager /
+            // PipelineManager are torn down below.
+            m_PostProcessBloomDownsamplePipelineLease.reset();
+            m_PostProcessBloomUpsamplePipelineLease.reset();
             // GRAPHICS-074 Slice D.1 — drop the renderer-owned
             // `Picking.Readback` lease before the BufferManager is torn
             // down so the lease's destructor still observes a live manager
@@ -1353,21 +1369,26 @@ namespace Extrinsic::Graphics
                         // `"PostProcessPass"` whenever
                         // `features.EnablePostProcess` is true (its current
                         // unconditional default in
-                        // `DeriveDefaultFrameRecipeFeatures`). Slice A only
-                        // routes ToneMap; the Slices B–E Histogram / Bloom /
-                        // FXAA / SMAA sub-passes will fan out from this same
-                        // branch as their pipelines and helpers land,
-                        // mirroring the GRAPHICS-074 `"PickingPass"` fan-out.
-                        // The status is accumulated under the single
-                        // `"PostProcessPass"` name to keep the executor's
-                        // per-pass status taxonomy the same shape the rest of
-                        // the recipe uses: any sub-pass that records bumps
-                        // the aggregate to `Recorded`; a sub-pass with a
-                        // not-yet-ready pipeline downgrades to
-                        // `SkippedUnavailable` per
+                        // `DeriveDefaultFrameRecipeFeatures`). Slice B.1
+                        // fans out to Bloom (downsample + upsample) before
+                        // ToneMap so the bloom write naturally precedes the
+                        // tonemap read of `PostProcess.BloomScratch` in
+                        // recorded order. Slices C/D/E will add the FXAA /
+                        // SMAA / Histogram sub-passes behind the same
+                        // branch, mirroring the GRAPHICS-074 `"PickingPass"`
+                        // fan-out. The status is accumulated under the
+                        // single `"PostProcessPass"` name to keep the
+                        // executor's per-pass status taxonomy the same
+                        // shape the rest of the recipe uses: any sub-pass
+                        // that records bumps the aggregate to `Recorded`;
+                        // a sub-pass with a not-yet-ready pipeline
+                        // downgrades to `SkippedUnavailable` per
                         // `AccumulateCommandRecordStatus`'s usual rules; a
                         // non-operational device produces
                         // `SkippedNonOperational` uniformly.
+                        const RenderCommandPassStatus bloomStatus =
+                            RecordPostProcessBloomPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, bloomStatus);
                         const RenderCommandPassStatus toneMapStatus =
                             RecordPostProcessToneMapPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, toneMapStatus);
@@ -1674,6 +1695,36 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetPostProcessToneMapPipelineDesc() const noexcept override
         {
             return BuildPostProcessToneMapPipelineDesc(m_BackbufferFormat);
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetPostProcessBloomDownsamplePipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_PostProcessBloomDownsamplePipelineLease.has_value() ||
+                !m_PostProcessBloomDownsamplePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_PostProcessBloomDownsamplePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetPostProcessBloomDownsamplePipelineDesc() const noexcept override
+        {
+            return BuildPostProcessBloomDownsamplePipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetPostProcessBloomUpsamplePipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_PostProcessBloomUpsamplePipelineLease.has_value() ||
+                !m_PostProcessBloomUpsamplePipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_PostProcessBloomUpsamplePipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetPostProcessBloomUpsamplePipelineDesc() const noexcept override
+        {
+            return BuildPostProcessBloomUpsamplePipelineDesc();
         }
 
         [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
@@ -2284,6 +2335,85 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-075 Slice B.1 — default-recipe postprocess bloom
+        // downsample pipeline. Pairs the fullscreen `post_fullscreen.vert.spv`
+        // with `post_bloom_downsample.frag.spv` (samples the prior bloom
+        // mip via `sampler2D uInput`, writes the 13-tap downsample result
+        // into the next mip of `PostProcess.BloomScratch`). The target
+        // format follows the recipe's `BloomScratch` declaration
+        // (`RGBA16_FLOAT`) and there is no depth attachment.
+        //
+        // Push constants: `PushConstantSize =
+        // sizeof(PostProcessBloomDownsamplePushConstants)` (16 bytes,
+        // `vec2 InvSrcResolution + float Threshold + int IsFirstMip`)
+        // mirrors the shader's `layout(push_constant) Push { ... }` block
+        // byte-for-byte under std430. The canonical 20-byte
+        // `PostProcessPushConstants` block shared by other postprocess
+        // stages is intentionally *not* used here per the standing
+        // "Shader push-constant compatibility policy": pushing it would
+        // alias `Gamma` (2.2) onto `Threshold` and `BloomIntensity` onto
+        // `IsFirstMip` (`bit_cast<int>(0.05f)` ≈ 1.04e9 → always-first-mip)
+        // while reading past the shader's declared block.
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessBloomDownsamplePipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_fullscreen.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_bloom_downsample.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessBloomDownsamplePushConstants));
+            desc.DebugName = "Renderer.PostProcess.Bloom.Downsample";
+            return desc;
+        }
+
+        // GRAPHICS-075 Slice B.1 — default-recipe postprocess bloom
+        // upsample pipeline. Pairs `post_fullscreen.vert.spv` with
+        // `post_bloom_upsample.frag.spv` (samples the coarser mip via
+        // `sampler2D uCoarser` + the current downsample mip via
+        // `sampler2D uCurrent`, writes the 9-tap tent-filter accumulation
+        // result into the finer mip of `PostProcess.BloomScratch`). Same
+        // target shape as the downsample pipeline (RGBA16F color,
+        // no depth).
+        //
+        // Push constants: `PushConstantSize =
+        // sizeof(PostProcessBloomUpsamplePushConstants)` (16 bytes,
+        // `vec2 InvCoarserResolution + float FilterRadius + float _pad0`).
+        // Same std430 alias hazard as the downsample pipeline; the canonical
+        // 20-byte block stays out.
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessBloomUpsamplePipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_fullscreen.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_bloom_upsample.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessBloomUpsamplePushConstants));
+            desc.DebugName = "Renderer.PostProcess.Bloom.Upsample";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -2793,6 +2923,56 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] PostProcess.ToneMap pipeline unavailable; default-recipe tonemap recording will be skipped: error={}",
                                 static_cast<int>(postProcessToneMapPipeline.error()));
+            }
+
+            // GRAPHICS-075 Slice B.1 — postprocess bloom downsample +
+            // upsample pipelines. Same reset/republish pattern as the
+            // tonemap pipeline above so a failed `Create()` leaves the
+            // bloom pass in `SkippedUnavailable` (per the independent
+            // early-skips in `PostProcessBloomPass::Execute`) rather than
+            // retaining a stale device handle across rebuilds. Slice B.2
+            // keeps both pipelines and adds per-mip iteration on top.
+            m_PostProcessBloomDownsamplePipelineLease.reset();
+            m_PostProcessBloomUpsamplePipelineLease.reset();
+            if (m_PostProcessBloomPass)
+            {
+                m_PostProcessBloomPass->SetDownsamplePipeline(RHI::PipelineHandle{});
+                m_PostProcessBloomPass->SetUpsamplePipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc postProcessBloomDownsampleDesc =
+                BuildPostProcessBloomDownsamplePipelineDesc();
+            auto postProcessBloomDownsamplePipeline = m_PipelineManager->Create(postProcessBloomDownsampleDesc);
+            if (postProcessBloomDownsamplePipeline.has_value())
+            {
+                m_PostProcessBloomDownsamplePipelineLease.emplace(std::move(*postProcessBloomDownsamplePipeline));
+                if (m_PostProcessBloomPass)
+                {
+                    m_PostProcessBloomPass->SetDownsamplePipeline(
+                        m_PipelineManager->GetDeviceHandle(m_PostProcessBloomDownsamplePipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] PostProcess.Bloom.Downsample pipeline unavailable; default-recipe bloom downsample recording will be skipped: error={}",
+                                static_cast<int>(postProcessBloomDownsamplePipeline.error()));
+            }
+
+            const RHI::PipelineDesc postProcessBloomUpsampleDesc =
+                BuildPostProcessBloomUpsamplePipelineDesc();
+            auto postProcessBloomUpsamplePipeline = m_PipelineManager->Create(postProcessBloomUpsampleDesc);
+            if (postProcessBloomUpsamplePipeline.has_value())
+            {
+                m_PostProcessBloomUpsamplePipelineLease.emplace(std::move(*postProcessBloomUpsamplePipeline));
+                if (m_PostProcessBloomPass)
+                {
+                    m_PostProcessBloomPass->SetUpsamplePipeline(
+                        m_PipelineManager->GetDeviceHandle(m_PostProcessBloomUpsamplePipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] PostProcess.Bloom.Upsample pipeline unavailable; default-recipe bloom upsample recording will be skipped: error={}",
+                                static_cast<int>(postProcessBloomUpsamplePipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -3325,6 +3505,51 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-075 Slice B.1 — default-recipe `"PostProcessPass"`
+        // umbrella executor route, Bloom leg. Mirrors the tonemap helper
+        // above: a non-operational device → `SkippedNonOperational`; a
+        // missing pass / system → `SkippedUnavailable`; both bloom leases
+        // missing or invalid → `SkippedUnavailable`; otherwise the bloom
+        // pass records its placeholder downsample + upsample bind/push/
+        // draw for whichever stage's lease succeeded and we return
+        // `Recorded`. Crucially the helper requires only ONE valid bloom
+        // pipeline lease to proceed — the per-stage early-skips inside
+        // `PostProcessBloomPass::Execute` independently gate the
+        // downsample and upsample bind/push/draw on their own lease
+        // validity, so a partial pipeline outage (e.g. only the upsample
+        // shader compiles) still records the surviving stage rather than
+        // collapsing the whole bloom leg into a SkippedUnavailable. The
+        // `Execute` body additionally early-returns when
+        // `IsStageEnabled(Bloom)` is false (i.e. when
+        // `PostProcessSettings::EnableBloom` is off or the chain is
+        // globally disabled), so a disabled bloom chain becomes a
+        // structurally-recorded no-op rather than altering the executor's
+        // per-pass status taxonomy. Slice B.2 keeps this helper and adds
+        // per-mip iteration with the matching inline barriers.
+        [[nodiscard]] RenderCommandPassStatus RecordPostProcessBloomPass(RHI::ICommandContext& cmd,
+                                                                          const RHI::CameraUBO& camera)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            const bool hasDownsamplePipeline =
+                m_PostProcessBloomDownsamplePipelineLease.has_value() &&
+                m_PostProcessBloomDownsamplePipelineLease->IsValid();
+            const bool hasUpsamplePipeline =
+                m_PostProcessBloomUpsamplePipelineLease.has_value() &&
+                m_PostProcessBloomUpsamplePipelineLease->IsValid();
+            if (!m_PostProcessSystem.has_value() ||
+                !m_PostProcessBloomPass.has_value() ||
+                (!hasDownsamplePipeline && !hasUpsamplePipeline))
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_PostProcessBloomPass->Execute(cmd, camera);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-072 Slice A — default-recipe deferred-mode `"SurfacePass"`
         // route. Reached from the executor lambda when
         // `defaultRecipeUsesDeferred` is true and the active pass is
@@ -3581,6 +3806,9 @@ namespace Extrinsic::Graphics
         // sibling Histogram / Bloom / FXAA / SMAA pass instances behind
         // the same `"PostProcessPass"` umbrella executor branch.
         std::optional<PostProcessToneMapPass> m_PostProcessToneMapPass;
+        // GRAPHICS-075 Slice B.1 — default-recipe postprocess bloom pass.
+        // Same lifetime contract as the tonemap pass above.
+        std::optional<PostProcessBloomPass>   m_PostProcessBloomPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -3601,6 +3829,13 @@ namespace Extrinsic::Graphics
         // `SkippedUnavailable` rather than retaining a stale device handle
         // across rebuilds.
         std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessToneMapPipelineLease;
+        // GRAPHICS-075 Slice B.1 — postprocess bloom downsample + upsample
+        // pipeline leases. Same reset/republish pattern as the tonemap
+        // lease above so a failed `Create()` leaves the bloom helper in
+        // `SkippedUnavailable` rather than retaining a stale device
+        // handle across rebuilds.
+        std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessBloomDownsamplePipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessBloomUpsamplePipelineLease;
         // GRAPHICS-074 Slice D.1 — renderer-owned host-visible `Picking.Readback`
         // buffer. Allocated by `InitializeOperationalPassResources()` when
         // the device first becomes operational and re-used across
