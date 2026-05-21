@@ -658,6 +658,121 @@ static_assert(Graphics::kBloomMipChainLevels == 6u,
               "requires synchronising the architecture doc, the GRAPHICS-075 "
               "slice plan, and this assertion.");
 
+// GRAPHICS-075 Slice C — when `AntiAliasing == FXAA` the FXAA pass body
+// must push a `PostProcessFXAAPushConstants` block whose `InvResolution`
+// matches `1 / vec2(viewportWidth, viewportHeight)`. A zero
+// `InvResolution` would make every neighbour-tap UV in `post_fxaa.frag`
+// collapse onto the center pixel, silently degenerating FXAA into a
+// pass-through. This mirrors Slice B.1's
+// `BloomDownsamplePushFeedsNonZeroInvSrcResolution` for the bloom
+// per-tap kernel offsets.
+TEST(GraphicsPostProcessChainContract, FXAAPushFeedsNonZeroInvResolution)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::FXAA,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1920.0f;
+    camera.ViewportHeight = 1080.0f;
+
+    Graphics::PostProcessFXAAPass fxaa{post};
+    fxaa.SetPipeline(RHI::PipelineHandle{80u, 1u});
+    RecordingCommandContext cmd;
+    fxaa.Execute(cmd, camera);
+
+    ASSERT_EQ(cmd.Events.size(), 3u);
+    EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::Draw);
+    EXPECT_EQ(cmd.LastDrawVertexCount, 3u);
+    // The push payload must be the FXAA-shaped 20-byte block, not the
+    // canonical 20-byte `PostProcessPushConstants` block (which would
+    // alias Exposure/Gamma/etc. onto the FXAA shader's InvResolution/
+    // ContrastThreshold/etc. and produce visually-meaningless output
+    // even though the wire size happens to match).
+    EXPECT_EQ(cmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessFXAAPushConstants));
+    ASSERT_EQ(cmd.LastPushConstants.size(),
+              sizeof(Graphics::PostProcessFXAAPushConstants));
+    Graphics::PostProcessFXAAPushConstants observed{};
+    std::memcpy(&observed, cmd.LastPushConstants.data(),
+                sizeof(Graphics::PostProcessFXAAPushConstants));
+    EXPECT_FLOAT_EQ(observed.InvResolution[0], 1.0f / 1920.0f);
+    EXPECT_FLOAT_EQ(observed.InvResolution[1], 1.0f / 1080.0f);
+    EXPECT_FLOAT_EQ(observed.ContrastThreshold, 0.0312f);
+    EXPECT_FLOAT_EQ(observed.RelativeThreshold, 0.063f);
+    EXPECT_FLOAT_EQ(observed.SubpixelBlending, 0.75f);
+
+    // Cross-check the published builder produces the same byte shape so
+    // future settings extensions cannot drift the pass body away from
+    // the contract.
+    const Graphics::PostProcessFXAAPushConstants built =
+        Graphics::BuildPostProcessFXAAPushConstants(post.GetSettings(),
+                                                    camera.ViewportWidth,
+                                                    camera.ViewportHeight);
+    EXPECT_FLOAT_EQ(built.InvResolution[0], observed.InvResolution[0]);
+    EXPECT_FLOAT_EQ(built.InvResolution[1], observed.InvResolution[1]);
+    EXPECT_FLOAT_EQ(built.ContrastThreshold, observed.ContrastThreshold);
+}
+
+// GRAPHICS-075 Slice C — `PostProcessSettings::AntiAliasing` is the
+// branch selector for the typed AA stages: `FXAA` enables FXAA and
+// keeps SMAA off; `SMAA` does the reverse; `None` disables both. The
+// FXAA pass body must respect the selector and emit no bind/push/draw
+// when the stage is gated off, mirroring the existing SMAA-skipped
+// behavior in `PassesRecordOnlyEnabledStages` (which sets
+// `AntiAliasing = FXAA` and expects the SMAA pass to record empty).
+TEST(GraphicsPostProcessChainContract, FXAASkipsWhenAntiAliasingNotFXAA)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 1280.0f;
+    camera.ViewportHeight = 720.0f;
+
+    // AntiAliasing == None — FXAA must stay silent.
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::None,
+    });
+    Graphics::PostProcessFXAAPass fxaaNone{post};
+    fxaaNone.SetPipeline(RHI::PipelineHandle{81u, 1u});
+    RecordingCommandContext noneCmd;
+    fxaaNone.Execute(noneCmd, camera);
+    EXPECT_TRUE(noneCmd.Events.empty());
+
+    // AntiAliasing == SMAA — FXAA still stays silent (mutually exclusive
+    // per `PostProcessSettings::AntiAliasing`).
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::SMAA,
+    });
+    Graphics::PostProcessFXAAPass fxaaSmaa{post};
+    fxaaSmaa.SetPipeline(RHI::PipelineHandle{82u, 1u});
+    RecordingCommandContext smaaCmd;
+    fxaaSmaa.Execute(smaaCmd, camera);
+    EXPECT_TRUE(smaaCmd.Events.empty());
+
+    // AntiAliasing == FXAA — FXAA records.
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Graphics::PostProcessAntiAliasing::FXAA,
+    });
+    Graphics::PostProcessFXAAPass fxaaActive{post};
+    fxaaActive.SetPipeline(RHI::PipelineHandle{83u, 1u});
+    RecordingCommandContext activeCmd;
+    fxaaActive.Execute(activeCmd, camera);
+    ASSERT_EQ(activeCmd.Events.size(), 3u);
+    EXPECT_EQ(activeCmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(activeCmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(activeCmd.Events[2].Kind, EventKind::Draw);
+}
+
 TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)
 {
     Graphics::PostProcessSystem post;

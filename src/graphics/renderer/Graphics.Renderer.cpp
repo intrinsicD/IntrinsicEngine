@@ -51,6 +51,7 @@ import Extrinsic.Graphics.Pass.Selection.EdgeId;
 import Extrinsic.Graphics.Pass.Selection.PointId;
 import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
+import Extrinsic.Graphics.Pass.PostProcess.FXAA;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
@@ -341,6 +342,17 @@ namespace Extrinsic::Graphics
             // `SetDownsamplePipeline(...)` / `SetUpsamplePipeline(...)` on
             // `m_PostProcessBloomPass`.
             m_PostProcessBloomPass.emplace(*m_PostProcessSystem);
+            // GRAPHICS-075 Slice C — same lifetime contract as the bloom
+            // pass above: emplace after `m_PostProcessSystem` is
+            // initialised and before the operational publisher runs, so
+            // the initial `Initialize()` path can call `SetPipeline(...)`
+            // on `m_PostProcessFXAAPass`. The FXAA leg is gated by
+            // `PostProcessSettings::AntiAliasing == FXAA` inside the pass
+            // body (which `IsStageEnabled` already enforces); the helper
+            // still reports `Recorded` under the umbrella's accumulator
+            // when the stage is disabled, mirroring the bloom helper's
+            // "structurally-recorded no-op" taxonomy.
+            m_PostProcessFXAAPass.emplace(*m_PostProcessSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
@@ -433,6 +445,9 @@ namespace Extrinsic::Graphics
             // GRAPHICS-075 Slice B.1 — bloom pass shares the same lifetime
             // contract as the tonemap pass above.
             m_PostProcessBloomPass.reset();
+            // GRAPHICS-075 Slice C — FXAA pass shares the same lifetime
+            // contract as the bloom + tonemap passes above.
+            m_PostProcessFXAAPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -465,6 +480,10 @@ namespace Extrinsic::Graphics
             // PipelineManager are torn down below.
             m_PostProcessBloomDownsamplePipelineLease.reset();
             m_PostProcessBloomUpsamplePipelineLease.reset();
+            // GRAPHICS-075 Slice C — drop the FXAA pipeline lease alongside
+            // the tonemap + bloom leases above; same teardown ordering
+            // contract.
+            m_PostProcessFXAAPipelineLease.reset();
             // GRAPHICS-074 Slice D.1 — drop the renderer-owned
             // `Picking.Readback` lease before the BufferManager is torn
             // down so the lease's destructor still observes a live manager
@@ -1440,6 +1459,21 @@ namespace Extrinsic::Graphics
                         const RenderCommandPassStatus toneMapStatus =
                             RecordPostProcessToneMapPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, toneMapStatus);
+                        // GRAPHICS-075 Slice C — FXAA fans out *after*
+                        // tonemap so its sampled-image read of the
+                        // tonemapped LDR target sees the freshly-written
+                        // result in recorded order. AA selection is
+                        // driven inside the pass body via
+                        // `IsStageEnabled(FXAA)` (gated by
+                        // `PostProcessSettings::AntiAliasing == FXAA`);
+                        // when AA is set to `None` or `SMAA` the body
+                        // emits no bind/push/draw but the helper still
+                        // returns `Recorded` per the same
+                        // "structurally-recorded no-op" taxonomy the
+                        // bloom helper follows when `EnableBloom = false`.
+                        const RenderCommandPassStatus fxaaStatus =
+                            RecordPostProcessFXAAPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, fxaaStatus);
                     }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
@@ -1773,6 +1807,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetPostProcessBloomUpsamplePipelineDesc() const noexcept override
         {
             return BuildPostProcessBloomUpsamplePipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetPostProcessFXAAPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_PostProcessFXAAPipelineLease.has_value() ||
+                !m_PostProcessFXAAPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_PostProcessFXAAPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetPostProcessFXAAPipelineDesc() const noexcept override
+        {
+            return BuildPostProcessFXAAPipelineDesc(m_BackbufferFormat);
         }
 
         [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
@@ -2462,6 +2511,54 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-075 Slice C — default-recipe postprocess FXAA pipeline.
+        // Pairs `post_fullscreen.vert.spv` with `post_fxaa.frag.spv`
+        // (samples post-tonemap `SceneColorLDR` through one sampled-image
+        // binding plus a linear-clamp sampler, writes the anti-aliased
+        // result back into the recipe's LDR target). The target format
+        // follows the recipe's `SceneColorLDR` declaration (the
+        // backbuffer format `FrameRecipeSizing::BackbufferFormat`), so
+        // the pipeline takes the same `colorFormat` parameter the
+        // tonemap pipeline does. No depth attachment.
+        //
+        // Push constants: `PushConstantSize =
+        // sizeof(PostProcessFXAAPushConstants)` (20 bytes, `vec2
+        // InvResolution + float ContrastThreshold + float
+        // RelativeThreshold + float SubpixelBlending`) mirrors the
+        // shader's `layout(push_constant) Push { ... }` block byte-for-
+        // byte under std430. The canonical 20-byte
+        // `PostProcessPushConstants` block shared by other postprocess
+        // stages is intentionally *not* used here per the standing
+        // "Shader push-constant compatibility policy": pushing the
+        // canonical block would alias `Exposure` (1.0) onto
+        // `InvResolution.x`, `Gamma` (2.2) onto `InvResolution.y`,
+        // `BloomIntensity` (0.05) onto `ContrastThreshold`, etc., and
+        // produce visually-meaningless FXAA output even though the wire
+        // size happens to match.
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessFXAAPipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_fullscreen.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_fxaa.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = colorFormat;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessFXAAPushConstants));
+            desc.DebugName = "Renderer.PostProcess.FXAA";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -3021,6 +3118,38 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] PostProcess.Bloom.Upsample pipeline unavailable; default-recipe bloom upsample recording will be skipped: error={}",
                                 static_cast<int>(postProcessBloomUpsamplePipeline.error()));
+            }
+
+            // GRAPHICS-075 Slice C — postprocess FXAA pipeline. Same
+            // reset/republish pattern as the tonemap + bloom pipelines
+            // above so a failed `Create()` leaves the pass in
+            // `SkippedUnavailable` (per the early-skip inside
+            // `PostProcessFXAAPass::Execute` and the umbrella helper's
+            // `IsValid()` gate) rather than retaining a stale device
+            // handle across rebuilds. The pipeline targets the recipe's
+            // LDR backbuffer format so it stays render-pass-compatible
+            // with the tonemap leg's output target.
+            m_PostProcessFXAAPipelineLease.reset();
+            if (m_PostProcessFXAAPass)
+            {
+                m_PostProcessFXAAPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc postProcessFXAADesc =
+                BuildPostProcessFXAAPipelineDesc(m_BackbufferFormat);
+            auto postProcessFXAAPipeline = m_PipelineManager->Create(postProcessFXAADesc);
+            if (postProcessFXAAPipeline.has_value())
+            {
+                m_PostProcessFXAAPipelineLease.emplace(std::move(*postProcessFXAAPipeline));
+                if (m_PostProcessFXAAPass)
+                {
+                    m_PostProcessFXAAPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_PostProcessFXAAPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] PostProcess.FXAA pipeline unavailable; default-recipe FXAA recording will be skipped: error={}",
+                                static_cast<int>(postProcessFXAAPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -3598,6 +3727,37 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-075 Slice C — default-recipe `"PostProcessPass"`
+        // umbrella FXAA helper. Same status taxonomy as the tonemap +
+        // bloom helpers above: a non-operational device returns
+        // `SkippedNonOperational`; a missing `PostProcessSystem` / pass /
+        // pipeline lease returns `SkippedUnavailable`. Otherwise the
+        // helper calls `PostProcessFXAAPass::Execute(...)`. The pass body
+        // independently gates on `IsStageEnabled(FXAA)` (driven by
+        // `PostProcessSettings::AntiAliasing == FXAA`), so when AA is set
+        // to `None` or `SMAA` the helper still returns `Recorded` even
+        // though the pass body emits no bind/push/draw — the same
+        // "structurally-recorded no-op" taxonomy Slice B.1 added for
+        // `EnableBloom = false`.
+        [[nodiscard]] RenderCommandPassStatus RecordPostProcessFXAAPass(RHI::ICommandContext& cmd,
+                                                                       const RHI::CameraUBO& camera)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_PostProcessSystem.has_value() ||
+                !m_PostProcessFXAAPass.has_value() ||
+                !m_PostProcessFXAAPipelineLease.has_value() ||
+                !m_PostProcessFXAAPipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_PostProcessFXAAPass->Execute(cmd, camera);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-072 Slice A — default-recipe deferred-mode `"SurfacePass"`
         // route. Reached from the executor lambda when
         // `defaultRecipeUsesDeferred` is true and the active pass is
@@ -3857,6 +4017,9 @@ namespace Extrinsic::Graphics
         // GRAPHICS-075 Slice B.1 — default-recipe postprocess bloom pass.
         // Same lifetime contract as the tonemap pass above.
         std::optional<PostProcessBloomPass>   m_PostProcessBloomPass;
+        // GRAPHICS-075 Slice C — default-recipe postprocess FXAA pass.
+        // Same lifetime contract as the tonemap + bloom passes above.
+        std::optional<PostProcessFXAAPass>    m_PostProcessFXAAPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -3884,6 +4047,12 @@ namespace Extrinsic::Graphics
         // handle across rebuilds.
         std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessBloomDownsamplePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessBloomUpsamplePipelineLease;
+        // GRAPHICS-075 Slice C — postprocess FXAA pipeline lease. Same
+        // reset/republish pattern as the tonemap + bloom leases above so
+        // a failed `Create()` leaves the FXAA helper in
+        // `SkippedUnavailable` rather than retaining a stale device
+        // handle across rebuilds.
+        std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessFXAAPipelineLease;
         // GRAPHICS-074 Slice D.1 — renderer-owned host-visible `Picking.Readback`
         // buffer. Allocated by `InitializeOperationalPassResources()` when
         // the device first becomes operational and re-used across

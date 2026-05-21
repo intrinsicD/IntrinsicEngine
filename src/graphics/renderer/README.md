@@ -979,12 +979,46 @@ Concretely:
   transitions interleaved with the down/up chain remain a follow-up
   slice that needs both an `ICommandContext::TextureBarrier(handle,
   mipRange, ...)` RHI extension and per-mip render-pass restarts
-  between iterations. The remaining Slices C/D/E `FXAA` / `SMAA` / `Histogram`
-  helpers fan out from the same umbrella branch (mirroring
-  `GRAPHICS-074`'s `"PickingPass"` fan-out) once their pipelines +
-  retained LUTs + histogram readback drain land, and each is free to
-  define its own pass-local push block where the shader interface
-  demands more than the canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
+  between iterations. `GRAPHICS-075` Slice C adds the FXAA pipeline
+  (vertex `post_fullscreen.vert.spv` + fragment `post_fxaa.frag.spv`,
+  single backbuffer-format color target matching the tonemap leg's
+  `SceneColorLDR` output, no depth, `PushConstantSize =
+  sizeof(PostProcessFXAAPushConstants)` — 20 bytes mirroring the
+  shader's `vec2 InvResolution + float ContrastThreshold + float
+  RelativeThreshold + float SubpixelBlending` std430 push block). The
+  `NullRenderer` owns `m_PostProcessFXAAPass` +
+  `m_PostProcessFXAAPipelineLease`, both republished byte-identical
+  across `RebuildOperationalResources()`. The umbrella branch fans out
+  to `RecordPostProcessFXAAPass(...)` *after*
+  `RecordPostProcessToneMapPass(...)` so the FXAA shader's sampled-image
+  read of the post-tonemap LDR target sees the freshly-written result
+  in recorded order. `BuildPostProcessFXAAPushConstants(settings,
+  viewportWidth, viewportHeight)` derives `InvResolution` from
+  `RHI::CameraUBO::Viewport{Width,Height}` (a zero / negative extent
+  maps to a zero inverse so the shader's neighbour-tap UVs degenerate
+  gracefully) and keeps `ContrastThreshold` / `RelativeThreshold` /
+  `SubpixelBlending` at the FXAA 3.11 quality defaults documented in
+  `assets/shaders/post_fxaa.frag`; future `PostProcessSettings::FXAA*`
+  fields flow through this builder so the pass body and pipeline desc
+  stay unchanged. The canonical 20-byte `PostProcessPushConstants`
+  block is intentionally not reused even though the wire size matches
+  — under std430 it would alias `Exposure` onto `InvResolution.x`,
+  `Gamma` onto `InvResolution.y`, `BloomIntensity` onto
+  `ContrastThreshold`, etc., and produce visually-meaningless FXAA
+  output. The FXAA leg is gated by `PostProcessSettings::AntiAliasing ==
+  FXAA` inside the pass body (which `IsStageEnabled` enforces); `None`
+  or `SMAA` short-circuits `Execute(...)` to a no-op while the helper
+  still returns `Recorded` under the umbrella's accumulator, mirroring
+  the bloom helper's "structurally-recorded no-op" taxonomy when
+  `EnableBloom = false`. The remaining Slices D/E `SMAA` (mutually
+  exclusive with FXAA per `PostProcessSettings::AntiAliasing`, with
+  retained `AreaTex` / `SearchTex` LUTs + exposure-adaptation history
+  buffer) and `Histogram` (compute pipeline + readback drain) helpers
+  fan out from the same umbrella branch (mirroring `GRAPHICS-074`'s
+  `"PickingPass"` fan-out) once their pipelines / retained LUTs /
+  readback drain land, and each is free to define its own pass-local
+  push block where the shader interface demands more than the
+  canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
   postprocess-owned intermediates; concrete Vulkan descriptors/shaders
   remain backend follow-ups. Per `GRAPHICS-013AQ`,

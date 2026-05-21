@@ -23,9 +23,16 @@ Each active task should include:
   Default-recipe postprocess chain wiring (Histogram → Bloom → ToneMap →
   FXAA/SMAA). Promoted from `tasks/backlog/rendering/` on 2026-05-21 as the
   next unblocked Theme A default-recipe leaf after GRAPHICS-074's retirement.
-  Status: in-progress; Slice A (ToneMap pipeline + `"PostProcessPass"`
-  umbrella executor branch routing through `RecordPostProcessToneMapPass`)
-  on branch `claude/setup-agent-workflow-dFrfe`. Slices B–E (bloom, FXAA,
-  SMAA + retained LUTs, histogram compute + readback drain) queued behind
-  Slice A's CPU/null contract gate. Next verification step after Slice A
-  lands: open Slice B for the bloom downsample/upsample pipelines + helper.
+  Status: in-progress; Slices A (ToneMap) and B.1/B.2 (Bloom downsample +
+  upsample + per-mip iteration + recipe-side `BloomScratch.MipLevels`
+  clamping + barrier-sequence contract test) are merged via PRs #902 / #904.
+  Slice C (FXAA pipeline + `RecordPostProcessFXAAPass(...)` umbrella fan-out
+  + 20-byte `PostProcessFXAAPushConstants` std430 push block + contract
+  tests) is landing on branch `claude/setup-agent-workflow-ReViy`; Slices D
+  (SMAA + retained LUTs + exposure-adaptation history buffer) and E
+  (Histogram compute + readback drain) remain queued behind Slice C's
+  CPU/null contract gate. Next verification step after Slice C lands: open
+  Slice D for the SMAA edge/blend/resolve pipelines + retained `AreaTex` /
+  `SearchTex` LUT textures + exposure-adaptation history buffer + recipe-
+  side `PostProcess.AATemp.{Edges,Weights}` rename, behind the same
+  `"PostProcessPass"` umbrella branch.
