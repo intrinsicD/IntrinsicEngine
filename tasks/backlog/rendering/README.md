@@ -612,22 +612,29 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   task's `set 0, binding 1` shorthand to `set 1, binding 1` to match
   `assets/shaders/deferred_lighting.frag` (forward path keeps `set 0,
   binding 1`).
-- [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](../../active/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
-  depends on GRAPHICS-070. **In progress (Slice D next)**. Slice A
-  landed the EntityId selection pipeline + `"PickingPass"` executor
-  route + GpuScene-aware `selection/entity_id.{vert,frag}` shader pair
-  (PR #890; commits `ad2e40d` + `08af46e`, merge `558a75d`). The
-  recipe-side follow-up between Slice A and Slice B then reordered
-  `PickingPass` after `DepthPrepass`, added `Read(SceneDepth, DepthRead)`,
-  gated picking + its `EntityId` / `PrimitiveId` / `Picking.Readback`
-  resources on `pickingActive = EnablePicking && EnableDepthPrepass`
-  (with `EntityId` surviving when `EnableSelectionOutline=true`), and
-  flipped `BuildSelectionEntityIdPipelineDesc()` to depth-equal /
-  `D32_FLOAT` so the picking readback returns nearest-surface IDs
+- [GRAPHICS-074 — Default-recipe selection ID passes, outline pass, and picking readback drain](../../done/GRAPHICS-074-default-recipe-selection-outline-and-picking-readback.md):
+  done (retired 2026-05-21 at `Operational` on the CPU/null gate). Slice A
+  landed the EntityId selection pipeline + `"PickingPass"` executor route +
+  GpuScene-aware `selection/entity_id.{vert,frag}` shader pair (PR #890;
+  commits `ad2e40d` + `08af46e`, merge `558a75d`). The recipe-side
+  follow-up reordered `PickingPass` after `DepthPrepass`, added
+  `Read(SceneDepth, DepthRead)`, gated picking + its `EntityId` /
+  `PrimitiveId` / `Picking.Readback` resources on `pickingActive =
+  EnablePicking && EnableDepthPrepass` (with `EntityId` surviving when
+  `EnableSelectionOutline=true`), and flipped
+  `BuildSelectionEntityIdPipelineDesc()` to depth-equal / `D32_FLOAT`
   (PR #891; commits `dac6f47` + `b78347d`, merge `5b5309d`). Slice B
-  (Face/Edge/Point pipelines) and Slice C (outline pipeline +
-  `"SelectionOutlinePass"` route) have landed; Slice D (`Picking.Readback`
-  buffer + drain + `PublishPickResult` / `PublishNoHit` wiring) remains.
+  added the Face/Edge/Point pipelines + executor fan-out; Slice C added
+  the outline pipeline + `"SelectionOutlinePass"` route; Slice D split
+  into D.1 (renderer-owned host-visible `Picking.Readback` buffer
+  lifecycle), D.2 (recipe-side `ImportBuffer` + per-frame copy + RHI
+  region seam), D.3 (`BeginFrame()`-side drain + `PublishPickResult` /
+  `PublishNoHit` routing), and D.4 (outline push constants sourced from
+  `RenderWorld::Selection`; PR #900, slice commit `b47c459`, merge
+  `7c29e10`). Outstanding portability follow-up: compact
+  `SelectedIds[16]` to a UBO/bindless tail so the outline push block
+  stays <= 128 bytes on hosts at the Vulkan-guaranteed minimum (tracked
+  separately, intentionally out-of-scope here).
 - [GRAPHICS-075 — Default-recipe postprocess chain wiring](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
   depends on GRAPHICS-072 (HDR scene color producer).
 - [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
