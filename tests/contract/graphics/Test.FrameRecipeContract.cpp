@@ -110,6 +110,12 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
         "LinePass",
         "PointPass",
         "PostProcessPass",
+        // GRAPHICS-075 Slice C — FXAA (and Slice D's SMAA) execute in
+        // their own ordered graph pass after `PostProcessPass` so the
+        // AA legs sample the freshly-written `SceneColorLDR` through a
+        // real framegraph read-after-write barrier instead of aliasing
+        // the umbrella's color attachment mid-render-pass.
+        "PostProcessAAPass",
         "ImGuiPass",
         "Present",
     };
@@ -576,6 +582,7 @@ TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeDeclaresTwoPassesInOrderWithS
         EXPECT_NE(pass.Name, std::string_view{"LinePass"});
         EXPECT_NE(pass.Name, std::string_view{"PointPass"});
         EXPECT_NE(pass.Name, std::string_view{"PostProcessPass"});
+        EXPECT_NE(pass.Name, std::string_view{"PostProcessAAPass"});
         EXPECT_NE(pass.Name, std::string_view{"ImGuiPass"});
         EXPECT_NE(pass.Name, std::string_view{"Present"});
     }

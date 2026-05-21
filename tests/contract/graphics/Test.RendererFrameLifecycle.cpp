@@ -113,13 +113,16 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // false so the bloom `Execute` body emits no bind/push/draw, but the
     // helper still returns `Recorded` per the same "structurally-recorded
     // no-op" taxonomy the tonemap helper follows when the chain is
-    // disabled. GRAPHICS-075 Slice C — the umbrella branch now also fans
-    // out to the FXAA helper *after* tonemap. `AntiAliasing` defaults to
-    // `None` so the FXAA `Execute` body emits no bind/push/draw, but the
-    // helper still returns `Recorded` under the same taxonomy. The
-    // umbrella therefore adds three Recorded entries (`PostProcessPass` ×
-    // {bloom, tonemap, fxaa}). Remaining unwired passes still soft-skip
-    // with SkippedUnavailable.
+    // disabled. GRAPHICS-075 Slice C — FXAA runs in its *own* ordered
+    // graph pass (`"PostProcessAAPass"`) so its `SceneColorLDR` read
+    // crosses a real framegraph read-after-write barrier rather than
+    // aliasing the umbrella's color attachment. `AntiAliasing` defaults
+    // to `None` so the FXAA `Execute` body emits no bind/push/draw, but
+    // the helper still returns `Recorded` under the same "structurally-
+    // recorded no-op" taxonomy. Total Recorded entries: 5 routed
+    // (Culling/Depth/Surface/Line/Point) + 2 under `"PostProcessPass"`
+    // (bloom + tonemap) + 1 under `"PostProcessAAPass"` (fxaa) = 8.
+    // Remaining unwired passes still soft-skip with SkippedUnavailable.
     EXPECT_EQ(stats.CommandRecords.Recorded, 8u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
@@ -141,6 +144,12 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    // GRAPHICS-075 Slice C — FXAA runs in its own ordered graph pass so
+    // the framegraph emits a real `SceneColorLDR ColorAttachment →
+    // ShaderRead` barrier between the umbrella render-pass scopes.
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
@@ -392,10 +401,13 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // fans out to the bloom helper too (returning Recorded under the
     // "structurally-recorded no-op" taxonomy even though `EnableBloom`
     // defaults to false). GRAPHICS-075 Slice C — the rebuild also
-    // publishes the FXAA pipeline lease, so the umbrella fans out to the
-    // FXAA helper as well (returning Recorded even though `AntiAliasing`
-    // defaults to `None`). Total `Recorded` climbs to 8. Remaining
-    // unwired passes still soft-skip with SkippedUnavailable.
+    // publishes the FXAA pipeline lease and the recipe declares the
+    // `"PostProcessAAPass"` ordered graph pass (a *separate* umbrella
+    // from `PostProcessPass` so the FXAA read of `SceneColorLDR`
+    // crosses a real framegraph read-after-write barrier). Total
+    // `Recorded` climbs to 8: 5 routed + 2 under `PostProcessPass`
+    // (bloom + tonemap) + 1 under `PostProcessAAPass` (fxaa).
+    // Remaining unwired passes still soft-skip with SkippedUnavailable.
     EXPECT_EQ(stats.CommandRecords.Recorded, 8u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
@@ -416,6 +428,9 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
@@ -458,7 +473,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // out to the bloom helper. GRAPHICS-075 Slice C — the FXAA pipeline
     // is created last in `InitializeOperationalPassResources()` and is
     // also independent of the depth-prepass failure point, so the
-    // umbrella fans out to the FXAA helper too → bumps the count to 7.
+    // *separate* `"PostProcessAAPass"` graph pass adds one more Recorded
+    // entry → total climbs to 7 (4 routed + 2 under PostProcessPass +
+    // 1 under PostProcessAAPass).
     EXPECT_EQ(stats.CommandRecords.Recorded, 7u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
@@ -480,6 +497,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
@@ -517,8 +537,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // GRAPHICS-075 Slice B.1 — the bloom pipelines have the same
     // culling-independence as the tonemap pipeline, so the umbrella adds
     // a second Recorded entry for the bloom helper. GRAPHICS-075 Slice C
-    // — the FXAA pipeline has the same culling-independence, so the
-    // umbrella adds a third Recorded entry for the FXAA helper.
+    // — the FXAA pipeline has the same culling-independence, and FXAA
+    // now runs in its own `"PostProcessAAPass"` graph pass, so a third
+    // Recorded entry lands under the AA umbrella.
     EXPECT_EQ(stats.CommandRecords.Recorded, 3u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
@@ -531,6 +552,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
@@ -607,10 +631,16 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
     static constexpr const char* kRoutedPasses[] = {
         "CullingPass", "DepthPrepass", "SurfacePass", "LinePass", "PointPass",
         // GRAPHICS-075 Slice A — `"PostProcessPass"` is now wired through the
-        // umbrella executor branch (ToneMap leg) and reports `Recorded` on
-        // the operational CPU/null gate. Slices B–E add the bloom / FXAA /
-        // SMAA / histogram sub-passes behind the same umbrella branch.
+        // umbrella executor branch (Bloom + ToneMap legs) and reports
+        // `Recorded` on the operational CPU/null gate.
         "PostProcessPass",
+        // GRAPHICS-075 Slice C — `"PostProcessAAPass"` is a *separate*
+        // ordered graph pass that owns FXAA (Slice C) + SMAA (Slice D)
+        // so the AA legs sample the freshly-written `SceneColorLDR`
+        // through a framegraph read-after-write barrier rather than
+        // aliasing the umbrella's color attachment mid-render-pass.
+        // Slice E adds the Histogram sub-pass behind `PostProcessPass`.
+        "PostProcessAAPass",
     };
     static constexpr const char* kSoftSkippedPasses[] = {
         "ImGuiPass",

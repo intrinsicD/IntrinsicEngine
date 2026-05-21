@@ -988,12 +988,21 @@ Concretely:
   RelativeThreshold + float SubpixelBlending` std430 push block). The
   `NullRenderer` owns `m_PostProcessFXAAPass` +
   `m_PostProcessFXAAPipelineLease`, both republished byte-identical
-  across `RebuildOperationalResources()`. The umbrella branch fans out
-  to `RecordPostProcessFXAAPass(...)` *after*
-  `RecordPostProcessToneMapPass(...)` so the FXAA shader's sampled-image
-  read of the post-tonemap LDR target sees the freshly-written result
-  in recorded order. `BuildPostProcessFXAAPushConstants(settings,
-  viewportWidth, viewportHeight)` derives `InvResolution` from
+  across `RebuildOperationalResources()`. **FXAA runs in its own
+  ordered graph pass** (`"PostProcessAAPass"`) declared by the recipe
+  with `Read(SceneColorLDR, ShaderRead) + Write(PostProcess.AATemp,
+  ColorAttachmentWrite)` so the framegraph compiler emits the
+  `SceneColorLDR ColorAttachment → ShaderRead` transition between the
+  `PostProcessPass` umbrella render-pass scope (bloom + tonemap) and
+  the FXAA umbrella scope. Sharing the `PostProcessPass` umbrella with
+  the tonemap leg would have made FXAA's sampled-image read alias the
+  umbrella's own color attachment mid-render-pass — Vulkan's classic
+  read-after-write feedback hazard. `presentSource` stays on
+  `SceneColorLDR` for now; flipping present routing to consume
+  `PostProcess.AATemp` (or its Slice D `AATemp.Edges` / `AATemp.Weights`
+  SMAA siblings) when AA is enabled is Slice D's recipe-level change.
+  `BuildPostProcessFXAAPushConstants(settings, viewportWidth,
+  viewportHeight)` derives `InvResolution` from
   `RHI::CameraUBO::Viewport{Width,Height}` (a zero / negative extent
   maps to a zero inverse so the shader's neighbour-tap UVs degenerate
   gracefully) and keeps `ContrastThreshold` / `RelativeThreshold` /
@@ -1008,17 +1017,17 @@ Concretely:
   output. The FXAA leg is gated by `PostProcessSettings::AntiAliasing ==
   FXAA` inside the pass body (which `IsStageEnabled` enforces); `None`
   or `SMAA` short-circuits `Execute(...)` to a no-op while the helper
-  still returns `Recorded` under the umbrella's accumulator, mirroring
-  the bloom helper's "structurally-recorded no-op" taxonomy when
-  `EnableBloom = false`. The remaining Slices D/E `SMAA` (mutually
-  exclusive with FXAA per `PostProcessSettings::AntiAliasing`, with
-  retained `AreaTex` / `SearchTex` LUTs + exposure-adaptation history
-  buffer) and `Histogram` (compute pipeline + readback drain) helpers
-  fan out from the same umbrella branch (mirroring `GRAPHICS-074`'s
-  `"PickingPass"` fan-out) once their pipelines / retained LUTs /
-  readback drain land, and each is free to define its own pass-local
-  push block where the shader interface demands more than the
-  canonical 20 bytes. Frame recipe resources `PostProcess.BloomScratch`,
+  still returns `Recorded` under the `"PostProcessAAPass"` accumulator,
+  mirroring the bloom helper's "structurally-recorded no-op" taxonomy
+  when `EnableBloom = false`. SMAA (Slice D) will fan out from the
+  same `"PostProcessAAPass"` umbrella branch alongside FXAA (mutually
+  exclusive per `PostProcessSettings::AntiAliasing`, with retained
+  `AreaTex` / `SearchTex` LUTs + exposure-adaptation history buffer);
+  Histogram (Slice E, compute pipeline + readback drain) fans out
+  behind the existing `"PostProcessPass"` umbrella alongside bloom +
+  tonemap. Each AA stage is free to define its own pass-local push
+  block where the shader interface demands more than the canonical 20
+  bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
   postprocess-owned intermediates; concrete Vulkan descriptors/shaders
   remain backend follow-ups. Per `GRAPHICS-013AQ`,

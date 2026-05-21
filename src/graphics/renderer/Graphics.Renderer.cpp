@@ -1392,18 +1392,24 @@ namespace Extrinsic::Graphics
                         // fans out to Bloom (downsample + upsample) before
                         // ToneMap so the bloom write naturally precedes the
                         // tonemap read of `PostProcess.BloomScratch` in
-                        // recorded order. Slices C/D/E will add the FXAA /
-                        // SMAA / Histogram sub-passes behind the same
-                        // branch, mirroring the GRAPHICS-074 `"PickingPass"`
-                        // fan-out. The status is accumulated under the
-                        // single `"PostProcessPass"` name to keep the
-                        // executor's per-pass status taxonomy the same
-                        // shape the rest of the recipe uses: any sub-pass
-                        // that records bumps the aggregate to `Recorded`;
-                        // a sub-pass with a not-yet-ready pipeline
-                        // downgrades to `SkippedUnavailable` per
-                        // `AccumulateCommandRecordStatus`'s usual rules; a
-                        // non-operational device produces
+                        // recorded order. Slice C splits FXAA into its own
+                        // ordered graph pass (`"PostProcessAAPass"`, see
+                        // the dedicated executor branch below) so the
+                        // FXAA leg samples the freshly-written
+                        // `SceneColorLDR` through a proper framegraph
+                        // read-after-write barrier instead of aliasing
+                        // the umbrella's own color attachment mid-render-
+                        // pass. Slice E will add the Histogram sub-pass
+                        // behind this same branch. The status is
+                        // accumulated under the single `"PostProcessPass"`
+                        // name to keep the executor's per-pass status
+                        // taxonomy the same shape the rest of the recipe
+                        // uses: any sub-pass that records bumps the
+                        // aggregate to `Recorded`; a sub-pass with a
+                        // not-yet-ready pipeline downgrades to
+                        // `SkippedUnavailable` per
+                        // `AccumulateCommandRecordStatus`'s usual rules;
+                        // a non-operational device produces
                         // `SkippedNonOperational` uniformly.
                         // GRAPHICS-075 Slice B.2 — resolve the per-frame
                         // `PostProcess.BloomScratch` transient handle from
@@ -1459,18 +1465,30 @@ namespace Extrinsic::Graphics
                         const RenderCommandPassStatus toneMapStatus =
                             RecordPostProcessToneMapPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, toneMapStatus);
-                        // GRAPHICS-075 Slice C — FXAA fans out *after*
-                        // tonemap so its sampled-image read of the
-                        // tonemapped LDR target sees the freshly-written
-                        // result in recorded order. AA selection is
-                        // driven inside the pass body via
-                        // `IsStageEnabled(FXAA)` (gated by
-                        // `PostProcessSettings::AntiAliasing == FXAA`);
-                        // when AA is set to `None` or `SMAA` the body
-                        // emits no bind/push/draw but the helper still
-                        // returns `Recorded` per the same
+                    }
+                    else if (passName == std::string_view{"PostProcessAAPass"})
+                    {
+                        // GRAPHICS-075 Slice C — FXAA executes in its own
+                        // ordered graph pass after `PostProcessPass`, with
+                        // recipe-level `Read(SceneColorLDR) +
+                        // Write(PostProcess.AATemp)` declarations so the
+                        // framegraph compiler emits the
+                        // `SceneColorLDR ColorAttachment → ShaderRead`
+                        // transition between the two umbrella render-pass
+                        // scopes. Sharing the `PostProcessPass` umbrella
+                        // (as Slice C's first attempt did) would have made
+                        // FXAA's sampled-image read alias the umbrella's
+                        // own color attachment mid-render-pass — Vulkan's
+                        // read-after-write feedback hazard. The AA branch
+                        // is gated by `PostProcessSettings::AntiAliasing ==
+                        // FXAA` inside `PostProcessFXAAPass::Execute` (via
+                        // `IsStageEnabled(FXAA)`); `None` or `SMAA`
+                        // short-circuits the body to a no-op while the
+                        // helper still returns `Recorded` under the same
                         // "structurally-recorded no-op" taxonomy the
                         // bloom helper follows when `EnableBloom = false`.
+                        // SMAA (Slice D) will fan out from this same
+                        // branch alongside FXAA.
                         const RenderCommandPassStatus fxaaStatus =
                             RecordPostProcessFXAAPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, fxaaStatus);

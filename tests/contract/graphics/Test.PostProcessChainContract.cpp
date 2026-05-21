@@ -210,12 +210,65 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresHdrToLdrResources)
     EXPECT_TRUE(Contains(post->Writes, "SceneColorLDR"));
     EXPECT_TRUE(Contains(post->Writes, "PostProcess.BloomScratch"));
     EXPECT_TRUE(Contains(post->Writes, "PostProcess.Histogram"));
-    EXPECT_TRUE(Contains(post->Writes, "PostProcess.AATemp"));
+    // GRAPHICS-075 Slice C — `PostProcess.AATemp` moved to the
+    // `PostProcessAAPass` pass so the FXAA/SMAA legs sample the
+    // freshly-written `SceneColorLDR` through a framegraph
+    // read-after-write barrier (see the new test
+    // `FrameRecipeSplitsAAPassFromPostProcessPass` below).
+    EXPECT_FALSE(Contains(post->Writes, "PostProcess.AATemp"))
+        << "PostProcess.AATemp must move to PostProcessAAPass per Slice C "
+           "so the FXAA leg reads SceneColorLDR via a real read-after-write "
+           "barrier instead of aliasing the umbrella's color attachment.";
 
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp", true));
+}
+
+// GRAPHICS-075 Slice C — the postprocess chain is split into two
+// ordered graph passes so the FXAA/SMAA legs (`PostProcessAAPass`) can
+// sample the freshly-written `SceneColorLDR` through a real framegraph
+// read-after-write barrier rather than aliasing the `PostProcessPass`
+// umbrella's own color attachment mid-render-pass — Vulkan's classic
+// read-after-write feedback hazard. This contract pins the split so
+// future scope creep cannot collapse the FXAA recording back into the
+// umbrella branch without flagging the regression.
+TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAPassFromPostProcessPass)
+{
+    const Graphics::FrameRecipeIntrospection description = Graphics::DescribeDefaultFrameRecipe(Graphics::FrameRecipeFeatures{});
+
+    const auto* aa = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAA);
+    ASSERT_NE(aa, nullptr);
+    EXPECT_TRUE(aa->Enabled);
+    EXPECT_TRUE(Contains(aa->Reads, "SceneColorLDR"))
+        << "PostProcessAAPass must declare a recipe-level Read(SceneColorLDR) "
+           "so the framegraph compiler emits the ColorAttachment → ShaderRead "
+           "transition between PostProcessPass and PostProcessAAPass.";
+    EXPECT_TRUE(Contains(aa->Writes, "PostProcess.AATemp"))
+        << "PostProcessAAPass owns the AATemp write so it cannot also be "
+           "declared on PostProcessPass (the umbrella SceneColorLDR target).";
+
+    Graphics::RenderGraph graph;
+    const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
+        graph,
+        Graphics::FrameRecipeFeatures{},
+        MakeImports(),
+        Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    const auto& compileResult = graph.GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    const std::vector<std::string> order = OrderedPassNames(*compiled);
+    const auto postIt = std::find(order.begin(), order.end(), "PostProcessPass");
+    const auto aaIt = std::find(order.begin(), order.end(), "PostProcessAAPass");
+    ASSERT_NE(postIt, order.end());
+    ASSERT_NE(aaIt, order.end());
+    EXPECT_LT(postIt, aaIt)
+        << "PostProcessAAPass must run after PostProcessPass so the FXAA "
+           "shader's sampled-image read sees the tonemap leg's write.";
 }
 
 TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
@@ -227,6 +280,12 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
     const auto* post = FindPass(description, Graphics::FrameRecipePassKind::PostProcess);
     ASSERT_NE(post, nullptr);
     EXPECT_FALSE(post->Enabled);
+    // GRAPHICS-075 Slice C — `PostProcessAAPass` shares the same
+    // `EnablePostProcess` gate (FXAA / SMAA are postprocess stages),
+    // so disabling postprocess also disables the AA pass.
+    const auto* aa = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAA);
+    ASSERT_NE(aa, nullptr);
+    EXPECT_FALSE(aa->Enabled);
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", false));
@@ -246,6 +305,7 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<std::string> order = OrderedPassNames(*compiled);
     EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessPass"), order.end());
+    EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAAPass"), order.end());
     EXPECT_NE(std::find(order.begin(), order.end(), "Present"), order.end());
 }
 

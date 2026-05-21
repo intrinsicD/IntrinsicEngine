@@ -34,6 +34,7 @@ namespace Extrinsic::Graphics
         Line,
         Point,
         PostProcess,
+        PostProcessAA,
         SelectionOutline,
         DebugView,
         ImGui,

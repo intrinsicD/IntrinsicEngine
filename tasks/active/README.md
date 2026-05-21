@@ -26,8 +26,11 @@ Each active task should include:
   Status: in-progress; Slices A (ToneMap) and B.1/B.2 (Bloom downsample +
   upsample + per-mip iteration + recipe-side `BloomScratch.MipLevels`
   clamping + barrier-sequence contract test) are merged via PRs #902 / #904.
-  Slice C (FXAA pipeline + `RecordPostProcessFXAAPass(...)` umbrella fan-out
-  + 20-byte `PostProcessFXAAPushConstants` std430 push block + contract
+  Slice C (FXAA pipeline + `RecordPostProcessFXAAPass(...)` helper running
+  in its own ordered `"PostProcessAAPass"` graph pass declared with
+  `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph
+  compiler emits the read-after-write barrier the FXAA shader needs +
+  20-byte `PostProcessFXAAPushConstants` std430 push block + contract
   tests) is landing on branch `claude/setup-agent-workflow-ReViy`; Slices D
   (SMAA + retained LUTs + exposure-adaptation history buffer) and E
   (Histogram compute + readback drain) remain queued behind Slice C's
