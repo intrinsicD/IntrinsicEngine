@@ -1145,7 +1145,7 @@ namespace Extrinsic::Graphics
                     }
                     else if (passName == std::string_view{"SelectionOutlinePass"})
                     {
-                        // GRAPHICS-074 Slice C — default-recipe selection
+                        // GRAPHICS-074 Slice C/D.4 — default-recipe selection
                         // outline route. The recipe declares
                         // `SelectionOutlinePass` only when
                         // `features.EnableSelectionOutline` is true (set from
@@ -1157,14 +1157,15 @@ namespace Extrinsic::Graphics
                         // mirrors the selection-ID helpers: non-operational
                         // device → `SkippedNonOperational`; missing pass /
                         // lease → `SkippedUnavailable`; otherwise the
-                        // fullscreen `Bind/Draw(3,1,0,0)` shape records and
-                        // we return `Recorded`. The
-                        // `selection_outline.frag` push block (outline
-                        // color/width/selected-id list) plumbing remains
-                        // future-slice scope alongside the `Picking.Readback`
-                        // drain (Slice D).
+                        // fullscreen `Bind/PushConstants/Draw(3,1,0,0)` shape
+                        // records and we return `Recorded`. Slice D.4 sources
+                        // the `selection_outline.frag` push block from
+                        // `renderWorld.Selection` so the shader sees the
+                        // seeded hovered/selected ids + outline visual style
+                        // instead of the Slice C all-zero placeholder.
                         const RenderCommandPassStatus status =
-                            RecordSelectionOutlinePass(graphicsContext, camera, frame.FrameIndex);
+                            RecordSelectionOutlinePass(graphicsContext, camera, frame.FrameIndex,
+                                                       renderWorld.Selection);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"PickingPass"})
@@ -3110,21 +3111,24 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-074 Slice C — default-recipe `"SelectionOutlinePass"`
+        // GRAPHICS-074 Slice C/D.4 — default-recipe `"SelectionOutlinePass"`
         // route. The recipe only declares the pass when
         // `features.EnableSelectionOutline` is true, so this helper is
         // reached only when at least one selectable entity is present this
         // frame. Mirrors the selection-ID helpers above with the
         // fullscreen-pass shape (no culling/GpuWorld prerequisites since
-        // the pass body is `BindPipeline + Draw(3,1,0,0)`): a non-
-        // operational device → `SkippedNonOperational`; missing pass /
+        // the pass body is `BindPipeline + PushConstants + Draw(3,1,0,0)`):
+        // a non-operational device → `SkippedNonOperational`; missing pass /
         // lease → `SkippedUnavailable`; otherwise
         // `SelectionOutlinePass::Execute` records the fullscreen draw and
-        // we return `Recorded`. The `Picking.Readback` drain +
-        // `PublishPickResult` / `PublishNoHit` wiring remain Slice D scope.
+        // we return `Recorded`. Slice D.4 sources the push payload from
+        // `renderWorld.Selection` so the shader actually sees the seeded
+        // hovered/selected ids and outline style instead of the Slice C
+        // all-zero placeholder.
         [[nodiscard]] RenderCommandPassStatus RecordSelectionOutlinePass(RHI::ICommandContext& cmd,
                                                                           const RHI::CameraUBO& camera,
-                                                                          const std::uint32_t frameIndex)
+                                                                          const std::uint32_t frameIndex,
+                                                                          const SelectionSnapshot& selection)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
@@ -3137,7 +3141,9 @@ namespace Extrinsic::Graphics
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_SelectionOutlinePass->Execute(cmd, camera, frameIndex);
+            const SelectionOutlinePushConstants pushConstants =
+                BuildSelectionOutlinePushConstants(selection);
+            m_SelectionOutlinePass->Execute(cmd, camera, frameIndex, pushConstants);
             return RenderCommandPassStatus::Recorded;
         }
 

@@ -56,6 +56,26 @@ namespace Extrinsic::Graphics
         std::span<const std::uint32_t> SelectedStableIds{};
         std::uint32_t HoveredStableId{0u};
         bool HasHovered{false};
+
+        // GRAPHICS-074 Slice D.4 — outline visual style routed through the
+        // `selection_outline.frag` push block. Defaults mirror the legacy
+        // `Graphics::Passes::SelectionOutlineSettings`: orange selection,
+        // light-blue semi-transparent hover, 2-texel solid outline, subtle
+        // hover fill, no selection fill, and pulse/glow ranges that remain
+        // ignored while `OutlineMode == 0` (Solid). The runtime fills these
+        // when it has user-controlled outline preferences; default-snapshot
+        // frames still produce a visible outline once the recipe declares
+        // `SelectionOutlinePass` (i.e. when a hover or selection exists).
+        glm::vec4     OutlineColor{1.0f, 0.6f, 0.0f, 1.0f};
+        glm::vec4     HoverColor{0.3f, 0.7f, 1.0f, 0.8f};
+        float         OutlineWidth{2.0f};
+        std::uint32_t OutlineMode{0u}; // 0=Solid, 1=Pulse, 2=Glow
+        float         SelectionFillAlpha{0.0f};
+        float         HoverFillAlpha{0.08f};
+        float         PulsePhase{0.0f};
+        float         PulseMin{0.4f};
+        float         PulseMax{1.0f};
+        float         GlowFalloff{2.0f};
     };
 
     export struct ShadowSnapshot
