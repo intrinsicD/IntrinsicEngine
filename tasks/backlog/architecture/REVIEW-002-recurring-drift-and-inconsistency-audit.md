@@ -199,7 +199,7 @@ grep -nE '^\s+task:' tools/repo/layering_allowlist.yaml \
 # Untracked TODO/shim drift (row 7). Window the grep to src/ only; the
 # checklist documents the noise threshold.
 git grep -nE '(TODO|FIXME|XXX|HACK)([^A-Za-z0-9]|$)' -- 'src/**'
-git grep -nE '(shim|backcompat|temporary)' -- 'src/**' 'docs/**'
+git grep -nE '(shim|backcompat|legacy|temporary)' -- 'src/**' 'docs/**'
 ```
 
 The remaining rows (3 — active branch drift; 4 / 5 — `(planned)` and
