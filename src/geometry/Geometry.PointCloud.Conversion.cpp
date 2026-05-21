@@ -126,11 +126,17 @@ namespace Geometry::PointCloud::Conversion
     {
         ToIndexedMeshResult result;
 
-        const std::size_t storageSize = cloud.VerticesSize();
+        // PointCloud::Cloud may be either an owning cloud or a submesh view over
+        // a slice [Offset, Offset+Size) of a backing cloud. Cloud::Handle(i)
+        // builds a backing-storage handle, so the iteration anchor must be the
+        // view offset for views (zero for owning clouds) and the count must be
+        // the view-relative size that VerticesSize() already returns for both.
+        const std::size_t viewOffset = cloud.IsSubmeshView() ? cloud.VertexRange().Offset : 0u;
+        const std::size_t viewSize = cloud.VerticesSize();
         std::size_t omittedDeleted = 0u;
-        for (std::size_t i = 0u; i < storageSize; ++i)
+        for (std::size_t i = 0u; i < viewSize; ++i)
         {
-            const VertexHandle handle = PointCloud::Cloud::Handle(i);
+            const VertexHandle handle = PointCloud::Cloud::Handle(viewOffset + i);
             if (cloud.IsDeleted(handle))
             {
                 ++omittedDeleted;

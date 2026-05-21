@@ -170,3 +170,53 @@ TEST(PointCloudConversion, BorrowedViewWithFacePropertiesEmitsRemapWarning)
     EXPECT_TRUE(HasDiagnostic(cloudResult.Diagnostics, ConversionDiagnosticKind::FacesDropped));
     EXPECT_TRUE(HasDiagnostic(cloudResult.Diagnostics, ConversionDiagnosticKind::AttributeRemapSkipped));
 }
+
+TEST(PointCloudConversion, SubmeshViewHonorsOffsetAndSize)
+{
+    Cloud backing;
+    AddPoint(backing, {0.0f, 0.0f, 0.0f});
+    AddPoint(backing, {1.0f, 0.0f, 0.0f});
+    AddPoint(backing, {2.0f, 0.0f, 0.0f});
+    AddPoint(backing, {3.0f, 0.0f, 0.0f});
+    AddPoint(backing, {4.0f, 0.0f, 0.0f});
+
+    const Cloud view = Cloud::CreateView(backing, Geometry::ElementRange{2u, 2u});
+    ASSERT_TRUE(view.IsSubmeshView());
+    ASSERT_EQ(view.VerticesSize(), 2u);
+
+    const auto soupResult = Geometry::PointCloud::Conversion::ToIndexedMesh(view);
+
+    ASSERT_TRUE(soupResult.Succeeded());
+    EXPECT_TRUE(soupResult.Diagnostics.empty());
+    ASSERT_EQ(soupResult.Mesh.VertexCount(), 2u);
+    EXPECT_EQ(soupResult.Mesh.Position(0u), (glm::vec3{2.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(soupResult.Mesh.Position(1u), (glm::vec3{3.0f, 0.0f, 0.0f}));
+}
+
+TEST(PointCloudConversion, SubmeshViewSkipsDeletedInRangeAndIgnoresDeletedOutsideRange)
+{
+    Cloud backing;
+    AddPoint(backing, {0.0f, 0.0f, 0.0f});
+    AddPoint(backing, {1.0f, 0.0f, 0.0f});
+    AddPoint(backing, {2.0f, 0.0f, 0.0f});
+    AddPoint(backing, {3.0f, 0.0f, 0.0f});
+    AddPoint(backing, {4.0f, 0.0f, 0.0f});
+    backing.DeletePoint(Cloud::Handle(0u));  // outside view
+    backing.DeletePoint(Cloud::Handle(3u));  // inside view
+
+    const Cloud view = Cloud::CreateView(backing, Geometry::ElementRange{2u, 3u});
+    ASSERT_TRUE(view.IsSubmeshView());
+    ASSERT_EQ(view.VerticesSize(), 3u);
+
+    const auto soupResult = Geometry::PointCloud::Conversion::ToIndexedMesh(view);
+
+    ASSERT_TRUE(soupResult.Succeeded());
+    ASSERT_EQ(soupResult.Mesh.VertexCount(), 2u);
+    EXPECT_EQ(soupResult.Mesh.Position(0u), (glm::vec3{2.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(soupResult.Mesh.Position(1u), (glm::vec3{4.0f, 0.0f, 0.0f}));
+    EXPECT_TRUE(HasDiagnostic(soupResult.Diagnostics, ConversionDiagnosticKind::DeletedPointsOmitted));
+    const auto deletedCount = std::ranges::count_if(soupResult.Diagnostics, [](const auto& diagnostic) {
+        return diagnostic.Kind == ConversionDiagnosticKind::DeletedPointsOmitted;
+    });
+    EXPECT_EQ(deletedCount, 1);
+}
