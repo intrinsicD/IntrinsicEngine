@@ -506,30 +506,30 @@ Concretely:
   matching `D32_FLOAT` depth target so the pipeline remains
   render-pass-compatible with the recipe's `Read(SceneDepth, DepthRead)`
   declaration on `"SelectionOutlinePass"`. `PushConstantSize = 144`
-  matches `SelectionOutlinePushConstants` defined in
-  `Passes/Pass.Selection.Outline.cpp`, which mirrors the
+  matches `SelectionOutlinePushConstants` exported from
+  `Passes/Pass.Selection.Outline.cppm`, which mirrors the
   `selection_outline.frag` `layout(push_constant) uniform Push { ... }`
   block byte-for-byte under Vulkan std430 (vec4 OutlineColor + vec4
-  HoverColor + 12 floats/uints + uint[16] SelectedIds). The pass body
-  pushes a zero-initialised instance every frame so the shader never
-  reads stale push-constant memory left by a prior draw; with
-  `SelectedCount = 0`, `HoveredId = 0`, and `OutlineWidth = 0` the
-  fragment shader's early-out fires on every pixel and emits transparent
-  black, keeping the pass a deterministic no-op overlay until the
-  runtime-driven outline state (selected/hovered IDs, colours, width,
-  animation) is plumbed in alongside the Slice D `Picking.Readback`
-  drain. Portability note: 144 bytes exceeds the Vulkan-guaranteed
-  minimum `maxPushConstantsSize` of 128 — reducing the block (e.g.
-  moving `SelectedIds[16]` to a UBO or bindless buffer) is tracked as
-  part of the Slice D outline-state plumbing. The executor's
+  HoverColor + 12 floats/uints + uint[16] SelectedIds). The executor's
   `"SelectionOutlinePass"` branch routes through
   `RecordSelectionOutlinePass(...)` with the standard
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy,
   and is reached only when `features.EnableSelectionOutline` is true
   (`world.Selection.HasHovered ||
-  !world.Selection.SelectedStableIds.empty()`). The
-  `Picking.Readback` buffer + drain +
-  `PublishPickResult`/`PublishNoHit` wiring (Slice D) remain.
+  !world.Selection.SelectedStableIds.empty()`). Slice D.4 lifts the
+  push payload from `RenderWorld::Selection` via
+  `BuildSelectionOutlinePushConstants(...)`: the helper truncates
+  `SelectedStableIds` to `kSelectionOutlineMaxSelectedIds = 16`,
+  gates `HoveredId` on `HasHovered`, and forwards the outline visual
+  style fields (`OutlineColor`/`HoverColor`/`OutlineWidth`/
+  `OutlineMode`/fill alphas/pulse/glow) extended on `SelectionSnapshot`
+  with the legacy `Graphics::Passes::SelectionOutlineSettings`
+  defaults — so a default-snapshot frame with at least one
+  hover/selection still renders a visible orange outline rather than
+  the Slice C transparent-black no-op overlay. Portability note: 144
+  bytes exceeds the Vulkan-guaranteed minimum `maxPushConstantsSize`
+  of 128 — reducing the block (e.g. moving `SelectedIds[16]` into a
+  UBO or bindless buffer) is the tracked portability follow-up.
 - GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
   recipe contract with the stable label `recipe.minimal-debug-surface`. The
   recipe is built by

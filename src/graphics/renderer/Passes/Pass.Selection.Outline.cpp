@@ -1,78 +1,89 @@
 module;
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 
 module Extrinsic.Graphics.Pass.Selection.Outline;
 
 namespace Extrinsic::Graphics
 {
-    namespace
-    {
-        // GRAPHICS-074 Slice C — deterministic push-constant block matching
-        // `assets/shaders/selection_outline.frag`'s `layout(push_constant)
-        // uniform Push { ... }` byte-for-byte under the Vulkan std430 default
-        // layout. Offsets (verified against the GLSL declaration):
-        //
-        //   0   vec4   OutlineColor          (16)
-        //   16  vec4   HoverColor            (16)
-        //   32  float  OutlineWidth          ( 4)
-        //   36  uint   SelectedCount         ( 4)
-        //   40  uint   HoveredId             ( 4)
-        //   44  uint   OutlineMode           ( 4)
-        //   48  float  SelectionFillAlpha    ( 4)
-        //   52  float  HoverFillAlpha        ( 4)
-        //   56  float  PulsePhase            ( 4)
-        //   60  float  PulseMin              ( 4)
-        //   64  float  PulseMax              ( 4)
-        //   68  float  GlowFalloff           ( 4)
-        //   72  uint   _pad0                 ( 4)
-        //   76  uint   _pad1                 ( 4)
-        //   80  uint   SelectedIds[16]       (64)
-        //  144  total
-        //
-        // The pass body pushes a zero-initialised instance so the shader sees
-        // defined values rather than stale push-constant memory left by an
-        // earlier draw. With `SelectedCount == 0u`, `HoveredId == 0u`, and the
-        // outline/hover colours fully transparent, the fragment shader's
-        // early-out (`if (!centerSelected && !centerHovered &&
-        // pc.SelectedCount == 0u && pc.HoveredId == 0u) { outColor = vec4(0);
-        // return; }`) fires on every pixel, so the pass remains a deterministic
-        // no-op overlay until the runtime-driven outline state is plumbed
-        // through (Slice D scope alongside the `Picking.Readback` drain).
-        // Crucially `OutlineWidth` is 0 (not garbage), so the inner
-        // neighbour-sampling loop's `for (r = 1; r <= max(width, 1); ...)`
-        // executes exactly once instead of running for the worst case of
-        // whatever stale bytes happened to be in push memory.
-        //
-        // Size note: 144 bytes exceeds the Vulkan-guaranteed
-        // `maxPushConstantsSize` minimum of 128. Hosts that report exactly
-        // 128 will reject pipeline-layout creation; the CPU/null gate the
-        // renderer runs against does not enforce this. Reducing the block
-        // below 128 (e.g. moving `SelectedIds` to a UBO or a small bindless
-        // structured buffer) is tracked as part of the Slice D outline
-        // wiring follow-up; until then this pipeline is opt-in on hosts that
-        // expose >=144 push bytes (which covers all current desktop Vulkan
-        // implementations).
-        struct alignas(16) SelectionOutlinePushConstants
-        {
-            float         OutlineColor[4]      {0.f, 0.f, 0.f, 0.f};
-            float         HoverColor[4]        {0.f, 0.f, 0.f, 0.f};
-            float         OutlineWidth         {0.f};
-            std::uint32_t SelectedCount        {0u};
-            std::uint32_t HoveredId            {0u};
-            std::uint32_t OutlineMode          {0u};
-            float         SelectionFillAlpha   {0.f};
-            float         HoverFillAlpha       {0.f};
-            float         PulsePhase           {0.f};
-            float         PulseMin             {0.f};
-            float         PulseMax             {0.f};
-            float         GlowFalloff          {0.f};
-            std::uint32_t _pad0                {0u};
-            std::uint32_t _pad1                {0u};
-            std::uint32_t SelectedIds[16]      {};
-        };
+    // GRAPHICS-074 Slice C/D.4 — push-constant block byte layout (Vulkan
+    // std430 default). Offsets (verified against the GLSL declaration in
+    // `assets/shaders/selection_outline.frag`):
+    //
+    //   0   vec4   OutlineColor          (16)
+    //   16  vec4   HoverColor            (16)
+    //   32  float  OutlineWidth          ( 4)
+    //   36  uint   SelectedCount         ( 4)
+    //   40  uint   HoveredId             ( 4)
+    //   44  uint   OutlineMode           ( 4)
+    //   48  float  SelectionFillAlpha    ( 4)
+    //   52  float  HoverFillAlpha        ( 4)
+    //   56  float  PulsePhase            ( 4)
+    //   60  float  PulseMin              ( 4)
+    //   64  float  PulseMax              ( 4)
+    //   68  float  GlowFalloff           ( 4)
+    //   72  uint   _pad0                 ( 4)
+    //   76  uint   _pad1                 ( 4)
+    //   80  uint   SelectedIds[16]       (64)
+    //  144  total
+    //
+    // Slice C introduced this block and pushed a zero-initialised instance so
+    // the shader saw defined values rather than stale push-constant memory
+    // left by an earlier draw. Slice D.4 keeps the same layout but the
+    // renderer's `RecordSelectionOutlinePass` now sources the contents from
+    // `RenderWorld::Selection` via `BuildSelectionOutlinePushConstants`, so
+    // a runtime hover/selection actually drives the outline instead of
+    // remaining a no-op overlay.
+    //
+    // Size note: 144 bytes exceeds the Vulkan-guaranteed
+    // `maxPushConstantsSize` minimum of 128. Hosts that report exactly 128
+    // will reject pipeline-layout creation; the CPU/null gate the renderer
+    // runs against does not enforce this. Reducing the block below 128
+    // (e.g. moving `SelectedIds[16]` to a UBO or a small bindless
+    // structured buffer) is tracked as the portability follow-up under the
+    // outline-state plumbing; until then this pipeline is opt-in on hosts
+    // that expose >=144 push bytes (which covers all current desktop
+    // Vulkan implementations).
+    static_assert(sizeof(SelectionOutlinePushConstants) == 144);
 
-        static_assert(sizeof(SelectionOutlinePushConstants) == 144);
+    SelectionOutlinePushConstants BuildSelectionOutlinePushConstants(
+        const SelectionSnapshot& selection) noexcept
+    {
+        SelectionOutlinePushConstants pc{};
+        pc.OutlineColor[0] = selection.OutlineColor.r;
+        pc.OutlineColor[1] = selection.OutlineColor.g;
+        pc.OutlineColor[2] = selection.OutlineColor.b;
+        pc.OutlineColor[3] = selection.OutlineColor.a;
+        pc.HoverColor[0]   = selection.HoverColor.r;
+        pc.HoverColor[1]   = selection.HoverColor.g;
+        pc.HoverColor[2]   = selection.HoverColor.b;
+        pc.HoverColor[3]   = selection.HoverColor.a;
+        pc.OutlineWidth        = selection.OutlineWidth;
+        // The shader's center/neighbour-hover test compares `pc.HoveredId`
+        // to texelFetch results that are already 0 for "no entity"; gating
+        // on `HasHovered` keeps the implicit-zero case explicit so the
+        // shader's early-out (`pc.HoveredId == 0u` branch) fires
+        // deterministically when the runtime did not publish a hover.
+        pc.HoveredId           = selection.HasHovered ? selection.HoveredStableId : 0u;
+        pc.OutlineMode         = selection.OutlineMode;
+        pc.SelectionFillAlpha  = selection.SelectionFillAlpha;
+        pc.HoverFillAlpha      = selection.HoverFillAlpha;
+        pc.PulsePhase          = selection.PulsePhase;
+        pc.PulseMin            = selection.PulseMin;
+        pc.PulseMax            = selection.PulseMax;
+        pc.GlowFalloff         = selection.GlowFalloff;
+
+        const std::size_t capacity = static_cast<std::size_t>(kSelectionOutlineMaxSelectedIds);
+        const std::size_t available = selection.SelectedStableIds.size();
+        const std::size_t copyCount = std::min(available, capacity);
+        for (std::size_t i = 0; i < copyCount; ++i)
+        {
+            pc.SelectedIds[i] = selection.SelectedStableIds[i];
+        }
+        pc.SelectedCount = static_cast<std::uint32_t>(copyCount);
+        return pc;
     }
 
     void SelectionOutlinePass::SetPipeline(const RHI::PipelineHandle pipeline) noexcept
@@ -89,21 +100,26 @@ namespace Extrinsic::Graphics
                                        const RHI::CameraUBO& camera,
                                        const std::uint32_t frameIndex)
     {
+        // GRAPHICS-074 Slice C compatibility — the no-snapshot overload
+        // continues to push a zero-initialised payload so the shader still
+        // sees defined values when a caller has no `SelectionSnapshot` to
+        // hand (e.g. the pre-Slice-D.4 isolated pass contract test).
+        Execute(cmd, camera, frameIndex, SelectionOutlinePushConstants{});
+    }
+
+    void SelectionOutlinePass::Execute(RHI::ICommandContext& cmd,
+                                       const RHI::CameraUBO& camera,
+                                       const std::uint32_t frameIndex,
+                                       const SelectionOutlinePushConstants& pushConstants)
+    {
         (void)camera;
         (void)frameIndex;
         if (!m_SelectionSystem.IsInitialized() || !m_Pipeline.IsValid())
         {
             return;
         }
-
-        // GRAPHICS-074 Slice C — push deterministic zero defaults before the
-        // fullscreen draw so the fragment shader does not read stale push
-        // memory left by a previous pass. Runtime-driven outline state
-        // (selected entity IDs, hover ID, width/colour/animation) is wired
-        // in alongside the Slice D `Picking.Readback` drain.
-        const SelectionOutlinePushConstants pc{};
         cmd.BindPipeline(m_Pipeline);
-        cmd.PushConstants(&pc, sizeof(pc));
+        cmd.PushConstants(&pushConstants, sizeof(pushConstants));
         cmd.Draw(3u, 1u, 0u, 0u);
     }
 }

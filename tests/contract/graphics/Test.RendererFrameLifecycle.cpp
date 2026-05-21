@@ -5,12 +5,16 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
+import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.SelectionSystem;
@@ -1881,39 +1885,135 @@ TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPres
     ASSERT_NE(outlinePass, nullptr);
     EXPECT_EQ(outlinePass->Status, Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
 
-    // GRAPHICS-074 Slice C — the outline pass must push deterministic
-    // 144-byte zero-initialised push constants before its fullscreen draw
-    // so the shader never reads stale push memory from a prior pass. Walk
-    // the captured `PushConstants(...)` payloads and require at least one
-    // 144-byte all-zero payload (the outline pass's contribution) to
-    // appear; earlier passes in the same frame contribute their own
-    // (`GpuScenePushConstants`, etc.) so we cannot just assert payload
-    // count == 1.
+    // GRAPHICS-074 Slice C/D.4 — the outline pass must push a deterministic
+    // 144-byte `SelectionOutlinePushConstants` block before its fullscreen
+    // draw so the shader never reads stale push memory from a prior pass.
+    // Slice D.4 now sources the payload from `renderWorld.Selection`, so the
+    // recorded bytes match `BuildSelectionOutlinePushConstants(...)` for the
+    // seeded snapshot (rather than the Slice C all-zero placeholder). Walk
+    // the captured `PushConstants(...)` payloads for a 144-byte block that
+    // byte-matches the expected contents — earlier passes in the same frame
+    // contribute their own (`GpuScenePushConstants`, etc.) so we cannot
+    // just assert payload count == 1.
+    const Extrinsic::Graphics::SelectionOutlinePushConstants expected =
+        Extrinsic::Graphics::BuildSelectionOutlinePushConstants(world.Selection);
     bool foundOutlinePush = false;
     for (const std::vector<std::byte>& payload : device.CommandContext.PushConstantPayloads)
     {
-        if (payload.size() != 144u)
+        if (payload.size() != sizeof(Extrinsic::Graphics::SelectionOutlinePushConstants))
         {
             continue;
         }
-        bool allZero = true;
-        for (const std::byte b : payload)
-        {
-            if (b != std::byte{0})
-            {
-                allZero = false;
-                break;
-            }
-        }
-        if (allZero)
+        if (std::memcmp(payload.data(), &expected, sizeof(expected)) == 0)
         {
             foundOutlinePush = true;
             break;
         }
     }
     EXPECT_TRUE(foundOutlinePush)
-        << "SelectionOutlinePass must push a deterministic 144-byte zero-"
-        << "initialised SelectionOutlinePushConstants block before its draw.";
+        << "SelectionOutlinePass must push a 144-byte SelectionOutlinePushConstants "
+        << "block byte-matching BuildSelectionOutlinePushConstants(renderWorld.Selection).";
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-074 Slice D.4 — outline push-constant plumbing from
+// `RenderWorld::Selection`. The default-recipe `"SelectionOutlinePass"`
+// executor route now builds the `selection_outline.frag` push block from the
+// runtime-extracted snapshot via
+// `BuildSelectionOutlinePushConstants(renderWorld.Selection)` and pushes it
+// before `Draw(3,1,0,0)`. Seeding a non-trivial snapshot (multiple selected
+// ids, a hovered id, a non-default outline color/width/mode) and asserting
+// the captured 144-byte push payload byte-matches the helper output
+// exercises:
+//   - SelectedStableIds is copied into `SelectedIds[]` and truncated to the
+//     `kSelectionOutlineMaxSelectedIds` cap (smaller in this test).
+//   - HoveredStableId only lands in `HoveredId` when `HasHovered` is true.
+//   - The outline visual style fields (color/width/mode/fill/pulse/glow) are
+//     plumbed through verbatim under the std430 byte layout the shader
+//     reads (`vec4 OutlineColor + vec4 HoverColor + ...`).
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, SelectionOutlinePushConstantsMatchRecipeInputs)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{295u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+
+    // Seed the snapshot with a recognisable selection set + hover + a
+    // non-default visual style. The backing vector outlives `ExecuteFrame`
+    // since the snapshot's `SelectedStableIds` is a non-owning span.
+    const std::vector<std::uint32_t> selectedIds{11u, 22u, 33u, 44u};
+    world.Selection.SelectedStableIds = std::span<const std::uint32_t>(selectedIds);
+    world.Selection.HasHovered = true;
+    world.Selection.HoveredStableId = 99u;
+    world.Selection.OutlineColor = glm::vec4(0.5f, 0.25f, 0.75f, 1.0f);
+    world.Selection.HoverColor   = glm::vec4(0.10f, 0.90f, 0.40f, 0.50f);
+    world.Selection.OutlineWidth = 3.0f;
+    world.Selection.OutlineMode  = 1u; // Pulse
+    world.Selection.SelectionFillAlpha = 0.20f;
+    world.Selection.HoverFillAlpha     = 0.05f;
+    world.Selection.PulsePhase = 1.25f;
+    world.Selection.PulseMin   = 0.30f;
+    world.Selection.PulseMax   = 0.95f;
+    world.Selection.GlowFalloff = 1.75f;
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* outlinePass =
+        FindCommandPass(stats, "SelectionOutlinePass");
+    ASSERT_NE(outlinePass, nullptr);
+    EXPECT_EQ(outlinePass->Status, Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    // Reference payload computed via the public helper the renderer also
+    // uses. Any divergence between this and the recorded payload indicates
+    // the renderer either failed to forward `renderWorld.Selection` or
+    // diverged from the shader's std430 layout.
+    const Extrinsic::Graphics::SelectionOutlinePushConstants expected =
+        Extrinsic::Graphics::BuildSelectionOutlinePushConstants(world.Selection);
+
+    EXPECT_EQ(expected.SelectedCount, 4u);
+    EXPECT_EQ(expected.HoveredId, 99u);
+    EXPECT_EQ(expected.OutlineMode, 1u);
+    EXPECT_EQ(expected.SelectedIds[0], 11u);
+    EXPECT_EQ(expected.SelectedIds[1], 22u);
+    EXPECT_EQ(expected.SelectedIds[2], 33u);
+    EXPECT_EQ(expected.SelectedIds[3], 44u);
+
+    bool matched = false;
+    for (const std::vector<std::byte>& payload : device.CommandContext.PushConstantPayloads)
+    {
+        if (payload.size() != sizeof(Extrinsic::Graphics::SelectionOutlinePushConstants))
+        {
+            continue;
+        }
+        if (std::memcmp(payload.data(), &expected, sizeof(expected)) == 0)
+        {
+            matched = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(matched)
+        << "Recorded SelectionOutlinePass push payload did not byte-match "
+        << "BuildSelectionOutlinePushConstants(renderWorld.Selection).";
 
     renderer->Shutdown();
 }
