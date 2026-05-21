@@ -1387,19 +1387,25 @@ namespace Extrinsic::Graphics
                         // non-operational device produces
                         // `SkippedNonOperational` uniformly.
                         // GRAPHICS-075 Slice B.2 — resolve the per-frame
-                        // `PostProcess.BloomScratch` transient handle from the
-                        // compiled graph and republish it to the bloom pass
-                        // so `Execute(...)` can emit the inline
-                        // `ColorAttachment ↔ ShaderRead` barriers between
-                        // mip iterations against the correct texture. The
-                        // transient resource may be absent (e.g. when
-                        // `EnablePostProcess = false`); when absent we
-                        // publish `TextureHandle{}` and the pass falls
-                        // back to recording the per-mip bind/push/draw
-                        // sequence without barriers. The lookup walks the
+                        // `PostProcess.BloomScratch` transient handle from
+                        // the compiled graph and republish it to the bloom
+                        // pass alongside the *effective* mip-chain depth
+                        // (clamped via `ComputeBloomMipChainLevels` against
+                        // the current viewport extent — Vulkan rejects
+                        // `mipLevels > floor(log2(max(W, H))) + 1`). The
+                        // recipe-side `BuildDefaultFrameRecipe` declares
+                        // `BloomScratch` with the same helper, so the pass-
+                        // side iteration count matches the allocated
+                        // texture's actual mip range. The lookup walks the
                         // compiled `TextureNames`/`TextureHandles` parallel
-                        // arrays the same way `PickingPass` resolves
-                        // `EntityId`/`PrimitiveId` upstream.
+                        // arrays the same way the picking executor route
+                        // resolves `EntityId`/`PrimitiveId` upstream. When
+                        // the transient resource is absent (e.g. when
+                        // `EnablePostProcess = false`) we publish
+                        // `TextureHandle{}` + a degenerate single-mip count;
+                        // the pass body early-skips the iteration in that
+                        // case rather than recording over a missing
+                        // attachment.
                         if (m_PostProcessBloomPass.has_value())
                         {
                             RHI::TextureHandle bloomScratchHandle{};
@@ -1415,7 +1421,18 @@ namespace Extrinsic::Graphics
                                     break;
                                 }
                             }
-                            m_PostProcessBloomPass->SetBloomScratch(bloomScratchHandle);
+                            const Core::Extent2D bloomExtent = m_Device != nullptr
+                                ? m_Device->GetBackbufferExtent()
+                                : Core::Extent2D{.Width = 1, .Height = 1};
+                            const std::uint32_t bloomWidth = bloomExtent.Width > 0
+                                ? static_cast<std::uint32_t>(bloomExtent.Width)
+                                : 1u;
+                            const std::uint32_t bloomHeight = bloomExtent.Height > 0
+                                ? static_cast<std::uint32_t>(bloomExtent.Height)
+                                : 1u;
+                            const std::uint32_t bloomMipLevels =
+                                ComputeBloomMipChainLevels(bloomWidth, bloomHeight);
+                            m_PostProcessBloomPass->SetBloomScratch(bloomScratchHandle, bloomMipLevels);
                         }
                         const RenderCommandPassStatus bloomStatus =
                             RecordPostProcessBloomPass(graphicsContext, camera);

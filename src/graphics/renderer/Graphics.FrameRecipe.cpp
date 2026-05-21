@@ -481,17 +481,19 @@ namespace Extrinsic::Graphics
         if (features.EnablePostProcess)
         {
             ldr = graph.CreateTexture("SceneColorLDR", ColorTargetDesc(width, height, sizing.BackbufferFormat, "SceneColorLDR"));
-            // GRAPHICS-075 Slice B.2 — `BloomScratch` is a six-mip pyramid per
-            // `docs/architecture/rendering-three-pass.md` ("capped at six mips,
-            // truncating at extents below 8x8"). The pass body iterates the
-            // chain (mip 0 → mip 1 → … → mip N-1 → mip 0) with inline
-            // `ColorAttachment ↔ ShaderRead` barriers between steps, so the
-            // transient must own enough mip storage upfront. `kBloomMipChainLevels`
-            // is the single source of truth for the cap; both the recipe and
-            // `PostProcessBloomPass::Execute` consume it so a recipe-side mip
-            // change cannot drift from the pass-side iteration count.
+            // GRAPHICS-075 Slice B.2 — `BloomScratch` is a mip pyramid capped
+            // at `kBloomMipChainLevels = 6` per
+            // `docs/architecture/rendering-three-pass.md` ("capped at six
+            // mips, truncating at extents below 8x8"). The effective depth
+            // for a given viewport is clamped via `ComputeBloomMipChainLevels`
+            // — Vulkan's `VkImageCreateInfo::mipLevels` rule
+            // (`mipLevels <= floor(log2(max(W, H))) + 1`) would otherwise
+            // fail texture allocation for tiny / minimised viewports.
+            // `PostProcessBloomPass::Execute` consumes the same helper via
+            // `SetBloomScratch(handle, mipLevels)` so the recipe-side
+            // storage and the pass-side iteration stay in lock-step.
             RHI::TextureDesc bloomScratchDesc = ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "PostProcess.BloomScratch");
-            bloomScratchDesc.MipLevels = kBloomMipChainLevels;
+            bloomScratchDesc.MipLevels = ComputeBloomMipChainLevels(width, height);
             postProcessBloomScratch = graph.CreateTexture("PostProcess.BloomScratch", bloomScratchDesc);
             postProcessAATemp = graph.CreateTexture("PostProcess.AATemp", ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp"));
             postProcessHistogram = graph.CreateBuffer("PostProcess.Histogram", RHI::BufferDesc{

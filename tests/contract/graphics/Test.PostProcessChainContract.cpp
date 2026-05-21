@@ -499,21 +499,26 @@ TEST(GraphicsPostProcessChainContract, BloomRecordsSurvivingStageWhenOnePipeline
     }
 }
 
-// GRAPHICS-075 Slice B.2 — when the renderer publishes a valid
+// GRAPHICS-075 Slice B.2 — when the renderer publishes the per-frame
 // `PostProcess.BloomScratch` transient handle to the bloom pass, the
-// per-mip iteration must emit `ColorAttachment ↔ ShaderRead` barriers
-// between each step so the downstream tonemap pass sees the bloom
-// pyramid in `ShaderReadOnly` and intermediate mips transition layouts
-// in lock-step with the down/up chain. The recorded shape (in event
-// order) is:
-//   - `N-1` downsamples: per step `Bind / Push / Draw / Barrier C→S`.
-//   - `N-1` upsamples:   per step `Barrier S→C / Bind / Push / Draw /
-//                                  Barrier C→S`.
-// The trailing `Barrier C→S` on the final upsample (mip 1 → mip 0)
-// leaves mip 0 in `ShaderReadOnly` so the tonemap pass that reads the
-// bloom pyramid root samples the right layout without an extra
-// framegraph-emitted barrier.
-TEST(GraphicsPostProcessChainContract, BloomMipChainBarrierSequence)
+// recorded shape iterates the canonical six-mip pyramid as:
+//   - `M-1` downsamples: per step `Bind / Push / Draw`.
+//   - `M-1` upsamples:   per step `Bind / Push / Draw`.
+// where `M = ComputeBloomMipChainLevels(viewport.W, viewport.H)`,
+// capped at `kBloomMipChainLevels = 6`. The pass body intentionally
+// emits *no* `TextureBarrier(...)` calls — the renderer's
+// `"PostProcessPass"` executor branch keeps a single umbrella render
+// pass active across bloom + tonemap, and Vulkan rejects layout
+// transitions issued inside a render-pass scope on the attachment
+// currently being rendered. Correct per-mip subresource barriers
+// require both an `ICommandContext::TextureBarrier(handle, mipRange,
+// ...)` extension to the RHI and a per-mip render-pass restart between
+// iterations; both are deferred to a follow-up slice. Until then the
+// inter-pass barrier between the bloom and tonemap legs is emitted by
+// the framegraph compiler from the recipe-level `Write(BloomScratch,
+// ColorAttachmentWrite)` / `Read(BloomScratch, ShaderRead)`
+// declarations, which is layout-safe for the whole-texture case.
+TEST(GraphicsPostProcessChainContract, BloomMipChainPerMipIterationShape)
 {
     Graphics::PostProcessSystem post;
     post.Initialize();
@@ -531,62 +536,110 @@ TEST(GraphicsPostProcessChainContract, BloomMipChainBarrierSequence)
     Graphics::PostProcessBloomPass bloom{post};
     bloom.SetDownsamplePipeline(RHI::PipelineHandle{60u, 1u});
     bloom.SetUpsamplePipeline(RHI::PipelineHandle{61u, 1u});
-    bloom.SetBloomScratch(bloomScratch);
+    bloom.SetBloomScratch(bloomScratch, Graphics::kBloomMipChainLevels);
 
     RecordingCommandContext cmd;
     bloom.Execute(cmd, camera);
 
     constexpr std::size_t kBloomChainSteps = Graphics::kBloomMipChainLevels - 1u;
-    // Per-step event counts: downsample = 4 (Bind, Push, Draw, Barrier
-    // C→S), upsample = 5 (Barrier S→C, Bind, Push, Draw, Barrier C→S).
-    constexpr std::size_t kDownsampleStepEvents = 4u;
-    constexpr std::size_t kUpsampleStepEvents = 5u;
-    constexpr std::size_t kExpectedEvents =
-        kBloomChainSteps * kDownsampleStepEvents + kBloomChainSteps * kUpsampleStepEvents;
-    constexpr std::size_t kExpectedBarriers =
-        kBloomChainSteps + 2u * kBloomChainSteps; // 1 trailing per down + (1 leading + 1 trailing) per up
+    constexpr std::size_t kEventsPerStep = 3u;
+    constexpr std::size_t kExpectedEvents = 2u * kBloomChainSteps * kEventsPerStep;
     ASSERT_EQ(cmd.Events.size(), kExpectedEvents);
-    ASSERT_EQ(cmd.TextureBarrierCalls.size(), kExpectedBarriers);
+    EXPECT_TRUE(cmd.TextureBarrierCalls.empty())
+        << "Pass body must not emit TextureBarriers (the umbrella render "
+           "pass is active when Execute(...) runs; layout transitions "
+           "inside a render-pass scope are invalid on Vulkan). The "
+           "inter-pass `ColorAttachment → ShaderReadOnly` transition is "
+           "owned by the framegraph compiler.";
 
-    // Walk the downsample steps: each should appear as
-    // `Bind / Push / Draw / Barrier C→S`.
-    std::size_t eventIndex = 0;
-    std::size_t barrierIndex = 0;
-    for (std::size_t step = 0; step < kBloomChainSteps; ++step)
+    for (std::size_t step = 0; step < 2u * kBloomChainSteps; ++step)
     {
-        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::BindPipeline) << "down step " << step;
-        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::PushConstants) << "down step " << step;
-        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::Draw) << "down step " << step;
-        ASSERT_EQ(cmd.Events[eventIndex++].Kind, EventKind::TextureBarrier) << "down step " << step;
-        const TextureBarrierRecord& barrier = cmd.TextureBarrierCalls[barrierIndex++];
-        EXPECT_EQ(barrier.Texture.Index, bloomScratch.Index) << "down step " << step;
-        EXPECT_EQ(barrier.Before, RHI::TextureLayout::ColorAttachment) << "down step " << step;
-        EXPECT_EQ(barrier.After, RHI::TextureLayout::ShaderReadOnly) << "down step " << step;
+        EXPECT_EQ(cmd.Events[step * kEventsPerStep + 0u].Kind, EventKind::BindPipeline) << "step " << step;
+        EXPECT_EQ(cmd.Events[step * kEventsPerStep + 1u].Kind, EventKind::PushConstants) << "step " << step;
+        EXPECT_EQ(cmd.Events[step * kEventsPerStep + 2u].Kind, EventKind::Draw) << "step " << step;
     }
+}
 
-    // Walk the upsample steps: each should appear as
-    // `Barrier S→C / Bind / Push / Draw / Barrier C→S`.
-    for (std::size_t step = 0; step < kBloomChainSteps; ++step)
-    {
-        ASSERT_EQ(cmd.Events[eventIndex++].Kind, EventKind::TextureBarrier) << "up step " << step << " leading";
-        const TextureBarrierRecord& leading = cmd.TextureBarrierCalls[barrierIndex++];
-        EXPECT_EQ(leading.Texture.Index, bloomScratch.Index) << "up step " << step << " leading";
-        EXPECT_EQ(leading.Before, RHI::TextureLayout::ShaderReadOnly) << "up step " << step << " leading";
-        EXPECT_EQ(leading.After, RHI::TextureLayout::ColorAttachment) << "up step " << step << " leading";
+// GRAPHICS-075 Slice B.2 — Vulkan's `VkImageCreateInfo::mipLevels`
+// rule (`mipLevels <= floor(log2(max(W, H))) + 1`) forbids declaring
+// six mips for tiny viewports: a 16x16 viewport only supports five
+// legal mips, an 8x8 four, and a 1x1 a single mip. The recipe-side
+// `BuildDefaultFrameRecipe` calls `ComputeBloomMipChainLevels(width,
+// height)` to clamp `RHI::TextureDesc::MipLevels`, and the renderer
+// passes the same clamped value to `SetBloomScratch(...)` so the
+// pass's iteration count never exceeds the texture's actual mip
+// range. This test exercises the helper across the boundary sizes
+// that matter (large enough → cap at 6, small → clamped, 0 →
+// degenerate single mip).
+TEST(GraphicsPostProcessChainContract, BloomMipChainClampedToVulkanMipRule)
+{
+    // Large viewports: clamp at the canonical six-mip cap.
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(1920u, 1080u), 6u);
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(1280u, 720u), 6u);
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(64u, 64u), 6u);
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(32u, 32u), 6u);
 
-        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::BindPipeline) << "up step " << step;
-        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::PushConstants) << "up step " << step;
-        EXPECT_EQ(cmd.Events[eventIndex++].Kind, EventKind::Draw) << "up step " << step;
+    // Boundary case: 16x16 supports exactly 5 legal mips
+    // (floor(log2(16)) + 1 = 5).
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(16u, 16u), 5u);
+    // Asymmetric tiny extent — the helper uses the *max* dimension.
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(16u, 4u), 5u);
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(4u, 16u), 5u);
 
-        ASSERT_EQ(cmd.Events[eventIndex++].Kind, EventKind::TextureBarrier) << "up step " << step << " trailing";
-        const TextureBarrierRecord& trailing = cmd.TextureBarrierCalls[barrierIndex++];
-        EXPECT_EQ(trailing.Texture.Index, bloomScratch.Index) << "up step " << step << " trailing";
-        EXPECT_EQ(trailing.Before, RHI::TextureLayout::ColorAttachment) << "up step " << step << " trailing";
-        EXPECT_EQ(trailing.After, RHI::TextureLayout::ShaderReadOnly) << "up step " << step << " trailing";
-    }
+    // Very small extents.
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(8u, 8u), 4u);
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(4u, 4u), 3u);
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(2u, 2u), 2u);
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(1u, 1u), 1u);
 
-    EXPECT_EQ(eventIndex, cmd.Events.size());
-    EXPECT_EQ(barrierIndex, cmd.TextureBarrierCalls.size());
+    // Degenerate / zero extents normalise to a single mip (matching
+    // `BuildDefaultFrameRecipe`'s `ClampExtent` convention).
+    EXPECT_EQ(Graphics::ComputeBloomMipChainLevels(0u, 0u), 1u);
+}
+
+// GRAPHICS-075 Slice B.2 — when the runtime extent is small enough
+// that `ComputeBloomMipChainLevels` clamps below the canonical six,
+// the pass's iteration count must follow the clamped storage; iterating
+// more steps than the texture has mips would silently re-draw past the
+// allocated range.
+TEST(GraphicsPostProcessChainContract, BloomPassIterationFollowsClampedMipCount)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .EnableBloom = true,
+    });
+
+    RHI::CameraUBO camera{};
+    camera.ViewportWidth = 16.0f;
+    camera.ViewportHeight = 16.0f;
+
+    const std::uint32_t mipLevels = Graphics::ComputeBloomMipChainLevels(16u, 16u);
+    ASSERT_EQ(mipLevels, 5u);
+
+    Graphics::PostProcessBloomPass bloom{post};
+    bloom.SetDownsamplePipeline(RHI::PipelineHandle{70u, 1u});
+    bloom.SetUpsamplePipeline(RHI::PipelineHandle{71u, 1u});
+    bloom.SetBloomScratch(RHI::TextureHandle{0xB10Du, 1u}, mipLevels);
+
+    RecordingCommandContext cmd;
+    bloom.Execute(cmd, camera);
+
+    const std::size_t chainSteps = mipLevels - 1u;  // 4 down + 4 up
+    EXPECT_EQ(cmd.Events.size(), 2u * chainSteps * 3u);
+    EXPECT_TRUE(cmd.TextureBarrierCalls.empty());
+
+    // A single-mip degenerate pyramid leaves no down/up chain to
+    // iterate; the pass must record nothing rather than emit a
+    // self-overwriting placeholder draw.
+    Graphics::PostProcessBloomPass degenerate{post};
+    degenerate.SetDownsamplePipeline(RHI::PipelineHandle{72u, 1u});
+    degenerate.SetUpsamplePipeline(RHI::PipelineHandle{73u, 1u});
+    degenerate.SetBloomScratch(RHI::TextureHandle{0xB10Eu, 1u}, 1u);
+    RecordingCommandContext degenerateCmd;
+    degenerate.Execute(degenerateCmd, camera);
+    EXPECT_TRUE(degenerateCmd.Events.empty());
 }
 
 // GRAPHICS-075 Slice B.2 — the canonical bloom mip-chain depth is six
