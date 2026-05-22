@@ -8,6 +8,10 @@ import Geometry.RobustPredicates;
 
 namespace
 {
+    using Geometry::RobustPredicates::ApproxZeroLen;
+    using Geometry::RobustPredicates::ApproxZeroLenDiagnostic;
+    using Geometry::RobustPredicates::ApproxZeroSq;
+    using Geometry::RobustPredicates::ApproxZeroSqDiagnostic;
     using Geometry::RobustPredicates::BarycentricRegion;
     using Geometry::RobustPredicates::BarycentricResult;
     using Geometry::RobustPredicates::Certainty;
@@ -34,6 +38,102 @@ TEST(RobustPredicatesScaledEpsilon, ZeroScaleStillReturnsPositiveFloor)
 TEST(RobustPredicatesScaledEpsilon, GrowsWithScale)
 {
     EXPECT_LT(ScaledEpsilon(1.0), ScaledEpsilon(1.0e6));
+}
+
+// -----------------------------------------------------------------------------
+// Scale-aware zero-magnitude helpers (GEOM-015 Slice 1).
+// -----------------------------------------------------------------------------
+
+TEST(RobustPredicatesApproxZero, ExactZeroIsCertainZeroAtAnyScale)
+{
+    for (const double scale : {1.0e-6, 1.0, 1.0e6})
+    {
+        const auto sq = ApproxZeroSqDiagnostic(0.0, scale);
+        EXPECT_EQ(sq.Sign, Sign::Zero);
+        EXPECT_EQ(sq.Certainty, Certainty::Certain);
+        EXPECT_TRUE(ApproxZeroSq(0.0, scale));
+
+        const auto len = ApproxZeroLenDiagnostic(0.0, scale);
+        EXPECT_EQ(len.Sign, Sign::Zero);
+        EXPECT_EQ(len.Certainty, Certainty::Certain);
+        EXPECT_TRUE(ApproxZeroLen(0.0, scale));
+    }
+}
+
+TEST(RobustPredicatesApproxZero, OrdinaryMagnitudeIsCertainPositive)
+{
+    // Ordinary 1.0-length vector at unit scale is well above the certain
+    // band by any reasonable relative tolerance.
+    const auto sq = ApproxZeroSqDiagnostic(1.0, 1.0);
+    EXPECT_EQ(sq.Sign, Sign::Positive);
+    EXPECT_EQ(sq.Certainty, Certainty::Certain);
+    EXPECT_GT(sq.FilterBound, 0.0);
+    EXPECT_FALSE(ApproxZeroSq(1.0, 1.0));
+
+    const auto len = ApproxZeroLenDiagnostic(1.0, 1.0);
+    EXPECT_EQ(len.Sign, Sign::Positive);
+    EXPECT_EQ(len.Certainty, Certainty::Certain);
+    EXPECT_FALSE(ApproxZeroLen(1.0, 1.0));
+}
+
+TEST(RobustPredicatesApproxZero, InsideBandIsUncertainPositive)
+{
+    // At scale = 1.0 with the default relative = 1e-9 the linear filter
+    // bound is ~1e-9 and the squared bound is ~1e-18; pick magnitudes
+    // safely inside both bands.
+    const auto len = ApproxZeroLenDiagnostic(1.0e-12, 1.0);
+    EXPECT_EQ(len.Sign, Sign::Positive);
+    EXPECT_EQ(len.Certainty, Certainty::Uncertain);
+    EXPECT_TRUE(ApproxZeroLen(1.0e-12, 1.0));
+
+    const auto sq = ApproxZeroSqDiagnostic(1.0e-24, 1.0);
+    EXPECT_EQ(sq.Sign, Sign::Positive);
+    EXPECT_EQ(sq.Certainty, Certainty::Uncertain);
+    EXPECT_TRUE(ApproxZeroSq(1.0e-24, 1.0));
+}
+
+TEST(RobustPredicatesApproxZero, ScaleAdaptsBandSize)
+{
+    // At a large scale, magnitudes that would be "certain non-zero" at
+    // unit scale slip into the band; at a small scale the band shrinks
+    // and the same magnitude becomes certain.
+    const double mag = 1.0e-5;
+    EXPECT_FALSE(ApproxZeroLen(mag, 1.0));       // ordinary at unit scale
+    EXPECT_TRUE (ApproxZeroLen(mag, 1.0e6));     // band ~1e-3 at this scale
+    EXPECT_FALSE(ApproxZeroLen(mag, 1.0e-9));    // band shrinks; mag stands out
+
+    const double magSq = mag * mag;
+    EXPECT_FALSE(ApproxZeroSq(magSq, 1.0));
+    EXPECT_TRUE (ApproxZeroSq(magSq, 1.0e6));
+    EXPECT_FALSE(ApproxZeroSq(magSq, 1.0e-9));
+}
+
+TEST(RobustPredicatesApproxZero, NegativeInputsAreTreatedAsMagnitude)
+{
+    // Signed length inputs are sometimes used by callers; the helpers
+    // operate on |length| and squared inputs are clamped at zero to
+    // preserve the squared-magnitude contract.
+    EXPECT_TRUE(ApproxZeroLen(-0.0, 1.0));
+    EXPECT_FALSE(ApproxZeroLen(-1.0, 1.0));
+    EXPECT_TRUE(ApproxZeroSq(-1.0e-20, 1.0));
+
+    const auto len = ApproxZeroLenDiagnostic(-1.0, 1.0);
+    EXPECT_EQ(len.Sign, Sign::Positive);
+    EXPECT_GT(len.Value, 0.0);
+}
+
+TEST(RobustPredicatesApproxZero, FilterBoundMatchesScaledEpsilon)
+{
+    // The diagnostic record exposes the filter bound so callers can
+    // reproduce / report the decision. Confirm it tracks `ScaledEpsilon`
+    // exactly.
+    const double scale = 7.5;
+    const double relative = 1.0e-8;
+    const auto len = ApproxZeroLenDiagnostic(1.0, scale, relative);
+    EXPECT_EQ(len.FilterBound, ScaledEpsilon(scale, relative));
+
+    const auto sq = ApproxZeroSqDiagnostic(1.0, scale, relative);
+    EXPECT_EQ(sq.FilterBound, ScaledEpsilon(scale, relative) * ScaledEpsilon(scale, relative));
 }
 
 // -----------------------------------------------------------------------------

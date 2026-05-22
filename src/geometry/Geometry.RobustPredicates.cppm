@@ -157,6 +157,110 @@ export namespace Geometry::RobustPredicates
     }
 
     // -----------------------------------------------------------------------
+    // Scale-aware zero-magnitude tests (GEOM-015 Slice 1).
+    // -----------------------------------------------------------------------
+    //
+    // GJK / Support-style code repeatedly asks "is this squared length /
+    // length effectively zero at the local primitive scale?". These helpers
+    // formalize that question against the same `ScaledEpsilon` policy used
+    // by the other predicates in this module and return a
+    // `SignedResult`-shaped diagnostic so callers can record the filter
+    // bound that was actually used. A bare boolean overload is provided for
+    // the common branch-style callsites (e.g. zero-vector guards in support
+    // primitives) that do not need the diagnostic record.
+    //
+    // Semantics:
+    // - `ApproxZeroSq(valueSq, scale, relative)` decides whether a squared
+    //   magnitude is inside the certain-zero band. The filter bound is
+    //   `eps * eps` so the comparison is performed in squared space and
+    //   matches the conventional `length2(v) <= EPS * EPS` pattern.
+    // - `ApproxZeroLen(length, scale, relative)` is the linear-magnitude
+    //   form and uses `eps` directly. Negative `length` inputs are treated
+    //   as their absolute value (callers occasionally pass signed
+    //   magnitudes).
+    // - When the value is exactly representable zero the result reports
+    //   `Sign::Zero` / `Certainty::Certain` regardless of scale; otherwise
+    //   the result reports `Sign::Positive` plus `Certainty::Certain` when
+    //   the magnitude is strictly above the filter, and `Sign::Positive`
+    //   plus `Certainty::Uncertain` when it sits inside the band but is
+    //   non-zero in floating-point.
+    [[nodiscard]] inline SignedResult ApproxZeroSqDiagnostic(double valueSq,
+                                                             double scale,
+                                                             double relative = 1.0e-9) noexcept
+    {
+        const double eps = ScaledEpsilon(scale, relative);
+        const double bound = eps * eps;
+        const double v = valueSq < 0.0 ? 0.0 : valueSq; // squared magnitudes are non-negative by contract
+        SignedResult result{};
+        result.Value = v;
+        result.FilterBound = bound;
+        if (v == 0.0)
+        {
+            result.Sign = Sign::Zero;
+            result.Certainty = Certainty::Certain;
+        }
+        else if (v > bound)
+        {
+            result.Sign = Sign::Positive;
+            result.Certainty = Certainty::Certain;
+        }
+        else
+        {
+            // Inside the certain-zero band; non-zero in floating-point but
+            // not reliably distinguishable from zero at this scale.
+            result.Sign = Sign::Positive;
+            result.Certainty = Certainty::Uncertain;
+        }
+        return result;
+    }
+
+    [[nodiscard]] inline SignedResult ApproxZeroLenDiagnostic(double length,
+                                                              double scale,
+                                                              double relative = 1.0e-9) noexcept
+    {
+        const double eps = ScaledEpsilon(scale, relative);
+        const double v = length < 0.0 ? -length : length;
+        SignedResult result{};
+        result.Value = v;
+        result.FilterBound = eps;
+        if (v == 0.0)
+        {
+            result.Sign = Sign::Zero;
+            result.Certainty = Certainty::Certain;
+        }
+        else if (v > eps)
+        {
+            result.Sign = Sign::Positive;
+            result.Certainty = Certainty::Certain;
+        }
+        else
+        {
+            result.Sign = Sign::Positive;
+            result.Certainty = Certainty::Uncertain;
+        }
+        return result;
+    }
+
+    // Bare boolean overloads for the common branch-style callsites. A value
+    // is considered approximately zero iff it lies in the certain-zero band
+    // (`Sign::Zero` or `Certainty::Uncertain` from the diagnostic forms).
+    [[nodiscard]] inline bool ApproxZeroSq(double valueSq, double scale,
+                                           double relative = 1.0e-9) noexcept
+    {
+        const double eps = ScaledEpsilon(scale, relative);
+        const double v = valueSq < 0.0 ? 0.0 : valueSq;
+        return v <= eps * eps;
+    }
+
+    [[nodiscard]] inline bool ApproxZeroLen(double length, double scale,
+                                            double relative = 1.0e-9) noexcept
+    {
+        const double eps = ScaledEpsilon(scale, relative);
+        const double v = length < 0.0 ? -length : length;
+        return v <= eps;
+    }
+
+    // -----------------------------------------------------------------------
     // 2D orientation predicate.
     // -----------------------------------------------------------------------
     //
