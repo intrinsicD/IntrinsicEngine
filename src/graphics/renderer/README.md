@@ -1076,9 +1076,38 @@ Concretely:
   these builders without touching the pass body or pipeline descs.
   Retained `AreaTex` / `SearchTex` LUT textures sampled by the
   blend pipeline + exposure-adaptation history buffer +
-  device-aware `PostProcessSystem::Initialize(device)` overload
-  land in Slice D.2b; until then the blend shader samples
-  placeholder zero LUT bindings on the CPU/null gate.
+  device-aware `PostProcessSystem::Initialize(device)` overload have
+  landed with `GRAPHICS-075` Slice D.2b: the new
+  `PostProcessSystem::Initialize(device, textureMgr, bufferMgr)`
+  overload allocates the SMAA `AreaTex` (`RG8_UNORM`, 160x560) and
+  `SearchTex` (`R8_UNORM`, 66x33) LUT textures via
+  `RHI::TextureManager::Create(...)` and uploads their analytical
+  LUT bytes (ported byte-for-byte from
+  `src/legacy/Graphics/Passes/Graphics.SMAALookupTextures.hpp` into
+  a private namespace inside `Graphics.PostProcessSystem.cpp` so
+  promoted `graphics/renderer` never imports from `src/legacy`)
+  through `device.GetTransferQueue().UploadTexture(...)`; the
+  exposure-adaptation history buffer (new `PostProcessExposureHistory`
+  POD with `previous_average_log_lum` / `adaptation_velocity` /
+  `frame_index`) is allocated through `RHI::BufferManager::Create(...)`
+  with `Storage | TransferDst` for the histogram readback drain to
+  populate in Slice E. The overload is idempotent (a no-op when the
+  leases are already valid or when the device is non-operational)
+  and is invoked from both the renderer's `Initialize(device)` and
+  `RebuildOperationalResources(device)` so a non-operational-at-init
+  device still picks up the allocation when it becomes operational
+  without a `Shutdown()`+`Initialize()` round-trip.
+  `PostProcessSystem::Shutdown()` releases the three leases before
+  clearing the manager pointers, matching the `ShadowSystem`
+  teardown ordering contract so the lease destructors call back
+  through a still-live `TextureManager` / `BufferManager`. The
+  retained handles + uploaded payload sizes are pinned by the new
+  CPU/null contract test
+  `RendererFrameLifecycle.PostProcessSMAALookupTexturesSurviveOperationalRebuild`.
+  The SMAA blend shader still samples placeholder zero LUT bindings
+  on the CPU/null gate; descriptor-set wiring of the retained LUTs
+  into the SMAA blend pass body is a GPU/Vulkan-gate concern owned
+  by the opt-in `gpu;vulkan` smoke.
   Histogram (Slice E, compute pipeline + readback drain) fans out
   behind the existing `"PostProcessPass"` umbrella alongside bloom +
   tonemap. Each AA stage is free to define its own pass-local push

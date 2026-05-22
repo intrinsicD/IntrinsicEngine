@@ -330,11 +330,19 @@ namespace Extrinsic::Graphics
             // passes follow above: a `has_value()` lease but a default-
             // constructed pipeline handle on the pass would silently early-
             // return inside `PostProcessToneMapPass::Execute()` while the
-            // executor still reported `Recorded`. The PostProcessSystem
-            // constructor + `Initialize()` are CPU-only today (the
-            // device-aware retained-LUT allocation arrives with Slice D).
+            // executor still reported `Recorded`.
+            //
+            // GRAPHICS-075 Slice D.2b — uses the device-aware Initialize
+            // overload so PostProcessSystem allocates + uploads its retained
+            // SMAA `AreaTex` / `SearchTex` LUT textures and the exposure-
+            // adaptation history buffer up-front when the device is
+            // operational. The overload is idempotent and no-ops when the
+            // device is non-operational; the RebuildOperationalResources()
+            // path below re-invokes it so a device that becomes operational
+            // later picks up the allocation without a Shutdown()+Initialize()
+            // round-trip.
             m_PostProcessSystem.emplace();
-            m_PostProcessSystem->Initialize();
+            m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
             m_PostProcessToneMapPass.emplace(*m_PostProcessSystem);
             // GRAPHICS-075 Slice B.1 — same lifetime contract as the
             // tonemap pass above: emplace after `m_PostProcessSystem` is
@@ -408,6 +416,18 @@ namespace Extrinsic::Graphics
                 m_MaterialSystem->GetCapacity());
             m_MaterialSystem->SyncGpuBuffer();
             m_GpuWorld->SyncFrame();
+
+            // GRAPHICS-075 Slice D.2b — re-invoke the device-aware
+            // PostProcessSystem initializer to cover the case where the
+            // device was non-operational at first Initialize() and has
+            // since become operational. The overload is idempotent — the
+            // retained SMAA LUT + exposure-history leases survive
+            // RebuildOperationalResources() byte-identical when they were
+            // already allocated.
+            if (m_PostProcessSystem.has_value())
+            {
+                m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
+            }
 
             const bool passResourcesReady = InitializeOperationalPassResources(device);
             m_RenderGraph.Reset();
