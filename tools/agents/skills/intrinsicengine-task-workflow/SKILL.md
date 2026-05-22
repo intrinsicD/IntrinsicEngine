@@ -140,19 +140,68 @@ A slice plan reads like:
 - **Slice D.** Operational backend wiring + smoke. Cites `gpu;vulkan` run.
 ```
 
+## Grilling alignment before authoring a task
+
+Before writing a task file for any non-trivial change, **interview the user
+relentlessly** about the change until you reach a shared understanding. Walk
+down each branch of the design tree, resolving dependencies one at a time.
+For every question, provide your recommended answer.
+
+- Ask **one question at a time** — wait for the user's answer before asking
+  the next.
+- If a question can be answered by exploring the codebase or reading an ADR
+  under `docs/adr/`, explore instead of asking.
+- When the user uses a term that conflicts with existing engine vocabulary
+  (`AGENTS.md` layer names, maturity levels, backend identities, RHI
+  terminology), call it out immediately and ask which is meant.
+- When the user uses a fuzzy term ("the renderer", "the pipeline", "this
+  pass"), propose the precise canonical name (e.g. `Extrinsic.Graphics.Renderer.PassRegistry`)
+  before continuing.
+- Stress-test domain relationships with **concrete scenarios** that probe
+  edge cases — what happens on a Vulkan-incapable host, with a 0-element
+  mesh, on hot reload, with the legacy path active.
+- Cross-reference what the user says with the code. If they contradict, surface
+  it: "you said the asset service drives this, but the call site is in
+  `runtime` — which is right?".
+
+The output of the grilling is the task file (sections per
+`references/task-template.md`). Do not start implementing before the file is
+written and the user has confirmed scope.
+
+## When to record an ADR
+
+The engine already keeps ADRs under `docs/adr/` with the `NNNN-<slug>.md`
+naming. Add a new ADR only when **all three** are true:
+
+1. **Hard to reverse** — the cost of changing your mind later is meaningful
+   (layering decisions, backend selection rules, public method contracts,
+   data-format decisions, runtime composition order).
+2. **Surprising without context** — a future reader will wonder "why was it
+   done this way?" and the answer is not obvious from the code.
+3. **The result of a real trade-off** — there were genuine alternatives and
+   you picked one for specific reasons.
+
+If any of the three is missing, skip the ADR. Capture the decision in the
+task file's `Context` or `Non-goals` instead. ADRs are expensive; over-using
+them dilutes the signal of the ones that matter.
+
+When you do write one, follow the numbering of the existing ADRs and link it
+from the owning task's `Context` section.
+
 ## Task execution sequence
 
 Every task execution should follow:
 
 1. Inspect existing code and docs.
 2. Identify owning subsystem and layer (see `intrinsicengine-core` for layering).
-3. Write or update task file from `tasks/templates/`.
-4. Implement the smallest useful patch.
-5. Add or update tests with correct labels.
-6. Add or update docs.
-7. Run verification (focused targets first, then broaden).
-8. Update generated inventories if module surfaces changed.
-9. Self-review against the review checklist (see `intrinsicengine-review`).
+3. If the change is non-trivial, run a grilling alignment pass (see above).
+4. Write or update task file from `tasks/templates/`.
+5. Implement the smallest useful patch.
+6. Add or update tests with correct labels.
+7. Add or update docs; record an ADR only if the three-condition rule applies.
+8. Run verification (focused targets first, then broaden).
+9. Update generated inventories if module surfaces changed.
+10. Self-review against the review checklist (see `intrinsicengine-review`).
 
 ## Validation tools
 

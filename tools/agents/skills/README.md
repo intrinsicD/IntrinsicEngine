@@ -1,7 +1,9 @@
 # IntrinsicEngine Agent Skills
 
-This folder contains six [Agent Skills](https://agentskills.io) that wrap the
-IntrinsicEngine `AGENTS.md` contract and the procedure docs under `docs/agent/`.
+This folder contains nine [Agent Skills](https://agentskills.io). Six of them
+wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs under
+`docs/agent/`; three add cross-cutting workflow disciplines (diagnosis,
+zoom-out, handoff) that don't have a single source doc under `docs/agent/`.
 The skills are designed to load *progressively*: only the metadata (~100 tokens
 per skill) sits in context by default, with full content loaded only when the
 skill's trigger description matches the current task.
@@ -24,7 +26,9 @@ Packaging the same content as Agent Skills gives three additional benefits:
    Gemini CLI, and any other harness that supports the `agentskills.io`
    standard.
 
-## The six skills
+## The nine skills
+
+### Source-doc mirrors (six)
 
 | Skill | Wraps | Triggers on |
 | --- | --- | --- |
@@ -35,9 +39,21 @@ Packaging the same content as Agent Skills gives three additional benefits:
 | `intrinsicengine-benchmark` | `docs/agent/benchmark-workflow.md` + `docs/agent/benchmark-review-checklist.md` | Benchmark manifests, runners, performance claims |
 | `intrinsicengine-docs-sync` | `docs/agent/docs-sync-policy.md` | File moves, API surface changes, inventory regeneration |
 
-Together they cover all 13 of the `docs/agent/*.md` files plus `AGENTS.md`
+Together these cover all 13 of the `docs/agent/*.md` files plus `AGENTS.md`
 itself, the session-onboarding prompt under `docs/agent/prompt/prompt.md`, and
 the task template at `tasks/templates/task.md`.
+
+### Cross-cutting workflow disciplines (three)
+
+These skills do not wrap a single source doc under `docs/agent/`. They encode
+disciplines that apply across multiple touched scopes. The skill body is
+authoritative for these.
+
+| Skill | Purpose | Triggers on |
+| --- | --- | --- |
+| `intrinsicengine-diagnose` | Disciplined diagnosis loop: feedback-loop → reproduce → rank hypotheses → instrument with tagged probes → fix → regression-test → cleanup. Adapted with C++/Vulkan tooling (ctest labels, validation layers, RenderDoc, backend differentials, benchmark baselines). | "diagnose this", crashes, validation-layer errors, CPU/null gate failures, reference-vs-optimized parity mismatches, benchmark regressions |
+| `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | "zoom out", "where does this fit", "give me the layer map" |
+| `intrinsicengine-handoff` | Compact the current conversation into a handoff document for the next agent. Saves to `$TMPDIR`, never into the repo (no in-tree planning docs). | "handoff", "compact this", end-of-session summarization |
 
 ## Authority chain (important)
 

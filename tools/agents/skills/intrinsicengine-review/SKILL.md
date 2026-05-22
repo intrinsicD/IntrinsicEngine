@@ -139,6 +139,53 @@ the full version.
 - New failure/error modes include actionable diagnostics.
 - Fallback behavior is documented when applicable.
 
+### Architecture vocabulary and the deletion test
+
+Use this vocabulary in every architecture-impacting suggestion or finding —
+consistent language is the point. Don't drift into "component", "service",
+"helper", or "boundary".
+
+- **Module** — anything with an interface and an implementation. In this repo
+  that is typically a `.cppm` interface unit plus its partitions and
+  implementation TUs, but it can also mean a free function, a class, a
+  promoted CMake target, or a layer subdir.
+- **Interface** — everything a caller must know to use the module: exported
+  names, types, invariants, error/return contract, threading expectations,
+  ordering, and any required composition. Not just the function signatures.
+- **Implementation** — the code behind the interface.
+- **Depth** — leverage at the interface: a lot of behavior behind a small
+  interface. **Deep** = high leverage. **Shallow** = interface nearly as
+  complex as the implementation.
+- **Seam** — where an interface lives; a place behavior can be altered
+  without editing in place. Use this instead of "boundary".
+- **Adapter** — a concrete thing that satisfies an interface at a seam (e.g.
+  the Vulkan RHI adapter satisfying the RHI interface).
+- **Leverage** — what callers get from depth.
+- **Locality** — what maintainers get from depth: change, bugs, knowledge
+  concentrated in one place.
+
+Heuristics to apply during architecture review:
+
+- **Deletion test.** For any module you suspect is shallow, imagine deleting
+  it. If complexity vanishes, it was a pass-through and should be deleted or
+  inlined. If complexity reappears across N callers (or N backends), it was
+  earning its keep. A "yes, concentrates" is the signal for a deep module
+  worth keeping.
+- **The interface is the test surface.** If a behavior cannot be exercised
+  through the public interface, either the interface is wrong or the test is
+  wrong. Adding a private test seam is usually the wrong fix.
+- **One adapter = hypothetical seam. Two adapters = real seam.** Don't
+  introduce an interface for a single implementation unless a second backend
+  is concretely planned in `tasks/active/` or `tasks/backlog/`. The
+  reference vs. optimized vs. GPU backend split under `methods/` is the
+  archetypal real seam.
+- **Naming.** Identifiers should use the engine's domain vocabulary (layer
+  names, RHI terminology, maturity levels, backend identities). Drift into
+  generic terms ("Manager", "Handler", "Helper", "Util") is a smell.
+
+These heuristics also feed the weekly audit row 3 (premature abstraction) —
+a single-adapter interface is almost always premature.
+
 ### Maturity on architecture-impacting closures
 
 - The reached maturity level (see `intrinsicengine-task-workflow`) is stated
