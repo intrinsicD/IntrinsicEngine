@@ -19,9 +19,10 @@
   remain on the GEOM-007 Slice 4 / its own successor task.
 
 ## Context
-- Status: in-progress (Slice 3 next; Slices 1–2 landed).
+- Status: in-progress (Slice 4 next; Slices 1–3 landed).
 - Owner/agent: copilot.
-- Branch: claude/nice-knuth-QStLa.
+- Branch: claude/active-geom-task-jaLRp (Slices 1–2 landed on
+  claude/nice-knuth-QStLa, merged via PR #915 on 2026-05-22).
 - Owning subsystem/layer: `geometry` (`geometry -> core`; consumes
   `Geometry.RobustPredicates`).
 - Promoted from `tasks/backlog/geometry/` on 2026-05-22.
@@ -45,11 +46,23 @@
   `1.0e-3` preserves the prior 1e-6 threshold at unit scale). Adds
   regression tests for the previously-flipped sub-millimeter Ellipsoid
   and short-axis Cylinder cases.
-- **Slice 3 (next):** Decide the GJK normalized-workspace policy (keep
-  `GJK_EPSILON` as a normalized-space constant with explicit contract
-  vs. thread scale into the driver). Document the decision in
-  `docs/architecture/geometry.md`.
-- **Slice 4:** Surface GJK termination diagnostics (`iterations`,
+- **Slice 3 (landed):** Decided the GJK normalized-workspace policy:
+  keep `GJK_EPSILON` as a dimensionless normalized-space constant
+  (option (i) in "Required changes"); do not thread a per-call scale
+  into the driver because the driver already factors the scale out via
+  `invScale` and threading would double-normalize. Strengthened the
+  in-source contract block above `Config::GJK_EPSILON` in
+  `Geometry.GJK.cppm` and pinned the band with a `static_assert`
+  requiring `GJK_EPSILON ∈ (0, 1)`. Added a new "GJK tolerance contract"
+  subsection to `docs/architecture/geometry.md` describing the
+  normalized-workspace contract, the rationale for not threading a
+  per-call scale, where scale-aware tolerances live (Slice 2 migration
+  in `Geometry.Support` / `Geometry.SDFContact`), and the static-pin.
+  No callsite or runtime-behaviour change; existing GJK / Support /
+  ContactManifold / Overlap / RobustPredicates tests continue to pass
+  unchanged. Slice 4 (termination-reason diagnostics) is the remaining
+  open slice.
+- **Slice 4 (next):** Surface GJK termination diagnostics (`iterations`,
   `terminationReason`) via an overload or out-param. Keep the boolean
   entry point as a thin wrapper. Add convergence and parity regression
   tests.
@@ -98,13 +111,14 @@ shared across all primitives.
 
 ### Next verification step
 
-After Slice 2 lands, the same verification block has been run on this
-branch (clang-20 / preset `ci`, 145/145 geometry tests pass). The next
-slice (3) requires documenting the GJK normalized-workspace policy in
-`docs/architecture/geometry.md`; rerun:
+After Slice 3 lands, the next slice (4) surfaces GJK termination
+diagnostics (`iterations`, `terminationReason`) via an overload or
+out-param plus a parity / convergence regression battery. Rerun on
+slice landing:
 `cmake --build --preset ci --target IntrinsicGeometryTests`
 `ctest --test-dir build/ci --output-on-failure -R 'GJK|Support|ContactManifold|Overlap|RobustPredicates' --timeout 60`
-plus `python3 tools/repo/check_layering.py --root src --strict` and
+plus `python3 tools/repo/check_layering.py --root src --strict`,
+`python3 tools/docs/check_doc_links.py --root .`, and
 `python3 tools/agents/check_task_policy.py --root . --strict`.
 - Current state (as of GEOM-007 Slice 3.3.c landing):
   - `src/geometry/Geometry.GJK.cppm` defines `Config::GJK_EPSILON = 1e-6f`
@@ -153,7 +167,7 @@ plus `python3 tools/repo/check_layering.py --root src --strict` and
       to the new helper, deriving `scale` from the primitive's
       characteristic length (sphere radius, capsule length, OBB extent
       diagonal, etc.). *(Slice 2.)*
-- [ ] In `Geometry.GJK.cppm`, either:
+- [x] In `Geometry.GJK.cppm`, either:
       (i) keep `GJK_EPSILON` as a normalized-space constant but document
           the contract explicitly and add a static assertion / runtime
           diagnostic when the normalized-workspace assumption is
@@ -162,6 +176,12 @@ plus `python3 tools/repo/check_layering.py --root src --strict` and
           predicate helper can be used. Pick exactly one based on the
           Slice 3 plan's "callsite adoption" intent and the audit
           results; document the decision in the architecture doc.
+      *(Slice 3: option (i). The driver normalizes by `1/shapeScale`
+      before any tolerance check (see `Geometry.GJK.cppm:281–294`) and
+      every `GJK_EPSILON` callsite operates on that normalized
+      workspace, so threading a per-call scale would double-normalize.
+      Strengthened the in-source contract block and pinned the band
+      with `static_assert(GJK_EPSILON > 0 && GJK_EPSILON < 1)`.)*
 - [ ] Surface GJK termination diagnostics in the public result
       (`GJK_Boolean` already returns `bool`; consider an overload or
       out-param reporting `iterations`, `terminationReason` ∈
@@ -190,10 +210,17 @@ plus `python3 tools/repo/check_layering.py --root src --strict` and
       modification.
 
 ## Docs
-- [ ] Update `docs/architecture/geometry.md` (Robust predicates section)
+- [x] Update `docs/architecture/geometry.md` (Robust predicates section)
       with a paragraph describing the GJK tolerance contract:
       normalized-workspace constant vs scale-aware, and the rationale
       for the chosen path.
+      *(Slice 3: added a new "GJK tolerance contract" subsection
+      between "Robust predicates" and "Intersection classification
+      records" that records the normalized-workspace decision, the
+      reason for not threading a per-call scale, where scale-aware
+      tolerances live (`Geometry.Support` / `Geometry.SDFContact` via
+      GEOM-015 Slice 2), the `static_assert` pin, and the deferral of
+      termination-diagnostics surface to Slice 4.)*
 - [ ] If a new `ApproxZeroSq` / termination diagnostic surface is
       added, update `docs/api/generated/module_inventory.md` via
       `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.

@@ -142,6 +142,50 @@ Numerical policy and limitations:
   existing callers in order to keep foundation-add and semantic refactor
   separate per the contract in [`AGENTS.md`](../../AGENTS.md) §5.
 
+## GJK tolerance contract
+
+`Geometry.GJK` uses a single dimensionless convergence tolerance
+`Geometry::Internal::Config::GJK_EPSILON = 1e-6f` (`src/geometry/Geometry.GJK.cppm`)
+for every termination / progress / duplicate-membership / segment-degeneracy
+test in the simplex evolution.
+[`GEOM-015`](../../tasks/active/GEOM-015-gjk-termination-diagnostics.md)
+Slice 3 pins the contract for that constant:
+
+- **Normalized workspace.** `GJK_Boolean` and `GJK_Intersection` compute
+  `invScale = 1 / |initial support|` from the first Minkowski-difference
+  support point and multiply every subsequent support by `invScale` before
+  it enters any `GJK_EPSILON`-bearing predicate. The simplex therefore
+  lives in `~unit` space and `GJK_EPSILON` is a dimensionless tolerance on
+  that workspace, not a length / magnitude in original shape space.
+- **Why not thread a per-call scale into the driver.** The Slice 2
+  callsite audit (recorded in the GEOM-015 task file) confirmed that all
+  seven `GJK_EPSILON` consumers operate in this normalized workspace and
+  none of them want an original-space magnitude. Threading a per-call
+  scale into the GJK driver would double-normalize (the driver already
+  factors the scale out via `invScale`) and re-introduce the scale
+  dependence Slice 2 just removed. The decision is to keep `GJK_EPSILON`
+  as a normalized-space constant and document the contract explicitly,
+  rather than thread a redundant scale through the driver.
+- **Where scale-aware tolerances live.** Original-shape-space zero-vector
+  guards (Capsule / Cylinder / Ellipsoid / SDFContact) live in
+  `Geometry.Support` and `Geometry.SDFContact`, not in `Geometry.GJK`.
+  Those guards were migrated to
+  `Geometry::RobustPredicates::ApproxZeroSq` in GEOM-015 Slice 2 with
+  primitive-local `scale` choices recorded in the task notes; they do
+  not flow through `GJK_EPSILON`.
+- **Static pin.** A `static_assert(GJK_EPSILON > 0 && GJK_EPSILON < 1)` in
+  `Geometry.GJK.cppm` forces future edits to keep the value inside the
+  dimensionless `(0, 1)` band that the normalized-workspace contract
+  requires. Any future migration to a magnitude tolerance must revisit
+  this section and the GEOM-015 callsite audit before changing the
+  constant.
+- **Termination diagnostics.** Surfacing the GJK iteration count and
+  termination reason (`Converged` / `EarlyOutNegativeSupport` /
+  `NoSimplexProgress` / `MaxIterationsHit`) as an overload or out-param,
+  plus a parity test battery across small (`~1e-3`) and large (`~1e3`)
+  shape scales, is deferred to GEOM-015 Slice 4. The boolean entry point
+  stays as a thin wrapper.
+
 ## Intersection classification records
 
 `Geometry.IntersectionClassification` is the records-only sibling module
