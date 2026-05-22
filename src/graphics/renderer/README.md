@@ -1138,11 +1138,25 @@ Concretely:
   canonical 20-byte `PostProcessPushConstants` block would alias
   `Exposure` onto `Width` as `bit_cast<uint>(1.0f)` ≈ 1.07e9
   pixels, producing a degenerate dispatch. Slice E.2 adds the
-  renderer-owned host-visible `Histogram.Readback` buffer +
-  `BeginFrame()`-side drain mirroring the `Picking.Readback`
-  pattern + `PostProcessSystem::PublishHistogramReadback(...)` that
-  consumes the exposure-adaptation history buffer Slice D.2b
-  allocated. Each AA stage is free to define its own pass-local push
+  renderer-owned host-visible `Histogram.Readback` buffer
+  (`1024 * frames-in-flight` bytes, `HostVisible | TransferDst`)
+  imported by the recipe through `FrameRecipeImports::HistogramReadback`,
+  the per-frame `CopyBuffer(PostProcess.Histogram → Histogram.Readback
+  @ slot * 1024)` recorded by the `"PostProcessHistogramPass"`
+  executor branch after the compute dispatch (bracketed by
+  `ShaderWrite → TransferRead → ShaderWrite` buffer barriers on
+  the per-frame `PostProcess.Histogram` handle so the atomic
+  accumulations are visible to the copy), the `BeginFrame()`-side
+  drain mirroring the `Picking.Readback` drain pattern, and the
+  new `PostProcessSystem::PublishHistogramReadback(bins, frameIndex,
+  device)` entry point that decodes the 256-bin payload into the
+  retained `PostProcessExposureHistory` CPU mirror through a
+  one-pole IIR and uploads the new history to the device-side
+  `PostProcess.ExposureHistory` storage buffer through the
+  transfer queue. A new `HistogramReadbackCopyCount` stat counter
+  on `RenderGraphFrameStats` mirrors the existing
+  `PickingReadbackCopyCount` so contract tests can assert the
+  copy ran exactly once per operational frame. Each AA stage is free to define its own pass-local push
   block where the shader interface demands more than the canonical 20
   bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and

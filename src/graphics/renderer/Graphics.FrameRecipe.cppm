@@ -97,6 +97,15 @@ namespace Extrinsic::Graphics
         PostProcessAATempEdges,
         PostProcessAATempWeights,
         PostProcessAATempResolved,
+        // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
+        // `Histogram.Readback` buffer imported through
+        // `FrameRecipeImports::HistogramReadback`. The recipe authorises the
+        // `"PostProcessHistogramPass"` executor branch to record a
+        // `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot * 1024)`
+        // after the compute dispatch; the renderer drains completed slots on
+        // `BeginFrame()` and forwards the 256-bin payload to
+        // `PostProcessSystem::PublishHistogramReadback(...)`.
+        HistogramReadback,
     };
 
     export struct FrameRecipeFeatures
@@ -163,6 +172,16 @@ namespace Extrinsic::Graphics
         // feature itself requires an operational publisher to have wired
         // the buffer first.
         RHI::BufferHandle PickingReadback{};
+        // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
+        // `Histogram.Readback` buffer (allocated by Slice E.2's
+        // `InitializeOperationalPassResources`). Sized for
+        // `1024 * frames-in-flight` bytes (256 uint32 bins per slot, one slot
+        // per in-flight frame). When `EnablePostProcess` is true and the
+        // handle is valid, `BuildDefaultFrameRecipe` imports it as the
+        // destination of the per-frame
+        // `CopyBuffer(PostProcess.Histogram → Histogram.Readback)` recorded
+        // by the `"PostProcessHistogramPass"` executor branch.
+        RHI::BufferHandle HistogramReadback{};
     };
 
     // GRAPHICS-073 Slice B — typed sizing seam for the shadow atlas. When

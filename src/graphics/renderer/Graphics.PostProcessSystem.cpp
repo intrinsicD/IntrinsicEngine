@@ -343,6 +343,16 @@ namespace Extrinsic::Graphics
         RHI::TextureManager::TextureLease AreaLutLease{};
         RHI::TextureManager::TextureLease SearchLutLease{};
         RHI::BufferManager::BufferLease   ExposureHistoryLease{};
+        // GRAPHICS-075 Slice E.2 — CPU mirror of the device-side
+        // `PostProcess.ExposureHistory` storage buffer. Updated by
+        // `PublishHistogramReadback(...)` after each completed-frame drain
+        // decodes the 256-bin payload; uploaded to the GPU buffer through
+        // the transfer queue when an operational device is available. Tests
+        // read the mirror via `GetExposureHistorySnapshot()` so the drain →
+        // publish handshake is observable without round-tripping through
+        // the GPU buffer.
+        PostProcessExposureHistory ExposureHistory{};
+        std::uint32_t              HistogramPublishCount{0u};
     };
 
     // GRAPHICS-075 Slice D.2b — allocate + upload the retained SMAA LUT
@@ -480,6 +490,11 @@ namespace Extrinsic::Graphics
         m_Impl->TextureMgr = nullptr;
         m_Impl->BufferMgr  = nullptr;
         m_Impl->Initialized = false;
+        // GRAPHICS-075 Slice E.2 — reset the exposure-history mirror + publish
+        // counter so a fresh Initialize() after Shutdown() does not inherit
+        // the previous session's adaptation state.
+        m_Impl->ExposureHistory      = {};
+        m_Impl->HistogramPublishCount = 0u;
     }
 
     void PostProcessSystem::SetSettings(const PostProcessSettings& settings)
@@ -626,5 +641,124 @@ namespace Extrinsic::Graphics
     RHI::BufferHandle PostProcessSystem::GetExposureHistoryBuffer() const noexcept
     {
         return m_Impl->ExposureHistoryLease.GetHandle();
+    }
+
+    namespace
+    {
+        // GRAPHICS-075 Slice E.2 — canonical log-luminance bounds matching
+        // `PostProcessHistogramPushConstants` (and `GRAPHICS-013AQ`).
+        // The histogram covers `[-10, +10]` log2 stops over 256 bins. Keep
+        // these in lock-step with `Pass.PostProcess.Histogram.cpp` so the
+        // CPU-side average decode matches the GPU-side bin assignment.
+        constexpr float kHistogramMinLogLum = -10.0f;
+        constexpr float kHistogramMaxLogLum =  10.0f;
+        constexpr std::uint32_t kHistogramBinCount = 256u;
+
+        // GRAPHICS-075 Slice E.2 — eye-adaptation velocity used as the
+        // exponential moving average factor when blending the freshly
+        // observed average log luminance into the retained history.
+        // 0 means "snap to the current frame" (no adaptation); 1 means
+        // "retain the previous frame forever". The 0.05 default produces a
+        // gentle one-pole IIR that visibly tracks luminance changes over a
+        // handful of frames, matching the `PostProcessSettings::Exposure`
+        // adaptation pacing the bloom + tonemap chain expects.
+        constexpr float kHistogramAdaptationVelocity = 0.05f;
+
+        // Decode the average log luminance from a 256-bin payload by
+        // weighting each bin centre by its sample count. The histogram is
+        // partitioned over `[kHistogramMinLogLum, kHistogramMaxLogLum]` log2
+        // stops, so bin `i` represents the range
+        // `[minLogLum + i*step, minLogLum + (i+1)*step)` with
+        // `step = (maxLogLum - minLogLum) / 256`. Returns `minLogLum` when
+        // the payload is empty (no contribution) so the adaptation history
+        // does not jump to an undefined state on the first frame.
+        [[nodiscard]] float DecodeAverageLogLuminance(std::span<const std::uint32_t> bins) noexcept
+        {
+            if (bins.size() != kHistogramBinCount)
+            {
+                return kHistogramMinLogLum;
+            }
+            const float step = (kHistogramMaxLogLum - kHistogramMinLogLum)
+                               / static_cast<float>(kHistogramBinCount);
+            std::uint64_t totalCount = 0u;
+            double weightedSum = 0.0;
+            for (std::uint32_t i = 0; i < kHistogramBinCount; ++i)
+            {
+                const std::uint32_t count = bins[i];
+                if (count == 0u)
+                {
+                    continue;
+                }
+                const float binCentre = kHistogramMinLogLum +
+                                        (static_cast<float>(i) + 0.5f) * step;
+                weightedSum += static_cast<double>(count) * static_cast<double>(binCentre);
+                totalCount  += count;
+            }
+            if (totalCount == 0u)
+            {
+                return kHistogramMinLogLum;
+            }
+            return static_cast<float>(weightedSum / static_cast<double>(totalCount));
+        }
+    }
+
+    void PostProcessSystem::PublishHistogramReadback(std::span<const std::uint32_t> bins,
+                                                     const std::uint64_t frameIndex,
+                                                     RHI::IDevice* const device) noexcept
+    {
+        if (bins.size() != kHistogramBinCount)
+        {
+            ++m_Impl->Diagnostics.InvalidSettingCount;
+            return;
+        }
+
+        const float observedLogLum = DecodeAverageLogLuminance(bins);
+        // One-pole IIR: blend the freshly observed average into the retained
+        // history. The very first publish call (HistogramPublishCount == 0)
+        // snaps directly to the observed value so the history is not anchored
+        // to the default-constructed `0.0` on startup.
+        if (m_Impl->HistogramPublishCount == 0u)
+        {
+            m_Impl->ExposureHistory.PreviousAverageLogLum = observedLogLum;
+        }
+        else
+        {
+            m_Impl->ExposureHistory.PreviousAverageLogLum =
+                kHistogramAdaptationVelocity * m_Impl->ExposureHistory.PreviousAverageLogLum +
+                (1.0f - kHistogramAdaptationVelocity) * observedLogLum;
+        }
+        m_Impl->ExposureHistory.AdaptationVelocity = kHistogramAdaptationVelocity;
+        m_Impl->ExposureHistory.FrameIndex = static_cast<std::uint32_t>(frameIndex & 0xFFFFFFFFull);
+        ++m_Impl->HistogramPublishCount;
+
+        // GRAPHICS-075 Slice E.2 — propagate the new history payload to the
+        // device-side `PostProcess.ExposureHistory` storage buffer through the
+        // transfer queue (mirroring the SMAA LUT upload path Slice D.2b
+        // uses). When the device is non-operational or the lease is
+        // unavailable, the CPU mirror still updates so the drain → publish
+        // handshake remains observable through `GetExposureHistorySnapshot()`.
+        if (device != nullptr && device->IsOperational() &&
+            m_Impl->ExposureHistoryLease.GetHandle().IsValid())
+        {
+            const RHI::TransferToken token = device->GetTransferQueue().UploadBuffer(
+                m_Impl->ExposureHistoryLease.GetHandle(),
+                &m_Impl->ExposureHistory,
+                sizeof(m_Impl->ExposureHistory),
+                /*offset=*/0u);
+            if (!token.IsValid())
+            {
+                Core::Log::Warn("[Graphics] PostProcess.ExposureHistory upload rejected; retained history will be stale this frame.");
+            }
+        }
+    }
+
+    PostProcessExposureHistory PostProcessSystem::GetExposureHistorySnapshot() const noexcept
+    {
+        return m_Impl->ExposureHistory;
+    }
+
+    std::uint32_t PostProcessSystem::GetHistogramPublishCount() const noexcept
+    {
+        return m_Impl->HistogramPublishCount;
     }
 }

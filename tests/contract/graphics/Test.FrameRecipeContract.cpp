@@ -38,6 +38,11 @@ namespace
             // contract tests keep their compile path. Tests that disable
             // picking ignore this import (recipe drops the resource).
             .PickingReadback = Extrinsic::RHI::BufferHandle{16u, 1u},
+            // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
+            // `Histogram.Readback` buffer; same import-or-skip pattern as
+            // picking above. Tests that disable postprocess ignore this
+            // import (the recipe drops the histogram pass altogether).
+            .HistogramReadback = Extrinsic::RHI::BufferHandle{17u, 1u},
         };
     }
 

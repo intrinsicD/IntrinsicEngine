@@ -1,11 +1,13 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -73,6 +75,16 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
+        // GRAPHICS-075 Slice E.2 — `Histogram.Readback` per-slot size in
+        // bytes. Matches the recipe-side `PostProcess.Histogram` buffer
+        // declaration (`256 * sizeof(std::uint32_t)`) and the GPU shader's
+        // `bins[256]` storage block (`assets/shaders/post_histogram.comp`).
+        // The renderer-owned host-visible readback buffer holds
+        // `kHistogramReadbackSlotBytes * frames-in-flight` bytes total so
+        // each in-flight frame copies into its own slot without aliasing.
+        constexpr std::uint64_t kHistogramReadbackSlotBytes =
+            256ull * sizeof(std::uint32_t);
+
         [[nodiscard]] RHI::TextureLayout ToTextureLayout(const TextureBarrierState state)
         {
             switch (state)
@@ -563,6 +575,14 @@ namespace Extrinsic::Graphics
             m_PickingSlotIssuedFrame.clear();
             m_PickingSlotRequest.clear();
             m_PickingSlotInvalidated.clear();
+            // GRAPHICS-075 Slice E.2 — drop the renderer-owned
+            // `Histogram.Readback` lease + per-slot metadata before the
+            // BufferManager is torn down, mirroring the picking pattern.
+            m_HistogramReadbackBuffer.reset();
+            m_HistogramReadbackBufferSize = 0u;
+            m_HistogramSlotPending.clear();
+            m_HistogramSlotIssuedFrame.clear();
+            m_HistogramSlotInvalidated.clear();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
@@ -608,6 +628,17 @@ namespace Extrinsic::Graphics
             // `PublishPickResult` (live hit) or `PublishNoHit` (zero
             // EntityId, invalidated request, or read failure).
             DrainCompletedPickingSlots();
+            // GRAPHICS-075 Slice E.2 — drain completed histogram-readback
+            // slots before acquiring the next frame. Mirrors the picking
+            // drain pattern: uses `IDevice::GetGlobalFrameNumber()` as the
+            // completed-frame proxy (the post-EndFrame counter), decodes
+            // the 256 uint32 bins each slot copied, and forwards them to
+            // `PostProcessSystem::PublishHistogramReadback(...)`. Slots
+            // flagged `Invalidated` (e.g. by a `RebuildOperationalResources()`
+            // device-lost recovery) are released without publishing so the
+            // exposure-history mirror is never anchored to stale
+            // pre-rebuild bytes.
+            DrainCompletedHistogramSlots();
             return m_Device->BeginFrame(outFrame);
         }
 
@@ -1012,6 +1043,17 @@ namespace Extrinsic::Graphics
                 .PickingReadback = (m_PickingReadbackBuffer.has_value() && m_PickingReadbackBuffer->IsValid())
                                        ? m_PickingReadbackBuffer->GetHandle()
                                        : RHI::BufferHandle{},
+                // GRAPHICS-075 Slice E.2 — hand the renderer-owned host-
+                // visible `Histogram.Readback` lease to the recipe so the
+                // executor can record `CopyBuffer(PostProcess.Histogram →
+                // Histogram.Readback @ slot * 1024)` after the histogram
+                // dispatch. The handle is invalid until the operational
+                // publisher has run; `BuildDefaultFrameRecipe` falls back to
+                // skipping the import + readback write when the handle is
+                // not valid yet.
+                .HistogramReadback = (m_HistogramReadbackBuffer.has_value() && m_HistogramReadbackBuffer->IsValid())
+                                         ? m_HistogramReadbackBuffer->GetHandle()
+                                         : RHI::BufferHandle{},
             };
             const FrameRecipeSizing sizing{
                 .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
@@ -1579,6 +1621,19 @@ namespace Extrinsic::Graphics
                         // short-circuits and the helper still reports
                         // `Recorded` per the structurally-recorded-no-op
                         // taxonomy bloom / FXAA / SMAA already follow.
+                        RHI::BufferHandle histogramHandle{};
+                        for (std::size_t i = 0; i < compiled->BufferNames.size(); ++i)
+                        {
+                            if (i >= compiled->BufferHandles.size())
+                            {
+                                break;
+                            }
+                            if (compiled->BufferNames[i] == std::string_view{"PostProcess.Histogram"})
+                            {
+                                histogramHandle = compiled->BufferHandles[i];
+                                break;
+                            }
+                        }
                         if (m_PostProcessHistogramPass.has_value())
                         {
                             const Core::Extent2D histogramExtent = m_Device != nullptr
@@ -1591,24 +1646,87 @@ namespace Extrinsic::Graphics
                                 ? static_cast<std::uint32_t>(histogramExtent.Height)
                                 : 1u;
                             m_PostProcessHistogramPass->SetViewport(histogramWidth, histogramHeight);
-                            RHI::BufferHandle histogramHandle{};
-                            for (std::size_t i = 0; i < compiled->BufferNames.size(); ++i)
-                            {
-                                if (i >= compiled->BufferHandles.size())
-                                {
-                                    break;
-                                }
-                                if (compiled->BufferNames[i] == std::string_view{"PostProcess.Histogram"})
-                                {
-                                    histogramHandle = compiled->BufferHandles[i];
-                                    break;
-                                }
-                            }
                             m_PostProcessHistogramPass->SetHistogramBuffer(histogramHandle);
                         }
                         const RenderCommandPassStatus status =
                             RecordPostProcessHistogramPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, status);
+
+                        // GRAPHICS-075 Slice E.2 — record the per-frame
+                        // `CopyBuffer(PostProcess.Histogram → Histogram.Readback
+                        // @ slot * 1024)` after the histogram compute dispatch
+                        // so the next frame's `BeginFrame()`-side drain can
+                        // decode the 256-bin payload and publish it to
+                        // `PostProcessSystem::PublishHistogramReadback(...)`.
+                        // The copy is gated on:
+                        //   (a) the histogram helper actually recording
+                        //       (`status == Recorded` — operational device +
+                        //       valid pipeline + populated `PostProcessSystem`),
+                        //   (b) the histogram *stage* being live
+                        //       (`IsStageEnabled(Histogram)` — the helper
+                        //       returns `Recorded` even when the stage is off,
+                        //       under the standing "structurally-recorded
+                        //       no-op" taxonomy bloom / FXAA / SMAA also
+                        //       follow; the pass body early-returns without
+                        //       dispatching, so the transient
+                        //       `PostProcess.Histogram` buffer is never
+                        //       zero-filled or atomically populated this
+                        //       frame, and a copy here would publish
+                        //       undefined transient-allocator bytes into the
+                        //       exposure-history mirror through the next
+                        //       drain — corrupting adaptation state even
+                        //       though the histogram is disabled),
+                        //   (c) the renderer's `Histogram.Readback` lease
+                        //       being valid,
+                        //   (d) the recipe having compiled a transient
+                        //       `PostProcess.Histogram` handle into the graph.
+                        // The bracketing `ShaderWrite → TransferRead →
+                        // ShaderWrite` buffer barrier pair makes the atomic
+                        // accumulations visible to the copy and restores the
+                        // shader-write state so downstream consumers of the
+                        // histogram buffer (none today; landed under the
+                        // exposure-history Slice E.2 plan but consumed by
+                        // future GPU-side tonemap iterations) observe valid
+                        // state.
+                        const bool histogramStageLive =
+                            m_PostProcessSystem.has_value() &&
+                            m_PostProcessSystem->IsStageEnabled(PostProcessStageKind::Histogram);
+                        if (status == RenderCommandPassStatus::Recorded &&
+                            histogramStageLive &&
+                            m_HistogramReadbackBuffer.has_value() &&
+                            m_HistogramReadbackBuffer->IsValid() &&
+                            histogramHandle.IsValid())
+                        {
+                            const RHI::BufferHandle readbackBuffer =
+                                m_HistogramReadbackBuffer->GetHandle();
+                            const std::uint32_t framesInFlight =
+                                std::max(1u, m_Device->GetFramesInFlight());
+                            const std::uint32_t slot =
+                                frame.FrameIndex % framesInFlight;
+                            const std::uint64_t slotOffset =
+                                static_cast<std::uint64_t>(slot) *
+                                kHistogramReadbackSlotBytes;
+
+                            graphicsContext.BufferBarrier(histogramHandle,
+                                                          RHI::MemoryAccess::ShaderWrite,
+                                                          RHI::MemoryAccess::TransferRead);
+                            graphicsContext.CopyBuffer(histogramHandle,
+                                                       readbackBuffer,
+                                                       /*srcOffset=*/0u,
+                                                       /*dstOffset=*/slotOffset,
+                                                       /*sizeBytes=*/kHistogramReadbackSlotBytes);
+                            graphicsContext.BufferBarrier(histogramHandle,
+                                                          RHI::MemoryAccess::TransferRead,
+                                                          RHI::MemoryAccess::ShaderWrite);
+                            ++m_LastRenderGraphStats.HistogramReadbackCopyCount;
+
+                            if (slot < m_HistogramSlotPending.size())
+                            {
+                                m_HistogramSlotPending[slot] = true;
+                                m_HistogramSlotIssuedFrame[slot] = frame.FrameIndex;
+                                m_HistogramSlotInvalidated[slot] = false;
+                            }
+                        }
                     }
                     else if (passName == std::string_view{"PostProcessAAEdgePass"})
                     {
@@ -2074,6 +2192,25 @@ namespace Extrinsic::Graphics
         [[nodiscard]] std::uint64_t GetPickingReadbackBufferSize() const noexcept override
         {
             return m_PickingReadbackBufferSize;
+        }
+
+        // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
+        // `Histogram.Readback` buffer accessors. Same lazy-allocation
+        // pattern as the picking accessors above: an invalid handle / zero
+        // size means the operational publisher has not allocated the lease
+        // yet (non-operational device, or pre-`Initialize()`).
+        [[nodiscard]] RHI::BufferHandle GetHistogramReadbackBuffer() const noexcept override
+        {
+            if (!m_HistogramReadbackBuffer.has_value() || !m_HistogramReadbackBuffer->IsValid())
+            {
+                return RHI::BufferHandle{};
+            }
+            return m_HistogramReadbackBuffer->GetHandle();
+        }
+
+        [[nodiscard]] std::uint64_t GetHistogramReadbackBufferSize() const noexcept override
+        {
+            return m_HistogramReadbackBufferSize;
         }
 
         void SetLightingPath(FrameRecipeLightingPath path) noexcept override
@@ -3303,6 +3440,76 @@ namespace Extrinsic::Graphics
                 m_PickingSlotInvalidated.resize(newSlotCount, false);
             }
 
+            // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
+            // `Histogram.Readback` buffer. Allocated lazily so the buffer
+            // survives `RebuildOperationalResources()` byte-identical when
+            // `device.GetFramesInFlight()` is unchanged (same pattern picking
+            // follows above). Sized for `kHistogramReadbackSlotBytes *
+            // frames-in-flight` bytes (256 uint32 bins per slot, one slot
+            // per in-flight frame). If the expected size differs from the
+            // current allocation (e.g. the device reports a different
+            // frames-in-flight after a swapchain rebuild), the lease is
+            // dropped and re-created so the executor's `slot *
+            // kHistogramReadbackSlotBytes` per-frame addressing never
+            // overruns the buffer.
+            const std::uint64_t histogramReadbackBytes =
+                kHistogramReadbackSlotBytes *
+                static_cast<std::uint64_t>(pickingFramesInFlight);
+            const bool histogramReadbackNeedsAllocation =
+                !m_HistogramReadbackBuffer.has_value() ||
+                !m_HistogramReadbackBuffer->IsValid() ||
+                m_HistogramReadbackBufferSize != histogramReadbackBytes;
+            if (histogramReadbackNeedsAllocation)
+            {
+                m_HistogramReadbackBuffer.reset();
+                m_HistogramReadbackBufferSize = 0u;
+                auto histogramReadbackOr = m_BufferManager->Create({
+                    .SizeBytes   = histogramReadbackBytes,
+                    .Usage       = RHI::BufferUsage::TransferDst,
+                    .HostVisible = true,
+                    .DebugName   = "Renderer.HistogramReadback",
+                });
+                if (histogramReadbackOr.has_value())
+                {
+                    m_HistogramReadbackBuffer.emplace(std::move(*histogramReadbackOr));
+                    m_HistogramReadbackBufferSize = histogramReadbackBytes;
+                }
+                else
+                {
+                    Core::Log::Warn("[Graphics] Histogram.Readback buffer unavailable; default-recipe histogram readback will be skipped: error={}",
+                                    static_cast<int>(histogramReadbackOr.error()));
+                }
+            }
+
+            // GRAPHICS-075 Slice E.2 — keep the per-slot histogram metadata
+            // arrays sized to match the current `frames-in-flight` slot
+            // count. Mirrors the picking-slot resize policy above: shrinking
+            // the FIF discards trailing pending readbacks (they would never
+            // be drained naturally since the new slot indexing addresses a
+            // strictly smaller range), and any still-pending slots are
+            // flagged `Invalidated=true` so the upcoming `BeginFrame()`
+            // drain skips the publish for slots whose pre-rebuild copy is
+            // no longer trustworthy.
+            if (m_HistogramSlotPending.size() > newSlotCount)
+            {
+                m_HistogramSlotPending.resize(newSlotCount);
+                m_HistogramSlotIssuedFrame.resize(newSlotCount);
+                m_HistogramSlotInvalidated.resize(newSlotCount);
+            }
+            for (std::size_t slot = 0; slot < m_HistogramSlotPending.size(); ++slot)
+            {
+                if (m_HistogramSlotPending[slot])
+                {
+                    m_HistogramSlotInvalidated[slot] = true;
+                }
+            }
+            if (m_HistogramSlotPending.size() < newSlotCount)
+            {
+                m_HistogramSlotPending.resize(newSlotCount, false);
+                m_HistogramSlotIssuedFrame.resize(newSlotCount, 0u);
+                m_HistogramSlotInvalidated.resize(newSlotCount, false);
+            }
+
             // GRAPHICS-074 Slice A — EntityId selection pipeline. Same
             // reset/republish pattern as the forward, shadow, and deferred
             // pipelines so a failed `Create()` leaves the pass in
@@ -3785,6 +3992,79 @@ namespace Extrinsic::Graphics
                 m_PickingSlotInvalidated[slot] = false;
                 m_PickingSlotIssuedFrame[slot] = 0u;
                 m_PickingSlotRequest[slot] = PickPixelRequest{};
+            }
+        }
+
+        // GRAPHICS-075 Slice E.2 — drain any histogram-readback slot whose
+        // issuing frame has completed since its copy was recorded. Called
+        // at the top of `BeginFrame()` so the `PostProcessSystem` observes
+        // the exposure-history update before the runtime extracts the next
+        // frame's `RenderWorld` (the tonemap leg of the upcoming frame
+        // benefits from the freshly published adaptation state). The drain
+        // is gated on (a) a live operational device, (b) a valid
+        // renderer-owned `Histogram.Readback` lease, and (c) at least one
+        // slot whose `IssuedFrame` predates the current `GlobalFrameNumber`
+        // (slots issued this very frame have not yet completed their copy
+        // and stay pending). Slots flagged `Invalidated` (e.g. by a
+        // `RebuildOperationalResources()` device-lost recovery) are
+        // released without publishing — the publish handshake intentionally
+        // never sees stale pre-rebuild bytes.
+        void DrainCompletedHistogramSlots()
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return;
+            }
+            if (!m_HistogramReadbackBuffer.has_value() || !m_HistogramReadbackBuffer->IsValid())
+            {
+                return;
+            }
+            if (m_HistogramSlotPending.empty() || !m_PostProcessSystem.has_value())
+            {
+                return;
+            }
+            const std::uint64_t completedFrameNumber = m_Device->GetGlobalFrameNumber();
+            const RHI::BufferHandle bufferHandle = m_HistogramReadbackBuffer->GetHandle();
+            for (std::size_t slot = 0; slot < m_HistogramSlotPending.size(); ++slot)
+            {
+                if (!m_HistogramSlotPending[slot])
+                {
+                    continue;
+                }
+                if (m_HistogramSlotIssuedFrame[slot] >= completedFrameNumber)
+                {
+                    continue;
+                }
+
+                if (m_HistogramSlotInvalidated[slot])
+                {
+                    // Release without publishing — pre-rebuild bytes are
+                    // not trustworthy, and `PublishHistogramReadback` would
+                    // anchor the retained adaptation history to them.
+                    m_HistogramSlotPending[slot] = false;
+                    m_HistogramSlotInvalidated[slot] = false;
+                    m_HistogramSlotIssuedFrame[slot] = 0u;
+                    continue;
+                }
+
+                std::array<std::uint32_t, 256> bins{};
+                const std::uint64_t slotOffset =
+                    static_cast<std::uint64_t>(slot) * kHistogramReadbackSlotBytes;
+                if (slotOffset + kHistogramReadbackSlotBytes <= m_HistogramReadbackBufferSize)
+                {
+                    m_Device->ReadBuffer(bufferHandle,
+                                         bins.data(),
+                                         kHistogramReadbackSlotBytes,
+                                         slotOffset);
+                }
+                m_PostProcessSystem->PublishHistogramReadback(
+                    std::span<const std::uint32_t>{bins.data(), bins.size()},
+                    m_HistogramSlotIssuedFrame[slot],
+                    m_Device);
+
+                m_HistogramSlotPending[slot] = false;
+                m_HistogramSlotInvalidated[slot] = false;
+                m_HistogramSlotIssuedFrame[slot] = 0u;
             }
         }
 
@@ -4793,6 +5073,26 @@ namespace Extrinsic::Graphics
         std::vector<std::uint64_t>                     m_PickingSlotIssuedFrame;
         std::vector<PickPixelRequest>                  m_PickingSlotRequest;
         std::vector<bool>                              m_PickingSlotInvalidated;
+        // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
+        // `Histogram.Readback` buffer + per-slot drain metadata. Sized for
+        // `kHistogramReadbackSlotBytes * frames-in-flight` bytes (256 uint32
+        // bins per slot, one slot per in-flight frame). Allocated by
+        // `InitializeOperationalPassResources()` on first operational init,
+        // re-allocated on `RebuildOperationalResources()` only when the
+        // device's `GetFramesInFlight()` changes (same pattern picking
+        // follows). Drained from the top of `BeginFrame()` once the issuing
+        // frame's `GlobalFrameNumber` has advanced; the drain decodes the
+        // 256 uint32 bins and forwards them to
+        // `PostProcessSystem::PublishHistogramReadback(...)`. `Invalidated`
+        // is set by `RebuildOperationalResources()` for in-flight slots so
+        // the drain skips the publish for slots whose pre-rebuild copy is
+        // no longer trustworthy (same device-lost-recovery contract as
+        // picking).
+        std::optional<RHI::BufferManager::BufferLease> m_HistogramReadbackBuffer;
+        std::uint64_t                                  m_HistogramReadbackBufferSize{0u};
+        std::vector<bool>                              m_HistogramSlotPending;
+        std::vector<std::uint64_t>                     m_HistogramSlotIssuedFrame;
+        std::vector<bool>                              m_HistogramSlotInvalidated;
         std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
         std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
         std::vector<ScalarAttributePacket>              m_VisualizationScalars;

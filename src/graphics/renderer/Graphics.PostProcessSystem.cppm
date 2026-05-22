@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <vector>
 
 export module Extrinsic.Graphics.PostProcessSystem;
@@ -148,6 +149,36 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] RHI::TextureHandle GetSMAAAreaTexture() const noexcept;
         [[nodiscard]] RHI::TextureHandle GetSMAASearchTexture() const noexcept;
         [[nodiscard]] RHI::BufferHandle  GetExposureHistoryBuffer() const noexcept;
+
+        // GRAPHICS-075 Slice E.2 — consume one frame's 256-bin histogram
+        // payload after the `BeginFrame()`-side readback drain decodes it
+        // from the renderer-owned host-visible `Histogram.Readback` slot.
+        // Updates the retained `PostProcessExposureHistory` CPU mirror
+        // (`PreviousAverageLogLum`, `AdaptationVelocity`, `FrameIndex`) from
+        // the bin distribution and, when an operational device is available,
+        // uploads the new history payload into the device-side
+        // `PostProcess.ExposureHistory` storage buffer via
+        // `IDevice::GetTransferQueue().UploadBuffer(...)` (mirroring the SMAA
+        // LUT upload path Slice D.2b uses). `bins` must carry exactly 256
+        // entries; shorter spans are rejected as a diagnostics counter bump
+        // and treated as a no-op. The publish counter on the diagnostics
+        // surface lets contract tests assert the drain → publish handshake
+        // ran exactly once per completed frame.
+        void PublishHistogramReadback(std::span<const std::uint32_t> bins,
+                                      std::uint64_t frameIndex,
+                                      RHI::IDevice* device) noexcept;
+
+        // GRAPHICS-075 Slice E.2 — CPU-visible snapshot of the most recent
+        // exposure-history update. Test seam: the readback drain's effect on
+        // the retained `PostProcessExposureHistory` payload is observable
+        // here without round-tripping through the GPU buffer. Returns the
+        // default-constructed payload before the first publish call.
+        [[nodiscard]] PostProcessExposureHistory GetExposureHistorySnapshot() const noexcept;
+
+        // GRAPHICS-075 Slice E.2 — count of successful publish calls (rejected
+        // payloads with non-256 bin spans are tracked separately via
+        // `PostProcessDiagnostics::InvalidSettingCount`).
+        [[nodiscard]] std::uint32_t GetHistogramPublishCount() const noexcept;
 
     private:
         struct Impl;

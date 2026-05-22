@@ -116,6 +116,17 @@ namespace Extrinsic::Graphics
         // `BeginFrame()` drain + `SelectionSystem::PublishPickResult` /
         // `PublishNoHit` routing.
         std::uint32_t PickingReadbackCopyCount = 0;
+        // GRAPHICS-075 Slice E.2 — count of frames in which the default
+        // recipe's `PostProcessHistogramPass` executor branch recorded the
+        // histogram-readback `CopyBuffer(PostProcess.Histogram →
+        // Histogram.Readback @ slot * 1024)` after the compute dispatch.
+        // Each operational frame with a valid renderer-owned readback buffer
+        // increments by 1; stays at zero when the device is non-operational,
+        // when the readback buffer is unavailable, or when the histogram
+        // stage itself is gated off. The `BeginFrame()`-side drain consumes
+        // pending slots and forwards the 256-bin payload to
+        // `PostProcessSystem::PublishHistogramReadback(...)`.
+        std::uint32_t HistogramReadbackCopyCount = 0;
     };
 
     export struct RuntimeRenderSnapshotBatch
@@ -474,6 +485,22 @@ namespace Extrinsic::Graphics
         // `PublishPickResult` / `PublishNoHit` routing.
         [[nodiscard]] virtual RHI::BufferHandle GetPickingReadbackBuffer() const noexcept = 0;
         [[nodiscard]] virtual std::uint64_t GetPickingReadbackBufferSize() const noexcept = 0;
+
+        // GRAPHICS-075 Slice E.2 — accessor for the renderer-owned host-
+        // visible `Histogram.Readback` buffer. Sized for
+        // `1024 * frames-in-flight` bytes (256 uint32 bins per slot, one
+        // slot per in-flight frame), allocated with `HostVisible = true`
+        // and `BufferUsage::TransferDst` so the recipe can import it as the
+        // destination of a `CopyBuffer(PostProcess.Histogram →
+        // Histogram.Readback)` after the histogram dispatch, and the
+        // renderer can map it on `BeginFrame()` once the issuing frame has
+        // completed. Handle is invalid until an operational device path
+        // allocates the lease; size accessor returns the allocation size in
+        // bytes (0 when the buffer is not yet allocated). The drain
+        // publishes the 256-bin payload to
+        // `PostProcessSystem::PublishHistogramReadback(...)`.
+        [[nodiscard]] virtual RHI::BufferHandle GetHistogramReadbackBuffer() const noexcept = 0;
+        [[nodiscard]] virtual std::uint64_t GetHistogramReadbackBufferSize() const noexcept = 0;
 
         // GRAPHICS-072 (Slice A) — test seam for the default recipe's runtime
         // lighting path. `DeriveDefaultFrameRecipeFeatures` derives a default
