@@ -91,6 +91,45 @@ export namespace Geometry::Internal
                       "on the normalized GJK workspace; see GEOM-015 Slice 3.");
     }
 
+    // --- GJK Termination Diagnostics ---
+    //
+    // GEOM-015 Slice 4 surfaces *why* a GJK driver exited so callers can
+    // distinguish geometric outcomes from numerical-degeneracy fallbacks
+    // without re-running the algorithm. The boolean entry points stay as
+    // thin wrappers; callers that want diagnostics opt in via the
+    // out-param overload.
+    enum class TerminationReason : unsigned char
+    {
+        // NextSimplex confirmed origin is contained, or the search
+        // direction / current support collapsed to ~zero in the
+        // normalized workspace ⇒ origin is on the simplex.
+        Converged,
+        // dot(support, direction) < GJK_EPSILON: the latest support
+        // point did not extend strictly past the origin along the
+        // search direction ⇒ a separating axis exists.
+        EarlyOutNegativeSupport,
+        // The latest support point duplicates an existing simplex
+        // vertex (within GJK_EPSILON in normalized space) ⇒ no further
+        // progress is possible. Typically reached on edge-aligned
+        // degenerate inputs.
+        NoSimplexProgress,
+        // The iteration budget Config::GJK_MAX_ITERATIONS was exhausted
+        // before any of the above terminating conditions fired. Expected
+        // to be very rare on non-pathological inputs; persistent hits
+        // indicate either a misbehaving support function or a
+        // numerical-stability regression worth investigating.
+        MaxIterationsHit,
+    };
+
+    struct GJKDiagnostics
+    {
+        // Number of main-loop iterations executed (each iteration runs
+        // one Minkowski-difference support query). The initial seed
+        // support is *not* counted; the first new support is iteration 1.
+        int iterations = 0;
+        TerminationReason reason = TerminationReason::Converged;
+    };
+
     namespace Detail
     {
         [[nodiscard]] inline glm::vec3 TripleProduct(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
@@ -319,9 +358,11 @@ export namespace Geometry::Internal
     // =========================================================================
 
     template <typename A, typename B>
-    bool GJK_Boolean(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/)
+    bool GJK_Boolean(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
     {
         // Currently allocation-free; scratch is plumbed for consistency with EPA.
+        diag = {};
+
         glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
 
         // Compute normalization scale from the initial support point.
@@ -332,7 +373,10 @@ export namespace Geometry::Internal
         support *= invScale;
 
         if (Detail::NearlyZero(support))
+        {
+            diag.reason = TerminationReason::Converged;
             return true;
+        }
 
         Simplex points;
         points.Push(support);
@@ -342,20 +386,32 @@ export namespace Geometry::Internal
 
         while (true)
         {
+            ++diag.iterations;
+
             if (Detail::NearlyZero(direction))
+            {
+                diag.reason = TerminationReason::Converged;
                 return true;
+            }
 
             // Support query in original space, then normalize.
             support = MinkowskiDifference::Support(a, b, direction) * invScale;
 
             if (Detail::NearlyZero(support))
+            {
+                diag.reason = TerminationReason::Converged;
                 return true;
+            }
 
             // (a) normalized convergence tolerance: support-progress test.
             // In normalized workspace, a new support point that does not
             // strictly extend past the origin along `direction` means GJK has
             // converged on a separating axis.
-            if (glm::dot(support, direction) < Config::GJK_EPSILON) return false;
+            if (glm::dot(support, direction) < Config::GJK_EPSILON)
+            {
+                diag.reason = TerminationReason::EarlyOutNegativeSupport;
+                return false;
+            }
 
             bool duplicate = false;
             for (int i = 0; i < points.Size; ++i)
@@ -370,22 +426,39 @@ export namespace Geometry::Internal
                 }
             }
             if (duplicate)
+            {
+                diag.reason = TerminationReason::NoSimplexProgress;
                 return false;
+            }
 
             points.Push(support);
 
-            if (NextSimplex(points, direction)) return true;
+            if (NextSimplex(points, direction))
+            {
+                diag.reason = TerminationReason::Converged;
+                return true;
+            }
 
             if (points.Size > 0 && --maxIterations == 0)
             {
+                diag.reason = TerminationReason::MaxIterationsHit;
                 return false;
             }
         }
     }
 
     template <typename A, typename B>
-    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/)
+    bool GJK_Boolean(const A& a, const B& b, Core::Memory::LinearArena& scratch)
     {
+        GJKDiagnostics diag;
+        return GJK_Boolean(a, b, scratch, diag);
+    }
+
+    template <typename A, typename B>
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
+    {
+        diag = {};
+
         glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
 
         const float scale = glm::length(support);
@@ -398,40 +471,68 @@ export namespace Geometry::Internal
         points.Push(support);
 
         if (Detail::NearlyZero(support))
+        {
+            diag.reason = TerminationReason::Converged;
             return points;
+        }
 
         glm::vec3 direction = -support;
         int maxIterations = Config::GJK_MAX_ITERATIONS;
 
         while (maxIterations-- > 0)
         {
+            ++diag.iterations;
+
             if (Detail::NearlyZero(direction))
+            {
+                diag.reason = TerminationReason::Converged;
                 return points;
+            }
 
             support = MinkowskiDifference::Support(a, b, direction) * invScale;
 
             if (Detail::NearlyZero(support))
             {
                 points.Push(support);
+                diag.reason = TerminationReason::Converged;
                 return points;
             }
 
             // (a) normalized convergence tolerance: support-progress test
             // (Intersection variant; mirrors GJK_Boolean).
-            if (glm::dot(support, direction) < Config::GJK_EPSILON) return std::nullopt;
+            if (glm::dot(support, direction) < Config::GJK_EPSILON)
+            {
+                diag.reason = TerminationReason::EarlyOutNegativeSupport;
+                return std::nullopt;
+            }
 
             for (int i = 0; i < points.Size; ++i)
             {
                 // (a) normalized convergence tolerance: simplex-membership /
                 // duplicate test (Intersection variant; mirrors GJK_Boolean).
                 if (glm::length2(points[i] - support) <= Config::GJK_EPSILON * Config::GJK_EPSILON)
+                {
+                    diag.reason = TerminationReason::NoSimplexProgress;
                     return std::nullopt;
+                }
             }
 
             points.Push(support);
-            if (NextSimplex(points, direction)) return points;
+            if (NextSimplex(points, direction))
+            {
+                diag.reason = TerminationReason::Converged;
+                return points;
+            }
         }
+        diag.reason = TerminationReason::MaxIterationsHit;
         return std::nullopt;
+    }
+
+    template <typename A, typename B>
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Core::Memory::LinearArena& scratch)
+    {
+        GJKDiagnostics diag;
+        return GJK_Intersection(a, b, scratch, diag);
     }
 
     // Back-compat overloads (existing call sites): route through the scratch-taking versions.

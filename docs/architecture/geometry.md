@@ -179,12 +179,26 @@ Slice 3 pins the contract for that constant:
   requires. Any future migration to a magnitude tolerance must revisit
   this section and the GEOM-015 callsite audit before changing the
   constant.
-- **Termination diagnostics.** Surfacing the GJK iteration count and
-  termination reason (`Converged` / `EarlyOutNegativeSupport` /
-  `NoSimplexProgress` / `MaxIterationsHit`) as an overload or out-param,
-  plus a parity test battery across small (`~1e-3`) and large (`~1e3`)
-  shape scales, is deferred to GEOM-015 Slice 4. The boolean entry point
-  stays as a thin wrapper.
+- **Termination diagnostics.** GEOM-015 Slice 4 surfaces the GJK
+  iteration count and termination reason via the
+  `Geometry::Internal::GJKDiagnostics` out-param (with fields
+  `iterations` and `reason ∈ { Converged, EarlyOutNegativeSupport,
+  NoSimplexProgress, MaxIterationsHit }`). Both `GJK_Boolean` and
+  `GJK_Intersection` gained a four-argument overload taking the
+  diagnostics by reference; the existing two- and three-argument entry
+  points stay as thin wrappers and produce byte-identical boolean
+  outcomes. Callers that only want overlap continue using the existing
+  entry points; callers that need to distinguish a geometric "no
+  overlap" (`EarlyOutNegativeSupport`) from a numerical fallback
+  (`NoSimplexProgress`, `MaxIterationsHit`) opt in via the
+  diagnostic-bearing overload without re-running GJK. A parity test
+  battery in `tests/unit/geometry/Test_GJK.cpp` exercises boolean
+  outcomes across small (`~1e-3`) and large (`~1e3`) shape scales,
+  including a touching-sphere case and a near-touching-separation case
+  that exercises the previously-fragile sub-millimetre regime; an
+  iteration-budget regression test pins the practical iteration count
+  on the standard primitive corpus well below
+  `Config::GJK_MAX_ITERATIONS`.
 
 ## Intersection classification records
 
