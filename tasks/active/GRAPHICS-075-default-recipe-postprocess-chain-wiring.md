@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: in-progress (Slice E.1 landed; Slice E.2 queued next).
+- State: in-progress (Slice E.2 landed; task slice plan complete, awaiting retirement after final review).
   Maturity reached so far: Slice A closed `Scaffolded → CPUContracted`
   on the ToneMap leaf and the `"PostProcessPass"` umbrella executor
   branch (merged via PR #902); Slice B.1 added the bloom downsample +
@@ -62,21 +62,27 @@
   is a separate GPU/Vulkan-gate concern owned by the opt-in
   `gpu;vulkan` smoke).
 - Owner/agent: local agent workflow.
-- Branch: Slice D.2a on `claude/intrinsicengine-agent-onboarding-32x02`;
-  Slice D.2b on `claude/intrinsicengine-agent-onboarding-BQgHn`.
+- Branch: Slice E.2 on `claude/dreamy-sagan-XZ9Dl`; prior slices on
+  branches recorded in their per-slice notes below.
 - Activated: 2026-05-21 — first unblocked Theme A default-recipe leaf
   after GRAPHICS-074 retirement.
-- Next verification step: open Slice E.2 (host-visible
-  `Histogram.Readback` buffer + `BeginFrame()`-side readback drain
-  mirroring the `Picking.Readback` pattern +
-  `PostProcessSystem::PublishHistogramReadback(...)` + exposure-
-  adaptation history buffer consumption) in a follow-up session.
-  Slice E.1 (compute pipeline scaffold + `RecordPostProcessHistogramPass`
-  + new ordered `"PostProcessHistogramPass"` graph pass + push-constant
-  block) has landed on
-  `claude/gallant-hypatia-a2puc` and closed
-  `Scaffolded → CPUContracted` on the histogram leaf for the CPU/null
-  gate.
+- Next verification step: Slice E.2 closes the histogram readback drain
+  on the CPU/null gate. The slice plan is now complete; the task is
+  ready for final review and retirement to `tasks/done/` once the
+  branch is reviewed. Verification ran in-session against a build with
+  `clang-20`/`clang++-20`/`clang-scan-deps-20`:
+  ```bash
+  cmake --preset ci
+  cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+  ctest --test-dir build/ci --output-on-failure -L 'contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+  python3 tools/repo/check_layering.py --root src --strict
+  python3 tools/docs/check_doc_links.py --root .
+  python3 tools/agents/check_task_policy.py --root . --strict
+  ```
+  Result: 208/208 CPU graphics contract tests passed (including the
+  four new `RendererFrameLifecycle.HistogramReadback*` /
+  `PublishHistogramReadbackUpdatesExposureHistory` tests); layering,
+  doc-link, and task-policy validators all clean.
 
 ## Slice plan
 
@@ -484,6 +490,21 @@ a readback drain.
   survive `RebuildGpuResources()` byte-identical. Slice D.2b does not
   touch the framegraph or the pass-body pipeline-format contracts —
   those are pinned by Slice D.2a.
+- Slice E.2 closes `CPUContracted → Operational` on the Histogram leaf
+  for the CPU/null gate: the renderer-owned host-visible
+  `Histogram.Readback` buffer lifecycle (allocation, FIF-aware
+  resize, byte-identical rebuild survival), the per-frame
+  executor-recorded `CopyBuffer(PostProcess.Histogram →
+  Histogram.Readback)` with bracketing buffer barriers, the
+  `BeginFrame()`-side drain mirroring the `Picking.Readback`
+  drain pattern, and `PostProcessSystem::PublishHistogramReadback(...)`
+  with its one-pole IIR over the retained
+  `PostProcessExposureHistory` mirror + transfer-queue upload to
+  the GPU history buffer all land on the CPU/null contract gate.
+  Full `Operational` on the GPU/Vulkan gate for the Histogram leaf
+  is now gated only by the standing opt-in `gpu;vulkan` smoke
+  exercising the live `vkCmdDispatch` + `vkCmdCopyBuffer` +
+  host-mapped readback path.
 - Slice E.1 closes `Scaffolded → CPUContracted` on the Histogram leaf
   for the CPU/null gate: the recipe splits the histogram out of the
   `"PostProcessPass"` umbrella into its own ordered graph pass
@@ -587,12 +608,71 @@ a readback drain.
   postprocess helper (tonemap, bloom, FXAA, SMAA edge/blend/resolve)
   is unchanged from its prior slice. Per-stage executor branches
   remain in `Graphics.Renderer.cpp`'s per-pass switch.
-- [ ] **Slice E.2**: Implement the histogram readback drain on
-  `BeginFrame()` after the issuing frame's fences complete; surface
-  results through `PostProcessSystem::PublishHistogramReadback(...)`
-  (mirror the `Picking.Readback` drain); update the retained
-  `PostProcessExposureHistory` storage buffer via a `CopyBuffer(staging →
-  ExposureHistory)`.
+- [x] **Slice E.2**: `NullRenderer::InitializeOperationalPassResources(device)`
+  allocates the host-visible `Histogram.Readback` buffer alongside the
+  existing `Picking.Readback` buffer (`1024 * frames-in-flight` bytes,
+  `HostVisible | TransferDst`); same lazy-allocation pattern as
+  picking so the lease survives `RebuildOperationalResources()`
+  byte-identical when `device.GetFramesInFlight()` is unchanged and is
+  reallocated when it changes. `Shutdown()` drops the lease before
+  the `BufferManager` tears down. Per-slot
+  `m_HistogramSlotPending` / `m_HistogramSlotIssuedFrame` /
+  `m_HistogramSlotInvalidated` arrays track in-flight readbacks and
+  are kept in lock-step with the FIF count (slot-shrink flags any
+  pending readback as invalidated so the drain skips the publish).
+- [x] **Slice E.2**: `FrameRecipeImports` gains a new
+  `HistogramReadback` field; `BuildDefaultFrameRecipe` imports the
+  renderer-owned handle with
+  `BufferState::TransferDst → BufferState::HostReadback` and declares
+  it as a `BufferUsage::TransferDst` write on the
+  `"PostProcessHistogramPass"` graph pass (mirroring the picking
+  import on `PickingPass`). `DescribeDefaultFrameRecipe` adds
+  `FrameRecipeResourceKind::HistogramReadback` and lists
+  `"Histogram.Readback"` in the histogram pass's writes so the
+  recipe-aware validator authorises the imported-write.
+- [x] **Slice E.2**: Executor `"PostProcessHistogramPass"` branch
+  records the per-frame
+  `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot *
+  1024)` after the compute dispatch helper returns `Recorded`, with
+  bracketing `BufferBarrier(ShaderWrite → TransferRead → ShaderWrite)`
+  transitions on the transient `PostProcess.Histogram` handle so the
+  atomic accumulations are visible to the copy and the buffer's
+  post-copy state remains valid for any downstream consumer. The
+  copy is gated on `(operational device) && (valid renderer-owned
+  readback lease) && (compiled transient histogram handle)`. Each
+  recorded copy bumps the new
+  `RenderGraphFrameStats::HistogramReadbackCopyCount` counter
+  mirroring `PickingReadbackCopyCount`.
+- [x] **Slice E.2**: `BeginFrame()` invokes a new
+  `DrainCompletedHistogramSlots()` after the existing
+  `DrainCompletedPickingSlots()` and before
+  `m_Device->BeginFrame(...)`. The drain uses
+  `IDevice::GetGlobalFrameNumber()` as the completed-frame proxy
+  (`IssuedFrame < GlobalFrameNumber` ⇒ flushed), decodes the 256
+  uint32 bins each slot copied via `IDevice::ReadBuffer(...)`, and
+  forwards the payload to
+  `PostProcessSystem::PublishHistogramReadback(bins, frameIndex,
+  device)`. Slots flagged `Invalidated` (e.g. by a
+  `RebuildOperationalResources()` device-lost recovery) are
+  released without publishing so the exposure-history mirror is
+  never anchored to stale pre-rebuild bytes.
+- [x] **Slice E.2**: `PostProcessSystem::PublishHistogramReadback(...)`
+  decodes the 256-bin payload by weighting each bin centre by its
+  sample count, blends the resulting average log luminance into the
+  retained `PostProcessExposureHistory` CPU mirror through a
+  one-pole IIR (`adaptationVelocity = 0.05`; the first publish
+  snaps directly to the observed value so the history is not
+  anchored to the default-constructed `0.0` on startup), and
+  uploads the updated history payload into the device-side
+  `PostProcess.ExposureHistory` storage buffer through
+  `IDevice::GetTransferQueue().UploadBuffer(...)` — mirroring the
+  SMAA LUT upload path Slice D.2b uses. Rejected payloads (non-256
+  bin spans) increment `PostProcessDiagnostics::InvalidSettingCount`
+  and leave the mirror untouched. New
+  `GetExposureHistorySnapshot()` / `GetHistogramPublishCount()`
+  accessors expose the CPU mirror + the publish counter so contract
+  tests can observe the drain → publish handshake without
+  round-tripping through the GPU buffer.
 - [x] **Slice E.1**: `BuildDefaultFrameRecipe` declares the new
   `"PostProcessHistogramPass"` graph pass and routes the
   `PostProcess.Histogram` write through it. The umbrella
@@ -679,13 +759,38 @@ a readback drain.
     (+ rebuild / depth-failure / culling-failure variants) bumps the
     recorded-pass counters from 10/10/9/5 to 11/11/10/6;
     `kRoutedPasses` adds `"PostProcessHistogramPass"`.
-- [ ] **Slice E.2**: `contract;graphics` test that the histogram
-  readback drain calls `PostProcessSystem::PublishHistogramReadback`
-  after the issuing frame's fence completes; survives rebuild;
-  forwards the 256-bin payload byte-identical from the host-visible
-  `Histogram.Readback` slot.
-- [ ] **Slice E.2**: `contract;graphics` test: `PostProcessDiagnostics`
-  reports zero failure counters after a full chain init.
+- [x] **Slice E.2**: `contract;graphics` tests in
+  `Test.RendererFrameLifecycle.cpp`:
+  - `HistogramReadbackBufferSurvivesOperationalRebuild` asserts
+    the renderer-owned host-visible buffer is valid after
+    `Initialize()` (`1024 * frames-in-flight = 2048` bytes for the
+    MockDevice default FIF of 2), survives
+    `RebuildOperationalResources()` byte-identical (same handle +
+    size), and is released by `Shutdown()` so a later
+    `Initialize()` allocates fresh.
+  - `HistogramReadbackCopyRecordedOnOperationalFrame` asserts the
+    executor records exactly one
+    `CopyBuffer(PostProcess.Histogram → Histogram.Readback)` per
+    operational frame (via the new
+    `RenderGraphFrameStats::HistogramReadbackCopyCount` counter)
+    and that the per-frame buffer-barrier stream contains the
+    bracketing `ShaderWrite → TransferRead → ShaderWrite`
+    transitions on the histogram buffer.
+  - `HistogramReadbackDrainPublishesEachSlotExactlyOnce` exercises
+    the full drain handshake: frame 0 records the copy and seeds
+    slot-0 metadata; the mock buffer is then seeded with a
+    uniform 256-bin payload via
+    `MockDevice::BufferContents`; frame 1's `BeginFrame()` drain
+    decodes the bytes and forwards them to
+    `PublishHistogramReadback(...)`; frame 2's drain is asserted
+    a no-op (slot 0 is no longer pending).
+  - `PublishHistogramReadbackUpdatesExposureHistory` drives the
+    `PostProcessSystem` API directly with a uniform payload (first
+    publish snaps to the observed midpoint ≈ 0.0), then a
+    bin-0-skewed payload (second publish blends through the
+    one-pole IIR — strictly negative but above the raw
+    observation), and finally a rejected too-short payload (CPU
+    mirror untouched, publish counter unchanged).
 
 ## Docs
 - [x] **Slice A**: Update `src/graphics/renderer/README.md` to record the tonemap leg of the postprocess chain as operationally wired (umbrella `"PostProcessPass"` reports `Recorded`); call out Slices B–E as the bloom / FXAA / SMAA / histogram followups.
@@ -711,7 +816,16 @@ a readback drain.
   separate step ordered between `"PointPass"` and `"PostProcessPass"`;
   the canonical-pass-list paragraph notes the dispatch-vs-render-pass
   scope reason for the split.
-- [ ] **Slice E.2**: Extend `src/graphics/renderer/README.md` and `docs/architecture/rendering-three-pass.md` as the histogram readback drain lands.
+- [x] **Slice E.2**: `src/graphics/renderer/README.md` now records
+  the histogram readback wiring (renderer-owned host-visible
+  `Histogram.Readback` buffer, the per-frame `CopyBuffer` with
+  bracketing buffer barriers, the `BeginFrame()`-side drain,
+  `PostProcessSystem::PublishHistogramReadback(bins, frameIndex,
+  device)`, the one-pole IIR over `PostProcessExposureHistory`, and
+  the transfer-queue upload to the device-side history buffer).
+  `docs/architecture/rendering-three-pass.md` adds the same
+  description to the `PostProcessHistogramPass` row in the
+  pipeline-order table.
 
 ## Acceptance criteria
 - [x] **Slice A**: ToneMap pipeline records or `SkippedUnavailable` deterministically; `"PostProcessPass"` reports `Recorded` on the operational CPU/null gate.
@@ -731,7 +845,8 @@ a readback drain.
   `EnableHistogram = false` the pass body short-circuits and the
   helper still reports `Recorded` per the "structurally-recorded
   no-op" taxonomy bloom / FXAA / SMAA already follow.
-- [ ] **Slice E.2**: Histogram readback drain produces deterministic CPU-visible results.
+- [x] **Slice E.2**: Histogram readback drain produces deterministic CPU-visible results. Verified by the four new contract tests; the drain decodes the per-slot 256-bin payload via `IDevice::ReadBuffer(...)` and routes through `PostProcessSystem::PublishHistogramReadback(...)` whose CPU mirror (`PostProcessExposureHistory`) is observable via `GetExposureHistorySnapshot()`.
+- [x] **Slice E.2**: No regression in CPU/null contract tests for non-postprocess passes (208/208 graphics CPU contract tests pass after Slice E.2; layering, doc-link, and task-policy validators all clean).
 - [x] **Slice A**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice A).
 - [x] **Slice B.1**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.1).
 - [x] **Slice B.2**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.2).

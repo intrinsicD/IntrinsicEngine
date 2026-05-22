@@ -217,8 +217,15 @@ namespace Extrinsic::Graphics
         // `"PostProcessHistogramPass"` declaration reads `SceneColorHDR`
         // and writes the `PostProcess.Histogram` storage buffer; the
         // umbrella below no longer carries the histogram write.
+        // GRAPHICS-075 Slice E.2 — the histogram pass also writes the
+        // renderer-owned host-visible `Histogram.Readback` buffer via a
+        // `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot * 1024)`
+        // recorded by the executor after the compute dispatch. Declaring the
+        // buffer in the pass's `Writes` list authorises the imported-write
+        // through the recipe-aware validator (mirroring the `Picking.Readback`
+        // import on `PickingPass`).
         AddPass(out, FrameRecipePassKind::PostProcessHistogram, "PostProcessHistogramPass", features.EnablePostProcess, false,
-                {"SceneColorHDR"}, {"PostProcess.Histogram"});
+                {"SceneColorHDR"}, {"PostProcess.Histogram", "Histogram.Readback"});
         AddPass(out, FrameRecipePassKind::PostProcess, "PostProcessPass", features.EnablePostProcess, false,
                 {"SceneColorHDR"}, {"PostProcess.BloomScratch", "SceneColorLDR"});
         AddPass(out, FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass", features.EnablePostProcess, false,
@@ -292,6 +299,14 @@ namespace Extrinsic::Graphics
         // entry in the pass's `Writes` list) while keeping `optional=true`
         // since the resource still only exists when `pickingActive` is true.
         AddResource(out, FrameRecipeResourceKind::PickingReadback, "Picking.Readback", pickingActive, true, false, true, true);
+        // GRAPHICS-075 Slice E.2 — the histogram readback buffer is the
+        // renderer-owned host-visible buffer imported through
+        // `FrameRecipeImports::HistogramReadback`. Declared imported +
+        // imported-write-allowed (Slice E.2 records
+        // `CopyBuffer(PostProcess.Histogram → Histogram.Readback)` after the
+        // dispatch). Gated on `EnablePostProcess` to match the other
+        // postprocess transients above.
+        AddResource(out, FrameRecipeResourceKind::HistogramReadback, "Histogram.Readback", features.EnablePostProcess, true, false, true, true);
         return out;
     }
 
@@ -430,6 +445,7 @@ namespace Extrinsic::Graphics
         TextureRef debugView{};
         BufferRef postProcessHistogram{};
         BufferRef pickingReadback{};
+        BufferRef histogramReadback{};
 
         if (pickingActive || features.EnableSelectionOutline)
         {
@@ -565,6 +581,23 @@ namespace Extrinsic::Graphics
                 .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
                 .DebugName = "PostProcess.Histogram",
             });
+            // GRAPHICS-075 Slice E.2 — import the renderer-owned host-visible
+            // `Histogram.Readback` buffer rather than allocating a transient
+            // one. The `TransferDst` initial state satisfies the framegraph's
+            // imported-write contract (the recipe records
+            // `CopyBuffer(PostProcess.Histogram → Histogram.Readback)` after
+            // the compute dispatch), and the `HostReadback` final state leaves
+            // the buffer host-readable for the next `BeginFrame()`-side drain.
+            // The import is conditional on `imports.HistogramReadback` being
+            // valid so headless contract tests / non-operational devices that
+            // skip the renderer-side allocation still build a valid recipe.
+            if (imports.HistogramReadback.IsValid())
+            {
+                histogramReadback = graph.ImportBuffer("Histogram.Readback",
+                                                       imports.HistogramReadback,
+                                                       BufferState::TransferDst,
+                                                       BufferState::HostReadback);
+            }
         }
         if (features.EnableSelectionOutline)
         {
@@ -779,6 +812,14 @@ namespace Extrinsic::Graphics
             addOrderedPass("PostProcessHistogramPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(hdr, TextureUsage::ShaderRead);
                 builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
+                // GRAPHICS-075 Slice E.2 — when the renderer owns a valid
+                // host-visible `Histogram.Readback` buffer, declare it as a
+                // `TransferDst` write so the framegraph compiler authorises
+                // the post-dispatch `CopyBuffer` the executor records.
+                if (histogramReadback.IsValid())
+                {
+                    builder.Write(histogramReadback, BufferUsage::TransferDst);
+                }
             });
             addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(hdr, TextureUsage::ShaderRead);

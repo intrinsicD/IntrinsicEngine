@@ -3431,3 +3431,264 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForTruncatedSlotOnFifS
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice E.2 — renderer-owned host-visible `Histogram.Readback`
+// buffer lifecycle. The operational publisher allocates the buffer the first
+// time `InitializeOperationalPassResources()` runs (1024 bytes per in-flight
+// frame slot — 256 uint32 bins per slot) and intentionally does not
+// re-allocate it across `RebuildOperationalResources()` calls when
+// `device.GetFramesInFlight()` is unchanged, so the handle the recipe imports
+// stays byte-identical (same pattern picking follows).
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, HistogramReadbackBufferSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{401u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle initialBuffer = renderer->GetHistogramReadbackBuffer();
+    EXPECT_TRUE(initialBuffer.IsValid());
+
+    // Size = 1024 bytes per in-flight frame slot (256 uint32 bins).
+    // `MockDevice::GetFramesInFlight()` defaults to 2, so the allocation
+    // must be 2048 bytes.
+    const std::uint64_t initialSize = renderer->GetHistogramReadbackBufferSize();
+    EXPECT_EQ(initialSize, 1024ull *
+                               static_cast<std::uint64_t>(device.GetFramesInFlight()));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+
+    // Same handle (so the recipe import stays stable across rebuilds) and
+    // same size.
+    const Extrinsic::RHI::BufferHandle rebuiltBuffer = renderer->GetHistogramReadbackBuffer();
+    EXPECT_TRUE(rebuiltBuffer.IsValid());
+    EXPECT_EQ(rebuiltBuffer.Index, initialBuffer.Index);
+    EXPECT_EQ(rebuiltBuffer.Generation, initialBuffer.Generation);
+    EXPECT_EQ(renderer->GetHistogramReadbackBufferSize(), initialSize);
+
+    renderer->Shutdown();
+
+    // After `Shutdown()` the lease is released so a later `Initialize()`
+    // would allocate against the new BufferManager rather than handing out
+    // a dangling handle.
+    EXPECT_FALSE(renderer->GetHistogramReadbackBuffer().IsValid());
+    EXPECT_EQ(renderer->GetHistogramReadbackBufferSize(), 0u);
+}
+
+// GRAPHICS-075 Slice E.2 — when the histogram pass records its compute
+// dispatch on an operational frame, the executor must also record the
+// per-frame `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot)`
+// after the dispatch. The CPU-observable contract is the
+// `HistogramReadbackCopyCount` stat counter on `RenderGraphFrameStats`
+// (matching `PickingReadbackCopyCount`).
+TEST(RendererFrameLifecycle, HistogramReadbackCopyRecordedOnOperationalFrame)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{402u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle readbackBuffer = renderer->GetHistogramReadbackBuffer();
+    ASSERT_TRUE(readbackBuffer.IsValid());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    EXPECT_EQ(stats.HistogramReadbackCopyCount, 1u)
+        << "Histogram-readback copy must record exactly once per operational frame.";
+
+    // The dispatch is bracketed by `ShaderWrite → TransferRead → ShaderWrite`
+    // buffer barriers on the per-frame `PostProcess.Histogram` handle so
+    // the atomic accumulations are visible to the copy.
+    std::uint32_t shaderWriteToTransferRead = 0u;
+    std::uint32_t transferReadToShaderWrite = 0u;
+    for (const auto& barrier : device.CommandContext.BufferBarrierCalls)
+    {
+        if (barrier.Before == Extrinsic::RHI::MemoryAccess::ShaderWrite &&
+            barrier.After == Extrinsic::RHI::MemoryAccess::TransferRead)
+        {
+            ++shaderWriteToTransferRead;
+        }
+        else if (barrier.Before == Extrinsic::RHI::MemoryAccess::TransferRead &&
+                 barrier.After == Extrinsic::RHI::MemoryAccess::ShaderWrite)
+        {
+            ++transferReadToShaderWrite;
+        }
+    }
+    EXPECT_GE(shaderWriteToTransferRead, 1u)
+        << "Histogram readback must record ShaderWrite → TransferRead barrier "
+        << "before the copy.";
+    EXPECT_GE(transferReadToShaderWrite, 1u)
+        << "Histogram readback must restore the histogram buffer to ShaderWrite "
+        << "after the copy.";
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-075 Slice E.2 — the `BeginFrame()`-side drain decodes the
+// per-slot `Histogram.Readback` bytes and forwards them to
+// `PostProcessSystem::PublishHistogramReadback(...)` once the issuing
+// frame's `GlobalFrameNumber` has advanced. `MockCommandContext::CopyBuffer(...)`
+// is a no-op, so this test seeds the renderer-owned host-visible buffer via
+// `MockDevice::BufferContents[handle.Index]` to simulate the bytes the
+// histogram dispatch would have copied into slot 0.
+TEST(RendererFrameLifecycle, HistogramReadbackDrainPublishesEachSlotExactlyOnce)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{403u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle readbackBuffer = renderer->GetHistogramReadbackBuffer();
+    ASSERT_TRUE(readbackBuffer.IsValid());
+    const std::uint64_t readbackBufferSize = renderer->GetHistogramReadbackBufferSize();
+    ASSERT_GE(readbackBufferSize, 1024u);
+
+    // Frame 0 — record the copy. The executor populates slot-0 metadata
+    // (`Pending=true`, `IssuedFrame=0`).
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    ASSERT_EQ(renderer->GetLastRenderGraphStats().HistogramReadbackCopyCount, 1u);
+
+    [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
+    ASSERT_GE(device.GlobalFrameNumber, 1u);
+
+    // Seed slot 0 with a uniform 256-bin payload so the decoded average
+    // log luminance lands at the midpoint of the `[-10, +10]` range.
+    {
+        std::vector<std::byte>& contents = device.BufferContents[readbackBuffer.Index];
+        contents.assign(static_cast<std::size_t>(readbackBufferSize), std::byte{0});
+        std::uint32_t uniformBin = 1u;
+        for (std::size_t i = 0; i < 256u; ++i)
+        {
+            std::memcpy(contents.data() + i * sizeof(std::uint32_t),
+                        &uniformBin, sizeof(uniformBin));
+        }
+    }
+
+    ASSERT_EQ(renderer->GetPostProcessSystem().GetHistogramPublishCount(), 0u);
+
+    // Frame 1 — the drain runs at the top of `BeginFrame()`. Slot 0 has
+    // `IssuedFrame=0 < GlobalFrameNumber=1`, so the drain reads the bytes
+    // we seeded and forwards them to `PublishHistogramReadback(...)`.
+    device.NextFrame.FrameIndex = 1u;
+    Extrinsic::RHI::FrameHandle nextFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(nextFrame));
+
+    EXPECT_EQ(renderer->GetPostProcessSystem().GetHistogramPublishCount(), 1u)
+        << "Drain must invoke PublishHistogramReadback exactly once for the completed slot.";
+
+    // Frame 2 — drain runs again, but slot 0 is no longer pending (was
+    // consumed) and no new copy has been recorded yet (we never called
+    // ExecuteFrame on this frame). Publish count must stay at 1.
+    device.NextFrame.FrameIndex = 2u;
+    Extrinsic::RHI::FrameHandle thirdFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(thirdFrame));
+    EXPECT_EQ(renderer->GetPostProcessSystem().GetHistogramPublishCount(), 1u)
+        << "Each completed slot must publish at most once; the second drain must be a no-op.";
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-075 Slice E.2 — `PublishHistogramReadback(...)` must update the
+// retained `PostProcessExposureHistory` CPU mirror. The first publish snaps
+// directly to the observed average log luminance so the history is not
+// anchored to the default-constructed `0.0` on startup. Subsequent publishes
+// blend the freshly observed value into the retained mirror through the
+// one-pole IIR with the canonical adaptation velocity.
+TEST(RendererFrameLifecycle, PublishHistogramReadbackUpdatesExposureHistory)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{404u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::Graphics::PostProcessSystem& post = renderer->GetPostProcessSystem();
+
+    // Sanity: default snapshot is zero-initialised.
+    const Extrinsic::Graphics::PostProcessExposureHistory before = post.GetExposureHistorySnapshot();
+    EXPECT_FLOAT_EQ(before.PreviousAverageLogLum, 0.0f);
+    EXPECT_FLOAT_EQ(before.AdaptationVelocity, 0.0f);
+    EXPECT_EQ(before.FrameIndex, 0u);
+
+    // Uniform payload — count-weighted bin centre lands at the midpoint
+    // (`(-10 + 10) / 2 = 0`). The first publish snaps directly to the
+    // observed value.
+    std::array<std::uint32_t, 256> uniformBins{};
+    for (std::uint32_t& bin : uniformBins) { bin = 1u; }
+    post.PublishHistogramReadback(
+        std::span<const std::uint32_t>{uniformBins.data(), uniformBins.size()},
+        /*frameIndex=*/7u,
+        &device);
+
+    const Extrinsic::Graphics::PostProcessExposureHistory afterFirst = post.GetExposureHistorySnapshot();
+    EXPECT_NEAR(afterFirst.PreviousAverageLogLum, 0.0f, 1e-5f);
+    EXPECT_GT(afterFirst.AdaptationVelocity, 0.0f);
+    EXPECT_EQ(afterFirst.FrameIndex, 7u);
+    EXPECT_EQ(post.GetHistogramPublishCount(), 1u);
+
+    // Heavily-skewed payload: all samples in bin 0. The decoded average
+    // log luminance lands near `kHistogramMinLogLum + half-step ≈ -9.96`.
+    // The second publish blends this observation into the previous 0.0
+    // mirror through the one-pole IIR — the new mirror must be strictly
+    // negative but well above the raw observation (the previous-frame
+    // contribution is 5%).
+    std::array<std::uint32_t, 256> bin0Bins{};
+    bin0Bins[0] = 1024u;
+    post.PublishHistogramReadback(
+        std::span<const std::uint32_t>{bin0Bins.data(), bin0Bins.size()},
+        /*frameIndex=*/8u,
+        &device);
+
+    const Extrinsic::Graphics::PostProcessExposureHistory afterSecond = post.GetExposureHistorySnapshot();
+    EXPECT_LT(afterSecond.PreviousAverageLogLum, 0.0f);
+    EXPECT_GT(afterSecond.PreviousAverageLogLum, -10.0f);
+    EXPECT_EQ(afterSecond.FrameIndex, 8u);
+    EXPECT_EQ(post.GetHistogramPublishCount(), 2u);
+
+    // Rejected payload (wrong bin count) must leave the mirror untouched
+    // and must not increment the publish counter.
+    std::array<std::uint32_t, 16> tooFewBins{};
+    post.PublishHistogramReadback(
+        std::span<const std::uint32_t>{tooFewBins.data(), tooFewBins.size()},
+        /*frameIndex=*/9u,
+        &device);
+    const Extrinsic::Graphics::PostProcessExposureHistory afterReject = post.GetExposureHistorySnapshot();
+    EXPECT_EQ(post.GetHistogramPublishCount(), 2u);
+    EXPECT_FLOAT_EQ(afterReject.PreviousAverageLogLum, afterSecond.PreviousAverageLogLum);
+    EXPECT_EQ(afterReject.FrameIndex, afterSecond.FrameIndex);
+
+    renderer->Shutdown();
+}
+

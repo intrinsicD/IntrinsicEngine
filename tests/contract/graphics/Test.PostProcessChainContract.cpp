@@ -295,12 +295,20 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresPostProcessHistogramAs
     ASSERT_NE(histogram, nullptr);
     EXPECT_TRUE(histogram->Enabled);
     EXPECT_TRUE(Contains(histogram->Reads, "SceneColorHDR"));
-    EXPECT_EQ(histogram->Writes.size(), 1u)
-        << "PostProcessHistogramPass must declare only the storage-buffer "
-           "write so the framegraph compiler does not infer any color "
-           "attachment that would force the dispatch into a render-pass "
-           "scope on Vulkan.";
+    // GRAPHICS-075 Slice E.2 — the histogram pass writes two buffers (both
+    // storage / transfer destinations; never color attachments): the
+    // transient `PostProcess.Histogram` storage buffer the compute
+    // dispatch atomically accumulates into, and the renderer-owned
+    // host-visible `Histogram.Readback` buffer the executor copies into
+    // after the dispatch. Both are *buffer* writes — the framegraph
+    // compiler must still not infer any color-attachment write that
+    // would force the dispatch into a render-pass scope on Vulkan.
+    EXPECT_EQ(histogram->Writes.size(), 2u)
+        << "PostProcessHistogramPass must declare exactly the two buffer "
+           "writes (PostProcess.Histogram + Histogram.Readback) and no "
+           "color attachments.";
     EXPECT_TRUE(Contains(histogram->Writes, "PostProcess.Histogram"));
+    EXPECT_TRUE(Contains(histogram->Writes, "Histogram.Readback"));
 
     // Compiled order: PointPass → PostProcessHistogramPass → PostProcessPass.
     Graphics::RenderGraph graph;
