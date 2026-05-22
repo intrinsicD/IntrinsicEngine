@@ -359,6 +359,7 @@ set(_geometry_test_files
     Test_NormalEstimation.cpp
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
+    Test.RobustPredicates.cpp
     Test_SubmeshView.cpp
 )
 intrinsic_resolve_test_sources(_geometry_test_sources

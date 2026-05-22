@@ -70,6 +70,7 @@ target_sources(${target_name}
         Geometry.Ray.cppm
         Geometry.Raycast.cppm
         Geometry.Registration.cppm
+        Geometry.RobustPredicates.cppm
         Geometry.SDF.cppm
         Geometry.SDFContact.cppm
         Geometry.Segment.cppm

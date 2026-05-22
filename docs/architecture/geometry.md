@@ -104,6 +104,44 @@ the source soup. Renderer-upload staging remains a planned geometry-owned
 data-shape contract; geometry must not import assets, graphics, runtime, ECS,
 platform, or app layers to satisfy renderer staging needs.
 
+## Robust predicates
+
+`Geometry.RobustPredicates` is the narrow predicate foundation introduced by
+[`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md)
+Slice 1. It is **not** re-exported by the broad `Geometry` umbrella; callers
+must `import Geometry.RobustPredicates;` explicitly. Surface:
+
+- `Sign` (`Negative`/`Zero`/`Positive`) and `Certainty`
+  (`Certain`/`Uncertain`) diagnostic enums.
+- `SignedResult { Value, Sign, Certainty, FilterBound }` for orientation and
+  signed-distance predicates.
+- `Orientation2D` and `Orientation3D` Shewchuk-style filtered predicates
+  evaluated in `double` from `glm::vec*<float>` inputs.
+- `SignedDistanceToPlane(origin, unitNormal, query)`.
+- `ClassifyTriangleBarycentric(a, b, c, query)` returning
+  `BarycentricResult { Region, WA, WB, WC, PlaneDistance }` with
+  `BarycentricRegion ∈ {VertexA/B/C, EdgeAB/BC/CA, Interior, Outside, Degenerate, Uncertain}`.
+- Scale-aware helpers `ScaledEpsilon(scale, relative)` and `ApproxEqual`.
+
+Numerical policy and limitations:
+
+- The current implementation is filtered double precision. Inputs landing
+  inside the filter band are reported with `Certainty::Uncertain`; callers
+  must not silently coerce uncertain results into a hard sign.
+- Exact / adaptive Shewchuk-style escalation is a `GEOM-007` Slice 4
+  follow-up. Mesh-boolean and arrangement kernels needing guaranteed signs
+  must add snap-rounding or symbolic-perturbation pre-passes until that
+  slice lands.
+- Intersection-classification result records (segment/segment,
+  segment/triangle, ray/triangle, triangle/triangle, point/edge/face
+  incidence) are deferred to `GEOM-007` Slice 2 and will live in a sibling
+  module rather than being added to `Geometry.RobustPredicates`.
+- Callsite adoption (e.g. `Geometry.Raycast`, `Geometry.Overlap`,
+  `Geometry.Containment`, `Geometry.GJK`) is gated on Slices 1–2 and tracked
+  as `GEOM-007` Slice 3; this Slice 1 add deliberately does not migrate
+  existing callers in order to keep foundation-add and semantic refactor
+  separate per the contract in [`AGENTS.md`](../../AGENTS.md) §5.
+
 ## Migration note
 
 As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining `src/legacy` geometry shims (if any) must be temporary, tracked, and removed via follow-up migration tasks.

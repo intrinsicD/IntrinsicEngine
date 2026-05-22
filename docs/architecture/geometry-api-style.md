@@ -109,6 +109,13 @@ randomness, or dependence on traversal order unless that order is specified.
 - Future robust-predicate work should provide orientation, incircle/insphere,
   intersection, barycentric, and epsilon/scale-aware comparison utilities before
   expanding boolean, remeshing, arrangement, or reconstruction kernels.
+  Orientation 2D/3D, signed-distance, in-plane triangle barycentric
+  classification, and scale-aware epsilon helpers landed in
+  `Geometry.RobustPredicates` (see [Geometry Architecture →
+  Robust predicates](geometry.md#robust-predicates)). Incircle/insphere,
+  intersection classification records, and adaptive-exact escalation remain
+  open under [`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md)
+  Slices 2 and 4.
 
 The preferred numerical direction is a hybrid GLM + Eigen3 policy: GLM remains the
 public geometry storage vocabulary, while Eigen may be introduced behind

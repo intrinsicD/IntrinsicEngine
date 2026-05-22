@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 39 |
 | `ecs` | 26 |
-| `geometry` | 80 |
+| `geometry` | 81 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 52 |
@@ -168,6 +168,7 @@ Root scanned: `src`
 | `Geometry.Ray` | `src/geometry/Geometry.Ray.cppm` | `geometry` |
 | `Geometry.Raycast` | `src/geometry/Geometry.Raycast.cppm` | `geometry` |
 | `Geometry.Registration` | `src/geometry/Geometry.Registration.cppm` | `geometry` |
+| `Geometry.RobustPredicates` | `src/geometry/Geometry.RobustPredicates.cppm` | `geometry` |
 | `Geometry.SDF` | `src/geometry/Geometry.SDF.cppm` | `geometry` |
 | `Geometry.SDFContact` | `src/geometry/Geometry.SDFContact.cppm` | `geometry` |
 | `Geometry.Segment` | `src/geometry/Geometry.Segment.cppm` | `geometry` |
@@ -465,4 +466,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **438**
+Total modules: **439**
