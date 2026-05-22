@@ -209,7 +209,19 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresHdrToLdrResources)
     EXPECT_TRUE(Contains(post->Reads, "SceneColorHDR"));
     EXPECT_TRUE(Contains(post->Writes, "SceneColorLDR"));
     EXPECT_TRUE(Contains(post->Writes, "PostProcess.BloomScratch"));
-    EXPECT_TRUE(Contains(post->Writes, "PostProcess.Histogram"));
+    // GRAPHICS-075 Slice E.1 — the histogram compute dispatch moved
+    // out of the `"PostProcessPass"` umbrella into its own ordered
+    // graph pass `"PostProcessHistogramPass"`. Vulkan rejects
+    // `vkCmdDispatch` inside an active render-pass scope (and
+    // `"PostProcessPass"` is a render-pass-scope pass — bloom +
+    // tonemap write color attachments), so the histogram cannot
+    // share the umbrella's render-pass scope. The dedicated test
+    // `FrameRecipeDeclaresPostProcessHistogramAsOrderedPass` pins
+    // the new pass's read/write declarations.
+    EXPECT_FALSE(Contains(post->Writes, "PostProcess.Histogram"))
+        << "PostProcess.Histogram moved to its own ordered graph pass "
+           "`PostProcessHistogramPass` because Vulkan forbids "
+           "`vkCmdDispatch` inside an active render-pass scope.";
     // GRAPHICS-075 Slice D.2a — the AA umbrella split into three ordered
     // graph passes each owning one matched-format AA attachment; none of
     // them belong on `PostProcessPass` (which would re-introduce the
@@ -227,6 +239,55 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresHdrToLdrResources)
     EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Edges", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Weights", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Resolved", true));
+}
+
+// GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives in its
+// own ordered graph pass `"PostProcessHistogramPass"` before
+// `"PostProcessPass"`. Vulkan rejects `vkCmdDispatch` inside an active
+// render-pass scope and `"PostProcessPass"` is a render-pass-scope
+// pass (bloom + tonemap write color attachments), so the histogram
+// cannot share the umbrella's render-pass scope. The dedicated pass
+// declares `Read(SceneColorHDR, ShaderRead) + Write(PostProcess.Histogram,
+// BufferUsage::ShaderWrite)` so the framegraph compiler emits the
+// read-after-write barrier the shader needs and the dispatch executes
+// outside any render-pass scope.
+TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresPostProcessHistogramAsOrderedPass)
+{
+    const Graphics::FrameRecipeIntrospection description = Graphics::DescribeDefaultFrameRecipe(Graphics::FrameRecipeFeatures{});
+
+    const auto* histogram = FindPass(description, Graphics::FrameRecipePassKind::PostProcessHistogram);
+    ASSERT_NE(histogram, nullptr);
+    EXPECT_TRUE(histogram->Enabled);
+    EXPECT_TRUE(Contains(histogram->Reads, "SceneColorHDR"));
+    EXPECT_EQ(histogram->Writes.size(), 1u)
+        << "PostProcessHistogramPass must declare only the storage-buffer "
+           "write so the framegraph compiler does not infer any color "
+           "attachment that would force the dispatch into a render-pass "
+           "scope on Vulkan.";
+    EXPECT_TRUE(Contains(histogram->Writes, "PostProcess.Histogram"));
+
+    // Compiled order: PointPass → PostProcessHistogramPass → PostProcessPass.
+    Graphics::RenderGraph graph;
+    const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
+        graph,
+        Graphics::FrameRecipeFeatures{},
+        MakeImports(),
+        Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    const auto& compileResult = graph.GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    const std::vector<std::string> order = OrderedPassNames(*compiled);
+    const auto pointIt = std::find(order.begin(), order.end(), "PointPass");
+    const auto histogramIt = std::find(order.begin(), order.end(), "PostProcessHistogramPass");
+    const auto postIt = std::find(order.begin(), order.end(), "PostProcessPass");
+    ASSERT_NE(pointIt, order.end());
+    ASSERT_NE(histogramIt, order.end());
+    ASSERT_NE(postIt, order.end());
+    EXPECT_LT(pointIt, histogramIt);
+    EXPECT_LT(histogramIt, postIt);
 }
 
 // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three ordered
@@ -373,12 +434,17 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
     const auto* edge = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAAEdge);
     const auto* blend = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAABlend);
     const auto* resolve = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAAResolve);
+    // GRAPHICS-075 Slice E.1 — the histogram graph pass shares the
+    // same `EnablePostProcess` gate as the umbrella and AA passes.
+    const auto* histogram = FindPass(description, Graphics::FrameRecipePassKind::PostProcessHistogram);
     ASSERT_NE(edge, nullptr);
     ASSERT_NE(blend, nullptr);
     ASSERT_NE(resolve, nullptr);
+    ASSERT_NE(histogram, nullptr);
     EXPECT_FALSE(edge->Enabled);
     EXPECT_FALSE(blend->Enabled);
     EXPECT_FALSE(resolve->Enabled);
+    EXPECT_FALSE(histogram->Enabled);
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", false));
@@ -399,6 +465,7 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
     ASSERT_TRUE(compiled.has_value())
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<std::string> order = OrderedPassNames(*compiled);
+    EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessHistogramPass"), order.end());
     EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessPass"), order.end());
     EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAAEdgePass"), order.end());
     EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAABlendPass"), order.end());
@@ -513,13 +580,46 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_FLOAT_EQ(observedUp.InvCoarserResolution[0], 1.0f / 640.0f);
     EXPECT_FLOAT_EQ(observedUp.InvCoarserResolution[1], 1.0f / 360.0f);
 
+    // GRAPHICS-075 Slice E.1 — `PostProcessHistogramPass::SetViewport`
+    // publishes the runtime backbuffer extent so the compute dispatch
+    // shape tracks the viewport (`ceil(W/16) x ceil(H/16) x 1`,
+    // matching the shader's `local_size_x = local_size_y = 16` tile).
+    // Without a published viewport the dispatch falls back to
+    // `(1, 1, 1)` so headless tests that drive `Execute` directly
+    // still observe the event shape. A viewport of `1920x1080` here
+    // pins the executor-published path: `ceil(1920 / 16) = 120`,
+    // `ceil(1080 / 16) = 68`.
     Graphics::PostProcessHistogramPass histogram{post};
     histogram.SetPipeline(RHI::PipelineHandle{22u, 1u});
+    histogram.SetViewport(1920u, 1080u);
     RecordingCommandContext histogramCmd;
     histogram.Execute(histogramCmd, camera);
     ASSERT_EQ(histogramCmd.Events.size(), 3u);
+    EXPECT_EQ(histogramCmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(histogramCmd.Events[1].Kind, EventKind::PushConstants);
     EXPECT_EQ(histogramCmd.Events[2].Kind, EventKind::Dispatch);
-    EXPECT_EQ(histogramCmd.LastDispatchX, 1u);
+    EXPECT_EQ(histogramCmd.LastDispatchX, 120u);
+    // The pass body pushes the pass-local 16-byte
+    // `PostProcessHistogramPushConstants` block (std430-matched to
+    // `post_histogram.comp`) so the shader actually sees `Width` /
+    // `Height` + the canonical `[-10, +10]` log-luminance bounds.
+    // The canonical 20-byte `PostProcessPushConstants` block shared
+    // by other postprocess stages is intentionally not used here per
+    // the standing shader-push-constant compatibility policy: under
+    // std430 it would alias `Exposure` (1.0) onto `Width`
+    // (`bit_cast<uint>(1.0f)` ≈ 1.07e9 pixels), producing a
+    // degenerate out-of-bounds dispatch.
+    EXPECT_EQ(histogramCmd.LastPushConstantSize,
+              sizeof(Graphics::PostProcessHistogramPushConstants));
+    ASSERT_EQ(histogramCmd.LastPushConstants.size(),
+              sizeof(Graphics::PostProcessHistogramPushConstants));
+    Graphics::PostProcessHistogramPushConstants observedHistogram{};
+    std::memcpy(&observedHistogram, histogramCmd.LastPushConstants.data(),
+                sizeof(Graphics::PostProcessHistogramPushConstants));
+    EXPECT_EQ(observedHistogram.Width, 1920u);
+    EXPECT_EQ(observedHistogram.Height, 1080u);
+    EXPECT_FLOAT_EQ(observedHistogram.MinLogLum, -10.0f);
+    EXPECT_FLOAT_EQ(observedHistogram.RangeLogLum, 1.0f / 20.0f);
 
     // GRAPHICS-075 Slice D.2a — the SMAA pass exposes per-stage Execute
     // methods (`ExecuteEdge`/`ExecuteBlend`/`ExecuteResolve`) so the

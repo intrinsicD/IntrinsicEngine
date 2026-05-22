@@ -209,8 +209,18 @@ namespace Extrinsic::Graphics
         // bind/push/draw (the helpers still route `Recorded`); the
         // present source flips to `PostProcess.AATemp.Resolved` only
         // when `features.EnableAntiAliasing` is set.
+        // GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives
+        // in its own ordered graph pass before `"PostProcessPass"` because
+        // Vulkan forbids `vkCmdDispatch` inside an active render-pass
+        // scope, and `"PostProcessPass"` is a render-pass-scope pass
+        // (bloom + tonemap fragment work into color attachments). The
+        // `"PostProcessHistogramPass"` declaration reads `SceneColorHDR`
+        // and writes the `PostProcess.Histogram` storage buffer; the
+        // umbrella below no longer carries the histogram write.
+        AddPass(out, FrameRecipePassKind::PostProcessHistogram, "PostProcessHistogramPass", features.EnablePostProcess, false,
+                {"SceneColorHDR"}, {"PostProcess.Histogram"});
         AddPass(out, FrameRecipePassKind::PostProcess, "PostProcessPass", features.EnablePostProcess, false,
-                {"SceneColorHDR"}, {"PostProcess.BloomScratch", "PostProcess.Histogram", "SceneColorLDR"});
+                {"SceneColorHDR"}, {"PostProcess.BloomScratch", "SceneColorLDR"});
         AddPass(out, FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass", features.EnablePostProcess, false,
                 {"SceneColorLDR"}, {"PostProcess.AATemp.Edges"});
         AddPass(out, FrameRecipePassKind::PostProcessAABlend, "PostProcessAABlendPass", features.EnablePostProcess, false,
@@ -742,10 +752,29 @@ namespace Extrinsic::Graphics
             // color reaches present; otherwise it stays on
             // `SceneColorLDR` (the AA pass bodies short-circuit to no-op
             // when `PostProcessSettings::AntiAliasing == None`).
+            // GRAPHICS-075 Slice E.1 — the histogram compute dispatch
+            // lives in its own ordered graph pass before
+            // `"PostProcessPass"`. Vulkan rejects `vkCmdDispatch` inside
+            // an active render-pass scope, and `"PostProcessPass"` is a
+            // render-pass-scope pass (bloom + tonemap write color
+            // attachments), so collapsing the histogram dispatch back
+            // into the umbrella would re-introduce the same dispatch-
+            // inside-render-pass hazard that the AA umbrella split in
+            // Slice D.2a guarded against from the other direction
+            // (format-incompatible attachments in one render-pass
+            // scope). The framegraph compiler emits the
+            // `SceneColorHDR ShaderRead` declaration on both this pass
+            // and `"PostProcessPass"` so they share a single
+            // `SceneColorHDR ColorAttachment → ShaderRead` transition
+            // and the dispatch barrier lands before the bloom +
+            // tonemap render-pass scope opens.
+            addOrderedPass("PostProcessHistogramPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(hdr, TextureUsage::ShaderRead);
+                builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
+            });
             addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(hdr, TextureUsage::ShaderRead);
                 builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
-                builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
             });
             addOrderedPass("PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {

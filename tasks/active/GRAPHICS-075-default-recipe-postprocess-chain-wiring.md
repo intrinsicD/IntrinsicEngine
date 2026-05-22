@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: in-progress (Slice D.2b landed; Slice E queued next).
+- State: in-progress (Slice E.1 landed; Slice E.2 queued next).
   Maturity reached so far: Slice A closed `Scaffolded → CPUContracted`
   on the ToneMap leaf and the `"PostProcessPass"` umbrella executor
   branch (merged via PR #902); Slice B.1 added the bloom downsample +
@@ -66,10 +66,17 @@
   Slice D.2b on `claude/intrinsicengine-agent-onboarding-BQgHn`.
 - Activated: 2026-05-21 — first unblocked Theme A default-recipe leaf
   after GRAPHICS-074 retirement.
-- Next verification step: open Slice E (Histogram compute pipeline +
-  `BeginFrame()`-side readback drain mirroring the `Picking.Readback`
-  pattern + `PostProcessSystem::PublishHistogramReadback`) in a
-  follow-up session.
+- Next verification step: open Slice E.2 (host-visible
+  `Histogram.Readback` buffer + `BeginFrame()`-side readback drain
+  mirroring the `Picking.Readback` pattern +
+  `PostProcessSystem::PublishHistogramReadback(...)` + exposure-
+  adaptation history buffer consumption) in a follow-up session.
+  Slice E.1 (compute pipeline scaffold + `RecordPostProcessHistogramPass`
+  + new ordered `"PostProcessHistogramPass"` graph pass + push-constant
+  block) has landed on
+  `claude/gallant-hypatia-a2puc` and closed
+  `Scaffolded → CPUContracted` on the histogram leaf for the CPU/null
+  gate.
 
 ## Slice plan
 
@@ -315,12 +322,87 @@ a readback drain.
       `SMAA_SEARCHTEX_SIZE = vec2(66.0, 33.0)`, and the legacy generator
       in `src/legacy/Graphics/Passes/Graphics.SMAALookupTextures.hpp`
       emits `66×33` bytes. The corrected dimensions are 66×33.
-- **Slice E.** Histogram compute pipeline + `RecordPostProcessHistogramPass(...)`
-  dispatch + `BeginFrame()`-side readback drain mirroring GRAPHICS-074
-  Slice D.3's `Picking.Readback` pattern (per-frame slot, `Pending` /
-  `IssuedFrame` / `Invalidated` metadata) +
-  `PostProcessSystem::PublishHistogramReadback(...)`. Exposure-adaptation
-  history buffer consumed.
+- **Slice E.** Histogram compute pipeline + dispatch + readback drain.
+  Splits the same way Slice D did because the dispatch infrastructure
+  and the readback drain are independently reviewable, and the dispatch
+  has a structural prerequisite (the histogram is a *compute* dispatch
+  and so cannot share the existing `"PostProcessPass"` umbrella render-
+  pass scope — Vulkan forbids `vkCmdDispatch` inside an active render
+  pass; the same constraint Slice D.2a hit in reverse when it had to
+  split the AA umbrella to keep matched-format color attachments per
+  render pass). The histogram therefore lives in its own ordered graph
+  pass `"PostProcessHistogramPass"` declared with
+  `Read(SceneColorHDR, ShaderRead) + Write(PostProcess.Histogram,
+  BufferUsage::ShaderWrite)` before `"PostProcessPass"`; the umbrella
+  pass drops its prior `Write(PostProcess.Histogram, ...)` declaration
+  since the histogram is no longer fanned out under it.
+    - **Slice E.1 (this slice).** Recipe-side rename — replace the
+      `"PostProcess.Histogram"` write inside the `"PostProcessPass"`
+      umbrella declaration with a new ordered graph pass
+      `"PostProcessHistogramPass"` (ordered after `"PointPass"` and
+      before `"PostProcessPass"`) with `Read(SceneColorHDR, ShaderRead)`
+      + `Write(PostProcess.Histogram, BufferUsage::ShaderWrite)`. Add
+      `FrameRecipePassKind::PostProcessHistogram`. Histogram compute
+      pipeline (`post_histogram.comp`), pass-local 16-byte std430
+      `PostProcessHistogramPushConstants` block (`uint Width + uint
+      Height + float MinLogLum + float RangeLogLum`), and
+      `BuildPostProcessHistogramPushConstants(settings, width, height)`
+      that defaults the log-luminance range to `[-10, +10]` stops per
+      GRAPHICS-013AQ until Slice E.2's exposure adaptation overrides
+      the bounds. `NullRenderer` owns `m_PostProcessHistogramPass` +
+      `m_PostProcessHistogramPipelineLease` (constructed alongside the
+      existing GRAPHICS-070..075 SMAA pass, reset in `Shutdown()`
+      before `m_PostProcessSystem` is reset). Pipeline created in
+      `InitializeOperationalPassResources(device)` from
+      `BuildPostProcessHistogramPipelineDesc()` (compute pipeline,
+      `ComputeShaderPath = post_histogram.comp.spv`, `PushConstantSize
+      = sizeof(PostProcessHistogramPushConstants)`) and republished
+      byte-identical across `RebuildOperationalResources()`. `IRenderer`
+      exposes `GetPostProcessHistogramPipeline()` /
+      `GetPostProcessHistogramPipelineDesc()`. `RecordPostProcessHistogramPass(...)`
+      helper routes the new `"PostProcessHistogramPass"` executor
+      branch under the standard `SkippedNonOperational` /
+      `SkippedUnavailable` / `Recorded` taxonomy and calls
+      `m_PostProcessHistogramPass->SetViewport(width, height)` before
+      `Execute(...)` so the dispatch shape (`ceil(W/16) x ceil(H/16) x 1`)
+      tracks the backbuffer extent. Pass body short-circuits when
+      `IsStageEnabled(Histogram)` is false (i.e. `EnableHistogram =
+      false`); the helper still returns `Recorded` per the standing
+      "structurally-recorded no-op" taxonomy bloom / FXAA / SMAA use.
+      Contract tests:
+      `PostProcessHistogramPipelineSurvivesOperationalRebuild` (pin
+      the pipeline desc + survive-rebuild),
+      `FrameRecipeDeclaresPostProcessHistogramAsOrderedPass` (pin the
+      recipe-side split out of `"PostProcessPass"`), and the
+      `DefaultRecipeBuildsCanonicalPassOrder` /
+      `UsesDeviceFrameLifecycleBackbufferAndCommandContext` (+ rebuild
+      / depth-failure / culling-failure variants) updates that move
+      `"PostProcessHistogramPass"` into the canonical pass-name list
+      and bump the recorded-pass counters from 10/10/9/5 to 11/11/10/6.
+      Defers the host-visible `Histogram.Readback` buffer +
+      `BeginFrame()`-side readback drain + `PublishHistogramReadback`
+      + exposure-adaptation history buffer consumption to Slice E.2.
+    - **Slice E.2.** Renderer-owned host-visible `Histogram.Readback`
+      buffer (`1024 * frames-in-flight` bytes, `HostVisible | TransferDst`)
+      allocated alongside the existing `Picking.Readback` buffer in
+      `InitializeOperationalPassResources(device)`; recipe imports it
+      via a new `FrameRecipeImports::HistogramReadback` field with
+      `BufferState::TransferDst → BufferState::HostReadback`. The
+      executor records a `CopyBuffer(PostProcess.Histogram →
+      Histogram.Readback @ slot * 1024)` after the histogram dispatch.
+      `BeginFrame()` drains completed slots (per-slot `Pending` /
+      `IssuedFrame` / `Invalidated` metadata mirroring the
+      `Picking.Readback` drain Slice D.3 landed for GRAPHICS-074) and
+      forwards the 256-bin payload to
+      `PostProcessSystem::PublishHistogramReadback(...)`, which
+      updates the retained `PostProcessExposureHistory` storage buffer
+      (allocated by Slice D.2b) via a `CopyBuffer(staging →
+      ExposureHistory)`. Adds a `HistogramReadbackCopyCount` stat
+      counter to `RenderGraphFrameStats` mirroring the existing
+      `PickingReadbackCopyCount`. Contract tests:
+      `HistogramReadbackBufferSurvivesOperationalRebuild`,
+      `HistogramReadbackDrainPublishesEachSlotExactlyOnce`,
+      `PublishHistogramReadbackUpdatesExposureHistory`.
 
 ## Goal
 - Wire the full postprocess chain into the renderer executor under the default recipe per `GRAPHICS-013A`/`013AQ`: pipelines for histogram (compute), bloom downsample/upsample mip chain, tonemap, FXAA, and SMAA edge/blend/resolve created at renderer init; `PostProcessSystem` allocates the retained `AreaTex`/`SearchTex` LUT textures and the exposure-adaptation history buffer; transient `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp` declared by the recipe; executor routes each pass through the recorded `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
@@ -402,6 +484,29 @@ a readback drain.
   survive `RebuildGpuResources()` byte-identical. Slice D.2b does not
   touch the framegraph or the pass-body pipeline-format contracts —
   those are pinned by Slice D.2a.
+- Slice E.1 closes `Scaffolded → CPUContracted` on the Histogram leaf
+  for the CPU/null gate: the recipe splits the histogram out of the
+  `"PostProcessPass"` umbrella into its own ordered graph pass
+  `"PostProcessHistogramPass"` (Vulkan forbids `vkCmdDispatch` inside
+  an active render-pass scope, so the compute dispatch cannot share the
+  bloom + tonemap render-pass scope); the histogram compute pipeline
+  is created in `InitializeOperationalPassResources(device)` from
+  `BuildPostProcessHistogramPipelineDesc()` and republished byte-
+  identical across `RebuildOperationalResources()`; the per-shader
+  16-byte `PostProcessHistogramPushConstants` block (`uint Width +
+  uint Height + float MinLogLum + float RangeLogLum`) replaces the
+  canonical 20-byte `PostProcessPushConstants` block in the pass body
+  per the standing shader-push-constant compatibility policy; the
+  `RecordPostProcessHistogramPass(...)` helper routes the new
+  executor branch under the standard `SkippedNonOperational` /
+  `SkippedUnavailable` / `Recorded` taxonomy. Slice E.1 does *not*
+  allocate the host-visible `Histogram.Readback` buffer or wire the
+  `BeginFrame()`-side readback drain — those stay on Slice E.2, so
+  the histogram dispatch on the CPU/null gate writes the transient
+  `PostProcess.Histogram` storage buffer but the result is not
+  observed past the frame. Full `Operational` on the GPU/Vulkan gate
+  for the Histogram leaf is owned by Slice E.2 + the opt-in
+  `gpu;vulkan` smoke.
 
 ## Required changes
 - [x] **Slice A**: `NullRenderer` owns `m_PostProcessToneMapPass` + `m_PostProcessToneMapPipelineLease`; emplaced alongside the existing GRAPHICS-070..074 passes, reset in `Shutdown()` before `m_PostProcessSystem` is reset. Tonemap pipeline created in `InitializeOperationalPassResources(device)` from `BuildPostProcessToneMapPipelineDesc()` (vertex `post_fullscreen.vert.spv` + fragment `post_tonemap.frag.spv`, single backbuffer-format color target, no depth, `PushConstantSize = sizeof(PostProcessPushConstants)`); republished byte-identical across `RebuildOperationalResources()`. `"PostProcessPass"` executor branch routes through `RecordPostProcessToneMapPass(...)` with the recorded `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy. `IRenderer` exposes `GetPostProcessToneMapPipeline()` / `GetPostProcessToneMapPipelineDesc()`.
@@ -410,15 +515,73 @@ a readback drain.
 - [x] **Slice D.2a**: Pass-body slicing — `PostProcessSMAAPass::Execute` is split into `ExecuteEdge` / `ExecuteBlend` / `ExecuteResolve` per-stage methods; the existing `RecordPostProcessFXAAPass(...)` / `RecordPostProcessSMAAPass(...)` helpers are replaced by per-stage helpers (`RecordPostProcessAAEdgePass(...)`, `RecordPostProcessAABlendPass(...)`, `RecordPostProcessAAResolvePass(...)`). FXAA records under the resolve pass only; SMAA records under all three. Each per-stage body's `IsStageEnabled` selector stays in place; stage-disabled bodies stay no-op while the helper still reports `Recorded` (same "structurally-recorded no-op" taxonomy bloom + Slice C use).
 - [x] **Slice D.2b**: In `PostProcessSystem::Initialize(device, textureMgr, bufferMgr)`: allocates the SMAA `AreaTex` (`R8G8_UNORM`, 160×560 — sized via the exported `kPostProcessSMAAAreaTextureWidth` / `Height` constants) and `SearchTex` (`R8_UNORM`, 66×33 — sized via the exported `kPostProcessSMAASearchTextureWidth` / `Height` constants) LUT textures via `RHI::TextureManager::Create(...)`; uploads their LUT bytes via `IDevice::GetTransferQueue().UploadTexture()` (LUT bytes ported byte-for-byte from `src/legacy/Graphics/Passes/Graphics.SMAALookupTextures.hpp` into a private namespace in `Graphics.PostProcessSystem.cpp` so promoted `graphics/renderer` never imports from `src/legacy`); allocates the exposure-adaptation history buffer (the new exported `PostProcessExposureHistory` POD — `previous_average_log_lum`, `adaptation_velocity`, `frame_index`, plus a 4-byte tail pad — created with `BufferUsage::Storage | TransferDst`, device-local). The overload is idempotent (no-op when the leases are already valid or when `device.IsOperational()` is false), and the renderer also invokes it from `RebuildOperationalResources(device)` so a device that becomes operational only after the initial `Initialize()` still picks up the allocation without a `Shutdown()`+`Initialize()` round-trip.
 - [x] **Slice D.2b**: `PostProcessSystem::Shutdown()` frees all retained resources (drops the area / search LUT leases and the exposure-history buffer lease before clearing the manager pointers, matching the `ShadowSystem` teardown ordering contract so the lease destructors call back into a still-live `TextureManager` / `BufferManager`).
-- [ ] In `NullRenderer::InitializeOperationalPassResources(device)`, create:
-  - tonemap pipeline (`post_tonemap.frag`), **Slice A** *(done)*
-  - bloom downsample + upsample pipelines (`post_bloom_downsample.frag` + `post_bloom_upsample.frag` with a fullscreen vertex), **Slice B.1** *(done)*; per-mip iteration + recipe-side `BloomScratch.MipLevels = ComputeBloomMipChainLevels(width, height)` (clamped against Vulkan's `mipLevels <= floor(log2(maxDim)) + 1` rule) + renderer-side per-frame `PostProcess.BloomScratch` handle + clamped mip-count republish, **Slice B.2** *(done)*. Per-mip subresource barriers between iterations are *deferred*: the pass body emits no `TextureBarrier(...)` (the umbrella render pass is active when `Execute(...)` runs and Vulkan rejects layout transitions inside render-pass scope), and the inter-pass `BloomScratch ColorAttachment → ShaderReadOnly` between bloom and tonemap is owned by the framegraph compiler from the recipe-level read/write declarations
-  - FXAA pipeline (`post_fxaa.frag`), **Slice C** *(done)*. `m_PostProcessFXAAPipelineLease` + `m_PostProcessFXAAPass` follow the same reset/republish pattern as the tonemap + bloom leases. The pipeline takes the backbuffer format (same `colorFormat` parameter the tonemap pipeline does) so it stays render-pass-compatible with the tonemap leg's `SceneColorLDR` output. `PostProcessFXAAPushConstants` (20 bytes, std430-matched to `post_fxaa.frag`) replaces the canonical `PostProcessPushConstants` in the pass body
-  - SMAA edge/blend/resolve pipelines (`post_smaa_edge.frag`, `post_smaa_blend.frag`, `post_smaa_resolve.frag`), **Slice D.1** *(done)*. `m_PostProcessSMAA{Edge,Blend,Resolve}PipelineLease` + `m_PostProcessSMAAPass` follow the same reset/republish pattern as the FXAA + tonemap + bloom leases. All three pipelines target the current `PostProcess.AATemp` recipe attachment (allocated with `FrameRecipeSizing::BackbufferFormat`) so the AA umbrella render pass stays format-compatible with the pipelines bound inside it; Slice D.2a retargets edge to `RG8_UNORM` and blend to `RGBA8_UNORM` once the recipe declares `PostProcess.AATemp.{Edges,Weights,Resolved}` as three separate transient resources and the AA umbrella splits into three ordered graph passes. Three 16-byte std430 push blocks (`PostProcessSMAAEdgePushConstants`, `PostProcessSMAABlendPushConstants`, `PostProcessSMAAResolvePushConstants`) replace the canonical 20-byte block per the shader-push-constant compatibility policy
-  - histogram compute pipeline (`post_histogram.comp`), **Slice E**.
-- [ ] Add executor fan-out for the postprocess legs. **Slice A** lands ToneMap inside the `"PostProcessPass"` umbrella; **Slice B.1** adds the bloom helper ahead of tonemap inside the same `"PostProcessPass"` umbrella; **Slice C** *(done)* moves FXAA into its *own* `"PostProcessAAPass"` umbrella branch (a separate ordered graph pass declared by the recipe with `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph compiler emits the `SceneColorLDR ColorAttachment → ShaderRead` transition between the two umbrella render-pass scopes; sharing `PostProcessPass` would alias the umbrella's own color attachment as a sampled image mid-render-pass, Vulkan's read-after-write feedback hazard); **Slice D.1** *(done)* fans `RecordPostProcessSMAAPass(...)` out behind the same `"PostProcessAAPass"` branch alongside FXAA (mutually exclusive per `PostProcessSettings::AntiAliasing`, with both pass bodies' `IsStageEnabled` gate enforcing the selector so both helpers can run unconditionally and only the active stage emits bind/push/draw); **Slice D.2a** splits the single `"PostProcessAAPass"` umbrella into three ordered graph passes (`"PostProcessAAEdgePass"`, `"PostProcessAABlendPass"`, `"PostProcessAAResolvePass"`) so edge / blend / resolve pipelines can target format-incompatible color attachments (`RG8_UNORM` / `RGBA8_UNORM` / backbuffer); FXAA records under the resolve pass only, SMAA records under all three; **Slice E** adds the Histogram helper behind the existing `"PostProcessPass"` umbrella (compute pipeline + readback drain). Each helper records under the `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
-- [ ] **Slice E**: Implement the histogram readback drain on `BeginFrame()` after the issuing frame's fences complete; surface results through `PostProcessSystem::PublishHistogramReadback(...)` (mirror the `Picking.Readback` drain).
-- [ ] **Slice B**: Confirm `BuildDefaultFrameRecipe` declares `SceneColorHDR`, `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram`, `PostProcess.AATemp.Edges`, `PostProcess.AATemp.Weights` with the recorded formats. **Slice B.2** *(partial)*: `PostProcess.BloomScratch` now declares `MipLevels = kBloomMipChainLevels` so the per-mip iteration has the subresource storage it needs; the `AATemp.{Edges, Weights}` rename remains a Slice D follow-up.
+- [x] **Slice E.1**: Recipe-side split — `BuildDefaultFrameRecipe` /
+  `DescribeDefaultFrameRecipe` add a new ordered graph pass
+  `"PostProcessHistogramPass"` (gated on `EnablePostProcess`) declared with
+  `Read(SceneColorHDR, ShaderRead)` + `Write(PostProcess.Histogram,
+  BufferUsage::ShaderWrite)`, ordered after `"PointPass"` and before
+  `"PostProcessPass"`. The histogram write is removed from the
+  `"PostProcessPass"` umbrella declaration (the umbrella is a
+  render-pass-scope pass that hosts bloom + tonemap fragment work, and
+  Vulkan rejects `vkCmdDispatch` inside an active render-pass scope —
+  the same render-pass-scope vs compute incompatibility the
+  GRAPHICS-074 picking readback hit when it had to copy out of a
+  color attachment after the picking render pass ended). New
+  `FrameRecipePassKind::PostProcessHistogram` enum value tracks the
+  new pass slot in introspection.
+- [x] **Slice E.1**: Pass-local push block — new
+  `PostProcessHistogramPushConstants` (16 bytes, `uint Width + uint
+  Height + float MinLogLum + float RangeLogLum` std430 mirroring
+  `post_histogram.comp`'s `layout(push_constant) PushConstants` block
+  byte-for-byte) exported from `Pass.PostProcess.Histogram`. The
+  canonical 20-byte `PostProcessPushConstants` block is intentionally
+  not reused per the standing shader-push-constant compatibility
+  policy: pushing it under the histogram shader would alias
+  `Exposure` (1.0) onto `Width` (`bit_cast<uint>(1.0f)` = 0x3F800000
+  ≈ 1.07e9 pixels wide), `Gamma` (2.2) onto `Height` and
+  `BloomIntensity` (0.05) onto `MinLogLum` — producing a degenerate
+  out-of-bounds dispatch shape and a meaningless luminance histogram.
+  `BuildPostProcessHistogramPushConstants(settings, width, height)`
+  derives `Width` / `Height` from the runtime viewport and defaults
+  the log-luminance range to `[-10, +10]` stops per `GRAPHICS-013AQ`
+  until Slice E.2's exposure adaptation overrides the bounds. The
+  histogram pass body's existing canonical-block `PushConstants(&pc,
+  sizeof(pc))` call switches to the new typed block.
+- [x] **Slice E.1**: `PostProcessHistogramPass::SetViewport(width,
+  height)` published by the executor (mirroring the Slice B.2 bloom
+  pattern) so the dispatch shape (`ceil(W/16) x ceil(H/16) x 1`)
+  tracks the backbuffer extent rather than the stale `(1,1,1)` the
+  Slice A stub recorded.
+- [x] **Slice E.1**: In `NullRenderer::InitializeOperationalPassResources(device)`,
+  create the histogram compute pipeline (`post_histogram.comp`) from
+  `BuildPostProcessHistogramPipelineDesc()` (compute pipeline,
+  `ComputeShaderPath = post_histogram.comp.spv`, `PushConstantSize =
+  sizeof(PostProcessHistogramPushConstants)`). `m_PostProcessHistogramPipelineLease`
+  + `m_PostProcessHistogramPass` follow the same reset/republish
+  pattern as the tonemap + bloom + FXAA + SMAA leases above.
+- [ ] **Slice E.2**: In `NullRenderer::InitializeOperationalPassResources(device)`,
+  allocate the host-visible `Histogram.Readback` buffer alongside the
+  existing `Picking.Readback` buffer.
+- [x] **Slice E.1**: `IRenderer` exposes
+  `GetPostProcessHistogramPipeline()` /
+  `GetPostProcessHistogramPipelineDesc()`. Executor wires
+  `"PostProcessHistogramPass"` to `RecordPostProcessHistogramPass(...)`
+  with the standard `SkippedNonOperational` / `SkippedUnavailable` /
+  `Recorded` taxonomy; the helper plumbs the backbuffer extent into
+  `SetViewport(...)` before invoking `Execute(...)`. Each remaining
+  postprocess helper (tonemap, bloom, FXAA, SMAA edge/blend/resolve)
+  is unchanged from its prior slice. Per-stage executor branches
+  remain in `Graphics.Renderer.cpp`'s per-pass switch.
+- [ ] **Slice E.2**: Implement the histogram readback drain on
+  `BeginFrame()` after the issuing frame's fences complete; surface
+  results through `PostProcessSystem::PublishHistogramReadback(...)`
+  (mirror the `Picking.Readback` drain); update the retained
+  `PostProcessExposureHistory` storage buffer via a `CopyBuffer(staging →
+  ExposureHistory)`.
+- [x] **Slice E.1**: `BuildDefaultFrameRecipe` declares the new
+  `"PostProcessHistogramPass"` graph pass and routes the
+  `PostProcess.Histogram` write through it. The umbrella
+  `"PostProcessPass"` no longer declares the histogram write.
 
 ## Tests
 - [x] **Slice A**: `contract;graphics` test `PostProcessToneMapPipelineSurvivesOperationalRebuild` asserts the tonemap pipeline lease is valid after `Initialize()`, the descriptor's shader paths + single backbuffer-format color target + `Undefined` depth + `PushConstantSize = sizeof(PostProcessPushConstants)` match `BuildPostProcessToneMapPipelineDesc()`, and that the descriptor is byte-identical across `RebuildOperationalResources()`. The existing `RendererFrameLifecycle.DefaultRecipeExecutesEveryDeclaredPass` test moves `"PostProcessPass"` from `kSoftSkippedPasses` to `kRoutedPasses` so the umbrella branch reports `Recorded` on an operational frame.
@@ -467,8 +630,47 @@ a readback drain.
     pipeline missing the resolve helper must report `SkippedUnavailable`
     so the recipe-build site keeps present on `SceneColorLDR`.
 - [x] **Slice D.2b**: `contract;graphics` test `PostProcessSMAALookupTexturesSurviveOperationalRebuild` asserts the retained `AreaTex` / `SearchTex` / exposure-history handles obtained from `renderer->GetPostProcessSystem()` are valid after `Initialize()`, the transfer-queue captured one `UploadTexture(...)` per LUT at the expected byte sizes (160 × 560 × 2 = 179200 for area; 66 × 33 = 2178 for search; mip 0 / array layer 0), and the three handles are byte-identical (StrongHandle `operator==`) across `RebuildOperationalResources()` with zero extra upload records. `Shutdown()` is asserted to release the leases by snapshotting `DestroyTextureCount` / `DestroyBufferCount` from a post-rebuild baseline and checking the post-`Shutdown()` totals increase by ≥ 2 textures and ≥ 1 buffer.
-- [ ] **Slice E**: `contract;graphics` test that the histogram readback drain calls `PostProcessSystem::PublishHistogramReadback` after the issuing frame's fence completes.
-- [ ] **Slice E**: `contract;graphics` test: `PostProcessDiagnostics` reports zero failure counters after a full chain init.
+- [x] **Slice E.1**: `contract;graphics` tests:
+  - `PostProcessHistogramPipelineSurvivesOperationalRebuild` asserts
+    the histogram compute pipeline lease is valid after `Initialize()`,
+    the descriptor's `ComputeShaderPath` ends with
+    `post_histogram.comp.spv`, `VertexShaderPath` /
+    `FragmentShaderPath` are empty (so the backend interprets the
+    descriptor as a compute pipeline), `ColorTargetCount == 0`,
+    `DepthTargetFormat == Undefined`, and
+    `PushConstantSize == sizeof(PostProcessHistogramPushConstants)`;
+    descriptor stays byte-identical across
+    `RebuildOperationalResources()`.
+  - `FrameRecipeDeclaresPostProcessHistogramAsOrderedPass` asserts the
+    recipe declares `"PostProcessHistogramPass"` between
+    `"PointPass"` and `"PostProcessPass"`, that
+    `"PostProcessHistogramPass"` reads `SceneColorHDR` and writes
+    `PostProcess.Histogram`, and that `"PostProcessPass"` no longer
+    writes `PostProcess.Histogram` (so future scope creep cannot
+    collapse the compute dispatch back inside the umbrella render-
+    pass scope and re-introduce the dispatch-inside-render-pass
+    hazard).
+  - `HistogramPushFeedsViewportSizedDispatchShape` asserts that the
+    pass body's recorded `Dispatch` call uses
+    `gridX = ceil(W/16)` for a `1920x1080` viewport (i.e. `120`) and
+    that the pushed 16-byte `PostProcessHistogramPushConstants`
+    block carries `Width == 1920`, `Height == 1080`, and the
+    canonical `[-10, +10]` log-luminance bounds (`MinLogLum ==
+    -10.0`, `RangeLogLum == 1.0 / 20.0`).
+  - `DefaultRecipeBuildsCanonicalPassOrder` adds
+    `"PostProcessHistogramPass"` between `"PointPass"` and
+    `"PostProcessPass"`.
+  - `RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext`
+    (+ rebuild / depth-failure / culling-failure variants) bumps the
+    recorded-pass counters from 10/10/9/5 to 11/11/10/6;
+    `kRoutedPasses` adds `"PostProcessHistogramPass"`.
+- [ ] **Slice E.2**: `contract;graphics` test that the histogram
+  readback drain calls `PostProcessSystem::PublishHistogramReadback`
+  after the issuing frame's fence completes; survives rebuild;
+  forwards the 256-bin payload byte-identical from the host-visible
+  `Histogram.Readback` slot.
+- [ ] **Slice E.2**: `contract;graphics` test: `PostProcessDiagnostics`
+  reports zero failure counters after a full chain init.
 
 ## Docs
 - [x] **Slice A**: Update `src/graphics/renderer/README.md` to record the tonemap leg of the postprocess chain as operationally wired (umbrella `"PostProcessPass"` reports `Recorded`); call out Slices B–E as the bloom / FXAA / SMAA / histogram followups.
@@ -479,7 +681,22 @@ a readback drain.
 - [x] **Slice D.2a**: `src/graphics/renderer/README.md` now records the AA umbrella split into three ordered graph passes + edge / blend pipeline format flip + per-stage SMAA Execute methods + per-pass renderer helpers + `presentSource` flip; calls out Slice D.2b (retained LUTs + exposure-adaptation history) and Slice E (Histogram) as the remaining followups.
 - [x] **Slice D.2a**: `docs/architecture/rendering-three-pass.md` updates the canonical pipeline-order list (single `PostProcessPass` step + three new `PostProcessAA{Edge,Blend,Resolve}Pass` steps), the frame-recipe transient table (single `PostProcess.AATemp` row replaced by three matched-format rows for `.Edges` / `.Weights` / `.Resolved`), and the SMAA/FXAA backend-follow-ups paragraph.
 - [x] **Slice D.2b**: `src/graphics/renderer/README.md` now records the retained SMAA `AreaTex` / `SearchTex` LUT textures + `PostProcessExposureHistory` buffer as allocated via the device-aware `PostProcessSystem::Initialize(device, textureMgr, bufferMgr)` overload (idempotent, invoked from both renderer `Initialize` and `RebuildOperationalResources`, leases dropped in `Shutdown()` matching the `ShadowSystem` teardown ordering); `docs/architecture/rendering-three-pass.md` already factually described the retained-resource ownership at `PostProcessSystem::Initialize()` and `Shutdown()` boundaries, and Slice D.2b makes that text true on the CPU/null gate without further edits.
-- [ ] **Slice E**: Extend `src/graphics/renderer/README.md` and `docs/architecture/rendering-three-pass.md` as the histogram readback drain lands.
+- [x] **Slice E.1**: `src/graphics/renderer/README.md` records the
+  Histogram leg as CPU-contract wired behind its own ordered graph
+  pass `"PostProcessHistogramPass"` (compute dispatch outside the
+  `"PostProcessPass"` umbrella render-pass scope; reads
+  `SceneColorHDR`, writes `PostProcess.Histogram`; canonical
+  `[-10, +10]` log-luminance default until Slice E.2's exposure
+  adaptation overrides). Calls out Slice E.2 (host-visible
+  `Histogram.Readback` buffer + `BeginFrame()`-side drain +
+  `PublishHistogramReadback` + exposure-history consumption) as the
+  remaining followup.
+- [x] **Slice E.1**: `docs/architecture/rendering-three-pass.md`
+  pipeline-order list now records `"PostProcessHistogramPass"` as a
+  separate step ordered between `"PointPass"` and `"PostProcessPass"`;
+  the canonical-pass-list paragraph notes the dispatch-vs-render-pass
+  scope reason for the split.
+- [ ] **Slice E.2**: Extend `src/graphics/renderer/README.md` and `docs/architecture/rendering-three-pass.md` as the histogram readback drain lands.
 
 ## Acceptance criteria
 - [x] **Slice A**: ToneMap pipeline records or `SkippedUnavailable` deterministically; `"PostProcessPass"` reports `Recorded` on the operational CPU/null gate.
@@ -489,8 +706,17 @@ a readback drain.
 - [x] **Slice D.1**: SMAA pass records (or each stage `SkippedUnavailable` when its pipeline is missing) deterministically; `RecordPostProcessSMAAPass(...)` runs inside the `"PostProcessAAPass"` graph pass alongside FXAA (mutually exclusive per `PostProcessSettings::AntiAliasing`, with the pass bodies' `IsStageEnabled` gate enforcing the selector). Default `AntiAliasing == None` short-circuits the SMAA pass body to a no-op while the helper still reports `Recorded` under the `"PostProcessAAPass"` accumulator (the same "structurally-recorded no-op" taxonomy FXAA already follows).
 - [x] **Slice D.2a**: SMAA edge / blend / resolve passes each record (or `SkippedUnavailable` when the pipeline is missing) deterministically under their own `"PostProcessAA{Edge,Blend,Resolve}Pass"` ordered graph pass; FXAA records under `"PostProcessAAResolvePass"` only. The recipe declares `PostProcess.AATemp.{Edges,Weights,Resolved}` at `RG8_UNORM` / `RGBA8_UNORM` / backbuffer format; `presentSource` flips to `PostProcess.AATemp.Resolved` when `FrameRecipeFeatures::EnableAntiAliasing` is set so the AA output reaches present.
 - [x] **Slice D.2b**: Retained `AreaTex` / `SearchTex` LUT textures + exposure-adaptation history buffer allocated via the device-aware `PostProcessSystem::Initialize(device, textureMgr, bufferMgr)` overload survive `RebuildOperationalResources()` byte-identical; `Shutdown()` releases them. Verified by `PostProcessSMAALookupTexturesSurviveOperationalRebuild` on the CPU/null gate.
-- [ ] **Slice E**: Each remaining postprocess pass records or `SkippedUnavailable` deterministically.
-- [ ] **Slice E**: Histogram readback drain produces deterministic CPU-visible results.
+- [x] **Slice E.1**: Histogram compute pipeline records (or
+  `SkippedUnavailable` when pipeline/system are missing)
+  deterministically under its own
+  `"PostProcessHistogramPass"` ordered graph pass; the dispatch shape
+  tracks the backbuffer extent via `SetViewport(width, height)`; the
+  pushed `PostProcessHistogramPushConstants` block carries the
+  canonical `[-10, +10]` log-luminance bounds. With
+  `EnableHistogram = false` the pass body short-circuits and the
+  helper still reports `Recorded` per the "structurally-recorded
+  no-op" taxonomy bloom / FXAA / SMAA already follow.
+- [ ] **Slice E.2**: Histogram readback drain produces deterministic CPU-visible results.
 - [x] **Slice A**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice A).
 - [x] **Slice B.1**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.1).
 - [x] **Slice B.2**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.2).
@@ -498,6 +724,7 @@ a readback drain.
 - [x] **Slice D.1**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice D.1).
 - [x] **Slice D.2a**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice D.2a).
 - [x] **Slice D.2b**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice D.2b — 2081/2081 tests pass; layering, doc-link, and task-policy validators all clean).
+- [x] **Slice E.1**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice E.1).
 
 ## Verification
 ```bash
@@ -555,8 +782,19 @@ python3 tools/docs/check_doc_links.py --root .
   contract test asserting handle identity and upload-record stability
   across `RebuildOperationalResources()`); layering + doc-link +
   task-policy validators all clean.
-- After Slice D.2b, open Slice E (Histogram compute pipeline +
-  `RecordPostProcessHistogramPass(...)` dispatch + `BeginFrame()`-side
-  readback drain mirroring the `Picking.Readback` pattern +
+- Slice E.1 lands on `claude/gallant-hypatia-a2puc`. Verification
+  expected to run in-session against a build with
+  `clang-20`/`clang++-20`/`clang-scan-deps-20`:
+  ```bash
+  cmake --preset ci
+  cmake --build --preset ci --target IntrinsicTests
+  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+  python3 tools/repo/check_layering.py --root src --strict
+  python3 tools/docs/check_doc_links.py --root .
+  python3 tools/agents/check_task_policy.py --root . --strict
+  ```
+- After Slice E.1, open Slice E.2 (host-visible `Histogram.Readback`
+  buffer + `BeginFrame()`-side readback drain mirroring the
+  `Picking.Readback` pattern +
   `PostProcessSystem::PublishHistogramReadback(...)` consuming the
   exposure-adaptation history buffer Slice D.2b allocated).

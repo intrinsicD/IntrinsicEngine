@@ -34,6 +34,15 @@ namespace Extrinsic::Graphics
         Line,
         Point,
         PostProcess,
+        // GRAPHICS-075 Slice E.1 — the histogram is a *compute* dispatch
+        // and Vulkan forbids `vkCmdDispatch` inside an active render-pass
+        // scope, so it cannot share the `"PostProcessPass"` umbrella's
+        // render-pass scope (which hosts bloom + tonemap fragment work).
+        // The histogram therefore lives in its own ordered graph pass
+        // declared before `"PostProcessPass"` with
+        // `Read(SceneColorHDR, ShaderRead)` +
+        // `Write(PostProcess.Histogram, BufferUsage::ShaderWrite)`.
+        PostProcessHistogram,
         // GRAPHICS-075 Slice D.2a — the single `"PostProcessAAPass"` graph
         // pass splits into three ordered AA passes so edge / blend / resolve
         // pipelines can target format-incompatible color attachments
