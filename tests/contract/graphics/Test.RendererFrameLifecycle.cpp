@@ -115,22 +115,21 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // helper still returns `Recorded` per the same "structurally-recorded
     // no-op" taxonomy the tonemap helper follows when the chain is
     // disabled. GRAPHICS-075 Slice C — FXAA runs in its *own* ordered
-    // graph pass (`"PostProcessAAPass"`) so its `SceneColorLDR` read
-    // crosses a real framegraph read-after-write barrier rather than
-    // aliasing the umbrella's color attachment. `AntiAliasing` defaults
-    // to `None` so the FXAA `Execute` body emits no bind/push/draw, but
-    // the helper still returns `Recorded` under the same "structurally-
-    // recorded no-op" taxonomy. GRAPHICS-075 Slice D.1 — SMAA fans out
-    // alongside FXAA behind the same `"PostProcessAAPass"` umbrella and
-    // accumulates its own `Recorded` entry per the umbrella's per-helper
-    // accumulator (mutually exclusive with FXAA per
-    // `PostProcessSettings::AntiAliasing`; `AntiAliasing` defaults to
-    // `None` so the SMAA pass body emits no bind/push/draw and the bind
-    // counts below stay at 6). Total Recorded entries: 5 routed
+    // graph pass so its `SceneColorLDR` read crosses a real framegraph
+    // read-after-write barrier rather than aliasing the umbrella's color
+    // attachment. GRAPHICS-075 Slice D.2a — the AA umbrella splits into
+    // three ordered graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`)
+    // so edge / blend / resolve pipelines can target format-incompatible
+    // color attachments. SMAA records under all three; FXAA records
+    // under the resolve pass only. `AntiAliasing` defaults to `None` so
+    // every AA pass body emits no bind/push/draw (the per-stage helpers
+    // still return `Recorded` per the structurally-recorded-no-op
+    // taxonomy). Total Recorded entries: 5 routed
     // (Culling/Depth/Surface/Line/Point) + 2 under `"PostProcessPass"`
-    // (bloom + tonemap) + 2 under `"PostProcessAAPass"` (fxaa + smaa) = 9.
-    // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
+    // (bloom + tonemap) + 3 under the per-stage AA passes
+    // (edge / blend / resolve helpers) = 10. Remaining unwired passes
+    // still soft-skip with SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 10u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -152,11 +151,18 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    // GRAPHICS-075 Slice C — FXAA runs in its own ordered graph pass so
-    // the framegraph emits a real `SceneColorLDR ColorAttachment →
-    // ShaderRead` barrier between the umbrella render-pass scopes.
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
+    // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three ordered
+    // graph passes so the framegraph emits real `ColorAttachment →
+    // ShaderRead` barriers between SMAA edge / blend / resolve stages
+    // (and between `SceneColorLDR` and the AA reads in edge / resolve).
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
@@ -407,19 +413,15 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // publishes the bloom downsample + upsample leases, so the umbrella
     // fans out to the bloom helper too (returning Recorded under the
     // "structurally-recorded no-op" taxonomy even though `EnableBloom`
-    // defaults to false). GRAPHICS-075 Slice C — the rebuild also
-    // publishes the FXAA pipeline lease and the recipe declares the
-    // `"PostProcessAAPass"` ordered graph pass (a *separate* umbrella
-    // from `PostProcessPass` so the FXAA read of `SceneColorLDR`
-    // crosses a real framegraph read-after-write barrier).
-    // GRAPHICS-075 Slice D.1 — the rebuild also publishes the three
-    // SMAA pipeline leases (edge / blend / resolve) and the SMAA helper
-    // fans out under the same `"PostProcessAAPass"` umbrella alongside
-    // FXAA, adding a second Recorded entry under that pass name. Total
-    // `Recorded` climbs to 9: 5 routed + 2 under `PostProcessPass`
-    // (bloom + tonemap) + 2 under `PostProcessAAPass` (fxaa + smaa).
+    // defaults to false). GRAPHICS-075 Slice C/D.2a — the rebuild also
+    // publishes the FXAA + three SMAA pipeline leases, and the recipe
+    // declares the AA umbrella split across three ordered graph passes
+    // (`"PostProcessAA{Edge,Blend,Resolve}Pass"`). Each per-stage helper
+    // returns `Recorded` under the structurally-recorded-no-op taxonomy
+    // when `AntiAliasing == None`. Total `Recorded`: 5 routed + 2 under
+    // `PostProcessPass` (bloom + tonemap) + 3 under the AA passes = 10.
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 10u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -440,8 +442,14 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
@@ -478,20 +486,16 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // report `SkippedUnavailable` so its missing lease cannot regress
     // silently. GRAPHICS-075 Slice A — the tonemap pipeline is created
     // after the depth-prepass failure point and is unaffected by it, so
-    // `"PostProcessPass"` still routes Recorded. GRAPHICS-075 Slice B.1 —
-    // the bloom downsample + upsample pipelines are likewise created
+    // `"PostProcessPass"` still routes Recorded. GRAPHICS-075 Slice B.1
+    // — the bloom downsample + upsample pipelines are likewise created
     // after the depth-prepass failure point, so the umbrella also fans
-    // out to the bloom helper. GRAPHICS-075 Slice C — the FXAA pipeline
-    // is created last in `InitializeOperationalPassResources()` and is
-    // also independent of the depth-prepass failure point, so the
-    // *separate* `"PostProcessAAPass"` graph pass adds one more Recorded
-    // entry. GRAPHICS-075 Slice D.1 — the three SMAA pipelines are
-    // similarly created independently of the depth-prepass failure
-    // point, so the SMAA helper also fans out under
-    // `"PostProcessAAPass"` and accumulates a second entry → total
-    // climbs to 8 (4 routed + 2 under PostProcessPass + 2 under
-    // PostProcessAAPass).
-    EXPECT_EQ(stats.CommandRecords.Recorded, 8u);
+    // out to the bloom helper. GRAPHICS-075 Slice D.2a — the FXAA and
+    // three SMAA pipelines are created independently of the depth-
+    // prepass failure point, and the AA umbrella splits into three
+    // ordered graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`)
+    // so all three per-stage helpers fire → total climbs to 9 (4 routed
+    // + 2 under PostProcessPass + 3 under the AA passes).
+    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -513,8 +517,14 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
@@ -545,20 +555,20 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     // GRAPHICS-075 Slice A — culling-pipeline failure still leaves the
-    // tonemap pipeline lease intact (`PostProcessSystem` + tonemap pipeline
-    // do not depend on `m_CullingOutputAvailable`), so
-    // `"PostProcessPass"` still routes Recorded. Every other routed pass
-    // requires the culling output and reports `SkippedUnavailable`.
+    // tonemap pipeline lease intact (`PostProcessSystem` + tonemap
+    // pipeline do not depend on `m_CullingOutputAvailable`), so
+    // `"PostProcessPass"` still routes Recorded. Every other routed
+    // pass requires the culling output and reports `SkippedUnavailable`.
     // GRAPHICS-075 Slice B.1 — the bloom pipelines have the same
-    // culling-independence as the tonemap pipeline, so the umbrella adds
-    // a second Recorded entry for the bloom helper. GRAPHICS-075 Slice C
-    // — the FXAA pipeline has the same culling-independence, and FXAA
-    // now runs in its own `"PostProcessAAPass"` graph pass, so a third
-    // Recorded entry lands under the AA umbrella. GRAPHICS-075 Slice
-    // D.1 — the three SMAA pipelines are similarly culling-independent;
-    // SMAA fans out alongside FXAA under `"PostProcessAAPass"` and
-    // accumulates a fourth Recorded entry.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 4u);
+    // culling-independence as the tonemap pipeline, so the umbrella
+    // adds a second Recorded entry for the bloom helper. GRAPHICS-075
+    // Slice D.2a — the FXAA + three SMAA pipelines are similarly
+    // culling-independent, and the AA umbrella splits into three
+    // ordered graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`);
+    // each per-stage helper records `Recorded` → three more entries
+    // (total 5: 0 routed + 2 under PostProcessPass + 3 under the AA
+    // passes).
+    EXPECT_EQ(stats.CommandRecords.Recorded, 5u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -571,8 +581,14 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAPass")->Status,
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
@@ -652,13 +668,14 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
         // umbrella executor branch (Bloom + ToneMap legs) and reports
         // `Recorded` on the operational CPU/null gate.
         "PostProcessPass",
-        // GRAPHICS-075 Slice C — `"PostProcessAAPass"` is a *separate*
-        // ordered graph pass that owns FXAA (Slice C) + SMAA (Slice D)
-        // so the AA legs sample the freshly-written `SceneColorLDR`
-        // through a framegraph read-after-write barrier rather than
-        // aliasing the umbrella's color attachment mid-render-pass.
+        // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three
+        // ordered graph passes so edge / blend / resolve pipelines can
+        // target format-incompatible color attachments. FXAA records
+        // under the resolve pass only; SMAA records under all three.
         // Slice E adds the Histogram sub-pass behind `PostProcessPass`.
-        "PostProcessAAPass",
+        "PostProcessAAEdgePass",
+        "PostProcessAABlendPass",
+        "PostProcessAAResolvePass",
     };
     static constexpr const char* kSoftSkippedPasses[] = {
         "ImGuiPass",
@@ -2171,17 +2188,14 @@ TEST(RendererFrameLifecycle, PostProcessFXAAPipelineSurvivesOperationalRebuild)
 }
 
 // ---------------------------------------------------------------------------
-// GRAPHICS-075 Slice D.1 — default-recipe postprocess SMAA pipelines lease +
-// republish. Three pipelines (edge / blend / resolve) created in the
-// `"PostProcessAAPass"` branch alongside FXAA. All three target the
-// current `PostProcess.AATemp` recipe attachment (allocated with
-// `FrameRecipeSizing::BackbufferFormat`); the renderer feeds them
-// `m_BackbufferFormat` for render-pass / pipeline format compatibility
-// with the AA umbrella's single-attachment scope. MockDevice keeps the
-// default `RHI::Format::RGBA8_UNORM`, so all three pipeline descriptors
-// report that format. Slice D.2 retargets edge to `RG8_UNORM` and blend
-// to `RGBA8_UNORM` once the recipe declares
-// `PostProcess.AATemp.{Edges,Weights}` as separate transient resources.
+// GRAPHICS-075 Slice D.2a — default-recipe postprocess SMAA pipelines lease
+// + republish. Three pipelines (edge / blend / resolve) are created across
+// the per-stage AA graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`).
+// The recipe's `PostProcess.AATemp.{Edges,Weights,Resolved}` split pins
+// edge to `RG8_UNORM`, blend to `RGBA8_UNORM`, and resolve to the
+// backbuffer format. MockDevice keeps the default
+// `RHI::Format::RGBA8_UNORM` for the backbuffer, so the resolve pipeline
+// reports that format while edge / blend report their own fixed formats.
 // Each push block is 16 bytes and mirrors its shader's std430 layout
 // byte-for-byte. Each descriptor must survive
 // `RebuildOperationalResources()` byte-identical.
@@ -2220,11 +2234,10 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     EXPECT_FALSE(initialEdgeDesc.DepthStencil.DepthWriteEnable);
     EXPECT_FALSE(initialEdgeDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialEdgeDesc.ColorTargetCount, 1u);
-    // Slice D.1: pipeline targets the current `PostProcess.AATemp`
-    // attachment (`BackbufferFormat` = `RGBA8_UNORM` under MockDevice).
-    // Slice D.2 retargets to `RG8_UNORM` once the recipe declares
-    // `AATemp.Edges`.
-    EXPECT_EQ(initialEdgeDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
+    // Slice D.2a: edge pipeline is fixed at `RG8_UNORM` to match the
+    // recipe's `PostProcess.AATemp.Edges` transient (the SMAA edge
+    // shader writes `vec2 edges`).
+    EXPECT_EQ(initialEdgeDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RG8_UNORM);
     EXPECT_EQ(initialEdgeDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
     // 16-byte std430 block: `vec2 InvResolution + float EdgeThreshold + float _pad0`.
     EXPECT_EQ(initialEdgeDesc.PushConstantSize,
@@ -2242,10 +2255,8 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     EXPECT_FALSE(initialBlendDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialBlendDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialBlendDesc.ColorTargetCount, 1u);
-    // Slice D.1: same `PostProcess.AATemp` attachment as the edge
-    // pipeline; happens to share the backbuffer-format byte shape that
-    // Slice D.2's `AATemp.Weights` will declare, but the dependency must
-    // be on the *recipe* attachment until D.2 lands.
+    // Slice D.2a: blend pipeline is fixed at `RGBA8_UNORM` to match the
+    // recipe's `PostProcess.AATemp.Weights` transient.
     EXPECT_EQ(initialBlendDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
     EXPECT_EQ(initialBlendDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
     // 16-byte std430 block: `vec2 InvResolution + int MaxSearchSteps + int MaxSearchStepsDiag`.
@@ -2264,8 +2275,9 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     EXPECT_FALSE(initialResolveDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialResolveDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialResolveDesc.ColorTargetCount, 1u);
-    // SMAA resolve writes the final anti-aliased LDR to the backbuffer
-    // format; MockDevice keeps the default `RHI::Format::RGBA8_UNORM`.
+    // Slice D.2a: resolve writes `PostProcess.AATemp.Resolved`, which
+    // the recipe allocates with `FrameRecipeSizing::BackbufferFormat`;
+    // MockDevice keeps the default `RHI::Format::RGBA8_UNORM`.
     EXPECT_EQ(initialResolveDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
     EXPECT_EQ(initialResolveDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
     // 16-byte std430 block: `vec2 InvResolution + float _pad0 + float _pad1`.
@@ -2285,6 +2297,136 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     EXPECT_TRUE(PipelineDescBytesEqual(initialEdgeDesc, rebuiltEdgeDesc));
     EXPECT_TRUE(PipelineDescBytesEqual(initialBlendDesc, rebuiltBlendDesc));
     EXPECT_TRUE(PipelineDescBytesEqual(initialResolveDesc, rebuiltResolveDesc));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice D.2a — AA-mode-aware resolve gate. The recipe-build
+// site flips `FrameRecipeFeatures::EnableAntiAliasing` (and thus
+// `presentSource = PostProcess.AATemp.Resolved`) only when the selected
+// AA mode's pipeline(s) are actually available, and
+// `RecordPostProcessAAResolvePass` mirrors the same gate. Otherwise a
+// user-selected AA mode whose matching pipeline failed to build would
+// route present to the unwritten `AATemp.Resolved` attachment while
+// the pass body short-circuited to a no-op — the user would see a
+// cleared / undefined frame instead of the tonemapped `SceneColorLDR`.
+// These regression tests pin the gate so future scope creep can't
+// loosen it back to "either AA pipeline is good enough".
+//
+// `FailPipelineCreateCall` is a 1-indexed counter of `IDevice` pipeline-
+// create calls. Pipeline creation order inside
+// `InitializeOperationalPassResources` is:
+//   1 culling, 2 depth, 3 defaultDebugSurface, 4 minimalVisibleTriangle,
+//   5 forwardSurface, 6 forwardLine, 7 forwardPoint, 8 shadow,
+//   9 deferredGBuffer, 10 deferredLighting, 11-14 selectionId,
+//   15 selectionOutline, 16 tonemap, 17 bloomDownsample, 18 bloomUpsample,
+//   19 postProcessFXAA, 20 smaaEdge, 21 smaaBlend, 22 smaaResolve.
+// If a future change reorders pipeline creation, update the constants.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    constexpr int kPostProcessFXAACreateCallIndex = 19;
+    constexpr int kPostProcessSMAAResolveCreateCallIndex = 22;
+}
+
+TEST(RendererFrameLifecycle, FXAASelectedWithoutPipelineKeepsResolveSkippedAndPresentOnSceneColorLDR)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{321u, 1u};
+    device.FailPipelineCreateCall = kPostProcessFXAACreateCallIndex;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    // The targeted Create call should have failed; FXAA lease is invalid
+    // while SMAA leases remain valid.
+    EXPECT_FALSE(renderer->GetPostProcessFXAAPipeline().IsValid())
+        << "Test fixture targeted the wrong pipeline-create call; "
+           "FailPipelineCreateCall index needs to match the FXAA slot.";
+    EXPECT_TRUE(renderer->GetPostProcessSMAAResolvePipeline().IsValid());
+
+    // Select FXAA. Without the gate-tightening the resolve helper would
+    // accept the pass (SMAA resolve pipeline exists), the recipe would
+    // flip presentSource to AATemp.Resolved, and present would consume
+    // a cleared attachment.
+    renderer->GetPostProcessSystem().SetSettings(Extrinsic::Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Extrinsic::Graphics::PostProcessAntiAliasing::FXAA,
+    });
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* resolvePass =
+        FindCommandPass(stats, "PostProcessAAResolvePass");
+    ASSERT_NE(resolvePass, nullptr);
+    EXPECT_EQ(resolvePass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable)
+        << "FXAA was selected but the FXAA pipeline failed to build; the "
+           "resolve helper must report SkippedUnavailable rather than "
+           "falsely recording a no-op against the unwritten resolved "
+           "attachment.";
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, SMAASelectedWithoutResolvePipelineKeepsResolveSkippedAndPresentOnSceneColorLDR)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{322u, 1u};
+    device.FailPipelineCreateCall = kPostProcessSMAAResolveCreateCallIndex;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    EXPECT_FALSE(renderer->GetPostProcessSMAAResolvePipeline().IsValid())
+        << "Test fixture targeted the wrong pipeline-create call; "
+           "FailPipelineCreateCall index needs to match the SMAA resolve "
+           "slot.";
+    EXPECT_TRUE(renderer->GetPostProcessFXAAPipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPostProcessSMAAEdgePipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPostProcessSMAABlendPipeline().IsValid());
+
+    renderer->GetPostProcessSystem().SetSettings(Extrinsic::Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Extrinsic::Graphics::PostProcessAntiAliasing::SMAA,
+    });
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* resolvePass =
+        FindCommandPass(stats, "PostProcessAAResolvePass");
+    ASSERT_NE(resolvePass, nullptr);
+    EXPECT_EQ(resolvePass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable)
+        << "SMAA was selected but the resolve pipeline failed to build; "
+           "the resolve helper must report SkippedUnavailable so the "
+           "recipe-build site keeps presentSource on SceneColorLDR.";
 
     renderer->Shutdown();
 }

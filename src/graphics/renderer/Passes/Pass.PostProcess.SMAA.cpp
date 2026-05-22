@@ -73,54 +73,64 @@ namespace Extrinsic::Graphics
         m_ResolvePipeline = pipeline;
     }
 
-    void PostProcessSMAAPass::Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+    namespace
     {
-        // Gate the SMAA branch on `PostProcessSettings::AntiAliasing ==
-        // SMAA` (`IsStageEnabled(SMAA)` enforces this through
-        // `DescribeChain()` — mutually exclusive with FXAA per the same
-        // selector). When AA is `None` or `FXAA` the body emits no
-        // bind/push/draw, mirroring the bloom helper's
-        // "structurally-recorded no-op" taxonomy: the umbrella helper
-        // still returns `Recorded` because the pass / pipelines exist.
-        if (!m_PostProcessSystem.IsInitialized() ||
-            !m_PostProcessSystem.IsStageEnabled(PostProcessStageKind::SMAA))
+        // Gate the SMAA per-stage bodies on
+        // `PostProcessSettings::AntiAliasing == SMAA` (`IsStageEnabled(SMAA)`
+        // enforces this through `DescribeChain()` — mutually exclusive
+        // with FXAA per the same selector). When AA is `None` or `FXAA`
+        // every per-stage Execute returns false and emits no bind/push/
+        // draw, mirroring the bloom helper's "structurally-recorded
+        // no-op" taxonomy: the per-stage umbrella helpers still return
+        // `Recorded` because the pass / pipelines exist.
+        [[nodiscard]] bool SMAAEnabled(const PostProcessSystem& post) noexcept
+        {
+            return post.IsInitialized() && post.IsStageEnabled(PostProcessStageKind::SMAA);
+        }
+    }
+
+    void PostProcessSMAAPass::ExecuteEdge(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+    {
+        if (!SMAAEnabled(m_PostProcessSystem) || !m_EdgePipeline.IsValid())
         {
             return;
         }
+        const PostProcessSMAAEdgePushConstants edgePc =
+            BuildPostProcessSMAAEdgePushConstants(m_PostProcessSystem.GetSettings(),
+                                                  camera.ViewportWidth,
+                                                  camera.ViewportHeight);
+        cmd.BindPipeline(m_EdgePipeline);
+        cmd.PushConstants(&edgePc, sizeof(edgePc));
+        cmd.Draw(3u, 1u, 0u, 0u);
+    }
 
-        const PostProcessSettings& settings = m_PostProcessSystem.GetSettings();
-
-        if (m_EdgePipeline.IsValid())
+    void PostProcessSMAAPass::ExecuteBlend(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+    {
+        if (!SMAAEnabled(m_PostProcessSystem) || !m_BlendPipeline.IsValid())
         {
-            const PostProcessSMAAEdgePushConstants edgePc =
-                BuildPostProcessSMAAEdgePushConstants(settings,
+            return;
+        }
+        const PostProcessSMAABlendPushConstants blendPc =
+            BuildPostProcessSMAABlendPushConstants(m_PostProcessSystem.GetSettings(),
+                                                   camera.ViewportWidth,
+                                                   camera.ViewportHeight);
+        cmd.BindPipeline(m_BlendPipeline);
+        cmd.PushConstants(&blendPc, sizeof(blendPc));
+        cmd.Draw(3u, 1u, 0u, 0u);
+    }
+
+    void PostProcessSMAAPass::ExecuteResolve(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
+    {
+        if (!SMAAEnabled(m_PostProcessSystem) || !m_ResolvePipeline.IsValid())
+        {
+            return;
+        }
+        const PostProcessSMAAResolvePushConstants resolvePc =
+            BuildPostProcessSMAAResolvePushConstants(m_PostProcessSystem.GetSettings(),
                                                      camera.ViewportWidth,
                                                      camera.ViewportHeight);
-            cmd.BindPipeline(m_EdgePipeline);
-            cmd.PushConstants(&edgePc, sizeof(edgePc));
-            cmd.Draw(3u, 1u, 0u, 0u);
-        }
-
-        if (m_BlendPipeline.IsValid())
-        {
-            const PostProcessSMAABlendPushConstants blendPc =
-                BuildPostProcessSMAABlendPushConstants(settings,
-                                                      camera.ViewportWidth,
-                                                      camera.ViewportHeight);
-            cmd.BindPipeline(m_BlendPipeline);
-            cmd.PushConstants(&blendPc, sizeof(blendPc));
-            cmd.Draw(3u, 1u, 0u, 0u);
-        }
-
-        if (m_ResolvePipeline.IsValid())
-        {
-            const PostProcessSMAAResolvePushConstants resolvePc =
-                BuildPostProcessSMAAResolvePushConstants(settings,
-                                                        camera.ViewportWidth,
-                                                        camera.ViewportHeight);
-            cmd.BindPipeline(m_ResolvePipeline);
-            cmd.PushConstants(&resolvePc, sizeof(resolvePc));
-            cmd.Draw(3u, 1u, 0u, 0u);
-        }
+        cmd.BindPipeline(m_ResolvePipeline);
+        cmd.PushConstants(&resolvePc, sizeof(resolvePc));
+        cmd.Draw(3u, 1u, 0u, 0u);
     }
 }

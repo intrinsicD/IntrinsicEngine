@@ -53,7 +53,9 @@ namespace Extrinsic::Graphics
             case FrameRecipeResourceKind::SelectionOutline:
             case FrameRecipeResourceKind::DebugViewRGBA:
             case FrameRecipeResourceKind::PostProcessBloomScratch:
-            case FrameRecipeResourceKind::PostProcessAATemp:
+            case FrameRecipeResourceKind::PostProcessAATempEdges:
+            case FrameRecipeResourceKind::PostProcessAATempWeights:
+            case FrameRecipeResourceKind::PostProcessAATempResolved:
                 return DebugViewResourceClass::Texture;
             }
             return DebugViewResourceClass::Unknown;

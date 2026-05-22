@@ -198,19 +198,25 @@ namespace Extrinsic::Graphics
         // freshly-written `SceneColorLDR` through a proper framegraph
         // read-after-write barrier. `PostProcessPass` owns
         // Bloom + ToneMap (Histogram lands with Slice E) and writes
-        // `SceneColorLDR`; `PostProcessAAPass` reads `SceneColorLDR` +
-        // writes `PostProcess.AATemp` so the framegraph compiler emits
-        // the `SceneColorLDR ColorAttachment → ShaderRead` transition
-        // between the umbrella render-pass scopes. With
-        // `AntiAliasing == None` the AA pass body emits no bind/push/
-        // draw (the helper still routes `Recorded`); the present source
-        // remains `SceneColorLDR` until Slice D promotes AA-active
-        // viewports to consume `PostProcess.AATemp` (or its Slice D
-        // SMAA-renamed `AATemp.Edges`/`AATemp.Weights` siblings).
+        // `SceneColorLDR`. Slice D.2a then splits the single AA umbrella
+        // into three ordered passes so edge / blend / resolve pipelines
+        // can target format-incompatible color attachments (`RG8_UNORM`
+        // / `RGBA8_UNORM` / backbuffer format); each pass declares a
+        // single matched-format `Write`. FXAA records under the resolve
+        // pass only (its sampled-image read is the freshly-written
+        // `SceneColorLDR`); SMAA records under all three. With
+        // `AntiAliasing == None` all three AA pass bodies emit no
+        // bind/push/draw (the helpers still route `Recorded`); the
+        // present source flips to `PostProcess.AATemp.Resolved` only
+        // when `features.EnableAntiAliasing` is set.
         AddPass(out, FrameRecipePassKind::PostProcess, "PostProcessPass", features.EnablePostProcess, false,
                 {"SceneColorHDR"}, {"PostProcess.BloomScratch", "PostProcess.Histogram", "SceneColorLDR"});
-        AddPass(out, FrameRecipePassKind::PostProcessAA, "PostProcessAAPass", features.EnablePostProcess, false,
-                {"SceneColorLDR"}, {"PostProcess.AATemp"});
+        AddPass(out, FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass", features.EnablePostProcess, false,
+                {"SceneColorLDR"}, {"PostProcess.AATemp.Edges"});
+        AddPass(out, FrameRecipePassKind::PostProcessAABlend, "PostProcessAABlendPass", features.EnablePostProcess, false,
+                {"PostProcess.AATemp.Edges"}, {"PostProcess.AATemp.Weights"});
+        AddPass(out, FrameRecipePassKind::PostProcessAAResolve, "PostProcessAAResolvePass", features.EnablePostProcess, false,
+                {"SceneColorLDR", "PostProcess.AATemp.Weights"}, {"PostProcess.AATemp.Resolved"});
         AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", features.EnableSelectionOutline, false,
                 {"FrameRecipe.PresentSource", "EntityId", "SceneDepth"}, {"SelectionOutline"});
         AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
@@ -243,7 +249,14 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::SceneColorLDR, "SceneColorLDR", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessBloomScratch, "PostProcess.BloomScratch", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessHistogram, "PostProcess.Histogram", features.EnablePostProcess, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PostProcessAATemp, "PostProcess.AATemp", features.EnablePostProcess, false, false, true);
+        // GRAPHICS-075 Slice D.2a — three matched-format AA attachments
+        // replace the single `PostProcess.AATemp` transient. Edge is
+        // `RG8_UNORM`, blend is `RGBA8_UNORM`, resolve is the
+        // backbuffer format. `presentSource` flips to the resolved
+        // attachment when `features.EnableAntiAliasing` is set.
+        AddResource(out, FrameRecipeResourceKind::PostProcessAATempEdges, "PostProcess.AATemp.Edges", features.EnablePostProcess, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessAATempWeights, "PostProcess.AATemp.Weights", features.EnablePostProcess, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessAATempResolved, "PostProcess.AATemp.Resolved", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SelectionOutline, "SelectionOutline", features.EnableSelectionOutline, false, false, true);
         AddResource(out, FrameRecipeResourceKind::DebugViewRGBA, "DebugViewRGBA", features.EnableDebugView, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
@@ -400,7 +413,9 @@ namespace Extrinsic::Graphics
         TextureRef shadowAtlas{};
         TextureRef ldr{};
         TextureRef postProcessBloomScratch{};
-        TextureRef postProcessAATemp{};
+        TextureRef postProcessAATempEdges{};
+        TextureRef postProcessAATempWeights{};
+        TextureRef postProcessAATempResolved{};
         TextureRef selectionOutline{};
         TextureRef debugView{};
         BufferRef postProcessHistogram{};
@@ -511,7 +526,22 @@ namespace Extrinsic::Graphics
             RHI::TextureDesc bloomScratchDesc = ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "PostProcess.BloomScratch");
             bloomScratchDesc.MipLevels = ComputeBloomMipChainLevels(width, height);
             postProcessBloomScratch = graph.CreateTexture("PostProcess.BloomScratch", bloomScratchDesc);
-            postProcessAATemp = graph.CreateTexture("PostProcess.AATemp", ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp"));
+            // GRAPHICS-075 Slice D.2a — three matched-format AA attachments
+            // replace the single `PostProcess.AATemp` transient. The
+            // edge / blend / resolve graph passes each declare a single
+            // matched-format `Write`, so the framegraph compiler emits
+            // correct layout transitions between them and the AA umbrella
+            // never aliases two pipelines with incompatible color formats
+            // inside a single render-pass scope on Vulkan.
+            postProcessAATempEdges = graph.CreateTexture(
+                "PostProcess.AATemp.Edges",
+                ColorTargetDesc(width, height, RHI::Format::RG8_UNORM, "PostProcess.AATemp.Edges"));
+            postProcessAATempWeights = graph.CreateTexture(
+                "PostProcess.AATemp.Weights",
+                ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "PostProcess.AATemp.Weights"));
+            postProcessAATempResolved = graph.CreateTexture(
+                "PostProcess.AATemp.Resolved",
+                ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp.Resolved"));
             postProcessHistogram = graph.CreateBuffer("PostProcess.Histogram", RHI::BufferDesc{
                 .SizeBytes = 256u * sizeof(std::uint32_t),
                 .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc,
@@ -695,27 +725,43 @@ namespace Extrinsic::Graphics
             // freshly-written `SceneColorLDR` through a proper framegraph
             // read-after-write barrier rather than reading the umbrella
             // pass's own color attachment mid-render-pass. `PostProcessPass`
-            // owns Bloom (Slice B) + ToneMap (Slice A); `PostProcessAAPass`
-            // owns FXAA (Slice C) + SMAA (Slice D). The framegraph compiler
-            // emits the `SceneColorLDR ColorAttachment → ShaderRead`
-            // transition between the two umbrella render-pass scopes.
-            // `presentSource` stays on `SceneColorLDR` for now — flipping
-            // present routing to `PostProcess.AATemp` (or the Slice D
-            // SMAA-renamed `AATemp.Edges`/`AATemp.Weights` siblings) is
-            // Slice D's recipe-level change; with `AntiAliasing == None`
-            // the AA pass body short-circuits to a no-op so an empty
-            // AATemp transient does not regress the present output.
+            // owns Bloom (Slice B) + ToneMap (Slice A). Slice D.2a then
+            // splits the AA umbrella into three ordered graph passes so
+            // edge / blend / resolve pipelines can target format-
+            // incompatible color attachments (`RG8_UNORM` / `RGBA8_UNORM`
+            // / backbuffer format). Each AA pass declares a single
+            // matched-format `Write`; the framegraph compiler emits the
+            // `SceneColorLDR ColorAttachment → ShaderRead` transition
+            // between `PostProcessPass` and `PostProcessAAEdgePass`, the
+            // `AATemp.Edges ColorAttachment → ShaderRead` transition
+            // between edge and blend, and so on. FXAA records under the
+            // resolve pass only (its sampled-image read is the freshly-
+            // written `SceneColorLDR`); SMAA records under all three.
+            // With `features.EnableAntiAliasing` set, `presentSource`
+            // flips to `PostProcess.AATemp.Resolved` so the AA-resolved
+            // color reaches present; otherwise it stays on
+            // `SceneColorLDR` (the AA pass bodies short-circuit to no-op
+            // when `PostProcessSettings::AntiAliasing == None`).
             addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(hdr, TextureUsage::ShaderRead);
                 builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
                 builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
             });
-            addOrderedPass("PostProcessAAPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass("PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
                 builder.Read(ldr, TextureUsage::ShaderRead);
-                builder.Write(postProcessAATemp, TextureUsage::ColorAttachmentWrite);
+                builder.Write(postProcessAATempEdges, TextureUsage::ColorAttachmentWrite);
             });
-            presentSource = ldr;
+            addOrderedPass("PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(postProcessAATempEdges, TextureUsage::ShaderRead);
+                builder.Write(postProcessAATempWeights, TextureUsage::ColorAttachmentWrite);
+            });
+            addOrderedPass("PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
+                builder.Read(ldr, TextureUsage::ShaderRead);
+                builder.Read(postProcessAATempWeights, TextureUsage::ShaderRead);
+                builder.Write(postProcessAATempResolved, TextureUsage::ColorAttachmentWrite);
+            });
+            presentSource = features.EnableAntiAliasing ? postProcessAATempResolved : ldr;
         }
 
         if (features.EnableSelectionOutline)

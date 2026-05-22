@@ -988,19 +988,36 @@ Concretely:
   RelativeThreshold + float SubpixelBlending` std430 push block). The
   `NullRenderer` owns `m_PostProcessFXAAPass` +
   `m_PostProcessFXAAPipelineLease`, both republished byte-identical
-  across `RebuildOperationalResources()`. **FXAA runs in its own
-  ordered graph pass** (`"PostProcessAAPass"`) declared by the recipe
-  with `Read(SceneColorLDR, ShaderRead) + Write(PostProcess.AATemp,
-  ColorAttachmentWrite)` so the framegraph compiler emits the
-  `SceneColorLDR ColorAttachment → ShaderRead` transition between the
-  `PostProcessPass` umbrella render-pass scope (bloom + tonemap) and
-  the FXAA umbrella scope. Sharing the `PostProcessPass` umbrella with
-  the tonemap leg would have made FXAA's sampled-image read alias the
-  umbrella's own color attachment mid-render-pass — Vulkan's classic
-  read-after-write feedback hazard. `presentSource` stays on
-  `SceneColorLDR` for now; flipping present routing to consume
-  `PostProcess.AATemp` (or its Slice D `AATemp.Edges` / `AATemp.Weights`
-  SMAA siblings) when AA is enabled is Slice D's recipe-level change.
+  across `RebuildOperationalResources()`. **GRAPHICS-075 Slice D.2a
+  splits the AA umbrella into three ordered graph passes**
+  (`"PostProcessAAEdgePass"`, `"PostProcessAABlendPass"`,
+  `"PostProcessAAResolvePass"`) so edge / blend / resolve pipelines
+  can target format-incompatible color attachments. The recipe
+  declares `PostProcess.AATemp.{Edges,Weights,Resolved}` as three
+  matched-format transients (`RG8_UNORM` / `RGBA8_UNORM` /
+  backbuffer format) and each pass declares a single matched-format
+  `Write`. FXAA records under the resolve pass only — its sampled-
+  image read of `SceneColorLDR` crosses a real framegraph read-
+  after-write barrier rather than aliasing the umbrella's color
+  attachment mid-render-pass (Vulkan's classic read-after-write
+  feedback hazard). The framegraph compiler emits the
+  `SceneColorLDR ColorAttachment → ShaderRead` transition between
+  `PostProcessPass` (bloom + tonemap) and `PostProcessAAEdgePass`,
+  then the `AATemp.Edges ColorAttachment → ShaderRead` transition
+  between edge and blend, and the `AATemp.Weights ColorAttachment →
+  ShaderRead` transition before resolve. `presentSource` flips to
+  `PostProcess.AATemp.Resolved` only when
+  `PostProcessSettings::AntiAliasing != None` **and** the matching
+  AA mode's pipeline(s) are actually present
+  (`FrameRecipeFeatures::EnableAntiAliasing = true` only if the
+  renderer's `SelectedAntiAliasingPipelinesAvailable()` is true:
+  FXAA requires the FXAA pipeline; SMAA requires all three SMAA
+  pipelines because the resolve shader reads `AATemp.Weights` and
+  the blend shader reads `AATemp.Edges`, so a missing upstream
+  pipeline would route a cleared resolve to present). Otherwise
+  present stays on `SceneColorLDR`, and
+  `RecordPostProcessAAResolvePass` reports `SkippedUnavailable`
+  rather than falsely recording `Recorded` against a no-op draw.
   `BuildPostProcessFXAAPushConstants(settings, viewportWidth,
   viewportHeight)` derives `InvResolution` from
   `RHI::CameraUBO::Viewport{Width,Height}` (a zero / negative extent
@@ -1014,55 +1031,63 @@ Concretely:
   — under std430 it would alias `Exposure` onto `InvResolution.x`,
   `Gamma` onto `InvResolution.y`, `BloomIntensity` onto
   `ContrastThreshold`, etc., and produce visually-meaningless FXAA
-  output. The FXAA leg is gated by `PostProcessSettings::AntiAliasing ==
-  FXAA` inside the pass body (which `IsStageEnabled` enforces); `None`
-  or `SMAA` short-circuits `Execute(...)` to a no-op while the helper
-  still returns `Recorded` under the `"PostProcessAAPass"` accumulator,
-  mirroring the bloom helper's "structurally-recorded no-op" taxonomy
-  when `EnableBloom = false`. `GRAPHICS-075` Slice D.1 adds the three
-  SMAA pipelines (vertex `post_fullscreen.vert.spv` paired with
-  `post_smaa_edge.frag.spv` / `post_smaa_blend.frag.spv` /
-  `post_smaa_resolve.frag.spv`); all three target the current
-  `PostProcess.AATemp` recipe attachment (allocated with
-  `FrameRecipeSizing::BackbufferFormat`) so the AA umbrella render pass
-  stays format-compatible with the pipelines bound inside it. Slice D.2
-  retargets edge to `RG8_UNORM` and blend to `RGBA8_UNORM` once the
-  recipe splits `AATemp` into `AATemp.{Edges,Weights}` siblings. Each
-  pipeline carries its own 16-byte std430 push block
+  output. The FXAA body is gated by
+  `PostProcessSettings::AntiAliasing == FXAA` inside the pass body
+  (which `IsStageEnabled` enforces); `None` or `SMAA` short-circuits
+  `Execute(...)` to a no-op while the helper still returns
+  `Recorded` under the `"PostProcessAAResolvePass"` accumulator,
+  mirroring the bloom helper's "structurally-recorded no-op"
+  taxonomy when `EnableBloom = false`. `GRAPHICS-075` Slice D.2a
+  fixes the three SMAA pipelines (vertex
+  `post_fullscreen.vert.spv` paired with `post_smaa_edge.frag.spv` /
+  `post_smaa_blend.frag.spv` / `post_smaa_resolve.frag.spv`) at the
+  recipe's matched formats: edge writes
+  `PostProcess.AATemp.Edges` (`RG8_UNORM`), blend writes
+  `PostProcess.AATemp.Weights` (`RGBA8_UNORM`), and resolve writes
+  `PostProcess.AATemp.Resolved` (backbuffer format). The edge /
+  blend pipeline build helpers are no longer parameterised on
+  format because the recipe's transient declarations pin them.
+  Each pipeline carries its own 16-byte std430 push block
   (`PostProcessSMAAEdgePushConstants` / `PostProcessSMAABlendPushConstants`
   / `PostProcessSMAAResolvePushConstants`) mirroring the matching
   shader's `Push` declaration byte-for-byte; the canonical 20-byte
   `PostProcessPushConstants` is intentionally not reused per the same
   shader-push-constant compatibility policy that motivated the
   Slice A / B / C pass-local push blocks. `NullRenderer` owns
-  `m_PostProcessSMAAPass` + `m_PostProcessSMAA{Edge,Blend,Resolve}PipelineLease`,
-  all four republished byte-identical across
-  `RebuildOperationalResources()`. `RecordPostProcessSMAAPass(...)`
-  fans out behind the same `"PostProcessAAPass"` branch alongside the
-  FXAA helper; both pass bodies' `IsStageEnabled` gate enforces the
-  `PostProcessSettings::AntiAliasing` selector so the helpers run
-  unconditionally and only the active stage emits bind/push/draw. The
-  pass body records three Bind/Push/Draw triples (edge → blend →
-  resolve) when `AntiAliasing == SMAA`, mirroring the bloom helper's
-  per-stage early-skip on individual pipeline `IsValid()` so a partial
-  outage still records the surviving stages. Each SMAA push builder
-  derives `InvResolution` from `RHI::CameraUBO::Viewport{Width,Height}`
-  (zero / negative extent maps to a zero inverse so the shaders'
-  neighbour-tap UVs degenerate gracefully) and keeps `EdgeThreshold` /
+  `m_PostProcessSMAAPass` +
+  `m_PostProcessSMAA{Edge,Blend,Resolve}PipelineLease`, all four
+  republished byte-identical across `RebuildOperationalResources()`.
+  The SMAA pass exposes per-stage Execute methods
+  (`ExecuteEdge` / `ExecuteBlend` / `ExecuteResolve`); each of the
+  three per-stage AA helpers
+  (`RecordPostProcessAA{Edge,Blend,Resolve}Pass`) invokes the
+  matching SMAA Execute, and the resolve helper additionally
+  invokes the FXAA pass body. Each per-stage body's `IsStageEnabled`
+  gate enforces the `PostProcessSettings::AntiAliasing` selector so
+  the helpers run unconditionally and only the active stage emits
+  bind/push/draw; partial pipeline outages drop only the affected
+  stage rather than collapsing the whole AA leg. Each SMAA push
+  builder derives `InvResolution` from
+  `RHI::CameraUBO::Viewport{Width,Height}` (zero / negative extent
+  maps to a zero inverse so the shaders' neighbour-tap UVs
+  degenerate gracefully) and keeps `EdgeThreshold` /
   `MaxSearchSteps` / `MaxSearchStepsDiag` at the SMAA reference
   defaults; future `PostProcessSettings::SMAA*` fields flow through
   these builders without touching the pass body or pipeline descs.
-  Retained `AreaTex` / `SearchTex` LUT textures sampled by the blend
-  pipeline + exposure-adaptation history buffer + recipe-side
-  `PostProcess.AATemp.{Edges,Weights}` rename land in Slice D.2.
+  Retained `AreaTex` / `SearchTex` LUT textures sampled by the
+  blend pipeline + exposure-adaptation history buffer +
+  device-aware `PostProcessSystem::Initialize(device)` overload
+  land in Slice D.2b; until then the blend shader samples
+  placeholder zero LUT bindings on the CPU/null gate.
   Histogram (Slice E, compute pipeline + readback drain) fans out
   behind the existing `"PostProcessPass"` umbrella alongside bloom +
   tonemap. Each AA stage is free to define its own pass-local push
   block where the shader interface demands more than the canonical 20
   bytes. Frame recipe resources `PostProcess.BloomScratch`,
-  `PostProcess.Histogram`, and `PostProcess.AATemp` are transient
-  postprocess-owned intermediates; concrete Vulkan descriptors/shaders
-  remain backend follow-ups. Per `GRAPHICS-013AQ`,
+  `PostProcess.Histogram`, and
+  `PostProcess.AATemp.{Edges,Weights,Resolved}` are transient
+  postprocess-owned intermediates; concrete Vulkan descriptors and
+  shaders remain backend follow-ups. Per `GRAPHICS-013AQ`,
   `PostProcessSystem` is the sole owner of the retained postprocess resources
   (SMAA `AreaTex` `R8G8_UNORM` 160x560 and `SearchTex` `R8_UNORM` 66x33
   lookup textures — the historic `256x33` notation tracked the wrong
@@ -1079,10 +1104,14 @@ Concretely:
   pattern as `Picking.Readback` (host-visible staging copy recorded at
   frame-record time, drained on the next `BeginFrame()` after the issuing
   frame's fences complete). FXAA samples post-tonemap `SceneColorLDR` with no
-  intermediate and no LUT, while SMAA edge/blend intermediates fold under the
-  existing `PostProcess.AATemp` slot as two named subresources
-  (`AATemp.Edges` `R8G8_UNORM`, `AATemp.Weights` `R8G8B8A8_UNORM`); FXAA and
-  SMAA remain mutually exclusive per `PostProcessSettings::AntiAliasing`, and
+  intermediate and no LUT, writing the resolved color directly into
+  `PostProcess.AATemp.Resolved` (the resolve graph pass). SMAA fans out across
+  three matched-format transients
+  (`PostProcess.AATemp.Edges` `R8G8_UNORM`,
+  `PostProcess.AATemp.Weights` `R8G8B8A8_UNORM`,
+  `PostProcess.AATemp.Resolved` backbuffer format), one per ordered AA graph
+  pass; FXAA and SMAA remain mutually exclusive per
+  `PostProcessSettings::AntiAliasing`, and
   quality presets are encoded into `PostProcessPushConstants::StageKind`
   packing rather than expanding the push-constant struct. Concrete
   `VkDescriptorSetLayout` bindings remain backend-local under

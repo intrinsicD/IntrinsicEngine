@@ -110,12 +110,15 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
         "LinePass",
         "PointPass",
         "PostProcessPass",
-        // GRAPHICS-075 Slice C — FXAA (and Slice D's SMAA) execute in
-        // their own ordered graph pass after `PostProcessPass` so the
-        // AA legs sample the freshly-written `SceneColorLDR` through a
-        // real framegraph read-after-write barrier instead of aliasing
-        // the umbrella's color attachment mid-render-pass.
-        "PostProcessAAPass",
+        // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three
+        // ordered graph passes so edge / blend / resolve pipelines can
+        // target format-incompatible color attachments (`RG8_UNORM` /
+        // `RGBA8_UNORM` / backbuffer). FXAA records under the resolve
+        // pass only (its sampled-image read is the freshly-written
+        // `SceneColorLDR`); SMAA records under all three.
+        "PostProcessAAEdgePass",
+        "PostProcessAABlendPass",
+        "PostProcessAAResolvePass",
         "ImGuiPass",
         "Present",
     };
@@ -582,7 +585,9 @@ TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeDeclaresTwoPassesInOrderWithS
         EXPECT_NE(pass.Name, std::string_view{"LinePass"});
         EXPECT_NE(pass.Name, std::string_view{"PointPass"});
         EXPECT_NE(pass.Name, std::string_view{"PostProcessPass"});
-        EXPECT_NE(pass.Name, std::string_view{"PostProcessAAPass"});
+        EXPECT_NE(pass.Name, std::string_view{"PostProcessAAEdgePass"});
+        EXPECT_NE(pass.Name, std::string_view{"PostProcessAABlendPass"});
+        EXPECT_NE(pass.Name, std::string_view{"PostProcessAAResolvePass"});
         EXPECT_NE(pass.Name, std::string_view{"ImGuiPass"});
         EXPECT_NE(pass.Name, std::string_view{"Present"});
     }
