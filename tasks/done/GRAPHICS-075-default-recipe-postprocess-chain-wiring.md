@@ -2,8 +2,10 @@
 
 ## Status
 
-- State: in-progress (Slice E.2 landed; task slice plan complete, awaiting retirement after final review).
-  Maturity reached so far: Slice A closed `Scaffolded → CPUContracted`
+- State: done. All slices landed (Slice A + B.1 + B.2 + C + D.1 + D.2a + D.2b + E.1 + E.2). Maturity reached: `Operational` on the CPU/null gate for all five postprocess stage families (ToneMap, Bloom, FXAA + SMAA edge/blend/resolve, Histogram including the readback drain). The Vulkan-backend `Operational` claim is gated on the standing opt-in `gpu;vulkan` smoke and is intentionally out-of-scope here; a portability follow-up to compact the outline-style push blocks where applicable, and live `vkCmdDispatch` + `vkCmdCopyBuffer` + host-mapped readback exercise of the histogram path, are tracked separately. See "Completion note" below.
+- Completed: 2026-05-22. Last in-task merge was Slice E.2 via PR #916 (slice commit `1bcdfe5`, fixup commit `62fa3d2`, merge `be9d916`); retirement landed on branch `claude/active-graphics-task-KjTY8`.
+- PR: Slice A — PR #902; Slice B.1 — PR #903; Slice B.2 — PR #904; Slice C — PR #906; Slice D.1 — PR #907 (commits `ca60ac9` + `94c41f0`); Slice D.2a — PR #911 (commits `dff63b3` + `fcf70f9`); Slice D.2b — PR #912 (commits `e75d967` + `45cb178`); Slice E.1 — PR #913 (commits `9f9a6e7` + `131d53e`); Slice E.2 — PR #916 (commits `1bcdfe5` + `62fa3d2`).
+- Maturity reached so far: Slice A closed `Scaffolded → CPUContracted`
   on the ToneMap leaf and the `"PostProcessPass"` umbrella executor
   branch (merged via PR #902); Slice B.1 added the bloom downsample +
   upsample pipeline leases + `RecordPostProcessBloomPass(...)`
@@ -66,11 +68,7 @@
   branches recorded in their per-slice notes below.
 - Activated: 2026-05-21 — first unblocked Theme A default-recipe leaf
   after GRAPHICS-074 retirement.
-- Next verification step: Slice E.2 closes the histogram readback drain
-  on the CPU/null gate. The slice plan is now complete; the task is
-  ready for final review and retirement to `tasks/done/` once the
-  branch is reviewed. Verification ran in-session against a build with
-  `clang-20`/`clang++-20`/`clang-scan-deps-20`:
+- Completion verification: see "Completion note" below. Slice E.2 verification (rerun in-session against a build with `clang-20`/`clang++-20`/`clang-scan-deps-20`):
   ```bash
   cmake --preset ci
   cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
@@ -82,7 +80,10 @@
   Result: 209/209 CPU graphics contract tests passed (including the
   five new `RendererFrameLifecycle.HistogramReadback*` /
   `PublishHistogramReadbackUpdatesExposureHistory` tests); layering,
-  doc-link, and task-policy validators all clean.
+  doc-link, and task-policy validators all clean. Retirement is a
+  docs/task-only change, so `python3 tools/agents/check_task_policy.py --root . --strict`
+  and `python3 tools/docs/check_doc_links.py --root .` are the gates
+  for this commit.
 
 ## Slice plan
 
@@ -595,9 +596,6 @@ a readback drain.
   sizeof(PostProcessHistogramPushConstants)`). `m_PostProcessHistogramPipelineLease`
   + `m_PostProcessHistogramPass` follow the same reset/republish
   pattern as the tonemap + bloom + FXAA + SMAA leases above.
-- [ ] **Slice E.2**: In `NullRenderer::InitializeOperationalPassResources(device)`,
-  allocate the host-visible `Histogram.Readback` buffer alongside the
-  existing `Picking.Readback` buffer.
 - [x] **Slice E.1**: `IRenderer` exposes
   `GetPostProcessHistogramPipeline()` /
   `GetPostProcessHistogramPipelineDesc()`. Executor wires
@@ -886,60 +884,16 @@ python3 tools/docs/check_doc_links.py --root .
 - Adding new AA techniques.
 - Mutating canonical `PostProcessPushConstants` packing.
 
-## Next verification step
-- Slice D.1 has landed on `main` via PR #907 (commits `ca60ac9` +
-  `94c41f0`) and the CPU/null contract gate stayed green.
-- Slice D.2a landed on
-  `claude/intrinsicengine-agent-onboarding-32x02`. Verification run
-  in-session against a build with `clang-20`/`clang++-20`/
-  `clang-scan-deps-20`:
-  ```bash
-  cmake --preset ci
-  cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
-  ctest --test-dir build/ci --output-on-failure -L 'contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-  python3 tools/repo/check_layering.py --root src --strict
-  python3 tools/docs/check_doc_links.py --root .
-  python3 tools/agents/check_task_policy.py --root . --strict
-  ```
-  Result: 196/196 contract tests passed (including the updated
-  `FrameRecipeContract.DefaultRecipeBuildsCanonicalPassOrder`,
-  `GraphicsPostProcessChainContract.FrameRecipeSplitsAAUmbrellaPerStage`,
-  `GraphicsPostProcessChainContract.AntiAliasingFlipsPresentSourceToResolved`,
-  per-stage SMAA recording tests, and
-  `RendererFrameLifecycle.PostProcessSMAAPipelinesSurviveOperationalRebuild`
-  with `RG8_UNORM` / `RGBA8_UNORM` edge / blend formats); layering
-  + doc-link + task-policy validators all clean.
-- Slice D.2b landed on
-  `claude/intrinsicengine-agent-onboarding-BQgHn`. Verification run
-  in-session against a build with `clang-20`/`clang++-20`/
-  `clang-scan-deps-20`:
-  ```bash
-  cmake --preset ci
-  cmake --build --preset ci --target IntrinsicTests
-  cmake --build --preset ci --target IntrinsicBenchmarkSmoke
-  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-  python3 tools/repo/check_layering.py --root src --strict
-  python3 tools/docs/check_doc_links.py --root .
-  python3 tools/agents/check_task_policy.py --root . --strict
-  ```
-  Result: 2081/2081 default-gate tests passed (including the new
-  `RendererFrameLifecycle.PostProcessSMAALookupTexturesSurviveOperationalRebuild`
-  contract test asserting handle identity and upload-record stability
-  across `RebuildOperationalResources()`); layering + doc-link +
-  task-policy validators all clean.
-- Slice E.1 lands on `claude/gallant-hypatia-a2puc`. Verification
-  expected to run in-session against a build with
-  `clang-20`/`clang++-20`/`clang-scan-deps-20`:
-  ```bash
-  cmake --preset ci
-  cmake --build --preset ci --target IntrinsicTests
-  ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-  python3 tools/repo/check_layering.py --root src --strict
-  python3 tools/docs/check_doc_links.py --root .
-  python3 tools/agents/check_task_policy.py --root . --strict
-  ```
-- After Slice E.1, open Slice E.2 (host-visible `Histogram.Readback`
-  buffer + `BeginFrame()`-side readback drain mirroring the
-  `Picking.Readback` pattern +
-  `PostProcessSystem::PublishHistogramReadback(...)` consuming the
-  exposure-adaptation history buffer Slice D.2b allocated).
+## Completion note
+
+- Slice A (PR #902): `NullRenderer` owns `m_PostProcessToneMapPass` + `m_PostProcessToneMapPipelineLease`; the tonemap pipeline is created in `InitializeOperationalPassResources(device)` from `BuildPostProcessToneMapPipelineDesc()` and republished byte-identical across `RebuildOperationalResources()`; the `"PostProcessPass"` umbrella executor branch routes through `RecordPostProcessToneMapPass(...)` with the `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy. Contract test: `PostProcessToneMapPipelineSurvivesOperationalRebuild`. Closed `Scaffolded → CPUContracted` on the ToneMap leaf and the umbrella branch.
+- Slice B.1 (PR #903): adds `m_PostProcessBloomPass` + bloom downsample / upsample pipeline leases + per-shader 16-byte push blocks; `RecordPostProcessBloomPass(...)` fans out under `"PostProcessPass"` ahead of tonemap. Contract test: `PostProcessBloomPipelinesSurviveOperationalRebuild`.
+- Slice B.2 (PR #904): per-mip iteration over the canonical six-mip bloom pyramid (clamped via `ComputeBloomMipChainLevels` for Vulkan's `mipLevels <= floor(log2(maxDim)) + 1` rule) + recipe-side `BloomScratch.MipLevels` + renderer-side per-frame `PostProcess.BloomScratch` handle republish. Contract tests: `BloomMipChainPerMipIterationShape`, `BloomMipChainClampedToVulkanMipRule`, `BloomPassIterationFollowsClampedMipCount`. Closed the bloom leaf toward `Operational` on the CPU/null gate.
+- Slice C (PR #906, commit `6c9ff66`): FXAA pipeline + 20-byte `PostProcessFXAAPushConstants` std430 push block + `RecordPostProcessFXAAPass(...)` helper running inside its own ordered graph pass `"PostProcessAAPass"` declared with `Read(SceneColorLDR, ShaderRead) + Write(PostProcess.AATemp, ColorAttachmentWrite)` so the framegraph compiler emits the `SceneColorLDR ColorAttachment → ShaderRead` transition between the bloom + tonemap umbrella render-pass scope and the FXAA umbrella scope (the original attempt to share the umbrella aliased the umbrella's color attachment as a sampled image mid-render-pass — the classic Vulkan read-after-write feedback hazard). Contract tests: `PostProcessFXAAPipelineSurvivesOperationalRebuild`, `FXAAPushFeedsNonZeroInvResolution`, `FXAASkipsWhenAntiAliasingNotFXAA`, `FrameRecipeSplitsAAPassFromPostProcessPass`. Closed `Scaffolded → CPUContracted` on the FXAA leaf.
+- Slice D.1 (PR #907, commits `ca60ac9` + `94c41f0`): three SMAA pipeline leases (edge / blend / resolve) + per-shader 16-byte std430 push blocks + reshaped `PostProcessSMAAPass` (`SetEdgePipeline` / `SetBlendPipeline` / `SetResolvePipeline`) + `RecordPostProcessSMAAPass(...)` fan-out under `"PostProcessAAPass"` alongside FXAA, mutually exclusive per `PostProcessSettings::AntiAliasing`. Contract tests: `PostProcessSMAAPipelinesSurviveOperationalRebuild`, `SMAAPushFeedsNonZeroInvResolutionForAllStages`, `SMAASkipsWhenAntiAliasingNotSMAA`, `SMAARecordsPerStageIndependently`. Closed `Scaffolded → CPUContracted` on the SMAA pipeline-scaffold leaf.
+- Slice D.2a (PR #911, commits `dff63b3` + `fcf70f9`): AA umbrella split into three ordered graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`), recipe declares three matched-format transients (`PostProcess.AATemp.Edges` `RG8_UNORM` / `.Weights` `RGBA8_UNORM` / `.Resolved` backbuffer format), edge / blend pipeline descs fixed at their matched formats, `PostProcessSMAAPass` exposes per-stage `Execute{Edge,Blend,Resolve}` methods, per-pass renderer helpers `RecordPostProcessAA{Edge,Blend,Resolve}Pass(...)` route FXAA under the resolve pass only and SMAA across all three, `presentSource` flips to `PostProcess.AATemp.Resolved` when `FrameRecipeFeatures::EnableAntiAliasing` is set (the renderer plumbs that flag from `SelectedAntiAliasingPipelinesAvailable()`). Contract tests: updated `PostProcessSMAAPipelinesSurviveOperationalRebuild` (now asserts `RG8_UNORM` / `RGBA8_UNORM` / backbuffer formats authoritatively), `FrameRecipeSplitsAAUmbrellaPerStage`, `AntiAliasingFlipsPresentSourceToResolved`, updated `DefaultRecipeBuildsCanonicalPassOrder` + `RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext` (recorded-pass counter bumps), `FXAASelectedWithoutPipelineKeepsResolveSkippedAndPresentOnSceneColorLDR`, `SMAASelectedWithoutResolvePipelineKeepsResolveSkippedAndPresentOnSceneColorLDR`. Closed `CPUContracted → Operational` on the SMAA pipeline leaf for the CPU/null gate.
+- Slice D.2b (PR #912, commits `e75d967` + `45cb178`): device-aware `PostProcessSystem::Initialize(device, textureMgr, bufferMgr)` overload allocates + uploads the SMAA `AreaTex` (`RG8_UNORM`, 160×560) and `SearchTex` (`R8_UNORM`, 66×33) LUT textures via the transfer queue (LUT bytes ported byte-for-byte from `src/legacy/Graphics/Passes/Graphics.SMAALookupTextures.hpp` into a private namespace in `Graphics.PostProcessSystem.cpp` so promoted `graphics/renderer` never imports from `src/legacy`) and the new exported `PostProcessExposureHistory` storage buffer (`Storage | TransferDst`); overload is idempotent and is invoked from both the renderer's `Initialize(device)` and its `RebuildOperationalResources(device)`. `Shutdown()` releases the three leases before clearing the manager pointers (matching the `ShadowSystem` teardown ordering contract). The fixup commit `45cb178` rolls back the lease on a failed LUT upload so a transient transfer-queue failure does not leave the system half-initialised. Contract test: `PostProcessSMAALookupTexturesSurviveOperationalRebuild`. Closed the retained-resource side of the SMAA leaf on the CPU/null gate.
+- Slice E.1 (PR #913, commits `9f9a6e7` + `131d53e`): recipe split — the histogram is a compute dispatch and so cannot share the `"PostProcessPass"` umbrella render-pass scope (Vulkan forbids `vkCmdDispatch` inside an active render pass; the same constraint Slice D.2a hit in reverse when it had to split the AA umbrella to keep matched-format color attachments per render pass). The histogram now lives in its own ordered graph pass `"PostProcessHistogramPass"` declared with `Read(SceneColorHDR, ShaderRead) + Write(PostProcess.Histogram, BufferUsage::ShaderWrite)` between `"PointPass"` and `"PostProcessPass"`; the umbrella pass no longer writes the histogram. Adds `FrameRecipePassKind::PostProcessHistogram`, the histogram compute pipeline + 16-byte `PostProcessHistogramPushConstants` std430 push block (`uint Width + uint Height + float MinLogLum + float RangeLogLum`), `PostProcessHistogramPass::SetViewport(...)` so the dispatch shape (`ceil(W/16) x ceil(H/16) x 1`) tracks the backbuffer extent, and (fixup commit `131d53e`) `SetHistogramBuffer(handle)` plus a `vkCmdFillBuffer + ShaderWrite-barrier` zero-fill before dispatch so the transient allocator's reused bytes from prior frames never contaminate the next frame's luminance distribution. The recipe-side `PostProcess.Histogram` buffer declares `BufferUsage::Storage | TransferSrc | TransferDst` so the fill is legal. Contract tests: `PostProcessHistogramPipelineSurvivesOperationalRebuild`, `FrameRecipeDeclaresPostProcessHistogramAsOrderedPass`, `HistogramPushFeedsViewportSizedDispatchShape`, `HistogramClearsBinsBeforeDispatchWhenBufferPublished`, `HistogramSkipsClearWhenNoBufferPublished`, updated `DefaultRecipeBuildsCanonicalPassOrder` + `RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext` (recorded-pass counter bumps to 11/11/10/6). Closed `Scaffolded → CPUContracted` on the Histogram leaf.
+- Slice E.2 (PR #916, commits `1bcdfe5` + `62fa3d2`): renderer-owned host-visible `Histogram.Readback` buffer (`1024 * frames-in-flight` bytes, `HostVisible | TransferDst`) allocated alongside the existing `Picking.Readback` buffer in `InitializeOperationalPassResources(device)` with per-slot `m_HistogramSlotPending` / `m_HistogramSlotIssuedFrame` / `m_HistogramSlotInvalidated` arrays mirroring the picking-readback lifecycle; recipe imports the buffer via `FrameRecipeImports::HistogramReadback` and declares it as a `BufferUsage::TransferDst` write on `"PostProcessHistogramPass"` with `BufferState::TransferDst → BufferState::HostReadback`; the executor records a per-frame `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot * 1024)` with bracketing `BufferBarrier(ShaderWrite → TransferRead → ShaderWrite)` transitions, gated on `(operational device) && (helper Recorded) && (IsStageEnabled(Histogram)) && (valid renderer-owned readback lease) && (compiled transient histogram handle)`; `BeginFrame()` invokes a new `DrainCompletedHistogramSlots()` after the existing `DrainCompletedPickingSlots()` that decodes the 256 uint32 bins via `IDevice::ReadBuffer(...)` and forwards them to `PostProcessSystem::PublishHistogramReadback(bins, frameIndex, device)`, which weights each bin centre by its sample count, blends through a one-pole IIR (`adaptationVelocity = 0.05`, first publish snaps to the observed value), and uploads the updated `PostProcessExposureHistory` into the device-side history buffer via `IDevice::GetTransferQueue().UploadBuffer(...)`. The fixup commit `62fa3d2` gates the readback copy on `IsStageEnabled(Histogram)` so the structurally-recorded no-op path (`EnableHistogram == false`) never publishes undefined transient-allocator bytes into the exposure-history mirror. Adds `RenderGraphFrameStats::HistogramReadbackCopyCount` mirroring `PickingReadbackCopyCount`, plus `PostProcessSystem::GetExposureHistorySnapshot()` / `GetHistogramPublishCount()` for the drain-handshake contract tests. Contract tests: `HistogramReadbackBufferSurvivesOperationalRebuild`, `HistogramReadbackCopyRecordedOnOperationalFrame`, `HistogramReadbackCopySkippedWhenStageDisabled`, `HistogramReadbackDrainPublishesEachSlotExactlyOnce`, `PublishHistogramReadbackUpdatesExposureHistory`. Closed `CPUContracted → Operational` on the Histogram leaf for the CPU/null gate.
+- Outstanding follow-ups intentionally out-of-scope here: (a) the standing opt-in `gpu;vulkan` smoke exercising the live `vkCmdDispatch` + `vkCmdCopyBuffer` + host-mapped readback path for the histogram leaf, the live `RG8_UNORM` / `RGBA8_UNORM` color-attachment paths for the SMAA edge / blend stages, and the live SMAA LUT sampling path; (b) per-mip subresource barriers for the bloom pyramid (interleaved `ColorAttachment ↔ ShaderRead` transitions between mip iterations) need both an `ICommandContext::TextureBarrier(handle, mipRange, ...)` RHI extension and per-mip render-pass restarts, deferred to a follow-up slice. Neither is required for the `Operational` claim on the CPU/null gate.
+- Maturity reached: `Operational` on the CPU/null gate for all five postprocess stage families. The Vulkan-backend `Operational` claim is gated on the standing opt-in `gpu;vulkan` smoke + the follow-ups above.

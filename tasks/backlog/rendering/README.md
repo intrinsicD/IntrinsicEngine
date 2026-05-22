@@ -635,10 +635,15 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   `SelectedIds[16]` to a UBO/bindless tail so the outline push block
   stays <= 128 bytes on hosts at the Vulkan-guaranteed minimum (tracked
   separately, intentionally out-of-scope here).
-- [GRAPHICS-075 — Default-recipe postprocess chain wiring](../../active/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
-  depends on GRAPHICS-072 (HDR scene color producer). Promoted to
-  `tasks/active/` on 2026-05-21; Slice A (ToneMap pipeline + umbrella
-  executor branch) in-progress.
+- [GRAPHICS-075 — Default-recipe postprocess chain wiring](../../done/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md):
+  depended on GRAPHICS-072 (HDR scene color producer). Retired 2026-05-22 at
+  `Operational` on the CPU/null gate for all five postprocess stage families
+  (ToneMap / Bloom / FXAA + SMAA edge-blend-resolve / Histogram including the
+  readback drain). Last in-task merge: Slice E.2 via PR #916 (commits
+  `1bcdfe5` + `62fa3d2`, merge `be9d916`). The Vulkan-backend `Operational`
+  claim and the bloom per-mip subresource barriers are tracked as standing
+  follow-ups via the opt-in `gpu;vulkan` smoke and the `ICommandContext::TextureBarrier`
+  RHI extension respectively, intentionally out-of-scope of this task.
 - [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
   depends on GRAPHICS-075.
 - [GRAPHICS-077 — Backend transient-debug-primitive upload helper](GRAPHICS-077-transient-debug-primitive-upload-helper.md):
