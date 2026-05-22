@@ -190,6 +190,32 @@ Slice 3; this Slice 2 add deliberately does not migrate existing callers in
 order to keep foundation-add and semantic refactor separate per the
 contract in [`AGENTS.md`](../../AGENTS.md) §5.
 
+### Callsite adoption (Slice 3)
+
+Slice 3 migrates existing geometry callsites onto the Slice 1 predicates and
+Slice 2 records one at a time. The general adoption pattern, demonstrated
+first by `Geometry::RayTriangle_Classify`, is:
+
+- Keep the existing entry point in place and unchanged (e.g.
+  `RayTriangle_Watertight`).
+- Add a sibling classifying entry point whose name mirrors the existing one
+  with a `_Classify` suffix and which returns the appropriate
+  `Intersection::*Result` record.
+- Implement the classifying entry point by reusing the existing numerical
+  kernel — typically by calling the legacy function and folding its output
+  into the result record — so geometric fields (parameters, weights, hit
+  position) are bit-exact identical between the two paths.
+- Map the legacy "missing" / "degenerate" / "out of range" return states
+  onto `Kind::None` / `Kind::DegenerateInput` / `Kind::None` respectively
+  so callers can distinguish "no intersection" from "unanswerable question".
+- Add a parity test file `Test.<Caller>Classify.cpp` that pins the bit-exact
+  geometric agreement plus boundary classification against the same inputs
+  the legacy tests use.
+
+Existing callers (typically in `src/legacy/` for now) stay on the legacy
+entry point until their own per-callsite Slice 3.x commit replaces the call.
+The legacy entry point is removed only when every caller has migrated.
+
 ## Migration note
 
 As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining `src/legacy` geometry shims (if any) must be temporary, tracked, and removed via follow-up migration tasks.

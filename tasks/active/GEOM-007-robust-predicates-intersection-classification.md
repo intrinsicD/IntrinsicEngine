@@ -10,10 +10,10 @@
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
 ## Context
-- Status: in-progress (Slice 2).
+- Status: in-progress (Slice 3 — callsite adoption, first commit landed).
 - Owner/agent: copilot.
-- Branch: main (single-slice landing per slice; promote to a feature branch if a slice batches multiple commits).
-- Next verification step: after Slice 2, run the focused ctest filter `RobustPredicates|IntersectionClassification` plus the layering / test-layout / doc-links / task-policy structural checks.
+- Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
+- Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify` plus the layering / test-layout / doc-links / task-policy structural checks after each Slice 3.x callsite-adoption commit; once Raycast callers are migrated, repeat for `Overlap`, `Containment`, and `GJK`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and called out by [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md) §"Numeric policy".
 - Current geometry code has many collision/query algorithms but lacks a common robust predicate policy for degeneracies, nearly coincident elements, and exact/filtered decisions.
@@ -26,17 +26,29 @@
   in-plane triangle barycentric classification, scale-aware epsilon helpers,
   and `Sign`/`Certainty`/`BarycentricRegion` diagnostic enums plus the unit
   test suite. No callsite refactors.
-- **Slice 2 (this PR) — intersection classification records.** Sibling module
-  `Geometry.IntersectionClassification` defining the result records and
-  intersection-kind enums for segment-segment, segment-triangle, ray-triangle,
-  triangle-triangle, and point-triangle incidence cases. Records only — no
-  intersection algorithms shipped, no existing caller refactored. Unit tests
-  cover default construction, enum values, and helpers (e.g. point/parameter
-  computation from a `Proper` segment-segment record).
-- **Slice 3 — callsite adoption.** Migrate existing geometry callsites one at
-  a time (likely `Raycast` triangle hit first) to consume the Slice 1
-  predicates and Slice 2 records, with parity tests. Each callsite is a
-  separate reviewable commit.
+- **Slice 2 (landed `a2f39b30`) — intersection classification records.**
+  Sibling module `Geometry.IntersectionClassification` defining the result
+  records and intersection-kind enums for segment-segment, segment-triangle,
+  ray-triangle, triangle-triangle, and point-triangle incidence cases.
+  Records only; no intersection algorithms shipped, no existing caller
+  refactored.
+- **Slice 3 — callsite adoption (in progress).** Migrate existing geometry
+  callsites one at a time onto the Slice 1 predicates and Slice 2 records,
+  with parity tests. Each callsite is a separate reviewable commit.
+  - **Slice 3.1 (this PR) — `Geometry::RayTriangle_Classify`.** Add a
+    classifying companion to `RayTriangle_Watertight` that returns
+    `Intersection::RayTriangleResult` and shares the watertight numerical
+    kernel so the geometric fields are bit-exact identical. Existing
+    callers (`src/legacy/Runtime/Runtime.Selection.cpp`, `Test_Raycast.cpp`)
+    stay on the legacy API; their migration is queued as Slice 3.2.
+  - **Slice 3.2 — Runtime.Selection adoption.** Migrate the five
+    `RayTriangle_Watertight` callsites in `src/legacy/Runtime/Runtime.Selection.cpp`
+    onto `RayTriangle_Classify` so picking/refinement consumes the
+    diagnostic vocabulary; legacy `RayTriangle_Watertight` stays as a
+    thin alias until the last caller is gone.
+  - **Slice 3.3 — Overlap / Containment / GJK migration.** Repeat the
+    `Geometry.RobustPredicates` adoption pattern at the next-highest-
+    traffic callsites; each gets its own commit.
 - **Slice 4 — exact / adaptive escalation (optional).** Decide whether to add
   Shewchuk-style adaptive predicates behind the same surface, or keep the
   filtered-only policy and document caller fallback strategies.
@@ -55,6 +67,7 @@
 - [x] Slice 1: Cover ordinary, degenerate, near-degenerate, coplanar, collinear, duplicate, and large/small scale cases.
 - [x] Slice 2: Add unit tests `tests/unit/geometry/Test.IntersectionClassification.cpp` covering default construction, enum value stability, and small helpers on the result records.
 - [ ] Slice 3: Add regression-style cases for triangle/segment classification and barycentric boundary classification at callsite-adoption time.
+  - [x] Slice 3.1: `Test.RaycastClassify.cpp` covers parity with `RayTriangle_Watertight`, miss / tMin / tMax, degenerate triangle, invalid ray, vertex / edge / interior boundary classification, ray-origin vs ray-interior, and batched cross-check.
 - [x] Slice 1: Compare deterministic classification outputs against documented expectations.
 
 ## Docs

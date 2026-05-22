@@ -360,6 +360,7 @@ set(_geometry_test_files
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
     Test.IntersectionClassification.cpp
+    Test.RaycastClassify.cpp
     Test.RobustPredicates.cpp
     Test_SubmeshView.cpp
 )

@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cmath>
 #include <optional>
 #include <glm/glm.hpp>
@@ -8,6 +9,8 @@ module Geometry.Raycast;
 
 import Geometry.Primitives;
 import Geometry.Validation;
+import Geometry.IntersectionClassification;
+import Geometry.RobustPredicates;
 
 namespace Geometry
 {
@@ -129,6 +132,97 @@ namespace Geometry
         hit.U = U / det;
         hit.V = V / det;
         return hit;
+    }
+
+    // -----------------------------------------------------------------------
+    // GEOM-007 Slice 3 — classifying companion. Reuses the watertight kernel
+    // for bit-exact parity on the geometric fields, then folds the result
+    // into `Intersection::RayTriangleResult` with shared diagnostics.
+    // -----------------------------------------------------------------------
+    Intersection::RayTriangleResult
+    RayTriangle_Classify(const Ray& ray, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
+                         float tMin, float tMax)
+    {
+        namespace IX = Intersection;
+        namespace RP = RobustPredicates;
+
+        IX::RayTriangleResult result{};
+
+        if (!Validation::IsValid(ray))
+        {
+            result.Kind = IX::Kind::DegenerateInput;
+            return result;
+        }
+
+        const glm::vec3 e0 = b - a;
+        const glm::vec3 e1 = c - a;
+        const glm::vec3 n = glm::cross(e0, e1);
+        if (!(glm::dot(n, n) > 1e-20f))
+        {
+            result.Kind = IX::Kind::DegenerateInput;
+            return result;
+        }
+
+        const auto hit = RayTriangle_Watertight(ray, a, b, c, tMin, tMax);
+        if (!hit)
+        {
+            result.Kind = IX::Kind::None;
+            return result;
+        }
+
+        const double wa = static_cast<double>(hit->U);
+        const double wb = static_cast<double>(hit->V);
+        const double wc = 1.0 - wa - wb;
+
+        result.RayParam = static_cast<double>(hit->T);
+        result.WA = wa;
+        result.WB = wb;
+        result.WC = wc;
+        result.Point = ray.Origin + hit->T * ray.Direction;
+
+        // Boundary classification on the barycentric weights. The watertight
+        // kernel returns single-precision weights, so we use a looser relative
+        // tolerance than the predicate module's default to avoid missing
+        // genuine vertex/edge hits.
+        const double weightScale = std::max({1.0,
+                                             std::fabs(wa),
+                                             std::fabs(wb),
+                                             std::fabs(wc)});
+        const double weightEps = RP::ScaledEpsilon(weightScale, 1.0e-6);
+
+        const bool aZero = std::fabs(wa) <= weightEps;
+        const bool bZero = std::fabs(wb) <= weightEps;
+        const bool cZero = std::fabs(wc) <= weightEps;
+        const int zeroCount = (aZero ? 1 : 0) + (bZero ? 1 : 0) + (cZero ? 1 : 0);
+
+        if (zeroCount >= 2)
+        {
+            result.Kind = IX::Kind::Touching;
+            if (!aZero) result.OnTriangle = IX::TriangleFeature::VertexA;
+            else if (!bZero) result.OnTriangle = IX::TriangleFeature::VertexB;
+            else result.OnTriangle = IX::TriangleFeature::VertexC;
+        }
+        else if (zeroCount == 1)
+        {
+            result.Kind = IX::Kind::Touching;
+            if (aZero) result.OnTriangle = IX::TriangleFeature::EdgeBC; // opposite A
+            else if (bZero) result.OnTriangle = IX::TriangleFeature::EdgeCA; // opposite B
+            else result.OnTriangle = IX::TriangleFeature::EdgeAB; // opposite C
+        }
+        else
+        {
+            result.Kind = IX::Kind::Proper;
+            result.OnTriangle = IX::TriangleFeature::Interior;
+        }
+
+        // Ray feature: at origin when the parameter is within a scale-aware
+        // epsilon of zero, otherwise interior of the ray.
+        const double tAbs = std::fabs(result.RayParam);
+        const double rayScale = std::max(1.0, tAbs);
+        const double rayEps = RP::ScaledEpsilon(rayScale, 1.0e-6);
+        result.OnRay = (tAbs <= rayEps) ? IX::RayFeature::Origin
+                                        : IX::RayFeature::Interior;
+        return result;
     }
 }
 
