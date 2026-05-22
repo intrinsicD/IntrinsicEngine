@@ -142,6 +142,9 @@ Load the specialist skill for the touched scope rather than reading every guide:
 | Implementing or modifying paper/method work under `methods/` | `intrinsicengine-method` |
 | Adding, changing, or running benchmark harnesses/manifests/baselines | `intrinsicengine-benchmark` |
 | Moving files, changing public APIs/module surfaces, refreshing inventories | `intrinsicengine-docs-sync` |
+| Diagnosing a hard bug, validation-layer error, parity mismatch, or perf regression | `intrinsicengine-diagnose` |
+| Getting a layer-cake map of an unfamiliar file before editing | `intrinsicengine-zoom-out` |
+| Compacting a long session into a handoff doc for the next agent | `intrinsicengine-handoff` |
 
 References bundled with this skill (read on demand):
 
