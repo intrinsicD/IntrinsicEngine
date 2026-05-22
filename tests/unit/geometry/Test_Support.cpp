@@ -180,6 +180,74 @@ TEST(Support, Ellipsoid_ShortAxis)
     EXPECT_NEAR(p.z, 1.0f, kEps);
 }
 
+// GEOM-015 Slice 2: regression for the original-space magnitude guards
+// migrated from absolute 1e-6f to scale-aware
+// `RobustPredicates::ApproxZeroSq(..., scale, 1e-3)`.
+//
+// Before the migration, `len2 = length2(localDir * Radii)` for an ellipsoid
+// with sub-mm radii fell below the absolute 1e-6 threshold for any direction,
+// so `Support(Ellipsoid)` returned `Center` regardless of input direction.
+// Scale-aware policy with `scale = length(Radii)` makes the guard a
+// numerical-stability test instead of a shape-rejection test.
+TEST(Support, Ellipsoid_SubMillimeterScaleProducesNonCenterSupport)
+{
+    const float s = 1.0e-3f;
+    Ellipsoid e{glm::vec3(0, 0, 0), glm::vec3(s, s, s), glm::quat(1, 0, 0, 0)};
+    auto px = Support(e, glm::vec3(1, 0, 0));
+    EXPECT_NEAR(px.x, s, s * 0.01f);
+    EXPECT_NEAR(px.y, 0.0f, s);
+    EXPECT_NEAR(px.z, 0.0f, s);
+
+    auto pz = Support(e, glm::vec3(0, 0, -1));
+    EXPECT_NEAR(pz.z, -s, s * 0.01f);
+}
+
+TEST(Support, Ellipsoid_NonUniformSubMillimeterRadii)
+{
+    Ellipsoid e{glm::vec3(0, 0, 0), glm::vec3(3.0e-3f, 2.0e-3f, 1.0e-3f), glm::quat(1, 0, 0, 0)};
+    auto p = Support(e, glm::vec3(1, 0, 0));
+    EXPECT_NEAR(p.x, 3.0e-3f, 1.0e-5f);
+}
+
+// GEOM-015 Slice 2: anisotropic-ellipsoid regression. With `scale =
+// length(Radii)`, the zero-band would be proportional to the largest
+// semi-axis (~1414 for Radii = (1000, 1000, 1e-3)), and the +Z direction
+// query — whose normal magnitude in radii-space is ~1e-3 — would fall
+// inside the band and return Center instead of a surface point on the
+// thin axis. Axis-local `scale = min(|Radii|)` keeps the guard a
+// numerical-stability test rather than a thin-axis rejection test.
+TEST(Support, Ellipsoid_HighlyAnisotropicThinAxisProducesSurfaceSupport)
+{
+    Ellipsoid e{glm::vec3(0, 0, 0),
+                glm::vec3(1000.0f, 1000.0f, 1.0e-3f),
+                glm::quat(1, 0, 0, 0)};
+
+    auto pz = Support(e, glm::vec3(0, 0, 1));
+    EXPECT_NEAR(pz.z, 1.0e-3f, 1.0e-5f);
+    EXPECT_NEAR(pz.x, 0.0f, 1.0f);
+    EXPECT_NEAR(pz.y, 0.0f, 1.0f);
+
+    auto px = Support(e, glm::vec3(1, 0, 0));
+    EXPECT_NEAR(px.x, 1000.0f, 1.0f);
+}
+
+// GEOM-015 Slice 2: fat-disk Cylinder regression. The axis-degeneracy
+// guard is a numerical zero-vector floor on `axis`, not a shape-ratio
+// test. With `scale = shape.Radius`, a cylinder where R is much larger
+// than axisLen (a wide, flat disk) would have axisLen² ≤ (R · 1e-3)²
+// and the guard would mis-classify the axis as degenerate, skipping the
+// radial expansion that is in fact dominant for this geometry. Scale 1.0
+// (absolute floor) keeps the original semantic: only reject `axis` when
+// it is numerically zero.
+TEST(Support, Cylinder_FatDiskExpandsRadially)
+{
+    // R = 1000, axisLen = 1 ⇒ axisLen² = 1, which is exactly the
+    // would-have-been threshold (R · 1e-3)² = 1 under a shape.Radius scale.
+    Cylinder c{glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 1000.0f};
+    auto p = Support(c, glm::vec3(1, 0, 0));
+    EXPECT_NEAR(p.x, 1000.0f, 1.0f);
+}
+
 // ============================================================================
 // Segment
 // ============================================================================
