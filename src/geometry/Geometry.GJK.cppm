@@ -53,17 +53,42 @@ export namespace Geometry::Internal
     //     (c) barycentric clamp — dimensionless [0, 1] tolerance on a
     //         barycentric coordinate, not a magnitude.
     //   No (b) original-space magnitude guards exist here; original-space
-    //   guards live in Geometry.Support and Geometry.SDFContact and are
-    //   migrated to Geometry.RobustPredicates::ApproxZeroSq in the same
-    //   slice. The decision whether to keep GJK_EPSILON as a normalized
-    //   constant vs. thread a per-call scale is deferred to GEOM-015
-    //   Slice 3.
+    //   guards live in Geometry.Support and Geometry.SDFContact and were
+    //   migrated to Geometry.RobustPredicates::ApproxZeroSq in that slice.
+    //
+    // GEOM-015 Slice 3 GJK tolerance contract:
+    //   The driver (GJK_Boolean / GJK_Intersection) computes
+    //     invScale = 1 / |initial support|
+    //   from the first Minkowski-difference support point and multiplies
+    //   every subsequent support result by invScale before it enters any
+    //   GJK_EPSILON-bearing predicate. The resulting workspace is
+    //   dimensionless and bounded by O(shape-ratio) — typically O(1) for
+    //   non-degenerate inputs. GJK_EPSILON is therefore a dimensionless
+    //   convergence tolerance on this normalized workspace, NOT a
+    //   length / magnitude / area in original shape space.
+    //
+    //   Decision: keep GJK_EPSILON as a normalized-space constant. We do
+    //   not thread a per-call scale into the driver because the driver
+    //   already factors the scale out via invScale; doing so would double-
+    //   normalize and re-introduce the scale dependence we just removed.
+    //   See docs/architecture/geometry.md "GJK tolerance contract" for the
+    //   full rationale.
     namespace Config
     {
-        constexpr float GJK_EPSILON  = 1e-6f;  // Numerical tolerance for GJK convergence (normalized workspace)
+        constexpr float GJK_EPSILON  = 1e-6f;  // Numerical tolerance for GJK convergence (normalized workspace; dimensionless)
         constexpr int   GJK_MAX_ITERATIONS = 64;
         constexpr float EPA_EPSILON  = 1e-4f;  // Tolerance for EPA penetration depth
         constexpr int   EPA_MAX_ITERATIONS = 32;
+
+        // Sanity-pin the GJK_EPSILON contract: it is dimensionless in the
+        // ~unit normalized workspace, so it must be strictly positive and
+        // strictly smaller than 1. If a future edit pushes GJK_EPSILON
+        // outside this band, revisit the docs/architecture/geometry.md
+        // "GJK tolerance contract" and the GEOM-015 callsite audit before
+        // changing this value.
+        static_assert(GJK_EPSILON > 0.0f && GJK_EPSILON < 1.0f,
+                      "GJK_EPSILON must be a dimensionless tolerance in (0, 1) "
+                      "on the normalized GJK workspace; see GEOM-015 Slice 3.");
     }
 
     namespace Detail
