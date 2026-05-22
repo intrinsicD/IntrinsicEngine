@@ -1,7 +1,9 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -9,12 +11,290 @@ module;
 
 module Extrinsic.Graphics.PostProcessSystem;
 
+import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
+
 namespace Extrinsic::Graphics
 {
     namespace
     {
         constexpr std::uint32_t kMinHistogramBins = 16u;
         constexpr std::uint32_t kMaxHistogramBins = 4096u;
+
+        // -----------------------------------------------------------------
+        // GRAPHICS-075 Slice D.2b — SMAA lookup-texture byte generators.
+        // Ported byte-for-byte from
+        // `src/legacy/Graphics/Passes/Graphics.SMAALookupTextures.hpp` so
+        // promoted graphics/renderer code never imports from legacy. The
+        // analytical area / search texture math follows the SMAA reference
+        // (Jimenez et al. 2012, https://github.com/iryoku/smaa).
+        // -----------------------------------------------------------------
+        constexpr int kAreaTexMaxDist     = 16;
+        constexpr int kAreaTexSubtexels   = 7;
+        constexpr int kNumOrthoPatterns   = 16;
+        constexpr float kSmoothMaxDist    = 32.0f;
+
+        struct Vec2 { float x, y; };
+
+        inline float Saturate(float v) { return std::clamp(v, 0.0f, 1.0f); }
+        inline float Lerp(float a, float b, float t) { return a + (b - a) * t; }
+
+        Vec2 AreaUnderLine(Vec2 p1, Vec2 p2, float x)
+        {
+            const float dx = p2.x - p1.x;
+            const float dy = p2.y - p1.y;
+            float x0 = x;
+            float x1 = x + 1.0f;
+            if (x0 < p1.x) x0 = p1.x;
+            if (x1 > p2.x) x1 = p2.x;
+            if (x0 >= x1) return {0.0f, 0.0f};
+            const float t0 = (std::abs(dx) > 1e-9f) ? (x0 - p1.x) / dx : 0.0f;
+            const float t1 = (std::abs(dx) > 1e-9f) ? (x1 - p1.x) / dx : 0.0f;
+            const float y0 = p1.y + dy * t0;
+            const float y1 = p1.y + dy * t1;
+            const float width = x1 - x0;
+            if (y0 >= 0.0f && y1 >= 0.0f)
+            {
+                const float area = (y0 + y1) * 0.5f * width;
+                return {0.0f, area};
+            }
+            if (y0 <= 0.0f && y1 <= 0.0f)
+            {
+                const float area = -(y0 + y1) * 0.5f * width;
+                return {area, 0.0f};
+            }
+            const float xCross = x0 + (-y0 / (y1 - y0)) * width;
+            const float wLeft  = xCross - x0;
+            const float wRight = x1 - xCross;
+            const float areaLeft  = std::abs(y0) * wLeft * 0.5f;
+            const float areaRight = std::abs(y1) * wRight * 0.5f;
+            if (y0 < 0.0f) return {areaLeft, areaRight};
+            return {areaRight, areaLeft};
+        }
+
+        Vec2 SmoothArea(float d, Vec2 area)
+        {
+            Vec2 smoothed;
+            smoothed.x = std::sqrt(area.x * 2.0f) * 0.5f;
+            smoothed.y = std::sqrt(area.y * 2.0f) * 0.5f;
+            const float t = Saturate(d / kSmoothMaxDist);
+            return {Lerp(smoothed.x, area.x, t), Lerp(smoothed.y, area.y, t)};
+        }
+
+        Vec2 AreaOrthoPattern(int pattern, float left, float right, float offset)
+        {
+            const float d  = left + right + 1.0f;
+            const float o1 = 0.5f + offset;
+            const float o2 = 0.5f + offset - 1.0f;
+            Vec2 result = {0.0f, 0.0f};
+            switch (pattern)
+            {
+            case 0: break;
+            case 1:
+                if (left <= right) {
+                    auto a = AreaUnderLine({0.0f, o2}, {d * 0.5f, 0.0f}, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            case 2:
+                if (left >= right) {
+                    auto a = AreaUnderLine({d * 0.5f, 0.0f}, {d, o2}, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            case 3: {
+                auto a1 = AreaUnderLine({0.0f, o2}, {d * 0.5f, 0.0f}, left);
+                auto a2 = AreaUnderLine({d * 0.5f, 0.0f}, {d, o2}, left);
+                result = SmoothArea(d, {a1.x + a2.x, a1.y + a2.y});
+                break;
+            }
+            case 4:
+                if (left <= right) {
+                    auto a = AreaUnderLine({0.0f, o1}, {d * 0.5f, 0.0f}, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            case 5: break;
+            case 6: {
+                auto aFull = AreaUnderLine({0.0f, o1}, {d, o2}, left);
+                if (std::abs(offset) > 1e-6f) {
+                    auto aL1 = AreaUnderLine({0.0f, o1}, {d * 0.5f, 0.0f}, left);
+                    auto aL2 = AreaUnderLine({d * 0.5f, 0.0f}, {d, o2}, left);
+                    result = {(aFull.x + aL1.x + aL2.x) * 0.5f, (aFull.y + aL1.y + aL2.y) * 0.5f};
+                } else {
+                    result = aFull;
+                }
+                break;
+            }
+            case 7: {
+                auto a = AreaUnderLine({0.0f, o1}, {d, o2}, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 8:
+                if (left >= right) {
+                    auto a = AreaUnderLine({d * 0.5f, 0.0f}, {d, o1}, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            case 9: {
+                auto aFull = AreaUnderLine({0.0f, o2}, {d, o1}, left);
+                if (std::abs(offset) > 1e-6f) {
+                    auto aL1 = AreaUnderLine({0.0f, o2}, {d * 0.5f, 0.0f}, left);
+                    auto aL2 = AreaUnderLine({d * 0.5f, 0.0f}, {d, o1}, left);
+                    result = {(aFull.x + aL1.x + aL2.x) * 0.5f, (aFull.y + aL1.y + aL2.y) * 0.5f};
+                } else {
+                    result = aFull;
+                }
+                break;
+            }
+            case 10: break;
+            case 11: {
+                auto a = AreaUnderLine({0.0f, o2}, {d, o1}, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 12: {
+                auto a1 = AreaUnderLine({0.0f, o1}, {d * 0.5f, 0.0f}, left);
+                auto a2 = AreaUnderLine({d * 0.5f, 0.0f}, {d, o1}, left);
+                result = SmoothArea(d, {a1.x + a2.x, a1.y + a2.y});
+                break;
+            }
+            case 13: {
+                auto a = AreaUnderLine({0.0f, o2}, {d, o1}, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 14: {
+                auto a = AreaUnderLine({0.0f, o1}, {d, o2}, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 15: break;
+            }
+            return result;
+        }
+
+        constexpr std::array<std::pair<int, int>, 16> kOrthoTilePos = {{
+            {0, 0}, {3, 0}, {0, 3}, {3, 3},
+            {1, 0}, {4, 0}, {1, 3}, {4, 3},
+            {0, 1}, {3, 1}, {0, 4}, {3, 4},
+            {1, 1}, {4, 1}, {1, 4}, {4, 4}
+        }};
+
+        constexpr std::array<float, 7> kOrthoSubpixelOffsets = {
+            0.0f, -0.25f, 0.25f, -0.125f, 0.125f, -0.375f, 0.375f
+        };
+
+        float BilinearDecode(float e0, float e1, float e2, float e3)
+        {
+            const float a = Lerp(e0, e1, 0.75f);
+            const float b = Lerp(e2, e3, 0.75f);
+            return Lerp(a, b, 0.875f);
+        }
+
+        int DeltaLeft(const float left[4], const float top[4])
+        {
+            int delta = 0;
+            if (top[3] == 1.0f) delta = 1;
+            if (delta == 1 && top[2] == 1.0f && left[1] != 1.0f && left[3] != 1.0f)
+                delta = 2;
+            return delta;
+        }
+
+        int DeltaRight(const float left[4], const float top[4])
+        {
+            int delta = 0;
+            if (top[3] == 1.0f && left[1] != 1.0f && left[3] != 1.0f)
+                delta = 1;
+            if (delta == 1 && top[2] == 1.0f && left[0] != 1.0f && left[2] != 1.0f)
+                delta = 2;
+            return delta;
+        }
+
+        std::vector<std::uint8_t> GenerateSMAAAreaTextureBytes()
+        {
+            const int width  = static_cast<int>(kPostProcessSMAAAreaTextureWidth);
+            const int height = static_cast<int>(kPostProcessSMAAAreaTextureHeight);
+            std::vector<std::uint8_t> data(static_cast<std::size_t>(width * height * 2), 0);
+            const int subtexSize = kAreaTexMaxDist;
+            for (int subtex = 0; subtex < kAreaTexSubtexels; ++subtex)
+            {
+                const float offset = kOrthoSubpixelOffsets[static_cast<std::size_t>(subtex)];
+                for (int pattern = 0; pattern < kNumOrthoPatterns; ++pattern)
+                {
+                    const auto [tileCol, tileRow] = kOrthoTilePos[static_cast<std::size_t>(pattern)];
+                    for (int y = 0; y < subtexSize; ++y)
+                    {
+                        for (int x = 0; x < subtexSize; ++x)
+                        {
+                            const float d1 = static_cast<float>(y * y);
+                            const float d2 = static_cast<float>(x * x);
+                            const Vec2 area = AreaOrthoPattern(pattern, d1, d2, offset);
+                            const int px = x + tileCol * subtexSize;
+                            const int py = y + (tileRow + subtex * 5) * subtexSize;
+                            if (px >= 0 && px < width && py >= 0 && py < height)
+                            {
+                                const int idx = (py * width + px) * 2;
+                                data[static_cast<std::size_t>(idx) + 0] = static_cast<std::uint8_t>(
+                                    std::clamp(area.x * 255.0f, 0.0f, 255.0f));
+                                data[static_cast<std::size_t>(idx) + 1] = static_cast<std::uint8_t>(
+                                    std::clamp(area.y * 255.0f, 0.0f, 255.0f));
+                            }
+                        }
+                    }
+                }
+            }
+            return data;
+        }
+
+        std::vector<std::uint8_t> GenerateSMAASearchTextureBytes()
+        {
+            const int width  = static_cast<int>(kPostProcessSMAASearchTextureWidth);
+            const int height = static_cast<int>(kPostProcessSMAASearchTextureHeight);
+            std::vector<std::uint8_t> data(static_cast<std::size_t>(width * height), 0);
+
+            struct EdgeConfig { float e[4]; float bilinear; };
+            std::array<EdgeConfig, 16> configs;
+            for (int i = 0; i < 16; ++i)
+            {
+                const float e0 = (i & 1) ? 1.0f : 0.0f;
+                const float e1 = (i & 2) ? 1.0f : 0.0f;
+                const float e2 = (i & 4) ? 1.0f : 0.0f;
+                const float e3 = (i & 8) ? 1.0f : 0.0f;
+                configs[static_cast<std::size_t>(i)] = {{e0, e1, e2, e3}, BilinearDecode(e0, e1, e2, e3)};
+            }
+            const float quantStep = 1.0f / 32.0f;
+            for (int y = 0; y < height; ++y)
+            {
+                const float topBilinear = static_cast<float>(y) * quantStep;
+                for (int x = 0; x < width; ++x)
+                {
+                    const bool isRight = (x >= 33);
+                    const int localX = isRight ? (x - 33) : x;
+                    const float leftBilinear = static_cast<float>(localX) * quantStep;
+                    auto findClosest = [&](float target) -> int {
+                        int best = 0;
+                        float bestDist = std::abs(configs[0].bilinear - target);
+                        for (int i = 1; i < 16; ++i)
+                        {
+                            const float dist = std::abs(configs[static_cast<std::size_t>(i)].bilinear - target);
+                            if (dist < bestDist) { bestDist = dist; best = i; }
+                        }
+                        return best;
+                    };
+                    const int leftIdx = findClosest(leftBilinear);
+                    const int topIdx  = findClosest(topBilinear);
+                    const float* leftEdges = configs[static_cast<std::size_t>(leftIdx)].e;
+                    const float* topEdges  = configs[static_cast<std::size_t>(topIdx)].e;
+                    const int delta = isRight ? DeltaRight(leftEdges, topEdges) : DeltaLeft(leftEdges, topEdges);
+                    data[static_cast<std::size_t>(y * width + x)] =
+                        static_cast<std::uint8_t>(std::clamp(127 * delta, 0, 255));
+                }
+            }
+            return data;
+        }
 
         [[nodiscard]] bool IsSupportedAA(const PostProcessAntiAliasing aa) noexcept
         {
@@ -52,7 +332,96 @@ namespace Extrinsic::Graphics
         bool Initialized{false};
         PostProcessSettings Settings{};
         PostProcessDiagnostics Diagnostics{};
+
+        // GRAPHICS-075 Slice D.2b — retained-resource ownership. The
+        // managers are non-owning pointers; the leases own their slots
+        // and are released in Shutdown() before the managers themselves
+        // are torn down by the renderer.
+        RHI::TextureManager* TextureMgr{nullptr};
+        RHI::BufferManager*  BufferMgr{nullptr};
+        RHI::TextureManager::TextureLease AreaLutLease{};
+        RHI::TextureManager::TextureLease SearchLutLease{};
+        RHI::BufferManager::BufferLease   ExposureHistoryLease{};
     };
+
+    // GRAPHICS-075 Slice D.2b — allocate + upload the retained SMAA LUT
+    // textures and the exposure-adaptation history buffer. Idempotent:
+    // returns immediately when the leases are already valid, so calling
+    // from both the renderer's Initialize() and a later
+    // RebuildOperationalResources() (covering the "non-operational at
+    // first Initialize, operational by rebuild" case) does not
+    // re-allocate or re-upload.
+    void PostProcessSystem::TryAllocateRetainedResources(PostProcessSystem::Impl& impl,
+                                                        RHI::IDevice& device)
+    {
+        if (!impl.TextureMgr || !impl.BufferMgr || !device.IsOperational())
+        {
+            return;
+        }
+        if (impl.AreaLutLease.GetHandle().IsValid() &&
+            impl.SearchLutLease.GetHandle().IsValid() &&
+            impl.ExposureHistoryLease.GetHandle().IsValid())
+        {
+            return;
+        }
+
+        if (!impl.AreaLutLease.GetHandle().IsValid())
+        {
+            const RHI::TextureDesc areaDesc{
+                .Width  = kPostProcessSMAAAreaTextureWidth,
+                .Height = kPostProcessSMAAAreaTextureHeight,
+                .Fmt    = RHI::Format::RG8_UNORM,
+                .Usage  = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
+                .DebugName = "PostProcess.SMAA.AreaTex",
+            };
+            auto areaOr = impl.TextureMgr->Create(areaDesc);
+            if (areaOr.has_value())
+            {
+                impl.AreaLutLease = std::move(*areaOr);
+                const std::vector<std::uint8_t> bytes = GenerateSMAAAreaTextureBytes();
+                (void)device.GetTransferQueue().UploadTexture(
+                    impl.AreaLutLease.GetHandle(),
+                    bytes.data(),
+                    static_cast<std::uint64_t>(bytes.size()));
+            }
+        }
+
+        if (!impl.SearchLutLease.GetHandle().IsValid())
+        {
+            const RHI::TextureDesc searchDesc{
+                .Width  = kPostProcessSMAASearchTextureWidth,
+                .Height = kPostProcessSMAASearchTextureHeight,
+                .Fmt    = RHI::Format::R8_UNORM,
+                .Usage  = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
+                .DebugName = "PostProcess.SMAA.SearchTex",
+            };
+            auto searchOr = impl.TextureMgr->Create(searchDesc);
+            if (searchOr.has_value())
+            {
+                impl.SearchLutLease = std::move(*searchOr);
+                const std::vector<std::uint8_t> bytes = GenerateSMAASearchTextureBytes();
+                (void)device.GetTransferQueue().UploadTexture(
+                    impl.SearchLutLease.GetHandle(),
+                    bytes.data(),
+                    static_cast<std::uint64_t>(bytes.size()));
+            }
+        }
+
+        if (!impl.ExposureHistoryLease.GetHandle().IsValid())
+        {
+            const RHI::BufferDesc historyDesc{
+                .SizeBytes   = sizeof(PostProcessExposureHistory),
+                .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                .HostVisible = false,
+                .DebugName   = "PostProcess.ExposureHistory",
+            };
+            auto historyOr = impl.BufferMgr->Create(historyDesc);
+            if (historyOr.has_value())
+            {
+                impl.ExposureHistoryLease = std::move(*historyOr);
+            }
+        }
+    }
 
     PostProcessSystem::PostProcessSystem()
         : m_Impl(std::make_unique<Impl>())
@@ -65,8 +434,28 @@ namespace Extrinsic::Graphics
         m_Impl->Initialized = true;
     }
 
+    void PostProcessSystem::Initialize(RHI::IDevice& device,
+                                       RHI::TextureManager& textureMgr,
+                                       RHI::BufferManager& bufferMgr)
+    {
+        m_Impl->Initialized = true;
+        m_Impl->TextureMgr  = &textureMgr;
+        m_Impl->BufferMgr   = &bufferMgr;
+        PostProcessSystem::TryAllocateRetainedResources(*m_Impl, device);
+    }
+
     void PostProcessSystem::Shutdown()
     {
+        // GRAPHICS-075 Slice D.2b — drop leases before clearing the
+        // manager pointers so the lease destructors call back through
+        // a still-live manager. The renderer's Shutdown() tears the
+        // managers down only after PostProcessSystem::Shutdown() has
+        // returned.
+        m_Impl->AreaLutLease         = {};
+        m_Impl->SearchLutLease       = {};
+        m_Impl->ExposureHistoryLease = {};
+        m_Impl->TextureMgr = nullptr;
+        m_Impl->BufferMgr  = nullptr;
         m_Impl->Initialized = false;
     }
 
@@ -199,5 +588,20 @@ namespace Extrinsic::Graphics
             .HistogramBinCount = m_Impl->Settings.HistogramBinCount,
             .StageKind = static_cast<std::uint32_t>(stage),
         };
+    }
+
+    RHI::TextureHandle PostProcessSystem::GetSMAAAreaTexture() const noexcept
+    {
+        return m_Impl->AreaLutLease.GetHandle();
+    }
+
+    RHI::TextureHandle PostProcessSystem::GetSMAASearchTexture() const noexcept
+    {
+        return m_Impl->SearchLutLease.GetHandle();
+    }
+
+    RHI::BufferHandle PostProcessSystem::GetExposureHistoryBuffer() const noexcept
+    {
+        return m_Impl->ExposureHistoryLease.GetHandle();
     }
 }

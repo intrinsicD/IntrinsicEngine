@@ -22,17 +22,22 @@ Each active task should include:
   `PostProcessFXAAPushConstants` std430 push block + contract tests),
   D.1 (three SMAA pipelines — edge / blend / resolve — + per-shader
   16-byte std430 push blocks + umbrella fan-out alongside FXAA,
-  mutually exclusive per `PostProcessSettings::AntiAliasing`), and
-  D.2a (AA umbrella split into three ordered passes
+  mutually exclusive per `PostProcessSettings::AntiAliasing`), D.2a
+  (AA umbrella split into three ordered passes
   `"PostProcessAA{Edge,Blend,Resolve}Pass"` + recipe-side
   `PostProcess.AATemp` rename into
   `.{Edges,Weights,Resolved}` + edge / blend pipeline format flip to
   `RG8_UNORM` / `RGBA8_UNORM` + per-stage SMAA pass body
   `Execute{Edge,Blend,Resolve}` + per-pass renderer helpers + AA
-  feature-flag plumbing + contract test updates) are landed. Slice
-  D.2b (retained `AreaTex` / `SearchTex` LUT textures +
-  exposure-adaptation history buffer + device-aware
-  `PostProcessSystem::Initialize(device)` overload + survive-rebuild
-  contract test for the retained LUTs) and Slice E (Histogram compute
-  + readback drain) remain queued. Next verification step: open Slice
-  D.2b in a follow-up session.
+  feature-flag plumbing + contract test updates), and D.2b
+  (device-aware `PostProcessSystem::Initialize(device, textureMgr,
+  bufferMgr)` overload that allocates + uploads the retained SMAA
+  `AreaTex` / `SearchTex` LUT textures and the
+  `PostProcessExposureHistory` storage buffer, idempotent across
+  renderer rebuild, with `Shutdown()` releasing the leases +
+  survive-rebuild contract test
+  `PostProcessSMAALookupTexturesSurviveOperationalRebuild`) are
+  landed. Slice E (Histogram compute pipeline + readback drain
+  consuming the exposure-adaptation history buffer Slice D.2b
+  allocated) remains queued. Next verification step: open Slice E in
+  a follow-up session.

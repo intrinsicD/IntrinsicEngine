@@ -2302,6 +2302,99 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
 }
 
 // ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice D.2b — retained SMAA `AreaTex` / `SearchTex` LUT
+// textures + exposure-adaptation history buffer. `PostProcessSystem`'s
+// device-aware Initialize() allocates the area/search LUTs (uploaded via
+// the transfer queue) and the exposure-history buffer up-front, and the
+// handles + dimensions must survive `RebuildOperationalResources()`
+// byte-identical so the SMAA blend pass keeps sampling the same retained
+// resources across recipe rebuilds. The test also pins the upload
+// payload sizes (160 * 560 * 2 = 179200 bytes for the area texture,
+// 66 * 33 = 2178 bytes for the search texture) and asserts no
+// re-allocation or re-upload happens across the rebuild.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PostProcessSMAALookupTexturesSurviveOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{411u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::TextureHandle initialAreaTex =
+        renderer->GetPostProcessSystem().GetSMAAAreaTexture();
+    const Extrinsic::RHI::TextureHandle initialSearchTex =
+        renderer->GetPostProcessSystem().GetSMAASearchTexture();
+    const Extrinsic::RHI::BufferHandle initialExposureBuffer =
+        renderer->GetPostProcessSystem().GetExposureHistoryBuffer();
+
+    EXPECT_TRUE(initialAreaTex.IsValid());
+    EXPECT_TRUE(initialSearchTex.IsValid());
+    EXPECT_TRUE(initialExposureBuffer.IsValid());
+
+    constexpr std::uint64_t kExpectedAreaBytes =
+        static_cast<std::uint64_t>(Extrinsic::Graphics::kPostProcessSMAAAreaTextureWidth) *
+        Extrinsic::Graphics::kPostProcessSMAAAreaTextureHeight * 2u;
+    constexpr std::uint64_t kExpectedSearchBytes =
+        static_cast<std::uint64_t>(Extrinsic::Graphics::kPostProcessSMAASearchTextureWidth) *
+        Extrinsic::Graphics::kPostProcessSMAASearchTextureHeight;
+
+    const auto findUpload =
+        [&device](Extrinsic::RHI::TextureHandle handle) -> const Extrinsic::Tests::MockTransferQueue::TextureUploadRecord* {
+            for (const auto& upload : device.TransferQueue.TextureUploads)
+            {
+                if (upload.Texture == handle)
+                {
+                    return &upload;
+                }
+            }
+            return nullptr;
+        };
+
+    const Extrinsic::Tests::MockTransferQueue::TextureUploadRecord* areaUpload =
+        findUpload(initialAreaTex);
+    const Extrinsic::Tests::MockTransferQueue::TextureUploadRecord* searchUpload =
+        findUpload(initialSearchTex);
+    ASSERT_NE(areaUpload, nullptr);
+    ASSERT_NE(searchUpload, nullptr);
+    EXPECT_EQ(areaUpload->SizeBytes, kExpectedAreaBytes);
+    EXPECT_EQ(searchUpload->SizeBytes, kExpectedSearchBytes);
+    EXPECT_EQ(areaUpload->MipLevel, 0u);
+    EXPECT_EQ(areaUpload->ArrayLayer, 0u);
+    EXPECT_EQ(searchUpload->MipLevel, 0u);
+    EXPECT_EQ(searchUpload->ArrayLayer, 0u);
+
+    const std::size_t uploadsAfterInit = device.TransferQueue.TextureUploads.size();
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+
+    // Byte-identical survival: the retained SMAA LUT + exposure-history
+    // leases use the same underlying device handles after the rebuild,
+    // and no extra transfer-queue upload was issued (the analytical LUT
+    // bytes are uploaded once at first device-aware Initialize() time).
+    EXPECT_EQ(renderer->GetPostProcessSystem().GetSMAAAreaTexture(), initialAreaTex);
+    EXPECT_EQ(renderer->GetPostProcessSystem().GetSMAASearchTexture(), initialSearchTex);
+    EXPECT_EQ(renderer->GetPostProcessSystem().GetExposureHistoryBuffer(), initialExposureBuffer);
+    EXPECT_EQ(device.TransferQueue.TextureUploads.size(), uploadsAfterInit);
+
+    // Snapshot the device's destroy counters *after* the rebuild — the
+    // rebuild legitimately recreates other systems' GPU resources
+    // (GpuWorld / MaterialSystem buffers, etc.), but the SMAA LUT +
+    // exposure-history leases must outlive it. Shutdown() must then
+    // release those leases via TextureManager / BufferManager, which
+    // calls back into IDevice::Destroy{Texture,Buffer}.
+    const int destroyTexturesBeforeShutdown = device.DestroyTextureCount;
+    const int destroyBuffersBeforeShutdown  = device.DestroyBufferCount;
+    renderer->Shutdown();
+    EXPECT_GE(device.DestroyTextureCount, destroyTexturesBeforeShutdown + 2)
+        << "Shutdown should release the SMAA AreaTex and SearchTex leases.";
+    EXPECT_GE(device.DestroyBufferCount, destroyBuffersBeforeShutdown + 1)
+        << "Shutdown should release the exposure-adaptation history buffer lease.";
+}
+
+// ---------------------------------------------------------------------------
 // GRAPHICS-075 Slice D.2a — AA-mode-aware resolve gate. The recipe-build
 // site flips `FrameRecipeFeatures::EnableAntiAliasing` (and thus
 // `presentSource = PostProcess.AATemp.Resolved`) only when the selected
