@@ -11,6 +11,7 @@ module;
 
 module Extrinsic.Graphics.PostProcessSystem;
 
+import Extrinsic.Core.Logging;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
@@ -377,12 +378,26 @@ namespace Extrinsic::Graphics
             auto areaOr = impl.TextureMgr->Create(areaDesc);
             if (areaOr.has_value())
             {
-                impl.AreaLutLease = std::move(*areaOr);
+                RHI::TextureManager::TextureLease lease = std::move(*areaOr);
                 const std::vector<std::uint8_t> bytes = GenerateSMAAAreaTextureBytes();
-                (void)device.GetTransferQueue().UploadTexture(
-                    impl.AreaLutLease.GetHandle(),
+                // UploadTexture returns an invalid token (Value == 0) when
+                // the backend rejects the upload (e.g. staging allocation
+                // failure). Roll the lease back in that case so the
+                // idempotence check sees an invalid handle and retries the
+                // allocate+upload on the next Initialize(...) call rather
+                // than leaving SMAA sampling uninitialized texture content.
+                const RHI::TransferToken token = device.GetTransferQueue().UploadTexture(
+                    lease.GetHandle(),
                     bytes.data(),
                     static_cast<std::uint64_t>(bytes.size()));
+                if (token.IsValid())
+                {
+                    impl.AreaLutLease = std::move(lease);
+                }
+                else
+                {
+                    Core::Log::Warn("[Graphics] PostProcess.SMAA.AreaTex upload rejected; lease released, will retry on next Initialize.");
+                }
             }
         }
 
@@ -398,12 +413,20 @@ namespace Extrinsic::Graphics
             auto searchOr = impl.TextureMgr->Create(searchDesc);
             if (searchOr.has_value())
             {
-                impl.SearchLutLease = std::move(*searchOr);
+                RHI::TextureManager::TextureLease lease = std::move(*searchOr);
                 const std::vector<std::uint8_t> bytes = GenerateSMAASearchTextureBytes();
-                (void)device.GetTransferQueue().UploadTexture(
-                    impl.SearchLutLease.GetHandle(),
+                const RHI::TransferToken token = device.GetTransferQueue().UploadTexture(
+                    lease.GetHandle(),
                     bytes.data(),
                     static_cast<std::uint64_t>(bytes.size()));
+                if (token.IsValid())
+                {
+                    impl.SearchLutLease = std::move(lease);
+                }
+                else
+                {
+                    Core::Log::Warn("[Graphics] PostProcess.SMAA.SearchTex upload rejected; lease released, will retry on next Initialize.");
+                }
             }
         }
 

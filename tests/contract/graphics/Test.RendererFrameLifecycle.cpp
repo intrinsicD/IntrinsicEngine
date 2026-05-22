@@ -2395,6 +2395,68 @@ TEST(RendererFrameLifecycle, PostProcessSMAALookupTexturesSurviveOperationalRebu
 }
 
 // ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice D.2b — failed-upload retry. UploadTexture(...) can
+// return an invalid token (Value == 0) when the backend rejects the
+// upload (e.g. staging allocation failure). The retained-resource
+// allocator must drop the freshly-created lease in that case so the
+// idempotence check sees an invalid handle and a follow-up Initialize
+// (which the renderer invokes from RebuildOperationalResources) retries
+// the allocate+upload instead of leaving SMAA sampling uninitialized
+// texture content indefinitely.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PostProcessSMAALookupTexturesRetryAfterFailedUpload)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{412u, 1u};
+    device.TransferQueue.FailTextureUploads = true;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    // Initial Initialize() ran while every UploadTexture returned an
+    // invalid token; both LUT leases must have been rolled back so the
+    // public handles report invalid. The exposure-history buffer does
+    // not flow through the transfer queue, so its lease can be valid.
+    EXPECT_FALSE(renderer->GetPostProcessSystem().GetSMAAAreaTexture().IsValid());
+    EXPECT_FALSE(renderer->GetPostProcessSystem().GetSMAASearchTexture().IsValid());
+
+    // Clear the failure knob and trigger a re-init via
+    // RebuildOperationalResources(...). The retained-resource allocator
+    // is idempotent on already-valid leases but must retry the failed
+    // ones; the LUT handles should land valid this time.
+    device.TransferQueue.FailTextureUploads = false;
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+
+    const Extrinsic::RHI::TextureHandle retriedAreaTex =
+        renderer->GetPostProcessSystem().GetSMAAAreaTexture();
+    const Extrinsic::RHI::TextureHandle retriedSearchTex =
+        renderer->GetPostProcessSystem().GetSMAASearchTexture();
+    EXPECT_TRUE(retriedAreaTex.IsValid());
+    EXPECT_TRUE(retriedSearchTex.IsValid());
+
+    // The transfer queue records every UploadTexture call (including the
+    // rejected first attempt), so it must hold at least the two retried
+    // upload records keyed to the now-valid handles.
+    const auto findUpload =
+        [&device](Extrinsic::RHI::TextureHandle handle) -> const Extrinsic::Tests::MockTransferQueue::TextureUploadRecord* {
+            for (const auto& upload : device.TransferQueue.TextureUploads)
+            {
+                if (upload.Texture == handle)
+                {
+                    return &upload;
+                }
+            }
+            return nullptr;
+        };
+    EXPECT_NE(findUpload(retriedAreaTex), nullptr);
+    EXPECT_NE(findUpload(retriedSearchTex), nullptr);
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
 // GRAPHICS-075 Slice D.2a — AA-mode-aware resolve gate. The recipe-build
 // site flips `FrameRecipeFeatures::EnableAntiAliasing` (and thus
 // `presentSource = PostProcess.AATemp.Resolved`) only when the selected
