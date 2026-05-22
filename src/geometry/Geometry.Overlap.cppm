@@ -10,6 +10,7 @@ import Geometry.Primitives;
 import Geometry.SDF;
 import Geometry.GJK;
 import Geometry.Support;
+import Geometry.RobustPredicates;
 
 export namespace Geometry
 {
@@ -164,25 +165,26 @@ export namespace Geometry
         // --- Frustum vs AABB ---
         bool Overlap_Analytic(const Frustum& f, const AABB& box)
         {
+            // GEOM-007 Slice 3.3.b: evaluate the half-space test with
+            // `RobustPredicates::SignedDistanceToHessianPlane`. Culling
+            // decision is conservative-inside — only cull when the box's
+            // most-positive vertex is *certainly* on the negative half-
+            // space; treat `Certainty::Uncertain` as "still inside" so
+            // visible geometry never pops at the filter-band boundary.
+            namespace RP = Geometry::RobustPredicates;
             for (const auto& plane : f.Planes)
             {
-                // Test the vertex most likely to be BEHIND the plane (Negative Half-Space)
-                // If the "Negative Vertex" is still strictly positive (in front of plane),
-                // then the entire box is in the positive half-space (Inside).
-                // If the "Positive Vertex" is strictly negative (behind plane),
-                // then the entire box is Outside.
-
-                // Assuming Gribb-Hartmann: Normals point INWARD.
-                // Inside = Positive Distance.
-                // We want to check if the box is fully OUTSIDE (Negative Distance).
-
-                glm::vec3 maxPoint; // The point furthest in the normal direction
+                // Test the vertex most likely to be BEHIND the plane
+                // (assumes Gribb-Hartmann: normals point INWARD).
+                glm::vec3 maxPoint;
                 if (plane.Normal.x > 0) maxPoint.x = box.Max.x; else maxPoint.x = box.Min.x;
                 if (plane.Normal.y > 0) maxPoint.y = box.Max.y; else maxPoint.y = box.Min.y;
                 if (plane.Normal.z > 0) maxPoint.z = box.Max.z; else maxPoint.z = box.Min.z;
 
-                // If the point furthest IN is actually OUT (<0), the whole box is culled.
-                if (SDF::Math::Sdf_Plane(maxPoint, plane.Normal, plane.Distance) < 0.0f)
+                const auto signed_ = RP::SignedDistanceToHessianPlane(
+                    plane.Normal, plane.Distance, maxPoint);
+                if (signed_.Sign == RP::Sign::Negative
+                    && signed_.Certainty == RP::Certainty::Certain)
                 {
                     return false;
                 }
@@ -193,9 +195,19 @@ export namespace Geometry
         // --- Frustum vs Sphere (Plane-Based) ---
         bool Overlap_Analytic(const Frustum& f, const Sphere& s)
         {
+            // GEOM-007 Slice 3.3.b: same conservative-inside policy as the
+            // AABB path, but the comparison is `value < -radius` rather
+            // than `value < 0`. We evaluate the dot in double via the
+            // robust predicate and require the result to be more than one
+            // filter-bound below `-radius` before culling so float-precision
+            // round-off cannot flip a visible sphere out of the frustum.
+            namespace RP = Geometry::RobustPredicates;
             for (const auto& plane : f.Planes)
             {
-                if (SDF::Math::Sdf_Plane(s.Center, plane.Normal, plane.Distance) < -s.Radius)
+                const auto signed_ = RP::SignedDistanceToHessianPlane(
+                    plane.Normal, plane.Distance, s.Center);
+                const double radius = static_cast<double>(s.Radius);
+                if (signed_.Value < -radius - signed_.FilterBound)
                 {
                     return false;
                 }

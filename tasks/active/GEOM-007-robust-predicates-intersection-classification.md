@@ -10,7 +10,7 @@
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
 ## Context
-- Status: in-progress (Slice 3.3.a — Hessian-plane predicate helper landed; next code commit is Slice 3.3.b — Overlap frustum migration).
+- Status: in-progress (Slice 3.3.b — Overlap frustum migration landed; next code commit is Slice 3.3.c — Containment frustum migration).
 - Owner/agent: copilot.
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
 - Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify` plus the layering / test-layout / doc-links / task-policy structural checks for Slice 3.3.a; extend the filter to `Overlap` / `Containment` (and add the new parity-battery test names) at the corresponding 3.3.b / 3.3.c commits.
@@ -65,17 +65,26 @@
       and large/small scale decidability cases. No callsite migration
       in this sub-slice; just the predicate foundation Slices 3.3.b /
       3.3.c consume.
-    - **Slice 3.3.b — `Overlap` frustum plane tests.** Migrate the two
-      `SDF::Math::Sdf_Plane(...) < 0` / `< -s.Radius` callsites in
+    - **Slice 3.3.b (landed this PR) — `Overlap` frustum plane tests.**
+      Migrated the two `SDF::Math::Sdf_Plane(...) < 0` /
+      `< -s.Radius` callsites in
       `Geometry::Internal::Overlap_Analytic(Frustum, AABB)` and
       `Overlap_Analytic(Frustum, Sphere)` (`src/geometry/Geometry.Overlap.cppm`)
-      onto `SignedDistanceToHessianPlane`. Decision policy: treat
-      `Sign::Negative` (certain or uncertain) as "outside half-space";
-      treat `Uncertain` near zero as "still inside" so culling stays
-      conservative (no popping). Add a unit test asserting parity with
-      the legacy float `Sdf_Plane` on a manufactured frustum + AABB /
-      Sphere battery covering inside / outside / straddling / on-plane
-      cases.
+      onto `RobustPredicates::SignedDistanceToHessianPlane`. Decision
+      policy: AABB path culls only when `Sign::Negative` AND
+      `Certainty::Certain`; sphere path culls only when
+      `signed.Value < -radius - signed.FilterBound`. Both are
+      conservative-inside — uncertain near-boundary cases stay visible.
+      `Test_Overlap.cpp` gains a `Frustum`-vs-`AABB` test set
+      (Inside / OutsideBehindCamera / OutsideFarBeyondFar /
+      StraddlingNearPlane / OffToTheSide) and parity batteries
+      (`FrustumAABBBatteryAgreesWithLegacyOracle` and
+      `FrustumSphereBatteryAgreesWithLegacyOracle`) that sweep boxes /
+      spheres across the view volume and assert the migrated
+      implementation never culls geometry the legacy `Sdf_Plane`-based
+      oracle kept (false-negative is the dangerous direction). The
+      reverse direction is documented and allowed by the
+      conservative-inside policy.
     - **Slice 3.3.c — `Containment` frustum strict-containment.**
       Migrate the two `Sdf_Plane(...) < 0` / `< s.Radius` callsites in
       `Geometry::Internal::Contains_Analytic(Frustum, AABB)` and
