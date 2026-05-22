@@ -340,6 +340,86 @@ export namespace Geometry::RobustPredicates
     }
 
     // -----------------------------------------------------------------------
+    // Signed-distance evaluation for a Hessian-form plane.
+    // -----------------------------------------------------------------------
+    //
+    // Hessian convention used by the geometry layer's plane storage
+    // (`Geometry::Plane` and `Geometry::Frustum::Plane`):
+    //
+    //     dot(planeNormal, point) + planeOffset == 0  on the plane.
+    //
+    // This is the same convention as `Geometry::SDF::Math::Sdf_Plane`. The
+    // helper computes the signed value in double precision with the same
+    // `SignedResult` + filter-bound diagnostics as
+    // `SignedDistanceToPlane(origin, normal, query)` so callers migrating
+    // off the float-precision `Sdf_Plane` form get a drop-in replacement
+    // (GEOM-007 Slice 3.3.a).
+    //
+    // Caller responsibilities mirror the origin-form overload:
+    // - `planeNormal` is treated as supplied; the helper does not
+    //   renormalize. When `|planeNormal|` is not 1 the returned value is
+    //   `dot(N, q) + d` (i.e. distance scaled by `|N|`); sign / certainty
+    //   diagnostics are unchanged by that scaling.
+    // - The certainty band is derived from the sum of absolute term
+    //   magnitudes, so on-plane queries report `Sign::Zero` /
+    //   `Certainty::Certain` when the inputs are exactly representable.
+    [[nodiscard]] inline SignedResult SignedDistanceToHessianPlane(
+        const glm::vec3& planeNormal,
+        float planeOffset,
+        const glm::vec3& query) noexcept
+    {
+        const double nx = static_cast<double>(planeNormal.x);
+        const double ny = static_cast<double>(planeNormal.y);
+        const double nz = static_cast<double>(planeNormal.z);
+
+        const double qx = static_cast<double>(query.x);
+        const double qy = static_cast<double>(query.y);
+        const double qz = static_cast<double>(query.z);
+
+        const double d = static_cast<double>(planeOffset);
+
+        const double tx = qx * nx;
+        const double ty = qy * ny;
+        const double tz = qz * nz;
+        const double value = tx + ty + tz + d;
+
+        // Three multiplies plus three adds; bound at ~5 eps of the permanent
+        // (matching the slack policy used by `SignedDistanceToPlane`, with
+        // one extra term accounting for the constant `d` add).
+        const double permanent =
+              std::fabs(tx)
+            + std::fabs(ty)
+            + std::fabs(tz)
+            + std::fabs(d);
+        const double filter = permanent * (5.0 * kDoubleEpsilon);
+
+        SignedResult result{};
+        result.Value = value;
+        result.FilterBound = filter;
+        if (value == 0.0)
+        {
+            result.Sign = Sign::Zero;
+            result.Certainty = Certainty::Certain;
+        }
+        else if (value > filter)
+        {
+            result.Sign = Sign::Positive;
+            result.Certainty = Certainty::Certain;
+        }
+        else if (value < -filter)
+        {
+            result.Sign = Sign::Negative;
+            result.Certainty = Certainty::Certain;
+        }
+        else
+        {
+            result.Sign = (value > 0.0) ? Sign::Positive : Sign::Negative;
+            result.Certainty = Certainty::Uncertain;
+        }
+        return result;
+    }
+
+    // -----------------------------------------------------------------------
     // In-plane triangle barycentric classification.
     // -----------------------------------------------------------------------
     //

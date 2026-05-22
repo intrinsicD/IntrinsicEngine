@@ -10,7 +10,7 @@
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
 ## Context
-- Status: in-progress (Slice 3.3 sub-plan recorded; next code commit is Slice 3.3.a — Hessian-plane predicate helper).
+- Status: in-progress (Slice 3.3.a — Hessian-plane predicate helper landed; next code commit is Slice 3.3.b — Overlap frustum migration).
 - Owner/agent: copilot.
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
 - Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify` plus the layering / test-layout / doc-links / task-policy structural checks for Slice 3.3.a; extend the filter to `Overlap` / `Containment` (and add the new parity-battery test names) at the corresponding 3.3.b / 3.3.c commits.
@@ -54,18 +54,17 @@
     candidate callsites use different evaluation paths (Hessian-form
     plane sign, OBB-vs-OBB SAT epsilon, GJK termination epsilon) and
     each has a different behavior-change blast radius.
-    - **Slice 3.3.a — Hessian-plane predicate helper.** Add a
-      `RobustPredicates::SignedDistanceToHessianPlane(planeNormal,
+    - **Slice 3.3.a (landed this PR) — Hessian-plane predicate helper.**
+      Added `RobustPredicates::SignedDistanceToHessianPlane(planeNormal,
       planeOffset, query)` companion to the existing
       `SignedDistanceToPlane(origin, normal, query)` that evaluates the
       Hessian-form plane equation `dot(N, q) + d` in double precision
-      with the same `SignedResult` + filter-bound diagnostic shape. No
-      callsite migration in this sub-slice; just the predicate + its
-      unit tests (`Test.RobustPredicates.cpp` additions covering
-      identity vs `SignedDistanceToPlane(origin = -N*d, N, q)` for
-      `|N|=1`, sign certainty across scale, unit-normal vs scaled
-      normal, exact-zero on-plane case). This is the predicate
-      foundation Slices 3.3.b/c/d consume.
+      with the same `SignedResult` + filter-bound diagnostic shape.
+      `Test.RobustPredicates.cpp` gains exact-on-plane, above/below
+      certainty, parity-with-origin-form (for unit `N`), scaled-normal,
+      and large/small scale decidability cases. No callsite migration
+      in this sub-slice; just the predicate foundation Slices 3.3.b /
+      3.3.c consume.
     - **Slice 3.3.b — `Overlap` frustum plane tests.** Migrate the two
       `SDF::Math::Sdf_Plane(...) < 0` / `< -s.Radius` callsites in
       `Geometry::Internal::Overlap_Analytic(Frustum, AABB)` and

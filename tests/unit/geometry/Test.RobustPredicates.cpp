@@ -16,6 +16,7 @@ namespace
     using Geometry::RobustPredicates::Orientation3D;
     using Geometry::RobustPredicates::ScaledEpsilon;
     using Geometry::RobustPredicates::SignedDistanceToPlane;
+    using Geometry::RobustPredicates::SignedDistanceToHessianPlane;
     using Geometry::RobustPredicates::Sign;
     using Geometry::RobustPredicates::SignedResult;
 }
@@ -187,6 +188,107 @@ TEST(RobustPredicatesSignedDistanceToPlane, OnPlaneIsZero)
         {1.0f, 2.0f, 0.0f});
     EXPECT_EQ(r.Sign, Sign::Zero);
     EXPECT_EQ(r.Certainty, Certainty::Certain);
+}
+
+// -----------------------------------------------------------------------------
+// Hessian-form plane signed distance (GEOM-007 Slice 3.3.a).
+// -----------------------------------------------------------------------------
+
+TEST(RobustPredicatesSignedDistanceToHessianPlane, ExactZeroOnPlaneIsCertainZero)
+{
+    // Plane: z + 1 == 0  (i.e. z == -1).
+    const glm::vec3 n{0.0f, 0.0f, 1.0f};
+    constexpr float d = 1.0f;
+    const auto r = SignedDistanceToHessianPlane(n, d, {3.0f, -2.0f, -1.0f});
+    EXPECT_EQ(r.Sign, Sign::Zero);
+    EXPECT_EQ(r.Certainty, Certainty::Certain);
+    EXPECT_NEAR(r.Value, 0.0, 1.0e-12);
+}
+
+TEST(RobustPredicatesSignedDistanceToHessianPlane, AboveAndBelowReportCertainSign)
+{
+    // Plane: z - 0.25 == 0  (i.e. z == 0.25).
+    const glm::vec3 n{0.0f, 0.0f, 1.0f};
+    constexpr float d = -0.25f;
+
+    const auto above = SignedDistanceToHessianPlane(n, d, {1.0f, -3.0f, 0.75f});
+    EXPECT_EQ(above.Sign, Sign::Positive);
+    EXPECT_EQ(above.Certainty, Certainty::Certain);
+    EXPECT_NEAR(above.Value, 0.5, 1.0e-12);
+
+    const auto below = SignedDistanceToHessianPlane(n, d, {1.0f, -3.0f, -0.75f});
+    EXPECT_EQ(below.Sign, Sign::Negative);
+    EXPECT_EQ(below.Certainty, Certainty::Certain);
+    EXPECT_NEAR(below.Value, -1.0, 1.0e-12);
+}
+
+TEST(RobustPredicatesSignedDistanceToHessianPlane, MatchesOriginFormForUnitNormal)
+{
+    // For unit `N`, the Hessian form `dot(N, q) + d == 0` is the origin
+    // form with `origin = -N * d`. Slice 3.3.b / 3.3.c rely on this
+    // parity for the Overlap / Containment frustum migration.
+    const glm::vec3 n = glm::normalize(glm::vec3{0.3f, 0.7f, 0.65f});
+    constexpr float d = -1.25f;
+    const glm::vec3 origin = -n * d;
+
+    const glm::vec3 samples[] = {
+        {2.0f, -1.0f, 0.5f},
+        {-3.0f, 4.0f, 1.0f},
+        {0.0f, 0.0f, 0.0f},
+        {7.5f, -2.25f, 11.0f},
+    };
+
+    for (const auto& q : samples)
+    {
+        const auto hessian = SignedDistanceToHessianPlane(n, d, q);
+        const auto origForm = SignedDistanceToPlane(origin, n, q);
+        EXPECT_EQ(hessian.Sign, origForm.Sign);
+        // Tolerance must absorb the float-precision rounding of
+        // `origin = -n * d` (the float multiply does not reconstruct the
+        // double-precision Hessian sum exactly), not just double-precision
+        // accumulation noise.
+        EXPECT_NEAR(hessian.Value, origForm.Value, 1.0e-5);
+    }
+}
+
+TEST(RobustPredicatesSignedDistanceToHessianPlane, ScaledNormalScalesValueButNotSign)
+{
+    // The helper does not renormalize; callers passing a non-unit normal
+    // see the value scaled by `|N|`, but the sign / certainty diagnostics
+    // are preserved. This matches `SDF::Math::Sdf_Plane` semantics.
+    const glm::vec3 unit{0.0f, 1.0f, 0.0f};
+    constexpr float d = -2.0f;
+    const glm::vec3 scaled = unit * 4.0f;
+    const float dScaled = d * 4.0f;
+
+    const glm::vec3 q{5.0f, 3.0f, -1.0f};
+    const auto a = SignedDistanceToHessianPlane(unit, d, q);
+    const auto b = SignedDistanceToHessianPlane(scaled, dScaled, q);
+    EXPECT_EQ(a.Sign, b.Sign);
+    EXPECT_EQ(a.Sign, Sign::Positive);
+    EXPECT_NEAR(b.Value, a.Value * 4.0, 1.0e-9);
+}
+
+TEST(RobustPredicatesSignedDistanceToHessianPlane, LargeAndSmallScaleAreDecidable)
+{
+    // The filtered double-precision evaluation must keep its certain band
+    // wide enough to decide non-degenerate queries at both very large and
+    // very small object scales — the frustum-culling and strict-
+    // containment callsites in Slices 3.3.b / 3.3.c span that range.
+    {
+        const glm::vec3 n{0.0f, 0.0f, 1.0f};
+        constexpr float d = -1.0e6f;
+        const auto above = SignedDistanceToHessianPlane(n, d, {0.0f, 0.0f, 1.0e6f + 1.0f});
+        EXPECT_EQ(above.Sign, Sign::Positive);
+        EXPECT_EQ(above.Certainty, Certainty::Certain);
+    }
+    {
+        const glm::vec3 n{1.0f, 0.0f, 0.0f};
+        constexpr float d = -1.0e-3f;
+        const auto below = SignedDistanceToHessianPlane(n, d, {1.0e-4f, 0.0f, 0.0f});
+        EXPECT_EQ(below.Sign, Sign::Negative);
+        EXPECT_EQ(below.Certainty, Certainty::Certain);
+    }
 }
 
 // -----------------------------------------------------------------------------
