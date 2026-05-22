@@ -7,6 +7,7 @@ module;
 export module Geometry.SDFContact;
 
 import Geometry.ContactManifold;
+import Geometry.RobustPredicates;
 import Core.Telemetry;
 
 export namespace Geometry::SDF
@@ -63,7 +64,13 @@ export namespace Geometry::SDF
 
                 // Normal A -> B
                 glm::vec3 separationAxis = gradA - gradB;
-                if (glm::dot(separationAxis, separationAxis) < 1e-6f)
+                // GEOM-015 Slice 2: unit-space magnitude guard. `gradA` and
+                // `gradB` are SDF gradients normalized in CalculateGradient,
+                // so `separationAxis` magnitude is bounded by [0, 2]. Scale
+                // 1.0 with relative 1e-3 reproduces the prior 1e-6 threshold
+                // on |separationAxis|².
+                const double sepSq = static_cast<double>(glm::dot(separationAxis, separationAxis));
+                if (Geometry::RobustPredicates::ApproxZeroSq(sepSq, 1.0, 1.0e-3))
                 {
                     m.Normal = glm::vec3(0, 1, 0);
                 }

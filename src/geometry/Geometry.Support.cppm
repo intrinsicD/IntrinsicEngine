@@ -7,6 +7,7 @@ module;
 export module Geometry.Support;
 
 import Geometry.Primitives;
+import Geometry.RobustPredicates;
 
 export namespace Geometry
 {
@@ -62,8 +63,16 @@ export namespace Geometry
         // 2. Expand by radius in the dir of the search
         // We must normalize dir to add exactly 'Radius' distance.
         // Guard against zero vector to prevent NaN.
+        //
+        // GEOM-015 Slice 2: original-space magnitude guard on the input search
+        // direction. Scale is 1.0 because callers (GJK, raycast, etc.) pass
+        // unit-ish directions; `relative = 1.0e-3` reproduces the prior
+        // numerical-stability threshold of |dir|² ≤ 1e-6 at unit scale.
         float lenSq = glm::length2(direction);
-        if (lenSq < 1e-6f) return segmentSupport;
+        if (Geometry::RobustPredicates::ApproxZeroSq(static_cast<double>(lenSq),
+                                                    1.0,
+                                                    1.0e-3))
+            return segmentSupport;
 
         return segmentSupport + (direction * (shape.Radius * glm::inversesqrt(lenSq)));
     }
@@ -109,12 +118,28 @@ export namespace Geometry
         // Orthonormal projection: v_perp = v - (v . n) * n
         // We avoid sqrt(axisLen) by using dot/len2 projection formula.
 
-        if (axisLen2 > 1e-6f)
+        // GEOM-015 Slice 2: original-space magnitude guard on the cylinder
+        // axis length. Scale derives from the cylinder's characteristic
+        // transverse dimension (Radius); a cylinder is "axis-degenerate" when
+        // its height is below 1e-3 * Radius. At Radius == 1 this reproduces
+        // the prior |axis|² ≤ 1e-6 threshold; at sub-mm radii the threshold
+        // adapts so a tiny but well-formed cylinder is still treated as
+        // axially extended.
+        const double radiusScale = static_cast<double>(shape.Radius);
+        if (!Geometry::RobustPredicates::ApproxZeroSq(static_cast<double>(axisLen2),
+                                                     radiusScale,
+                                                     1.0e-3))
         {
             glm::vec3 axisDir = dir - axis * (dirDotAxis / axisLen2);
             float perpLen2 = glm::length2(axisDir);
 
-            if (perpLen2 > 1e-6f)
+            // GEOM-015 Slice 2: unit-space guard. `axisDir` is the projection
+            // of a unit direction onto the plane perpendicular to `axis`, so
+            // perpLen2 lies in [0, 1] regardless of cylinder scale. Scale 1.0
+            // and relative 1e-3 preserve the prior 1e-6 threshold.
+            if (!Geometry::RobustPredicates::ApproxZeroSq(static_cast<double>(perpLen2),
+                                                         1.0,
+                                                         1.0e-3))
             {
                 // Add radius in the perpendicular dir
                 return capCenter + axisDir * (shape.Radius * glm::inversesqrt(perpLen2));
@@ -139,8 +164,18 @@ export namespace Geometry
         // N_sphere = N_ellipsoid * Radii
         glm::vec3 normal = localDir * shape.Radii;
 
+        // GEOM-015 Slice 2: original-space magnitude guard. `normal` lives in
+        // ellipsoid radius-space (|localDir| == 1 by Internal::Normalize), so
+        // |normal|² is bounded by `|Radii|²`. The previous absolute 1e-6
+        // threshold caused this guard to trip unconditionally for ellipsoids
+        // with sub-mm radii. Scale derived from |Radii| makes the guard a
+        // numerical-stability test rather than a shape-rejection test.
         float len2 = glm::length2(normal);
-        if (len2 < 1e-6f) return shape.Center;
+        const double radiiScale = static_cast<double>(glm::length(shape.Radii));
+        if (Geometry::RobustPredicates::ApproxZeroSq(static_cast<double>(len2),
+                                                    radiiScale,
+                                                    1.0e-3))
+            return shape.Center;
 
         // Normalize to get point on Unit Sphere
         glm::vec3 unitSpherePoint = normal * glm::inversesqrt(len2);

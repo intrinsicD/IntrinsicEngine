@@ -19,9 +19,9 @@
   remain on the GEOM-007 Slice 4 / its own successor task.
 
 ## Context
-- Status: in-progress (Slice 1).
+- Status: in-progress (Slice 3 next; Slices 1–2 landed).
 - Owner/agent: copilot.
-- Branch: main.
+- Branch: claude/nice-knuth-QStLa.
 - Owning subsystem/layer: `geometry` (`geometry -> core`; consumes
   `Geometry.RobustPredicates`).
 - Promoted from `tasks/backlog/geometry/` on 2026-05-22.
@@ -31,16 +31,21 @@
 
 ### Slice plan
 
-- **Slice 1 (this slice):** Add `RobustPredicates::ApproxZeroSq` /
+- **Slice 1 (landed):** Add `RobustPredicates::ApproxZeroSq` /
   `ApproxZeroLen` helpers with `SignedResult`-shaped diagnostics and
   unit tests. No callsite migration; `Geometry.GJK` and `Geometry.Support`
   unchanged.
-- **Slice 2:** Audit the seven `GJK_EPSILON` and four `Geometry.Support`
-  `1e-6f` callsites; classify and add inline comments. Migrate the
-  original-space magnitude guards in `Geometry.Support.cppm` and the one
-  in `Geometry.SDFContact.cppm` to the new helper, deriving `scale`
-  from the primitive's characteristic length.
-- **Slice 3:** Decide the GJK normalized-workspace policy (keep
+- **Slice 2 (landed):** Audit the GJK and Support 1e-6f callsites;
+  classify and add inline comments. Migrate the original-space magnitude
+  guards in `Geometry.Support.cppm` (Capsule direction, Cylinder
+  axis-degeneracy + perpendicular projection, Ellipsoid radii) and the
+  one in `Geometry.SDFContact.cppm` (separation-axis zero guard) to
+  `RobustPredicates::ApproxZeroSq`, deriving `scale` from the primitive's
+  characteristic length or from the unit-direction contract (relative =
+  `1.0e-3` preserves the prior 1e-6 threshold at unit scale). Adds
+  regression tests for the previously-flipped sub-millimeter Ellipsoid
+  and short-axis Cylinder cases.
+- **Slice 3 (next):** Decide the GJK normalized-workspace policy (keep
   `GJK_EPSILON` as a normalized-space constant with explicit contract
   vs. thread scale into the driver). Document the decision in
   `docs/architecture/geometry.md`.
@@ -49,10 +54,51 @@
   entry point as a thin wrapper. Add convergence and parity regression
   tests.
 
+### Slice 2 audit notes
+
+GJK_EPSILON callsites in `Geometry.GJK.cppm` (all in normalized workspace;
+inline comments record the classification):
+- `Detail::NearlyZero` (line ~67): (a) normalized convergence — early-out /
+  zero-direction guard, `|v|² ≤ EPS²`.
+- `case 2` segment-degeneracy: (a) normalized convergence, `abLenSq ≤ EPS`
+  (intentionally compared to EPS, not EPS², documented inline).
+- `case 2` segment parameter clamp: (c) barycentric clamp on `t ∈ [0, 1]`,
+  dimensionless; not a magnitude.
+- `case 3` in-plane projection guard: (a) normalized convergence,
+  `|abc · ao| ≤ EPS`.
+- `GJK_Boolean` support-progress: (a) normalized convergence.
+- `GJK_Boolean` simplex-membership duplicate test: (a) normalized
+  convergence, `|p − support|² ≤ EPS²`.
+- `GJK_Intersection` support-progress / membership: (a) — mirrors
+  `GJK_Boolean`.
+
+`Geometry.Support.cppm` 1e-6f callsites migrated to
+`RobustPredicates::ApproxZeroSq`:
+- Capsule direction-magnitude guard: scale = 1.0 (unit-direction
+  contract), relative = 1e-3.
+- Cylinder axis-degeneracy: scale = `shape.Radius` (transverse
+  characteristic length), relative = 1e-3.
+- Cylinder perpendicular-projection guard: scale = 1.0 (perpLen ≤ |unit
+  dir|), relative = 1e-3.
+- Ellipsoid radii-scaled direction guard: scale = `length(shape.Radii)`,
+  relative = 1e-3.
+
+The `Internal::Normalize` `1e-12f` fallback in `Geometry.Support.cppm` is
+out of scope for this slice — it is a true machine-zero guard rather than
+a numerical-stability threshold and applies to bare direction vectors
+shared across all primitives.
+
+`Geometry.SDFContact.cppm` separation-axis guard migrated with scale =
+1.0 (gradients are unit-normalized in `CalculateGradient`).
+
 ### Next verification step
 
-After Slice 1 lands:
-`ctest --test-dir build/ci --output-on-failure -R 'RobustPredicates' --timeout 60`
+After Slice 2 lands, the same verification block has been run on this
+branch (clang-20 / preset `ci`, 145/145 geometry tests pass). The next
+slice (3) requires documenting the GJK normalized-workspace policy in
+`docs/architecture/geometry.md`; rerun:
+`cmake --build --preset ci --target IntrinsicGeometryTests`
+`ctest --test-dir build/ci --output-on-failure -R 'GJK|Support|ContactManifold|Overlap|RobustPredicates' --timeout 60`
 plus `python3 tools/repo/check_layering.py --root src --strict` and
 `python3 tools/agents/check_task_policy.py --root . --strict`.
 - Current state (as of GEOM-007 Slice 3.3.c landing):
@@ -85,20 +131,23 @@ plus `python3 tools/repo/check_layering.py --root src --strict` and
     fall through to `GJK_Boolean`).
 
 ## Required changes
-- [ ] Audit the GJK and Support epsilon callsites and classify each as
+- [x] Audit the GJK and Support epsilon callsites and classify each as
       (a) normalized-space convergence tolerance, (b) original-space
       magnitude/zero guard, or (c) barycentric clamp. Record the
       classification inline as a code comment and in the task notes.
-- [ ] Add `RobustPredicates::ApproxZeroSq(double valueSq, double scale,
+      *(Slice 2: classifications added inline in `Geometry.GJK.cppm` and
+      `Geometry.Support.cppm`; summary recorded above.)*
+- [x] Add `RobustPredicates::ApproxZeroSq(double valueSq, double scale,
       double relative = 1.0e-9)` (and/or `ApproxZeroLen` for length-form
       callers) that returns a `Sign` / `Certainty` diagnostic compatible
       with the existing `SignedResult` shape. Add unit tests covering
       ordinary, near-zero, exactly-zero, and large/small scale cases.
-- [ ] Migrate the original-space magnitude guards in
+      *(Slice 1, c93ae0b.)*
+- [x] Migrate the original-space magnitude guards in
       `Geometry.Support.cppm` (and the one in `Geometry.SDFContact.cppm`)
       to the new helper, deriving `scale` from the primitive's
       characteristic length (sphere radius, capsule length, OBB extent
-      diagonal, etc.).
+      diagonal, etc.). *(Slice 2.)*
 - [ ] In `Geometry.GJK.cppm`, either:
       (i) keep `GJK_EPSILON` as a normalized-space constant but document
           the contract explicitly and add a static assertion / runtime

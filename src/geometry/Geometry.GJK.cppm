@@ -40,10 +40,27 @@ export namespace Geometry::Internal
 
     // --- GJK Configuration ---
     // All arithmetic runs in a normalized workspace (~unit scale) so fixed
-    // tolerances are well-conditioned regardless of original object size.
+    // tolerances are well-conditioned regardless of original object size
+    // (see GJK_Boolean / GJK_Intersection invScale comment block below).
+    //
+    // GEOM-015 Slice 2 callsite audit:
+    //   Every GJK_EPSILON consumer below operates in this normalized
+    //   workspace, so the constant is intentionally a normalized-space
+    //   tolerance rather than an original-space magnitude. Each callsite is
+    //   tagged with one of:
+    //     (a) normalized convergence tolerance — termination / progress /
+    //         duplicate-membership tests in ~unit space.
+    //     (c) barycentric clamp — dimensionless [0, 1] tolerance on a
+    //         barycentric coordinate, not a magnitude.
+    //   No (b) original-space magnitude guards exist here; original-space
+    //   guards live in Geometry.Support and Geometry.SDFContact and are
+    //   migrated to Geometry.RobustPredicates::ApproxZeroSq in the same
+    //   slice. The decision whether to keep GJK_EPSILON as a normalized
+    //   constant vs. thread a per-call scale is deferred to GEOM-015
+    //   Slice 3.
     namespace Config
     {
-        constexpr float GJK_EPSILON  = 1e-6f;  // Numerical tolerance for GJK convergence
+        constexpr float GJK_EPSILON  = 1e-6f;  // Numerical tolerance for GJK convergence (normalized workspace)
         constexpr int   GJK_MAX_ITERATIONS = 64;
         constexpr float EPA_EPSILON  = 1e-4f;  // Tolerance for EPA penetration depth
         constexpr int   EPA_MAX_ITERATIONS = 32;
@@ -56,6 +73,9 @@ export namespace Geometry::Internal
             return glm::cross(glm::cross(a, b), c);
         }
 
+        // (a) normalized convergence tolerance: early-out / zero-direction guard.
+        // Operates on the normalized simplex workspace; |v|² ≤ EPS² ⇒ direction
+        // has collapsed to ~zero and origin is effectively on the current simplex.
         [[nodiscard]] inline bool NearlyZero(const glm::vec3& v) noexcept
         {
             return glm::length2(v) <= Config::GJK_EPSILON * Config::GJK_EPSILON;
@@ -79,6 +99,9 @@ export namespace Geometry::Internal
                 glm::vec3 ao = -a;
 
                 const float abLenSq = glm::length2(ab);
+                // (a) normalized convergence tolerance: segment-degeneracy guard.
+                // Comparison is intentionally against GJK_EPSILON (not EPS²) — at
+                // unit-scale workspace this matches a length cutoff of ~1e-3.
                 if (abLenSq <= Config::GJK_EPSILON)
                 {
                     direction = ao;
@@ -94,6 +117,10 @@ export namespace Geometry::Internal
                     if (Detail::NearlyZero(perp))
                     {
                         const float t = projection / abLenSq;
+                        // (c) barycentric clamp: dimensionless [0, 1] tolerance on
+                        // the segment parameter t = (ao · ab) / |ab|². Not a
+                        // length / magnitude — the absolute value of GJK_EPSILON
+                        // is being reused as a clamp slack regardless of scale.
                         if (t >= -Config::GJK_EPSILON && t <= 1.0f + Config::GJK_EPSILON)
                             return true; // Origin lies on the segment AB.
 
@@ -166,6 +193,9 @@ export namespace Geometry::Internal
                     else
                     {
                         const float planeDot = glm::dot(abc, ao);
+                        // (a) normalized convergence tolerance: in-plane projection
+                        // guard. abc and ao are both in normalized workspace, so
+                        // |abc · ao| ≤ EPS ⇒ origin lies on the supporting plane.
                         if (std::abs(planeDot) <= Config::GJK_EPSILON)
                             return true;
 
@@ -296,11 +326,18 @@ export namespace Geometry::Internal
             if (Detail::NearlyZero(support))
                 return true;
 
+            // (a) normalized convergence tolerance: support-progress test.
+            // In normalized workspace, a new support point that does not
+            // strictly extend past the origin along `direction` means GJK has
+            // converged on a separating axis.
             if (glm::dot(support, direction) < Config::GJK_EPSILON) return false;
 
             bool duplicate = false;
             for (int i = 0; i < points.Size; ++i)
             {
+                // (a) normalized convergence tolerance: simplex-membership /
+                // duplicate test. Two normalized-space supports within EPS of
+                // each other ⇒ no further progress is possible.
                 if (glm::length2(points[i] - support) <= Config::GJK_EPSILON * Config::GJK_EPSILON)
                 {
                     duplicate = true;
@@ -354,10 +391,14 @@ export namespace Geometry::Internal
                 return points;
             }
 
+            // (a) normalized convergence tolerance: support-progress test
+            // (Intersection variant; mirrors GJK_Boolean).
             if (glm::dot(support, direction) < Config::GJK_EPSILON) return std::nullopt;
 
             for (int i = 0; i < points.Size; ++i)
             {
+                // (a) normalized convergence tolerance: simplex-membership /
+                // duplicate test (Intersection variant; mirrors GJK_Boolean).
                 if (glm::length2(points[i] - support) <= Config::GJK_EPSILON * Config::GJK_EPSILON)
                     return std::nullopt;
             }

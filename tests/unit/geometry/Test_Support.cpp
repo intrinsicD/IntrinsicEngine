@@ -180,6 +180,51 @@ TEST(Support, Ellipsoid_ShortAxis)
     EXPECT_NEAR(p.z, 1.0f, kEps);
 }
 
+// GEOM-015 Slice 2: regression for the original-space magnitude guards
+// migrated from absolute 1e-6f to scale-aware
+// `RobustPredicates::ApproxZeroSq(..., scale, 1e-3)`.
+//
+// Before the migration, `len2 = length2(localDir * Radii)` for an ellipsoid
+// with sub-mm radii fell below the absolute 1e-6 threshold for any direction,
+// so `Support(Ellipsoid)` returned `Center` regardless of input direction.
+// Scale-aware policy with `scale = length(Radii)` makes the guard a
+// numerical-stability test instead of a shape-rejection test.
+TEST(Support, Ellipsoid_SubMillimeterScaleProducesNonCenterSupport)
+{
+    const float s = 1.0e-3f;
+    Ellipsoid e{glm::vec3(0, 0, 0), glm::vec3(s, s, s), glm::quat(1, 0, 0, 0)};
+    auto px = Support(e, glm::vec3(1, 0, 0));
+    EXPECT_NEAR(px.x, s, s * 0.01f);
+    EXPECT_NEAR(px.y, 0.0f, s);
+    EXPECT_NEAR(px.z, 0.0f, s);
+
+    auto pz = Support(e, glm::vec3(0, 0, -1));
+    EXPECT_NEAR(pz.z, -s, s * 0.01f);
+}
+
+TEST(Support, Ellipsoid_NonUniformSubMillimeterRadii)
+{
+    Ellipsoid e{glm::vec3(0, 0, 0), glm::vec3(3.0e-3f, 2.0e-3f, 1.0e-3f), glm::quat(1, 0, 0, 0)};
+    auto p = Support(e, glm::vec3(1, 0, 0));
+    EXPECT_NEAR(p.x, 3.0e-3f, 1.0e-5f);
+}
+
+// GEOM-015 Slice 2: regression for the Cylinder axis-degeneracy guard.
+// Previously the absolute 1e-6f threshold trips when |axis|² < 1e-6, i.e.
+// any cylinder with height < 1mm was treated as axis-degenerate (caps-only
+// support). With `scale = shape.Radius`, a tiny but well-formed cylinder
+// still produces radial expansion in directions perpendicular to its axis.
+TEST(Support, Cylinder_SubMillimeterHeightStillExpandsRadially)
+{
+    const float h = 5.0e-4f; // 0.5 mm, |axis|² = 2.5e-7 < 1e-6f (would trip the old guard)
+    const float r = 1.0e-3f;
+    Cylinder c{glm::vec3(0, 0, 0), glm::vec3(0, h, 0), r};
+    auto p = Support(c, glm::vec3(1, 0, 0));
+    // Perpendicular direction must put the support at +r in X, regardless of
+    // which cap wins along the axis projection.
+    EXPECT_NEAR(p.x, r, 1.0e-5f);
+}
+
 // ============================================================================
 // Segment
 // ============================================================================
