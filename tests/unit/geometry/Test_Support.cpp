@@ -209,20 +209,43 @@ TEST(Support, Ellipsoid_NonUniformSubMillimeterRadii)
     EXPECT_NEAR(p.x, 3.0e-3f, 1.0e-5f);
 }
 
-// GEOM-015 Slice 2: regression for the Cylinder axis-degeneracy guard.
-// Previously the absolute 1e-6f threshold trips when |axis|² < 1e-6, i.e.
-// any cylinder with height < 1mm was treated as axis-degenerate (caps-only
-// support). With `scale = shape.Radius`, a tiny but well-formed cylinder
-// still produces radial expansion in directions perpendicular to its axis.
-TEST(Support, Cylinder_SubMillimeterHeightStillExpandsRadially)
+// GEOM-015 Slice 2: anisotropic-ellipsoid regression. With `scale =
+// length(Radii)`, the zero-band would be proportional to the largest
+// semi-axis (~1414 for Radii = (1000, 1000, 1e-3)), and the +Z direction
+// query — whose normal magnitude in radii-space is ~1e-3 — would fall
+// inside the band and return Center instead of a surface point on the
+// thin axis. Axis-local `scale = min(|Radii|)` keeps the guard a
+// numerical-stability test rather than a thin-axis rejection test.
+TEST(Support, Ellipsoid_HighlyAnisotropicThinAxisProducesSurfaceSupport)
 {
-    const float h = 5.0e-4f; // 0.5 mm, |axis|² = 2.5e-7 < 1e-6f (would trip the old guard)
-    const float r = 1.0e-3f;
-    Cylinder c{glm::vec3(0, 0, 0), glm::vec3(0, h, 0), r};
+    Ellipsoid e{glm::vec3(0, 0, 0),
+                glm::vec3(1000.0f, 1000.0f, 1.0e-3f),
+                glm::quat(1, 0, 0, 0)};
+
+    auto pz = Support(e, glm::vec3(0, 0, 1));
+    EXPECT_NEAR(pz.z, 1.0e-3f, 1.0e-5f);
+    EXPECT_NEAR(pz.x, 0.0f, 1.0f);
+    EXPECT_NEAR(pz.y, 0.0f, 1.0f);
+
+    auto px = Support(e, glm::vec3(1, 0, 0));
+    EXPECT_NEAR(px.x, 1000.0f, 1.0f);
+}
+
+// GEOM-015 Slice 2: fat-disk Cylinder regression. The axis-degeneracy
+// guard is a numerical zero-vector floor on `axis`, not a shape-ratio
+// test. With `scale = shape.Radius`, a cylinder where R is much larger
+// than axisLen (a wide, flat disk) would have axisLen² ≤ (R · 1e-3)²
+// and the guard would mis-classify the axis as degenerate, skipping the
+// radial expansion that is in fact dominant for this geometry. Scale 1.0
+// (absolute floor) keeps the original semantic: only reject `axis` when
+// it is numerically zero.
+TEST(Support, Cylinder_FatDiskExpandsRadially)
+{
+    // R = 1000, axisLen = 1 ⇒ axisLen² = 1, which is exactly the
+    // would-have-been threshold (R · 1e-3)² = 1 under a shape.Radius scale.
+    Cylinder c{glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 1000.0f};
     auto p = Support(c, glm::vec3(1, 0, 0));
-    // Perpendicular direction must put the support at +r in X, regardless of
-    // which cap wins along the axis projection.
-    EXPECT_NEAR(p.x, r, 1.0e-5f);
+    EXPECT_NEAR(p.x, 1000.0f, 1.0f);
 }
 
 // ============================================================================

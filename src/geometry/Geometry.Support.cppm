@@ -2,6 +2,7 @@ module;
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
+#include <algorithm>
 #include <concepts>
 
 export module Geometry.Support;
@@ -119,15 +120,14 @@ export namespace Geometry
         // We avoid sqrt(axisLen) by using dot/len2 projection formula.
 
         // GEOM-015 Slice 2: original-space magnitude guard on the cylinder
-        // axis length. Scale derives from the cylinder's characteristic
-        // transverse dimension (Radius); a cylinder is "axis-degenerate" when
-        // its height is below 1e-3 * Radius. At Radius == 1 this reproduces
-        // the prior |axis|² ≤ 1e-6 threshold; at sub-mm radii the threshold
-        // adapts so a tiny but well-formed cylinder is still treated as
-        // axially extended.
-        const double radiusScale = static_cast<double>(shape.Radius);
+        // axis length. This is a numerical zero-vector floor on `axis`, not
+        // a shape-ratio test — `scale = shape.Radius` would erroneously
+        // trip for fat-disk cylinders (e.g. R = 1000, axisLen = 1 has
+        // `axisLen²` = 1 ≤ (1000 · 1e-3)² = 1, which would skip the radial
+        // expansion that is in fact dominant for that geometry). Scale 1.0
+        // with relative 1e-3 reproduces the prior absolute 1e-6 threshold.
         if (!Geometry::RobustPredicates::ApproxZeroSq(static_cast<double>(axisLen2),
-                                                     radiusScale,
+                                                     1.0,
                                                      1.0e-3))
         {
             glm::vec3 axisDir = dir - axis * (dirDotAxis / axisLen2);
@@ -165,15 +165,25 @@ export namespace Geometry
         glm::vec3 normal = localDir * shape.Radii;
 
         // GEOM-015 Slice 2: original-space magnitude guard. `normal` lives in
-        // ellipsoid radius-space (|localDir| == 1 by Internal::Normalize), so
-        // |normal|² is bounded by `|Radii|²`. The previous absolute 1e-6
-        // threshold caused this guard to trip unconditionally for ellipsoids
-        // with sub-mm radii. Scale derived from |Radii| makes the guard a
-        // numerical-stability test rather than a shape-rejection test.
+        // ellipsoid radius-space (|localDir| == 1 by Internal::Normalize) and
+        // |normal|² for any unit direction is bounded below by
+        // `min(|Radii_k|)²` (worst case: direction aligned with the smallest
+        // semi-axis). The previous absolute 1e-6 threshold caused this guard
+        // to trip unconditionally for ellipsoids with sub-mm radii.
+        //
+        // Scale must be axis-local: using `length(Radii)` would scale the
+        // zero-band by the largest semi-axis and spuriously trip the guard
+        // for highly anisotropic ellipsoids (e.g. Radii = (1000, 1000, 1e-3)
+        // along the thin Z axis would see |normal|² ≈ 1e-6 ≪
+        // (1414 · 1e-3)² ≈ 2.0). Using `min(|Radii_k|)` instead keeps the
+        // guard a numerical-stability test (degenerate ⇔ smallest semi-axis
+        // is at machine zero) without rejecting valid thin axes.
         float len2 = glm::length2(normal);
-        const double radiiScale = static_cast<double>(glm::length(shape.Radii));
+        const glm::vec3 absRadii = glm::abs(shape.Radii);
+        const double axisLocalScale = static_cast<double>(
+            std::min({absRadii.x, absRadii.y, absRadii.z}));
         if (Geometry::RobustPredicates::ApproxZeroSq(static_cast<double>(len2),
-                                                    radiiScale,
+                                                    axisLocalScale,
                                                     1.0e-3))
             return shape.Center;
 

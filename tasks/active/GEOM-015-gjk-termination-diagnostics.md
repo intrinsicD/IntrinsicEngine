@@ -73,15 +73,20 @@ inline comments record the classification):
   `GJK_Boolean`.
 
 `Geometry.Support.cppm` 1e-6f callsites migrated to
-`RobustPredicates::ApproxZeroSq`:
+`RobustPredicates::ApproxZeroSq`. Scale choices are deliberately
+*axis-local* rather than `length(Radii)` / `shape.Radius` because those
+larger scales spuriously trip the zero-band for anisotropic
+primitives (e.g. an Ellipsoid with Radii = (1000, 1000, 1e-3) along its
+thin axis, or a fat-disk Cylinder with R = 1000 and axisLen = 1):
 - Capsule direction-magnitude guard: scale = 1.0 (unit-direction
   contract), relative = 1e-3.
-- Cylinder axis-degeneracy: scale = `shape.Radius` (transverse
-  characteristic length), relative = 1e-3.
+- Cylinder axis-degeneracy: scale = 1.0 (numerical zero-vector floor on
+  `axis`, not a shape-ratio test), relative = 1e-3.
 - Cylinder perpendicular-projection guard: scale = 1.0 (perpLen ≤ |unit
   dir|), relative = 1e-3.
-- Ellipsoid radii-scaled direction guard: scale = `length(shape.Radii)`,
-  relative = 1e-3.
+- Ellipsoid radii-scaled direction guard: scale = `min(|Radii_k|)`
+  (worst-case smallest semi-axis ⇒ degenerate only when the smallest
+  semi-axis is at machine zero), relative = 1e-3.
 
 The `Internal::Normalize` `1e-12f` fallback in `Geometry.Support.cppm` is
 out of scope for this slice — it is a true machine-zero guard rather than
