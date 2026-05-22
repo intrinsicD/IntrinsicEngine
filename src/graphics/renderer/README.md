@@ -1006,11 +1006,18 @@ Concretely:
   then the `AATemp.Edges ColorAttachment → ShaderRead` transition
   between edge and blend, and the `AATemp.Weights ColorAttachment →
   ShaderRead` transition before resolve. `presentSource` flips to
-  `PostProcess.AATemp.Resolved` when the renderer reports
-  `PostProcessSettings::AntiAliasing != None`
-  (`FrameRecipeFeatures::EnableAntiAliasing = true`); otherwise it
-  stays on `SceneColorLDR` so the unwritten resolved attachment
-  never reaches present.
+  `PostProcess.AATemp.Resolved` only when
+  `PostProcessSettings::AntiAliasing != None` **and** the matching
+  AA mode's pipeline(s) are actually present
+  (`FrameRecipeFeatures::EnableAntiAliasing = true` only if the
+  renderer's `SelectedAntiAliasingPipelinesAvailable()` is true:
+  FXAA requires the FXAA pipeline; SMAA requires all three SMAA
+  pipelines because the resolve shader reads `AATemp.Weights` and
+  the blend shader reads `AATemp.Edges`, so a missing upstream
+  pipeline would route a cleared resolve to present). Otherwise
+  present stays on `SceneColorLDR`, and
+  `RecordPostProcessAAResolvePass` reports `SkippedUnavailable`
+  rather than falsely recording `Recorded` against a no-op draw.
   `BuildPostProcessFXAAPushConstants(settings, viewportWidth,
   viewportHeight)` derives `InvResolution` from
   `RHI::CameraUBO::Viewport{Width,Height}` (a zero / negative extent

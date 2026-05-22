@@ -2301,6 +2301,136 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
     renderer->Shutdown();
 }
 
+// ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice D.2a — AA-mode-aware resolve gate. The recipe-build
+// site flips `FrameRecipeFeatures::EnableAntiAliasing` (and thus
+// `presentSource = PostProcess.AATemp.Resolved`) only when the selected
+// AA mode's pipeline(s) are actually available, and
+// `RecordPostProcessAAResolvePass` mirrors the same gate. Otherwise a
+// user-selected AA mode whose matching pipeline failed to build would
+// route present to the unwritten `AATemp.Resolved` attachment while
+// the pass body short-circuited to a no-op — the user would see a
+// cleared / undefined frame instead of the tonemapped `SceneColorLDR`.
+// These regression tests pin the gate so future scope creep can't
+// loosen it back to "either AA pipeline is good enough".
+//
+// `FailPipelineCreateCall` is a 1-indexed counter of `IDevice` pipeline-
+// create calls. Pipeline creation order inside
+// `InitializeOperationalPassResources` is:
+//   1 culling, 2 depth, 3 defaultDebugSurface, 4 minimalVisibleTriangle,
+//   5 forwardSurface, 6 forwardLine, 7 forwardPoint, 8 shadow,
+//   9 deferredGBuffer, 10 deferredLighting, 11-14 selectionId,
+//   15 selectionOutline, 16 tonemap, 17 bloomDownsample, 18 bloomUpsample,
+//   19 postProcessFXAA, 20 smaaEdge, 21 smaaBlend, 22 smaaResolve.
+// If a future change reorders pipeline creation, update the constants.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+    constexpr int kPostProcessFXAACreateCallIndex = 19;
+    constexpr int kPostProcessSMAAResolveCreateCallIndex = 22;
+}
+
+TEST(RendererFrameLifecycle, FXAASelectedWithoutPipelineKeepsResolveSkippedAndPresentOnSceneColorLDR)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{321u, 1u};
+    device.FailPipelineCreateCall = kPostProcessFXAACreateCallIndex;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    // The targeted Create call should have failed; FXAA lease is invalid
+    // while SMAA leases remain valid.
+    EXPECT_FALSE(renderer->GetPostProcessFXAAPipeline().IsValid())
+        << "Test fixture targeted the wrong pipeline-create call; "
+           "FailPipelineCreateCall index needs to match the FXAA slot.";
+    EXPECT_TRUE(renderer->GetPostProcessSMAAResolvePipeline().IsValid());
+
+    // Select FXAA. Without the gate-tightening the resolve helper would
+    // accept the pass (SMAA resolve pipeline exists), the recipe would
+    // flip presentSource to AATemp.Resolved, and present would consume
+    // a cleared attachment.
+    renderer->GetPostProcessSystem().SetSettings(Extrinsic::Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Extrinsic::Graphics::PostProcessAntiAliasing::FXAA,
+    });
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* resolvePass =
+        FindCommandPass(stats, "PostProcessAAResolvePass");
+    ASSERT_NE(resolvePass, nullptr);
+    EXPECT_EQ(resolvePass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable)
+        << "FXAA was selected but the FXAA pipeline failed to build; the "
+           "resolve helper must report SkippedUnavailable rather than "
+           "falsely recording a no-op against the unwritten resolved "
+           "attachment.";
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, SMAASelectedWithoutResolvePipelineKeepsResolveSkippedAndPresentOnSceneColorLDR)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{322u, 1u};
+    device.FailPipelineCreateCall = kPostProcessSMAAResolveCreateCallIndex;
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    EXPECT_FALSE(renderer->GetPostProcessSMAAResolvePipeline().IsValid())
+        << "Test fixture targeted the wrong pipeline-create call; "
+           "FailPipelineCreateCall index needs to match the SMAA resolve "
+           "slot.";
+    EXPECT_TRUE(renderer->GetPostProcessFXAAPipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPostProcessSMAAEdgePipeline().IsValid());
+    EXPECT_TRUE(renderer->GetPostProcessSMAABlendPipeline().IsValid());
+
+    renderer->GetPostProcessSystem().SetSettings(Extrinsic::Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Extrinsic::Graphics::PostProcessAntiAliasing::SMAA,
+    });
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* resolvePass =
+        FindCommandPass(stats, "PostProcessAAResolvePass");
+    ASSERT_NE(resolvePass, nullptr);
+    EXPECT_EQ(resolvePass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable)
+        << "SMAA was selected but the resolve pipeline failed to build; "
+           "the resolve helper must report SkippedUnavailable so the "
+           "recipe-build site keeps presentSource on SceneColorLDR.";
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPresent)
 {
     Extrinsic::Tests::MockDevice device;

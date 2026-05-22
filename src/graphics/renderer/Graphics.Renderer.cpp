@@ -1007,18 +1007,28 @@ namespace Extrinsic::Graphics
             defaultRecipeFeatures.LightingPath = m_LightingPath;
             // GRAPHICS-075 Slice D.2a — flip `presentSource` to
             // `PostProcess.AATemp.Resolved` only when the postprocess
-            // system reports a non-`None` AA selector. The AA pass
-            // bodies short-circuit on `AntiAliasing == None`, so
-            // consuming `AATemp.Resolved` from present in that mode
-            // would surface the (cleared / undefined) AA-resolved
+            // system reports a non-`None` AA selector *and* the selected
+            // mode's pipeline(s) are actually available. Plumbing only on
+            // the selector (`AntiAliasing != None`) would route present
+            // to `AATemp.Resolved` even when the matching pipeline
+            // failed to build — both AA pass bodies would short-circuit
+            // (FXAA needs its pipeline; SMAA needs its three) and
+            // present would consume the cleared / undefined resolved
             // attachment instead of the freshly-written `SceneColorLDR`.
+            // For SMAA we require all three pipelines because the
+            // resolve shader reads `AATemp.Weights`: if blend (or edge)
+            // is missing the resolve still draws but reads cleared
+            // inputs, so we treat AA as unavailable for present-routing
+            // purposes and fall back to `SceneColorLDR`. The resolve
+            // helper itself mirrors this gate so its
+            // `RenderCommandPassStatus` faithfully reports
+            // `SkippedUnavailable` when the mode's pipeline is missing.
             // `DeriveDefaultFrameRecipeFeatures` itself does not see
             // `PostProcessSettings` (it is renderer-internal state, not
-            // a `RenderWorld` field), so plumb the flag here at the
-            // recipe-build call site.
+            // a `RenderWorld` field), so plumb the flag here.
             defaultRecipeFeatures.EnableAntiAliasing =
                 m_PostProcessSystem.has_value() &&
-                m_PostProcessSystem->GetSettings().AntiAliasing != PostProcessAntiAliasing::None;
+                SelectedAntiAliasingPipelinesAvailable();
             const FrameRecipeBuildResult recipe = (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
                 ? BuildMinimalDebugSurfaceRecipe(m_RenderGraph, imports, sizing)
                 : BuildDefaultFrameRecipe(m_RenderGraph,
@@ -4083,13 +4093,60 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // Resolve fans out to both FXAA and SMAA resolve, mutually
-        // exclusive per `PostProcessSettings::AntiAliasing` (each pass
-        // body's `IsStageEnabled` gate enforces the selector). A
-        // missing FXAA OR resolve-stage pipeline only silences that
-        // sub-leg rather than collapsing the whole pass to
-        // `SkippedUnavailable`; the helper requires the system + the
-        // SMAA pass + at least one of the FXAA / SMAA-resolve leases.
+        // Reports whether the currently-selected AA mode's pipeline(s)
+        // are all available. For `None` this is trivially false (AA is
+        // off). For `FXAA` it requires the FXAA pipeline lease. For
+        // `SMAA` it requires all three SMAA pipeline leases — the
+        // resolve shader reads `AATemp.Weights` and the blend shader
+        // reads `AATemp.Edges`, so if either upstream pipeline is
+        // missing the resolved attachment is sourced from cleared
+        // inputs and the AA leg cannot produce a usable image. The
+        // recipe-build site uses this to gate
+        // `FrameRecipeFeatures::EnableAntiAliasing`, and
+        // `RecordPostProcessAAResolvePass` mirrors the same gate so a
+        // user-selected AA mode without its matching pipeline returns
+        // `SkippedUnavailable` instead of falsely reporting `Recorded`
+        // against a no-op draw.
+        [[nodiscard]] bool SelectedAntiAliasingPipelinesAvailable() const noexcept
+        {
+            if (!m_PostProcessSystem.has_value())
+            {
+                return false;
+            }
+            const PostProcessAntiAliasing aa = m_PostProcessSystem->GetSettings().AntiAliasing;
+            switch (aa)
+            {
+            case PostProcessAntiAliasing::None:
+                return false;
+            case PostProcessAntiAliasing::FXAA:
+                return m_PostProcessFXAAPipelineLease.has_value() &&
+                       m_PostProcessFXAAPipelineLease->IsValid();
+            case PostProcessAntiAliasing::SMAA:
+                return m_PostProcessSMAAEdgePipelineLease.has_value() &&
+                       m_PostProcessSMAAEdgePipelineLease->IsValid() &&
+                       m_PostProcessSMAABlendPipelineLease.has_value() &&
+                       m_PostProcessSMAABlendPipelineLease->IsValid() &&
+                       m_PostProcessSMAAResolvePipelineLease.has_value() &&
+                       m_PostProcessSMAAResolvePipelineLease->IsValid();
+            }
+            return false;
+        }
+
+        // Resolve runs whichever stage matches
+        // `PostProcessSettings::AntiAliasing`. When AA is `None` the
+        // body is a structurally-recorded no-op (neither sub-stage
+        // emits draws, and `presentSource` stays on `SceneColorLDR` via
+        // `FrameRecipeFeatures::EnableAntiAliasing = false`). When AA
+        // is `FXAA` or `SMAA` the matching pipeline must be available
+        // — otherwise we return `SkippedUnavailable` and the
+        // recipe-build site has already kept `presentSource` on
+        // `SceneColorLDR`, so present still sees a usable image.
+        // Falling back to "either pipeline is good enough" here would
+        // hide the mismatch: with AA = FXAA + only the SMAA-resolve
+        // lease (or vice versa) both pass bodies' `IsStageEnabled`
+        // gate would short-circuit, neither stage would draw, the
+        // helper would report `Recorded`, and the recipe could already
+        // route present to the unwritten resolved attachment.
         [[nodiscard]] RenderCommandPassStatus RecordPostProcessAAResolvePass(RHI::ICommandContext& cmd,
                                                                              const RHI::CameraUBO& camera)
         {
@@ -4097,27 +4154,42 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            const bool hasFxaaPipeline =
-                m_PostProcessFXAAPipelineLease.has_value() &&
-                m_PostProcessFXAAPipelineLease->IsValid();
-            const bool hasResolvePipeline =
-                m_PostProcessSMAAResolvePipelineLease.has_value() &&
-                m_PostProcessSMAAResolvePipelineLease->IsValid();
             if (!m_PostProcessSystem.has_value() ||
                 !m_PostProcessFXAAPass.has_value() ||
-                !m_PostProcessSMAAPass.has_value() ||
-                (!hasFxaaPipeline && !hasResolvePipeline))
+                !m_PostProcessSMAAPass.has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            if (hasFxaaPipeline)
+            const PostProcessAntiAliasing aa = m_PostProcessSystem->GetSettings().AntiAliasing;
+            const bool hasFxaaPipeline =
+                m_PostProcessFXAAPipelineLease.has_value() &&
+                m_PostProcessFXAAPipelineLease->IsValid();
+            const bool hasSmaaResolvePipeline =
+                m_PostProcessSMAAResolvePipelineLease.has_value() &&
+                m_PostProcessSMAAResolvePipelineLease->IsValid();
+
+            switch (aa)
             {
+            case PostProcessAntiAliasing::None:
+                // Structurally-recorded no-op: both bodies' selector
+                // gate short-circuits regardless of which pipelines
+                // exist; `presentSource` stays on `SceneColorLDR`.
+                break;
+            case PostProcessAntiAliasing::FXAA:
+                if (!hasFxaaPipeline)
+                {
+                    return RenderCommandPassStatus::SkippedUnavailable;
+                }
                 m_PostProcessFXAAPass->Execute(cmd, camera);
-            }
-            if (hasResolvePipeline)
-            {
+                break;
+            case PostProcessAntiAliasing::SMAA:
+                if (!hasSmaaResolvePipeline)
+                {
+                    return RenderCommandPassStatus::SkippedUnavailable;
+                }
                 m_PostProcessSMAAPass->ExecuteResolve(cmd, camera);
+                break;
             }
             return RenderCommandPassStatus::Recorded;
         }
