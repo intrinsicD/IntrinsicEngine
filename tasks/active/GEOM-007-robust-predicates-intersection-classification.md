@@ -10,10 +10,10 @@
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
 ## Context
-- Status: in-progress (Slice 3 — callsite adoption, first commit landed).
+- Status: in-progress (Slice 3.2 — Runtime.Selection adoption landed; next up Slice 3.3 Overlap/Containment/GJK).
 - Owner/agent: copilot.
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
-- Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify` plus the layering / test-layout / doc-links / task-policy structural checks after each Slice 3.x callsite-adoption commit; once Raycast callers are migrated, repeat for `Overlap`, `Containment`, and `GJK`.
+- Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify|RuntimeSelection|ElementSelection` plus the layering / test-layout / doc-links / task-policy structural checks after each Slice 3.x callsite-adoption commit; once Raycast callers are migrated, repeat for `Overlap`, `Containment`, and `GJK`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and called out by [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md) §"Numeric policy".
 - Current geometry code has many collision/query algorithms but lacks a common robust predicate policy for degeneracies, nearly coincident elements, and exact/filtered decisions.
@@ -41,11 +41,13 @@
     kernel so the geometric fields are bit-exact identical. Existing
     callers (`src/legacy/Runtime/Runtime.Selection.cpp`, `Test_Raycast.cpp`)
     stay on the legacy API; their migration is queued as Slice 3.2.
-  - **Slice 3.2 — Runtime.Selection adoption.** Migrate the five
-    `RayTriangle_Watertight` callsites in `src/legacy/Runtime/Runtime.Selection.cpp`
-    onto `RayTriangle_Classify` so picking/refinement consumes the
-    diagnostic vocabulary; legacy `RayTriangle_Watertight` stays as a
-    thin alias until the last caller is gone.
+  - **Slice 3.2 (landed this PR) — Runtime.Selection adoption.** Migrated
+    all five `RayTriangle_Watertight` callsites in
+    `src/legacy/Runtime/Runtime.Selection.cpp` onto
+    `RayTriangle_Classify` so picking/refinement consumes the
+    diagnostic vocabulary (`Intersection::HasIntersection`, `hit.Point`,
+    `hit.WA`/`WB`). Legacy `RayTriangle_Watertight` stays as a thin
+    alias until the last out-of-tree caller is gone.
   - **Slice 3.3 — Overlap / Containment / GJK migration.** Repeat the
     `Geometry.RobustPredicates` adoption pattern at the next-highest-
     traffic callsites; each gets its own commit.
@@ -68,6 +70,7 @@
 - [x] Slice 2: Add unit tests `tests/unit/geometry/Test.IntersectionClassification.cpp` covering default construction, enum value stability, and small helpers on the result records.
 - [ ] Slice 3: Add regression-style cases for triangle/segment classification and barycentric boundary classification at callsite-adoption time.
   - [x] Slice 3.1: `Test.RaycastClassify.cpp` covers parity with `RayTriangle_Watertight`, miss / tMin / tMax, degenerate triangle, invalid ray, vertex / edge / interior boundary classification, ray-origin vs ray-interior, and batched cross-check.
+  - [x] Slice 3.2: Existing runtime selection contract / integration tests (`IntrinsicRuntimeSelectionContractTests`, `Test_RuntimeSelection`, `Test_ElementSelection`) cover the migrated callsites and continue to pass; the Slice 3.1 parity suite remains the numerical guardrail.
 - [x] Slice 1: Compare deterministic classification outputs against documented expectations.
 
 ## Docs

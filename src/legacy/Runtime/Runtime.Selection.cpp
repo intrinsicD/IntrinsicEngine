@@ -29,6 +29,7 @@ import Geometry.Raycast;
 import Geometry.Ray;
 import Geometry.Validation;
 import Geometry.Properties;
+import Geometry.IntersectionClassification;
 
 import Core.Logging;
 
@@ -630,17 +631,17 @@ namespace Runtime::Selection
                 if (SquaredLength(bestWorldNormal) <= 1.0e-20f && SquaredLength(triWorldNormal) > 1.0e-20f)
                     bestWorldNormal = triWorldNormal;
 
-                const auto hit = Geometry::RayTriangle_Watertight(
+                const auto hit = Geometry::RayTriangle_Classify(
                     rayLocal,
                     local0,
                     local1,
                     local2,
                     0.0f,
                     request.MaxDistance);
-                if (!hit)
+                if (!Geometry::Intersection::HasIntersection(hit.Kind))
                     continue;
 
-                const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                const glm::vec3 localPoint = hit.Point;
                 const glm::vec3 worldPoint = TransformPoint(world, localPoint);
                 const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
                 if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
@@ -653,7 +654,9 @@ namespace Runtime::Selection
                 bestLocalPoint = localPoint;
                 bestWorldPoint = worldPoint;
                 bestWorldNormal = triWorldNormal;
-                bestBarycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+                const float wa = static_cast<float>(hit.WA);
+                const float wb = static_cast<float>(hit.WB);
+                bestBarycentric = glm::vec3(wa, wb, 1.0f - wa - wb);
             }
 
             if (!hasExactHit)
@@ -841,17 +844,17 @@ namespace Runtime::Selection
                         continue;
 
                     const auto& tri = primitiveBvh->Triangles[candidateIndex];
-                    const auto hit = Geometry::RayTriangle_Watertight(
+                    const auto hit = Geometry::RayTriangle_Classify(
                         rayLocal,
                         tri.A,
                         tri.B,
                         tri.C,
                         0.0f,
                         request.MaxDistance);
-                    if (!hit)
+                    if (!Geometry::Intersection::HasIntersection(hit.Kind))
                         continue;
 
-                    const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                    const glm::vec3 localPoint = hit.Point;
                     const glm::vec3 worldPoint = TransformPoint(world, localPoint);
                     const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
                     if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
@@ -869,7 +872,11 @@ namespace Runtime::Selection
                     picked.spaces.World = worldPoint;
                     picked.spaces.Local = localPoint;
                     picked.spaces.WorldNormal = ComputeTriangleNormal(world0, world1, world2);
-                    picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+                    {
+                        const float wa = static_cast<float>(hit.WA);
+                        const float wb = static_cast<float>(hit.WB);
+                        picked.spaces.Barycentric = glm::vec3(wa, wb, 1.0f - wa - wb);
+                    }
 
                     const Geometry::FaceHandle face{static_cast<Geometry::PropertyIndex>(tri.FaceIndex)};
                     if (mesh.IsValid(face) && !mesh.IsDeleted(face))
@@ -927,17 +934,17 @@ namespace Runtime::Selection
                     const auto v1 = faceVertices[corner];
                     const auto v2 = faceVertices[corner + 1];
 
-                    const auto hit = Geometry::RayTriangle_Watertight(
+                    const auto hit = Geometry::RayTriangle_Classify(
                         rayLocal,
                         mesh.Position(v0),
                         mesh.Position(v1),
                         mesh.Position(v2),
                         0.0f,
                         request.MaxDistance);
-                    if (!hit)
+                    if (!Geometry::Intersection::HasIntersection(hit.Kind))
                         continue;
 
-                    const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                    const glm::vec3 localPoint = hit.Point;
                     const glm::vec3 worldPoint = TransformPoint(world, localPoint);
                     const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
                     if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
@@ -955,7 +962,11 @@ namespace Runtime::Selection
                     picked.spaces.World = worldPoint;
                     picked.spaces.Local = localPoint;
                     picked.spaces.WorldNormal = ComputeTriangleNormal(world0, world1, world2);
-                    picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+                    {
+                        const float wa = static_cast<float>(hit.WA);
+                        const float wb = static_cast<float>(hit.WB);
+                        picked.spaces.Barycentric = glm::vec3(wa, wb, 1.0f - wa - wb);
+                    }
 
                     float bestEdgeDistSq = std::numeric_limits<float>::infinity();
                     for (const auto halfedge : mesh.HalfedgesAroundFace(face))
@@ -1039,17 +1050,17 @@ namespace Runtime::Selection
                         continue;
 
                     const auto& tri = primitiveBvh->Triangles[candidateIndex];
-                    const auto hit = Geometry::RayTriangle_Watertight(
+                    const auto hit = Geometry::RayTriangle_Classify(
                         rayLocal,
                         tri.A,
                         tri.B,
                         tri.C,
                         0.0f,
                         request.MaxDistance);
-                    if (!hit)
+                    if (!Geometry::Intersection::HasIntersection(hit.Kind))
                         continue;
 
-                    const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                    const glm::vec3 localPoint = hit.Point;
                     const glm::vec3 worldPoint = TransformPoint(world, localPoint);
                     const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
                     if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
@@ -1067,7 +1078,11 @@ namespace Runtime::Selection
                     picked.spaces.World = worldPoint;
                     picked.spaces.Local = localPoint;
                     picked.spaces.WorldNormal = ComputeTriangleNormal(w0, w1, w2);
-                    picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+                    {
+                        const float wa = static_cast<float>(hit.WA);
+                        const float wb = static_cast<float>(hit.WB);
+                        picked.spaces.Barycentric = glm::vec3(wa, wb, 1.0f - wa - wb);
+                    }
 
                     const glm::vec3 triWorld[3] = {w0, w1, w2};
                     const uint32_t triIndices[3] = {tri.I0, tri.I1, tri.I2};
@@ -1121,15 +1136,15 @@ namespace Runtime::Selection
                 if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size())
                     continue;
 
-                const auto hit = Geometry::RayTriangle_Watertight(
+                const auto hit = Geometry::RayTriangle_Classify(
                     rayLocal,
                     positions[i0], positions[i1], positions[i2],
                     0.0f,
                     request.MaxDistance);
-                if (!hit)
+                if (!Geometry::Intersection::HasIntersection(hit.Kind))
                     continue;
 
-                const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                const glm::vec3 localPoint = hit.Point;
                 const glm::vec3 worldPoint = TransformPoint(world, localPoint);
                 const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
                 if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
@@ -1147,7 +1162,11 @@ namespace Runtime::Selection
                 picked.spaces.World = worldPoint;
                 picked.spaces.Local = localPoint;
                 picked.spaces.WorldNormal = ComputeTriangleNormal(w0, w1, w2);
-                picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+                {
+                    const float wa = static_cast<float>(hit.WA);
+                    const float wb = static_cast<float>(hit.WB);
+                    picked.spaces.Barycentric = glm::vec3(wa, wb, 1.0f - wa - wb);
+                }
 
                 const glm::vec3 triWorld[3] = {w0, w1, w2};
                 const uint32_t triIndices[3] = {i0, i1, i2};
