@@ -552,6 +552,21 @@ a readback drain.
   pattern) so the dispatch shape (`ceil(W/16) x ceil(H/16) x 1`)
   tracks the backbuffer extent rather than the stale `(1,1,1)` the
   Slice A stub recorded.
+- [x] **Slice E.1 fixup**: `PostProcessHistogramPass::SetHistogramBuffer(handle)`
+  published by the executor (mirroring the bloom-scratch handle
+  plumbing) so `Execute(...)` can zero-fill the 256 uint32 bins via
+  `FillBuffer + BufferBarrier(TransferWrite → ShaderWrite)` before
+  dispatching. The histogram shader accumulates via
+  `atomicAdd(histogram.bins[binIdx], 1)`, so without the per-frame
+  clear the transient allocator's reused contents from prior frames
+  would contaminate the next frame's luminance distribution and
+  corrupt Slice E.2's exposure-adaptation readback. The recipe-side
+  `PostProcess.Histogram` buffer now declares
+  `BufferUsage::Storage | TransferSrc | TransferDst` so
+  `vkCmdFillBuffer` is legal; the fill+barrier idiom mirrors
+  `CullingSystem::ResetCounters`. New contract tests
+  `HistogramClearsBinsBeforeDispatchWhenBufferPublished` and
+  `HistogramSkipsClearWhenNoBufferPublished` pin the event shape.
 - [x] **Slice E.1**: In `NullRenderer::InitializeOperationalPassResources(device)`,
   create the histogram compute pipeline (`post_histogram.comp`) from
   `BuildPostProcessHistogramPipelineDesc()` (compute pipeline,

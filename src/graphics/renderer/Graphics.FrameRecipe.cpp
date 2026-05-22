@@ -552,9 +552,17 @@ namespace Extrinsic::Graphics
             postProcessAATempResolved = graph.CreateTexture(
                 "PostProcess.AATemp.Resolved",
                 ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp.Resolved"));
+            // GRAPHICS-075 Slice E.1 — `TransferDst` is required so the
+            // histogram pass body can `vkCmdFillBuffer` the 256 uint32
+            // bins to zero before each frame's dispatch (the shader
+            // accumulates via `atomicAdd`, so any non-zero contents
+            // from transient-allocator reuse would corrupt the
+            // distribution and the downstream exposure-adaptation
+            // readback Slice E.2 wires). `TransferSrc` stays for the
+            // Slice E.2 host-visible readback copy.
             postProcessHistogram = graph.CreateBuffer("PostProcess.Histogram", RHI::BufferDesc{
                 .SizeBytes = 256u * sizeof(std::uint32_t),
-                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc,
+                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
                 .DebugName = "PostProcess.Histogram",
             });
         }

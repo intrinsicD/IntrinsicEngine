@@ -62,6 +62,24 @@ namespace Extrinsic::Graphics
 
 		void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
 
+		// GRAPHICS-075 Slice E.1 — receives the per-frame
+		// `PostProcess.Histogram` transient buffer handle from the
+		// executor. `Execute(...)` zeroes the 256 uint32 bins via
+		// `FillBuffer + BufferBarrier(TransferWrite → ShaderWrite)`
+		// before dispatching the compute shader. The histogram shader
+		// accumulates bins through `atomicAdd`, so without the
+		// per-frame clear the transient allocator's reused contents
+		// from prior frames would contaminate the next frame's
+		// luminance distribution and any downstream exposure-adaptation
+		// readback (the bug review caught this before Slice E.2 wired
+		// the readback drain — the silent-accumulation regression
+		// would have surfaced only once `PublishHistogramReadback`
+		// landed). When the executor never publishes a handle (e.g.
+		// headless contract tests that drive `Execute` directly), the
+		// fill + barrier are skipped so the existing event-stream
+		// assertions stay bind/push/dispatch-only.
+		void SetHistogramBuffer(RHI::BufferHandle buffer) noexcept;
+
 		// GRAPHICS-075 Slice E.1 — published by the executor before
 		// `Execute(...)` so the compute dispatch shape (`ceil(W/16) x
 		// ceil(H/16) x 1`, matching the shader's `local_size_x =
@@ -78,6 +96,7 @@ namespace Extrinsic::Graphics
 	private:
 		PostProcessSystem& m_PostProcessSystem;
 		RHI::PipelineHandle m_Pipeline{};
+		RHI::BufferHandle m_HistogramBuffer{};
 		std::uint32_t m_ViewportWidth{0u};
 		std::uint32_t m_ViewportHeight{0u};
 	};

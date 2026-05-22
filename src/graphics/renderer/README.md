@@ -1120,7 +1120,18 @@ Concretely:
   helper (`RecordPostProcessHistogramPass(...)` plumbing the
   backbuffer extent into `PostProcessHistogramPass::SetViewport(...)`
   so the dispatch shape `ceil(W/16) x ceil(H/16) x 1` tracks the
-  runtime viewport instead of the Slice A stub's `(1, 1, 1)`) and
+  runtime viewport instead of the Slice A stub's `(1, 1, 1)`, and
+  the compiled `PostProcess.Histogram` transient buffer handle
+  into `SetHistogramBuffer(...)` so the pass body zero-fills the
+  256 uint32 bins via `FillBuffer + BufferBarrier(TransferWrite →
+  ShaderWrite)` before dispatching — the shader accumulates via
+  `atomicAdd`, so without the per-frame clear the transient
+  allocator's reused contents would contaminate the next frame's
+  luminance distribution and corrupt Slice E.2's exposure-adaptation
+  readback; this mirrors `CullingSystem::ResetCounters` for the
+  same atomic-add-on-stale-data hazard, and the recipe declares
+  `BufferUsage::Storage | TransferSrc | TransferDst` on
+  `PostProcess.Histogram` so `vkCmdFillBuffer` is legal) and
   the pass-local 16-byte `PostProcessHistogramPushConstants` block
   (`uint Width + uint Height + float MinLogLum + float RangeLogLum`)
   mirroring `post_histogram.comp` byte-for-byte under std430 — the

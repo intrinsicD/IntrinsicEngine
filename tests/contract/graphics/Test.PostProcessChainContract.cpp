@@ -38,6 +38,12 @@ namespace
         // first-class event so the assertion can walk a single
         // chronological event stream.
         TextureBarrier,
+        // GRAPHICS-075 Slice E.1 — the histogram clear-before-dispatch
+        // contract test needs to observe the `FillBuffer` zero-clear
+        // and the matching `BufferBarrier(TransferWrite → ShaderWrite)`
+        // emitted before the bind/push/dispatch triple.
+        FillBuffer,
+        BufferBarrier,
     };
 
     struct Event
@@ -52,11 +58,28 @@ namespace
         RHI::TextureLayout After{RHI::TextureLayout::Undefined};
     };
 
+    struct FillBufferRecord
+    {
+        RHI::BufferHandle Buffer{};
+        std::uint64_t Offset{0u};
+        std::uint64_t Size{0u};
+        std::uint32_t Value{0u};
+    };
+
+    struct BufferBarrierRecord
+    {
+        RHI::BufferHandle Buffer{};
+        RHI::MemoryAccess Before{RHI::MemoryAccess::None};
+        RHI::MemoryAccess After{RHI::MemoryAccess::None};
+    };
+
     class RecordingCommandContext final : public RHI::ICommandContext
     {
     public:
         std::vector<Event> Events{};
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
+        std::vector<FillBufferRecord> FillBufferCalls{};
+        std::vector<BufferBarrierRecord> BufferBarrierCalls{};
         RHI::PipelineHandle LastPipeline{};
         std::uint32_t LastDrawVertexCount{0u};
         std::uint32_t LastDispatchX{0u};
@@ -108,8 +131,21 @@ namespace
             Events.push_back({.Kind = EventKind::TextureBarrier});
             TextureBarrierCalls.push_back({.Texture = texture, .Before = before, .After = after});
         }
-        void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
-        void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
+        void BufferBarrier(RHI::BufferHandle buffer,
+                           RHI::MemoryAccess before,
+                           RHI::MemoryAccess after) override
+        {
+            Events.push_back({.Kind = EventKind::BufferBarrier});
+            BufferBarrierCalls.push_back({.Buffer = buffer, .Before = before, .After = after});
+        }
+        void FillBuffer(RHI::BufferHandle buffer,
+                        std::uint64_t offset,
+                        std::uint64_t size,
+                        std::uint32_t value) override
+        {
+            Events.push_back({.Kind = EventKind::FillBuffer});
+            FillBufferCalls.push_back({.Buffer = buffer, .Offset = offset, .Size = size, .Value = value});
+        }
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t, RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
     };
@@ -654,6 +690,98 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
 // pipeline is set) so the recorded push payload is unambiguously the
 // downsample block. Slice B.2 expands the recording to per-mip
 // iteration: the first push payload is the mip 0 → mip 1 step (the
+// GRAPHICS-075 Slice E.1 — when the executor publishes a valid
+// histogram buffer handle, the pass must zero-fill the 256 bins
+// before dispatch so the shader's `atomicAdd` accumulations start
+// from a clean slate. Without the per-frame clear, transient
+// allocator reuse from prior frames would contaminate the next
+// frame's luminance distribution and corrupt the downstream
+// exposure-adaptation readback Slice E.2 wires. The expected event
+// shape is `FillBuffer → BufferBarrier(TransferWrite →
+// ShaderWrite) → BindPipeline → PushConstants → Dispatch`,
+// mirroring the `CullingSystem::ResetCounters` idiom that already
+// handles the same atomic-add-on-stale-data hazard for the
+// indirect-draw count buffers.
+TEST(GraphicsPostProcessChainContract, HistogramClearsBinsBeforeDispatchWhenBufferPublished)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .EnableHistogram = true,
+    });
+
+    RHI::CameraUBO camera{};
+
+    Graphics::PostProcessHistogramPass histogram{post};
+    histogram.SetPipeline(RHI::PipelineHandle{200u, 1u});
+    histogram.SetViewport(640u, 360u);
+    const RHI::BufferHandle histogramBuffer{99u, 1u};
+    histogram.SetHistogramBuffer(histogramBuffer);
+
+    RecordingCommandContext cmd;
+    histogram.Execute(cmd, camera);
+
+    // FillBuffer → BufferBarrier → BindPipeline → PushConstants → Dispatch
+    ASSERT_EQ(cmd.Events.size(), 5u);
+    EXPECT_EQ(cmd.Events[0].Kind, EventKind::FillBuffer);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::BufferBarrier);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(cmd.Events[3].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[4].Kind, EventKind::Dispatch);
+
+    ASSERT_EQ(cmd.FillBufferCalls.size(), 1u);
+    EXPECT_EQ(cmd.FillBufferCalls[0].Buffer, histogramBuffer);
+    EXPECT_EQ(cmd.FillBufferCalls[0].Offset, 0u);
+    EXPECT_EQ(cmd.FillBufferCalls[0].Size, 256ull * sizeof(std::uint32_t))
+        << "Fill must cover the full 256-bin histogram so atomicAdd starts "
+           "from zero in every slot.";
+    EXPECT_EQ(cmd.FillBufferCalls[0].Value, 0u);
+
+    ASSERT_EQ(cmd.BufferBarrierCalls.size(), 1u);
+    EXPECT_EQ(cmd.BufferBarrierCalls[0].Buffer, histogramBuffer);
+    EXPECT_EQ(cmd.BufferBarrierCalls[0].Before, RHI::MemoryAccess::TransferWrite)
+        << "Before-mask must mirror the fill's TransferWrite so the "
+           "compute dispatch sees the zeroed bins.";
+    EXPECT_EQ(cmd.BufferBarrierCalls[0].After, RHI::MemoryAccess::ShaderWrite)
+        << "After-mask must be ShaderWrite so the dispatch's atomicAdds "
+           "are properly ordered against the fill.";
+}
+
+// GRAPHICS-075 Slice E.1 — when no histogram buffer handle is
+// published (headless contract tests driving Execute directly,
+// or any future caller that hasn't wired the executor plumbing),
+// the pass must skip the fill+barrier and fall back to the
+// original bind/push/dispatch triple. This keeps the per-pass
+// event-shape contract simple for tests that already rely on
+// the 3-event shape (`PassesRecordOnlyEnabledStages` above).
+TEST(GraphicsPostProcessChainContract, HistogramSkipsClearWhenNoBufferPublished)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+    post.SetSettings(Graphics::PostProcessSettings{
+        .Enabled = true,
+        .EnableHistogram = true,
+    });
+
+    RHI::CameraUBO camera{};
+
+    Graphics::PostProcessHistogramPass histogram{post};
+    histogram.SetPipeline(RHI::PipelineHandle{200u, 1u});
+    histogram.SetViewport(640u, 360u);
+    // Intentionally do not publish a histogram buffer handle.
+
+    RecordingCommandContext cmd;
+    histogram.Execute(cmd, camera);
+
+    ASSERT_EQ(cmd.Events.size(), 3u);
+    EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::Dispatch);
+    EXPECT_TRUE(cmd.FillBufferCalls.empty());
+    EXPECT_TRUE(cmd.BufferBarrierCalls.empty());
+}
+
 // `SceneColorHDR`-sourced read that must carry `IsFirstMip = 1` and
 // the full-viewport `InvSrcResolution`).
 TEST(GraphicsPostProcessChainContract, BloomDownsamplePushFeedsNonZeroInvSrcResolution)

@@ -1565,7 +1565,16 @@ namespace Extrinsic::Graphics
                         // ceil(H/16) x 1`, matching the shader's
                         // `local_size_x = local_size_y = 16` tile) tracks
                         // the runtime viewport rather than the stale
-                        // `(1, 1, 1)` the Slice A stub recorded. With
+                        // `(1, 1, 1)` the Slice A stub recorded, and
+                        // publish the per-frame `PostProcess.Histogram`
+                        // transient buffer handle so the pass body can
+                        // zero-fill the 256 bins before dispatching
+                        // (the shader accumulates via `atomicAdd`, so
+                        // without a per-frame clear the transient
+                        // allocator's reused contents from prior frames
+                        // would contaminate the next frame's luminance
+                        // distribution and corrupt Slice E.2's
+                        // exposure-adaptation readback). With
                         // `EnableHistogram == false` the pass body
                         // short-circuits and the helper still reports
                         // `Recorded` per the structurally-recorded-no-op
@@ -1582,6 +1591,20 @@ namespace Extrinsic::Graphics
                                 ? static_cast<std::uint32_t>(histogramExtent.Height)
                                 : 1u;
                             m_PostProcessHistogramPass->SetViewport(histogramWidth, histogramHeight);
+                            RHI::BufferHandle histogramHandle{};
+                            for (std::size_t i = 0; i < compiled->BufferNames.size(); ++i)
+                            {
+                                if (i >= compiled->BufferHandles.size())
+                                {
+                                    break;
+                                }
+                                if (compiled->BufferNames[i] == std::string_view{"PostProcess.Histogram"})
+                                {
+                                    histogramHandle = compiled->BufferHandles[i];
+                                    break;
+                                }
+                            }
+                            m_PostProcessHistogramPass->SetHistogramBuffer(histogramHandle);
                         }
                         const RenderCommandPassStatus status =
                             RecordPostProcessHistogramPass(graphicsContext, camera);
