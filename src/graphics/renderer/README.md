@@ -1108,9 +1108,41 @@ Concretely:
   on the CPU/null gate; descriptor-set wiring of the retained LUTs
   into the SMAA blend pass body is a GPU/Vulkan-gate concern owned
   by the opt-in `gpu;vulkan` smoke.
-  Histogram (Slice E, compute pipeline + readback drain) fans out
-  behind the existing `"PostProcessPass"` umbrella alongside bloom +
-  tonemap. Each AA stage is free to define its own pass-local push
+  Histogram is wired through its own ordered graph pass
+  `"PostProcessHistogramPass"` declared by the recipe with
+  `Read(SceneColorHDR, ShaderRead) + Write(PostProcess.Histogram,
+  BufferUsage::ShaderWrite)` between `"PointPass"` and
+  `"PostProcessPass"`. The histogram is a *compute* dispatch and
+  Vulkan rejects `vkCmdDispatch` inside an active render-pass scope,
+  so it cannot share the `"PostProcessPass"` umbrella's render-pass
+  scope (which hosts bloom + tonemap fragment work into color
+  attachments). Slice E.1 lands the pipeline scaffold + dispatch
+  helper (`RecordPostProcessHistogramPass(...)` plumbing the
+  backbuffer extent into `PostProcessHistogramPass::SetViewport(...)`
+  so the dispatch shape `ceil(W/16) x ceil(H/16) x 1` tracks the
+  runtime viewport instead of the Slice A stub's `(1, 1, 1)`, and
+  the compiled `PostProcess.Histogram` transient buffer handle
+  into `SetHistogramBuffer(...)` so the pass body zero-fills the
+  256 uint32 bins via `FillBuffer + BufferBarrier(TransferWrite →
+  ShaderWrite)` before dispatching — the shader accumulates via
+  `atomicAdd`, so without the per-frame clear the transient
+  allocator's reused contents would contaminate the next frame's
+  luminance distribution and corrupt Slice E.2's exposure-adaptation
+  readback; this mirrors `CullingSystem::ResetCounters` for the
+  same atomic-add-on-stale-data hazard, and the recipe declares
+  `BufferUsage::Storage | TransferSrc | TransferDst` on
+  `PostProcess.Histogram` so `vkCmdFillBuffer` is legal) and
+  the pass-local 16-byte `PostProcessHistogramPushConstants` block
+  (`uint Width + uint Height + float MinLogLum + float RangeLogLum`)
+  mirroring `post_histogram.comp` byte-for-byte under std430 — the
+  canonical 20-byte `PostProcessPushConstants` block would alias
+  `Exposure` onto `Width` as `bit_cast<uint>(1.0f)` ≈ 1.07e9
+  pixels, producing a degenerate dispatch. Slice E.2 adds the
+  renderer-owned host-visible `Histogram.Readback` buffer +
+  `BeginFrame()`-side drain mirroring the `Picking.Readback`
+  pattern + `PostProcessSystem::PublishHistogramReadback(...)` that
+  consumes the exposure-adaptation history buffer Slice D.2b
+  allocated. Each AA stage is free to define its own pass-local push
   block where the shader interface demands more than the canonical 20
   bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and

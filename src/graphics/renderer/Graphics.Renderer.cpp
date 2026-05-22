@@ -52,6 +52,7 @@ import Extrinsic.Graphics.Pass.Selection.PointId;
 import Extrinsic.Graphics.Pass.Selection.Outline;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.FXAA;
+import Extrinsic.Graphics.Pass.PostProcess.Histogram;
 import Extrinsic.Graphics.Pass.PostProcess.SMAA;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
@@ -372,6 +373,13 @@ namespace Extrinsic::Graphics
             // accumulators. Per-stage pipeline leases (edge / blend /
             // resolve) are bound in `InitializeOperationalPassResources`.
             m_PostProcessSMAAPass.emplace(*m_PostProcessSystem);
+            // GRAPHICS-075 Slice E.1 — same lifetime contract as the
+            // tonemap + bloom + FXAA + SMAA passes above; emplaced after
+            // `m_PostProcessSystem` is initialised and before the
+            // operational publisher runs so the initial `Initialize()`
+            // path can call `SetPipeline(...)` on
+            // `m_PostProcessHistogramPass`.
+            m_PostProcessHistogramPass.emplace(*m_PostProcessSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
@@ -484,6 +492,12 @@ namespace Extrinsic::Graphics
             // before `m_PostProcessSystem` is reset below so the optional
             // destructor does not observe a dangling reference.
             m_PostProcessSMAAPass.reset();
+            // GRAPHICS-075 Slice E.1 — histogram pass shares the same
+            // lifetime contract as the SMAA / FXAA / bloom / tonemap
+            // passes above; drop before `m_PostProcessSystem` is reset
+            // below so the optional destructor does not observe a
+            // dangling reference.
+            m_PostProcessHistogramPass.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -528,6 +542,12 @@ namespace Extrinsic::Graphics
             m_PostProcessSMAAEdgePipelineLease.reset();
             m_PostProcessSMAABlendPipelineLease.reset();
             m_PostProcessSMAAResolvePipelineLease.reset();
+            // GRAPHICS-075 Slice E.1 — drop the histogram pipeline lease
+            // alongside the SMAA leases above; same teardown ordering
+            // contract. The lease must reset before `m_PipelineManager`
+            // is torn down below since the lease destructor calls back
+            // through the manager.
+            m_PostProcessHistogramPipelineLease.reset();
             // GRAPHICS-074 Slice D.1 — drop the renderer-owned
             // `Picking.Readback` lease before the BufferManager is torn
             // down so the lease's destructor still observes a live manager
@@ -1534,6 +1554,62 @@ namespace Extrinsic::Graphics
                             RecordPostProcessToneMapPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, toneMapStatus);
                     }
+                    else if (passName == std::string_view{"PostProcessHistogramPass"})
+                    {
+                        // GRAPHICS-075 Slice E.1 — the histogram compute
+                        // dispatch lives in its own ordered graph pass
+                        // before `"PostProcessPass"` because Vulkan
+                        // forbids `vkCmdDispatch` inside an active
+                        // render-pass scope. Publish the backbuffer
+                        // extent so the dispatch shape (`ceil(W/16) x
+                        // ceil(H/16) x 1`, matching the shader's
+                        // `local_size_x = local_size_y = 16` tile) tracks
+                        // the runtime viewport rather than the stale
+                        // `(1, 1, 1)` the Slice A stub recorded, and
+                        // publish the per-frame `PostProcess.Histogram`
+                        // transient buffer handle so the pass body can
+                        // zero-fill the 256 bins before dispatching
+                        // (the shader accumulates via `atomicAdd`, so
+                        // without a per-frame clear the transient
+                        // allocator's reused contents from prior frames
+                        // would contaminate the next frame's luminance
+                        // distribution and corrupt Slice E.2's
+                        // exposure-adaptation readback). With
+                        // `EnableHistogram == false` the pass body
+                        // short-circuits and the helper still reports
+                        // `Recorded` per the structurally-recorded-no-op
+                        // taxonomy bloom / FXAA / SMAA already follow.
+                        if (m_PostProcessHistogramPass.has_value())
+                        {
+                            const Core::Extent2D histogramExtent = m_Device != nullptr
+                                ? m_Device->GetBackbufferExtent()
+                                : Core::Extent2D{.Width = 1, .Height = 1};
+                            const std::uint32_t histogramWidth = histogramExtent.Width > 0
+                                ? static_cast<std::uint32_t>(histogramExtent.Width)
+                                : 1u;
+                            const std::uint32_t histogramHeight = histogramExtent.Height > 0
+                                ? static_cast<std::uint32_t>(histogramExtent.Height)
+                                : 1u;
+                            m_PostProcessHistogramPass->SetViewport(histogramWidth, histogramHeight);
+                            RHI::BufferHandle histogramHandle{};
+                            for (std::size_t i = 0; i < compiled->BufferNames.size(); ++i)
+                            {
+                                if (i >= compiled->BufferHandles.size())
+                                {
+                                    break;
+                                }
+                                if (compiled->BufferNames[i] == std::string_view{"PostProcess.Histogram"})
+                                {
+                                    histogramHandle = compiled->BufferHandles[i];
+                                    break;
+                                }
+                            }
+                            m_PostProcessHistogramPass->SetHistogramBuffer(histogramHandle);
+                        }
+                        const RenderCommandPassStatus status =
+                            RecordPostProcessHistogramPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                     else if (passName == std::string_view{"PostProcessAAEdgePass"})
                     {
                         // GRAPHICS-075 Slice D.2a — the AA umbrella splits
@@ -1969,6 +2045,21 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAAResolvePipelineDesc() const noexcept override
         {
             return BuildPostProcessSMAAResolvePipelineDesc(m_BackbufferFormat);
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetPostProcessHistogramPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_PostProcessHistogramPipelineLease.has_value() ||
+                !m_PostProcessHistogramPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_PostProcessHistogramPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetPostProcessHistogramPipelineDesc() const noexcept override
+        {
+            return BuildPostProcessHistogramPipelineDesc();
         }
 
         [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
@@ -2817,6 +2908,46 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-075 Slice E.1 — default-recipe postprocess histogram
+        // compute pipeline. Standalone compute pipeline (no vertex /
+        // fragment stages); the `ComputeShaderPath` field is what the
+        // pipeline backend uses to interpret the descriptor as compute
+        // per the `PipelineDesc` contract. The dispatch runs in its own
+        // ordered graph pass `"PostProcessHistogramPass"` (declared by
+        // the recipe with `Read(SceneColorHDR, ShaderRead)` +
+        // `Write(PostProcess.Histogram, BufferUsage::ShaderWrite)`) so
+        // the framegraph compiler emits the read-after-write barrier
+        // and the dispatch executes outside any render-pass scope —
+        // Vulkan rejects `vkCmdDispatch` inside an active render-pass
+        // scope, which is why the histogram cannot share the
+        // `"PostProcessPass"` umbrella's render-pass scope.
+        //
+        // Push constants: `PushConstantSize =
+        // sizeof(PostProcessHistogramPushConstants)` (16 bytes,
+        // `uint Width + uint Height + float MinLogLum + float
+        // RangeLogLum`) mirrors the shader's
+        // `layout(push_constant) PushConstants` block byte-for-byte
+        // under std430. The canonical 20-byte `PostProcessPushConstants`
+        // block shared by other postprocess stages is intentionally
+        // *not* used here per the standing shader-push-constant
+        // compatibility policy: under std430 it would alias `Exposure`
+        // (1.0) onto `Width` (`bit_cast<uint>(1.0f)` = 0x3F800000 ≈
+        // 1.07e9 pixels wide), `Gamma` (2.2) onto `Height`, and
+        // `BloomIntensity` (0.05) onto `MinLogLum`, producing a
+        // degenerate out-of-bounds dispatch shape and a meaningless
+        // luminance histogram.
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessHistogramPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.ComputeShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/post_histogram.comp.spv");
+            desc.ColorTargetCount = 0u;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessHistogramPushConstants));
+            desc.DebugName = "Renderer.PostProcess.Histogram";
+            return desc;
+        }
+
         [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -3486,6 +3617,35 @@ namespace Extrinsic::Graphics
                                 static_cast<int>(postProcessSMAAResolvePipeline.error()));
             }
 
+            // GRAPHICS-075 Slice E.1 — postprocess histogram compute
+            // pipeline. Same reset/republish pattern as the tonemap +
+            // bloom + FXAA + SMAA leases above so a failed `Create()`
+            // leaves the histogram helper in `SkippedUnavailable`
+            // rather than retaining a stale device handle across
+            // rebuilds.
+            m_PostProcessHistogramPipelineLease.reset();
+            if (m_PostProcessHistogramPass)
+            {
+                m_PostProcessHistogramPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc postProcessHistogramDesc =
+                BuildPostProcessHistogramPipelineDesc();
+            auto postProcessHistogramPipeline = m_PipelineManager->Create(postProcessHistogramDesc);
+            if (postProcessHistogramPipeline.has_value())
+            {
+                m_PostProcessHistogramPipelineLease.emplace(std::move(*postProcessHistogramPipeline));
+                if (m_PostProcessHistogramPass)
+                {
+                    m_PostProcessHistogramPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_PostProcessHistogramPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] PostProcess.Histogram pipeline unavailable; default-recipe histogram recording will be skipped: error={}",
+                                static_cast<int>(postProcessHistogramPipeline.error()));
+            }
+
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
                 m_DepthPrepassPipelineLease->IsValid();
         }
@@ -4061,6 +4221,46 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-075 Slice E.1 — default-recipe
+        // `"PostProcessHistogramPass"` executor route. The histogram is
+        // a compute dispatch (`vkCmdDispatch(ceil(W/16), ceil(H/16),
+        // 1)`) and Vulkan rejects dispatches inside an active render-
+        // pass scope, so it runs in its own ordered graph pass before
+        // `"PostProcessPass"` (declared by the recipe with
+        // `Read(SceneColorHDR, ShaderRead)` + `Write(PostProcess.Histogram,
+        // BufferUsage::ShaderWrite)`). The helper follows the same
+        // status taxonomy as the tonemap / bloom helpers: a non-
+        // operational device returns `SkippedNonOperational`; a missing
+        // system / pass / pipeline lease returns `SkippedUnavailable`;
+        // otherwise the helper invokes `Execute(...)` and returns
+        // `Recorded`. The pass body independently gates on
+        // `IsStageEnabled(Histogram)` so when histogram is gated off
+        // the body emits no bind/push/dispatch but the helper still
+        // records `Recorded` ("structurally-recorded no-op" taxonomy,
+        // same as bloom-disabled and the Slice C/D.1 FXAA/SMAA
+        // helpers). Slice E.2 adds the renderer-owned host-visible
+        // `Histogram.Readback` buffer + `BeginFrame()`-side drain +
+        // `PostProcessSystem::PublishHistogramReadback(...)` that
+        // consumes the exposure-adaptation history buffer.
+        [[nodiscard]] RenderCommandPassStatus RecordPostProcessHistogramPass(RHI::ICommandContext& cmd,
+                                                                              const RHI::CameraUBO& camera)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_PostProcessSystem.has_value() ||
+                !m_PostProcessHistogramPass.has_value() ||
+                !m_PostProcessHistogramPipelineLease.has_value() ||
+                !m_PostProcessHistogramPipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_PostProcessHistogramPass->Execute(cmd, camera);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-075 Slice D.2a — per-stage AA helpers. The AA umbrella
         // splits into three ordered graph passes so edge / blend /
         // resolve pipelines can target format-incompatible color
@@ -4488,6 +4688,17 @@ namespace Extrinsic::Graphics
         // operational publisher runs; reset before `m_PostProcessSystem`
         // in `Shutdown()`.
         std::optional<PostProcessSMAAPass>    m_PostProcessSMAAPass;
+        // GRAPHICS-075 Slice E.1 — default-recipe postprocess histogram
+        // compute pass. The histogram is a compute dispatch and so cannot
+        // share the `"PostProcessPass"` umbrella's render-pass scope
+        // (Vulkan forbids `vkCmdDispatch` inside an active render-pass
+        // scope); it therefore fans out under its own ordered graph pass
+        // `"PostProcessHistogramPass"` declared by the recipe. Same
+        // lifetime contract as the tonemap + bloom + FXAA + SMAA passes
+        // above: emplaced after `m_PostProcessSystem` is initialised and
+        // before the operational publisher runs; reset before
+        // `m_PostProcessSystem` in `Shutdown()`.
+        std::optional<PostProcessHistogramPass> m_PostProcessHistogramPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
@@ -4533,6 +4744,12 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessSMAAEdgePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessSMAABlendPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessSMAAResolvePipelineLease;
+        // GRAPHICS-075 Slice E.1 — postprocess histogram compute pipeline
+        // lease. Same reset/republish pattern as the tonemap + bloom +
+        // FXAA + SMAA leases above so a failed `Create()` leaves the
+        // histogram helper in `SkippedUnavailable` rather than retaining
+        // a stale device handle across rebuilds.
+        std::optional<RHI::PipelineManager::PipelineLease> m_PostProcessHistogramPipelineLease;
         // GRAPHICS-074 Slice D.1 — renderer-owned host-visible `Picking.Readback`
         // buffer. Allocated by `InitializeOperationalPassResources()` when
         // the device first becomes operational and re-used across

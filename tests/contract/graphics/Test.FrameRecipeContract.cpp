@@ -109,6 +109,14 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
         "CompositionPass",
         "LinePass",
         "PointPass",
+        // GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives
+        // in its own ordered graph pass before `"PostProcessPass"`.
+        // Vulkan rejects `vkCmdDispatch` inside an active render-pass
+        // scope and `"PostProcessPass"` is a render-pass-scope pass
+        // (bloom + tonemap write color attachments), so collapsing the
+        // histogram dispatch back into the umbrella would reintroduce
+        // the dispatch-inside-render-pass hazard.
+        "PostProcessHistogramPass",
         "PostProcessPass",
         // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three
         // ordered graph passes so edge / blend / resolve pipelines can

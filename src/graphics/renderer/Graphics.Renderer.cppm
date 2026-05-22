@@ -432,6 +432,31 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessSMAAResolvePipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessSMAAResolvePipelineDesc() const noexcept = 0;
 
+        // GRAPHICS-075 (Slice E.1) — accessor for the default-recipe
+        // postprocess histogram compute pipeline (`post_histogram.comp`,
+        // no vertex/fragment stages, `PushConstantSize =
+        // sizeof(PostProcessHistogramPushConstants)` — 16 bytes mirroring
+        // the shader's `uint Width + uint Height + float MinLogLum +
+        // float RangeLogLum` std430 push block). The pipeline is a
+        // compute dispatch (`local_size_x = local_size_y = 16`) bound
+        // and dispatched by the new ordered graph pass
+        // `"PostProcessHistogramPass"` declared by the recipe with
+        // `Read(SceneColorHDR, ShaderRead)` +
+        // `Write(PostProcess.Histogram, BufferUsage::ShaderWrite)` so
+        // the framegraph compiler emits the read-after-write barrier
+        // the shader needs and the dispatch executes outside any
+        // render-pass scope (Vulkan rejects `vkCmdDispatch` inside an
+        // active render-pass scope, which is why the histogram cannot
+        // share the `"PostProcessPass"` umbrella's render-pass scope).
+        // Handle is invalid until an operational device path publishes
+        // the lease; the descriptor remains deterministic so contract
+        // tests can assert byte-identical rebuild behavior. Slice E.2
+        // adds the renderer-owned host-visible `Histogram.Readback`
+        // buffer + `BeginFrame()`-side drain + `PublishHistogramReadback`
+        // wiring that consumes the exposure-adaptation history buffer.
+        [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessHistogramPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessHistogramPipelineDesc() const noexcept = 0;
+
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for
         // `8 * frames-in-flight` bytes (one 4-byte `EntityId` word + one

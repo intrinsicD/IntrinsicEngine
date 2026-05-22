@@ -16,6 +16,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.FXAA;
+import Extrinsic.Graphics.Pass.PostProcess.Histogram;
 import Extrinsic.Graphics.Pass.PostProcess.SMAA;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Selection.Outline;
@@ -124,12 +125,20 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // under the resolve pass only. `AntiAliasing` defaults to `None` so
     // every AA pass body emits no bind/push/draw (the per-stage helpers
     // still return `Recorded` per the structurally-recorded-no-op
-    // taxonomy). Total Recorded entries: 5 routed
-    // (Culling/Depth/Surface/Line/Point) + 2 under `"PostProcessPass"`
+    // taxonomy). GRAPHICS-075 Slice E.1 — the histogram compute
+    // dispatch lives in its own ordered graph pass before
+    // `"PostProcessPass"` (Vulkan rejects dispatches inside an active
+    // render-pass scope, and `"PostProcessPass"` is a render-pass-scope
+    // pass — bloom + tonemap write color attachments). With
+    // `EnableHistogram == false` the body short-circuits but the helper
+    // still reports `Recorded` per the structurally-recorded-no-op
+    // taxonomy. Total Recorded entries: 5 routed
+    // (Culling/Depth/Surface/Line/Point) + 1 under
+    // `"PostProcessHistogramPass"` + 2 under `"PostProcessPass"`
     // (bloom + tonemap) + 3 under the per-stage AA passes
-    // (edge / blend / resolve helpers) = 10. Remaining unwired passes
+    // (edge / blend / resolve helpers) = 11. Remaining unwired passes
     // still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 10u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 11u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -147,6 +156,9 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PointPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PointPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessHistogramPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
@@ -418,10 +430,15 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // declares the AA umbrella split across three ordered graph passes
     // (`"PostProcessAA{Edge,Blend,Resolve}Pass"`). Each per-stage helper
     // returns `Recorded` under the structurally-recorded-no-op taxonomy
-    // when `AntiAliasing == None`. Total `Recorded`: 5 routed + 2 under
-    // `PostProcessPass` (bloom + tonemap) + 3 under the AA passes = 10.
+    // when `AntiAliasing == None`. GRAPHICS-075 Slice E.1 — the rebuild
+    // also publishes the histogram compute pipeline lease, so the new
+    // ordered `"PostProcessHistogramPass"` graph pass routes its helper
+    // (returning `Recorded` per the structurally-recorded-no-op taxonomy
+    // since `EnableHistogram` defaults to false). Total `Recorded`: 5
+    // routed + 1 under `PostProcessHistogramPass` + 2 under
+    // `PostProcessPass` (bloom + tonemap) + 3 under the AA passes = 11.
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 10u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 11u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -438,6 +455,9 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PointPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PointPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessHistogramPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
@@ -495,7 +515,15 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // ordered graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`)
     // so all three per-stage helpers fire → total climbs to 9 (4 routed
     // + 2 under PostProcessPass + 3 under the AA passes).
-    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
+    // GRAPHICS-075 Slice E.1 — the histogram compute pipeline is created
+    // independently of the depth-prepass failure point, and the new
+    // ordered `"PostProcessHistogramPass"` graph pass fans out
+    // independently of `PostProcessPass`, so its helper records
+    // `Recorded` per the structurally-recorded-no-op taxonomy
+    // (`EnableHistogram` defaults to false) → total climbs to 10
+    // (4 routed + 1 under PostProcessHistogramPass + 2 under
+    // PostProcessPass + 3 under the AA passes).
+    EXPECT_EQ(stats.CommandRecords.Recorded, 10u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -513,6 +541,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PointPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PointPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessHistogramPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
@@ -567,8 +598,14 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // ordered graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`);
     // each per-stage helper records `Recorded` → three more entries
     // (total 5: 0 routed + 2 under PostProcessPass + 3 under the AA
-    // passes).
-    EXPECT_EQ(stats.CommandRecords.Recorded, 5u);
+    // passes). GRAPHICS-075 Slice E.1 — the histogram compute pipeline
+    // is similarly culling-independent and lives in its own ordered
+    // graph pass `"PostProcessHistogramPass"`; the helper records
+    // `Recorded` per the structurally-recorded-no-op taxonomy
+    // (`EnableHistogram` defaults to false) → total climbs to 6
+    // (0 routed + 1 under PostProcessHistogramPass + 2 under
+    // PostProcessPass + 3 under the AA passes).
+    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -578,6 +615,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessHistogramPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
@@ -664,6 +704,12 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
     // changes can't silently regress to a no-op.
     static constexpr const char* kRoutedPasses[] = {
         "CullingPass", "DepthPrepass", "SurfacePass", "LinePass", "PointPass",
+        // GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives
+        // in its own ordered graph pass before `"PostProcessPass"`
+        // because Vulkan rejects `vkCmdDispatch` inside an active
+        // render-pass scope (and `"PostProcessPass"` is a render-pass-
+        // scope pass — bloom + tonemap write color attachments).
+        "PostProcessHistogramPass",
         // GRAPHICS-075 Slice A — `"PostProcessPass"` is now wired through the
         // umbrella executor branch (Bloom + ToneMap legs) and reports
         // `Recorded` on the operational CPU/null gate.
@@ -672,7 +718,6 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
         // ordered graph passes so edge / blend / resolve pipelines can
         // target format-incompatible color attachments. FXAA records
         // under the resolve pass only; SMAA records under all three.
-        // Slice E adds the Histogram sub-pass behind `PostProcessPass`.
         "PostProcessAAEdgePass",
         "PostProcessAABlendPass",
         "PostProcessAAResolvePass",
@@ -2302,6 +2347,61 @@ TEST(RendererFrameLifecycle, PostProcessSMAAPipelinesSurviveOperationalRebuild)
 }
 
 // ---------------------------------------------------------------------------
+// GRAPHICS-075 Slice E.1 — default-recipe postprocess histogram compute
+// pipeline lease + republish. Mirrors the SMAA rebuild test above for the
+// `post_histogram.comp` shader: the pipeline is a *compute* pipeline (no
+// vertex / fragment stages), targets no color attachment, and carries the
+// 16-byte `PostProcessHistogramPushConstants` block byte-for-byte
+// matching the shader's std430 push declaration. The pipeline lives in
+// its own ordered graph pass (`"PostProcessHistogramPass"`) because
+// Vulkan rejects `vkCmdDispatch` inside an active render-pass scope —
+// the survive-rebuild contract pins both the descriptor shape and the
+// byte-identical rebuild behavior.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, PostProcessHistogramPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{421u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetPostProcessHistogramPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetPostProcessHistogramPipelineDesc();
+    EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
+        "shaders/post_histogram.comp.spv"))
+        << initialDesc.ComputeShaderPath;
+    EXPECT_TRUE(initialDesc.VertexShaderPath.empty())
+        << "Compute pipeline must leave VertexShaderPath empty so the "
+           "backend interprets the descriptor as compute.";
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.empty())
+        << "Compute pipeline must leave FragmentShaderPath empty so the "
+           "backend interprets the descriptor as compute.";
+    EXPECT_EQ(initialDesc.ColorTargetCount, 0u);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    // 16-byte std430 block: `uint Width + uint Height + float MinLogLum +
+    // float RangeLogLum`. The canonical 20-byte block is intentionally
+    // not used here per the standing shader-push-constant compatibility
+    // policy (it would alias `Exposure` onto `Width` as
+    // `bit_cast<uint>(1.0f)` ≈ 1.07e9, producing a degenerate dispatch
+    // shape).
+    EXPECT_EQ(initialDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::PostProcessHistogramPushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetPostProcessHistogramPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessHistogramPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
 // GRAPHICS-075 Slice D.2b — retained SMAA `AreaTex` / `SearchTex` LUT
 // textures + exposure-adaptation history buffer. `PostProcessSystem`'s
 // device-aware Initialize() allocates the area/search LUTs (uploaded via
@@ -2476,7 +2576,8 @@ TEST(RendererFrameLifecycle, PostProcessSMAALookupTexturesRetryAfterFailedUpload
 //   5 forwardSurface, 6 forwardLine, 7 forwardPoint, 8 shadow,
 //   9 deferredGBuffer, 10 deferredLighting, 11-14 selectionId,
 //   15 selectionOutline, 16 tonemap, 17 bloomDownsample, 18 bloomUpsample,
-//   19 postProcessFXAA, 20 smaaEdge, 21 smaaBlend, 22 smaaResolve.
+//   19 postProcessFXAA, 20 smaaEdge, 21 smaaBlend, 22 smaaResolve,
+//   23 postProcessHistogram.
 // If a future change reorders pipeline creation, update the constants.
 // ---------------------------------------------------------------------------
 

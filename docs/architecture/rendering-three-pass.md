@@ -39,7 +39,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `ShadowAtlas` | `D32_SFLOAT` | Frame transient | Cascade shadow depth atlas (horizontal strip, one cascade per column block). Produced by `ShadowPass`, sampled by `SurfacePass` (forward) and `CompositionPass` (deferred) |
 | `SceneColorLDR` | Swapchain format | Frame transient | Post-process + overlay composition target |
 | `PostProcess.BloomScratch` | `R16G16B16A16_SFLOAT` | Frame transient | Optional bloom intermediate owned by `PostProcessPass` |
-| `PostProcess.Histogram` | storage buffer | Frame transient | Optional luminance histogram diagnostics owned by `PostProcessPass` |
+| `PostProcess.Histogram` | storage buffer | Frame transient | Luminance histogram (256 R32_UINT bins) written by `PostProcessHistogramPass`; the compute dispatch lives in its own ordered graph pass because Vulkan rejects `vkCmdDispatch` inside an active render-pass scope (so it cannot share the `PostProcessPass` umbrella's render-pass scope) |
 | `PostProcess.AATemp.Edges` | `R8G8_UNORM` | Frame transient | SMAA edge-detection output owned by `PostProcessAAEdgePass` |
 | `PostProcess.AATemp.Weights` | `R8G8B8A8_UNORM` | Frame transient | SMAA blending-weights output owned by `PostProcessAABlendPass` |
 | `PostProcess.AATemp.Resolved` | Swapchain format | Frame transient | Resolved anti-aliased color (FXAA or SMAA) owned by `PostProcessAAResolvePass`; `presentSource` flips here when `PostProcessSettings::AntiAliasing != None` |
@@ -125,7 +125,8 @@ than native handles or transient allocation IDs.
 | `CompositionPass` | deferred: `SceneNormal`, `Albedo`, `Material0`, `SceneDepth`, `ShadowAtlas` (sampled through the bindless heap at `set = 0, binding = 0`, indexed by `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` sourced from `ShadowSystem::GetAtlasBindlessIndex()`) | deferred: `SceneColorHDR` | Fullscreen deferred lighting with PCF shadow sampling from cascade atlas. The legacy `set 1, binding 1` `sampler2DShadow` model cannot be honored on the bindless-only promoted Vulkan pipeline layout (`setLayoutCount = 1`), so the engine pushes the atlas bindless slot through push constants instead (GRAPHICS-072 Slice C). The framegraph compiler emits a `DepthAttachment → ShaderReadOnly` barrier on the atlas between `ShadowPass` and this pass. No-op in forward mode |
 | `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for wireframe/graph/debug lines; accumulates via `LOAD` |
 | `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for point clouds/debug points; accumulates via `LOAD` |
-| `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR`, `PostProcess.BloomScratch`, `PostProcess.Histogram` | Backend-agnostic HDR-to-LDR chain. `PostProcessSystem` describes deterministic stages in order: optional `Histogram`, optional `Bloom`, required enabled-chain `ToneMap`. Anti-aliasing (FXAA or SMAA) runs in three subsequent ordered passes — see `PostProcessAA{Edge,Blend,Resolve}Pass` below. Invalid numeric settings are sanitized and unsupported AA enum values are diagnosed without Vulkan |
+| `PostProcessHistogramPass` | `SceneColorHDR` | `PostProcess.Histogram` | Backend-agnostic luminance histogram compute dispatch (`ceil(W/16) x ceil(H/16) x 1` workgroups, `local_size_x = local_size_y = 16`). Lives in its own ordered graph pass before `PostProcessPass` because Vulkan rejects `vkCmdDispatch` inside an active render-pass scope. Body short-circuits when `PostProcessSettings::EnableHistogram == false`; helper still reports `Recorded` per the structurally-recorded-no-op taxonomy. Slice E.2 wires the host-visible `Histogram.Readback` buffer + `BeginFrame()` drain + `PublishHistogramReadback` consumption of the exposure-adaptation history buffer |
+| `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR`, `PostProcess.BloomScratch` | Backend-agnostic HDR-to-LDR chain. `PostProcessSystem` describes deterministic stages in order: optional `Bloom`, required enabled-chain `ToneMap`. Anti-aliasing (FXAA or SMAA) runs in three subsequent ordered passes — see `PostProcessAA{Edge,Blend,Resolve}Pass` below. Invalid numeric settings are sanitized and unsupported AA enum values are diagnosed without Vulkan |
 | `PostProcessAAEdgePass` | `SceneColorLDR` | `PostProcess.AATemp.Edges` | SMAA edge-detection (no-op when `AntiAliasing != SMAA`); structurally records under the per-stage helper's accumulator regardless of stage selector |
 | `PostProcessAABlendPass` | `PostProcess.AATemp.Edges` | `PostProcess.AATemp.Weights` | SMAA blending-weights pass (no-op when `AntiAliasing != SMAA`) |
 | `PostProcessAAResolvePass` | `SceneColorLDR`, `PostProcess.AATemp.Weights` | `PostProcess.AATemp.Resolved` | FXAA single-pass resolve **or** SMAA neighborhood-blending resolve, mutually exclusive per `PostProcessSettings::AntiAliasing` (`None` short-circuits both). `presentSource` flips to this attachment when AA is enabled |
@@ -372,14 +373,15 @@ Per-frame lighting is carried by `LightEnvironmentPacket` and includes direction
 6. `CompositionPass`
 7. `LinePass`
 8. `PointPass`
-9. `PostProcessPass`
-10. `PostProcessAAEdgePass` (SMAA edge; no-op when `AntiAliasing != SMAA`)
-11. `PostProcessAABlendPass` (SMAA blending weights; no-op when `AntiAliasing != SMAA`)
-12. `PostProcessAAResolvePass` (FXAA or SMAA resolve, mutually exclusive per `PostProcessSettings::AntiAliasing`)
-13. `SelectionOutlinePass`
-14. `DebugViewPass`
-15. `ImGuiPass`
-16. `Present`
+9. `PostProcessHistogramPass` (compute dispatch; lives in its own ordered graph pass because Vulkan rejects `vkCmdDispatch` inside an active render-pass scope; body short-circuits when `EnableHistogram == false`)
+10. `PostProcessPass`
+11. `PostProcessAAEdgePass` (SMAA edge; no-op when `AntiAliasing != SMAA`)
+12. `PostProcessAABlendPass` (SMAA blending weights; no-op when `AntiAliasing != SMAA`)
+13. `PostProcessAAResolvePass` (FXAA or SMAA resolve, mutually exclusive per `PostProcessSettings::AntiAliasing`)
+14. `SelectionOutlinePass`
+15. `DebugViewPass`
+16. `ImGuiPass`
+17. `Present`
 
 `Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this pass order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`.
 
