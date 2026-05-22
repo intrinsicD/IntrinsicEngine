@@ -106,15 +106,14 @@
       `*BatteryNeverOverReportsContainment` sweeps that pin the
       false-positive direction (the migrated impl never reports
       containment the legacy `Sdf_Plane` oracle rejected).
-    - **Slice 3.3.d — GJK termination diagnostics (deferred).** GJK's
-      `GJK_EPSILON = 1e-6f` termination test is a convergence guard,
-      not an orientation/incidence decision, so it does not map onto
-      the current `RobustPredicates` predicate surface. Record this as
-      a follow-up to either (i) add `RobustPredicates::ApproxZeroSq`
-      with `ScaledEpsilon` derived from the Minkowski-support magnitude,
-      or (ii) leave GJK's epsilon policy as-is and document the chosen
-      tolerance. Decide in Slice 4 or in a successor task; do not
-      rewrite GJK as part of GEOM-007 callsite adoption.
+    - **Slice 3.3.d — GJK termination diagnostics (deferred to GEOM-015).**
+      GJK's `GJK_EPSILON = 1e-6f` termination test is a convergence
+      guard, not an orientation/incidence decision, so it does not map
+      onto the current `RobustPredicates` predicate surface. Tracked as
+      a dedicated backlog task at
+      [`tasks/backlog/geometry/GEOM-015-gjk-termination-diagnostics.md`](../backlog/geometry/GEOM-015-gjk-termination-diagnostics.md)
+      so the GEOM-007 foundation can close without owning a downstream
+      algorithm-policy rewrite. Do not re-fold this into GEOM-007.
 - **Slice 4 — exact / adaptive escalation (optional).** Decide whether to add
   Shewchuk-style adaptive predicates behind the same surface, or keep the
   filtered-only policy and document caller fallback strategies.
