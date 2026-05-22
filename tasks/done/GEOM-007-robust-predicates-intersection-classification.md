@@ -9,8 +9,30 @@
 - No arrangement/BSP kernel beyond foundational predicates and classification records.
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
+## Status
+- Status: done.
+- Completed: 2026-05-22.
+- Commits (oldest first):
+  - `1ac8720d` — Slice 1: `Geometry.RobustPredicates` foundation.
+  - `a2f39b30` — Slice 2: `Geometry.IntersectionClassification` records.
+  - `5ab37c74` — Slice 3.1: `Geometry::RayTriangle_Classify`.
+  - `6471de57` — Slice 3.2: `Runtime.Selection` picks migrated.
+  - `a4578a96` — Slice 3.3 plan: sub-slice Overlap / Containment / GJK.
+  - `5e94fa0c` — Slice 3.3.a: `SignedDistanceToHessianPlane` predicate.
+  - `cbd665ae` — Slice 3.3.b: `Overlap` frustum tests migrated.
+  - `cf664c1f` — Slice 3.3.c: `Containment` frustum tests migrated.
+  - `97aa7824` — Slice 3.3.d deferred to `GEOM-015`.
+- PR: TBD (filled in when the landing PR is opened).
+- Follow-up tasks promoted from the original Slice 3.3.d / Slice 4 plan:
+  - [`tasks/active/GEOM-015-gjk-termination-diagnostics.md`](../active/GEOM-015-gjk-termination-diagnostics.md)
+    owns the GJK + `Geometry.Support` tolerance audit and the
+    `RobustPredicates::ApproxZeroSq` migration.
+  - Slice 4 (Shewchuk-style exact / adaptive escalation) remains
+    optional; promote to its own paper-method-workflow task when a
+    caller actually requires guaranteed signs.
+
 ## Context
-- Status: in-progress (Slice 3.3.c — Containment frustum migration landed; remaining Slice 3.3 work is the deferred Slice 3.3.d GJK termination follow-up, otherwise Slice 3 callsite adoption is at its planned stopping point).
+- Status: done; foundation + Slice 3 callsite adoption landed 2026-05-22. GJK termination follow-up is tracked at [`GEOM-015`](../active/GEOM-015-gjk-termination-diagnostics.md) and is not a reopen condition for this task.
 - Owner/agent: copilot.
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
 - Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify` plus the layering / test-layout / doc-links / task-policy structural checks for Slice 3.3.a; extend the filter to `Overlap` / `Containment` (and add the new parity-battery test names) at the corresponding 3.3.b / 3.3.c commits.
@@ -111,7 +133,7 @@
       guard, not an orientation/incidence decision, so it does not map
       onto the current `RobustPredicates` predicate surface. Tracked as
       a dedicated backlog task at
-      [`tasks/backlog/geometry/GEOM-015-gjk-termination-diagnostics.md`](../backlog/geometry/GEOM-015-gjk-termination-diagnostics.md)
+      [`tasks/active/GEOM-015-gjk-termination-diagnostics.md`](../active/GEOM-015-gjk-termination-diagnostics.md)
       so the GEOM-007 foundation can close without owning a downstream
       algorithm-policy rewrite. Do not re-fold this into GEOM-007.
 - **Slice 4 — exact / adaptive escalation (optional).** Decide whether to add
@@ -131,9 +153,10 @@
 - [x] Slice 1: Add `tests/unit/geometry/Test.RobustPredicates.cpp` using the `Test.<Name>.cpp` naming style.
 - [x] Slice 1: Cover ordinary, degenerate, near-degenerate, coplanar, collinear, duplicate, and large/small scale cases.
 - [x] Slice 2: Add unit tests `tests/unit/geometry/Test.IntersectionClassification.cpp` covering default construction, enum value stability, and small helpers on the result records.
-- [ ] Slice 3: Add regression-style cases for triangle/segment classification and barycentric boundary classification at callsite-adoption time.
+- [x] Slice 3: Add regression-style cases for triangle/segment classification and barycentric boundary classification at callsite-adoption time.
   - [x] Slice 3.1: `Test.RaycastClassify.cpp` covers parity with `RayTriangle_Watertight`, miss / tMin / tMax, degenerate triangle, invalid ray, vertex / edge / interior boundary classification, ray-origin vs ray-interior, and batched cross-check.
   - [x] Slice 3.2: Existing runtime selection contract / integration tests (`IntrinsicRuntimeSelectionContractTests`, `Test_RuntimeSelection`, `Test_ElementSelection`) cover the migrated callsites and continue to pass; the Slice 3.1 parity suite remains the numerical guardrail.
+  - [x] Slice 3.3.a/b/c: `Test.RobustPredicates.cpp` gains Hessian-plane cases (exact-on-plane, above/below, parity with origin-form, scaled-normal, large/small scale); `Test_Overlap.cpp` gains the `Frustum`-vs-`AABB` set plus `*BatteryAgreesWithLegacyOracle` sweeps; `Test_Containment.cpp` gains the mirror `*BatteryNeverOverReportsContainment` sweeps.
 - [x] Slice 1: Compare deterministic classification outputs against documented expectations.
 
 ## Docs
@@ -142,10 +165,10 @@
 - [x] Slice 1: Update `docs/api/generated/module_inventory.md` after module surface changes.
 
 ## Acceptance criteria
-- [ ] New robust-operation algorithms have one predicate/classification module to depend on.
-- [ ] Degenerate and uncertain cases are surfaced explicitly in result records.
-- [ ] The implementation preserves `geometry -> core` layering.
-- [ ] Focused tests and structural checks pass.
+- [x] New robust-operation algorithms have one predicate/classification module to depend on.
+- [x] Degenerate and uncertain cases are surfaced explicitly in result records.
+- [x] The implementation preserves `geometry -> core` layering.
+- [x] Focused tests and structural checks pass.
 
 ## Verification
 ```bash

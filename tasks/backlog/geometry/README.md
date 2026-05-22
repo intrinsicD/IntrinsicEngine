@@ -11,7 +11,7 @@ map.
 
 - [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../done/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
-- [GEOM-007 — Robust predicates and intersection classification foundation](../../active/GEOM-007-robust-predicates-intersection-classification.md) (active).
+- [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).
 - [GEOM-008 — Geometry linear algebra and solver infrastructure](GEOM-008-linear-algebra-solver-infrastructure.md).
 - [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md) (done).
 - [GEOM-010 — Point-cloud algorithm pack roadmap](GEOM-010-point-cloud-algorithm-pack-roadmap.md).
@@ -19,6 +19,7 @@ map.
 - [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](GEOM-012-symmetric-domain-views-property-sharing.md).
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
 - [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
+- [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../active/GEOM-015-gjk-termination-diagnostics.md) (active).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence

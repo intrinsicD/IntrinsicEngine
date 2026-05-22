@@ -11,18 +11,20 @@ Each active task should include:
 
 ## Currently active
 
-- [`GEOM-007`](GEOM-007-robust-predicates-intersection-classification.md) —
-  Robust predicates and intersection classification foundation. Promoted from
-  `tasks/backlog/geometry/` on 2026-05-22. Status: in-progress (Slice 1).
-  Slice 1 adds the narrow `Geometry.RobustPredicates` module (orientation 2D/3D,
-  signed distance, in-plane barycentric classification, scale-aware epsilon,
-  `Sign`/`Certainty`/`BarycentricRegion` enums) plus
-  `tests/unit/geometry/Test.RobustPredicates.cpp`, docs, and module-inventory
-  refresh. Slices 2 (intersection classification records), 3 (callsite
-  adoption), and 4 (optional adaptive-exact escalation) are queued. Next
-  verification step: run
+- [`GEOM-015`](GEOM-015-gjk-termination-diagnostics.md) — GJK termination
+  diagnostics and scale-aware tolerance policy. Promoted from
+  `tasks/backlog/geometry/` on 2026-05-22 as the deferred successor to
+  GEOM-007 Slice 3.3.d (GEOM-007 retired the same day). Status: in-progress
+  (Slice 1). Slice 1 adds `RobustPredicates::ApproxZeroSq` / `ApproxZeroLen`
+  helpers with `SignedResult`-shaped diagnostics plus unit tests, no
+  callsite migration. Slices 2 (Support / SDFContact magnitude-guard
+  migration), 3 (GJK normalized-workspace policy decision + architecture
+  doc), and 4 (GJK termination-reason diagnostics surface) are queued. Next
+  verification step:
   `ctest --test-dir build/ci --output-on-failure -R 'RobustPredicates' --timeout 60`
-  plus the layering/test-layout/docs structural checks after Slice 1 lands.
+  plus `python3 tools/repo/check_layering.py --root src --strict` and
+  `python3 tools/agents/check_task_policy.py --root . --strict` after Slice 1
+  lands.
 
 - [`GRAPHICS-075`](GRAPHICS-075-default-recipe-postprocess-chain-wiring.md) —
   Default-recipe postprocess chain wiring (Histogram → Bloom → ToneMap →

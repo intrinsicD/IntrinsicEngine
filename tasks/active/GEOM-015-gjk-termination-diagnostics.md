@@ -19,12 +19,42 @@
   remain on the GEOM-007 Slice 4 / its own successor task.
 
 ## Context
-- Status: backlog.
+- Status: in-progress (Slice 1).
+- Owner/agent: copilot.
+- Branch: main.
 - Owning subsystem/layer: `geometry` (`geometry -> core`; consumes
   `Geometry.RobustPredicates`).
-- Deferred from [`tasks/active/GEOM-007-robust-predicates-intersection-classification.md`](../../active/GEOM-007-robust-predicates-intersection-classification.md)
+- Promoted from `tasks/backlog/geometry/` on 2026-05-22.
+- Deferred from [`tasks/done/GEOM-007-robust-predicates-intersection-classification.md`](../done/GEOM-007-robust-predicates-intersection-classification.md)
   Slice 3.3.d, where the Slice 3.3 plan explicitly documented this as a
   successor-task candidate rather than a callsite-adoption sub-slice.
+
+### Slice plan
+
+- **Slice 1 (this slice):** Add `RobustPredicates::ApproxZeroSq` /
+  `ApproxZeroLen` helpers with `SignedResult`-shaped diagnostics and
+  unit tests. No callsite migration; `Geometry.GJK` and `Geometry.Support`
+  unchanged.
+- **Slice 2:** Audit the seven `GJK_EPSILON` and four `Geometry.Support`
+  `1e-6f` callsites; classify and add inline comments. Migrate the
+  original-space magnitude guards in `Geometry.Support.cppm` and the one
+  in `Geometry.SDFContact.cppm` to the new helper, deriving `scale`
+  from the primitive's characteristic length.
+- **Slice 3:** Decide the GJK normalized-workspace policy (keep
+  `GJK_EPSILON` as a normalized-space constant with explicit contract
+  vs. thread scale into the driver). Document the decision in
+  `docs/architecture/geometry.md`.
+- **Slice 4:** Surface GJK termination diagnostics (`iterations`,
+  `terminationReason`) via an overload or out-param. Keep the boolean
+  entry point as a thin wrapper. Add convergence and parity regression
+  tests.
+
+### Next verification step
+
+After Slice 1 lands:
+`ctest --test-dir build/ci --output-on-failure -R 'RobustPredicates' --timeout 60`
+plus `python3 tools/repo/check_layering.py --root src --strict` and
+`python3 tools/agents/check_task_policy.py --root . --strict`.
 - Current state (as of GEOM-007 Slice 3.3.c landing):
   - `src/geometry/Geometry.GJK.cppm` defines `Config::GJK_EPSILON = 1e-6f`
     and uses it at 7 sites covering early-out direction, support-progress
