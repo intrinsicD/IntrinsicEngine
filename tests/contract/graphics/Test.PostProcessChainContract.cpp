@@ -210,45 +210,66 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresHdrToLdrResources)
     EXPECT_TRUE(Contains(post->Writes, "SceneColorLDR"));
     EXPECT_TRUE(Contains(post->Writes, "PostProcess.BloomScratch"));
     EXPECT_TRUE(Contains(post->Writes, "PostProcess.Histogram"));
-    // GRAPHICS-075 Slice C — `PostProcess.AATemp` moved to the
-    // `PostProcessAAPass` pass so the FXAA/SMAA legs sample the
-    // freshly-written `SceneColorLDR` through a framegraph
-    // read-after-write barrier (see the new test
-    // `FrameRecipeSplitsAAPassFromPostProcessPass` below).
-    EXPECT_FALSE(Contains(post->Writes, "PostProcess.AATemp"))
-        << "PostProcess.AATemp must move to PostProcessAAPass per Slice C "
-           "so the FXAA leg reads SceneColorLDR via a real read-after-write "
-           "barrier instead of aliasing the umbrella's color attachment.";
+    // GRAPHICS-075 Slice D.2a — the AA umbrella split into three ordered
+    // graph passes each owning one matched-format AA attachment; none of
+    // them belong on `PostProcessPass` (which would re-introduce the
+    // aliased-attachment hazard Slice C fixed).
+    EXPECT_FALSE(Contains(post->Writes, "PostProcess.AATemp.Edges"))
+        << "PostProcess.AATemp.Edges belongs to PostProcessAAEdgePass.";
+    EXPECT_FALSE(Contains(post->Writes, "PostProcess.AATemp.Weights"))
+        << "PostProcess.AATemp.Weights belongs to PostProcessAABlendPass.";
+    EXPECT_FALSE(Contains(post->Writes, "PostProcess.AATemp.Resolved"))
+        << "PostProcess.AATemp.Resolved belongs to PostProcessAAResolvePass.";
 
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", true));
-    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp", true));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Edges", true));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Weights", true));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Resolved", true));
 }
 
-// GRAPHICS-075 Slice C — the postprocess chain is split into two
-// ordered graph passes so the FXAA/SMAA legs (`PostProcessAAPass`) can
-// sample the freshly-written `SceneColorLDR` through a real framegraph
-// read-after-write barrier rather than aliasing the `PostProcessPass`
-// umbrella's own color attachment mid-render-pass — Vulkan's classic
-// read-after-write feedback hazard. This contract pins the split so
-// future scope creep cannot collapse the FXAA recording back into the
-// umbrella branch without flagging the regression.
-TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAPassFromPostProcessPass)
+// GRAPHICS-075 Slice D.2a — the AA umbrella splits into three ordered
+// graph passes (`PostProcessAAEdgePass`, `PostProcessAABlendPass`,
+// `PostProcessAAResolvePass`) so edge / blend / resolve pipelines can
+// target format-incompatible color attachments (`RG8_UNORM` /
+// `RGBA8_UNORM` / backbuffer). Each pass declares a single matched-
+// format `Write`; the framegraph compiler emits correct layout
+// transitions between them. FXAA records under the resolve pass only;
+// SMAA records under all three. With `features.EnableAntiAliasing`,
+// `presentSource` flips to `PostProcess.AATemp.Resolved` so the AA
+// output reaches present.
+TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAUmbrellaPerStage)
 {
     const Graphics::FrameRecipeIntrospection description = Graphics::DescribeDefaultFrameRecipe(Graphics::FrameRecipeFeatures{});
 
-    const auto* aa = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAA);
-    ASSERT_NE(aa, nullptr);
-    EXPECT_TRUE(aa->Enabled);
-    EXPECT_TRUE(Contains(aa->Reads, "SceneColorLDR"))
-        << "PostProcessAAPass must declare a recipe-level Read(SceneColorLDR) "
-           "so the framegraph compiler emits the ColorAttachment → ShaderRead "
-           "transition between PostProcessPass and PostProcessAAPass.";
-    EXPECT_TRUE(Contains(aa->Writes, "PostProcess.AATemp"))
-        << "PostProcessAAPass owns the AATemp write so it cannot also be "
-           "declared on PostProcessPass (the umbrella SceneColorLDR target).";
+    const auto* edge = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAAEdge);
+    const auto* blend = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAABlend);
+    const auto* resolve = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAAResolve);
+    ASSERT_NE(edge, nullptr);
+    ASSERT_NE(blend, nullptr);
+    ASSERT_NE(resolve, nullptr);
+    EXPECT_TRUE(edge->Enabled);
+    EXPECT_TRUE(blend->Enabled);
+    EXPECT_TRUE(resolve->Enabled);
 
+    EXPECT_TRUE(Contains(edge->Reads, "SceneColorLDR"));
+    EXPECT_EQ(edge->Writes.size(), 1u)
+        << "Edge pass must declare a single matched-format Write so the "
+           "AA umbrella never aliases two pipelines with incompatible "
+           "color formats inside one render-pass scope on Vulkan.";
+    EXPECT_TRUE(Contains(edge->Writes, "PostProcess.AATemp.Edges"));
+
+    EXPECT_TRUE(Contains(blend->Reads, "PostProcess.AATemp.Edges"));
+    EXPECT_EQ(blend->Writes.size(), 1u);
+    EXPECT_TRUE(Contains(blend->Writes, "PostProcess.AATemp.Weights"));
+
+    EXPECT_TRUE(Contains(resolve->Reads, "SceneColorLDR"));
+    EXPECT_TRUE(Contains(resolve->Reads, "PostProcess.AATemp.Weights"));
+    EXPECT_EQ(resolve->Writes.size(), 1u);
+    EXPECT_TRUE(Contains(resolve->Writes, "PostProcess.AATemp.Resolved"));
+
+    // Compiled order: PostProcessPass → Edge → Blend → Resolve.
     Graphics::RenderGraph graph;
     const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
         graph,
@@ -263,12 +284,78 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAPassFromPostProcessPas
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<std::string> order = OrderedPassNames(*compiled);
     const auto postIt = std::find(order.begin(), order.end(), "PostProcessPass");
-    const auto aaIt = std::find(order.begin(), order.end(), "PostProcessAAPass");
+    const auto edgeIt = std::find(order.begin(), order.end(), "PostProcessAAEdgePass");
+    const auto blendIt = std::find(order.begin(), order.end(), "PostProcessAABlendPass");
+    const auto resolveIt = std::find(order.begin(), order.end(), "PostProcessAAResolvePass");
     ASSERT_NE(postIt, order.end());
-    ASSERT_NE(aaIt, order.end());
-    EXPECT_LT(postIt, aaIt)
-        << "PostProcessAAPass must run after PostProcessPass so the FXAA "
-           "shader's sampled-image read sees the tonemap leg's write.";
+    ASSERT_NE(edgeIt, order.end());
+    ASSERT_NE(blendIt, order.end());
+    ASSERT_NE(resolveIt, order.end());
+    EXPECT_LT(postIt, edgeIt);
+    EXPECT_LT(edgeIt, blendIt);
+    EXPECT_LT(blendIt, resolveIt);
+}
+
+// GRAPHICS-075 Slice D.2a — `presentSource` flips to
+// `PostProcess.AATemp.Resolved` when `features.EnableAntiAliasing` is
+// set, so the AA-resolved color reaches present rather than the
+// un-resolved `SceneColorLDR`. The renderer plumbs this from
+// `PostProcessSettings::AntiAliasing != None`; the recipe-level
+// `Present` pass's `Read` declaration is the framegraph-visible
+// observable.
+TEST(GraphicsPostProcessChainContract, AntiAliasingFlipsPresentSourceToResolved)
+{
+    auto presentReadsResolvedFor = [](const bool enableAntiAliasing) {
+        Graphics::FrameRecipeFeatures features{};
+        features.EnableAntiAliasing = enableAntiAliasing;
+        Graphics::RenderGraph graph;
+        const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
+            graph,
+            features,
+            MakeImports(),
+            Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u});
+        EXPECT_TRUE(build.Succeeded) << build.Diagnostic;
+
+        const auto compiled = graph.Compile();
+        EXPECT_TRUE(compiled.has_value());
+        if (!compiled.has_value())
+        {
+            return false;
+        }
+
+        // Walk the compiled graph for the Present pass and check whether
+        // it reads `PostProcess.AATemp.Resolved` (AA-on) or
+        // `SceneColorLDR` (AA-off).
+        for (const auto& decl : compiled->PassDeclarations)
+        {
+            if (decl.PassIndex >= compiled->PassNames.size() ||
+                compiled->PassNames[decl.PassIndex] != std::string_view{"Present"})
+            {
+                continue;
+            }
+            for (const std::uint32_t resIdx : decl.ReadTextures)
+            {
+                if (resIdx >= compiled->TextureNames.size())
+                {
+                    continue;
+                }
+                if (compiled->TextureNames[resIdx] == std::string_view{"PostProcess.AATemp.Resolved"})
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return false;
+    };
+
+    EXPECT_FALSE(presentReadsResolvedFor(false))
+        << "With AA disabled, present must consume SceneColorLDR so the "
+           "(cleared / undefined) AA-resolved attachment does not reach "
+           "the backbuffer.";
+    EXPECT_TRUE(presentReadsResolvedFor(true))
+        << "With AA enabled, present must consume PostProcess.AATemp.Resolved "
+           "so the AA-resolved color reaches the backbuffer.";
 }
 
 TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
@@ -280,16 +367,24 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
     const auto* post = FindPass(description, Graphics::FrameRecipePassKind::PostProcess);
     ASSERT_NE(post, nullptr);
     EXPECT_FALSE(post->Enabled);
-    // GRAPHICS-075 Slice C — `PostProcessAAPass` shares the same
+    // GRAPHICS-075 Slice D.2a — the three AA passes share the same
     // `EnablePostProcess` gate (FXAA / SMAA are postprocess stages),
-    // so disabling postprocess also disables the AA pass.
-    const auto* aa = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAA);
-    ASSERT_NE(aa, nullptr);
-    EXPECT_FALSE(aa->Enabled);
+    // so disabling postprocess also disables all three AA passes.
+    const auto* edge = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAAEdge);
+    const auto* blend = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAABlend);
+    const auto* resolve = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAAResolve);
+    ASSERT_NE(edge, nullptr);
+    ASSERT_NE(blend, nullptr);
+    ASSERT_NE(resolve, nullptr);
+    EXPECT_FALSE(edge->Enabled);
+    EXPECT_FALSE(blend->Enabled);
+    EXPECT_FALSE(resolve->Enabled);
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", false));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", false));
-    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp", false));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Edges", false));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Weights", false));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Resolved", false));
 
     Graphics::RenderGraph graph;
     const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
@@ -305,7 +400,9 @@ TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
         << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     const std::vector<std::string> order = OrderedPassNames(*compiled);
     EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessPass"), order.end());
-    EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAAPass"), order.end());
+    EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAAEdgePass"), order.end());
+    EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAABlendPass"), order.end());
+    EXPECT_EQ(std::find(order.begin(), order.end(), "PostProcessAAResolvePass"), order.end());
     EXPECT_NE(std::find(order.begin(), order.end(), "Present"), order.end());
 }
 
@@ -424,18 +521,21 @@ TEST(GraphicsPostProcessChainContract, PassesRecordOnlyEnabledStages)
     EXPECT_EQ(histogramCmd.Events[2].Kind, EventKind::Dispatch);
     EXPECT_EQ(histogramCmd.LastDispatchX, 1u);
 
-    // GRAPHICS-075 Slice D.1 — the SMAA pass reshaped to hold three
-    // pipelines (edge / blend / resolve), so the test wires them through
-    // the new per-stage setter API. `AntiAliasing == FXAA` short-circuits
-    // the body to a no-op via `IsStageEnabled(SMAA)`, so even with all
-    // three pipelines bound the SMAA pass must stay silent here
-    // (mirroring `SMAASkipsWhenAntiAliasingNotSMAA` below).
+    // GRAPHICS-075 Slice D.2a — the SMAA pass exposes per-stage Execute
+    // methods (`ExecuteEdge`/`ExecuteBlend`/`ExecuteResolve`) so the
+    // renderer can fan each stage out under its own ordered graph pass.
+    // `AntiAliasing == FXAA` short-circuits every per-stage body to a
+    // no-op via `IsStageEnabled(SMAA)`, so even with all three
+    // pipelines bound the SMAA pass must stay silent here (mirroring
+    // `SMAASkipsWhenAntiAliasingNotSMAA` below).
     Graphics::PostProcessSMAAPass smaa{post};
     smaa.SetEdgePipeline(RHI::PipelineHandle{23u, 1u});
     smaa.SetBlendPipeline(RHI::PipelineHandle{27u, 1u});
     smaa.SetResolvePipeline(RHI::PipelineHandle{28u, 1u});
     RecordingCommandContext smaaCmd;
-    smaa.Execute(smaaCmd, camera);
+    smaa.ExecuteEdge(smaaCmd, camera);
+    smaa.ExecuteBlend(smaaCmd, camera);
+    smaa.ExecuteResolve(smaaCmd, camera);
     EXPECT_TRUE(smaaCmd.Events.empty());
 
     Graphics::PostProcessFXAAPass fxaa{post};
@@ -872,7 +972,9 @@ TEST(GraphicsPostProcessChainContract, SMAAPushFeedsNonZeroInvResolutionForAllSt
     smaa.SetBlendPipeline(RHI::PipelineHandle{91u, 1u});
     smaa.SetResolvePipeline(RHI::PipelineHandle{92u, 1u});
     RecordingCommandContext cmd;
-    smaa.Execute(cmd, camera);
+    smaa.ExecuteEdge(cmd, camera);
+    smaa.ExecuteBlend(cmd, camera);
+    smaa.ExecuteResolve(cmd, camera);
 
     // Three Bind/Push/Draw triples: edge, blend, resolve.
     ASSERT_EQ(cmd.Events.size(), 9u);
@@ -942,7 +1044,13 @@ TEST(GraphicsPostProcessChainContract, SMAASkipsWhenAntiAliasingNotSMAA)
     camera.ViewportWidth = 1280.0f;
     camera.ViewportHeight = 720.0f;
 
-    // AntiAliasing == None — SMAA must stay silent.
+    auto driveAllStages = [&](Graphics::PostProcessSMAAPass& pass, RecordingCommandContext& sink) {
+        pass.ExecuteEdge(sink, camera);
+        pass.ExecuteBlend(sink, camera);
+        pass.ExecuteResolve(sink, camera);
+    };
+
+    // AntiAliasing == None — every SMAA per-stage body must stay silent.
     post.SetSettings(Graphics::PostProcessSettings{
         .Enabled = true,
         .AntiAliasing = Graphics::PostProcessAntiAliasing::None,
@@ -952,7 +1060,7 @@ TEST(GraphicsPostProcessChainContract, SMAASkipsWhenAntiAliasingNotSMAA)
     smaaNone.SetBlendPipeline(RHI::PipelineHandle{94u, 1u});
     smaaNone.SetResolvePipeline(RHI::PipelineHandle{95u, 1u});
     RecordingCommandContext noneCmd;
-    smaaNone.Execute(noneCmd, camera);
+    driveAllStages(smaaNone, noneCmd);
     EXPECT_TRUE(noneCmd.Events.empty());
 
     // AntiAliasing == FXAA — SMAA still stays silent (mutually exclusive
@@ -966,10 +1074,11 @@ TEST(GraphicsPostProcessChainContract, SMAASkipsWhenAntiAliasingNotSMAA)
     smaaFxaa.SetBlendPipeline(RHI::PipelineHandle{97u, 1u});
     smaaFxaa.SetResolvePipeline(RHI::PipelineHandle{98u, 1u});
     RecordingCommandContext fxaaCmd;
-    smaaFxaa.Execute(fxaaCmd, camera);
+    driveAllStages(smaaFxaa, fxaaCmd);
     EXPECT_TRUE(fxaaCmd.Events.empty());
 
-    // AntiAliasing == SMAA — SMAA records three Bind/Push/Draw triples.
+    // AntiAliasing == SMAA — SMAA records three Bind/Push/Draw triples
+    // (one per per-stage Execute).
     post.SetSettings(Graphics::PostProcessSettings{
         .Enabled = true,
         .AntiAliasing = Graphics::PostProcessAntiAliasing::SMAA,
@@ -979,7 +1088,7 @@ TEST(GraphicsPostProcessChainContract, SMAASkipsWhenAntiAliasingNotSMAA)
     smaaActive.SetBlendPipeline(RHI::PipelineHandle{100u, 1u});
     smaaActive.SetResolvePipeline(RHI::PipelineHandle{101u, 1u});
     RecordingCommandContext activeCmd;
-    smaaActive.Execute(activeCmd, camera);
+    driveAllStages(smaaActive, activeCmd);
     ASSERT_EQ(activeCmd.Events.size(), 9u);
     EXPECT_EQ(activeCmd.Events[0].Kind, EventKind::BindPipeline);
     EXPECT_EQ(activeCmd.Events[3].Kind, EventKind::BindPipeline);
@@ -1006,11 +1115,15 @@ TEST(GraphicsPostProcessChainContract, SMAARecordsPerStageIndependently)
     camera.ViewportHeight = 720.0f;
 
     // Only the edge pipeline is bound — the blend + resolve stages stay
-    // silent.
+    // silent. Driving every per-stage Execute mirrors the renderer's
+    // three ordered AA graph passes; the missing pipelines short-circuit
+    // their per-stage body.
     Graphics::PostProcessSMAAPass edgeOnly{post};
     edgeOnly.SetEdgePipeline(RHI::PipelineHandle{110u, 1u});
     RecordingCommandContext edgeOnlyCmd;
-    edgeOnly.Execute(edgeOnlyCmd, camera);
+    edgeOnly.ExecuteEdge(edgeOnlyCmd, camera);
+    edgeOnly.ExecuteBlend(edgeOnlyCmd, camera);
+    edgeOnly.ExecuteResolve(edgeOnlyCmd, camera);
     ASSERT_EQ(edgeOnlyCmd.Events.size(), 3u);
     EXPECT_EQ(edgeOnlyCmd.LastPushConstantSize,
               sizeof(Graphics::PostProcessSMAAEdgePushConstants));
@@ -1020,7 +1133,9 @@ TEST(GraphicsPostProcessChainContract, SMAARecordsPerStageIndependently)
     Graphics::PostProcessSMAAPass resolveOnly{post};
     resolveOnly.SetResolvePipeline(RHI::PipelineHandle{111u, 1u});
     RecordingCommandContext resolveOnlyCmd;
-    resolveOnly.Execute(resolveOnlyCmd, camera);
+    resolveOnly.ExecuteEdge(resolveOnlyCmd, camera);
+    resolveOnly.ExecuteBlend(resolveOnlyCmd, camera);
+    resolveOnly.ExecuteResolve(resolveOnlyCmd, camera);
     ASSERT_EQ(resolveOnlyCmd.Events.size(), 3u);
     EXPECT_EQ(resolveOnlyCmd.LastPushConstantSize,
               sizeof(Graphics::PostProcessSMAAResolvePushConstants));

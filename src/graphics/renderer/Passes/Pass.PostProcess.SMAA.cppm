@@ -95,16 +95,19 @@ namespace Extrinsic::Graphics
 		float viewportWidth,
 		float viewportHeight) noexcept;
 
-	// GRAPHICS-075 Slice D.1 — `PostProcessSMAAPass` reshapes to hold
-	// three pipelines (edge → blend → resolve) executed in sequence when
-	// `PostProcessSettings::AntiAliasing == SMAA`. The pass body is the
-	// SMAA analogue of the bloom helper's "structurally-recorded no-op"
-	// taxonomy: when AA is gated off (`None` or `FXAA`) the body emits
-	// no bind/push/draw events, but the umbrella helper still returns
-	// `Recorded` under the `"PostProcessAAPass"` accumulator. Retained
+	// GRAPHICS-075 Slice D.2a — `PostProcessSMAAPass` exposes per-stage
+	// `Execute{Edge,Blend,Resolve}(...)` so the renderer can fan each
+	// stage out under its own ordered graph pass
+	// (`"PostProcessAA{Edge,Blend,Resolve}Pass"`), with edge / blend /
+	// resolve targeting format-incompatible color attachments
+	// (`RG8_UNORM` / `RGBA8_UNORM` / backbuffer format). The pass body
+	// is the SMAA analogue of the bloom helper's "structurally-recorded
+	// no-op" taxonomy: when AA is gated off (`None` or `FXAA`) every
+	// per-stage Execute emits no bind/push/draw, but the umbrella
+	// helpers still return `Recorded` under their accumulators. Retained
 	// `AreaTex` / `SearchTex` LUTs (sampled by the blend pipeline) land
-	// in Slice D.2 alongside the recipe-side
-	// `PostProcess.AATemp.{Edges,Weights}` split.
+	// in Slice D.2b alongside the device-aware `Initialize(device)`
+	// overload.
 	export class PostProcessSMAAPass
 	{
 	public:
@@ -117,7 +120,9 @@ namespace Extrinsic::Graphics
 		void SetBlendPipeline(RHI::PipelineHandle pipeline) noexcept;
 		void SetResolvePipeline(RHI::PipelineHandle pipeline) noexcept;
 
-		void Execute(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
+		void ExecuteEdge(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
+		void ExecuteBlend(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
+		void ExecuteResolve(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera);
 
 	private:
 		PostProcessSystem& m_PostProcessSystem;

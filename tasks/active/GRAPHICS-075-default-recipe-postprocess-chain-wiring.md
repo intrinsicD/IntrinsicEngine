@@ -2,52 +2,50 @@
 
 ## Status
 
-- State: in-progress (Slice D.2 design clarification — Slice D.2 splits
-  into D.2a + D.2b; see slice plan). Maturity reached so far: Slice A
-  closed `Scaffolded → CPUContracted` on the ToneMap leaf and the
-  `"PostProcessPass"` umbrella executor branch (merged via PR #902);
-  Slice B.1 added the bloom downsample + upsample pipeline leases +
-  `RecordPostProcessBloomPass(...)` umbrella fan-out and closed
-  `Scaffolded → CPUContracted` on both bloom pipelines; Slice B.2 added
-  per-mip iteration + recipe-side `BloomScratch.MipLevels` clamping +
-  the multi-mip barrier-sequence contract test (merged via PR #904) and
-  closed bloom toward `Operational` on the CPU/null gate; Slice C added
-  the FXAA pipeline + `RecordPostProcessFXAAPass(...)` umbrella fan-out
-  + `PostProcessFXAAPushConstants` 20-byte std430 push block + contract
-  tests and closed `Scaffolded → CPUContracted` on the FXAA leaf (merged
-  via PR #906). Slice D.1 added the three SMAA pipelines (edge / blend /
-  resolve) + their 16-byte std430 push blocks +
-  `RecordPostProcessSMAAPass(...)` umbrella fan-out under the same
+- State: in-progress (Slice D.2a landed; Slice D.2b queued next).
+  Maturity reached so far: Slice A closed `Scaffolded → CPUContracted`
+  on the ToneMap leaf and the `"PostProcessPass"` umbrella executor
+  branch (merged via PR #902); Slice B.1 added the bloom downsample +
+  upsample pipeline leases + `RecordPostProcessBloomPass(...)`
+  umbrella fan-out and closed `Scaffolded → CPUContracted` on both
+  bloom pipelines; Slice B.2 added per-mip iteration + recipe-side
+  `BloomScratch.MipLevels` clamping + the multi-mip barrier-sequence
+  contract test (merged via PR #904) and closed bloom toward
+  `Operational` on the CPU/null gate; Slice C added the FXAA pipeline
+  + `RecordPostProcessFXAAPass(...)` umbrella fan-out +
+  `PostProcessFXAAPushConstants` 20-byte std430 push block + contract
+  tests and closed `Scaffolded → CPUContracted` on the FXAA leaf
+  (merged via PR #906). Slice D.1 added the three SMAA pipelines
+  (edge / blend / resolve) + their 16-byte std430 push blocks +
+  `RecordPostProcessSMAAPass(...)` umbrella fan-out under the single
   `"PostProcessAAPass"` graph pass + contract tests and closed
   `Scaffolded → CPUContracted` on the SMAA pipeline-scaffold leaf
-  (merged via PR #907; commits `ca60ac9` + `94c41f0`). All three SMAA
-  pipelines currently share the single backbuffer-format `AATemp` color
-  attachment per the Slice D.1 scope; the edge/blend format flip + the
-  retained `AreaTex` / `SearchTex` LUT allocation are owned by Slice
-  D.2 — the slice plan below now splits Slice D.2 into D.2a (AA
-  umbrella restructuring + recipe rename + edge / blend pipeline format
-  flip + contract tests) and D.2b (retained LUTs + exposure-adaptation
-  history buffer + device-aware `PostProcessSystem::Initialize(device)`
-  overload + `Shutdown()` release + survive-rebuild contract test),
-  because the original Slice D.2 description coupled an AA-umbrella
-  architectural change to a 510-line legacy LUT port and exceeded the
-  reviewable-patch ceiling that Slice B (B.1 / B.2) and Slice D (D.1 /
-  D.2) already follow.
+  (merged via PR #907; commits `ca60ac9` + `94c41f0`). Slice D.2a
+  landed on branch
+  `claude/intrinsicengine-agent-onboarding-32x02`: the AA umbrella
+  splits into three ordered graph passes
+  (`"PostProcessAA{Edge,Blend,Resolve}Pass"`), the recipe declares
+  three matched-format `PostProcess.AATemp.{Edges,Weights,Resolved}`
+  transients (`RG8_UNORM` / `RGBA8_UNORM` / backbuffer format), edge /
+  blend pipeline descs are fixed at their matched formats,
+  `PostProcessSMAAPass` exposes per-stage
+  `Execute{Edge,Blend,Resolve}` methods, per-pass renderer helpers
+  (`RecordPostProcessAA{Edge,Blend,Resolve}Pass`) route FXAA under the
+  resolve pass only and SMAA across all three, and `presentSource`
+  flips to `PostProcess.AATemp.Resolved` when
+  `FrameRecipeFeatures::EnableAntiAliasing` is set (renderer plumbs
+  this from `PostProcessSettings::AntiAliasing != None`). Slice D.2a
+  closes `CPUContracted → Operational` on the SMAA pipeline leaf for
+  the CPU/null gate; the retained LUT side stays with D.2b.
 - Owner/agent: local agent workflow.
-- Branch: Slice D.2 design clarification on
-  `claude/intrinsicengine-agent-onboarding-wxQKt`; Slice D.2a / D.2b
-  branches TBD.
-- Activated: 2026-05-21 — first unblocked Theme A default-recipe leaf after
-  GRAPHICS-074 retirement.
-- Next verification step: implement Slice D.2a (AA umbrella restructuring
-  + recipe rename `PostProcess.AATemp` → `PostProcess.AATemp.{Edges,
-  Weights,Resolved}` + edge / blend pipeline format flip to
-  `RG8_UNORM` / `RGBA8_UNORM` + contract test updates) in a follow-up
-  session; D.2b (retained `AreaTex` / `SearchTex` LUTs +
-  exposure-adaptation history buffer + device-aware
-  `PostProcessSystem::Initialize(device)` overload +
-  survive-rebuild contract test) lands after D.2a's CPU/null contract
-  gate is green.
+- Branch: Slice D.2a on `claude/intrinsicengine-agent-onboarding-32x02`;
+  Slice D.2b branch TBD.
+- Activated: 2026-05-21 — first unblocked Theme A default-recipe leaf
+  after GRAPHICS-074 retirement.
+- Next verification step: open Slice D.2b (retained `AreaTex` /
+  `SearchTex` LUT textures + exposure-adaptation history buffer +
+  device-aware `PostProcessSystem::Initialize(device)` overload +
+  survive-rebuild contract test) in a follow-up session.
 
 ## Slice plan
 
@@ -383,9 +381,9 @@ a readback drain.
 
 ## Required changes
 - [x] **Slice A**: `NullRenderer` owns `m_PostProcessToneMapPass` + `m_PostProcessToneMapPipelineLease`; emplaced alongside the existing GRAPHICS-070..074 passes, reset in `Shutdown()` before `m_PostProcessSystem` is reset. Tonemap pipeline created in `InitializeOperationalPassResources(device)` from `BuildPostProcessToneMapPipelineDesc()` (vertex `post_fullscreen.vert.spv` + fragment `post_tonemap.frag.spv`, single backbuffer-format color target, no depth, `PushConstantSize = sizeof(PostProcessPushConstants)`); republished byte-identical across `RebuildOperationalResources()`. `"PostProcessPass"` executor branch routes through `RecordPostProcessToneMapPass(...)` with the recorded `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy. `IRenderer` exposes `GetPostProcessToneMapPipeline()` / `GetPostProcessToneMapPipelineDesc()`.
-- [ ] **Slice D.2a**: Recipe-side rename — `BuildDefaultFrameRecipe` replaces `PostProcess.AATemp` with `PostProcess.AATemp.{Edges,Weights,Resolved}` (formats `RG8_UNORM` / `RGBA8_UNORM` / `sizing.BackbufferFormat`); the single `"PostProcessAAPass"` pass declaration is replaced by three ordered passes (`"PostProcessAAEdgePass"`, `"PostProcessAABlendPass"`, `"PostProcessAAResolvePass"`), each declaring a single matched-format `Write`. `FrameRecipeResourceKind::PostProcessAATemp` becomes `PostProcessAATempEdges` / `PostProcessAATempWeights` / `PostProcessAATempResolved`; `FrameRecipePassKind::PostProcessAA` becomes `PostProcessAAEdge` / `PostProcessAABlend` / `PostProcessAAResolve`. `BuildAndCompileDefaultFrameGraph` creates all three transients and declares the matching `Read` / `Write` edges; `presentSource` flips to `PostProcess.AATemp.Resolved` when `AntiAliasing != None`.
-- [ ] **Slice D.2a**: Pipeline format flip — `BuildPostProcessSMAAEdgePipelineDesc` is fixed at `RG8_UNORM`; `BuildPostProcessSMAABlendPipelineDesc` is fixed at `RGBA8_UNORM`; `BuildPostProcessSMAAResolvePipelineDesc` + `BuildPostProcessFXAAPipelineDesc` keep `m_BackbufferFormat`. The Slice D.1 SMAA pipeline descs are republished with the new fixed formats; existing leases are reset/rebuilt across `RebuildOperationalResources()` byte-identical.
-- [ ] **Slice D.2a**: Pass-body slicing — the existing `RecordPostProcessFXAAPass(...)` / `RecordPostProcessSMAAPass(...)` helpers split into per-stage helpers (`RecordPostProcessAAEdgePass(...)`, `RecordPostProcessAABlendPass(...)`, `RecordPostProcessAAResolvePass(...)`). FXAA records under the resolve pass only; SMAA records under all three. The `IsStageEnabled` selector stays per pass body; stage-disabled bodies stay no-op while the helper still reports `Recorded` (same "structurally-recorded no-op" taxonomy bloom + Slice C use).
+- [x] **Slice D.2a**: Recipe-side rename — `BuildDefaultFrameRecipe` replaces `PostProcess.AATemp` with `PostProcess.AATemp.{Edges,Weights,Resolved}` (formats `RG8_UNORM` / `RGBA8_UNORM` / `sizing.BackbufferFormat`); the single `"PostProcessAAPass"` pass declaration is replaced by three ordered passes (`"PostProcessAAEdgePass"`, `"PostProcessAABlendPass"`, `"PostProcessAAResolvePass"`), each declaring a single matched-format `Write`. `FrameRecipeResourceKind::PostProcessAATemp` becomes `PostProcessAATempEdges` / `PostProcessAATempWeights` / `PostProcessAATempResolved`; `FrameRecipePassKind::PostProcessAA` becomes `PostProcessAAEdge` / `PostProcessAABlend` / `PostProcessAAResolve`. `BuildAndCompileDefaultFrameGraph` creates all three transients and declares the matching `Read` / `Write` edges; `presentSource` flips to `PostProcess.AATemp.Resolved` when `FrameRecipeFeatures::EnableAntiAliasing` is set (renderer plumbs this from `PostProcessSettings::AntiAliasing != None`).
+- [x] **Slice D.2a**: Pipeline format flip — `BuildPostProcessSMAAEdgePipelineDesc` is fixed at `RG8_UNORM` (no longer parameterised); `BuildPostProcessSMAABlendPipelineDesc` is fixed at `RGBA8_UNORM` (no longer parameterised); `BuildPostProcessSMAAResolvePipelineDesc` + `BuildPostProcessFXAAPipelineDesc` keep `m_BackbufferFormat`. The Slice D.1 SMAA pipeline descs are republished with the new fixed formats; existing leases are reset/rebuilt across `RebuildOperationalResources()` byte-identical.
+- [x] **Slice D.2a**: Pass-body slicing — `PostProcessSMAAPass::Execute` is split into `ExecuteEdge` / `ExecuteBlend` / `ExecuteResolve` per-stage methods; the existing `RecordPostProcessFXAAPass(...)` / `RecordPostProcessSMAAPass(...)` helpers are replaced by per-stage helpers (`RecordPostProcessAAEdgePass(...)`, `RecordPostProcessAABlendPass(...)`, `RecordPostProcessAAResolvePass(...)`). FXAA records under the resolve pass only; SMAA records under all three. Each per-stage body's `IsStageEnabled` selector stays in place; stage-disabled bodies stay no-op while the helper still reports `Recorded` (same "structurally-recorded no-op" taxonomy bloom + Slice C use).
 - [ ] **Slice D.2b**: In `PostProcessSystem::Initialize(device)`: allocate the SMAA `AreaTex` (`R8G8_UNORM`, 160×560) and `SearchTex` (`R8_UNORM`, 66×33) LUT textures via `RHI::TextureManager::Create(...)`; upload their LUT bytes via `IDevice::GetTransferQueue().UploadTexture()` (LUT bytes ported from `src/legacy/Graphics/Passes/Graphics.SMAALookupTextures.hpp`); allocate the exposure-adaptation history buffer (`previous_average_log_lum`, `adaptation_velocity`, `frame_index`).
 - [ ] **Slice D.2b**: `PostProcessSystem::Shutdown()` frees all retained resources.
 - [ ] In `NullRenderer::InitializeOperationalPassResources(device)`, create:
@@ -412,24 +410,33 @@ a readback drain.
   - `SMAAPushFeedsNonZeroInvResolutionForAllStages` drives the pass body with all three pipelines bound + `AntiAliasing == SMAA`, asserts the recorded event stream is 3× Bind/Push/Draw (edge → blend → resolve), and pins each builder's `InvResolution = 1 / vec2(viewportWidth, viewportHeight)` plus SMAA reference defaults (`EdgeThreshold = 0.1`, `MaxSearchSteps = 16`, `MaxSearchStepsDiag = 8`).
   - `SMAASkipsWhenAntiAliasingNotSMAA` asserts the pass body emits no bind/push/draw for `AntiAliasing == None` and `AntiAliasing == FXAA`, and records the 3× Bind/Push/Draw triple for `AntiAliasing == SMAA`. This pins the FXAA/SMAA mutual-exclusion invariant from the SMAA side (mirrors `FXAASkipsWhenAntiAliasingNotFXAA`).
   - `SMAARecordsPerStageIndependently` exercises partial pipeline outage (edge-only / resolve-only), confirming each stage's bind/push/draw is independently gated on its own `IsValid()` (mirrors the bloom helper's per-stage early-skip).
-- [ ] **Slice D.2a**: `contract;graphics` tests:
-  - `PostProcessSMAAPipelinesSurviveOperationalRebuild` updates to assert
-    edge → `RG8_UNORM`, blend → `RGBA8_UNORM`, resolve → backbuffer format
-    authoritatively (Slice D.1's currently-uniform backbuffer-format claim
-    on edge/blend was scaffold-only and is replaced).
-  - `FrameRecipeSplitsAAUmbrellaPerStage` asserts the three ordered AA
-    passes' `Read` / `Write` declarations, that no single graph pass writes
-    two color attachments with incompatible formats, and that
-    `presentSource` flips to `PostProcess.AATemp.Resolved` when AA is
-    enabled.
-  - `FrameRecipeContract.DefaultRecipeBuildsCanonicalPassOrder` replaces
-    `"PostProcessAAPass"` with `"PostProcessAAEdgePass"`,
+- [x] **Slice D.2a**: `contract;graphics` tests:
+  - `PostProcessSMAAPipelinesSurviveOperationalRebuild` now asserts
+    edge → `RG8_UNORM`, blend → `RGBA8_UNORM`, resolve → backbuffer
+    format authoritatively.
+  - `FrameRecipeSplitsAAUmbrellaPerStage` asserts the three ordered
+    AA passes' `Read` / `Write` declarations and that each declares a
+    single matched-format `Write` (so no single graph pass writes two
+    color attachments with incompatible formats).
+  - `AntiAliasingFlipsPresentSourceToResolved` asserts that
+    `presentSource` flips to `PostProcess.AATemp.Resolved` when
+    `FrameRecipeFeatures::EnableAntiAliasing = true` and stays on
+    `SceneColorLDR` otherwise (observed via the compiled Present
+    pass's `ReadTextures`).
+  - `FrameRecipeContract.DefaultRecipeBuildsCanonicalPassOrder`
+    replaces `"PostProcessAAPass"` with `"PostProcessAAEdgePass"`,
     `"PostProcessAABlendPass"`, `"PostProcessAAResolvePass"` between
     `"PostProcessPass"` and `"ImGuiPass"`.
   - `RendererFrameLifecycle.UsesDeviceFrameLifecycleBackbufferAndCommandContext`
     (+ rebuild / depth-failure / culling-failure variants) bumps the
-    recorded-pass counter from 8/7/3 to 10/9/5; `kRoutedPasses` adds the
-    three new pass names (replacing the single `"PostProcessAAPass"`).
+    recorded-pass counter from 9/9/8/4 to 10/10/9/5; `kRoutedPasses`
+    adds the three new pass names (replacing the single
+    `"PostProcessAAPass"`).
+  - `GraphicsPostProcessChainContract.PassesRecordOnlyEnabledStages` /
+    `SMAAPushFeedsNonZeroInvResolutionForAllStages` /
+    `SMAASkipsWhenAntiAliasingNotSMAA` /
+    `SMAARecordsPerStageIndependently` drive the SMAA pass through
+    its new per-stage Execute methods.
 - [ ] **Slice D.2b**: `contract;graphics` test `PostProcessSMAALookupTexturesSurviveOperationalRebuild` for retained `AreaTex`/`SearchTex` LUTs surviving `RebuildGpuResources()` byte-identical.
 - [ ] **Slice E**: `contract;graphics` test that the histogram readback drain calls `PostProcessSystem::PublishHistogramReadback` after the issuing frame's fence completes.
 - [ ] **Slice E**: `contract;graphics` test: `PostProcessDiagnostics` reports zero failure counters after a full chain init.
@@ -440,8 +447,9 @@ a readback drain.
 - [x] **Slice B.2**: `src/graphics/renderer/README.md` now records the bloom leg as operationally wired on the CPU/null gate (per-mip iteration over the canonical six-mip pyramid + inline `ColorAttachment ↔ ShaderRead` barriers + renderer-side per-frame `PostProcess.BloomScratch` handle republish); calls out Slices C/D/E as the remaining FXAA/SMAA/Histogram followups.
 - [x] **Slice C**: `src/graphics/renderer/README.md` now records the FXAA leg as CPU-contract wired behind a *separate* ordered graph pass (`"PostProcessAAPass"`) declared by the recipe with `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph compiler emits the read-after-write barrier the FXAA shader needs; calls out Slices D/E (SMAA shares the AA umbrella; Histogram fans out under `PostProcessPass`) as the remaining followups.
 - [x] **Slice D.1**: `src/graphics/renderer/README.md` now records the SMAA pipeline scaffold (three pipelines + per-shader push blocks + `RecordPostProcessSMAAPass(...)` umbrella fan-out under `"PostProcessAAPass"` alongside FXAA, mutually exclusive per `PostProcessSettings::AntiAliasing`) as CPU-contract wired; calls out Slice D.2 (retained `AreaTex` / `SearchTex` LUTs + exposure-adaptation history buffer + recipe-side `PostProcess.AATemp.{Edges,Weights}` rename) and Slice E (Histogram) as the remaining followups.
-- [ ] **Slice D.2a / D.2b / E**: Extend `src/graphics/renderer/README.md` as each remaining pass family lands.
-- [ ] **Any slice**: Update `docs/architecture/rendering-three-pass.md` if pipeline-order step numbers shift — Slice A: not applicable (the recipe-level umbrella stays at the same step). Slice C: not applicable (FXAA fan-out lands behind the same `"PostProcessPass"` umbrella step, no numbered-step reflow). Slice D.1: not applicable (SMAA fan-out shares the `"PostProcessAAPass"` umbrella already added by Slice C; no numbered-step reflow). Slice D.2a: required — the single `"PostProcessAAPass"` step expands into three ordered passes (`"PostProcessAAEdgePass"`, `"PostProcessAABlendPass"`, `"PostProcessAAResolvePass"`).
+- [x] **Slice D.2a**: `src/graphics/renderer/README.md` now records the AA umbrella split into three ordered graph passes + edge / blend pipeline format flip + per-stage SMAA Execute methods + per-pass renderer helpers + `presentSource` flip; calls out Slice D.2b (retained LUTs + exposure-adaptation history) and Slice E (Histogram) as the remaining followups.
+- [x] **Slice D.2a**: `docs/architecture/rendering-three-pass.md` updates the canonical pipeline-order list (single `PostProcessPass` step + three new `PostProcessAA{Edge,Blend,Resolve}Pass` steps), the frame-recipe transient table (single `PostProcess.AATemp` row replaced by three matched-format rows for `.Edges` / `.Weights` / `.Resolved`), and the SMAA/FXAA backend-follow-ups paragraph.
+- [ ] **Slice D.2b / E**: Extend `src/graphics/renderer/README.md` and `docs/architecture/rendering-three-pass.md` as the remaining slices land.
 
 ## Acceptance criteria
 - [x] **Slice A**: ToneMap pipeline records or `SkippedUnavailable` deterministically; `"PostProcessPass"` reports `Recorded` on the operational CPU/null gate.
@@ -449,7 +457,7 @@ a readback drain.
 - [x] **Slice B.2**: Bloom pass records the per-mip chain (or `SkippedUnavailable` when pipelines/system are missing) deterministically; the bloom mip-chain barrier-sequence contract test (`BloomMipChainBarrierSequence`) exercises the inline `ColorAttachment ↔ ShaderRead` barriers against a synthetic `PostProcess.BloomScratch` handle.
 - [x] **Slice C**: FXAA pass records (or `SkippedUnavailable` when pipeline/system are missing) deterministically; helper runs inside the *separate* `"PostProcessAAPass"` graph pass declared with `Read(SceneColorLDR) + Write(PostProcess.AATemp)` so the framegraph compiler emits the `SceneColorLDR ColorAttachment → ShaderRead` transition between the `PostProcessPass` (bloom + tonemap) and `PostProcessAAPass` (FXAA, SMAA Slice D) render-pass scopes — avoiding the read-after-write feedback hazard that would arise from sharing the umbrella. Default `AntiAliasing == None` short-circuits the pass body to a no-op while the helper still reports `Recorded` under the `"PostProcessAAPass"` accumulator (the same "structurally-recorded no-op" taxonomy the bloom helper follows when `EnableBloom = false`).
 - [x] **Slice D.1**: SMAA pass records (or each stage `SkippedUnavailable` when its pipeline is missing) deterministically; `RecordPostProcessSMAAPass(...)` runs inside the `"PostProcessAAPass"` graph pass alongside FXAA (mutually exclusive per `PostProcessSettings::AntiAliasing`, with the pass bodies' `IsStageEnabled` gate enforcing the selector). Default `AntiAliasing == None` short-circuits the SMAA pass body to a no-op while the helper still reports `Recorded` under the `"PostProcessAAPass"` accumulator (the same "structurally-recorded no-op" taxonomy FXAA already follows).
-- [ ] **Slice D.2a**: SMAA edge / blend / resolve passes each record (or `SkippedUnavailable` when the pipeline is missing) deterministically under their own `"PostProcessAA{Edge,Blend,Resolve}Pass"` ordered graph pass; FXAA records under `"PostProcessAAResolvePass"` only. The recipe declares `PostProcess.AATemp.{Edges,Weights,Resolved}` at `RG8_UNORM` / `RGBA8_UNORM` / backbuffer format; `presentSource` flips to `PostProcess.AATemp.Resolved` when `AntiAliasing != None` so the AA output reaches present.
+- [x] **Slice D.2a**: SMAA edge / blend / resolve passes each record (or `SkippedUnavailable` when the pipeline is missing) deterministically under their own `"PostProcessAA{Edge,Blend,Resolve}Pass"` ordered graph pass; FXAA records under `"PostProcessAAResolvePass"` only. The recipe declares `PostProcess.AATemp.{Edges,Weights,Resolved}` at `RG8_UNORM` / `RGBA8_UNORM` / backbuffer format; `presentSource` flips to `PostProcess.AATemp.Resolved` when `FrameRecipeFeatures::EnableAntiAliasing` is set so the AA output reaches present.
 - [ ] **Slice D.2b**: Retained `AreaTex` / `SearchTex` LUT textures + exposure-adaptation history buffer allocated via the device-aware `PostProcessSystem::Initialize(device)` overload survive `RebuildGpuResources()` byte-identical; `Shutdown()` releases them.
 - [ ] **Slice E**: Each remaining postprocess pass records or `SkippedUnavailable` deterministically.
 - [ ] **Slice E**: Histogram readback drain produces deterministic CPU-visible results.
@@ -458,6 +466,7 @@ a readback drain.
 - [x] **Slice B.2**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice B.2).
 - [x] **Slice C**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice C).
 - [x] **Slice D.1**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice D.1).
+- [x] **Slice D.2a**: No regression in CPU/null tests for non-postprocess passes (default gate passes after Slice D.2a).
 
 ## Verification
 ```bash
@@ -477,25 +486,28 @@ python3 tools/docs/check_doc_links.py --root .
 ## Next verification step
 - Slice D.1 has landed on `main` via PR #907 (commits `ca60ac9` +
   `94c41f0`) and the CPU/null contract gate stayed green.
-- Slice D.2 design clarification (this slice): no code changes — only
-  the task-file split into D.2a + D.2b and the AA-umbrella restructuring
-  design note above. Documentation validators:
-  ```bash
-  python3 tools/agents/check_task_policy.py --root . --strict
-  python3 tools/docs/check_doc_links.py --root .
-  ```
-- Slice D.2a verification (run from a build with
-  `clang-20`/`clang++-20`/`clang-scan-deps-20` on PATH, or pass the C/C++
-  compiler overrides as Slice 2 of GEOM-006 documents):
+- Slice D.2a landed on
+  `claude/intrinsicengine-agent-onboarding-32x02`. Verification run
+  in-session against a build with `clang-20`/`clang++-20`/
+  `clang-scan-deps-20`:
   ```bash
   cmake --preset ci
-  cmake --build --preset ci --target IntrinsicGraphicsContractTests
+  cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
   ctest --test-dir build/ci --output-on-failure -L 'contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   python3 tools/repo/check_layering.py --root src --strict
   python3 tools/docs/check_doc_links.py --root .
+  python3 tools/agents/check_task_policy.py --root . --strict
   ```
-- After Slice D.2a's CPU/null contract gate is green, open Slice D.2b
-  (retained `AreaTex` / `SearchTex` LUT textures +
-  exposure-adaptation history buffer allocated via the device-aware
+  Result: 196/196 contract tests passed (including the updated
+  `FrameRecipeContract.DefaultRecipeBuildsCanonicalPassOrder`,
+  `GraphicsPostProcessChainContract.FrameRecipeSplitsAAUmbrellaPerStage`,
+  `GraphicsPostProcessChainContract.AntiAliasingFlipsPresentSourceToResolved`,
+  per-stage SMAA recording tests, and
+  `RendererFrameLifecycle.PostProcessSMAAPipelinesSurviveOperationalRebuild`
+  with `RG8_UNORM` / `RGBA8_UNORM` edge / blend formats); layering
+  + doc-link + task-policy validators all clean.
+- After Slice D.2a, open Slice D.2b (retained `AreaTex` /
+  `SearchTex` LUT textures + exposure-adaptation history buffer
+  allocated via the device-aware
   `PostProcessSystem::Initialize(device)` overload + survive-rebuild
   contract test for the retained LUTs).

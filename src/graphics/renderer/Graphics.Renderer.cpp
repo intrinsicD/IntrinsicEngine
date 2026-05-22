@@ -354,13 +354,14 @@ namespace Extrinsic::Graphics
             // when the stage is disabled, mirroring the bloom helper's
             // "structurally-recorded no-op" taxonomy.
             m_PostProcessFXAAPass.emplace(*m_PostProcessSystem);
-            // GRAPHICS-075 Slice D.1 — SMAA pass shares the same lifetime
+            // GRAPHICS-075 Slice D.2a — SMAA pass shares the same lifetime
             // contract as the bloom + FXAA passes above. Mutually
             // exclusive with FXAA per `PostProcessSettings::AntiAliasing`;
-            // `IsStageEnabled(SMAA)` short-circuits the body to a no-op
-            // when AA is `None` or `FXAA`, while the umbrella helper still
-            // reports `Recorded` under the `"PostProcessAAPass"`
-            // accumulator. Per-stage pipeline leases (edge / blend /
+            // `IsStageEnabled(SMAA)` short-circuits the per-stage Execute
+            // calls to no-op when AA is `None` or `FXAA`, while the
+            // per-stage umbrella helpers still report `Recorded` under
+            // their `"PostProcessAA{Edge,Blend,Resolve}Pass"`
+            // accumulators. Per-stage pipeline leases (edge / blend /
             // resolve) are bound in `InitializeOperationalPassResources`.
             m_PostProcessSMAAPass.emplace(*m_PostProcessSystem);
             if (device.IsOperational())
@@ -1004,6 +1005,20 @@ namespace Extrinsic::Graphics
             // `Deferred` / `Hybrid` when set via `SetLightingPath(...)`.
             FrameRecipeFeatures defaultRecipeFeatures = DeriveDefaultFrameRecipeFeatures(renderWorld);
             defaultRecipeFeatures.LightingPath = m_LightingPath;
+            // GRAPHICS-075 Slice D.2a — flip `presentSource` to
+            // `PostProcess.AATemp.Resolved` only when the postprocess
+            // system reports a non-`None` AA selector. The AA pass
+            // bodies short-circuit on `AntiAliasing == None`, so
+            // consuming `AATemp.Resolved` from present in that mode
+            // would surface the (cleared / undefined) AA-resolved
+            // attachment instead of the freshly-written `SceneColorLDR`.
+            // `DeriveDefaultFrameRecipeFeatures` itself does not see
+            // `PostProcessSettings` (it is renderer-internal state, not
+            // a `RenderWorld` field), so plumb the flag here at the
+            // recipe-build call site.
+            defaultRecipeFeatures.EnableAntiAliasing =
+                m_PostProcessSystem.has_value() &&
+                m_PostProcessSystem->GetSettings().AntiAliasing != PostProcessAntiAliasing::None;
             const FrameRecipeBuildResult recipe = (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
                 ? BuildMinimalDebugSurfaceRecipe(m_RenderGraph, imports, sizing)
                 : BuildDefaultFrameRecipe(m_RenderGraph,
@@ -1416,14 +1431,14 @@ namespace Extrinsic::Graphics
                         // ToneMap so the bloom write naturally precedes the
                         // tonemap read of `PostProcess.BloomScratch` in
                         // recorded order. Slice C splits FXAA into its own
-                        // ordered graph pass (`"PostProcessAAPass"`, see
-                        // the dedicated executor branch below) so the
-                        // FXAA leg samples the freshly-written
-                        // `SceneColorLDR` through a proper framegraph
-                        // read-after-write barrier instead of aliasing
-                        // the umbrella's own color attachment mid-render-
-                        // pass. Slice E will add the Histogram sub-pass
-                        // behind this same branch. The status is
+                        // ordered graph pass, and Slice D.2a further
+                        // splits the AA umbrella into three ordered
+                        // passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`,
+                        // see the dedicated executor branches below) so
+                        // edge / blend / resolve pipelines can target
+                        // format-incompatible color attachments. Slice E
+                        // will add the Histogram sub-pass behind this
+                        // same `"PostProcessPass"` branch. The status is
                         // accumulated under the single `"PostProcessPass"`
                         // name to keep the executor's per-pass status
                         // taxonomy the same shape the rest of the recipe
@@ -1489,48 +1504,48 @@ namespace Extrinsic::Graphics
                             RecordPostProcessToneMapPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, toneMapStatus);
                     }
-                    else if (passName == std::string_view{"PostProcessAAPass"})
+                    else if (passName == std::string_view{"PostProcessAAEdgePass"})
                     {
-                        // GRAPHICS-075 Slice C — FXAA executes in its own
-                        // ordered graph pass after `PostProcessPass`, with
-                        // recipe-level `Read(SceneColorLDR) +
-                        // Write(PostProcess.AATemp)` declarations so the
-                        // framegraph compiler emits the
-                        // `SceneColorLDR ColorAttachment → ShaderRead`
-                        // transition between the two umbrella render-pass
-                        // scopes. Sharing the `PostProcessPass` umbrella
-                        // (as Slice C's first attempt did) would have made
-                        // FXAA's sampled-image read alias the umbrella's
-                        // own color attachment mid-render-pass — Vulkan's
-                        // read-after-write feedback hazard. The AA branch
-                        // is gated by `PostProcessSettings::AntiAliasing ==
-                        // FXAA` inside `PostProcessFXAAPass::Execute` (via
-                        // `IsStageEnabled(FXAA)`); `None` or `SMAA`
-                        // short-circuits the body to a no-op while the
+                        // GRAPHICS-075 Slice D.2a — the AA umbrella splits
+                        // into three ordered graph passes so edge / blend
+                        // / resolve pipelines can target format-
+                        // incompatible color attachments (`RG8_UNORM` /
+                        // `RGBA8_UNORM` / backbuffer). SMAA edge records
+                        // here when `AntiAliasing == SMAA`; otherwise the
+                        // pass body short-circuits to a no-op and the
                         // helper still returns `Recorded` under the same
-                        // "structurally-recorded no-op" taxonomy the
-                        // bloom helper follows when `EnableBloom = false`.
-                        // GRAPHICS-075 Slice D.1 — SMAA fans out behind
-                        // this same `"PostProcessAAPass"` branch alongside
-                        // FXAA, mutually exclusive per
-                        // `PostProcessSettings::AntiAliasing` (the pass
-                        // bodies' own `IsStageEnabled` gate enforces the
-                        // selector, so both helpers can run unconditionally
-                        // here and only the active stage emits
-                        // bind/push/draw). The umbrella accumulator merges
-                        // both helpers' status under the single
-                        // `"PostProcessAAPass"` pass name; the highest
-                        // status wins per `AccumulateCommandRecordStatus`'s
-                        // usual rules. Retained `AreaTex`/`SearchTex` LUT
-                        // textures + exposure-adaptation history buffer +
-                        // recipe-side `PostProcess.AATemp.{Edges,Weights}`
-                        // split land in Slice D.2.
-                        const RenderCommandPassStatus fxaaStatus =
-                            RecordPostProcessFXAAPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, fxaaStatus);
-                        const RenderCommandPassStatus smaaStatus =
-                            RecordPostProcessSMAAPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, smaaStatus);
+                        // "structurally-recorded no-op" taxonomy bloom
+                        // and FXAA already follow.
+                        const RenderCommandPassStatus status =
+                            RecordPostProcessAAEdgePass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"PostProcessAABlendPass"})
+                    {
+                        // GRAPHICS-075 Slice D.2a — SMAA blend records
+                        // here when `AntiAliasing == SMAA`; mutually
+                        // exclusive with FXAA, which records under the
+                        // resolve pass only.
+                        const RenderCommandPassStatus status =
+                            RecordPostProcessAABlendPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"PostProcessAAResolvePass"})
+                    {
+                        // GRAPHICS-075 Slice D.2a — both FXAA and SMAA
+                        // resolve write `PostProcess.AATemp.Resolved` in
+                        // the resolve graph pass. FXAA samples
+                        // `SceneColorLDR` directly; SMAA resolve samples
+                        // `SceneColorLDR` + `AATemp.Weights`. Both bodies
+                        // are gated on `IsStageEnabled` per
+                        // `PostProcessSettings::AntiAliasing`, so only
+                        // the active mode emits bind/push/draw; the
+                        // helper still returns `Recorded` when both
+                        // bodies short-circuit (e.g. `AntiAliasing ==
+                        // None`).
+                        const RenderCommandPassStatus status =
+                            RecordPostProcessAAResolvePass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
@@ -1893,7 +1908,7 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAAEdgePipelineDesc() const noexcept override
         {
-            return BuildPostProcessSMAAEdgePipelineDesc(m_BackbufferFormat);
+            return BuildPostProcessSMAAEdgePipelineDesc();
         }
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAABlendPipeline() const noexcept override
@@ -1908,7 +1923,7 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAABlendPipelineDesc() const noexcept override
         {
-            return BuildPostProcessSMAABlendPipelineDesc(m_BackbufferFormat);
+            return BuildPostProcessSMAABlendPipelineDesc();
         }
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAAResolvePipeline() const noexcept override
@@ -2661,33 +2676,31 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        // GRAPHICS-075 Slice D.1 — three default-recipe postprocess SMAA
-        // pipelines. Each pairs `post_fullscreen.vert.spv` with the
-        // matching SMAA fragment shader. All three pipelines target the
-        // current `PostProcess.AATemp` recipe attachment, which
-        // `BuildDefaultFrameRecipe` allocates with
-        // `FrameRecipeSizing::BackbufferFormat` — so the
-        // `colorFormat` parameter follows the same pattern the FXAA
-        // builder uses, and the renderer passes `m_BackbufferFormat`
-        // when it creates the lease. The Slice D.2 recipe-side
-        // `PostProcess.AATemp.{Edges,Weights}` split is what retargets
-        // edge to a 2-channel mask (`RG8_UNORM`) and blend to a 4-channel
-        // weights texture (`RGBA8_UNORM`); D.1 deliberately keeps the
-        // pipeline format aligned with the *current* AA attachment so
-        // the AA umbrella render pass / pipeline stay format-compatible
-        // on Vulkan (a mismatched attachment-vs-pipeline color format is
-        // a render-pass-compatibility rule violation and would fail
-        // validation or silently skip the bound stage). Push-constant
-        // sizes match each shader's std430 push block byte-for-byte (16
-        // bytes per stage); the canonical 20-byte
+        // GRAPHICS-075 Slice D.2a — three default-recipe postprocess SMAA
+        // pipelines, each pairing `post_fullscreen.vert.spv` with the
+        // matching SMAA fragment shader. The recipe's
+        // `PostProcess.AATemp.{Edges,Weights,Resolved}` split allocates
+        // three matched-format AA transients, so the edge pipeline is
+        // *fixed* at `RG8_UNORM`, the blend pipeline is *fixed* at
+        // `RGBA8_UNORM`, and the resolve pipeline keeps the
+        // backbuffer-format `colorFormat` parameter (mirroring the FXAA
+        // pipeline, which also writes to `AATemp.Resolved` under the
+        // resolve graph pass). The edge / blend formats are no longer
+        // parameterised because the recipe-level resource declarations
+        // pin them — letting a caller pass a different `colorFormat`
+        // would diverge from the recipe's AATemp.{Edges,Weights}
+        // attachment formats and either fail Vulkan's render-pass-
+        // compatibility rule or silently skip the bound stage. Push-
+        // constant sizes still match each shader's std430 push block
+        // byte-for-byte (16 bytes per stage); the canonical 20-byte
         // `PostProcessPushConstants` is intentionally not reused per the
         // "Shader push-constant compatibility policy" — see
         // `Pass.PostProcess.SMAA.cppm` for the aliasing rationale. The
         // retained `AreaTex` / `SearchTex` LUT textures sampled by the
-        // blend pipeline are owned by `PostProcessSystem` and allocated
-        // in Slice D.2.
-        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAAEdgePipelineDesc(
-            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        // blend pipeline are owned by `PostProcessSystem` and land in
+        // Slice D.2b alongside the device-aware `Initialize(device)`
+        // overload.
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAAEdgePipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
@@ -2703,20 +2716,18 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorTargetCount = 1u;
-            // Matches the current `PostProcess.AATemp` recipe attachment
-            // (allocated with `FrameRecipeSizing::BackbufferFormat`).
-            // Slice D.2 retargets to `RG8_UNORM` once the recipe declares
-            // `AATemp.Edges`; the shader's `outEdges = vec4(edges, 0, 0)`
-            // write still only carries useful data in .rg either way.
-            desc.ColorTargetFormats[0] = colorFormat;
+            // Fixed at `RG8_UNORM` to match the recipe's
+            // `PostProcess.AATemp.Edges` transient; the shader writes
+            // `vec2 edges` so the unused .ba channels would waste
+            // bandwidth on a wider target.
+            desc.ColorTargetFormats[0] = RHI::Format::RG8_UNORM;
             desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessSMAAEdgePushConstants));
             desc.DebugName = "Renderer.PostProcess.SMAA.Edge";
             return desc;
         }
 
-        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAABlendPipelineDesc(
-            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        [[nodiscard]] static RHI::PipelineDesc BuildPostProcessSMAABlendPipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
@@ -2732,14 +2743,13 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorTargetCount = 1u;
-            // Matches the current `PostProcess.AATemp` recipe attachment
-            // for the same render-pass-compatibility reason as the edge
-            // pipeline above. Slice D.2 retargets to `RGBA8_UNORM`
-            // explicitly once the recipe declares `AATemp.Weights`
-            // (which happens to be the same byte shape as the default
-            // backbuffer format, but the dependency must be on the
-            // *recipe* declaration rather than a coincidence).
-            desc.ColorTargetFormats[0] = colorFormat;
+            // Fixed at `RGBA8_UNORM` to match the recipe's
+            // `PostProcess.AATemp.Weights` transient (four-channel
+            // blending weights per the SMAA reference). Happens to share
+            // the byte shape of the default backbuffer format, but the
+            // dependency is on the *recipe* declaration, not the
+            // coincidence.
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA8_UNORM;
             desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessSMAABlendPushConstants));
             desc.DebugName = "Renderer.PostProcess.SMAA.Blend";
@@ -2763,12 +2773,13 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = false;
             desc.ColorTargetCount = 1u;
-            // Resolve writes the final anti-aliased LDR to the backbuffer
-            // format (same `colorFormat` parameter the FXAA pipeline
-            // takes) so it stays render-pass-compatible with the current
-            // `PostProcess.AATemp` attachment. Slice D.2's recipe-side
-            // change reroutes resolve's color target to the final LDR
-            // scene output once present routing flips to AATemp.Weights.
+            // Resolve writes the final anti-aliased LDR to
+            // `PostProcess.AATemp.Resolved`, which the recipe allocates
+            // with `FrameRecipeSizing::BackbufferFormat`. The FXAA
+            // pipeline writes the same resolved attachment and takes the
+            // same backbuffer-format `colorFormat` parameter, so both
+            // pipelines stay render-pass-compatible with the recipe's
+            // resolve graph pass.
             desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessSMAAResolvePushConstants));
@@ -3394,7 +3405,7 @@ namespace Extrinsic::Graphics
                 m_PostProcessSMAAPass->SetResolvePipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc postProcessSMAAEdgeDesc =
-                BuildPostProcessSMAAEdgePipelineDesc(m_BackbufferFormat);
+                BuildPostProcessSMAAEdgePipelineDesc();
             auto postProcessSMAAEdgePipeline = m_PipelineManager->Create(postProcessSMAAEdgeDesc);
             if (postProcessSMAAEdgePipeline.has_value())
             {
@@ -3411,7 +3422,7 @@ namespace Extrinsic::Graphics
                                 static_cast<int>(postProcessSMAAEdgePipeline.error()));
             }
             const RHI::PipelineDesc postProcessSMAABlendDesc =
-                BuildPostProcessSMAABlendPipelineDesc(m_BackbufferFormat);
+                BuildPostProcessSMAABlendPipelineDesc();
             auto postProcessSMAABlendPipeline = m_PipelineManager->Create(postProcessSMAABlendDesc);
             if (postProcessSMAABlendPipeline.has_value())
             {
@@ -4020,77 +4031,94 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-075 Slice C — default-recipe `"PostProcessPass"`
-        // umbrella FXAA helper. Same status taxonomy as the tonemap +
-        // bloom helpers above: a non-operational device returns
-        // `SkippedNonOperational`; a missing `PostProcessSystem` / pass /
-        // pipeline lease returns `SkippedUnavailable`. Otherwise the
-        // helper calls `PostProcessFXAAPass::Execute(...)`. The pass body
-        // independently gates on `IsStageEnabled(FXAA)` (driven by
-        // `PostProcessSettings::AntiAliasing == FXAA`), so when AA is set
-        // to `None` or `SMAA` the helper still returns `Recorded` even
-        // though the pass body emits no bind/push/draw — the same
-        // "structurally-recorded no-op" taxonomy Slice B.1 added for
-        // `EnableBloom = false`.
-        [[nodiscard]] RenderCommandPassStatus RecordPostProcessFXAAPass(RHI::ICommandContext& cmd,
-                                                                       const RHI::CameraUBO& camera)
+        // GRAPHICS-075 Slice D.2a — per-stage AA helpers. The AA umbrella
+        // splits into three ordered graph passes so edge / blend /
+        // resolve pipelines can target format-incompatible color
+        // attachments. FXAA records under the resolve pass only; SMAA
+        // records under all three. Each helper follows the same status
+        // taxonomy as the tonemap / bloom helpers: a non-operational
+        // device returns `SkippedNonOperational`; a missing system /
+        // pass / pipeline lease returns `SkippedUnavailable`; otherwise
+        // the helper invokes the matching per-stage Execute and returns
+        // `Recorded`. The pass body independently gates on
+        // `IsStageEnabled(...)` so when AA is gated off the body emits
+        // no bind/push/draw but the helper still records `Recorded`
+        // ("structurally-recorded no-op" taxonomy, same as bloom-
+        // disabled and the Slice D.1 SMAA/FXAA helpers).
+        [[nodiscard]] RenderCommandPassStatus RecordPostProcessAAEdgePass(RHI::ICommandContext& cmd,
+                                                                          const RHI::CameraUBO& camera)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
             if (!m_PostProcessSystem.has_value() ||
-                !m_PostProcessFXAAPass.has_value() ||
-                !m_PostProcessFXAAPipelineLease.has_value() ||
-                !m_PostProcessFXAAPipelineLease->IsValid())
+                !m_PostProcessSMAAPass.has_value() ||
+                !m_PostProcessSMAAEdgePipelineLease.has_value() ||
+                !m_PostProcessSMAAEdgePipelineLease->IsValid())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_PostProcessFXAAPass->Execute(cmd, camera);
+            m_PostProcessSMAAPass->ExecuteEdge(cmd, camera);
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-075 Slice D.1 — default-recipe `"PostProcessAAPass"`
-        // umbrella SMAA helper. Mirrors the bloom helper's "any-of-N
-        // pipelines valid" gate so a partial pipeline outage (e.g. only
-        // the edge shader compiles) still records the surviving stages
-        // rather than collapsing the whole SMAA leg into a
-        // `SkippedUnavailable`. The pass body independently gates on
-        // `IsStageEnabled(SMAA)` (driven by `PostProcessSettings::
-        // AntiAliasing == SMAA`), so when AA is set to `None` or `FXAA`
-        // the helper still returns `Recorded` even though the pass body
-        // emits no bind/push/draw — the same "structurally-recorded
-        // no-op" taxonomy the FXAA helper follows when AA is not FXAA.
-        // The umbrella accumulator merges the FXAA + SMAA helper status
-        // under the single `"PostProcessAAPass"` pass name. Retained
-        // `AreaTex` / `SearchTex` LUT textures (sampled by the blend
-        // pipeline) + exposure-adaptation history buffer + recipe-side
-        // `PostProcess.AATemp.{Edges,Weights}` split land in Slice D.2.
-        [[nodiscard]] RenderCommandPassStatus RecordPostProcessSMAAPass(RHI::ICommandContext& cmd,
-                                                                       const RHI::CameraUBO& camera)
+        [[nodiscard]] RenderCommandPassStatus RecordPostProcessAABlendPass(RHI::ICommandContext& cmd,
+                                                                           const RHI::CameraUBO& camera)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            const bool hasEdgePipeline =
-                m_PostProcessSMAAEdgePipelineLease.has_value() &&
-                m_PostProcessSMAAEdgePipelineLease->IsValid();
-            const bool hasBlendPipeline =
-                m_PostProcessSMAABlendPipelineLease.has_value() &&
-                m_PostProcessSMAABlendPipelineLease->IsValid();
+            if (!m_PostProcessSystem.has_value() ||
+                !m_PostProcessSMAAPass.has_value() ||
+                !m_PostProcessSMAABlendPipelineLease.has_value() ||
+                !m_PostProcessSMAABlendPipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_PostProcessSMAAPass->ExecuteBlend(cmd, camera);
+            return RenderCommandPassStatus::Recorded;
+        }
+
+        // Resolve fans out to both FXAA and SMAA resolve, mutually
+        // exclusive per `PostProcessSettings::AntiAliasing` (each pass
+        // body's `IsStageEnabled` gate enforces the selector). A
+        // missing FXAA OR resolve-stage pipeline only silences that
+        // sub-leg rather than collapsing the whole pass to
+        // `SkippedUnavailable`; the helper requires the system + the
+        // SMAA pass + at least one of the FXAA / SMAA-resolve leases.
+        [[nodiscard]] RenderCommandPassStatus RecordPostProcessAAResolvePass(RHI::ICommandContext& cmd,
+                                                                             const RHI::CameraUBO& camera)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            const bool hasFxaaPipeline =
+                m_PostProcessFXAAPipelineLease.has_value() &&
+                m_PostProcessFXAAPipelineLease->IsValid();
             const bool hasResolvePipeline =
                 m_PostProcessSMAAResolvePipelineLease.has_value() &&
                 m_PostProcessSMAAResolvePipelineLease->IsValid();
             if (!m_PostProcessSystem.has_value() ||
+                !m_PostProcessFXAAPass.has_value() ||
                 !m_PostProcessSMAAPass.has_value() ||
-                (!hasEdgePipeline && !hasBlendPipeline && !hasResolvePipeline))
+                (!hasFxaaPipeline && !hasResolvePipeline))
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_PostProcessSMAAPass->Execute(cmd, camera);
+            if (hasFxaaPipeline)
+            {
+                m_PostProcessFXAAPass->Execute(cmd, camera);
+            }
+            if (hasResolvePipeline)
+            {
+                m_PostProcessSMAAPass->ExecuteResolve(cmd, camera);
+            }
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -4356,15 +4384,17 @@ namespace Extrinsic::Graphics
         // GRAPHICS-075 Slice C — default-recipe postprocess FXAA pass.
         // Same lifetime contract as the tonemap + bloom passes above.
         std::optional<PostProcessFXAAPass>    m_PostProcessFXAAPass;
-        // GRAPHICS-075 Slice D.1 — default-recipe postprocess SMAA pass.
+        // GRAPHICS-075 Slice D.2a — default-recipe postprocess SMAA pass.
         // Holds the three SMAA pipelines (edge / blend / resolve) and
-        // runs alongside FXAA under the `"PostProcessAAPass"` umbrella
-        // executor branch (mutually exclusive per
-        // `PostProcessSettings::AntiAliasing`). Same lifetime contract as
+        // fans out across three ordered graph passes
+        // (`"PostProcessAA{Edge,Blend,Resolve}Pass"`); FXAA records on
+        // the resolve pass only. Mutually exclusive with FXAA per
+        // `PostProcessSettings::AntiAliasing` (each per-stage Execute
+        // gates on `IsStageEnabled(SMAA)`). Same lifetime contract as
         // the tonemap + bloom + FXAA passes above: emplaced after
-        // `m_PostProcessSystem` is initialised and before the operational
-        // publisher runs; reset before `m_PostProcessSystem` in
-        // `Shutdown()`.
+        // `m_PostProcessSystem` is initialised and before the
+        // operational publisher runs; reset before `m_PostProcessSystem`
+        // in `Shutdown()`.
         std::optional<PostProcessSMAAPass>    m_PostProcessSMAAPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;

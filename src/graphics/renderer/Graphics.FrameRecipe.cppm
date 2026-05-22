@@ -34,7 +34,14 @@ namespace Extrinsic::Graphics
         Line,
         Point,
         PostProcess,
-        PostProcessAA,
+        // GRAPHICS-075 Slice D.2a — the single `"PostProcessAAPass"` graph
+        // pass splits into three ordered AA passes so edge / blend / resolve
+        // pipelines can target format-incompatible color attachments
+        // (`RG8_UNORM` / `RGBA8_UNORM` / backbuffer format). FXAA records
+        // under `PostProcessAAResolve` only; SMAA records under all three.
+        PostProcessAAEdge,
+        PostProcessAABlend,
+        PostProcessAAResolve,
         SelectionOutline,
         DebugView,
         ImGui,
@@ -72,7 +79,15 @@ namespace Extrinsic::Graphics
         PickingReadback,
         PostProcessBloomScratch,
         PostProcessHistogram,
-        PostProcessAATemp,
+        // GRAPHICS-075 Slice D.2a — the single `PostProcess.AATemp`
+        // transient splits into three matched-format AA attachments so
+        // edge / blend / resolve graph passes can each Write a single
+        // matched-format color attachment. The resolved attachment is the
+        // backbuffer-format target that `presentSource` flips to when AA
+        // is enabled.
+        PostProcessAATempEdges,
+        PostProcessAATempWeights,
+        PostProcessAATempResolved,
     };
 
     export struct FrameRecipeFeatures
@@ -84,6 +99,15 @@ namespace Extrinsic::Graphics
         bool EnableSelectionOutline{false};
         bool EnableDebugView{false};
         bool EnablePostProcess{true};
+        // GRAPHICS-075 Slice D.2a — when set, `BuildDefaultFrameRecipe`
+        // flips `presentSource` from `SceneColorLDR` to
+        // `PostProcess.AATemp.Resolved` so the AA-resolved color reaches
+        // present. Recipe-build keeps allocating the three AA transients
+        // unconditionally (their allocation is gated on `EnablePostProcess`),
+        // but the present routing only consumes the resolved target when
+        // `PostProcessSettings::AntiAliasing != None`. The renderer derives
+        // this flag from `PostProcessSystem::GetSettings().AntiAliasing`.
+        bool EnableAntiAliasing{false};
         bool EnableImGui{true};
     };
 
