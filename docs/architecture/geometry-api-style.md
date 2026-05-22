@@ -112,10 +112,15 @@ randomness, or dependence on traversal order unless that order is specified.
   Orientation 2D/3D, signed-distance, in-plane triangle barycentric
   classification, and scale-aware epsilon helpers landed in
   `Geometry.RobustPredicates` (see [Geometry Architecture →
-  Robust predicates](geometry.md#robust-predicates)). Incircle/insphere,
-  intersection classification records, and adaptive-exact escalation remain
-  open under [`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md)
-  Slices 2 and 4.
+  Robust predicates](geometry.md#robust-predicates)). The records-only
+  sibling `Geometry.IntersectionClassification` adds the segment/segment,
+  segment/triangle, ray/triangle, triangle/triangle, and point/triangle
+  result vocabulary (see [Geometry Architecture → Intersection
+  classification records](geometry.md#intersection-classification-records)).
+  Incircle/insphere predicates and adaptive-exact escalation remain open
+  under [`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md):
+  incircle/insphere are out of the current slice plan and tracked as a
+  follow-up; adaptive-exact escalation is Slice 4.
 
 The preferred numerical direction is a hybrid GLM + Eigen3 policy: GLM remains the
 public geometry storage vocabulary, while Eigen may be introduced behind

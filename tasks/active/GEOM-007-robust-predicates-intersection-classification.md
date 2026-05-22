@@ -10,15 +10,40 @@
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
 ## Context
-- Status: backlog.
+- Status: in-progress (Slice 2).
+- Owner/agent: copilot.
+- Branch: main (single-slice landing per slice; promote to a feature branch if a slice batches multiple commits).
+- Next verification step: after Slice 2, run the focused ctest filter `RobustPredicates|IntersectionClassification` plus the layering / test-layout / doc-links / task-policy structural checks.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
-- Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
+- Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and called out by [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md) §"Numeric policy".
 - Current geometry code has many collision/query algorithms but lacks a common robust predicate policy for degeneracies, nearly coincident elements, and exact/filtered decisions.
 - This task should be completed before expanding booleans, remeshing, tetrahedralization, arrangements, or reconstruction robustness.
 
+## Slice plan
+
+- **Slice 1 (landed `1ac8720d`) — predicate foundation.** Narrow
+  `Geometry.RobustPredicates` module with orientation 2D/3D, signed-distance,
+  in-plane triangle barycentric classification, scale-aware epsilon helpers,
+  and `Sign`/`Certainty`/`BarycentricRegion` diagnostic enums plus the unit
+  test suite. No callsite refactors.
+- **Slice 2 (this PR) — intersection classification records.** Sibling module
+  `Geometry.IntersectionClassification` defining the result records and
+  intersection-kind enums for segment-segment, segment-triangle, ray-triangle,
+  triangle-triangle, and point-triangle incidence cases. Records only — no
+  intersection algorithms shipped, no existing caller refactored. Unit tests
+  cover default construction, enum values, and helpers (e.g. point/parameter
+  computation from a `Proper` segment-segment record).
+- **Slice 3 — callsite adoption.** Migrate existing geometry callsites one at
+  a time (likely `Raycast` triangle hit first) to consume the Slice 1
+  predicates and Slice 2 records, with parity tests. Each callsite is a
+  separate reviewable commit.
+- **Slice 4 — exact / adaptive escalation (optional).** Decide whether to add
+  Shewchuk-style adaptive predicates behind the same surface, or keep the
+  filtered-only policy and document caller fallback strategies.
+
 ## Required changes
 - [x] Slice 1: Define robust predicate APIs for orientation in 2D/3D, signed distance/classification, barycentric classification for in-plane triangle queries, and scale-aware comparisons. (`Geometry.RobustPredicates`)
-- [ ] Slice 2: Define intersection classification records for segment-segment, segment-triangle, ray-triangle, triangle-triangle, and point/edge/face incidence cases.
+- [x] Slice 2: Define intersection classification records for segment-segment, segment-triangle, ray-triangle, triangle-triangle, and point/edge/face incidence cases. (`Geometry.IntersectionClassification`)
 - [x] Slice 1: Add diagnostic enums that distinguish no intersection, proper intersection, touching, overlap, coplanar, degenerate input, and numerically uncertain cases (predicate side: `Sign`, `Certainty`, `BarycentricRegion`).
 - [x] Slice 1: First implementation is filtered double-precision evaluated from `glm::vec*<float>` inputs; exact/adaptive escalation is Slice 4.
 - [x] Slice 1: Add conversion helpers that interoperate with existing `glm::vec*` primitives without changing public storage types.
@@ -28,7 +53,8 @@
 ## Tests
 - [x] Slice 1: Add `tests/unit/geometry/Test.RobustPredicates.cpp` using the `Test.<Name>.cpp` naming style.
 - [x] Slice 1: Cover ordinary, degenerate, near-degenerate, coplanar, collinear, duplicate, and large/small scale cases.
-- [ ] Slice 2/3: Add regression-style cases for triangle/segment classification and barycentric boundary classification at callsite-adoption time.
+- [x] Slice 2: Add unit tests `tests/unit/geometry/Test.IntersectionClassification.cpp` covering default construction, enum value stability, and small helpers on the result records.
+- [ ] Slice 3: Add regression-style cases for triangle/segment classification and barycentric boundary classification at callsite-adoption time.
 - [x] Slice 1: Compare deterministic classification outputs against documented expectations.
 
 ## Docs

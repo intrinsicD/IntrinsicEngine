@@ -359,6 +359,7 @@ set(_geometry_test_files
     Test_NormalEstimation.cpp
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
+    Test.IntersectionClassification.cpp
     Test.RobustPredicates.cpp
     Test_SubmeshView.cpp
 )

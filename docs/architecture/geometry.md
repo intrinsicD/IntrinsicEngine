@@ -142,6 +142,54 @@ Numerical policy and limitations:
   existing callers in order to keep foundation-add and semantic refactor
   separate per the contract in [`AGENTS.md`](../../AGENTS.md) §5.
 
+## Intersection classification records
+
+`Geometry.IntersectionClassification` is the records-only sibling module
+introduced by [`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md)
+Slice 2. Like `Geometry.RobustPredicates`, it is **not** re-exported by the
+broad `Geometry` umbrella; callers must `import
+Geometry.IntersectionClassification;` explicitly. The module ships data
+records only — no intersection algorithm implementations — so it can land
+without rewriting existing callers. Surface:
+
+- `Kind` (`None`/`Proper`/`Touching`/`Overlap`/`Coplanar`/`Coincident`/
+  `DegenerateInput`/`Uncertain`) is the shared intersection-outcome vocabulary.
+- `SegmentFeature`, `RayFeature`, and `TriangleFeature` enums identify which
+  boundary feature of an operand is involved in a `Touching`/`Coplanar`
+  outcome.
+- Result records:
+  - `SegmentSegmentResult { Kind, OnA, OnB, ParamA, ParamB, Point, OverlapStart, OverlapEnd }`,
+  - `SegmentTriangleResult { Kind, OnSegment, OnTriangle, SegmentParam, WA/WB/WC, Point, OverlapStart, OverlapEnd }`,
+  - `RayTriangleResult { Kind, OnRay, OnTriangle, RayParam, WA/WB/WC, Point }`,
+  - `TriangleTriangleResult { Kind, OnA, OnB, ContactStart, ContactEnd, IsCoplanar }`,
+  - `PointTriangleResult { Kind, Feature, PlaneSide, PlaneSideCertainty, SignedPlaneDistance, WA/WB/WC }`.
+- Free helpers: `HasIntersection(Kind)`, `IsAmbiguous(Kind)`, and
+  `TriangleFeatureFromBarycentric(BarycentricRegion)`.
+
+Defaulting policy:
+
+- Every record defaults to `Kind::Uncertain`, every feature field to
+  `…::None`, every scalar to a `kUnspecified` quiet-NaN, and every point to
+  the origin. Callers can therefore never accidentally consume an unwritten
+  record as a valid intersection.
+- All records are trivially copyable (POD-shaped data envelopes); future
+  benchmark/serialization callers can rely on this.
+
+Numerical-uncertainty propagation:
+
+- When the underlying `Geometry.RobustPredicates` evaluation cannot decide
+  an outcome inside the filter band, the implementation should set
+  `Kind::Uncertain` and leave the geometric fields at their defaults rather
+  than guess. `PointTriangleResult` additionally carries the
+  `PlaneSide`/`PlaneSideCertainty` pair so callers can inspect the
+  underlying predicate diagnostic without re-running the predicate.
+
+Callsite adoption (`Geometry.Raycast`, `Geometry.Overlap`,
+`Geometry.Containment`, `Geometry.GJK`, etc.) is tracked as `GEOM-007`
+Slice 3; this Slice 2 add deliberately does not migrate existing callers in
+order to keep foundation-add and semantic refactor separate per the
+contract in [`AGENTS.md`](../../AGENTS.md) §5.
+
 ## Migration note
 
 As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining `src/legacy` geometry shims (if any) must be temporary, tracked, and removed via follow-up migration tasks.

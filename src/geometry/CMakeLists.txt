@@ -46,6 +46,7 @@ target_sources(${target_name}
         Geometry.HtexPatch.cppm
         Geometry.IO.cppm
         Geometry.ImplicitPlaneField.cppm
+        Geometry.IntersectionClassification.cppm
         Geometry.KDTree.cppm
         Geometry.KMeans.cppm
         Geometry.LinearSolver.cppm

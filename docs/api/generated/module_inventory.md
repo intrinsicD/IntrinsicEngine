@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 39 |
 | `ecs` | 26 |
-| `geometry` | 81 |
+| `geometry` | 82 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 52 |
@@ -143,6 +143,7 @@ Root scanned: `src`
 | `Geometry.HtexPatch` | `src/geometry/Geometry.HtexPatch.cppm` | `geometry` |
 | `Geometry.IO` | `src/geometry/Geometry.IO.cppm` | `geometry` |
 | `Geometry.ImplicitPlaneField` | `src/geometry/Geometry.ImplicitPlaneField.cppm` | `geometry` |
+| `Geometry.IntersectionClassification` | `src/geometry/Geometry.IntersectionClassification.cppm` | `geometry` |
 | `Geometry.KDTree` | `src/geometry/Geometry.KDTree.cppm` | `geometry` |
 | `Geometry.KMeans` | `src/geometry/Geometry.KMeans.cppm` | `geometry` |
 | `Geometry.LinearSolver` | `src/geometry/Geometry.LinearSolver.cppm` | `geometry` |
@@ -466,4 +467,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **439**
+Total modules: **440**
