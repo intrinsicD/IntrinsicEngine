@@ -72,8 +72,11 @@ loop is a debugging superpower.
 
 For race conditions in the task graph, async loaders, or the GPU queue, the
 goal is not a clean repro but a **higher reproduction rate**. Loop the trigger
-100×, add `--repeat until-fail` to ctest, run with TSan, narrow timing windows
-with `std::this_thread::sleep_for` injection. A 50%-flake bug is debuggable;
+100×, run the test under `ctest --repeat until-fail:100 -R <name>` (or the
+equivalent `ctest --repeat-until-fail 100 -R <name>` — both require an
+iteration count; bare `--repeat until-fail` is invalid and exits immediately),
+run with TSan, narrow timing windows with `std::this_thread::sleep_for`
+injection. A 50%-flake bug is debuggable;
 1% is not — keep raising the rate until it's debuggable.
 
 ### When you genuinely cannot build a loop
