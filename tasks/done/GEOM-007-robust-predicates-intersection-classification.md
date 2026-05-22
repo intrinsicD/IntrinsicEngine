@@ -24,15 +24,15 @@
   - `97aa7824` — Slice 3.3.d deferred to `GEOM-015`.
 - PR: TBD (filled in when the landing PR is opened).
 - Follow-up tasks promoted from the original Slice 3.3.d / Slice 4 plan:
-  - [`tasks/active/GEOM-015-gjk-termination-diagnostics.md`](../active/GEOM-015-gjk-termination-diagnostics.md)
-    owns the GJK + `Geometry.Support` tolerance audit and the
-    `RobustPredicates::ApproxZeroSq` migration.
+  - [`tasks/done/GEOM-015-gjk-termination-diagnostics.md`](./GEOM-015-gjk-termination-diagnostics.md)
+    owned the GJK + `Geometry.Support` tolerance audit and the
+    `RobustPredicates::ApproxZeroSq` migration; retired 2026-05-22.
   - Slice 4 (Shewchuk-style exact / adaptive escalation) remains
     optional; promote to its own paper-method-workflow task when a
     caller actually requires guaranteed signs.
 
 ## Context
-- Status: done; foundation + Slice 3 callsite adoption landed 2026-05-22. GJK termination follow-up is tracked at [`GEOM-015`](../active/GEOM-015-gjk-termination-diagnostics.md) and is not a reopen condition for this task.
+- Status: done; foundation + Slice 3 callsite adoption landed 2026-05-22. GJK termination follow-up was tracked at [`GEOM-015`](./GEOM-015-gjk-termination-diagnostics.md) (retired 2026-05-22) and is not a reopen condition for this task.
 - Owner/agent: copilot.
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
 - Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify` plus the layering / test-layout / doc-links / task-policy structural checks for Slice 3.3.a; extend the filter to `Overlap` / `Containment` (and add the new parity-battery test names) at the corresponding 3.3.b / 3.3.c commits.
@@ -133,7 +133,7 @@
       guard, not an orientation/incidence decision, so it does not map
       onto the current `RobustPredicates` predicate surface. Tracked as
       a dedicated backlog task at
-      [`tasks/active/GEOM-015-gjk-termination-diagnostics.md`](../active/GEOM-015-gjk-termination-diagnostics.md)
+      [`tasks/done/GEOM-015-gjk-termination-diagnostics.md`](./GEOM-015-gjk-termination-diagnostics.md)
       so the GEOM-007 foundation can close without owning a downstream
       algorithm-policy rewrite. Do not re-fold this into GEOM-007.
 - **Slice 4 — exact / adaptive escalation (optional).** Decide whether to add

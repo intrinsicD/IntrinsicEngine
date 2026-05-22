@@ -18,14 +18,38 @@
 - No paper-method-workflow work — Shewchuk-style adaptive predicates
   remain on the GEOM-007 Slice 4 / its own successor task.
 
+## Status
+- Status: done.
+- Completed: 2026-05-22.
+- Commits (oldest first):
+  - `c93ae0b` — Slice 1: `RobustPredicates::ApproxZeroSq` /
+    `ApproxZeroLen` helpers + unit tests (no callsite migration).
+  - `cd8f51a` — Slice 2: classify GJK callsites; migrate
+    `Geometry.Support` / `Geometry.SDFContact` original-space magnitude
+    guards to `RobustPredicates::ApproxZeroSq`.
+  - `04fda64` — Slice 2 fixup: axis-local scale for Ellipsoid /
+    Cylinder guards.
+  - `c91b832` — Slice 3: pin GJK normalized-workspace tolerance
+    contract (decision (i)); add `static_assert(GJK_EPSILON > 0 &&
+    GJK_EPSILON < 1)`; document the contract in
+    `docs/architecture/geometry.md`.
+  - `496f9bd` — Slice 4: surface GJK termination diagnostics
+    (`TerminationReason`, `GJKDiagnostics`) via four-argument overloads
+    of `GJK_Boolean` / `GJK_Intersection`; add the parity battery,
+    near-touching regression, and iteration-budget regression in
+    `tests/unit/geometry/Test_GJK.cpp`; extend the GJK tolerance
+    contract subsection.
+- PR: #915 (Slices 1–2), #917 (Slice 3), #919 (Slice 4).
+- Closes maturity at `Operational`: the diagnostics overload is wired
+  on the production GJK driver and is exercised by the parity battery
+  and iteration-budget regression in the default CPU gate.
+
 ## Context
-- Status: ready-to-retire (Slices 1–4 landed; pending acceptance-criteria
-  sign-off).
 - Owner/agent: copilot.
-- Branch: claude/active-geom-task-XWbO2 (Slice 4 lands here; Slice 3
-  landed on claude/active-geom-task-jaLRp via PR #917 on 2026-05-22;
-  Slices 1–2 landed on claude/nice-knuth-QStLa, merged via PR #915 on
-  2026-05-22).
+- Branches (landed): `claude/nice-knuth-QStLa` (Slices 1–2, PR #915),
+  `claude/active-geom-task-jaLRp` (Slice 3, PR #917),
+  `claude/active-geom-task-XWbO2` (Slice 4, PR #919). All merged to
+  `main` on 2026-05-22.
 - Owning subsystem/layer: `geometry` (`geometry -> core`; consumes
   `Geometry.RobustPredicates`).
 - Promoted from `tasks/backlog/geometry/` on 2026-05-22.
@@ -129,13 +153,10 @@ shared across all primitives.
 `Geometry.SDFContact.cppm` separation-axis guard migrated with scale =
 1.0 (gradients are unit-normalized in `CalculateGradient`).
 
-### Next verification step
+### Final verification
 
-Slice 4 landed on `claude/active-geom-task-XWbO2` (see commit log). All
-slice-level work for GEOM-015 is now complete; the task is ready to be
-retired to `tasks/done/` once the merge lands and the
-acceptance-criteria checkboxes above are confirmed by review. Slice 4
-verification rerun on landing:
+Slice 4 was the last open slice; all four slices have landed on `main`
+(see commit log above). Verification rerun on landing:
 `cmake --preset ci`
 `cmake --build --preset ci --target IntrinsicGeometryTests`
 `ctest --test-dir build/ci --output-on-failure -R 'GJK|Support|ContactManifold|Overlap|RobustPredicates' --timeout 60`
