@@ -10,10 +10,10 @@
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
 ## Context
-- Status: in-progress (Slice 3.2 — Runtime.Selection adoption landed; next up Slice 3.3 Overlap/Containment/GJK).
+- Status: in-progress (Slice 3.3 sub-plan recorded; next code commit is Slice 3.3.a — Hessian-plane predicate helper).
 - Owner/agent: copilot.
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
-- Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify|RuntimeSelection|ElementSelection` plus the layering / test-layout / doc-links / task-policy structural checks after each Slice 3.x callsite-adoption commit; once Raycast callers are migrated, repeat for `Overlap`, `Containment`, and `GJK`.
+- Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify` plus the layering / test-layout / doc-links / task-policy structural checks for Slice 3.3.a; extend the filter to `Overlap` / `Containment` (and add the new parity-battery test names) at the corresponding 3.3.b / 3.3.c commits.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and called out by [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md) §"Numeric policy".
 - Current geometry code has many collision/query algorithms but lacks a common robust predicate policy for degeneracies, nearly coincident elements, and exact/filtered decisions.
@@ -50,7 +50,52 @@
     alias until the last out-of-tree caller is gone.
   - **Slice 3.3 — Overlap / Containment / GJK migration.** Repeat the
     `Geometry.RobustPredicates` adoption pattern at the next-highest-
-    traffic callsites; each gets its own commit.
+    traffic callsites; each gets its own commit. Sub-sliced because the
+    candidate callsites use different evaluation paths (Hessian-form
+    plane sign, OBB-vs-OBB SAT epsilon, GJK termination epsilon) and
+    each has a different behavior-change blast radius.
+    - **Slice 3.3.a — Hessian-plane predicate helper.** Add a
+      `RobustPredicates::SignedDistanceToHessianPlane(planeNormal,
+      planeOffset, query)` companion to the existing
+      `SignedDistanceToPlane(origin, normal, query)` that evaluates the
+      Hessian-form plane equation `dot(N, q) + d` in double precision
+      with the same `SignedResult` + filter-bound diagnostic shape. No
+      callsite migration in this sub-slice; just the predicate + its
+      unit tests (`Test.RobustPredicates.cpp` additions covering
+      identity vs `SignedDistanceToPlane(origin = -N*d, N, q)` for
+      `|N|=1`, sign certainty across scale, unit-normal vs scaled
+      normal, exact-zero on-plane case). This is the predicate
+      foundation Slices 3.3.b/c/d consume.
+    - **Slice 3.3.b — `Overlap` frustum plane tests.** Migrate the two
+      `SDF::Math::Sdf_Plane(...) < 0` / `< -s.Radius` callsites in
+      `Geometry::Internal::Overlap_Analytic(Frustum, AABB)` and
+      `Overlap_Analytic(Frustum, Sphere)` (`src/geometry/Geometry.Overlap.cppm`)
+      onto `SignedDistanceToHessianPlane`. Decision policy: treat
+      `Sign::Negative` (certain or uncertain) as "outside half-space";
+      treat `Uncertain` near zero as "still inside" so culling stays
+      conservative (no popping). Add a unit test asserting parity with
+      the legacy float `Sdf_Plane` on a manufactured frustum + AABB /
+      Sphere battery covering inside / outside / straddling / on-plane
+      cases.
+    - **Slice 3.3.c — `Containment` frustum strict-containment.**
+      Migrate the two `Sdf_Plane(...) < 0` / `< s.Radius` callsites in
+      `Geometry::Internal::Contains_Analytic(Frustum, AABB)` and
+      `Contains_Analytic(Frustum, Sphere)`
+      (`src/geometry/Geometry.Containment.cppm`) onto
+      `SignedDistanceToHessianPlane`. Decision policy for strict
+      containment is the inverse of 3.3.b: treat `Uncertain` near zero
+      as "not strictly contained" so callers do not get false positives
+      on near-boundary tests. Add a unit test mirroring the Overlap
+      battery.
+    - **Slice 3.3.d — GJK termination diagnostics (deferred).** GJK's
+      `GJK_EPSILON = 1e-6f` termination test is a convergence guard,
+      not an orientation/incidence decision, so it does not map onto
+      the current `RobustPredicates` predicate surface. Record this as
+      a follow-up to either (i) add `RobustPredicates::ApproxZeroSq`
+      with `ScaledEpsilon` derived from the Minkowski-support magnitude,
+      or (ii) leave GJK's epsilon policy as-is and document the chosen
+      tolerance. Decide in Slice 4 or in a successor task; do not
+      rewrite GJK as part of GEOM-007 callsite adoption.
 - **Slice 4 — exact / adaptive escalation (optional).** Decide whether to add
   Shewchuk-style adaptive predicates behind the same surface, or keep the
   filtered-only policy and document caller fallback strategies.
