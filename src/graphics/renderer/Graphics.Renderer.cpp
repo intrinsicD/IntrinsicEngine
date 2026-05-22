@@ -1662,11 +1662,25 @@ namespace Extrinsic::Graphics
                         //   (a) the histogram helper actually recording
                         //       (`status == Recorded` — operational device +
                         //       valid pipeline + populated `PostProcessSystem`),
-                        //   (b) the renderer's `Histogram.Readback` lease
+                        //   (b) the histogram *stage* being live
+                        //       (`IsStageEnabled(Histogram)` — the helper
+                        //       returns `Recorded` even when the stage is off,
+                        //       under the standing "structurally-recorded
+                        //       no-op" taxonomy bloom / FXAA / SMAA also
+                        //       follow; the pass body early-returns without
+                        //       dispatching, so the transient
+                        //       `PostProcess.Histogram` buffer is never
+                        //       zero-filled or atomically populated this
+                        //       frame, and a copy here would publish
+                        //       undefined transient-allocator bytes into the
+                        //       exposure-history mirror through the next
+                        //       drain — corrupting adaptation state even
+                        //       though the histogram is disabled),
+                        //   (c) the renderer's `Histogram.Readback` lease
                         //       being valid,
-                        //   (c) the recipe having compiled a transient
+                        //   (d) the recipe having compiled a transient
                         //       `PostProcess.Histogram` handle into the graph.
-                        // The bracketing `ShaderWrite → TransferSrc →
+                        // The bracketing `ShaderWrite → TransferRead →
                         // ShaderWrite` buffer barrier pair makes the atomic
                         // accumulations visible to the copy and restores the
                         // shader-write state so downstream consumers of the
@@ -1674,7 +1688,11 @@ namespace Extrinsic::Graphics
                         // exposure-history Slice E.2 plan but consumed by
                         // future GPU-side tonemap iterations) observe valid
                         // state.
+                        const bool histogramStageLive =
+                            m_PostProcessSystem.has_value() &&
+                            m_PostProcessSystem->IsStageEnabled(PostProcessStageKind::Histogram);
                         if (status == RenderCommandPassStatus::Recorded &&
+                            histogramStageLive &&
                             m_HistogramReadbackBuffer.has_value() &&
                             m_HistogramReadbackBuffer->IsValid() &&
                             histogramHandle.IsValid())

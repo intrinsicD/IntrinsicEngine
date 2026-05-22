@@ -3479,12 +3479,17 @@ TEST(RendererFrameLifecycle, HistogramReadbackBufferSurvivesOperationalRebuild)
     EXPECT_EQ(renderer->GetHistogramReadbackBufferSize(), 0u);
 }
 
-// GRAPHICS-075 Slice E.2 — when the histogram pass records its compute
-// dispatch on an operational frame, the executor must also record the
-// per-frame `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot)`
-// after the dispatch. The CPU-observable contract is the
+// GRAPHICS-075 Slice E.2 — when the histogram stage is *live* on an
+// operational frame, the executor must also record the per-frame
+// `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot)` after
+// the compute dispatch. The CPU-observable contract is the
 // `HistogramReadbackCopyCount` stat counter on `RenderGraphFrameStats`
-// (matching `PickingReadbackCopyCount`).
+// (matching `PickingReadbackCopyCount`). The copy is gated on
+// `IsStageEnabled(Histogram)` so the structurally-recorded-no-op path
+// (helper returns `Recorded` with the body short-circuited because
+// `EnableHistogram == false`) cannot publish stale transient bytes;
+// `HistogramReadbackCopySkippedWhenStageDisabled` pins that gate from
+// the other side.
 TEST(RendererFrameLifecycle, HistogramReadbackCopyRecordedOnOperationalFrame)
 {
     Extrinsic::Tests::MockDevice device;
@@ -3496,6 +3501,14 @@ TEST(RendererFrameLifecycle, HistogramReadbackCopyRecordedOnOperationalFrame)
 
     const Extrinsic::RHI::BufferHandle readbackBuffer = renderer->GetHistogramReadbackBuffer();
     ASSERT_TRUE(readbackBuffer.IsValid());
+
+    // Enable the histogram stage so the dispatch + readback copy actually
+    // run. With the default `EnableHistogram == false` the pass body
+    // short-circuits and the executor must (and does — see
+    // `HistogramReadbackCopySkippedWhenStageDisabled`) skip the copy.
+    Extrinsic::Graphics::PostProcessSettings settings = renderer->GetPostProcessSystem().GetSettings();
+    settings.EnableHistogram = true;
+    renderer->GetPostProcessSystem().SetSettings(settings);
 
     Extrinsic::RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
@@ -3565,6 +3578,16 @@ TEST(RendererFrameLifecycle, HistogramReadbackDrainPublishesEachSlotExactlyOnce)
     const std::uint64_t readbackBufferSize = renderer->GetHistogramReadbackBufferSize();
     ASSERT_GE(readbackBufferSize, 1024u);
 
+    // Enable the histogram stage so the executor records the copy + slot
+    // metadata the drain keys off (see
+    // `HistogramReadbackCopySkippedWhenStageDisabled` for the negative
+    // gate).
+    {
+        Extrinsic::Graphics::PostProcessSettings settings = renderer->GetPostProcessSystem().GetSettings();
+        settings.EnableHistogram = true;
+        renderer->GetPostProcessSystem().SetSettings(settings);
+    }
+
     // Frame 0 — record the copy. The executor populates slot-0 metadata
     // (`Pending=true`, `IssuedFrame=0`).
     Extrinsic::RHI::FrameHandle frame{};
@@ -3615,6 +3638,67 @@ TEST(RendererFrameLifecycle, HistogramReadbackDrainPublishesEachSlotExactlyOnce)
     ASSERT_TRUE(renderer->BeginFrame(thirdFrame));
     EXPECT_EQ(renderer->GetPostProcessSystem().GetHistogramPublishCount(), 1u)
         << "Each completed slot must publish at most once; the second drain must be a no-op.";
+
+    renderer->Shutdown();
+}
+
+// GRAPHICS-075 Slice E.2 — when the histogram stage is *not* live (default
+// `PostProcessSettings::EnableHistogram == false`), the helper still
+// returns `Recorded` under the structurally-recorded-no-op taxonomy bloom /
+// FXAA / SMAA also follow — the pass body early-returns without
+// dispatching, so the transient `PostProcess.Histogram` buffer is never
+// zero-filled or atomically populated this frame. The executor must
+// therefore skip the post-dispatch readback copy (and the associated slot
+// metadata) so the next drain does not publish undefined transient bytes
+// into the exposure-history mirror.
+TEST(RendererFrameLifecycle, HistogramReadbackCopySkippedWhenStageDisabled)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{405u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    // Sanity: default settings keep the histogram stage off.
+    ASSERT_FALSE(renderer->GetPostProcessSystem().GetSettings().EnableHistogram);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    // Histogram pass still routes as `Recorded` per the
+    // structurally-recorded-no-op taxonomy.
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* histogramPass =
+        FindCommandPass(stats, "PostProcessHistogramPass");
+    ASSERT_NE(histogramPass, nullptr);
+    EXPECT_EQ(histogramPass->Status, Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    // But no readback copy is recorded — the per-frame counter stays zero.
+    EXPECT_EQ(stats.HistogramReadbackCopyCount, 0u)
+        << "Disabled-stage frames must not record the readback copy, since the "
+        << "transient PostProcess.Histogram buffer was never zero-filled or "
+        << "populated this frame.";
+
+    [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
+
+    // No slot was marked pending, so the next BeginFrame() drain must be a
+    // no-op (publish counter stays at zero).
+    device.NextFrame.FrameIndex = 1u;
+    Extrinsic::RHI::FrameHandle nextFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(nextFrame));
+    EXPECT_EQ(renderer->GetPostProcessSystem().GetHistogramPublishCount(), 0u)
+        << "Disabled-stage frames must leave the drain idle so PublishHistogramReadback "
+        << "is never invoked with undefined transient bytes.";
 
     renderer->Shutdown();
 }

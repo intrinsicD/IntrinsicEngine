@@ -79,8 +79,8 @@
   python3 tools/docs/check_doc_links.py --root .
   python3 tools/agents/check_task_policy.py --root . --strict
   ```
-  Result: 208/208 CPU graphics contract tests passed (including the
-  four new `RendererFrameLifecycle.HistogramReadback*` /
+  Result: 209/209 CPU graphics contract tests passed (including the
+  five new `RendererFrameLifecycle.HistogramReadback*` /
   `PublishHistogramReadbackUpdatesExposureHistory` tests); layering,
   doc-link, and task-policy validators all clean.
 
@@ -638,9 +638,17 @@ a readback drain.
   transitions on the transient `PostProcess.Histogram` handle so the
   atomic accumulations are visible to the copy and the buffer's
   post-copy state remains valid for any downstream consumer. The
-  copy is gated on `(operational device) && (valid renderer-owned
-  readback lease) && (compiled transient histogram handle)`. Each
-  recorded copy bumps the new
+  copy is gated on `(operational device) && (helper Recorded) &&
+  (PostProcessSystem::IsStageEnabled(Histogram)) && (valid
+  renderer-owned readback lease) && (compiled transient histogram
+  handle)`. The stage-enabled clause is load-bearing: the helper
+  returns `Recorded` even when `EnableHistogram == false` per the
+  structurally-recorded-no-op taxonomy bloom / FXAA / SMAA also
+  follow, but in that case the pass body early-returns without
+  dispatching — copying the unpopulated transient bytes into the
+  host-visible slot would publish undefined contents into the
+  retained `PostProcessExposureHistory` mirror through the next
+  drain. Each recorded copy bumps the new
   `RenderGraphFrameStats::HistogramReadbackCopyCount` counter
   mirroring `PickingReadbackCopyCount`.
 - [x] **Slice E.2**: `BeginFrame()` invokes a new
@@ -771,11 +779,18 @@ a readback drain.
   - `HistogramReadbackCopyRecordedOnOperationalFrame` asserts the
     executor records exactly one
     `CopyBuffer(PostProcess.Histogram → Histogram.Readback)` per
-    operational frame (via the new
-    `RenderGraphFrameStats::HistogramReadbackCopyCount` counter)
+    operational frame *when the histogram stage is enabled* (via the
+    new `RenderGraphFrameStats::HistogramReadbackCopyCount` counter)
     and that the per-frame buffer-barrier stream contains the
     bracketing `ShaderWrite → TransferRead → ShaderWrite`
     transitions on the histogram buffer.
+  - `HistogramReadbackCopySkippedWhenStageDisabled` pins the
+    negative-gate: with the default `EnableHistogram == false`, the
+    helper still reports `Recorded` (structurally-recorded no-op),
+    but `HistogramReadbackCopyCount` stays at zero, no slot is
+    marked pending, and the next `BeginFrame()` drain leaves
+    `GetHistogramPublishCount()` at zero — so undefined
+    transient-allocator bytes never reach the exposure-history mirror.
   - `HistogramReadbackDrainPublishesEachSlotExactlyOnce` exercises
     the full drain handshake: frame 0 records the copy and seeds
     slot-0 metadata; the mock buffer is then seeded with a
