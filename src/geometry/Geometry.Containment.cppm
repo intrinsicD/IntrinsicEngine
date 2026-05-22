@@ -10,6 +10,7 @@ export module Geometry.Containment;
 
 import Geometry.Primitives;
 import Geometry.SDF;
+import Geometry.RobustPredicates;
 
 export namespace Geometry
 {
@@ -85,18 +86,33 @@ export namespace Geometry
         // We implement strict containment here.
         bool Contains_Analytic(const Frustum& f, const AABB& box)
         {
-            // For STRICT containment, ALL 8 corners of the AABB must be inside ALL 6 planes.
-            // Optimization: Test the point most likely to be OUTSIDE (Negative Vertex)
-
+            // GEOM-007 Slice 3.3.c: evaluate the half-space test with
+            // `RobustPredicates::SignedDistanceToHessianPlane`. Strict
+            // containment is the inverse of culling, so the decision
+            // policy is conservative-EXCLUDE — only report "contained"
+            // when every plane is *certainly* satisfied. Uncertain near-
+            // boundary cases are reported as not contained so callers
+            // (frustum culling that wants "fully inside" without the
+            // "intersection" path, BVH refinement, etc.) never get a
+            // false positive on a near-plane primitive.
+            namespace RP = Geometry::RobustPredicates;
             for (const auto& plane : f.Planes)
             {
-                // Find the point most likely to be "outside" (behind) the plane
+                // Find the point most likely to be "outside" (behind) the plane.
                 glm::vec3 negativeVertex = box.Max;
                 if (plane.Normal.x >= 0) negativeVertex.x = box.Min.x;
                 if (plane.Normal.y >= 0) negativeVertex.y = box.Min.y;
                 if (plane.Normal.z >= 0) negativeVertex.z = box.Min.z;
 
-                if (SDF::Math::Sdf_Plane(negativeVertex, plane.Normal, plane.Distance) < 0)
+                const auto signed_ = RP::SignedDistanceToHessianPlane(
+                    plane.Normal, plane.Distance, negativeVertex);
+                // Containment passes this plane only when we are CERTAINLY
+                // on the non-negative half-space. Uncertain or negative ⇒
+                // not contained.
+                const bool certainlyInside =
+                    signed_.Certainty == RP::Certainty::Certain
+                    && signed_.Sign != RP::Sign::Negative;
+                if (!certainlyInside)
                 {
                     return false;
                 }
@@ -106,10 +122,21 @@ export namespace Geometry
 
         bool Contains_Analytic(const Frustum& f, const Sphere& s)
         {
-            for (const auto& p : f.Planes)
+            // GEOM-007 Slice 3.3.c: same conservative-exclude policy as the
+            // AABB path. Strict containment requires the sphere's center
+            // to be at least `radius` inside every plane; we require that
+            // margin in double precision with the filter bound added so a
+            // sphere flagged "fully contained" really is.
+            namespace RP = Geometry::RobustPredicates;
+            for (const auto& plane : f.Planes)
             {
-                // If the sphere touches or crosses the plane (dist > -r), it's not fully contained
-                if (SDF::Math::Sdf_Plane(s.Center, p.Normal, p.Distance) < s.Radius) return false;
+                const auto signed_ = RP::SignedDistanceToHessianPlane(
+                    plane.Normal, plane.Distance, s.Center);
+                const double radius = static_cast<double>(s.Radius);
+                if (signed_.Value < radius + signed_.FilterBound)
+                {
+                    return false;
+                }
             }
             return true;
         }

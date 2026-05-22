@@ -10,7 +10,7 @@
 - No dependency on broad external geometry frameworks such as CGAL/libigl in the core geometry layer.
 
 ## Context
-- Status: in-progress (Slice 3.3.b — Overlap frustum migration landed; next code commit is Slice 3.3.c — Containment frustum migration).
+- Status: in-progress (Slice 3.3.c — Containment frustum migration landed; remaining Slice 3.3 work is the deferred Slice 3.3.d GJK termination follow-up, otherwise Slice 3 callsite adoption is at its planned stopping point).
 - Owner/agent: copilot.
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
 - Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify` plus the layering / test-layout / doc-links / task-policy structural checks for Slice 3.3.a; extend the filter to `Overlap` / `Containment` (and add the new parity-battery test names) at the corresponding 3.3.b / 3.3.c commits.
@@ -85,16 +85,27 @@
       oracle kept (false-negative is the dangerous direction). The
       reverse direction is documented and allowed by the
       conservative-inside policy.
-    - **Slice 3.3.c — `Containment` frustum strict-containment.**
-      Migrate the two `Sdf_Plane(...) < 0` / `< s.Radius` callsites in
+    - **Slice 3.3.c (landed this PR) — `Containment` frustum strict-containment.**
+      Migrated the two `Sdf_Plane(...) < 0` / `< s.Radius` callsites in
       `Geometry::Internal::Contains_Analytic(Frustum, AABB)` and
       `Contains_Analytic(Frustum, Sphere)`
       (`src/geometry/Geometry.Containment.cppm`) onto
-      `SignedDistanceToHessianPlane`. Decision policy for strict
-      containment is the inverse of 3.3.b: treat `Uncertain` near zero
-      as "not strictly contained" so callers do not get false positives
-      on near-boundary tests. Add a unit test mirroring the Overlap
-      battery.
+      `RobustPredicates::SignedDistanceToHessianPlane`. Decision policy
+      for strict containment is the inverse of 3.3.b: AABB path reports
+      contained only when every plane is `Certainty::Certain` AND
+      `Sign` is non-negative; sphere path requires
+      `signed.Value >= radius + signed.FilterBound`. Both are
+      conservative-EXCLUDE — uncertain near-boundary primitives are
+      reported as "not contained" so callers do not get false positives.
+      `Test_Containment.cpp` gains
+      `FrustumAABB_DeepInsideMatchesLegacy`,
+      `FrustumAABB_StraddlingNearPlaneIsNotContained`,
+      `FrustumAABB_OutsideMatchesLegacy`,
+      `FrustumSphere_DeepInsideMatchesLegacy`,
+      `FrustumSphere_StraddlingFarPlaneIsNotContained`, and
+      `*BatteryNeverOverReportsContainment` sweeps that pin the
+      false-positive direction (the migrated impl never reports
+      containment the legacy `Sdf_Plane` oracle rejected).
     - **Slice 3.3.d — GJK termination diagnostics (deferred).** GJK's
       `GJK_EPSILON = 1e-6f` termination test is a convergence guard,
       not an orientation/incidence decision, so it does not map onto
