@@ -823,9 +823,18 @@ namespace Extrinsic::Graphics
         // (GRAPHICS-076 Slice A follow-up). The LOAD-store color
         // attachment preserves the lit color from the prior passes; the
         // depth attachment is depth-read-only (Slice B/C variants test
-        // against the prepass depth without overwriting it). Slice A
-        // records no commands inside the pass body — the executor branch
-        // returns `SkippedUnavailable` because no pipelines exist yet.
+        // against the prepass depth without overwriting it). The depth
+        // `StoreOp` is `Store` (not `DontCare`) because downstream
+        // passes that still read `SceneDepth` — `SelectionOutlinePass`
+        // when `EnableSelectionOutline` is set declares
+        // `Read(depth, TextureUsage::DepthRead)` — must see the same
+        // depth contents the prepass populated; `DontCare` would let
+        // Vulkan discard the depth contents at the end of this pass
+        // and produce undefined outline/depth-based results when both
+        // transient debug primitives and selection outlining are
+        // active in the same frame. Slice A records no commands
+        // inside the pass body — the executor branch returns
+        // `SkippedUnavailable` because no pipelines exist yet.
         if (features.EnableTransientDebugSurface)
         {
             addOrderedPass("TransientDebugSurfacePass", [=](RenderGraphBuilder& builder) {
@@ -836,7 +845,7 @@ namespace Extrinsic::Graphics
                     .Depth = RHI::DepthAttachment{
                         .Target = RenderPassAttachmentToken(),
                         .Load = RHI::LoadOp::Load,
-                        .Store = RHI::StoreOp::DontCare,
+                        .Store = RHI::StoreOp::Store,
                     },
                 });
             });
