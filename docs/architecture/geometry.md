@@ -148,7 +148,7 @@ Numerical policy and limitations:
 `Geometry::Internal::Config::GJK_EPSILON = 1e-6f` (`src/geometry/Geometry.GJK.cppm`)
 for every termination / progress / duplicate-membership / segment-degeneracy
 test in the simplex evolution.
-[`GEOM-015`](../../tasks/active/GEOM-015-gjk-termination-diagnostics.md)
+[`GEOM-015`](../../tasks/done/GEOM-015-gjk-termination-diagnostics.md)
 Slice 3 pins the contract for that constant:
 
 - **Normalized workspace.** `GJK_Boolean` and `GJK_Intersection` compute
