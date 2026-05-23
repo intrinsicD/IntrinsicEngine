@@ -2,12 +2,13 @@
 
 ## Status
 
-- Status: in-progress (Slice B landing).
-- Owner/agent: Claude on `claude/intrinsicengine-agent-onboarding-cp7C2`.
-- Branch: `claude/intrinsicengine-agent-onboarding-cp7C2`.
+- Status: in-progress (Slice C landing).
+- Owner/agent: Claude on `claude/intrinsicengine-agent-onboarding-wImXR`.
+- Branch: `claude/intrinsicengine-agent-onboarding-wImXR`.
 - Started: 2026-05-23 (Slice A landed via PR #921 on
-  `claude/intrinsicengine-agent-onboarding-GdEzP`; Slice B continues on
-  the next onboarding-series branch).
+  `claude/intrinsicengine-agent-onboarding-GdEzP`; Slice B landed via
+  PR #923 on `claude/intrinsicengine-agent-onboarding-cp7C2`; Slice C
+  continues on the next onboarding-series branch).
 - Next verification step: build `IntrinsicGraphicsContractCpuTests` on a
   `clang-20` host and run the default-recipe CPU/null gate
   (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
@@ -189,10 +190,20 @@ Slice B (canonical `Pass.DebugView`, this slice):
       FrameRecipeIntrospection mapping", runtime translates editor
       strings to canonical resource names before calling this seam.
 
-Slice C (render-graph validation negative test, deferred):
-- [ ] Add a `contract;graphics` test confirming that a non-present write
-      to the imported `Backbuffer` surfaces a
-      `RenderGraphValidationResult` finding rather than silent success.
+Slice C (render-graph validation negative test, this slice):
+- [x] Add `RenderGraphValidation.CompileBackbufferWrittenByNonFinalizerReportsStructuredFinding`
+      to `tests/contract/graphics/Test.RenderGraphValidation.cpp`,
+      exercising `RenderGraphCompiler::Compile(...)` end-to-end with an
+      imported `Backbuffer` written by both a non-finalizer
+      `"EarlyComposite"` pass and the canonical finalizer `"Present"`
+      pass. Asserts that exactly one `BackbufferWrittenByNonFinalizer`
+      error finding is produced, attributed to the non-finalizer pass,
+      and that the finding is mirrored on both
+      `compiled->ValidationFindings` and
+      `RenderGraphCompiler::GetLastCompileValidationResult()`. Pins the
+      compile-path leg of the contract that
+      `ImportedBackbufferNonFinalizerWriteReportsError` pins at the
+      `ValidateCompiledGraph`-direct level.
 
 Slice D (default-recipe `gpu;vulkan` visible-triangle smoke, deferred):
 - [ ] Add `tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`
@@ -318,7 +329,7 @@ Full task:
 - [x] No silent failure when `DebugViewSettings` requests an invalid
       resource (must fall back deterministically and surface a
       diagnostic) — Slice B.
-- [ ] Non-present writes to `Backbuffer` produce a render-graph
+- [x] Non-present writes to `Backbuffer` produce a render-graph
       validation finding (Slice C).
 - [ ] Default-recipe `gpu;vulkan` smoke green on Vulkan-capable hosts
       with zero fallback counters (Slice D).
@@ -344,9 +355,15 @@ python3 tools/docs/check_doc_links.py --root .
 - After Slice A: build `IntrinsicGraphicsContractTests` on a `clang-20`
   host and run the default-recipe CPU/null gate
   (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
-- After Slice B (this slice): build
+- After Slice B: build
   `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and run the
   default-recipe CPU/null gate
   (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`),
   then proceed to Slice C (render-graph validation negative test for
   non-present writes to `Backbuffer`).
+- After Slice C (this slice): build
+  `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and run the
+  default-recipe CPU/null gate
+  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`),
+  then proceed to Slice D (default-recipe `gpu;vulkan`
+  visible-triangle smoke) on a Vulkan-capable host.
