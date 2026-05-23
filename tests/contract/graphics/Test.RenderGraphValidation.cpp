@@ -411,6 +411,68 @@ TEST(RenderGraphValidation, CompileCycleReportsStructuredFinding)
     EXPECT_NE(findings[0].Message.find("cycle"), std::string::npos);
 }
 
+TEST(RenderGraphValidation, CompileBackbufferWrittenByNonFinalizerReportsStructuredFinding)
+{
+    // GRAPHICS-076 Slice C — a non-present write to the imported `Backbuffer`
+    // must surface a `RenderGraphValidationResult` finding through the
+    // full `RenderGraphCompiler::Compile(...)` path, not just the
+    // hand-built `ValidateCompiledGraph` shape pinned by
+    // `ImportedBackbufferNonFinalizerWriteReportsError`.
+    RHI::TextureDesc backbufferDesc{};
+    std::vector<TextureResourceDesc> textures(1u);
+    textures[0].Name = "Backbuffer";
+    textures[0].Imported = true;
+    textures[0].IsBackbuffer = true;
+    textures[0].FinalState = TextureState::Present;
+    textures[0].ImportedHandle = RHI::TextureHandle{1u, 1u};
+    textures[0].Desc = backbufferDesc;
+
+    std::vector<RenderPassRecord> passes{
+        RenderPassRecord{
+            .Name = "EarlyComposite",
+            .SideEffect = false,
+            .TextureAccesses = {TextureAccess{.Ref = TextureRef{.Index = 0u, .Generation = 1u},
+                                              .Usage = TextureUsage::ColorAttachmentWrite,
+                                              .Write = true}},
+        },
+        RenderPassRecord{
+            .Name = "Present",
+            .SideEffect = true,
+            .TextureAccesses = {TextureAccess{.Ref = TextureRef{.Index = 0u, .Generation = 1u},
+                                              .Usage = TextureUsage::ColorAttachmentWrite,
+                                              .Write = true}},
+        },
+    };
+
+    const auto compiled = RenderGraphCompiler::Compile(passes, textures, {});
+
+    const RenderGraphValidationResult& compileResult = RenderGraphCompiler::GetLastCompileValidationResult();
+    ASSERT_TRUE(compiled.has_value())
+        << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+
+    const std::vector<RenderGraphValidationFinding> findings = FindingsByCode(
+        RenderGraphValidationResult{.Findings = compiled->ValidationFindings},
+        RenderGraphValidationCode::BackbufferWrittenByNonFinalizer);
+    ASSERT_EQ(findings.size(), 1u);
+    EXPECT_EQ(findings.front().Severity, RenderGraphValidationSeverity::Error);
+    EXPECT_EQ(findings.front().PassName, "EarlyComposite");
+    EXPECT_EQ(findings.front().ResourceName, "Backbuffer");
+    EXPECT_TRUE(findings.front().IsTextureResource);
+
+    // The finalizer write through "Present" is allowed and must not surface
+    // an additional `BackbufferWrittenByNonFinalizer` finding.
+    for (const RenderGraphValidationFinding& finding : findings)
+    {
+        EXPECT_NE(finding.PassName, "Present");
+    }
+
+    // `GetLastCompileValidationResult()` mirrors the compiled-graph findings
+    // so renderer/runtime diagnostics observe the same payload as direct
+    // validator callers (parity with `SuccessfulCompileStoresValidationFindings`).
+    EXPECT_EQ(RenderGraphCompiler::GetLastCompileValidationResult().Findings.size(),
+              compiled->ValidationFindings.size());
+}
+
 TEST(RenderGraphValidation, SuccessfulCompileStoresValidationFindings)
 {
     RHI::TextureDesc desc{};

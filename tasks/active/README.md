@@ -13,13 +13,13 @@ Each active task should include:
 
 - [`GRAPHICS-076`](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md) —
   Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring.
-  Status: in-progress (Slice B landing). Owner: Claude on
-  `claude/intrinsicengine-agent-onboarding-cp7C2`. Promoted from
+  Status: in-progress (Slice C landing). Owner: Claude on
+  `claude/intrinsicengine-agent-onboarding-wImXR`. Promoted from
   `tasks/backlog/rendering/` on 2026-05-23 with a four-slice plan covering
   canonical present wiring (A, landed via PR #921), canonical debug-view
-  wiring (B, this slice), the non-present-write `Backbuffer` negative
-  test (C), and the scaffold-retirement-obligation `gpu;vulkan`
-  default-recipe smoke (D) that unblocks `GRAPHICS-081`.
+  wiring (B, landed via PR #923), the non-present-write `Backbuffer`
+  negative test (C, this slice), and the scaffold-retirement-obligation
+  `gpu;vulkan` default-recipe smoke (D) that unblocks `GRAPHICS-081`.
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
