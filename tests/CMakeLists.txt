@@ -571,6 +571,7 @@ endif()
 set(_graphics_contract_cpu_test_files
     Test.CullingPassContracts.cpp
     Test.DebugViewContract.cpp
+    Test.DebugViewPass.cpp
     Test.FrameRecipeContract.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp

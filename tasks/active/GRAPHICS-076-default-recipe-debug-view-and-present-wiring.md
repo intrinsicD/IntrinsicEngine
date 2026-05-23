@@ -2,11 +2,13 @@
 
 ## Status
 
-- Status: in-progress (Slice A landing).
-- Owner/agent: Claude on `claude/intrinsicengine-agent-onboarding-GdEzP`.
-- Branch: `claude/intrinsicengine-agent-onboarding-GdEzP`.
-- Started: 2026-05-23.
-- Next verification step: build `IntrinsicGraphicsContractTests` on a
+- Status: in-progress (Slice B landing).
+- Owner/agent: Claude on `claude/intrinsicengine-agent-onboarding-cp7C2`.
+- Branch: `claude/intrinsicengine-agent-onboarding-cp7C2`.
+- Started: 2026-05-23 (Slice A landed via PR #921 on
+  `claude/intrinsicengine-agent-onboarding-GdEzP`; Slice B continues on
+  the next onboarding-series branch).
+- Next verification step: build `IntrinsicGraphicsContractCpuTests` on a
   `clang-20` host and run the default-recipe CPU/null gate
   (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
 
@@ -135,15 +137,57 @@ Slice A (this slice):
       assertions in `Test.FrameRecipeContract.cpp` and
       `Test.ImGuiPresentContract.cpp` are updated to match.
 
-Slice B (canonical `Pass.DebugView`, deferred):
-- [ ] Add `m_DebugViewPass` + `m_DebugViewPipelineLease` members.
-- [ ] Add `BuildDebugViewPipelineDesc(...)` pointing at
-      `assets/shaders/debug_view.{vert,frag}` (and/or `debug_view.comp`
-      per `GRAPHICS-013B`; the implementer picks the canonical form).
-- [ ] Wire the executor `"DebugViewPass"` branch through
-      `RecordDebugViewPass(...)` with the `Recorded` /
-      `SkippedNonOperational` / `SkippedUnavailable` taxonomy and a
-      diagnostic counter on invalid-resource fallback.
+Slice B (canonical `Pass.DebugView`, this slice):
+- [x] Add `m_DebugViewSystem` (`std::optional<DebugViewSystem>`),
+      `m_DebugViewPass` (`std::optional<DebugViewPass>`, bound to
+      `*m_DebugViewSystem`), and `m_DebugViewPipelineLease` members
+      with `Initialize(device)` emplacement and `Shutdown()` teardown
+      mirroring the system-bound-pass patterns from
+      `m_ForwardSurfacePass` / `m_PostProcessToneMapPass`.
+- [x] Add `BuildDebugViewPipelineDesc()` pointing at
+      `assets/shaders/debug_view.{vert,frag}` (graphics pipeline form
+      chosen as the canonical CPU-contracted form). Pinned to
+      `RGBA8_UNORM` color target (the recipe's `DebugViewRGBA`
+      attachment format) and `PushConstantSize = sizeof(DebugViewPushConstants)`
+      (16 bytes, matching the canonical 4-`uint32` packing from
+      GRAPHICS-013BQ §"Shader visualization modes"). Created last in
+      `InitializeOperationalPassResources()` (call #25, immediately
+      after present at #24) so upstream `FailPipelineCreateCall`
+      indices stay stable.
+- [x] Wire the executor `"DebugViewPass"` branch through
+      `RecordDebugViewPass(graphicsContext, camera)` with the
+      `Recorded` / `SkippedNonOperational` / `SkippedUnavailable`
+      taxonomy. Each frame `ExecuteFrame()` drives
+      `m_DebugViewSystem->SetSettings({.Enabled = world.DebugOverlayEnabled ||
+      world.DebugPrimitives.HasTransientDebug, ...})` followed by
+      `ResolveSelection(recipeIntrospection)` immediately after the
+      recipe introspection is built; the resolved selection's
+      `UsedFallback` increments `RenderGraphFrameStats::DebugViewFallbackInvocationCount`
+      whenever debug view is enabled and the requested resource
+      resolved through the fallback path. The `Recorded` path also
+      increments `DebugViewPassExecutions`.
+- [x] Update `assets/shaders/debug_view.frag` push block from the
+      legacy `(int Mode, float DepthNear, float DepthFar)` 12-byte
+      layout to the canonical `(uint ResourceKind, uint ResourceClass,
+      uint UsedFallback, uint Reserved)` 16-byte layout, deriving the
+      visualization path from `ResourceClass` per the GRAPHICS-013BQ
+      decision (no user-selectable mode field). Per-class pixel
+      correctness on a real Vulkan device is owned by a follow-up
+      operational slice; the CPU/null gate only validates the command
+      shape + `PushConstantSize = 16u`.
+- [x] Add `DebugViewPass::GetPipeline()` accessor mirroring
+      `PresentPass::GetPipeline()` / `MinimalDebugPresentPass::GetPipeline()`
+      so the renderer's fail-closed `RecordDebugViewPass` prerequisite
+      check observes the same shape on every canonical default-recipe
+      path.
+- [x] Add `IRenderer::SetDebugViewRequestedResourceName(...)` /
+      `GetDebugViewRequestedResourceName()` public seam so runtime
+      and contract tests can drive `RequestedResourceName` (the
+      `Enabled` field stays renderer-driven from world state, so a
+      stale `Enabled = true` cannot keep the pass live across
+      overlay-off frames). Per GRAPHICS-013BQ §"UI-name to
+      FrameRecipeIntrospection mapping", runtime translates editor
+      strings to canonical resource names before calling this seam.
 
 Slice C (render-graph validation negative test, deferred):
 - [ ] Add a `contract;graphics` test confirming that a non-present write
@@ -181,15 +225,63 @@ Slice A (this slice):
       `kRoutedPasses` gains it, and the default-recipe `BindPipelineCalls`
       assertion increments by one to match the new bind.
 
-Slice B–D tests are written when those slices land.
+Slice B (canonical `Pass.DebugView`, this slice):
+- [x] `contract;graphics` — `DebugViewPassContract.RendererRoutesAndRecordsDebugViewPass`:
+      `RenderFrameInput::DebugOverlayEnabled = true` flips
+      `features.EnableDebugView`, the executor records `"DebugViewPass"`
+      with `Status = Recorded`, a 16-byte
+      `DebugViewPushConstants`-sized push reaches the device command
+      context, and the bind-count exceeds the Slice A baseline by at
+      least one. `DebugViewPassExecutions == 1u`.
+- [x] `contract;graphics` — `DebugViewPassContract.DebugOverlayDisabledKeepsDebugViewOutOfRecipe`:
+      default world omits `"DebugViewPass"` from
+      `RenderGraphFrameStats::CommandRecords` entirely, and both
+      `DebugViewPassExecutions` / `DebugViewFallbackInvocationCount`
+      stay at zero — the renderer's per-frame DebugView driving
+      cannot leak into the executor stats when the world has not
+      requested an overlay.
+- [x] `contract;graphics` — `DebugViewPassContract.MissingDebugViewPipelineLeaseSkipsUnavailable`:
+      `MockDevice::FailPipelineCreateCall = 25` fails the DebugView
+      pipeline create (call #25, immediately after present at #24),
+      yielding `"DebugViewPass" = SkippedUnavailable` while the
+      `"Present"` pass still records (upstream pipelines unaffected).
+- [x] `contract;graphics` — `DebugViewPassContract.NonOperationalDeviceSkipsNonOperational`:
+      `device.Operational = false` after Initialize yields
+      `"DebugViewPass" = SkippedNonOperational`, mirroring the
+      symmetric shape across present/debug-view paths.
+- [x] `contract;graphics` — `DebugViewPassContract.InvalidResourceFallsBackDeterministicallyAndIncrementsCounter`:
+      `SetDebugViewRequestedResourceName("DebugViewRGBA")` (non-previewable
+      per the GRAPHICS-013BQ inspection-table aliasing gate) routes
+      `ResolveSelection` through fallback to the first previewable
+      resource (typically `SceneColorHDR`); the pass still records
+      `Recorded` (no silent failure), and
+      `DebugViewFallbackInvocationCount` increments by exactly 1.
+- [x] `contract;graphics` — `DebugViewPassContract.DefaultRequestedResourceDoesNotIncrementFallbackCounter`:
+      the default `"FrameRecipe.PresentSource"` sentinel routes
+      through the canonical "show present source" path inside
+      `ResolveSelection` and does NOT mark `UsedFallback = true`,
+      keeping `DebugViewFallbackInvocationCount = 0` under the
+      common "overlay on, no selection yet" UX state.
+- [x] `contract;graphics` — direct `DebugViewPass::Execute` shape +
+      disabled-selection / missing-pipeline short-circuits already
+      pinned by the pre-existing `Test.DebugViewContract.cpp` tests
+      (`DebugViewPassRecordsFullscreenPreviewForResolvedSelection`,
+      `DebugViewPassSkipsDisabledSelectionAndMissingPipeline`).
+
+Slice C–D tests are written when those slices land.
 
 ## Docs
 - [x] (Slice A) Update `src/graphics/renderer/README.md` to record
       canonical `Pass.Present` as operationally wired and to point at
       this task as the upstream retirement gate for the `MinimalDebug`
       present scaffold.
-- [ ] (Slice B) Update the same README to record `Pass.DebugView` as
-      operationally wired when Slice B lands.
+- [x] (Slice B) Update the same README to record canonical
+      `Pass.DebugView` as operationally wired, including the
+      `DebugViewSystem` per-frame driving (settings + resolved
+      selection), the new diagnostic counters
+      (`DebugViewPassExecutions`, `DebugViewFallbackInvocationCount`),
+      and the `IRenderer::SetDebugViewRequestedResourceName(...)`
+      public seam.
 
 ## Acceptance criteria
 
@@ -202,9 +294,28 @@ Slice A:
 - [x] No silent failure when the present pipeline lease is missing — the
       executor reports `SkippedUnavailable` and records no draw.
 
+Slice B:
+- [x] Canonical `Pass.DebugView` records `BindPipeline +
+      PushConstants(16) + Draw(3, 1, 0, 0)` in the operational state
+      when the world has the debug overlay enabled, and
+      `DebugViewPassExecutions` increments by 1.
+- [x] No silent failure when `DebugViewSettings::RequestedResourceName`
+      requests a non-previewable / missing / disabled resource: the
+      `DebugViewSystem` falls back deterministically to the first
+      previewable resource (typically `SceneColorHDR`), the pass still
+      records `Recorded`, and the renderer surfaces
+      `DebugViewFallbackInvocationCount += 1` so runtime/editor can
+      observe the diagnostic.
+- [x] The default `"FrameRecipe.PresentSource"` sentinel does NOT
+      increment `DebugViewFallbackInvocationCount` (canonical "show
+      present source" path, not a fallback).
+- [x] Default world omits `"DebugViewPass"` from
+      `RenderGraphFrameStats::CommandRecords` entirely; both
+      diagnostic counters stay at zero.
+
 Full task:
-- [ ] Both canonical passes record commands in the operational state (Slice B).
-- [ ] No silent failure when `DebugViewSettings` requests an invalid
+- [x] Both canonical passes record commands in the operational state (Slice B).
+- [x] No silent failure when `DebugViewSettings` requests an invalid
       resource (must fall back deterministically and surface a
       diagnostic) — Slice B.
 - [ ] Non-present writes to `Backbuffer` produce a render-graph
@@ -233,3 +344,9 @@ python3 tools/docs/check_doc_links.py --root .
 - After Slice A: build `IntrinsicGraphicsContractTests` on a `clang-20`
   host and run the default-recipe CPU/null gate
   (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
+- After Slice B (this slice): build
+  `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and run the
+  default-recipe CPU/null gate
+  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`),
+  then proceed to Slice C (render-graph validation negative test for
+  non-present writes to `Backbuffer`).

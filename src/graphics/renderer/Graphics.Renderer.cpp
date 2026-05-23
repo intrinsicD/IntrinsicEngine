@@ -60,6 +60,14 @@ import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present;
+// GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`.
+// Imported alongside the canonical `Pass.Present` above so the renderer
+// can own a `DebugViewPass` instance bound to a renderer-owned
+// `DebugViewSystem`. The system module is imported explicitly so the
+// renderer can construct + drive the system itself (Pass.DebugView only
+// holds a reference and does not re-export the system module).
+import Extrinsic.Graphics.Pass.DebugView;
+import Extrinsic.Graphics.DebugViewSystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -393,6 +401,25 @@ namespace Extrinsic::Graphics
             // path can call `SetPipeline(...)` on
             // `m_PostProcessHistogramPass`.
             m_PostProcessHistogramPass.emplace(*m_PostProcessSystem);
+            // GRAPHICS-076 Slice B — `DebugViewSystem` is a renderer-owned
+            // CPU-only system (resource inspection / deterministic
+            // selection / fallback diagnostics) that the canonical
+            // `Pass.DebugView` records against. Initialize is called
+            // synchronously so the system's resolved-selection state is
+            // valid from the first frame; the per-frame
+            // `SetSettings({.Enabled = ...}) + ResolveSelection(recipe)`
+            // pair runs inside `ExecuteFrame()` after the
+            // `FrameRecipeIntrospection` for the current frame is
+            // computed. The pass is emplaced immediately after the
+            // system so the operational publisher's
+            // `SetPipeline(...)` call observes a fully-constructed
+            // `DebugViewPass` with the `DebugViewSystem&` reference
+            // bound; the same publisher-before-first-frame invariant
+            // the selection / forward / deferred / postprocess passes
+            // above all follow.
+            m_DebugViewSystem.emplace();
+            m_DebugViewSystem->Initialize();
+            m_DebugViewPass.emplace(*m_DebugViewSystem);
             if (device.IsOperational())
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
@@ -463,6 +490,13 @@ namespace Extrinsic::Graphics
             m_Device = nullptr;
             if (m_SelectionSystem) m_SelectionSystem->Shutdown();
             if (m_LightSystem)     m_LightSystem->Shutdown();
+            // GRAPHICS-076 Slice B — drop the renderer-owned
+            // `DebugViewSystem` alongside the other CPU-only systems
+            // above. The pass + pipeline-lease resets below land before
+            // `m_DebugViewSystem.reset()` later in this function so the
+            // optional destructor never observes a dangling system
+            // reference.
+            if (m_DebugViewSystem) m_DebugViewSystem->Shutdown();
             if (m_ForwardSystem)   m_ForwardSystem->Shutdown();
             if (m_DeferredSystem)  m_DeferredSystem->Shutdown();
             if (m_PostProcessSystem) m_PostProcessSystem->Shutdown();
@@ -511,6 +545,14 @@ namespace Extrinsic::Graphics
             // below so the optional destructor does not observe a
             // dangling reference.
             m_PostProcessHistogramPass.reset();
+            // GRAPHICS-076 Slice B — reset the canonical `DebugViewPass`
+            // before `m_DebugViewSystem` is destroyed below so the
+            // optional destructor does not observe a dangling
+            // `DebugViewSystem&`. Mirrors the lifetime contract the
+            // selection / forward / deferred / postprocess passes follow
+            // for their system-bound `Execute(...)` references.
+            m_DebugViewPass.reset();
+            m_DebugViewSystem.reset();
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -531,6 +573,11 @@ namespace Extrinsic::Graphics
             // lease above; same teardown ordering contract (lease reset
             // before `m_PipelineManager` is destroyed below).
             m_PresentPipelineLease.reset();
+            // GRAPHICS-076 Slice B — drop the canonical default-recipe
+            // `Pass.DebugView` pipeline lease alongside the present
+            // lease above; same teardown ordering contract (lease reset
+            // before `m_PipelineManager` is destroyed below).
+            m_DebugViewPipelineLease.reset();
             m_ForwardSurfacePipelineLease.reset();
             m_ForwardLinePipelineLease.reset();
             m_ForwardPointPipelineLease.reset();
@@ -1181,6 +1228,42 @@ namespace Extrinsic::Graphics
                 (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
                     ? DescribeMinimalDebugSurfaceRecipe()
                     : DescribeDefaultFrameRecipe(defaultRecipeFeatures);
+            // GRAPHICS-076 Slice B — drive the renderer-owned
+            // `DebugViewSystem` from the current frame's world + recipe
+            // declarations before the executor records the
+            // `"DebugViewPass"` branch. The recipe-side enablement
+            // (`features.EnableDebugView`) is derived from the same
+            // `world.DebugOverlayEnabled || world.DebugPrimitives.HasTransientDebug`
+            // condition; mirror it on the system side so the resolved
+            // selection's `Enabled` flag aligns with what the recipe
+            // exposes. `ResolveSelection` updates the cached selection +
+            // diagnostics and reports `UsedFallback = true` when the
+            // requested resource is missing/disabled/unsupported and the
+            // configured fallback resource was substituted; surface that
+            // diagnostic on the frame stats so contract tests can assert
+            // "no silent failure on invalid resource" without poking the
+            // system directly. The fallback counter only increments when
+            // debug view is actually requested (`debugViewEnabled`) so a
+            // baseline frame with the overlay off does not spuriously
+            // bump the diagnostic — `DebugViewSystem::ResolveSelection`
+            // also sets `UsedFallback = true` for the
+            // `DebugViewDisabled` reason which we treat as routine
+            // not-requested state.
+            if (m_DebugViewSystem.has_value())
+            {
+                const bool debugViewEnabled =
+                    renderWorld.DebugOverlayEnabled ||
+                    renderWorld.DebugPrimitives.HasTransientDebug;
+                DebugViewSettings settings = m_DebugViewSystem->GetSettings();
+                settings.Enabled = debugViewEnabled;
+                m_DebugViewSystem->SetSettings(settings);
+                const DebugViewResolvedSelection resolved =
+                    m_DebugViewSystem->ResolveSelection(recipeIntrospection);
+                if (debugViewEnabled && resolved.UsedFallback)
+                {
+                    ++m_LastRenderGraphStats.DebugViewFallbackInvocationCount;
+                }
+            }
             const RenderGraphValidationResult recipeValidation =
                 ValidateRecipeCompiledGraph(recipeIntrospection, *compiled);
             const bool recipeValidationClean =
@@ -1805,6 +1888,35 @@ namespace Extrinsic::Graphics
                             RecordPresentPass(graphicsContext);
                         AccumulateCommandRecordStatus(passName, status);
                     }
+                    else if (passName == std::string_view{"DebugViewPass"})
+                    {
+                        // GRAPHICS-076 Slice B — default-recipe canonical
+                        // debug-view route. The recipe declares
+                        // `"DebugViewPass"` only when
+                        // `features.EnableDebugView` is true (set from
+                        // `world.DebugOverlayEnabled ||
+                        // world.DebugPrimitives.HasTransientDebug` in
+                        // `DeriveDefaultFrameRecipeFeatures`), so this
+                        // branch is reached only when the world has
+                        // requested a debug overlay. The renderer-side
+                        // `m_DebugViewSystem` has already had
+                        // `SetSettings + ResolveSelection` driven for this
+                        // frame above (right after
+                        // `DescribeDefaultFrameRecipe` produced
+                        // `recipeIntrospection`), so the executor only
+                        // needs to fan into `RecordDebugViewPass(...)`.
+                        // `RecordDebugViewPass` returns
+                        // `SkippedNonOperational` for a non-operational
+                        // device, `SkippedUnavailable` when the pipeline
+                        // lease / pass / system / resolved selection is
+                        // missing or disabled, and `Recorded` when the
+                        // fullscreen `BindPipeline + PushConstants(16) +
+                        // Draw(3, 1, 0, 0)` shape lands on the command
+                        // context.
+                        const RenderCommandPassStatus status =
+                            RecordDebugViewPass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
                     else if (passName == kMinimalDebugPresentPassName)
                     {
                         const RenderCommandPassStatus status =
@@ -2275,6 +2387,35 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept override
         {
             return m_MinimalDebugReadbackBuffer;
+        }
+
+        // GRAPHICS-076 Slice B — public seam for the renderer-owned
+        // `DebugViewSystem` request. The renderer drives the
+        // `Enabled` field each frame from the world (see
+        // `ExecuteFrame()`'s `SetSettings + ResolveSelection` block);
+        // callers only own `RequestedResourceName`. Stored on the
+        // system itself so the value survives across frames without
+        // a renderer-local mirror, and so the system's existing
+        // `ResolveSelection` path observes the new name on the next
+        // frame. Becomes a no-op if `Initialize()` has not yet run.
+        void SetDebugViewRequestedResourceName(std::string name) override
+        {
+            if (!m_DebugViewSystem.has_value())
+            {
+                return;
+            }
+            DebugViewSettings settings = m_DebugViewSystem->GetSettings();
+            settings.RequestedResourceName = std::move(name);
+            m_DebugViewSystem->SetSettings(settings);
+        }
+
+        [[nodiscard]] std::string GetDebugViewRequestedResourceName() const override
+        {
+            if (!m_DebugViewSystem.has_value())
+            {
+                return std::string{};
+            }
+            return m_DebugViewSystem->GetSettings().RequestedResourceName;
         }
 
         RHI::BufferManager&   GetBufferManager()   override { return *m_BufferManager;   }
@@ -3183,6 +3324,47 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`
+        // pipeline. Pairs with `assets/shaders/debug_view.{vert,frag}`:
+        // the vertex stage emits the fullscreen-triangle (positions
+        // [-1,-1], [3,-1], [-1,3]) and the fragment derives a
+        // visualization path from the canonical
+        // `DebugViewPushConstants::ResourceClass` field (per
+        // GRAPHICS-013BQ §"Shader visualization modes") and writes the
+        // recipe-owned `DebugViewRGBA` color attachment
+        // (`Format::RGBA8_UNORM`, declared by `BuildDefaultFrameRecipe`).
+        // Held byte-identical between the initial `Initialize()` and any
+        // subsequent `RebuildOperationalResources()` so the pipeline
+        // registry's dedupe yields a stable device handle.
+        // `PushConstantSize = sizeof(DebugViewPushConstants)` (16 bytes)
+        // matches the four-`uint32` packing from
+        // `Graphics.DebugViewSystem.cppm`. Color target pinned to
+        // `RGBA8_UNORM` regardless of the swapchain backbuffer format
+        // because the `DebugViewRGBA` attachment is itself an
+        // `RGBA8_UNORM` resource per the recipe.
+        [[nodiscard]] static RHI::PipelineDesc BuildDebugViewPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/debug_view.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/debug_view.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA8_UNORM;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(DebugViewPushConstants));
+            desc.DebugName = "Renderer.DebugView";
+            return desc;
+        }
+
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
         {
             if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
@@ -3953,6 +4135,39 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] Present pipeline unavailable; default-recipe present recording will be skipped: error={}",
                                 static_cast<int>(presentPipeline.error()));
+            }
+
+            // GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`
+            // pipeline. Created LAST so the test fixtures that target
+            // `FailPipelineCreateCall` against specific upstream pipelines
+            // (culling=1, depth=2, defaultDebugSurface=3,
+            // minimalVisibleTriangle=4, forward/shadow/deferred at 5-10,
+            // selection at 11-15, postprocess at 16-23, present=24) keep
+            // their documented call indices unchanged. The DebugView slot
+            // is call #25. Same reset/republish + fail-closed pattern as
+            // the other leases above so a failed `Create()` leaves
+            // `m_DebugViewPass` in the fail-closed state that
+            // `RecordDebugViewPass` interprets as `SkippedUnavailable`.
+            m_DebugViewPipelineLease.reset();
+            if (m_DebugViewPass)
+            {
+                m_DebugViewPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc debugViewDesc = BuildDebugViewPipelineDesc();
+            auto debugViewPipeline = m_PipelineManager->Create(debugViewDesc);
+            if (debugViewPipeline.has_value())
+            {
+                m_DebugViewPipelineLease.emplace(std::move(*debugViewPipeline));
+                if (m_DebugViewPass)
+                {
+                    m_DebugViewPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_DebugViewPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] DebugView pipeline unavailable; default-recipe debug-view recording will be skipped: error={}",
+                                static_cast<int>(debugViewPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -5007,6 +5222,58 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-076 Slice B — canonical default-recipe debug-view
+        // executor helper. Mirrors `RecordPresentPass` for the
+        // operational/lease checks, and additionally gates on
+        // `m_DebugViewSystem`'s resolved-selection enablement so a
+        // disabled or unresolvable selection reports `SkippedUnavailable`
+        // rather than silently no-op'ing inside `DebugViewPass::Execute`.
+        // `DebugViewPass::Execute(cmd, camera)` itself short-circuits
+        // when `!IsInitialized() || !pipeline.IsValid() ||
+        // !selection.Enabled`, so this helper's gates are the renderer-
+        // side observable surface for the same conditions; without
+        // them the executor would record `Recorded` even though the
+        // pass body emitted zero commands. The recipe-side gate
+        // (`features.EnableDebugView`) already prevents this branch
+        // from being reached when the world has no debug overlay /
+        // transient debug, so the helper only sees frames where the
+        // recipe enabled the pass.
+        [[nodiscard]] RenderCommandPassStatus RecordDebugViewPass(RHI::ICommandContext& cmd,
+                                                                   const RHI::CameraUBO& camera)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_DebugViewPipelineLease.has_value() ||
+                !m_DebugViewPipelineLease->IsValid() ||
+                !m_DebugViewPass.has_value() ||
+                !m_DebugViewPass->GetPipeline().IsValid() ||
+                !m_DebugViewSystem.has_value() ||
+                !m_DebugViewSystem->IsInitialized())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+            // Resolved-selection gate. `ExecuteFrame` already drives
+            // `SetSettings(...) + ResolveSelection(recipeIntrospection)`
+            // before the executor lambda runs, so by the time this helper
+            // executes the resolved selection reflects the current frame's
+            // world state and recipe declarations. If the resolved
+            // selection is disabled (debug overlay off, requested resource
+            // missing AND no usable fallback, etc.), the pass body is a
+            // no-op and we surface that as `SkippedUnavailable` so the
+            // executor taxonomy stays truthful.
+            const DebugViewResolvedSelection resolved = m_DebugViewSystem->GetResolvedSelection();
+            if (!resolved.Enabled)
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_DebugViewPass->Execute(cmd, camera);
+            ++m_LastRenderGraphStats.DebugViewPassExecutions;
+            return RenderCommandPassStatus::Recorded;
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -5042,6 +5309,28 @@ namespace Extrinsic::Graphics
         // above: lives for the renderer's full lifetime, pipeline handle
         // zeroed in `Shutdown()` before `m_PipelineManager` is reset.
         PresentPass                          m_PresentPass;
+        // GRAPHICS-076 Slice B — canonical default-recipe `DebugViewSystem`
+        // + `DebugViewPass`. The system owns resource inspection /
+        // selection / diagnostics; the pass holds a reference to the
+        // system and records `BindPipeline + PushConstants(16) +
+        // Draw(3, 1, 0, 0)` when both `IsInitialized() && pipeline.IsValid()
+        // && resolvedSelection.Enabled` (per
+        // `DebugViewPass::Execute(cmd, camera)`). Both are held as
+        // `std::optional` because `DebugViewPass` requires an explicit
+        // `DebugViewSystem&` constructor argument; the system is
+        // emplaced + `Initialize()`d in `Initialize(device)`, the pass
+        // is emplaced immediately after holding `*m_DebugViewSystem`,
+        // and both are reset in `Shutdown()` before
+        // `m_PipelineManager` / `m_DebugViewPipelineLease` are torn
+        // down. The system is driven from `ExecuteFrame()`:
+        // `SetSettings({.Enabled = world.DebugOverlayEnabled ||
+        // world.DebugPrimitives.HasTransientDebug, ...})` then
+        // `ResolveSelection(recipeIntrospection)` per frame, mirroring
+        // the recipe's `features.EnableDebugView` gate so the
+        // CPU/null contract observes the same operational seam as the
+        // recipe-side enablement.
+        std::optional<DebugViewSystem>       m_DebugViewSystem;
+        std::optional<DebugViewPass>         m_DebugViewPass;
         // GRAPHICS-070 — default-recipe forward surface pass. Owned as an
         // `optional` so the explicit `ForwardSystem&` constructor invariant is
         // preserved: emplaced in `Initialize()` immediately after the
@@ -5130,6 +5419,16 @@ namespace Extrinsic::Graphics
         // the fail-closed state that `RecordPresentPass` interprets as
         // `SkippedUnavailable`.
         std::optional<RHI::PipelineManager::PipelineLease> m_PresentPipelineLease;
+        // GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`
+        // pipeline lease. Same reset/republish pattern as the present
+        // lease above so a failed `Create()` leaves `m_DebugViewPass` in
+        // the fail-closed state that `RecordDebugViewPass` interprets as
+        // `SkippedUnavailable`. Created LAST inside
+        // `InitializeOperationalPassResources()` (call #25, immediately
+        // after present at #24) so the existing
+        // `FailPipelineCreateCall` indices (1-24) used by other lifecycle
+        // tests remain stable.
+        std::optional<RHI::PipelineManager::PipelineLease> m_DebugViewPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;
