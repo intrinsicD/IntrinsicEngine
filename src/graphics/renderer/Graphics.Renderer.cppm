@@ -127,6 +127,26 @@ namespace Extrinsic::Graphics
         // pending slots and forwards the 256-bin payload to
         // `PostProcessSystem::PublishHistogramReadback(...)`.
         std::uint32_t HistogramReadbackCopyCount = 0;
+        // GRAPHICS-076 Slice B — count of frames in which the default
+        // recipe's canonical `DebugViewPass` executor branch recorded the
+        // fullscreen `BindPipeline + PushConstants + Draw(3, 1, 0, 0)`
+        // shape. Increments by 1 per operational frame in which the
+        // resolved selection is enabled and the pipeline lease is valid;
+        // stays at zero when the device is non-operational, when
+        // `DebugViewSettings::Enabled` is false, when the pipeline lease
+        // is missing, or when the resolved selection's fallback path also
+        // disabled the pass (`DebugViewFallbackReason::FallbackUnavailable`).
+        std::uint32_t DebugViewPassExecutions = 0;
+        // GRAPHICS-076 Slice B — count of frames in which the default
+        // recipe's `DebugViewSystem::ResolveSelection(...)` reported
+        // `UsedFallback = true` because the requested resource was
+        // missing / disabled / unsupported and the system substituted the
+        // configured fallback resource. Surfaces deterministically the
+        // diagnostic that the task's "no silent failure on invalid
+        // resource" acceptance criterion requires; tests assert this
+        // counter increments by exactly 1 per frame in which the request
+        // resolved through fallback.
+        std::uint32_t DebugViewFallbackInvocationCount = 0;
     };
 
     export struct RuntimeRenderSnapshotBatch
@@ -534,6 +554,25 @@ namespace Extrinsic::Graphics
         virtual void SetMinimalDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
 
         [[nodiscard]] virtual RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept = 0;
+
+        // GRAPHICS-076 Slice B — public seam for the renderer-owned
+        // `DebugViewSystem`'s `RequestedResourceName` setting. Runtime /
+        // editor callers translate UI selections into canonical
+        // `FrameRecipeIntrospection::Resources[i].Name` keys (per the
+        // GRAPHICS-013BQ §"UI-name to FrameRecipeIntrospection mapping"
+        // decision) and pass them in here; contract tests use this seam
+        // to force the fallback path so the
+        // `RenderGraphFrameStats::DebugViewFallbackInvocationCount`
+        // diagnostic can be observed deterministically. The `Enabled`
+        // field is driven by the renderer from
+        // `world.DebugOverlayEnabled || world.DebugPrimitives.HasTransientDebug`
+        // each frame (so a stale `Enabled = true` from this setter
+        // cannot keep the pass live across frames where the world has
+        // turned the overlay off); callers should treat
+        // `RequestedResourceName` as the durable field they control.
+        virtual void SetDebugViewRequestedResourceName(std::string name) = 0;
+
+        [[nodiscard]] virtual std::string GetDebugViewRequestedResourceName() const = 0;
     };
 
     export std::unique_ptr<IRenderer> CreateRenderer();

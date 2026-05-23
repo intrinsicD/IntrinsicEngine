@@ -616,11 +616,58 @@ Concretely:
   1, 0, 0) shape, missing-pipeline-lease `SkippedUnavailable`,
   non-operational-device `SkippedNonOperational`); the lifecycle test
   picks up the global "Present is Recorded under the default recipe"
-  invariant + the `BindPipelineCalls += 1` count bump. Slice B
-  (canonical `Pass.DebugView` operational wiring) and Slice D
-  (default-recipe `gpu;vulkan` visible-triangle smoke) remain open
-  under the same GRAPHICS-076 task and are required before
-  GRAPHICS-081 can delete the MinimalDebug scaffold.
+  invariant + the `BindPipelineCalls += 1` count bump.
+- GRAPHICS-076 Slice B wires the canonical default-recipe
+  `Pass.DebugView` (`Extrinsic.Graphics.Pass.DebugView`) operationally
+  on the CPU/null path. The renderer holds an `std::optional<DebugViewSystem>`
+  (initialized in `Initialize(device)`) plus an
+  `std::optional<DebugViewPass>` (constructed with the
+  system reference) and `m_DebugViewPipelineLease`. Each frame,
+  `ExecuteFrame()` drives
+  `DebugViewSystem::SetSettings({.Enabled = world.DebugOverlayEnabled ||
+  world.DebugPrimitives.HasTransientDebug, ...})` and
+  `ResolveSelection(recipeIntrospection)` immediately after the recipe
+  introspection is built, mirroring the recipe-side
+  `features.EnableDebugView` gate so the resolved selection's
+  `Enabled` flag aligns with what the recipe declares. The DebugView
+  pipeline lives in `BuildDebugViewPipelineDesc()`: it targets the new
+  canonical `assets/shaders/debug_view.{vert,frag}` pair (push-constant
+  block aligned to the 16-byte `DebugViewPushConstants` packing per
+  GRAPHICS-013BQ §"Shader visualization modes"), pins
+  `ColorTargetFormats[0] = RGBA8_UNORM` (the recipe's `DebugViewRGBA`
+  attachment format), and is created LAST inside the operational
+  publisher (call #25, immediately after present at #24) so the
+  existing `FailPipelineCreateCall` indices (1-24) used by other
+  lifecycle / present tests remain stable. On the executor side, the
+  new `"DebugViewPass"` branch (textually between the `"Present"` and
+  `MinimalDebugPresent` branches) routes through
+  `RecordDebugViewPass(graphicsContext, camera)` with the
+  `Recorded` / `SkippedNonOperational` / `SkippedUnavailable` taxonomy
+  the other default-recipe helpers use. Two new diagnostics surface on
+  `RenderGraphFrameStats`: `DebugViewPassExecutions` increments per
+  frame the pass records, and `DebugViewFallbackInvocationCount`
+  increments when the runtime-requested resource resolved through the
+  `DebugViewSystem` fallback path (a non-previewable resource, missing
+  resource, or disabled resource — the canonical default
+  `"FrameRecipe.PresentSource"` sentinel does not increment the
+  counter because it is the "show present source" path, not a
+  fallback). `IRenderer::SetDebugViewRequestedResourceName(...)` and
+  the matching getter are the public seam runtime / editor use to
+  drive the requested resource (the `Enabled` field is driven
+  per-frame from the world). The Slice B contract pin is
+  `tests/contract/graphics/Test.DebugViewPass.cpp` (BindPipeline +
+  PushConstants(16) + Draw(3, 1, 0, 0) routing under the default
+  recipe; missing pipeline lease `SkippedUnavailable` at call #25;
+  non-operational-device `SkippedNonOperational`; invalid-resource
+  fallback diagnostic counter increments without silent failure; the
+  default `"FrameRecipe.PresentSource"` request does not increment the
+  counter; default world omits `"DebugViewPass"` from the recipe
+  entirely). The renderer-internal `Pass.DebugView::Execute` contract
+  is verified by the existing `Test.DebugViewContract.cpp`. Slice D
+  (default-recipe `gpu;vulkan` visible-triangle smoke) and Slice C
+  (render-graph validation negative test) remain open under the same
+  GRAPHICS-076 task and are required before GRAPHICS-081 can delete
+  the MinimalDebug scaffold.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
