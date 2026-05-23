@@ -239,7 +239,7 @@ namespace Extrinsic::Graphics
         AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
                 {"FrameRecipe.PresentSource"}, {"DebugViewRGBA"});
         AddPass(out, FrameRecipePassKind::ImGui, "ImGuiPass", features.EnableImGui, false, {"FrameRecipe.PresentSource"}, {});
-        AddPass(out, FrameRecipePassKind::Present, "Present", true, true, {"FrameRecipe.PresentSource", "Backbuffer"}, {});
+        AddPass(out, FrameRecipePassKind::Present, "Present", true, true, {"FrameRecipe.PresentSource"}, {"Backbuffer"});
 
         AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
         AddResource(out, FrameRecipeResourceKind::SceneDepth, "SceneDepth", true);
@@ -873,9 +873,28 @@ namespace Extrinsic::Graphics
             });
         }
 
+        // GRAPHICS-076 Slice A follow-up — the canonical default-recipe
+        // `Pass.Present` records `BindPipeline + Draw(3, 1, 0, 0)` against
+        // the backbuffer, so the framegraph must declare it as a real
+        // color-attachment pass. Without `Write(backbuffer,
+        // ColorAttachmentWrite)` + `SetRenderPass(...)` the compiler
+        // emits zero `CompiledRenderPassAttachment` entries for this
+        // pass, `BuildActiveRenderPassDesc` reports `HasAttachments=false`,
+        // and the executor issues the present draw outside any render
+        // pass — invalid command-buffer usage on Vulkan that surfaces
+        // as a validation error and a missing final blit to the
+        // backbuffer. Mirrors the `Pass.Present.MinimalDebug` wiring in
+        // `BuildMinimalDebugSurfaceRecipe`; the post-pass
+        // `ColorAttachmentWrite → Present` transition is emitted by the
+        // compiler from the imported backbuffer's `FinalState = Present`
+        // contract (see `RenderGraph::ImportBackbuffer`), so no
+        // `TextureUsage::Present` read is needed on this pass.
         addOrderedPass("Present", [=](RenderGraphBuilder& builder) {
             builder.Read(presentSource, TextureUsage::ShaderRead);
-            builder.Read(backbuffer, TextureUsage::Present);
+            builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
+            builder.SetRenderPass(RHI::RenderPassDesc{
+                .ColorTargets = kMinimalRenderPassColorAttachments,
+            });
             builder.SideEffect();
         }, true);
 

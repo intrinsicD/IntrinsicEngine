@@ -348,7 +348,16 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
 
     const auto* present = FindPass(description, FrameRecipePassKind::Present);
     ASSERT_NE(present, nullptr);
-    EXPECT_TRUE(Contains(present->Reads, "Backbuffer"));
+    // GRAPHICS-076 Slice A follow-up — the default-recipe present pass
+    // declares the imported `Backbuffer` as a color-attachment *write*
+    // (mirroring the `Pass.Present.MinimalDebug` finalizer) so the
+    // framegraph compiler emits real render-pass attachments and the
+    // executor's `BindPipeline + Draw(3, 1, 0, 0)` runs inside a
+    // `BeginRenderPass/EndRenderPass` scope. Pre-fixup the introspection
+    // listed `Backbuffer` under `Reads` because the recipe only
+    // consumed it for the `ColorAttachment → Present` end-of-graph
+    // transition.
+    EXPECT_TRUE(Contains(present->Writes, "Backbuffer"));
     EXPECT_TRUE(present->FinalizesBackbuffer);
 }
 

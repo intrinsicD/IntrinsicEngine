@@ -611,7 +611,19 @@ Concretely:
   `RecordPresentPass(...)` with the same `Recorded` /
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy the other
   default-recipe pass helpers already use; no new per-pass counter is
-  introduced. The Slice A contract pin is
+  introduced. The recipe-side wiring declares
+  `Write(backbuffer, ColorAttachmentWrite)` + `SetRenderPass(...)` on
+  the canonical `"Present"` node — matching the
+  `Pass.Present.MinimalDebug` finalizer — so the framegraph compiler
+  emits a real `CompiledRenderPassAttachment` entry for the backbuffer,
+  `BuildActiveRenderPassDesc` reports `HasAttachments = true`, and the
+  executor wraps `BindPipeline + Draw(3, 1, 0, 0)` in a
+  `BeginRenderPass/EndRenderPass` scope so the draw is well-formed on
+  Vulkan. The post-pass `ColorAttachmentWrite → Present` transition is
+  emitted by the compiler from the imported backbuffer's
+  `FinalState = Present` contract (see `RenderGraph::ImportBackbuffer`),
+  so the recipe does not need a separate `TextureUsage::Present` read
+  on this pass. The Slice A contract pin is
   `tests/contract/graphics/Test.PresentPass.cpp` (BindPipeline + Draw(3,
   1, 0, 0) shape, missing-pipeline-lease `SkippedUnavailable`,
   non-operational-device `SkippedNonOperational`); the lifecycle test

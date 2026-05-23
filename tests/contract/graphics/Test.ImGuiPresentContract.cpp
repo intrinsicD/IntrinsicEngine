@@ -143,7 +143,13 @@ TEST(GraphicsImGuiPresentContract, FrameRecipeKeepsImGuiOffBackbufferAndPresentF
     ASSERT_NE(present, nullptr);
     EXPECT_TRUE(present->FinalizesBackbuffer);
     EXPECT_TRUE(Contains(present->Reads, "FrameRecipe.PresentSource"));
-    EXPECT_TRUE(Contains(present->Reads, "Backbuffer"));
+    // GRAPHICS-076 Slice A follow-up — the default-recipe present pass
+    // declares the imported `Backbuffer` as a color-attachment *write*
+    // so the framegraph emits real render-pass attachments and the
+    // present `BindPipeline + Draw(3, 1, 0, 0)` runs inside a render
+    // pass on Vulkan. See `Graphics.FrameRecipe.cpp` for the matching
+    // builder change.
+    EXPECT_TRUE(Contains(present->Writes, "Backbuffer"));
 }
 
 TEST(GraphicsImGuiPresentContract, RenderGraphRejectsNonPresentBackbufferWrites)
