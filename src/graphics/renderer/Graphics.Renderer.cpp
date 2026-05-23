@@ -59,6 +59,7 @@ import Extrinsic.Graphics.Pass.PostProcess.SMAA;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
 import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present.MinimalDebug;
+import Extrinsic.Graphics.Pass.Present;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -525,6 +526,11 @@ namespace Extrinsic::Graphics
             m_DepthPrepassPipelineLease.reset();
             m_DefaultDebugSurfacePipelineLease.reset();
             m_MinimalDebugPresentPipelineLease.reset();
+            // GRAPHICS-076 Slice A — drop the canonical default-recipe
+            // present pipeline lease alongside the MinimalDebug present
+            // lease above; same teardown ordering contract (lease reset
+            // before `m_PipelineManager` is destroyed below).
+            m_PresentPipelineLease.reset();
             m_ForwardSurfacePipelineLease.reset();
             m_ForwardLinePipelineLease.reset();
             m_ForwardPointPipelineLease.reset();
@@ -585,6 +591,12 @@ namespace Extrinsic::Graphics
             m_HistogramSlotInvalidated.clear();
             m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
             m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
+            // GRAPHICS-076 Slice A — zero the canonical present pass's
+            // cached pipeline handle alongside the MinimalDebug present
+            // pass above so a later `Initialize(device)` starts from a
+            // clean fail-closed state instead of inheriting a stale
+            // device handle from a previous operational lifecycle.
+            m_PresentPass.SetPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -1769,6 +1781,28 @@ namespace Extrinsic::Graphics
                         // None`).
                         const RenderCommandPassStatus status =
                             RecordPostProcessAAResolvePass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"Present"})
+                    {
+                        // GRAPHICS-076 Slice A — default-recipe canonical
+                        // present route. The recipe always declares
+                        // `"Present"` as the end-of-graph finalization
+                        // pass (it reads `FrameRecipe.PresentSource` and
+                        // the imported `Backbuffer`), so this branch is
+                        // reached every frame in the default recipe.
+                        // `RecordPresentPass` mirrors the other default-
+                        // recipe helpers' taxonomy: non-operational device
+                        // → `SkippedNonOperational`; missing pipeline lease
+                        // → `SkippedUnavailable`; otherwise the canonical
+                        // fullscreen `BindPipeline + Draw(3, 1, 0, 0)`
+                        // shape records and we return `Recorded`. The
+                        // MinimalDebug scaffold still routes through the
+                        // adjacent branch below so the two present paths
+                        // remain textually side-by-side until
+                        // `GRAPHICS-081` retires the scaffold.
+                        const RenderCommandPassStatus status =
+                            RecordPresentPass(graphicsContext);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == kMinimalDebugPresentPassName)
@@ -3109,6 +3143,46 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-076 Slice A — canonical default-recipe present pipeline.
+        // Pairs with the new `assets/shaders/present.{vert,frag}` shaders:
+        // the vertex stage emits the fullscreen triangle (positions
+        // [-1,-1], [3,-1], [-1,3]) and the fragment samples
+        // `FrameRecipe.PresentSource` and writes the imported backbuffer
+        // LDR target with alpha forced to opaque. Held byte-identical
+        // between the initial `Initialize()` and any subsequent
+        // `RebuildOperationalResources()` so the pipeline registry's
+        // dedupe yields a stable device handle. `PushConstantSize = 0u`
+        // because the canonical `PresentPass::Execute()` records only
+        // `BindPipeline + Draw(3, 1, 0, 0)`; no per-frame push data is
+        // required (the present source binding is descriptor-side, owned
+        // by the backend's pipeline layout). Distinct from
+        // `BuildMinimalVisibleTrianglePipelineDesc(...)` so the
+        // MinimalDebug scaffold can retire with `GRAPHICS-081` without
+        // disturbing the canonical present pipeline.
+        [[nodiscard]] static RHI::PipelineDesc BuildPresentPipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/present.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/present.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = colorFormat;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = 0u;
+            desc.DebugName = "Renderer.Present";
+            return desc;
+        }
+
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
         {
             if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
@@ -3851,6 +3925,34 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] PostProcess.Histogram pipeline unavailable; default-recipe histogram recording will be skipped: error={}",
                                 static_cast<int>(postProcessHistogramPipeline.error()));
+            }
+
+            // GRAPHICS-076 Slice A — canonical default-recipe present
+            // pipeline. Created LAST so the test fixtures that target
+            // `FailPipelineCreateCall` against specific upstream pipelines
+            // (culling=1, depth=2, defaultDebugSurface=3,
+            // minimalVisibleTriangle=4, forward/shadow/deferred at 5-10,
+            // selection at 11-15, postprocess at 16-23) keep their
+            // documented call indices unchanged. The present slot is
+            // call #24. Same reset/republish + fail-closed pattern as
+            // the other leases above so a failed `Create()` leaves
+            // `m_PresentPass` in the fail-closed state that
+            // `RecordPresentPass` interprets as `SkippedUnavailable`.
+            m_PresentPipelineLease.reset();
+            m_PresentPass.SetPipeline(RHI::PipelineHandle{});
+            const RHI::PipelineDesc presentDesc =
+                BuildPresentPipelineDesc(m_BackbufferFormat);
+            auto presentPipeline = m_PipelineManager->Create(presentDesc);
+            if (presentPipeline.has_value())
+            {
+                m_PresentPipelineLease.emplace(std::move(*presentPipeline));
+                m_PresentPass.SetPipeline(
+                    m_PipelineManager->GetDeviceHandle(m_PresentPipelineLease->GetHandle()));
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] Present pipeline unavailable; default-recipe present recording will be skipped: error={}",
+                                static_cast<int>(presentPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -4876,6 +4978,35 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-076 Slice A — canonical default-recipe present executor
+        // helper. Mirrors `RecordMinimalDebugPresentPass` but drives the
+        // canonical `PresentPass` (sampling `FrameRecipe.PresentSource`)
+        // instead of the MinimalDebug scaffold (rendering a fixed-color
+        // triangle). The `PresentPass::Execute()` body records the
+        // `BindPipeline + Draw(3, 1, 0, 0)` shape unconditionally when its
+        // pipeline handle is valid, so the helper only needs the
+        // device-operational / pipeline-lease prerequisite checks the rest
+        // of the default recipe's pass helpers already use; no per-pass
+        // counter is added because the executor's `RenderCommandPassStatus`
+        // taxonomy already distinguishes `Recorded` from
+        // `SkippedNonOperational` / `SkippedUnavailable`.
+        [[nodiscard]] RenderCommandPassStatus RecordPresentPass(RHI::ICommandContext& cmd)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_PresentPipelineLease.has_value() ||
+                !m_PresentPipelineLease->IsValid() ||
+                !m_PresentPass.GetPipeline().IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_PresentPass.Execute(cmd);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -4900,6 +5031,17 @@ namespace Extrinsic::Graphics
         DepthPrepassPass                     m_DepthPrepassPass;
         MinimalDebugSurfacePass              m_MinimalDebugSurfacePass;
         MinimalDebugPresentPass              m_MinimalDebugPresentPass;
+        // GRAPHICS-076 Slice A — canonical default-recipe present pass.
+        // Default-constructed (no system dependency); the publisher in
+        // `InitializeOperationalPassResources(device)` calls
+        // `SetPipeline(...)` once the present pipeline lease is created.
+        // `Execute(cmd)` records the `BindPipeline + Draw(3, 1, 0, 0)`
+        // shape unconditionally when its cached pipeline handle is valid,
+        // matching the contract enforced by the new `PresentPassContract`
+        // tests. Lifetime contract mirrors `m_MinimalDebugPresentPass`
+        // above: lives for the renderer's full lifetime, pipeline handle
+        // zeroed in `Shutdown()` before `m_PipelineManager` is reset.
+        PresentPass                          m_PresentPass;
         // GRAPHICS-070 — default-recipe forward surface pass. Owned as an
         // `optional` so the explicit `ForwardSystem&` constructor invariant is
         // preserved: emplaced in `Initialize()` immediately after the
@@ -4982,6 +5124,12 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
+        // GRAPHICS-076 Slice A — canonical default-recipe present pipeline
+        // lease. Same reset/republish pattern as the MinimalDebug present
+        // lease above so a failed `Create()` leaves `m_PresentPass` in
+        // the fail-closed state that `RecordPresentPass` interprets as
+        // `SkippedUnavailable`.
+        std::optional<RHI::PipelineManager::PipelineLease> m_PresentPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;

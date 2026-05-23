@@ -584,6 +584,7 @@ set(_graphics_contract_cpu_test_files
     Test.MinimalRecipeBackendParity.cpp
     Test.MinimalTriangleReadbackHarness.cpp
     Test.PostProcessChainContract.cpp
+    Test.PresentPass.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphValidation.cpp

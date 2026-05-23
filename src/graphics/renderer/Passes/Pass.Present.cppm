@@ -20,6 +20,9 @@ namespace Extrinsic::Graphics
         PresentPass& operator=(const PresentPass&) = delete;
 
         void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
+
+        [[nodiscard]] RHI::PipelineHandle GetPipeline() const noexcept { return m_Pipeline; }
+
         void Execute(RHI::ICommandContext& cmd);
 
     private:

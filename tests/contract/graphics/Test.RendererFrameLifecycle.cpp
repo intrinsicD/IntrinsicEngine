@@ -132,13 +132,15 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // pass — bloom + tonemap write color attachments). With
     // `EnableHistogram == false` the body short-circuits but the helper
     // still reports `Recorded` per the structurally-recorded-no-op
-    // taxonomy. Total Recorded entries: 5 routed
-    // (Culling/Depth/Surface/Line/Point) + 1 under
+    // taxonomy. GRAPHICS-076 Slice A — the canonical `Pass.Present`
+    // now records under the default recipe (BindPipeline + Draw(3,1,0,0)
+    // fullscreen finalizer), bumping Recorded by one. Total Recorded
+    // entries: 5 routed (Culling/Depth/Surface/Line/Point) + 1 under
     // `"PostProcessHistogramPass"` + 2 under `"PostProcessPass"`
     // (bloom + tonemap) + 3 under the per-stage AA passes
-    // (edge / blend / resolve helpers) = 11. Remaining unwired passes
-    // still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 11u);
+    // (edge / blend / resolve helpers) + 1 under `"Present"` = 12.
+    // Remaining unwired passes still soft-skip with SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 12u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -176,9 +178,13 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    // GRAPHICS-076 Slice A — `Pass.Present` records the canonical
+    // fullscreen `BindPipeline + Draw(3, 1, 0, 0)` shape on the
+    // operational CPU/null path, replacing the previous
+    // `SkippedUnavailable` taxonomy.
     ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.GetBackbufferHandleCount, 1);
     EXPECT_EQ(device.LastBackbufferFrame.FrameIndex, frame.FrameIndex);
     EXPECT_EQ(device.LastBackbufferFrame.SwapchainImageIndex, frame.SwapchainImageIndex);
@@ -193,9 +199,13 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // Slice B.1 / Slice C — `EnableBloom` and `AntiAliasing` default to
     // false / `None`, so the bloom + FXAA `Execute` bodies emit no
     // bind/push/draw under the default settings (their helpers still
-    // report `Recorded` under the umbrella's accumulator). The
-    // bind/push count therefore stays at 6.
-    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 6);
+    // report `Recorded` under the umbrella's accumulator).
+    // GRAPHICS-076 Slice A — the canonical `Pass.Present` finalizer adds
+    // one fullscreen `BindPipeline` (the present pipeline) but no
+    // additional push constant since `BuildPresentPipelineDesc()` pins
+    // `PushConstantSize = 0u`. The bind count therefore becomes 7 while
+    // the push count stays at 6.
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 7);
     EXPECT_EQ(device.CommandContext.PushConstantsCalls, 6);
     ASSERT_EQ(device.CommandContext.PushConstantSizes.size(), 6u);
     EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
@@ -434,11 +444,15 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // also publishes the histogram compute pipeline lease, so the new
     // ordered `"PostProcessHistogramPass"` graph pass routes its helper
     // (returning `Recorded` per the structurally-recorded-no-op taxonomy
-    // since `EnableHistogram` defaults to false). Total `Recorded`: 5
-    // routed + 1 under `PostProcessHistogramPass` + 2 under
-    // `PostProcessPass` (bloom + tonemap) + 3 under the AA passes = 11.
-    // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 11u);
+    // since `EnableHistogram` defaults to false). GRAPHICS-076 Slice A —
+    // the rebuild also publishes the canonical present pipeline lease,
+    // so the `"Present"` graph pass routes through `RecordPresentPass`
+    // and reports `Recorded` after the operational rebuild. Total
+    // `Recorded`: 5 routed + 1 under `PostProcessHistogramPass` + 2
+    // under `PostProcessPass` (bloom + tonemap) + 3 under the AA
+    // passes + 1 under `Present` = 12. Remaining unwired passes still
+    // soft-skip with SkippedUnavailable.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 12u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -522,8 +536,12 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // `Recorded` per the structurally-recorded-no-op taxonomy
     // (`EnableHistogram` defaults to false) → total climbs to 10
     // (4 routed + 1 under PostProcessHistogramPass + 2 under
-    // PostProcessPass + 3 under the AA passes).
-    EXPECT_EQ(stats.CommandRecords.Recorded, 10u);
+    // PostProcessPass + 3 under the AA passes). GRAPHICS-076 Slice A —
+    // the canonical present pipeline is created LAST (call #24), well
+    // after the depth-prepass failure point at call #2, so the
+    // `"Present"` graph pass records via `RecordPresentPass` → total
+    // climbs to 11.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 11u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -604,8 +622,13 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // `Recorded` per the structurally-recorded-no-op taxonomy
     // (`EnableHistogram` defaults to false) → total climbs to 6
     // (0 routed + 1 under PostProcessHistogramPass + 2 under
-    // PostProcessPass + 3 under the AA passes).
-    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
+    // PostProcessPass + 3 under the AA passes). GRAPHICS-076 Slice A —
+    // the canonical present pipeline is created LAST (call #24) and is
+    // similarly culling-independent (the present helper only checks
+    // device-operational + present pipeline lease, never
+    // `m_CullingOutputAvailable`); the `"Present"` graph pass records
+    // → total climbs to 7.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 7u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -721,10 +744,15 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
         "PostProcessAAEdgePass",
         "PostProcessAABlendPass",
         "PostProcessAAResolvePass",
+        // GRAPHICS-076 Slice A — the canonical default-recipe present pass
+        // records the fullscreen `BindPipeline + Draw(3, 1, 0, 0)` shape
+        // when its pipeline lease is valid; the executor's `"Present"`
+        // branch routes through `RecordPresentPass(...)` and reports
+        // `Recorded` on the operational CPU/null gate.
+        "Present",
     };
     static constexpr const char* kSoftSkippedPasses[] = {
         "ImGuiPass",
-        "Present",
     };
     EXPECT_EQ(FindCommandPass(stats, "CompositionPass"), nullptr)
         << "CompositionPass is forward-mode-disabled per GRAPHICS-070; "
@@ -2577,7 +2605,8 @@ TEST(RendererFrameLifecycle, PostProcessSMAALookupTexturesRetryAfterFailedUpload
 //   9 deferredGBuffer, 10 deferredLighting, 11-14 selectionId,
 //   15 selectionOutline, 16 tonemap, 17 bloomDownsample, 18 bloomUpsample,
 //   19 postProcessFXAA, 20 smaaEdge, 21 smaaBlend, 22 smaaResolve,
-//   23 postProcessHistogram.
+//   23 postProcessHistogram, 24 present (GRAPHICS-076 Slice A — created
+//   last so the indices for the older slots remain stable).
 // If a future change reorders pipeline creation, update the constants.
 // ---------------------------------------------------------------------------
 
