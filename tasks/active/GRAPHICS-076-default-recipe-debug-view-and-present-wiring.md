@@ -2,16 +2,44 @@
 
 ## Status
 
-- Status: in-progress (Slice C landing).
-- Owner/agent: Claude on `claude/intrinsicengine-agent-onboarding-wImXR`.
-- Branch: `claude/intrinsicengine-agent-onboarding-wImXR`.
-- Started: 2026-05-23 (Slice A landed via PR #921 on
-  `claude/intrinsicengine-agent-onboarding-GdEzP`; Slice B landed via
-  PR #923 on `claude/intrinsicengine-agent-onboarding-cp7C2`; Slice C
-  continues on the next onboarding-series branch).
-- Next verification step: build `IntrinsicGraphicsContractCpuTests` on a
-  `clang-20` host and run the default-recipe CPU/null gate
-  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
+- Status: blocked on Vulkan-capable host (Slices A–C landed; Slice D
+  is a `gpu;vulkan` smoke that requires a host with a working Vulkan
+  driver and `vkCreateInstance` returning a usable device).
+- Owner/agent: unassigned; next pick-up by any agent on a
+  Vulkan-capable host. Headers last refreshed on
+  `claude/intrinsicengine-agent-onboarding-vGJrv`.
+- Branch: Slice D will be developed on a new
+  `claude/intrinsicengine-agent-onboarding-*` branch once picked up.
+- Started: 2026-05-23. Landed slices:
+  - Slice A: PR #921 on `claude/intrinsicengine-agent-onboarding-GdEzP`
+    (commits `203d4c4` + Slice A follow-up `22cbbe9` via PR #922 on
+    `claude/present-draw-render-pass-AUIdC`, merge `1131435`).
+  - Slice B: PR #923 on `claude/intrinsicengine-agent-onboarding-cp7C2`
+    (commit `21be263`, merge `ddedfb4`).
+  - Slice C: PR #924 on `claude/intrinsicengine-agent-onboarding-wImXR`
+    (commit `e33c9b3`, merge `9ccc42c`).
+- Next verification step: on a Vulkan-capable host, configure with
+  the `ci-vulkan` preset, build
+  `IntrinsicGraphicsIntegrationTests`, and run the opt-in smoke
+  (`ctest --test-dir build/ci-vulkan -L 'gpu' --output-on-failure --timeout 120`).
+  See Slice D in `## Required changes` and `## Verification` below for
+  the test file location and the sibling `Test.MinimalDebugSurfaceGpuSmoke.cpp`
+  fixture to mirror.
+
+## Nonblocking clarification (2026-05-23)
+
+- Slices A–C are fully landed via PRs #921, #922 (Slice A follow-up),
+  #923, and #924. The only remaining slice is the opt-in `gpu;vulkan`
+  default-recipe smoke (Slice D), which cannot run in a sandbox that
+  lacks a Vulkan ICD (`/dev/dri` absent, `vkCreateInstance` returns
+  `ERROR_INCOMPATIBLE_DRIVER`). The task is parked here rather than
+  retired so it stays visible to the next agent on a host with a real
+  Vulkan device; CPU-only environments should pick the next earliest
+  unblocked Theme A leaf from `tasks/backlog/README.md` rather than
+  scaffolding Slice D without the ability to verify it.
+- The `GRAPHICS-081` scaffold-retirement obligation cannot be unblocked
+  until Slice D is green on a Vulkan-capable host (see the
+  "Scaffold-retirement obligation" callout below).
 
 ## Slice plan
 
@@ -75,7 +103,7 @@ correctness gate; only Slice D exercises an opt-in `gpu;vulkan` smoke.
 > **Scaffold-retirement obligation.** This task is the last upstream gate before [`GRAPHICS-081`](../backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) can begin deleting the `MinimalDebugSurface` recipe scaffold. As part of `GRAPHICS-076`, author the **default-recipe equivalent** of the `GRAPHICS-033D` `gpu;vulkan` visible-triangle smoke (same pixel-readback driver harness, same four-sample-point assertion, same zero-fallback-counter invariant) so that `GRAPHICS-081` can delete the minimal-recipe fixture without reducing `gpu;vulkan` coverage. Owned by Slice D.
 
 ## Context
-- Status: Slice A in-progress (see `## Status`).
+- Status: Slices A–C landed; Slice D blocked on Vulkan-capable host (see `## Status`).
 - Owner/layer: `graphics/renderer`.
 - Planning anchors: `tasks/done/GRAPHICS-013B-debug-view-and-render-target-inspection.md`, `tasks/done/GRAPHICS-013BQ-debug-view-backend-clarifications.md`, `tasks/done/GRAPHICS-013C-imgui-overlay-and-present.md`, `tasks/done/GRAPHICS-013CQ-imgui-present-backend-clarifications.md`.
 - Today: `Pass.DebugView.cpp` and `Pass.Present.cpp` exist as shells (Pass.Present has the `BindPipeline` + `Draw(3,1,0,0)` body but is not owned by `NullRenderer`); the executor lambda has no branches for either pass.
@@ -352,18 +380,24 @@ python3 tools/docs/check_doc_links.py --root .
   to Slice B so reviewers see one new executor branch per slice.
 
 ## Next verification step
-- After Slice A: build `IntrinsicGraphicsContractTests` on a `clang-20`
-  host and run the default-recipe CPU/null gate
+- After Slice A (landed PR #921 + Slice A follow-up PR #922): built
+  `IntrinsicGraphicsContractTests` on a `clang-20` host and ran the
+  default-recipe CPU/null gate
   (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
-- After Slice B: build
-  `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and run the
+- After Slice B (landed PR #923): built
+  `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and ran the
   default-recipe CPU/null gate
-  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`),
-  then proceed to Slice C (render-graph validation negative test for
-  non-present writes to `Backbuffer`).
-- After Slice C (this slice): build
-  `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and run the
+  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
+- After Slice C (landed PR #924): built
+  `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and ran the
   default-recipe CPU/null gate
-  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`),
-  then proceed to Slice D (default-recipe `gpu;vulkan`
-  visible-triangle smoke) on a Vulkan-capable host.
+  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
+- Slice D (remaining, blocked on Vulkan-capable host): configure with
+  the `ci-vulkan` preset on a host with a working Vulkan ICD and a
+  display (or headless surface) loader, build
+  `IntrinsicGraphicsIntegrationTests`, and run the opt-in `gpu;vulkan`
+  smoke
+  (`ctest --test-dir build/ci-vulkan -L 'gpu' -LE 'slow|flaky-quarantine' --output-on-failure --timeout 120`).
+  Mirror the existing `Test.MinimalDebugSurfaceGpuSmoke.cpp` driver
+  helper; assert four-sample-point pixel-readback parity and zero
+  fallback counters.
