@@ -116,6 +116,24 @@ Slice A (this slice):
       reporting `Recorded` under the default recipe and the
       `BindPipelineCalls` count incrementing by one (no new push
       constants — present pipeline carries a zero-byte push range).
+- [x] Slice A follow-up: wire the recipe-side `"Present"` node as a
+      real color-attachment pass. The initial Slice A landing only
+      declared `Read(backbuffer, TextureUsage::Present)` +
+      `SideEffect()` on the present pass, so the framegraph compiler
+      emitted zero `CompiledRenderPassAttachment` entries for it,
+      `BuildActiveRenderPassDesc` reported `HasAttachments = false`,
+      and the executor issued `RecordPresentPass(...)`'s
+      `BindPipeline + Draw(3, 1, 0, 0)` outside any render pass —
+      invalid command-buffer usage on Vulkan that would surface as a
+      validation error and a missing final blit to the backbuffer.
+      `Graphics.FrameRecipe.cpp::BuildDefaultFrameRecipe` now declares
+      `Write(backbuffer, TextureUsage::ColorAttachmentWrite)` +
+      `SetRenderPass(...)` on the canonical `"Present"` node
+      (mirroring the `Pass.Present.MinimalDebug` finalizer), and
+      `DescribeDefaultFrameRecipe` lists `"Backbuffer"` under the
+      present pass's writes rather than reads. The contract-test
+      assertions in `Test.FrameRecipeContract.cpp` and
+      `Test.ImGuiPresentContract.cpp` are updated to match.
 
 Slice B (canonical `Pass.DebugView`, deferred):
 - [ ] Add `m_DebugViewPass` + `m_DebugViewPipelineLease` members.
