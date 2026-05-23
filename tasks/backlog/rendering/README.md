@@ -648,7 +648,9 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   depends on GRAPHICS-075 (done). Promoted to `tasks/active/` on 2026-05-23
   with a four-slice plan (canonical present → canonical debug-view →
   non-present-`Backbuffer`-write negative test → default-recipe
-  `gpu;vulkan` visible-triangle smoke). Slice A in-progress.
+  `gpu;vulkan` visible-triangle smoke). Slices A–C landed via PRs
+  #921 + #922 (Slice A follow-up), #923, and #924; Slice D is
+  blocked on a Vulkan-capable host.
 - [GRAPHICS-077 — Backend transient-debug-primitive upload helper](GRAPHICS-077-transient-debug-primitive-upload-helper.md):
   depends on GRAPHICS-072 (uses `SceneColorHDR`/`SceneDepth` LOAD-store).
 - [GRAPHICS-078 — Backend visualization-overlay upload helper](GRAPHICS-078-visualization-overlay-upload-helper.md):
