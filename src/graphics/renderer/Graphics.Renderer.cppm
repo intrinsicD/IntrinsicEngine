@@ -77,6 +77,30 @@ namespace Extrinsic::Graphics
         std::vector<RenderGraphCommandPassStats> Passes{};
     };
 
+    // GRAPHICS-077 Slice A — deterministic CPU diagnostics for the
+    // new `TransientDebugSurfacePass`. All counters stay at zero in
+    // Slice A (the pass records no commands). Slice B begins
+    // incrementing the triangle counters; Slice C begins incrementing
+    // the line + point counters. `MissingPipelineSkipCount` increments
+    // when the executor reaches the pass branch with the device
+    // operational but at least one required pipeline lease is missing
+    // (so the pass returns `SkippedUnavailable`); useful for distinguishing
+    // "feature off" (counter stays zero, pass not in stats) from
+    // "feature on but pipeline missing" (counter increments).
+    // `UploadOverflowCount` is reserved for the Slice B/C upload helper
+    // to report transient-buffer-allocator capacity exhaustion.
+    export struct TransientDebugUploadDiagnostics
+    {
+        std::uint64_t UploadOverflowCount = 0;
+        std::uint64_t LineRecordsSubmitted = 0;
+        std::uint64_t PointRecordsSubmitted = 0;
+        std::uint64_t TriangleRecordsSubmitted = 0;
+        std::uint64_t LineRecordsRecorded = 0;
+        std::uint64_t PointRecordsRecorded = 0;
+        std::uint64_t TriangleRecordsRecorded = 0;
+        std::uint64_t MissingPipelineSkipCount = 0;
+    };
+
     export struct RenderGraphFrameStats
     {
         RenderGraphCompileStats Compile{};
@@ -147,6 +171,14 @@ namespace Extrinsic::Graphics
         // counter increments by exactly 1 per frame in which the request
         // resolved through fallback.
         std::uint32_t DebugViewFallbackInvocationCount = 0;
+        // GRAPHICS-077 Slice A — aggregate diagnostics for the
+        // `TransientDebugSurfacePass` upload + recording path. All
+        // counters stay at zero in Slice A (no pipelines, scaffold
+        // executor branch only). Slice B starts populating the triangle
+        // counters; Slice C starts populating the line + point counters.
+        // Reset per-frame through the existing
+        // `m_LastRenderGraphStats = {}` cadence in `ExecuteFrame()`.
+        TransientDebugUploadDiagnostics TransientDebugUpload{};
     };
 
     export struct RuntimeRenderSnapshotBatch
