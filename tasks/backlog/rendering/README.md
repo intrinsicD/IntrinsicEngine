@@ -651,8 +651,13 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   `gpu;vulkan` visible-triangle smoke). Slices A–C landed via PRs
   #921 + #922 (Slice A follow-up), #923, and #924; Slice D is
   blocked on a Vulkan-capable host.
-- [GRAPHICS-077 — Backend transient-debug-primitive upload helper](GRAPHICS-077-transient-debug-primitive-upload-helper.md):
+- [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../active/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
   depends on GRAPHICS-072 (uses `SceneColorHDR`/`SceneDepth` LOAD-store).
+  Promoted to `tasks/active/` on 2026-05-23 with a four-slice plan
+  (recipe/executor scaffold → triangle lane → line + point lanes →
+  optional `gpu;vulkan` smoke). Slice A (scaffold-only) is the next
+  pick-up; Slices A–C are CPU-testable and only Slice D requires a
+  Vulkan-capable host.
 - [GRAPHICS-078 — Backend visualization-overlay upload helper](GRAPHICS-078-visualization-overlay-upload-helper.md):
   depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](GRAPHICS-079-default-recipe-imgui-pass-wiring.md):

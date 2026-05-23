@@ -29,6 +29,19 @@ Each active task should include:
   pick the next earliest unblocked Theme A leaf from
   [`tasks/backlog/README.md`](../backlog/README.md) rather than
   scaffolding Slice D without the ability to verify it.
+- [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
+  Backend transient-debug-primitive upload helper. Status:
+  in-progress (planning landed; Slice A not started). Owner:
+  unassigned; next pick-up by any agent on any host (the next four
+  slices are CPU-testable; only the optional Slice D requires a
+  Vulkan-capable host). Promoted from `tasks/backlog/rendering/` on
+  2026-05-23 on `claude/intrinsicengine-agent-onboarding-utAFW` as
+  the next earliest unblocked Theme A leaf once GRAPHICS-076 parked
+  on its Vulkan-host blocker. Four-slice plan: recipe/executor
+  scaffold (A, scaffold-only, next pick-up), triangle lane
+  operational wiring (B), line + point lane operational wiring (C),
+  and the optional `gpu;vulkan` smoke (D, deferred behind the same
+  Vulkan-host gate as GRAPHICS-076 Slice D).
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
