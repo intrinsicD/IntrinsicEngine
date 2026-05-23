@@ -589,7 +589,38 @@ Concretely:
   driver loop is not duplicated. The entire MinimalDebug scaffold (the
   recipe, the two passes, and the three counters) is deleted by
   GRAPHICS-081 once the canonical default recipe records every pass body
-  operationally.
+  operationally; the upstream gate for that deletion is GRAPHICS-076 plus
+  its scaffold-retirement-obligation `gpu;vulkan` default-recipe
+  visible-triangle smoke (Slice D).
+- GRAPHICS-076 Slice A wires the canonical default-recipe `Pass.Present`
+  (`Extrinsic.Graphics.Pass.Present`) operationally on the CPU/null path.
+  The renderer holds `m_PresentPass` (a default-constructed `PresentPass`)
+  plus `m_PresentPipelineLease`, and
+  `InitializeOperationalPassResources()` creates the present pipeline
+  from `BuildPresentPipelineDesc(m_BackbufferFormat)` — a fullscreen
+  pipeline pointed at the new `assets/shaders/present.{vert,frag}` pair
+  with `PushConstantSize = 0`, `Rasterizer.Culling = None`, depth test +
+  write disabled, and `ColorTargetFormats[0]` pinned to the backbuffer
+  format. The present pipeline is the LAST pipeline created inside the
+  publisher (call #24 per
+  `tests/contract/graphics/Test.RendererFrameLifecycle.cpp`), placed
+  after the postprocess histogram pipeline so the existing test
+  fixtures' `FailPipelineCreateCall` indices (1-23) remain stable. On
+  the executor side, the new `"Present"` branch (textually adjacent to
+  the existing `MinimalDebugPresent` branch) routes through
+  `RecordPresentPass(...)` with the same `Recorded` /
+  `SkippedNonOperational` / `SkippedUnavailable` taxonomy the other
+  default-recipe pass helpers already use; no new per-pass counter is
+  introduced. The Slice A contract pin is
+  `tests/contract/graphics/Test.PresentPass.cpp` (BindPipeline + Draw(3,
+  1, 0, 0) shape, missing-pipeline-lease `SkippedUnavailable`,
+  non-operational-device `SkippedNonOperational`); the lifecycle test
+  picks up the global "Present is Recorded under the default recipe"
+  invariant + the `BindPipelineCalls += 1` count bump. Slice B
+  (canonical `Pass.DebugView` operational wiring) and Slice D
+  (default-recipe `gpu;vulkan` visible-triangle smoke) remain open
+  under the same GRAPHICS-076 task and are required before
+  GRAPHICS-081 can delete the MinimalDebug scaffold.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
