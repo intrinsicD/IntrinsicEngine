@@ -709,20 +709,50 @@ Concretely:
   `RenderGraphFrameStats::TransientDebugUpload` and exposes eight
   counters (`UploadOverflowCount`, `{Line,Point,Triangle}RecordsSubmitted`,
   `{Line,Point,Triangle}RecordsRecorded`, `MissingPipelineSkipCount`).
-  Slice A pins all counters at zero except `MissingPipelineSkipCount`,
-  which increments by one each frame the executor reaches the branch
-  with an operational device but no pipeline (the
-  scaffold-only signal that distinguishes "feature on" from
-  "feature off"). Slice B begins populating the triangle counters
-  once the per-lane pipelines + `TransientDebugUploadHelper` land;
-  Slice C extends to line + point lanes. The contract pin is
-  `tests/contract/graphics/Test.TransientDebugSurfacePass.cpp`
+  Slice A pinned all counters at zero except `MissingPipelineSkipCount`,
+  which incremented by one each frame the executor reached the branch
+  with an operational device but no pipeline (the scaffold-only
+  signal that distinguished "feature on" from "feature off").
+  GRAPHICS-077 Slice B promotes the triangle lane from
+  `SkippedUnavailable` to `Recorded`. `NullRenderer` now owns two
+  triangle pipeline leases (`m_TransientDebugTrianglePipelineLeaseDepthTested`
+  / `m_TransientDebugTrianglePipelineLeaseAlwaysOnTop`), created via
+  `BuildTransientDebugTrianglePipelineDesc(depthTested)` at call indices
+  #26 + #27 inside `InitializeOperationalPassResources()` (immediately
+  after the GRAPHICS-076 debug-view pipeline at #25 so upstream
+  `FailPipelineCreateCall` indices stay stable). Both pipelines bind
+  `assets/shaders/transient_debug_triangle.{vert,frag}`, target the
+  `RGBA16_FLOAT` `SceneColorHDR` color attachment with depth attachment
+  `D32_FLOAT`, and carry the 16-byte
+  `TransientDebugTrianglePushConstants` push block (BDA + per-draw
+  `FirstVertex`). The renderer also owns a backend-local
+  `TransientDebugUploadHelper` (declared in
+  `Extrinsic.Graphics.TransientDebugUploadHelper`) that leases a single
+  growing host-visible vertex buffer through `BufferManager` and packs
+  per-frame triangle vertices via `IDevice::WriteBuffer(...)`; the
+  helper is reset before the `BufferManager` in `Shutdown()` so its
+  internal `BufferLease` destructor observes a live manager.
+  `RecordTransientDebugSurfacePass(...)` now consumes
+  `world.DebugPrimitives.Triangles`, gates on both triangle pipeline
+  leases, and routes through `TransientDebugSurfacePass::ExecuteTriangles(...)`
+  which records `BindPipeline(variant) + PushConstants(16) + Draw(3, 1,
+  0, 0)` per packet (switching the bound variant whenever the packet's
+  `DepthTested` flag flips). Per-packet recording increments
+  `TriangleRecordsSubmitted` + `TriangleRecordsRecorded`;
+  `UploadOverflowCount` only ticks if the helper exceeds its
+  per-frame vertex-count cap (256 K vertices ≈ 4 MiB).
+  `MissingPipelineSkipCount` continues to increment on the
+  operational-no-pipeline path (e.g. `FailPipelineCreateCall = 26`).
+  Slice C extends the helper + pass to the line + point lanes; Slice D
+  (opt-in `gpu;vulkan` pixel-readback smoke) remains deferred behind
+  the same Vulkan-capable-host gate as GRAPHICS-076 Slice D. The
+  contract pin is `tests/contract/graphics/Test.TransientDebugSurfacePass.cpp`
   (recipe declaration with/without transient primitives, executor
-  `SkippedUnavailable` with `MissingPipelineSkipCount` increment,
-  executor `SkippedNonOperational` short-circuit before the pipeline
-  check). Slice D (the opt-in `gpu;vulkan` pixel-readback smoke)
-  remains deferred behind the same Vulkan-capable-host gate as
-  GRAPHICS-076 Slice D.
+  `SkippedNonOperational` short-circuit, executor
+  `SkippedUnavailable` with `MissingPipelineSkipCount` increment on
+  pipeline-create failure, the operational `Recorded` taxonomy with
+  triangle counters, per-packet variant selection, and per-frame
+  buffer-recycling invariant across multiple frames).
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is

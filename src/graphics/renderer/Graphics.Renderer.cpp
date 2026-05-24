@@ -68,12 +68,14 @@ import Extrinsic.Graphics.Pass.Present;
 // holds a reference and does not re-export the system module).
 import Extrinsic.Graphics.Pass.DebugView;
 import Extrinsic.Graphics.DebugViewSystem;
-// GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
-// Owned as a plain member (no system dependency) alongside the canonical
-// present + debug-view passes; Slice A holds no pipelines so the
-// executor branch reports `SkippedUnavailable` on the operational path
-// and `SkippedNonOperational` otherwise.
+// GRAPHICS-077 Slice A — `TransientDebugSurfacePass` shell. Slice B
+// promotes the triangle lane from `SkippedUnavailable` to `Recorded`
+// by creating two pipeline variants (depth-tested + always-on-top)
+// and driving a backend-local upload helper that packs the sanitized
+// `DebugTrianglePacket` span into a host-visible vertex buffer per
+// frame; Slice C extends to line + point lanes.
 import Extrinsic.Graphics.Pass.TransientDebug.Surface;
+import Extrinsic.Graphics.TransientDebugUploadHelper;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -245,6 +247,17 @@ namespace Extrinsic::Graphics
             m_SamplerManager .emplace(device);
             m_TextureManager .emplace(device, device.GetBindlessHeap());
             m_PipelineManager.emplace(device);
+            // GRAPHICS-077 Slice B — backend-local transient-debug upload
+            // helper. Constructed alongside the BufferManager so per-frame
+            // `UploadTriangles(...)` can lease a single growing host-
+            // visible vertex buffer. Reset in `Shutdown()` before the
+            // BufferManager so its `BufferLease` destructor observes a
+            // live manager. The default in-renderer implementation is
+            // CPU-functional against `MockDevice` for the contract gate;
+            // the Vulkan-tuned concrete implementation lands with
+            // GRAPHICS-077 Slice D.
+            m_TransientDebugUploadHelper =
+                std::make_unique<TransientDebugUploadHelper>(device, *m_BufferManager);
             m_BackbufferFormat = device.GetBackbufferFormat();
             m_GpuWorld.emplace();
             m_GpuWorld->Initialize(device, *m_BufferManager);
@@ -584,6 +597,13 @@ namespace Extrinsic::Graphics
             // lease above; same teardown ordering contract (lease reset
             // before `m_PipelineManager` is destroyed below).
             m_DebugViewPipelineLease.reset();
+            // GRAPHICS-077 Slice B — drop the canonical default-recipe
+            // transient-debug triangle pipeline leases (depth-tested +
+            // always-on-top) alongside the debug-view lease above; same
+            // teardown ordering contract (leases reset before
+            // `m_PipelineManager` is destroyed below).
+            m_TransientDebugTrianglePipelineLeaseDepthTested.reset();
+            m_TransientDebugTrianglePipelineLeaseAlwaysOnTop.reset();
             m_ForwardSurfacePipelineLease.reset();
             m_ForwardLinePipelineLease.reset();
             m_ForwardPointPipelineLease.reset();
@@ -650,9 +670,20 @@ namespace Extrinsic::Graphics
             // clean fail-closed state instead of inheriting a stale
             // device handle from a previous operational lifecycle.
             m_PresentPass.SetPipeline(RHI::PipelineHandle{});
+            // GRAPHICS-077 Slice B — zero the transient-debug surface
+            // pass's cached per-lane triangle pipeline handles so a
+            // later `Initialize(device)` starts from a clean fail-
+            // closed state.
+            m_TransientDebugSurfacePass.SetTriangleDepthTestedPipeline(RHI::PipelineHandle{});
+            m_TransientDebugSurfacePass.SetTriangleAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
+            // GRAPHICS-077 Slice B — drop the transient-debug upload
+            // helper before the BufferManager is destroyed so the
+            // helper's internal `BufferManager::BufferLease` destructor
+            // observes a live manager.
+            m_TransientDebugUploadHelper.reset();
             m_BufferManager  .reset();
             m_CullingOutputAvailable = false;
             // GRAPHICS-033D — drop the smoke's readback handle so a later
@@ -1874,28 +1905,28 @@ namespace Extrinsic::Graphics
                     }
                     else if (passName == std::string_view{"TransientDebugSurfacePass"})
                     {
-                        // GRAPHICS-077 Slice A — scaffold-only branch for
-                        // the new transient-debug surface overlay. The
-                        // recipe declares this pass only when at least
-                        // one transient debug primitive packet exists
-                        // (`features.EnableTransientDebugSurface` derived
-                        // from per-lane span emptiness in
+                        // GRAPHICS-077 Slice B — triangle-lane operational
+                        // branch for the transient-debug surface overlay.
+                        // The recipe declares this pass only when at
+                        // least one transient debug primitive packet
+                        // exists (`features.EnableTransientDebugSurface`
+                        // derived from per-lane span emptiness in
                         // `DeriveDefaultFrameRecipeFeatures`), so this
                         // branch is reached only when the world has
                         // submitted transient debug payload for the
-                        // frame. Slice A holds no pipelines and no
-                        // helper — `RecordTransientDebugSurfacePass`
-                        // returns `SkippedNonOperational` for a
-                        // non-operational device and
-                        // `SkippedUnavailable` otherwise, mirroring the
-                        // taxonomy the other default-recipe helpers use
-                        // before their pipeline leases land. Slice B
-                        // wires the triangle lane (executor flips from
-                        // `SkippedUnavailable` to `Recorded` when at
-                        // least one triangle packet records); Slice C
-                        // extends to line + point lanes.
+                        // frame. The triangle lane is operational: the
+                        // helper consumes
+                        // `world.DebugPrimitives.Triangles`, packs them
+                        // into a host-visible vertex buffer through
+                        // `m_TransientDebugUploadHelper`, and
+                        // `ExecuteTriangles(...)` records the per-packet
+                        // `BindPipeline + PushConstants + Draw(3, 1, 0, 0)`
+                        // shape — `Recorded` when at least one packet
+                        // records, otherwise the recipe-side gate
+                        // prevented the branch entirely. Slice C extends
+                        // the helper + pass to line + point lanes.
                         const RenderCommandPassStatus status =
-                            RecordTransientDebugSurfacePass(graphicsContext);
+                            RecordTransientDebugSurfacePass(graphicsContext, renderWorld);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"Present"})
@@ -3397,6 +3428,52 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-077 Slice B — transient-debug triangle pipelines. Two
+        // variants per lane (depth-tested + always-on-top) so packets
+        // with `DepthTested = true` rasterize against the prepass depth
+        // and packets with `DepthTested = false` overlay on top
+        // regardless of occlusion. Both variants share the same shader
+        // pair (`assets/shaders/transient_debug_triangle.{vert,frag}`),
+        // a BDA-fetch vertex layout (positions + packed RGBA8 color
+        // pulled from the helper's host-visible vertex buffer), and the
+        // 16-byte `TransientDebugTrianglePushConstants` push block (BDA +
+        // per-draw `FirstVertex`). Color target pinned to `RGBA16_FLOAT`
+        // because the pass writes the `SceneColorHDR` resource declared
+        // by `BuildDefaultFrameRecipe(...)`. `DepthTargetFormat` is
+        // `D32_FLOAT` for both variants (matching the prepass depth);
+        // the always-on-top variant disables `DepthTestEnable` so it
+        // ignores occlusion while still consuming the same render-pass
+        // attachment layout. `ColorBlend[0].Enable = false` matches the
+        // GRAPHICS-077 task non-goal of "no new blend modes" — opaque
+        // overlay is the canonical CPUContracted form; alpha-blended
+        // overlays are reserved for a follow-up task.
+        [[nodiscard]] static RHI::PipelineDesc BuildTransientDebugTrianglePipelineDesc(
+            const bool depthTested) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/transient_debug_triangle.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/transient_debug_triangle.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = depthTested;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize =
+                static_cast<std::uint32_t>(sizeof(TransientDebugTrianglePushConstants));
+            desc.DebugName = depthTested
+                ? "Renderer.TransientDebug.Triangle.DepthTested"
+                : "Renderer.TransientDebug.Triangle.AlwaysOnTop";
+            return desc;
+        }
+
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
         {
             if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
@@ -4200,6 +4277,62 @@ namespace Extrinsic::Graphics
             {
                 Core::Log::Warn("[Graphics] DebugView pipeline unavailable; default-recipe debug-view recording will be skipped: error={}",
                                 static_cast<int>(debugViewPipeline.error()));
+            }
+
+            // GRAPHICS-077 Slice B — transient-debug triangle pipelines.
+            // Created LAST so contract-test fixtures targeting
+            // `FailPipelineCreateCall` against specific upstream
+            // pipelines keep their documented call indices unchanged
+            // (culling=1, depth=2, defaultDebugSurface=3,
+            // minimalVisibleTriangle=4, forward/shadow/deferred=5-10,
+            // selection=11-15, postprocess=16-23, present=24,
+            // debugView=25). The triangle DepthTested slot is call #26
+            // and the AlwaysOnTop slot is call #27. Same reset/republish
+            // + fail-closed pattern as the other leases above so a
+            // failed `Create()` leaves the pass in the fail-closed state
+            // that `RecordTransientDebugSurfacePass` interprets as
+            // `SkippedUnavailable` (`MissingPipelineSkipCount` then
+            // increments on the operational-no-pipeline path).
+            m_TransientDebugTrianglePipelineLeaseDepthTested.reset();
+            m_TransientDebugTrianglePipelineLeaseAlwaysOnTop.reset();
+            m_TransientDebugSurfacePass.SetTriangleDepthTestedPipeline(RHI::PipelineHandle{});
+            m_TransientDebugSurfacePass.SetTriangleAlwaysOnTopPipeline(RHI::PipelineHandle{});
+            const RHI::PipelineDesc triangleDepthTestedDesc =
+                BuildTransientDebugTrianglePipelineDesc(true);
+            auto triangleDepthTestedPipeline = m_PipelineManager->Create(triangleDepthTestedDesc);
+            if (triangleDepthTestedPipeline.has_value())
+            {
+                m_TransientDebugTrianglePipelineLeaseDepthTested.emplace(
+                    std::move(*triangleDepthTestedPipeline));
+                m_TransientDebugSurfacePass.SetTriangleDepthTestedPipeline(
+                    m_PipelineManager->GetDeviceHandle(
+                        m_TransientDebugTrianglePipelineLeaseDepthTested->GetHandle()));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] TransientDebug.Triangle.DepthTested pipeline unavailable; "
+                    "default-recipe transient-debug recording will be skipped: error={}",
+                    static_cast<int>(triangleDepthTestedPipeline.error()));
+            }
+
+            const RHI::PipelineDesc triangleAlwaysOnTopDesc =
+                BuildTransientDebugTrianglePipelineDesc(false);
+            auto triangleAlwaysOnTopPipeline = m_PipelineManager->Create(triangleAlwaysOnTopDesc);
+            if (triangleAlwaysOnTopPipeline.has_value())
+            {
+                m_TransientDebugTrianglePipelineLeaseAlwaysOnTop.emplace(
+                    std::move(*triangleAlwaysOnTopPipeline));
+                m_TransientDebugSurfacePass.SetTriangleAlwaysOnTopPipeline(
+                    m_PipelineManager->GetDeviceHandle(
+                        m_TransientDebugTrianglePipelineLeaseAlwaysOnTop->GetHandle()));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] TransientDebug.Triangle.AlwaysOnTop pipeline unavailable; "
+                    "default-recipe transient-debug recording will be skipped: error={}",
+                    static_cast<int>(triangleAlwaysOnTopPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -5306,29 +5439,61 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-077 Slice A — scaffold-only executor helper for the new
+        // GRAPHICS-077 Slice B — operational executor helper for the
         // `TransientDebugSurfacePass`. Mirrors `RecordPresentPass` for the
-        // operational gate. Slice A has no pipelines and no helper, so the
-        // operational path always returns `SkippedUnavailable`; Slice B
-        // begins reporting `Recorded` once the triangle-lane pipelines +
-        // upload helper land. `MissingPipelineSkipCount` increments on the
-        // operational-but-not-pipelined path so the diagnostic counter
-        // distinguishes "feature on, scaffold-only" from "feature off"
-        // (the latter does not reach this branch at all).
-        [[nodiscard]] RenderCommandPassStatus RecordTransientDebugSurfacePass(RHI::ICommandContext& cmd)
+        // operational gate and `RecordDebugViewPass` for the
+        // missing-pipeline taxonomy. The triangle lane requires both the
+        // depth-tested and always-on-top pipeline variants; either
+        // missing yields `SkippedUnavailable` so per-packet
+        // pipeline-variant selection inside `ExecuteTriangles(...)` cannot
+        // silently fall back to an invalid handle.
+        // `MissingPipelineSkipCount` increments on the operational-no-
+        // pipeline path so the diagnostic counter distinguishes
+        // "feature on, pipeline missing" from "feature off" (the latter
+        // does not reach this branch at all).
+        //
+        // Slice C extends the gate to the line + point pipeline leases
+        // and routes through additional `ExecuteLines(...)` /
+        // `ExecutePoints(...)` helpers on the same pass.
+        [[nodiscard]] RenderCommandPassStatus RecordTransientDebugSurfacePass(
+            RHI::ICommandContext& cmd,
+            const RenderWorld&    world)
         {
-            (void)cmd;
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_TransientDebugSurfacePass.GetPipeline().IsValid())
+            if (!m_TransientDebugTrianglePipelineLeaseDepthTested.has_value() ||
+                !m_TransientDebugTrianglePipelineLeaseDepthTested->IsValid() ||
+                !m_TransientDebugTrianglePipelineLeaseAlwaysOnTop.has_value() ||
+                !m_TransientDebugTrianglePipelineLeaseAlwaysOnTop->IsValid() ||
+                !m_TransientDebugSurfacePass.GetTriangleDepthTestedPipeline().IsValid() ||
+                !m_TransientDebugSurfacePass.GetTriangleAlwaysOnTopPipeline().IsValid())
             {
                 ++m_LastRenderGraphStats.TransientDebugUpload.MissingPipelineSkipCount;
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_TransientDebugSurfacePass.Execute(cmd);
+            // The helper is constructed alongside `m_BufferManager` in
+            // `InitializeOperationalPassResources(...)`; on a successful
+            // operational gate it is always present. Defensive nullopt
+            // gate left in place so a Slice C/D refactor that defers
+            // helper construction (e.g. behind a Vulkan-specific impl)
+            // cannot silently regress to a no-op.
+            if (!m_TransientDebugUploadHelper)
+            {
+                ++m_LastRenderGraphStats.TransientDebugUpload.MissingPipelineSkipCount;
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            const TransientDebugTriangleUploadResult uploadResult =
+                m_TransientDebugUploadHelper->UploadTriangles(world.DebugPrimitives.Triangles);
+
+            m_TransientDebugSurfacePass.ExecuteTriangles(
+                cmd,
+                world.DebugPrimitives.Triangles,
+                uploadResult,
+                m_LastRenderGraphStats.TransientDebugUpload);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -5498,6 +5663,29 @@ namespace Extrinsic::Graphics
         // `FailPipelineCreateCall` indices (1-24) used by other lifecycle
         // tests remain stable.
         std::optional<RHI::PipelineManager::PipelineLease> m_DebugViewPipelineLease;
+        // GRAPHICS-077 Slice B — transient-debug triangle pipelines.
+        // Two variants per lane (depth-tested + always-on-top); same
+        // reset/republish pattern as the debug-view lease above so a
+        // failed `Create()` leaves `m_TransientDebugSurfacePass` in
+        // the fail-closed state that `RecordTransientDebugSurfacePass`
+        // interprets as `SkippedUnavailable` (with
+        // `MissingPipelineSkipCount += 1` per operational-no-pipeline
+        // frame). Created LAST inside
+        // `InitializeOperationalPassResources()` — depth-tested at
+        // call #26 (immediately after debug-view at #25) and
+        // always-on-top at call #27 — so the existing
+        // `FailPipelineCreateCall` indices (1-25) used by other
+        // lifecycle tests remain stable.
+        std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugTrianglePipelineLeaseDepthTested;
+        std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugTrianglePipelineLeaseAlwaysOnTop;
+        // GRAPHICS-077 Slice B — backend-local transient-debug upload
+        // helper. Held as `unique_ptr<ITransientDebugUploadHelper>` so
+        // Slice D can swap in a Vulkan-tuned concrete implementation
+        // without disturbing the renderer-side wiring. Constructed in
+        // `Initialize(device)` against the live `BufferManager`; reset
+        // in `Shutdown()` before the `BufferManager` so the helper's
+        // internal lease destructor observes a live manager.
+        std::unique_ptr<ITransientDebugUploadHelper> m_TransientDebugUploadHelper;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;

@@ -2,29 +2,34 @@
 
 ## Status
 
-- Status: in-progress (Slice A landed; Slice B not started). Slice A
-  scaffolded the recipe + executor shape on
-  `claude/intrinsicengine-agent-onboarding-p1J2P` on 2026-05-23 and
-  verified through the contract CPU/null gate (224/224 graphics
-  contract tests pass).
-- Owner/agent: unassigned for Slice B; next pick-up by any agent on any
-  host (Slices B and C are CPU-testable; Slice D requires a
-  Vulkan-capable host).
+- Status: in-progress (Slices A + B landed; Slice C not started).
+  Slice A scaffolded the recipe + executor shape on
+  `claude/intrinsicengine-agent-onboarding-p1J2P` on 2026-05-23
+  (224/224 graphics contract tests pass). Slice B promoted the
+  triangle lane from `SkippedUnavailable` to `Recorded` on
+  `claude/intrinsicengine-agent-onboarding-MnHl0` on 2026-05-24 and
+  verified through the contract CPU/null gate (227/227 graphics
+  contract tests pass; 2201/2201 full CPU/null gate green).
+- Owner/agent: unassigned for Slice C; next pick-up by any agent on any
+  host (Slice C is CPU-testable; Slice D requires a Vulkan-capable
+  host).
 - Branch: Slice A landed on
-  `claude/intrinsicengine-agent-onboarding-p1J2P`; subsequent slices
+  `claude/intrinsicengine-agent-onboarding-p1J2P`; Slice B landed on
+  `claude/intrinsicengine-agent-onboarding-MnHl0`; subsequent slices
   will be developed on new `claude/intrinsicengine-agent-onboarding-*`
   branches.
 - Started: 2026-05-23.
-- Next verification step: when Slice B is picked up, configure with the
+- Next verification step: when Slice C is picked up, configure with the
   `ci` preset, build `IntrinsicGraphicsContractTests`
-  + `IntrinsicGraphicsContractCpuTests`
-  + `IntrinsicGraphicsVulkanContractTests`, and run the contract
+  + `IntrinsicGraphicsContractCpuTests`, and run the contract
   CPU/null gate (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`).
-  Slice A's pin is `Test.TransientDebugSurfacePass.cpp` (four
-  contract tests; see `## Tests`). Slice B adds the triangle-lane
-  pipelines + `TransientDebugUploadHelper` interface + recording
-  body; see Slice B in `## Slice plan` and `## Verification` for the
-  exact test/file additions to validate against.
+  Slice B's pin is `Test.TransientDebugSurfacePass.cpp` (seven
+  contract tests covering recipe declaration, executor taxonomy,
+  triangle-lane bind/draw shape, per-packet variant selection, and
+  per-frame buffer recycling). Slice C adds the line + point
+  pipelines + shaders + helper extension + per-lane recording; see
+  Slice C in `## Slice plan` and `## Verification` for the exact
+  test/file additions to validate against.
 
 ## Slice plan
 
@@ -65,20 +70,28 @@ slice exercises an opt-in `gpu;vulkan` smoke.
   `"TransientDebugSurfacePass"` to `kSoftSkippedPasses` so the
   baseline lifecycle assertion stays deterministic.
   No new pipelines, no helper, no shader files in Slice A.
-- **Slice B.** Triangle-lane operational wiring. Adds two triangle
-  pipelines (`DepthTested` + `AlwaysOnTop`) via a
+- **Slice B (landed 2026-05-24 on `claude/intrinsicengine-agent-onboarding-MnHl0`).**
+  Triangle-lane operational wiring. Adds two triangle pipelines
+  (`DepthTested` + `AlwaysOnTop`) via a
   `BuildTransientDebugTrianglePipelineDesc(depthTested)` helper, two
-  pipeline-lease members on `NullRenderer`, the new shader pair
-  `assets/shaders/transient_debug_triangle.{vert,frag}` (positions in,
-  RGBA8 color in, drawn into `SceneColorHDR`), the `Pass.Present`
-  pattern of `Initialize`/`Shutdown`/`Rebuild`, and the per-frame
-  triangle-lane upload through a new `TransientDebugUploadHelper`
-  (the helper itself is backend-local under `src/graphics/vulkan` but
-  exposes a CPU-mockable interface so contract tests can assert the
-  shape without a real Vulkan device). Records `BindPipeline +
-  BindVertexBuffer + Draw(3 * N, 1, 0, 0)` per triangle packet, with
-  per-packet `DepthTested` selecting the matching pipeline variant
-  and `RecordTransientDebugSurfacePass` flipping from
+  pipeline-lease members on `NullRenderer` (created at call indices
+  #26 + #27 after the GRAPHICS-076 debug-view at #25), the new shader
+  pair `assets/shaders/transient_debug_triangle.{vert,frag}` (BDA-
+  fetched positions + packed RGBA8 color via push constants, drawn
+  into `SceneColorHDR`), and the per-frame triangle-lane upload
+  through a new `TransientDebugUploadHelper` (declared as the
+  virtual `ITransientDebugUploadHelper` in
+  `Extrinsic.Graphics.TransientDebugUploadHelper` so contract tests
+  can substitute; the default concrete impl lives in the renderer
+  module and uses `BufferManager` + `IDevice::WriteBuffer(...)` —
+  the Vulkan-tuned variant is deferred to Slice D per the
+  backend-locality non-goal). Records `BindPipeline(variant) +
+  PushConstants(16) + Draw(3, 1, 0, 0)` per triangle packet (rather
+  than the spec's `BindVertexBuffer + Draw(3 * N)` shape — the RHI
+  has no `BindVertexBuffer` API by design, so vertex fetch is BDA-
+  based via push constants; see the canonical `line.vert` precedent
+  in `assets/shaders/`). Per-packet `DepthTested` selects the matching
+  pipeline variant; `RecordTransientDebugSurfacePass` flips from
   `SkippedUnavailable` to `Recorded` when at least one triangle
   packet records. Increments `TriangleRecordsSubmitted` /
   `TriangleRecordsRecorded` deterministically.
@@ -113,7 +126,7 @@ slice exercises an opt-in `gpu;vulkan` smoke.
   promotes it to `CPUContracted` is named and in-scope. Slice B is
   named here and remains in-scope for this task, so the closure rule
   is honored.
-- Slice B closes triangle lane `Scaffolded → CPUContracted`.
+- Slice B (landed) closes triangle lane `Scaffolded → CPUContracted`.
 - Slice C closes line + point lanes `Scaffolded → CPUContracted` and
   closes the task at `CPUContracted` on CPU-only hosts.
 - Slice D closes `CPUContracted → Operational` on Vulkan-capable
@@ -213,35 +226,51 @@ Slice A (landed 2026-05-23):
       per-frame through the existing `m_LastRenderGraphStats = {}`
       cadence.
 
-Slice B (triangle lane, future slice):
-- [ ] Add `BuildTransientDebugTrianglePipelineDesc(depthTested)` helper
-      pinned to `SceneColorHDR` format with depth-test variant,
-      `Rasterizer.Culling = None`, `Topology = TriangleList`,
-      `PushConstantSize = 0`, color-write all channels,
-      `BlendEnabled = false`.
-- [ ] Add `assets/shaders/transient_debug_triangle.{vert,frag}` shader
+Slice B (triangle lane, landed 2026-05-24):
+- [x] Add `BuildTransientDebugTrianglePipelineDesc(depthTested)` helper
+      pinned to `RGBA16_FLOAT` (the `SceneColorHDR` format) with the
+      depth-test variant, `Rasterizer.Culling = None`,
+      `Topology = TriangleList`,
+      `PushConstantSize = sizeof(TransientDebugTrianglePushConstants)`
+      (16 bytes carrying BDA + per-draw `FirstVertex`),
+      `ColorBlend[0].Enable = false`. Deviation from the original
+      spec text: `PushConstantSize = 0` is not viable because vertex
+      fetch is BDA-based in this RHI (no `BindVertexBuffer` API by
+      design); the 16-byte push block carries the
+      `TransientDebugUploadHelper`'s vertex buffer BDA + the per-draw
+      `FirstVertex` so the BDA-fetch vertex shader can address the
+      right triangle. The shader contract pin is documented inline
+      in `assets/shaders/transient_debug_triangle.vert`.
+- [x] Add `assets/shaders/transient_debug_triangle.{vert,frag}` shader
       pair: vertex shader reads position (`vec3`) + packed RGBA8
-      color (`uint32`) per vertex, transforms by camera UBO; fragment
-      shader writes unpacked RGBA color directly.
-- [ ] Add `m_TransientDebugTrianglePipelineLeaseDepthTested` +
+      color (`uint32`) per vertex via BDA, transforms by camera UBO;
+      fragment shader writes unpacked RGBA color directly.
+- [x] Add `m_TransientDebugTrianglePipelineLeaseDepthTested` +
       `m_TransientDebugTrianglePipelineLeaseAlwaysOnTop` to
-      `NullRenderer`. Create after present at call indices #26 + #27
-      (immediately after the GRAPHICS-076 Slice B DebugView pipeline
-      at #25) so upstream `FailPipelineCreateCall` indices stay
-      stable.
-- [ ] Add `TransientDebugUploadHelper` interface declaration under
-      `src/graphics/renderer/` (CPU-mockable through a virtual
-      interface so contract tests can substitute) with concrete
-      implementation under `src/graphics/vulkan/` returning
-      RHI-internal vertex buffer views per lane.
-- [ ] Wire `RecordTransientDebugSurfacePass(...)` to consume the
-      sanitized triangle span from `RenderWorld::DebugPrimitives.Triangles`,
-      upload through the helper, and record per-packet
-      `BindPipeline(DepthTested or AlwaysOnTop) +
-      BindVertexBuffer + Draw(3 * triangleCount, 1, 0, 0)` shape.
-      Flip the pass to `Recorded` when at least one triangle packet
+      `NullRenderer`. Created at call indices #26 + #27 (immediately
+      after the GRAPHICS-076 Slice B DebugView pipeline at #25) so
+      upstream `FailPipelineCreateCall` indices stay stable.
+- [x] Add `TransientDebugUploadHelper` interface declaration in
+      `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm`
+      as the abstract `ITransientDebugUploadHelper` (CPU-mockable
+      virtual interface so contract tests can substitute) plus the
+      default concrete `TransientDebugUploadHelper` that uses
+      `BufferManager` + `IDevice::WriteBuffer(...)` to recycle a
+      single host-visible vertex buffer across frames. Deviation
+      from the original spec text: the concrete impl lives in the
+      renderer module (not `src/graphics/vulkan`) for Slice B so the
+      CPU/null gate verifies the helper without a real Vulkan device;
+      the Vulkan-tuned concrete impl is deferred to Slice D where it
+      ships alongside the `gpu;vulkan` smoke. The interface is in
+      `src/graphics/renderer/` per the spec.
+- [x] Wire `RecordTransientDebugSurfacePass(cmd, world)` to consume
+      the sanitized triangle span from
+      `world.DebugPrimitives.Triangles`, upload through the helper,
+      and record per-packet `BindPipeline(DepthTested or
+      AlwaysOnTop) + PushConstants(16) + Draw(3, 1, 0, 0)` shape.
+      Flips the pass to `Recorded` when at least one triangle packet
       records; `SkippedUnavailable` when either pipeline lease is
-      missing.
+      missing (with `MissingPipelineSkipCount += 1`).
 
 Slice C (line + point lanes, future slice):
 - [ ] Add `BuildTransientDebugLinePipelineDesc(depthTested)` +
@@ -304,20 +333,33 @@ Slice A (landed 2026-05-23):
       behaviour for both the populated and empty cases, so the
       lifecycle baseline stays clean without modification.
 
-Slice B (triangle lane, future slice):
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.RecordsTriangleBindPipelineAndDraw`:
+Slice B (triangle lane, landed 2026-05-24):
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.RecordsTriangleBindPipelineAndDraw`:
       one `DebugTrianglePacket{DepthTested=true, VertexCount=3}`
-      records `BindPipeline(DepthTested) + BindVertexBuffer + Draw(3, 1, 0, 0)`,
-      `TriangleRecordsRecorded == 1`, and pass status is `Recorded`.
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.SelectsAlwaysOnTopVariantPerPacket`:
-      mixed `DepthTested` flags across packets cause the correct
-      pipeline variant to bind per packet.
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.MissingTrianglePipelineLeaseSkipsUnavailable`:
+      records `BindPipeline(DepthTested) + PushConstants(16) +
+      Draw(3, 1, 0, 0)` (BDA-based vertex fetch, no
+      `BindVertexBuffer` API), `TriangleRecordsRecorded == 1`, and
+      pass status is `Recorded`. At least one 16-byte push reaches
+      the device command context (assertion deliberately uses
+      `>= 1` because `DebugViewPushConstants` also pushes 16 bytes
+      and is enabled in the same frame by the transient debug
+      submission flipping `HasTransientDebug`).
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.SelectsAlwaysOnTopVariantPerPacket`:
+      mixed `DepthTested` flags across three packets cause the
+      correct pipeline variant to bind per packet
+      (`TriangleRecordsRecorded == 3`; at least three 16-byte pushes
+      reach the device under the same shared-push-size caveat).
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.MissingTrianglePipelineLeaseSkipsUnavailable`:
       `FailPipelineCreateCall = 26` (triangle DepthTested) yields
       `SkippedUnavailable` and `MissingPipelineSkipCount += 1`.
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.PerFrameBufferRecycling`:
-      across N frames the upload-helper's transient buffer
-      allocator counters return to baseline (no per-frame leak).
+      Upstream `SurfacePass` still records `Recorded`.
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.PerFrameBufferRecyclingDoesNotLeak`:
+      across 5 frames with constant payload, `CreateBufferCount`
+      stays at the post-frame-1 baseline (no per-frame leak),
+      `UploadOverflowCount` stays at zero, and per-frame
+      `TriangleRecordsSubmitted` / `TriangleRecordsRecorded` reflect
+      the final frame's payload (renderer resets per
+      `ExecuteFrame()`).
 
 Slice C (line + point lanes, future slice):
 - [ ] `contract;graphics` — line + point lane bind/draw shape
@@ -347,12 +389,19 @@ Slice A (landed 2026-05-23):
       modules, the new `Extrinsic.Graphics.Pass.TransientDebug.Surface`
       module surface appears).
 
-Slice B (triangle lane, future slice):
-- [ ] Extend `src/graphics/renderer/README.md` with the triangle lane
+Slice B (triangle lane, landed 2026-05-24):
+- [x] Extend `src/graphics/renderer/README.md` with the triangle lane
       bind/draw shape and the
       `TriangleRecordsSubmitted`/`TriangleRecordsRecorded` counters.
-- [ ] Add a row to `src/graphics/vulkan/README.md` for the
-      `TransientDebugUploadHelper` (backend-local).
+- [-] `src/graphics/vulkan/README.md` row for the
+      `TransientDebugUploadHelper` is deferred to Slice D — the
+      Slice B helper lives in the renderer module (CPU-functional
+      via `BufferManager`); the Vulkan-tuned concrete impl that
+      lands with Slice D is what justifies a vulkan-README entry.
+- [x] Regenerated `docs/api/generated/module_inventory.md` (442
+      modules including the new `Extrinsic.Graphics.TransientDebugUploadHelper`
+      module surface).
+- [x] Update `tasks/active/README.md` to reflect Slice B status.
 
 Slice C (line + point lanes, future slice):
 - [ ] Extend both READMEs above with line + point lane equivalents.
@@ -436,13 +485,28 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
   IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests`,
   `ctest --test-dir build/ci -L contract -LE
   'gpu|vulkan|slow|flaky-quarantine' --timeout 60` — 224/224 graphics
-  contract tests passed; `python3 tools/repo/check_layering.py --root
-  src --strict`, `python3 tools/repo/check_test_layout.py --root .
-  --strict`, `python3 tools/docs/check_doc_links.py --root .`, `python3
-  tools/agents/check_task_policy.py --root . --strict` all clean.
-- Slice B/C pick-up: as Slice A, plus rebuild
-  `IntrinsicGraphicsVulkanContractTests` so the helper's
-  backend-local CPU-mock surface is exercised.
+  contract tests passed.
+- Slice B landed 2026-05-24 on
+  `claude/intrinsicengine-agent-onboarding-MnHl0`. Verification:
+  - `cmake --preset ci`
+  - `cmake --build --preset ci --target IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests`
+  - `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — 227/227 graphics contract tests passed.
+  - `cmake --build --preset ci --target IntrinsicTests IntrinsicBenchmarkSmoke`
+  - `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — 2201/2201 tests passed.
+  - `python3 tools/repo/check_layering.py --root src --strict`,
+    `python3 tools/repo/check_test_layout.py --root . --strict`,
+    `python3 tools/docs/check_doc_links.py --root .`,
+    `python3 tools/agents/check_task_policy.py --root . --strict`
+    — all clean.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+    — 442 modules.
+- Slice C pick-up: configure with `ci`, build
+  `IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests`,
+  and run the default contract gate. Slice C extends the helper to
+  line + point lanes with the same shape (two pipelines per lane,
+  per-packet bind/draw, per-lane counters).
 - Slice D pick-up (Vulkan-capable host): configure with `ci-vulkan`,
   build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
   `gpu;vulkan` smoke.

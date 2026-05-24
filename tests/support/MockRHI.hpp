@@ -162,9 +162,18 @@ namespace Extrinsic::Tests
             PushConstants,
             Dispatch,
             BindIndexBuffer,
+            Draw,
             DrawIndexedIndirectCount,
             DrawIndirectCount,
             TextureBarrier,
+        };
+
+        struct DrawRecord
+        {
+            std::uint32_t VertexCount = 0;
+            std::uint32_t InstanceCount = 0;
+            std::uint32_t FirstVertex = 0;
+            std::uint32_t FirstInstance = 0;
         };
 
         struct TextureBarrierRecord
@@ -227,7 +236,20 @@ namespace Extrinsic::Tests
             PushConstantPayloads.push_back(std::move(payload));
             Events.push_back(EventKind::PushConstants);
         }
-        void Draw(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) override {}
+        void Draw(std::uint32_t vertexCount,
+                  std::uint32_t instanceCount,
+                  std::uint32_t firstVertex,
+                  std::uint32_t firstInstance) override
+        {
+            ++DrawCalls;
+            LastDraw = DrawRecord{
+                .VertexCount = vertexCount,
+                .InstanceCount = instanceCount,
+                .FirstVertex = firstVertex,
+                .FirstInstance = firstInstance,
+            };
+            Events.push_back(EventKind::Draw);
+        }
         void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
         void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
@@ -287,8 +309,10 @@ namespace Extrinsic::Tests
         int BindIndexBufferCalls = 0;
         int PushConstantsCalls = 0;
         int DispatchCalls = 0;
+        int DrawCalls = 0;
         int DrawIndexedIndirectCountCalls = 0;
         int DrawIndirectCountCalls = 0;
+        DrawRecord LastDraw{};
         std::uint32_t LastPushConstantSize = 0;
         std::uint32_t LastPushConstantOffset = 0;
         DispatchRecord LastDispatch{};

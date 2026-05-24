@@ -33,6 +33,14 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+// GRAPHICS-077 — re-export the upload helper module so consumers of
+// `RenderGraphFrameStats::TransientDebugUpload` (e.g. contract tests,
+// editor diagnostics) reach the `TransientDebugUploadDiagnostics`
+// struct without separately importing this internal renderer module.
+// The helper interfaces themselves (`ITransientDebugUploadHelper`,
+// `TransientDebugTriangleUploadResult`) ride along for the same
+// consumers but are not part of the renderer's narrow public API.
+export import Extrinsic.Graphics.TransientDebugUploadHelper;
 import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Graphics
@@ -75,30 +83,6 @@ namespace Extrinsic::Graphics
         std::uint32_t SkippedNonOperational = 0;
         std::uint32_t SkippedUnavailable = 0;
         std::vector<RenderGraphCommandPassStats> Passes{};
-    };
-
-    // GRAPHICS-077 Slice A — deterministic CPU diagnostics for the
-    // new `TransientDebugSurfacePass`. All counters stay at zero in
-    // Slice A (the pass records no commands). Slice B begins
-    // incrementing the triangle counters; Slice C begins incrementing
-    // the line + point counters. `MissingPipelineSkipCount` increments
-    // when the executor reaches the pass branch with the device
-    // operational but at least one required pipeline lease is missing
-    // (so the pass returns `SkippedUnavailable`); useful for distinguishing
-    // "feature off" (counter stays zero, pass not in stats) from
-    // "feature on but pipeline missing" (counter increments).
-    // `UploadOverflowCount` is reserved for the Slice B/C upload helper
-    // to report transient-buffer-allocator capacity exhaustion.
-    export struct TransientDebugUploadDiagnostics
-    {
-        std::uint64_t UploadOverflowCount = 0;
-        std::uint64_t LineRecordsSubmitted = 0;
-        std::uint64_t PointRecordsSubmitted = 0;
-        std::uint64_t TriangleRecordsSubmitted = 0;
-        std::uint64_t LineRecordsRecorded = 0;
-        std::uint64_t PointRecordsRecorded = 0;
-        std::uint64_t TriangleRecordsRecorded = 0;
-        std::uint64_t MissingPipelineSkipCount = 0;
     };
 
     export struct RenderGraphFrameStats
