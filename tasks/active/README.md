@@ -31,13 +31,15 @@ Each active task should include:
   scaffolding Slice D without the ability to verify it.
 - [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
   Backend transient-debug-primitive upload helper. Status:
-  in-progress (Slices A + B landed; Slice C not started). Slice A
-  landed on `claude/intrinsicengine-agent-onboarding-p1J2P`
-  2026-05-23; Slice B landed on
-  `claude/intrinsicengine-agent-onboarding-MnHl0` 2026-05-24.
-  Owner: unassigned for Slice C; next pick-up by any agent on any
-  host (Slice C is CPU-testable; only the optional Slice D requires
-  a Vulkan-capable host). Promoted from
+  in-progress (Slices A + B + C landed; only the optional Slice D
+  remains, blocked on a Vulkan-capable host). Slice A landed on
+  `claude/intrinsicengine-agent-onboarding-p1J2P` 2026-05-23;
+  Slice B landed on `claude/intrinsicengine-agent-onboarding-MnHl0`
+  2026-05-24; Slice C landed on
+  `claude/intrinsicengine-agent-onboarding-WbeR9` 2026-05-24
+  (235/235 graphics contract tests pass; 2209/2209 full CPU/null
+  gate green). Owner: unassigned for Slice D; next pick-up by any
+  agent on a Vulkan-capable host. Promoted from
   `tasks/backlog/rendering/` on 2026-05-23 on
   `claude/intrinsicengine-agent-onboarding-utAFW` as the next
   earliest unblocked Theme A leaf once GRAPHICS-076 parked on its
@@ -47,9 +49,12 @@ Each active task should include:
   interface + concrete default helper in
   `Extrinsic.Graphics.TransientDebugUploadHelper` and two triangle
   pipelines at call indices #26 + #27), line + point lane
-  operational wiring (C, next pick-up), and the optional
-  `gpu;vulkan` smoke (D, deferred behind the same Vulkan-host gate
-  as GRAPHICS-076 Slice D).
+  operational wiring (C, landed; adds four pipelines at call
+  indices #28-#31, per-lane upload/record paths, and per-lane
+  pipeline gating in `RecordTransientDebugSurfacePass`), and the
+  optional `gpu;vulkan` smoke (D, deferred behind the same
+  Vulkan-host gate as GRAPHICS-076 Slice D). The task now sits at
+  `CPUContracted` on CPU-only hosts.
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK

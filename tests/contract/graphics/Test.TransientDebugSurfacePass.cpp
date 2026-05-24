@@ -81,6 +81,47 @@ namespace
             .DebugTriangles = std::span<const Graphics::DebugTrianglePacket>{sTriangles, 1u},
         });
     }
+
+    void SubmitOneLine(Graphics::IRenderer& renderer, const bool depthTested = true)
+    {
+        // GRAPHICS-077 Slice C — single sanitized line packet survives
+        // `IsValidDebugLine(...)` (finite endpoints, positive width,
+        // finite alpha-1 color).
+        static Graphics::DebugLinePacket sLines[1] = {
+            Graphics::DebugLinePacket{
+                .Start = glm::vec3{-0.5f, 0.0f, 0.0f},
+                .End   = glm::vec3{0.5f, 0.0f, 0.0f},
+                .Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                .Width = 1.0f,
+                .DepthTested = true,
+            },
+        };
+        sLines[0].DepthTested = depthTested;
+
+        renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+            .DebugLines = std::span<const Graphics::DebugLinePacket>{sLines, 1u},
+        });
+    }
+
+    void SubmitOnePoint(Graphics::IRenderer& renderer, const bool depthTested = true)
+    {
+        // GRAPHICS-077 Slice C — single sanitized point packet survives
+        // `IsValidDebugPoint(...)` (finite position, positive radius,
+        // finite alpha-1 color).
+        static Graphics::DebugPointPacket sPoints[1] = {
+            Graphics::DebugPointPacket{
+                .Position = glm::vec3{0.0f, 0.0f, 0.0f},
+                .Color    = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                .Radius   = 0.05f,
+                .DepthTested = true,
+            },
+        };
+        sPoints[0].DepthTested = depthTested;
+
+        renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+            .DebugPoints = std::span<const Graphics::DebugPointPacket>{sPoints, 1u},
+        });
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -531,6 +572,508 @@ TEST(TransientDebugSurfacePassContract, PerFrameBufferRecyclingDoesNotLeak)
     // `ExecuteFrame()`).
     EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 1u);
     EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
+
+    renderer->Shutdown();
+}
+
+// -----------------------------------------------------------------------------
+// Slice C — line lane executor + helper contract.
+// -----------------------------------------------------------------------------
+
+TEST(TransientDebugSurfacePassContract, RecordsLineBindPipelineAndDraw)
+{
+    // GRAPHICS-077 Slice C — a single sanitized `DebugLinePacket`
+    // (DepthTested=true, 2 vertices) records the canonical per-packet
+    // `BindPipeline(line.DepthTested) + PushConstants(16) +
+    // Draw(2, 1, 0, 0)` shape and increments `LineRecordsSubmitted` +
+    // `LineRecordsRecorded` by exactly 1.
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{710u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneLine(*renderer, /*depthTested=*/true);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
+
+    // A 16-byte `TransientDebugLinePushConstants` payload must reach
+    // the device. Other passes in the default recipe also push 16-byte
+    // payloads (e.g. `DebugViewPushConstants` when the overlay is on,
+    // which is also true here because the transient line submission
+    // flips `HasTransientDebug`), so the assertion is "at least one
+    // 16-byte push reached the context".
+    const auto expectedPushSize =
+        static_cast<std::uint32_t>(sizeof(Graphics::TransientDebugLinePushConstants));
+    std::size_t sizedPushCount = 0;
+    for (const std::uint32_t size : device.CommandContext.PushConstantSizes)
+    {
+        if (size == expectedPushSize) { ++sizedPushCount; }
+    }
+    EXPECT_GE(sizedPushCount, 1u)
+        << "expected at least one " << expectedPushSize
+        << "-byte push for the transient-debug line packet";
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, SelectsLineAlwaysOnTopVariantPerPacket)
+{
+    // GRAPHICS-077 Slice C — mixed `DepthTested` flags across three
+    // line packets cause the correct pipeline variant to bind per
+    // packet. The variant flip is exercised implicitly by the bind
+    // count.
+    static const std::array<Graphics::DebugLinePacket, 3> kLines{{
+        Graphics::DebugLinePacket{
+            .Start = glm::vec3{-0.5f, 0.0f, 0.0f},
+            .End   = glm::vec3{0.5f, 0.0f, 0.0f},
+            .Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            .Width = 1.0f,
+            .DepthTested = true,
+        },
+        Graphics::DebugLinePacket{
+            .Start = glm::vec3{-0.5f, 0.1f, 0.0f},
+            .End   = glm::vec3{0.5f, 0.1f, 0.0f},
+            .Color = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            .Width = 1.0f,
+            .DepthTested = false,
+        },
+        Graphics::DebugLinePacket{
+            .Start = glm::vec3{-0.5f, 0.2f, 0.0f},
+            .End   = glm::vec3{0.5f, 0.2f, 0.0f},
+            .Color = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+            .Width = 1.0f,
+            .DepthTested = true,
+        },
+    }};
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{711u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .DebugLines = std::span<const Graphics::DebugLinePacket>{kLines.data(), kLines.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 3u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 3u);
+
+    // 3 packets with alternating `DepthTested` flags ⇒ 3 16-byte
+    // pushes from this pass. The `>= 3` form keeps the test stable if
+    // a sibling 16-byte-push consumer changes.
+    const auto expectedPushSize =
+        static_cast<std::uint32_t>(sizeof(Graphics::TransientDebugLinePushConstants));
+    std::size_t sizedPushCount = 0;
+    for (const std::uint32_t size : device.CommandContext.PushConstantSizes)
+    {
+        if (size == expectedPushSize) { ++sizedPushCount; }
+    }
+    EXPECT_GE(sizedPushCount, 3u)
+        << "expected at least 3 " << expectedPushSize
+        << "-byte pushes for the three transient-debug line packets";
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, MissingLinePipelineLeaseSkipsUnavailable)
+{
+    // GRAPHICS-077 Slice C — failing the line DepthTested pipeline
+    // create (call #28, immediately after triangle AlwaysOnTop at #27)
+    // yields `LineRecordsSubmitted/Recorded == 0` and increments
+    // `MissingPipelineSkipCount` by exactly 1. With no other lane
+    // submissions the pass status is `SkippedUnavailable`.
+    MockDevice device;
+    device.FailPipelineCreateCall = 28;
+    device.BackbufferHandle = RHI::TextureHandle{712u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneLine(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
+
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 1u);
+
+    // Triangle / point lanes have no packets in this frame, so their
+    // counters stay at zero and they do not trip the missing-pipeline
+    // skip (the recipe-side gate would have already prevented the
+    // branch if all three lanes were empty).
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 0u);
+
+    renderer->Shutdown();
+}
+
+// -----------------------------------------------------------------------------
+// Slice C — point lane executor + helper contract.
+// -----------------------------------------------------------------------------
+
+TEST(TransientDebugSurfacePassContract, RecordsPointBindPipelineAndDraw)
+{
+    // GRAPHICS-077 Slice C — a single sanitized `DebugPointPacket`
+    // (DepthTested=true, 1 vertex) records the canonical per-packet
+    // `BindPipeline(point.DepthTested) + PushConstants(16) +
+    // Draw(1, 1, 0, 0)` shape and increments `PointRecordsSubmitted` +
+    // `PointRecordsRecorded` by exactly 1.
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{713u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOnePoint(*renderer, /*depthTested=*/true);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
+
+    const auto expectedPushSize =
+        static_cast<std::uint32_t>(sizeof(Graphics::TransientDebugPointPushConstants));
+    std::size_t sizedPushCount = 0;
+    for (const std::uint32_t size : device.CommandContext.PushConstantSizes)
+    {
+        if (size == expectedPushSize) { ++sizedPushCount; }
+    }
+    EXPECT_GE(sizedPushCount, 1u)
+        << "expected at least one " << expectedPushSize
+        << "-byte push for the transient-debug point packet";
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, SelectsPointAlwaysOnTopVariantPerPacket)
+{
+    // GRAPHICS-077 Slice C — mixed `DepthTested` flags across three
+    // point packets cause the correct pipeline variant to bind per
+    // packet.
+    static const std::array<Graphics::DebugPointPacket, 3> kPoints{{
+        Graphics::DebugPointPacket{
+            .Position = glm::vec3{0.0f, 0.0f, 0.0f},
+            .Color    = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            .Radius   = 0.05f,
+            .DepthTested = true,
+        },
+        Graphics::DebugPointPacket{
+            .Position = glm::vec3{0.1f, 0.1f, 0.0f},
+            .Color    = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            .Radius   = 0.05f,
+            .DepthTested = false,
+        },
+        Graphics::DebugPointPacket{
+            .Position = glm::vec3{0.2f, 0.2f, 0.0f},
+            .Color    = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+            .Radius   = 0.05f,
+            .DepthTested = true,
+        },
+    }};
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{714u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .DebugPoints = std::span<const Graphics::DebugPointPacket>{kPoints.data(), kPoints.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 3u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 3u);
+
+    const auto expectedPushSize =
+        static_cast<std::uint32_t>(sizeof(Graphics::TransientDebugPointPushConstants));
+    std::size_t sizedPushCount = 0;
+    for (const std::uint32_t size : device.CommandContext.PushConstantSizes)
+    {
+        if (size == expectedPushSize) { ++sizedPushCount; }
+    }
+    EXPECT_GE(sizedPushCount, 3u)
+        << "expected at least 3 " << expectedPushSize
+        << "-byte pushes for the three transient-debug point packets";
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, MissingPointPipelineLeaseSkipsUnavailable)
+{
+    // GRAPHICS-077 Slice C — failing the point DepthTested pipeline
+    // create (call #30) yields `PointRecordsSubmitted/Recorded == 0`
+    // and increments `MissingPipelineSkipCount` by exactly 1.
+    MockDevice device;
+    device.FailPipelineCreateCall = 30;
+    device.BackbufferHandle = RHI::TextureHandle{715u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOnePoint(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
+
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 1u);
+
+    renderer->Shutdown();
+}
+
+// -----------------------------------------------------------------------------
+// Slice C — cross-lane behavior.
+// -----------------------------------------------------------------------------
+
+TEST(TransientDebugSurfacePassContract, RecordsAllThreeLanesWhenAllSubmitted)
+{
+    // GRAPHICS-077 Slice C — a frame that submits one triangle, one
+    // line, and one point packet records all three lanes
+    // (`Recorded`), increments each per-lane recorded counter to 1,
+    // and leaves `MissingPipelineSkipCount` at zero.
+    static const std::array<Graphics::DebugTrianglePacket, 1> kTriangles{{
+        Graphics::DebugTrianglePacket{
+            .A = glm::vec3{0.0f, 0.5f, 0.0f},
+            .B = glm::vec3{-0.5f, -0.5f, 0.0f},
+            .C = glm::vec3{0.5f, -0.5f, 0.0f},
+            .Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Graphics::DebugLinePacket, 1> kLines{{
+        Graphics::DebugLinePacket{
+            .Start = glm::vec3{-0.4f, 0.0f, 0.0f},
+            .End   = glm::vec3{0.4f, 0.0f, 0.0f},
+            .Color = glm::vec4{0.5f, 0.5f, 0.5f, 1.0f},
+            .Width = 1.0f,
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Graphics::DebugPointPacket, 1> kPoints{{
+        Graphics::DebugPointPacket{
+            .Position = glm::vec3{0.0f, 0.0f, 0.0f},
+            .Color    = glm::vec4{0.25f, 0.25f, 0.25f, 1.0f},
+            .Radius   = 0.05f,
+            .DepthTested = true,
+        },
+    }};
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{716u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .DebugLines     = std::span<const Graphics::DebugLinePacket>{kLines.data(), kLines.size()},
+        .DebugPoints    = std::span<const Graphics::DebugPointPacket>{kPoints.data(), kPoints.size()},
+        .DebugTriangles = std::span<const Graphics::DebugTrianglePacket>{kTriangles.data(), kTriangles.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, MixedLanePartialPipelineSkipRecordsRemainingLanes)
+{
+    // GRAPHICS-077 Slice C — per-lane gating: when one lane's pipeline
+    // is missing but the other lanes' pipelines are valid, the other
+    // lanes still record their draws and the pass status stays
+    // `Recorded`. `MissingPipelineSkipCount` increments once for the
+    // skipped lane. This pins the per-lane independence promised by
+    // `RecordTransientDebugSurfacePass`.
+    static const std::array<Graphics::DebugLinePacket, 1> kLines{{
+        Graphics::DebugLinePacket{
+            .Start = glm::vec3{-0.4f, 0.0f, 0.0f},
+            .End   = glm::vec3{0.4f, 0.0f, 0.0f},
+            .Color = glm::vec4{0.5f, 0.5f, 0.5f, 1.0f},
+            .Width = 1.0f,
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Graphics::DebugPointPacket, 1> kPoints{{
+        Graphics::DebugPointPacket{
+            .Position = glm::vec3{0.0f, 0.0f, 0.0f},
+            .Color    = glm::vec4{0.25f, 0.25f, 0.25f, 1.0f},
+            .Radius   = 0.05f,
+            .DepthTested = true,
+        },
+    }};
+
+    MockDevice device;
+    // Fail point DepthTested (call #30) — line + triangle pipelines
+    // succeed, so triangle has no packets and the line lane records.
+    device.FailPipelineCreateCall = 30;
+    device.BackbufferHandle = RHI::TextureHandle{717u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .DebugLines  = std::span<const Graphics::DebugLinePacket>{kLines.data(), kLines.size()},
+        .DebugPoints = std::span<const Graphics::DebugPointPacket>{kPoints.data(), kPoints.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded)
+        << "the line lane should still record when only the point lane's pipeline is missing";
+
+    // Line lane records, point lane skips (pipeline missing), triangle
+    // lane has no packets.
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 1u);
 
     renderer->Shutdown();
 }

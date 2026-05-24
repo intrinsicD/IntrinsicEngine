@@ -12,8 +12,8 @@ import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 
-// GRAPHICS-077 Slice B — per-frame host-visible upload helper for the
-// transient debug surface pass. The helper packs sanitized
+// GRAPHICS-077 Slices B + C — per-frame host-visible upload helper for
+// the transient debug surface pass. The helper packs sanitized
 // `DebugTrianglePacket` / `DebugLinePacket` / `DebugPointPacket` spans
 // into a small set of host-visible vertex buffers that survive across
 // frames (geometric growth on demand) and reports per-lane upload
@@ -21,9 +21,11 @@ import Extrinsic.RHI.Handles;
 // helper can record deterministic `BindPipeline + PushConstants +
 // Draw(...)` shapes.
 //
-// Slice B wires the triangle lane only; line + point lanes are routed
-// through the same interface but the default implementation's
-// per-lane uploaders remain inert until Slice C.
+// Slice B wired the triangle lane; Slice C extends the interface to
+// the line + point lanes with the same shape (per-lane buffer lease,
+// per-lane growth, per-lane upload result). All three lanes share the
+// `position(vec3) + packed RGBA8 color(uint32)` 16-byte packed-vertex
+// layout consumed by `assets/shaders/transient_debug_*.{vert,frag}`.
 //
 // Lifetime contract: the helper is owned by the renderer. It holds a
 // `RHI::BufferManager::BufferLease` per lane; leases reset before the
@@ -78,6 +80,32 @@ export namespace Extrinsic::Graphics
         bool              Overflow{false};
     };
 
+    // GRAPHICS-077 Slice C — line-lane upload result. Mirrors the
+    // triangle result: BDA + vertex count + per-frame `Uploaded` flag.
+    // `VertexCount = 2 * PacketCount` (one segment = two vertices).
+    struct TransientDebugLineUploadResult
+    {
+        RHI::BufferHandle VertexBuffer{};
+        std::uint64_t     VertexBufferBDA{0u};
+        std::uint32_t     VertexCount{0u};
+        std::uint32_t     PacketCount{0u};
+        bool              Uploaded{false};
+        bool              Overflow{false};
+    };
+
+    // GRAPHICS-077 Slice C — point-lane upload result. Mirrors the
+    // triangle result. `VertexCount = PacketCount` (one point = one
+    // vertex).
+    struct TransientDebugPointUploadResult
+    {
+        RHI::BufferHandle VertexBuffer{};
+        std::uint64_t     VertexBufferBDA{0u};
+        std::uint32_t     VertexCount{0u};
+        std::uint32_t     PacketCount{0u};
+        bool              Uploaded{false};
+        bool              Overflow{false};
+    };
+
     class ITransientDebugUploadHelper
     {
     public:
@@ -91,6 +119,18 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] virtual TransientDebugTriangleUploadResult UploadTriangles(
             std::span<const DebugTrianglePacket> triangles) = 0;
 
+        // GRAPHICS-077 Slice C — line + point lane uploads. Same per-
+        // lane buffer-lease + geometric-growth shape as the triangle
+        // lane. Returns `Uploaded = false` when the lane has no
+        // packets, the device is non-operational, or no manager is
+        // attached; `Overflow = true` when the requested vertex count
+        // exceeds the per-lane cap or buffer creation fails.
+        [[nodiscard]] virtual TransientDebugLineUploadResult UploadLines(
+            std::span<const DebugLinePacket> lines) = 0;
+
+        [[nodiscard]] virtual TransientDebugPointUploadResult UploadPoints(
+            std::span<const DebugPointPacket> points) = 0;
+
         [[nodiscard]] virtual std::uint64_t GetBufferAllocationCount() const noexcept = 0;
 
     protected:
@@ -99,20 +139,23 @@ export namespace Extrinsic::Graphics
 
     // Default in-renderer implementation. Pairs `RHI::BufferManager` with
     // the device's `WriteBuffer(...)` path: per frame the helper resets
-    // its bookkeeping, the renderer calls `UploadTriangles(...)` once
-    // per draw stream, the helper ensures the host-visible vertex buffer
-    // has capacity for the requested vertex count (geometric growth ×2
-    // up to `kMaxTriangleVertexCount`), copies the packed
+    // its bookkeeping, the renderer calls
+    // `UploadTriangles(...)`/`UploadLines(...)`/`UploadPoints(...)` once
+    // per draw stream, the helper ensures the per-lane host-visible
+    // vertex buffer has capacity for the requested vertex count
+    // (geometric growth ×2 up to the per-lane cap), copies the packed
     // `position(vec3) + packed RGBA8 color(uint32)` vertices through
-    // `device.WriteBuffer(...)`, and returns the per-lane vertex buffer
-    // handle + BDA the pass uses for `BindPipeline + PushConstants(BDA)
-    // + Draw(3, 1, 0, 0)` per packet.
+    // `device.WriteBuffer(...)`, and returns the per-lane vertex
+    // buffer handle + BDA the pass uses for `BindPipeline +
+    // PushConstants(BDA + FirstVertex) + Draw(N, 1, 0, 0)` per packet
+    // (N = 3 for triangles, 2 for lines, 1 for points).
     //
-    // Buffer recycling: a single growing buffer is reused across frames.
-    // `GetBufferAllocationCount()` returns the number of underlying
-    // `BufferManager::Create(...)` calls the helper has issued. The
-    // `PerFrameBufferRecycling` contract test pins this to <= 1 across
-    // N frames with constant payload (no per-frame leak).
+    // Buffer recycling: a single growing buffer is reused across frames
+    // per lane. `GetBufferAllocationCount()` returns the cumulative
+    // number of underlying `BufferManager::Create(...)` calls across
+    // all lanes. The `PerFrameBufferRecycling` contract test pins this
+    // to the post-frame-1 baseline across N frames with constant
+    // payload (no per-frame leak).
     class TransientDebugUploadHelper final : public ITransientDebugUploadHelper
     {
     public:
@@ -123,6 +166,12 @@ export namespace Extrinsic::Graphics
 
         [[nodiscard]] TransientDebugTriangleUploadResult UploadTriangles(
             std::span<const DebugTrianglePacket> triangles) override;
+
+        [[nodiscard]] TransientDebugLineUploadResult UploadLines(
+            std::span<const DebugLinePacket> lines) override;
+
+        [[nodiscard]] TransientDebugPointUploadResult UploadPoints(
+            std::span<const DebugPointPacket> points) override;
 
         [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept override
         {
@@ -135,6 +184,18 @@ export namespace Extrinsic::Graphics
 
         std::optional<RHI::BufferManager::BufferLease> m_TriangleVertexBuffer{};
         std::uint64_t  m_TriangleVertexBufferCapacityBytes{0u};
+
+        // GRAPHICS-077 Slice C — independent per-lane buffer leases
+        // for the line + point lanes. Each lane grows independently
+        // and is reset before the `BufferManager` in the renderer's
+        // `Shutdown()` (via `m_TransientDebugUploadHelper.reset()`
+        // before `m_BufferManager.reset()`).
+        std::optional<RHI::BufferManager::BufferLease> m_LineVertexBuffer{};
+        std::uint64_t  m_LineVertexBufferCapacityBytes{0u};
+
+        std::optional<RHI::BufferManager::BufferLease> m_PointVertexBuffer{};
+        std::uint64_t  m_PointVertexBufferCapacityBytes{0u};
+
         std::uint64_t  m_BufferAllocationCount{0u};
     };
 }

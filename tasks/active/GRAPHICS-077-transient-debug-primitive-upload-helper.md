@@ -2,34 +2,43 @@
 
 ## Status
 
-- Status: in-progress (Slices A + B landed; Slice C not started).
+- Status: in-progress (Slices A + B + C landed; only the optional
+  Slice D remains, blocked on a Vulkan-capable host).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-p1J2P` on 2026-05-23
   (224/224 graphics contract tests pass). Slice B promoted the
   triangle lane from `SkippedUnavailable` to `Recorded` on
   `claude/intrinsicengine-agent-onboarding-MnHl0` on 2026-05-24 and
   verified through the contract CPU/null gate (227/227 graphics
-  contract tests pass; 2201/2201 full CPU/null gate green).
-- Owner/agent: unassigned for Slice C; next pick-up by any agent on any
-  host (Slice C is CPU-testable; Slice D requires a Vulkan-capable
-  host).
+  contract tests pass; 2201/2201 full CPU/null gate green). Slice C
+  promoted the line + point lanes from `SkippedUnavailable` to
+  `Recorded` on
+  `claude/intrinsicengine-agent-onboarding-WbeR9` on 2026-05-24
+  and verified through the contract CPU/null gate (235/235
+  graphics contract tests pass; 2209/2209 full CPU/null gate
+  green). The task is now at `CPUContracted` on CPU-only hosts;
+  only the optional Slice D `gpu;vulkan` smoke remains.
+- Owner/agent: unassigned for Slice D; next pick-up by any agent
+  on a Vulkan-capable host.
 - Branch: Slice A landed on
   `claude/intrinsicengine-agent-onboarding-p1J2P`; Slice B landed on
-  `claude/intrinsicengine-agent-onboarding-MnHl0`; subsequent slices
-  will be developed on new `claude/intrinsicengine-agent-onboarding-*`
-  branches.
+  `claude/intrinsicengine-agent-onboarding-MnHl0`; Slice C landed
+  on `claude/intrinsicengine-agent-onboarding-WbeR9`;
+  Slice D will land on a future
+  `claude/intrinsicengine-agent-onboarding-*` branch.
 - Started: 2026-05-23.
-- Next verification step: when Slice C is picked up, configure with the
-  `ci` preset, build `IntrinsicGraphicsContractTests`
-  + `IntrinsicGraphicsContractCpuTests`, and run the contract
-  CPU/null gate (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`).
-  Slice B's pin is `Test.TransientDebugSurfacePass.cpp` (seven
-  contract tests covering recipe declaration, executor taxonomy,
-  triangle-lane bind/draw shape, per-packet variant selection, and
-  per-frame buffer recycling). Slice C adds the line + point
-  pipelines + shaders + helper extension + per-lane recording; see
-  Slice C in `## Slice plan` and `## Verification` for the exact
-  test/file additions to validate against.
+- Next verification step: when the optional Slice D is picked up
+  on a Vulkan-capable host, configure with the `ci-vulkan` preset,
+  build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
+  `gpu;vulkan` smoke (`ctest --test-dir build/ci-vulkan -L gpu -LE
+  'slow|flaky-quarantine' --timeout 120`). The CPU-only Slice C
+  pin is `Test.TransientDebugSurfacePass.cpp` (now fifteen contract
+  tests covering recipe declaration, executor taxonomy, all three
+  lanes' bind/draw shapes, per-packet variant selection per lane,
+  per-lane missing-pipeline gating, mixed-lane all-three-record,
+  per-lane partial-skip independence, and per-frame buffer
+  recycling); the full CPU/null gate is 2209/2209 green on
+  `claude/intrinsicengine-agent-onboarding-WbeR9`.
 
 ## Slice plan
 
@@ -95,16 +104,26 @@ slice exercises an opt-in `gpu;vulkan` smoke.
   `SkippedUnavailable` to `Recorded` when at least one triangle
   packet records. Increments `TriangleRecordsSubmitted` /
   `TriangleRecordsRecorded` deterministically.
-- **Slice C.** Line + Point lane operational wiring. Mirrors Slice B
-  for line and point primitives: four more pipelines
-  (`Line.DepthTested`, `Line.AlwaysOnTop`, `Point.DepthTested`,
-  `Point.AlwaysOnTop`), the matching pipeline-desc helpers, the
-  shader pairs `assets/shaders/transient_debug_line.{vert,frag}` and
+- **Slice C (landed 2026-05-24 on `claude/intrinsicengine-agent-onboarding-WbeR9`).**
+  Line + Point lane operational wiring. Mirrors Slice B for line and
+  point primitives: four more pipelines (`Line.DepthTested`,
+  `Line.AlwaysOnTop`, `Point.DepthTested`, `Point.AlwaysOnTop`),
+  the matching pipeline-desc helpers, the shader pairs
+  `assets/shaders/transient_debug_line.{vert,frag}` and
   `assets/shaders/transient_debug_point.{vert,frag}`, and per-lane
-  upload + recording paths through `TransientDebugUploadHelper`. After
-  this slice all three lanes record their respective primitive draws
-  with deterministic CPU diagnostics, closing `Scaffolded →
-  CPUContracted` for the full transient-debug surface.
+  upload + recording paths through `TransientDebugUploadHelper`.
+  `RecordTransientDebugSurfacePass(...)` now gates each lane
+  independently: a lane with packets but a missing or invalid
+  pipeline pair increments `MissingPipelineSkipCount` and is
+  skipped, while sibling lanes with valid pipelines still record;
+  the pass status is `Recorded` when at least one lane recorded,
+  and `SkippedUnavailable` when every submitted lane failed its
+  gate. Per-lane independence preserves the Slice B
+  `MissingTrianglePipelineLeaseSkipsUnavailable` test exactly. All
+  three lanes now record their respective primitive draws with
+  deterministic CPU diagnostics, closing `Scaffolded →
+  CPUContracted` for the full transient-debug surface on CPU-only
+  hosts.
 - **Slice D (optional, deferred).** Opt-in `gpu;vulkan;graphics` smoke
   asserting the transient-debug surface pass actually rasterizes
   through a real Vulkan device on a Vulkan-capable host. Mirrors the
@@ -127,8 +146,9 @@ slice exercises an opt-in `gpu;vulkan` smoke.
   named here and remains in-scope for this task, so the closure rule
   is honored.
 - Slice B (landed) closes triangle lane `Scaffolded → CPUContracted`.
-- Slice C closes line + point lanes `Scaffolded → CPUContracted` and
-  closes the task at `CPUContracted` on CPU-only hosts.
+- Slice C (landed) closes line + point lanes `Scaffolded →
+  CPUContracted` and closes the task at `CPUContracted` on CPU-only
+  hosts.
 - Slice D closes `CPUContracted → Operational` on Vulkan-capable
   hosts.
 
@@ -272,21 +292,42 @@ Slice B (triangle lane, landed 2026-05-24):
       records; `SkippedUnavailable` when either pipeline lease is
       missing (with `MissingPipelineSkipCount += 1`).
 
-Slice C (line + point lanes, future slice):
-- [ ] Add `BuildTransientDebugLinePipelineDesc(depthTested)` +
+Slice C (line + point lanes, landed 2026-05-24):
+- [x] Add `BuildTransientDebugLinePipelineDesc(depthTested)` +
       `BuildTransientDebugPointPipelineDesc(depthTested)` helpers
       with `Topology = LineList` and `Topology = PointList`
-      respectively.
-- [ ] Add `assets/shaders/transient_debug_line.{vert,frag}` +
+      respectively. Both pipelines pin
+      `Rasterizer.Culling = None`, `ColorBlend[0].Enable = false`,
+      `ColorTargetFormats[0] = RGBA16_FLOAT`,
+      `DepthTargetFormat = D32_FLOAT`, and a 16-byte push block.
+- [x] Add `assets/shaders/transient_debug_line.{vert,frag}` +
       `assets/shaders/transient_debug_point.{vert,frag}` shader
-      pairs.
-- [ ] Add four more pipeline-lease members on `NullRenderer`
+      pairs. Both lanes share the per-vertex
+      `position(vec3) + packed RGBA8 color(uint32)` 16-byte layout
+      with the triangle lane and BDA-fetch per-vertex through the
+      same `VertexBuf` buffer-reference shape.
+- [x] Add four more pipeline-lease members on `NullRenderer`
       (`Line.DepthTested`, `Line.AlwaysOnTop`, `Point.DepthTested`,
       `Point.AlwaysOnTop`) created at call indices #28-#31.
-- [ ] Extend `TransientDebugUploadHelper` for line + point lanes.
-- [ ] Extend `RecordTransientDebugSurfacePass(...)` to record per-lane
+- [x] Extend `TransientDebugUploadHelper` for line + point lanes.
+      Three independent per-lane host-visible buffer leases with
+      geometric growth (cap 256 K vertices each) routed through a
+      shared `UploadPackedVertices(...)` prologue so the per-lane
+      `UploadLines(...)`/`UploadPoints(...)` bodies just pack their
+      lane's source spans.
+- [x] Extend `RecordTransientDebugSurfacePass(...)` to record per-lane
       bind + draw shape with per-packet `DepthTested` selecting the
-      variant.
+      variant. Per-lane gating: a lane with packets but a missing or
+      invalid pipeline pair increments `MissingPipelineSkipCount`
+      and is skipped, while sibling lanes with valid pipelines still
+      record. Pass status is `Recorded` when at least one lane
+      recorded, `SkippedUnavailable` when every submitted lane
+      failed its gate. Preserves the Slice B
+      `MissingTrianglePipelineLeaseSkipsUnavailable` semantics
+      exactly (a triangle-only frame with the triangle DepthTested
+      pipeline failed → triangle lane skipped → no other lanes
+      submitted → pass status `SkippedUnavailable` and
+      `MissingPipelineSkipCount = 1`).
 
 Slice D (optional `gpu;vulkan` smoke, deferred):
 - [ ] Add `tests/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp`
@@ -361,13 +402,47 @@ Slice B (triangle lane, landed 2026-05-24):
       the final frame's payload (renderer resets per
       `ExecuteFrame()`).
 
-Slice C (line + point lanes, future slice):
-- [ ] `contract;graphics` — line + point lane bind/draw shape
-      assertions mirroring the triangle Slice B tests.
-- [ ] `contract;graphics` — variant selection per `DepthTested` packet
-      field for line + point lanes.
-- [ ] `contract;graphics` — missing pipeline lease per lane yields
-      `SkippedUnavailable` with the matching counter increment.
+Slice C (line + point lanes, landed 2026-05-24):
+- [x] `contract;graphics` —
+      `TransientDebugSurfacePassContract.RecordsLineBindPipelineAndDraw`:
+      one `DebugLinePacket{DepthTested=true, VertexCount=2}` records
+      `BindPipeline(Line.DepthTested) + PushConstants(16) +
+      Draw(2, 1, 0, 0)` and increments
+      `LineRecordsSubmitted`/`LineRecordsRecorded` to 1.
+- [x] `contract;graphics` —
+      `TransientDebugSurfacePassContract.RecordsPointBindPipelineAndDraw`:
+      one `DebugPointPacket{DepthTested=true, VertexCount=1}`
+      records `BindPipeline(Point.DepthTested) + PushConstants(16)
+      + Draw(1, 1, 0, 0)` and increments
+      `PointRecordsSubmitted`/`PointRecordsRecorded` to 1.
+- [x] `contract;graphics` —
+      `TransientDebugSurfacePassContract.SelectsLineAlwaysOnTopVariantPerPacket`
+      and
+      `TransientDebugSurfacePassContract.SelectsPointAlwaysOnTopVariantPerPacket`:
+      three packets with alternating `DepthTested` flags per lane
+      flip the variant correctly and reach the device with the
+      matching number of 16-byte pushes.
+- [x] `contract;graphics` —
+      `TransientDebugSurfacePassContract.MissingLinePipelineLeaseSkipsUnavailable`
+      (`FailPipelineCreateCall = 28`) and
+      `TransientDebugSurfacePassContract.MissingPointPipelineLeaseSkipsUnavailable`
+      (`FailPipelineCreateCall = 30`): each lane's pipeline failure
+      yields `SkippedUnavailable` with
+      `MissingPipelineSkipCount += 1` on a single-lane-submission
+      frame.
+- [x] `contract;graphics` —
+      `TransientDebugSurfacePassContract.RecordsAllThreeLanesWhenAllSubmitted`:
+      a mixed-lane frame (one triangle + one line + one point)
+      records `Recorded` and increments all three per-lane recorded
+      counters to 1 with `MissingPipelineSkipCount` at zero.
+- [x] `contract;graphics` —
+      `TransientDebugSurfacePassContract.MixedLanePartialPipelineSkipRecordsRemainingLanes`:
+      per-lane gating independence — failing the point pipeline
+      (`FailPipelineCreateCall = 30`) while submitting one line and
+      one point keeps the line lane recording (`Recorded`),
+      increments `LineRecordsRecorded` to 1, and increments
+      `MissingPipelineSkipCount` by exactly 1 for the skipped point
+      lane.
 
 Slice D (optional `gpu;vulkan` smoke, deferred):
 - [ ] `gpu;vulkan;graphics` — pixel-readback assertion that the
@@ -403,8 +478,21 @@ Slice B (triangle lane, landed 2026-05-24):
       module surface).
 - [x] Update `tasks/active/README.md` to reflect Slice B status.
 
-Slice C (line + point lanes, future slice):
-- [ ] Extend both READMEs above with line + point lane equivalents.
+Slice C (line + point lanes, landed 2026-05-24):
+- [x] Extend `src/graphics/renderer/README.md` with the line + point
+      lane bind/draw shapes, per-lane pipeline call indices #28-#31,
+      per-lane counters (`{Line,Point}RecordsSubmitted`/`Recorded`),
+      and the per-lane gating semantics in
+      `RecordTransientDebugSurfacePass`.
+- [-] `src/graphics/vulkan/README.md` row for the
+      `TransientDebugUploadHelper` remains deferred to Slice D for
+      the same reason as Slice B — the Slice C helper lives in the
+      renderer module (CPU-functional via `BufferManager`); the
+      Vulkan-tuned concrete impl that lands with Slice D is what
+      justifies a vulkan-README entry.
+- [x] Regenerated `docs/api/generated/module_inventory.md` (442
+      modules; no new module surfaces — Slice C extends existing
+      modules with new exported types).
 
 ## Acceptance criteria
 
@@ -422,17 +510,22 @@ Slice A (landed 2026-05-23):
       tests pass on `claude/intrinsicengine-agent-onboarding-p1J2P`);
       no `gpu`/`vulkan` test additions in this slice.
 
-Full task (after Slice C):
-- [ ] Submitted debug primitives across all three lanes produce
+Full task (after Slice C, landed 2026-05-24):
+- [x] Submitted debug primitives across all three lanes produce
       deterministic `BindPipeline + Draw(...)` records in the
-      operational state.
-- [ ] Per-packet `DepthTested` selects the matching pipeline variant
-      for each lane.
-- [ ] No retained GPU resources on `GpuWorld`; no RHI/renderer surface
-      change beyond the per-pass `Get*Pipeline()` accessors.
-- [ ] No regression in transient-debug rejection counters or
-      `InvalidSnapshotRecordCount` semantics.
-- [ ] Default CPU/null gate stays green across slices.
+      operational state (verified by
+      `TransientDebugSurfacePassContract.RecordsAllThreeLanesWhenAllSubmitted`).
+- [x] Per-packet `DepthTested` selects the matching pipeline variant
+      for each lane (verified by the three
+      `Selects*AlwaysOnTopVariantPerPacket` tests, one per lane).
+- [x] No retained GPU resources on `GpuWorld`; no RHI/renderer
+      surface change beyond the per-pass `Get*Pipeline()` accessors.
+- [x] No regression in transient-debug rejection counters or
+      `InvalidSnapshotRecordCount` semantics (full CPU/null gate
+      green; 2209/2209 vs Slice B's 2201/2201 — the +8 delta is the
+      new Slice C tests).
+- [x] Default CPU/null gate stays green across slices (full
+      CPU/null gate green; see `## Next verification step`).
 
 Slice D (optional, Vulkan-capable hosts only):
 - [ ] `gpu;vulkan` smoke green with non-zero per-lane recorded
@@ -502,11 +595,23 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
     — all clean.
   - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
     — 442 modules.
-- Slice C pick-up: configure with `ci`, build
-  `IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests`,
-  and run the default contract gate. Slice C extends the helper to
-  line + point lanes with the same shape (two pipelines per lane,
-  per-packet bind/draw, per-lane counters).
+- Slice C landed 2026-05-24 on
+  `claude/intrinsicengine-agent-onboarding-WbeR9`. Verification:
+  - `cmake --preset ci`
+  - `cmake --build --preset ci --target IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests`
+  - `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — 235/235 graphics contract tests passed.
+  - `cmake --build --preset ci --target IntrinsicTests IntrinsicBenchmarkSmoke`
+  - `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — 2209/2209 tests passed.
+  - `python3 tools/repo/check_layering.py --root src --strict`,
+    `python3 tools/repo/check_test_layout.py --root . --strict`,
+    `python3 tools/docs/check_doc_links.py --root .`,
+    `python3 tools/agents/check_task_policy.py --root . --strict`
+    — all clean.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+    — 442 modules (no new module surfaces; Slice C extends existing
+    modules with new exported types).
 - Slice D pick-up (Vulkan-capable host): configure with `ci-vulkan`,
   build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
   `gpu;vulkan` smoke.

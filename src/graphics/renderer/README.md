@@ -743,16 +743,54 @@ Concretely:
   per-frame vertex-count cap (256 K vertices ≈ 4 MiB).
   `MissingPipelineSkipCount` continues to increment on the
   operational-no-pipeline path (e.g. `FailPipelineCreateCall = 26`).
-  Slice C extends the helper + pass to the line + point lanes; Slice D
+  GRAPHICS-077 Slice C extends the helper + pass to the line + point
+  lanes. `NullRenderer` now owns four additional pipeline leases
+  (`m_TransientDebugLinePipelineLeaseDepthTested` /
+  `m_TransientDebugLinePipelineLeaseAlwaysOnTop` /
+  `m_TransientDebugPointPipelineLeaseDepthTested` /
+  `m_TransientDebugPointPipelineLeaseAlwaysOnTop`), created via
+  `BuildTransientDebugLinePipelineDesc(depthTested)` and
+  `BuildTransientDebugPointPipelineDesc(depthTested)` at call indices
+  #28-#31 (immediately after the Slice B triangle pipelines at
+  #26+#27 so the Slice B contract tests pinning
+  `FailPipelineCreateCall = 26` still exercise the triangle
+  DepthTested gate without disturbance). The line lane uses
+  `Topology = LineList` with the shader pair
+  `assets/shaders/transient_debug_line.{vert,frag}`, draws
+  `Draw(2, 1, 0, 0)` per packet, and increments
+  `LineRecordsSubmitted` + `LineRecordsRecorded`. The point lane
+  uses `Topology = PointList` with the shader pair
+  `assets/shaders/transient_debug_point.{vert,frag}`, draws
+  `Draw(1, 1, 0, 0)` per packet, and increments
+  `PointRecordsSubmitted` + `PointRecordsRecorded`. Both lanes share
+  the same `position(vec3) + packed RGBA8 color(uint32)` 16-byte
+  packed-vertex layout as the triangle lane and carry the same
+  16-byte push block (BDA + per-draw `FirstVertex`) — type-distinct
+  as `TransientDebugLinePushConstants` /
+  `TransientDebugPointPushConstants` to keep room for per-lane push
+  evolution (e.g. line width, point radius) in a follow-up task.
+  `TransientDebugUploadHelper` grows three independent host-visible
+  vertex buffers (one per lane), each capped at 256 K vertices, with
+  geometric doubling under load. `RecordTransientDebugSurfacePass`
+  now gates each lane independently: a lane with packets but a
+  missing or invalid pipeline pair increments
+  `MissingPipelineSkipCount` and is skipped, while sibling lanes
+  with valid pipelines still record. The pass status is `Recorded`
+  when at least one lane recorded, and `SkippedUnavailable` when
+  every submitted lane failed its pipeline gate. Width / radius
+  expansion (thick lines, disc points) is deferred — the
+  CPUContracted form pins the bind/push/draw shape only; Slice D
   (opt-in `gpu;vulkan` pixel-readback smoke) remains deferred behind
   the same Vulkan-capable-host gate as GRAPHICS-076 Slice D. The
   contract pin is `tests/contract/graphics/Test.TransientDebugSurfacePass.cpp`
   (recipe declaration with/without transient primitives, executor
   `SkippedNonOperational` short-circuit, executor
   `SkippedUnavailable` with `MissingPipelineSkipCount` increment on
-  pipeline-create failure, the operational `Recorded` taxonomy with
-  triangle counters, per-packet variant selection, and per-frame
-  buffer-recycling invariant across multiple frames).
+  pipeline-create failure per lane, the operational `Recorded`
+  taxonomy with per-lane counters, per-packet variant selection,
+  per-frame buffer-recycling invariant across multiple frames, a
+  mixed-lane all-three-record acceptance test, and a per-lane
+  partial-skip test pinning the gate's per-lane independence).
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
